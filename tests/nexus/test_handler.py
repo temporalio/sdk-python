@@ -35,6 +35,7 @@ import temporalio.api.failure.v1
 import temporalio.nexus
 from temporalio import workflow
 from temporalio.client import Client, WorkflowHandle
+from temporalio.common import WorkflowIDReusePolicy
 from temporalio.converter import FailureConverter, PayloadConverter
 from temporalio.exceptions import ApplicationError
 from temporalio.nexus import CancelOperationContext, StartOperationContext, logger
@@ -202,6 +203,7 @@ class MyServiceHandler:
             input,
             id=test_context.workflow_id or str(uuid.uuid4()),
             task_queue=ctx.task_queue,
+            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
         )
 
     @nexusrpc.handler.sync_operation_handler
@@ -963,6 +965,64 @@ async def test_request_id_is_received_by_sync_operation_handler(
         )
         assert resp.status_code == 200
         assert resp.json() == {"value": f"request_id: {request_id}"}
+
+
+async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnvironment):
+    # We send two Nexus requests that would start a workflow with the same workflow ID,
+    # using reuse_policy=REJECT_DUPLICATE. This would fail if they used different
+    # request IDs. However, when we use the same request ID, it does not fail,
+    # demonstrating that the Nexus Start Operation request ID has become the
+    # StartWorkflow request ID.
+    task_queue = str(uuid.uuid4())
+    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    service_client = ServiceClient(
+        server_address=server_address(env),
+        endpoint=endpoint,
+        service=MyService.__name__,
+    )
+
+    decorator = nexusrpc.handler.service_handler(service=MyService)
+    service_handler = decorator(MyServiceHandler)()
+
+    async def start_two_workflows_with_conflicting_workflow_ids(
+        request_ids: tuple[tuple[str, int], tuple[str, int]],
+    ):
+        test_context.workflow_id = str(uuid.uuid4())
+        for request_id, status_code in request_ids:
+            resp = await service_client.start_operation(
+                "workflow_run_operation",
+                dataclass_as_dict(Input("")),
+                {"Nexus-Request-Id": request_id},
+            )
+            assert resp.status_code == status_code, (
+                f"expected status code {status_code} "
+                f"but got {resp.status_code} for response content "
+                f"{pprint.pformat(resp.content.decode())}"
+            )
+            if status_code == 201:
+                assert resp.json()["token"]
+                assert (
+                    resp.json()["state"]
+                    == nexusrpc.handler.OperationState.RUNNING.value
+                )
+
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_services=[service_handler],
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+    ):
+        request_id_1, request_id_2 = str(uuid.uuid4()), str(uuid.uuid4())
+        # Reusing the same request ID does not fail
+        await start_two_workflows_with_conflicting_workflow_ids(
+            ((request_id_1, 201), (request_id_1, 201))
+        )
+        # Using a different request ID does fail
+        # TODO(nexus-prerelease) I think that this should be a 409 per the spec. Go and
+        # Java are not doing that.
+        await start_two_workflows_with_conflicting_workflow_ids(
+            ((request_id_1, 201), (request_id_2, 500))
+        )
 
 
 def server_address(env: WorkflowEnvironment) -> str:
