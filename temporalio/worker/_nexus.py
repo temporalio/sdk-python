@@ -139,6 +139,44 @@ class _NexusWorker:
     # TODO(nexus-prerelease): stack trace pruning. See sdk-typescript NexusHandler.execute
     # "Any call up to this function and including this one will be trimmed out of stack traces.""
 
+    async def _handle_cancel_operation(
+        self, request: temporalio.api.nexus.v1.CancelOperationRequest, task_token: bytes
+    ) -> None:
+        ctx = temporalio.nexus.CancelOperationContext(
+            service=request.service,
+            operation=request.operation,
+            _client=self._client,
+            _task_queue=self._task_queue,
+        )
+        temporalio.nexus.current_context.set(
+            temporalio.nexus.Context(operation_context=ctx)
+        )
+        # TODO(nexus-prerelease): header
+        try:
+            await self._handler.cancel_operation(ctx, request.operation_token)
+        except Exception as err:
+            temporalio.nexus.logger.exception(
+                "Failed to execute Nexus cancel operation method"
+            )
+            completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                task_token=task_token,
+                error=await self._handler_error_to_proto(
+                    _exception_to_handler_error(err)
+                ),
+            )
+        else:
+            # TODO(nexus-prerelease): when do we use ack_cancel?
+            completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                task_token=task_token,
+                completed=temporalio.api.nexus.v1.Response(
+                    cancel_operation=temporalio.api.nexus.v1.CancelOperationResponse()
+                ),
+            )
+        try:
+            await self._bridge_worker().complete_nexus_task(completion)
+        except Exception:
+            temporalio.nexus.logger.exception("Failed to send Nexus task completion")
+
     async def _run_nexus_operation(
         self,
         task_token: bytes,
@@ -270,44 +308,6 @@ class _NexusWorker:
                 temporalio.nexus.logger.exception(
                     "Failed to remove completed Nexus operation"
                 )
-
-    async def _handle_cancel_operation(
-        self, request: temporalio.api.nexus.v1.CancelOperationRequest, task_token: bytes
-    ) -> None:
-        ctx = temporalio.nexus.CancelOperationContext(
-            service=request.service,
-            operation=request.operation,
-            _client=self._client,
-            _task_queue=self._task_queue,
-        )
-        temporalio.nexus.current_context.set(
-            temporalio.nexus.Context(operation_context=ctx)
-        )
-        # TODO(nexus-prerelease): header
-        try:
-            await self._handler.cancel_operation(ctx, request.operation_token)
-        except Exception as err:
-            temporalio.nexus.logger.exception(
-                "Failed to execute Nexus cancel operation method"
-            )
-            completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
-                task_token=task_token,
-                error=await self._handler_error_to_proto(
-                    _exception_to_handler_error(err)
-                ),
-            )
-        else:
-            # TODO(nexus-prerelease): when do we use ack_cancel?
-            completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
-                task_token=task_token,
-                completed=temporalio.api.nexus.v1.Response(
-                    cancel_operation=temporalio.api.nexus.v1.CancelOperationResponse()
-                ),
-            )
-        try:
-            await self._bridge_worker().complete_nexus_task(completion)
-        except Exception:
-            temporalio.nexus.logger.exception("Failed to send Nexus task completion")
 
     async def _exception_to_failure_proto(
         self,
