@@ -264,8 +264,8 @@ def workflow_run_operation_handler(
                 f"expected {start_method} to be a function or callable instance."
             )
 
-        factory.__nexus_operation__ = nexusrpc.Operation._create(
-            name=name,
+        factory.__nexus_operation__ = nexusrpc.Operation(
+            name=name or method_name,
             method_name=method_name,
             input_type=input_type,
             output_type=output_type,

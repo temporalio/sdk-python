@@ -178,7 +178,7 @@ class _NexusWorker:
         temporalio.nexus.current_context.set(
             temporalio.nexus.Context(operation_context=ctx)
         )
-        # TODO(nexus-prerelease): header
+        # TODO(nexus-prerelease): headers
         try:
             await self._handler.cancel_operation(ctx, request.operation_token)
         except Exception as err:
@@ -219,6 +219,7 @@ class _NexusWorker:
 
         try:
             start_response = await self._start_operation(start_request, headers)
+        # TODO(nexus-prerelease): handle BrokenExecutor by failing the worker
         except BaseException as err:
             handler_err = _exception_to_handler_error(err)
             completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
@@ -235,7 +236,6 @@ class _NexusWorker:
 
         try:
             await self._bridge_worker().complete_nexus_task(completion)
-        # TODO(nexus-prerelease): handle BrokenExecutor by failing the worker
         except Exception:
             temporalio.nexus.logger.exception("Failed to send Nexus task completion")
         finally:
@@ -290,8 +290,8 @@ class _NexusWorker:
                     async_success=temporalio.api.nexus.v1.StartOperationResponse.Async(
                         operation_token=result.token,
                         links=[
-                            temporalio.api.nexus.v1.Link(url=l.url, type=l.type)
-                            for l in ctx.outbound_links
+                            temporalio.api.nexus.v1.Link(url=link.url, type=link.type)
+                            for link in ctx.outbound_links
                         ],
                     )
                 )
@@ -305,8 +305,9 @@ class _NexusWorker:
             else:
                 raise _exception_to_handler_error(
                     TypeError(
-                        "Operation start method must return either nexusrpc.handler.StartOperationResultSync "
-                        "or nexusrpc.handler.StartOperationResultAsync"
+                        "Operation start method must return either "
+                        "nexusrpc.handler.StartOperationResultSync or "
+                        "nexusrpc.handler.StartOperationResultAsync."
                     )
                 )
         except nexusrpc.handler.OperationError as err:
@@ -321,7 +322,6 @@ class _NexusWorker:
         api_failure = temporalio.api.failure.v1.Failure()
         await self._data_converter.encode_failure(err, api_failure)
         api_failure = google.protobuf.json_format.MessageToDict(api_failure)
-        # TODO(nexus-prerelease): is metadata correct and playing intended role here?
         return temporalio.api.nexus.v1.Failure(
             message=api_failure.pop("message", ""),
             metadata={"type": "temporal.api.failure.v1.Failure"},
@@ -375,6 +375,7 @@ class _DummyPayloadSerializer:
                 [self.payload],
                 type_hints=[as_type] if as_type else None,
             )
+            return input
         except Exception as err:
             raise nexusrpc.handler.HandlerError(
                 "Data converter failed to decode Nexus operation input",
@@ -382,7 +383,6 @@ class _DummyPayloadSerializer:
                 cause=err,
                 retryable=False,
             ) from err
-        return input
 
 
 # TODO(nexus-prerelease): tests for this function

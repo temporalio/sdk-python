@@ -573,7 +573,7 @@ class OperationHandlerReturningUnwrappedResultError(_FailureTestCase):
         retryable_header=False,
         failure_message=(
             "Operation start method must return either "
-            "nexusrpc.handler.StartOperationResultSync or nexusrpc.handler.StartOperationResultAsync"
+            "nexusrpc.handler.StartOperationResultSync or nexusrpc.handler.StartOperationResultAsync."
         ),
     )
 
