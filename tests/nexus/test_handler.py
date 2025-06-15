@@ -307,15 +307,24 @@ class MyServiceHandler:
 
 @dataclass
 class Failure:
+    """A Nexus Failure object, with details parsed into an exception.
+
+    https://github.com/nexus-rpc/api/blob/main/SPEC.md#failure
+    """
+
     message: str = ""
     metadata: Optional[dict[str, str]] = None
     details: Optional[dict[str, Any]] = None
 
-    exception: Optional[BaseException] = dataclasses.field(init=False, default=None)
+    exception_from_details: Optional[BaseException] = dataclasses.field(
+        init=False, default=None
+    )
 
     def __post_init__(self) -> None:
         if self.metadata and (error_type := self.metadata.get("type")):
-            self.exception = self._instantiate_exception(error_type, self.details)
+            self.exception_from_details = self._instantiate_exception(
+                error_type, self.details
+            )
 
     def _instantiate_exception(
         self, error_type: str, details: Optional[dict[str, Any]]
@@ -420,9 +429,9 @@ class _FailureTestCase(_TestCase):
         else:
             assert cls.expected.retryable_header is None
 
-        if failure.exception:
-            assert isinstance(failure.exception, ApplicationError)
-            assert failure.exception.non_retryable == (
+        if failure.exception_from_details:
+            assert isinstance(failure.exception_from_details, ApplicationError)
+            assert failure.exception_from_details.non_retryable == (
                 not cls.expected.retryable_exception
             )
         else:
@@ -607,7 +616,7 @@ class NonRetryableApplicationError(_FailureTestCase):
     ) -> None:
         super().check_response(response, with_service_definition)
         failure = Failure(**response.json())
-        err = failure.exception
+        err = failure.exception_from_details
         assert isinstance(err, ApplicationError)
         assert err.non_retryable
         assert err.type == "TestFailureType"
