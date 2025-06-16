@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
 from contextlib import contextmanager
 from typing import Any, Mapping, Protocol, Type, cast
 
@@ -137,11 +136,6 @@ class OpenAIAgentsTracingInterceptor(
             payload_converter: The payload converter to use for serializing/deserializing
                 trace context. Defaults to the default Temporal payload converter.
         """
-        warnings.warn(
-            "OpenAIAgentsTracingInterceptor is experimental and may change in future versions",
-            category=FutureWarning,
-            stacklevel=2,
-        )
         self._payload_converter = payload_converter
 
     def intercept_client(

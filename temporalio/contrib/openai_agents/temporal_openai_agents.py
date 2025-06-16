@@ -1,6 +1,5 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
-import warnings
 from contextlib import contextmanager
 from typing import Optional
 
@@ -58,11 +57,6 @@ def set_open_ai_agent_temporal_overrides(**kwargs):
         This is a temporary solution. Future versions may wrap the worker directly
         instead of requiring this context manager.
     """
-    warnings.warn(
-        "set_open_ai_agent_temporal_overrides is experimental and may change in future versions",
-        category=FutureWarning,
-        stacklevel=2,
-    )
     previous_runner: Optional[Runner] = None
     previous_trace_provider: Optional[TraceProvider] = None
     try:
