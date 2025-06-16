@@ -1962,8 +1962,13 @@ class LogCapturer:
                 l.setLevel(prev_levels[i])
 
     def find_log(self, starts_with: str) -> Optional[logging.LogRecord]:
+        return self.find(lambda l: l.message.startswith(starts_with))
+
+    def find(
+        self, pred: Callable[[logging.LogRecord], bool]
+    ) -> Optional[logging.LogRecord]:
         for record in cast(List[logging.LogRecord], self.log_queue.queue):
-            if record.message.startswith(starts_with):
+            if pred(record):
                 return record
         return None
 
@@ -2059,6 +2064,7 @@ class TaskFailOnceWorkflow:
         if not task_fail_once_workflow_has_failed:
             task_fail_once_workflow_has_failed = True
             raise RuntimeError("Intentional workflow task failure")
+        task_fail_once_workflow_has_failed = False
 
         # Execute activity that will fail once
         await workflow.execute_activity(
@@ -7998,3 +8004,91 @@ async def test_quick_activity_swallows_cancellation(client: Client):
             assert cause.message == "Workflow cancelled"
 
         temporalio.worker._workflow_instance._raise_on_cancelling_completed_activity_override = False
+
+
+async def test_workflow_logging_trace_identifier(client: Client):
+    with LogCapturer().logs_captured(
+        temporalio.worker._workflow_instance.logger
+    ) as capturer:
+        async with new_worker(
+            client,
+            TaskFailOnceWorkflow,
+            activities=[task_fail_once_activity],
+        ) as worker:
+            await client.execute_workflow(
+                TaskFailOnceWorkflow.run,
+                id=f"workflow_failure_trace_identifier",
+                task_queue=worker.task_queue,
+            )
+
+        def workflow_failure(l: logging.LogRecord):
+            if (
+                hasattr(l, "__temporal_error_identifier")
+                and getattr(l, "__temporal_error_identifier") == "WorkflowTaskFailure"
+            ):
+                assert l.msg.startswith("Failed activation on workflow")
+                return True
+            return False
+
+        assert capturer.find(workflow_failure) is not None
+
+
+@activity.defn
+def use_in_workflow() -> bool:
+    return workflow.in_workflow()
+
+
+@workflow.defn
+class UseInWorkflow:
+    @workflow.run
+    async def run(self):
+        res = await workflow.execute_activity(
+            use_in_workflow, schedule_to_close_timeout=timedelta(seconds=10)
+        )
+        return res
+
+
+async def test_in_workflow_sync(client: Client):
+    async with new_worker(
+        client,
+        UseInWorkflow,
+        activities=[use_in_workflow],
+        activity_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1),
+    ) as worker:
+        res = await client.execute_workflow(
+            UseInWorkflow.run,
+            id=f"test_in_workflow_sync",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(minutes=1),
+        )
+        assert not res
+
+
+class SignalInterceptor(temporalio.worker.Interceptor):
+    def workflow_interceptor_class(
+        self, input: temporalio.worker.WorkflowInterceptorClassInput
+    ) -> Type[SignalInboundInterceptor]:
+        return SignalInboundInterceptor
+
+
+class SignalInboundInterceptor(temporalio.worker.WorkflowInboundInterceptor):
+    def init(self, outbound: temporalio.worker.WorkflowOutboundInterceptor) -> None:
+        def unblock() -> None:
+            return None
+
+        workflow.set_signal_handler("my_random_signal", unblock)
+        super().init(outbound)
+
+
+async def test_signal_handler_in_interceptor(client: Client):
+    async with new_worker(
+        client,
+        HelloWorkflow,
+        interceptors=[SignalInterceptor()],
+    ) as worker:
+        await client.execute_workflow(
+            HelloWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )

@@ -8,7 +8,7 @@ mod testing;
 mod worker;
 
 #[pymodule]
-fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
+fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Client stuff
     m.add("RPCError", py.get_type::<client::RPCError>())?;
     m.add_class::<client::ClientRef>()?;
@@ -62,7 +62,7 @@ fn connect_client<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
     config: client::ClientConfig,
-) -> PyResult<&'a PyAny> {
+) -> PyResult<Bound<'a, PyAny>> {
     client::connect_client(py, runtime_ref, config)
 }
 
@@ -77,7 +77,7 @@ fn init_runtime(telemetry_config: runtime::TelemetryConfig) -> PyResult<runtime:
 }
 
 #[pyfunction]
-fn raise_in_thread(py: Python, thread_id: std::os::raw::c_long, exc: &PyAny) -> bool {
+fn raise_in_thread(py: Python, thread_id: std::os::raw::c_long, exc: &Bound<'_, PyAny>) -> bool {
     runtime::raise_in_thread(py, thread_id, exc)
 }
 
@@ -86,7 +86,7 @@ fn start_dev_server<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
     config: testing::DevServerConfig,
-) -> PyResult<&'a PyAny> {
+) -> PyResult<Bound<'a, PyAny>> {
     testing::start_dev_server(py, runtime_ref, config)
 }
 
@@ -95,7 +95,7 @@ fn start_test_server<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
     config: testing::TestServerConfig,
-) -> PyResult<&'a PyAny> {
+) -> PyResult<Bound<'a, PyAny>> {
     testing::start_test_server(py, runtime_ref, config)
 }
 
@@ -113,6 +113,6 @@ fn new_replay_worker<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
     config: worker::WorkerConfig,
-) -> PyResult<&'a PyTuple> {
+) -> PyResult<Bound<'a, PyTuple>> {
     worker::new_replay_worker(py, runtime_ref, config)
 }
