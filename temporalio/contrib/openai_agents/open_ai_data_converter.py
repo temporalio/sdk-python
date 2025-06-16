@@ -6,7 +6,6 @@ These are mostly Pydantic types. Some of them should be explicitly imported.
 from __future__ import annotations
 
 from typing import Any, Optional, Type, TypeVar
-from typing_extensions import Required
 
 from agents import Usage
 from agents.items import TResponseOutputItem
