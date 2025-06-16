@@ -1055,7 +1055,7 @@ async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnviron
             if status_code == 201:
                 op_info = resp.json()
                 assert op_info["token"]
-                assert op_info["state"] == nexusrpc.handler.OperationState.RUNNING.value
+                assert op_info["state"] == nexusrpc.OperationState.RUNNING.value
 
     async with Worker(
         env.client,

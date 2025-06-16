@@ -18,7 +18,9 @@ from typing import (
 
 import google.protobuf.json_format
 import nexusrpc.handler
-from nexusrpc.handler._core import SyncExecutor
+from nexusrpc.asyncio import LazyValue
+from nexusrpc.asyncio.handler import Handler
+from nexusrpc.handler import SyncExecutor
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -64,7 +66,7 @@ class _NexusWorker:
                     f"Expected a service instance, but got a class: {service}. "
                     "Nexus services must be passed as instances, not classes."
                 )
-        self._handler = nexusrpc.handler.Handler(
+        self._handler = Handler(
             nexus_services,
             SyncExecutor(executor) if executor is not None else None,
         )
@@ -265,7 +267,7 @@ class _NexusWorker:
             request_id=start_request.request_id,
             callback_url=start_request.callback,
             inbound_links=[
-                nexusrpc.handler.Link(url=link.url, type=link.type)
+                nexusrpc.Link(url=link.url, type=link.type)
                 for link in start_request.links
             ],
             callback_headers=dict(start_request.callback_header),
@@ -275,7 +277,7 @@ class _NexusWorker:
         temporalio.nexus.current_context.set(
             temporalio.nexus.Context(operation_context=ctx)
         )
-        input = nexusrpc.handler.LazyValue(
+        input = LazyValue(
             serializer=_DummyPayloadSerializer(
                 data_converter=self._data_converter,
                 payload=start_request.payload,
@@ -360,14 +362,14 @@ class _DummyPayloadSerializer:
     data_converter: temporalio.converter.DataConverter
     payload: temporalio.api.common.v1.Payload
 
-    async def serialize(self, value: Any) -> nexusrpc.handler.Content:
+    async def serialize(self, value: Any) -> nexusrpc.Content:
         raise NotImplementedError(
             "The serialize method of the Serializer is not used by handlers"
         )
 
     async def deserialize(
         self,
-        content: nexusrpc.handler.Content,
+        content: nexusrpc.Content,
         as_type: Optional[Type[Any]] = None,
     ) -> Any:
         try:

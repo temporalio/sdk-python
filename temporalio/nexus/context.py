@@ -155,7 +155,7 @@ def _workflow_handle_to_workflow_execution_started_event_link(
 
 def _workflow_event_to_nexus_link(
     workflow_event: temporalio.api.common.v1.Link.WorkflowEvent,
-) -> nexusrpc.handler.Link:
+) -> nexusrpc.Link:
     scheme = "temporal"
     namespace = urllib.parse.quote(workflow_event.namespace)
     workflow_id = urllib.parse.quote(workflow_event.workflow_id)
@@ -169,7 +169,7 @@ def _workflow_event_to_nexus_link(
             "referenceType": "EventReference",
         }
     )
-    return nexusrpc.handler.Link(
+    return nexusrpc.Link(
         url=urllib.parse.urlunparse((scheme, "", path, "", query_params, "")),
         type=workflow_event.DESCRIPTOR.full_name,
     )
@@ -181,7 +181,7 @@ _LINK_URL_PATH_REGEX = re.compile(
 
 
 def _nexus_link_to_workflow_event(
-    link: nexusrpc.handler.Link,
+    link: nexusrpc.Link,
 ) -> Optional[temporalio.api.common.v1.Link.WorkflowEvent]:
     url = urllib.parse.urlparse(link.url)
     match = _LINK_URL_PATH_REGEX.match(url.path)

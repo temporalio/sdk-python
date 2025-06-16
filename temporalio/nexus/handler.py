@@ -17,7 +17,7 @@ from typing import (
 )
 
 import nexusrpc.handler
-from nexusrpc.handler._common import HandlerError, HandlerErrorType
+from nexusrpc.handler import HandlerError, HandlerErrorType
 from nexusrpc.types import (
     InputT,
     OutputT,

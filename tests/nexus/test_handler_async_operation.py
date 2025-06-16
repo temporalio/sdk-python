@@ -208,16 +208,16 @@ class TaskExecutor:
             self.add_task(task_id, coro), self.event_loop
         ).result()
 
-    def get_task_status(self, task_id: str) -> nexusrpc.handler.OperationState:
+    def get_task_status(self, task_id: str) -> nexusrpc.OperationState:
         task = self.tasks[task_id]
         if not task.done():
-            return nexusrpc.handler.OperationState.RUNNING
+            return nexusrpc.OperationState.RUNNING
         elif task.cancelled():
-            return nexusrpc.handler.OperationState.CANCELED
+            return nexusrpc.OperationState.CANCELED
         elif task.exception():
-            return nexusrpc.handler.OperationState.FAILED
+            return nexusrpc.OperationState.FAILED
         else:
-            return nexusrpc.handler.OperationState.SUCCEEDED
+            return nexusrpc.OperationState.SUCCEEDED
 
     async def get_task_result(self, task_id: str) -> Any:
         """
