@@ -1,5 +1,6 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
+import warnings
 from contextlib import contextmanager
 from typing import Optional
 
@@ -17,6 +18,10 @@ from temporalio.contrib.openai_agents._temporal_trace_provider import (
 @contextmanager
 def set_open_ai_agent_temporal_overrides(**kwargs):
     """Configure Temporal-specific overrides for OpenAI agents.
+
+    .. warning::
+        This API is experimental and may change in future versions.
+        Use with caution in production environments.
 
     This context manager sets up the necessary Temporal-specific runners and trace providers
     for running OpenAI agents within Temporal workflows. It should be called in the main
@@ -53,6 +58,11 @@ def set_open_ai_agent_temporal_overrides(**kwargs):
         This is a temporary solution. Future versions may wrap the worker directly
         instead of requiring this context manager.
     """
+    warnings.warn(
+        "set_open_ai_agent_temporal_overrides is experimental and may change in future versions",
+        category=FutureWarning,
+        stacklevel=2,
+    )
     previous_runner: Optional[Runner] = None
     previous_trace_provider: Optional[TraceProvider] = None
     try:

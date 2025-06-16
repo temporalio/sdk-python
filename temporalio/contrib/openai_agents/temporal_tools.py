@@ -1,5 +1,7 @@
 """Support for using Temporal activities as OpenAI agents tools."""
 
+import warnings
+
 from temporalio.workflow import unsafe
 
 with unsafe.imports_passed_through():
@@ -15,6 +17,10 @@ with unsafe.imports_passed_through():
 
 def activities_as_tools(*tools: Callable) -> list[Tool]:
     """Convert multiple Temporal activities to OpenAI agent tools.
+
+    .. warning::
+        This API is experimental and may change in future versions.
+        Use with caution in production environments.
 
     This function takes one or more Temporal activity functions and converts them
     into OpenAI agent tools that can be used by the agent to execute activities
@@ -34,11 +40,20 @@ def activities_as_tools(*tools: Callable) -> list[Tool]:
         tools = activities_as_tools(my_activity)
         # Use tools with an OpenAI agent
     """
+    warnings.warn(
+        "activities_as_tools is experimental and may change in future versions",
+        category=FutureWarning,
+        stacklevel=2,
+    )
     return [activity_as_tool(tool) for tool in tools]
 
 
 def activity_as_tool(fn: Callable, **kwargs) -> Tool:
     """Convert a single Temporal activity function to an OpenAI agent tool.
+
+    .. warning::
+        This API is experimental and may change in future versions.
+        Use with caution in production environments.
 
     This function takes a Temporal activity function and converts it into an
     OpenAI agent tool that can be used by the agent to execute the activity
@@ -78,6 +93,11 @@ def activity_as_tool(fn: Callable, **kwargs) -> Tool:
         )
         # Use tool with an OpenAI agent
     """
+    warnings.warn(
+        "activity_as_tool is experimental and may change in future versions",
+        category=FutureWarning,
+        stacklevel=2,
+    )
     ret = activity._Definition.from_callable(fn)
     if not ret:
         raise ApplicationError(

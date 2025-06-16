@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from contextlib import contextmanager
 from typing import Any, Mapping, Protocol, Type, cast
 
@@ -107,6 +108,10 @@ class OpenAIAgentsTracingInterceptor(
 ):
     """Interceptor that propagates OpenAI agent tracing context through Temporal workflows and activities.
 
+    .. warning::
+        This API is experimental and may change in future versions.
+        Use with caution in production environments.
+
     This interceptor enables tracing of OpenAI agent operations across Temporal workflows
     and activities. It propagates trace context through workflow and activity boundaries,
     allowing for end-to-end tracing of agent operations.
@@ -132,6 +137,11 @@ class OpenAIAgentsTracingInterceptor(
             payload_converter: The payload converter to use for serializing/deserializing
                 trace context. Defaults to the default Temporal payload converter.
         """
+        warnings.warn(
+            "OpenAIAgentsTracingInterceptor is experimental and may change in future versions",
+            category=FutureWarning,
+            stacklevel=2,
+        )
         self._payload_converter = payload_converter
 
     def intercept_client(
