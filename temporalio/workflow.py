@@ -1466,13 +1466,14 @@ class LoggerAdapter(logging.LoggerAdapter):
         self, msg: Any, kwargs: MutableMapping[str, Any]
     ) -> Tuple[Any, MutableMapping[str, Any]]:
         """Override to add workflow details."""
+        extra: Dict[str, Any] = {}
+        msg_extra: Dict[str, Any] = {}
+
         if (
             self.workflow_info_on_message
             or self.workflow_info_on_extra
             or self.full_workflow_info_on_extra
         ):
-            extra: Dict[str, Any] = {}
-            msg_extra: Dict[str, Any] = {}
             runtime = _Runtime.maybe_current()
             if runtime:
                 workflow_details = runtime.logger_details
