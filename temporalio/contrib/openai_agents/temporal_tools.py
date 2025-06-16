@@ -47,6 +47,16 @@ def activity_as_tool(fn: Callable, **kwargs) -> Tool:
 
     Args:
         fn: A Temporal activity function to convert to a tool.
+        **kwargs: Additional arguments to pass to workflow.execute_activity.
+            These arguments configure how the activity is executed. Common options include:
+            - start_to_close_timeout: Maximum time for the activity to complete
+            - schedule_to_close_timeout: Maximum time from scheduling to completion
+            - schedule_to_start_timeout: Maximum time from scheduling to starting
+            - heartbeat_timeout: Maximum time between heartbeats
+            - retry_policy: Policy for retrying failed activities
+            - task_queue: Specific task queue to use for this activity
+            - cancellation_type: How the activity handles cancellation
+            - workflow_id_reuse_policy: Policy for workflow ID reuse
 
     Returns:
         An OpenAI agent tool that wraps the provided activity.
@@ -59,7 +69,13 @@ def activity_as_tool(fn: Callable, **kwargs) -> Tool:
         def process_data(input: str) -> str:
             return f"Processed: {input}"
 
-        tool = activity_as_tool(process_data)
+        # Create tool with custom activity options
+        tool = activity_as_tool(
+            process_data,
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+            heartbeat_timeout=timedelta(seconds=10)
+        )
         # Use tool with an OpenAI agent
     """
     ret = activity._Definition.from_callable(fn)

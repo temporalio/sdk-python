@@ -27,8 +27,20 @@ def set_open_ai_agent_temporal_overrides(**kwargs):
     2. Configuring a Temporal-aware trace provider
     3. Restoring previous settings when the context exits
 
+    Args:
+        **kwargs: Additional arguments to pass to the TemporalOpenAIRunner constructor.
+            These arguments are forwarded to workflow.execute_activity_method when
+            executing model calls. Common options include:
+            - start_to_close_timeout: Maximum time for the activity to complete
+            - schedule_to_close_timeout: Maximum time from scheduling to completion
+            - retry_policy: Policy for retrying failed activities
+            - task_queue: Specific task queue to use for model activities
+
     Example usage:
-        with set_open_ai_agent_temporal_overrides():
+        with set_open_ai_agent_temporal_overrides(
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(maximum_attempts=3)
+        ):
             # Initialize Temporal client and worker here
             client = await Client.connect("localhost:7233")
             worker = Worker(client, task_queue="my-task-queue")
