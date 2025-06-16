@@ -7,9 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Optional, Type, TypeVar
 
-from agents import Usage
-from agents.items import TResponseOutputItem
-from openai import NOT_GIVEN, BaseModel
+from openai import BaseModel
 from pydantic import RootModel, TypeAdapter
 
 import temporalio.api.common.v1
@@ -75,7 +73,7 @@ class _OpenAIJSONPlainPayloadConverter(EncodingPayloadConverter):
             cannot be converted.
         """
         wrapper = _WrapperModel[Any](root=value)
-        data = wrapper.model_dump_json().encode()
+        data = wrapper.model_dump_json(exclude_unset=True).encode()
 
         return temporalio.api.common.v1.Payload(
             metadata={"encoding": self.encoding.encode()}, data=data
@@ -104,17 +102,7 @@ class _OpenAIJSONPlainPayloadConverter(EncodingPayloadConverter):
         """
         _type_hint = type_hint if type_hint is not None else Any
         wrapper = _WrapperModel[_type_hint]  # type: ignore[valid-type]
-        # Needed due to
-        # if TYPE_CHECKING:
-        #     from .agent import Agent
-        #
-        # in the agents/items.py
-        wrapper.model_rebuild(
-            _types_namespace={
-                "TResponseOutputItem": TResponseOutputItem,
-                "Usage": Usage,
-            }
-        )
+
         return TypeAdapter(wrapper).validate_json(payload.data.decode()).root
 
 
