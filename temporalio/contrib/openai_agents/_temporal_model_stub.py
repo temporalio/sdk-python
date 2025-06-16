@@ -3,7 +3,6 @@ from __future__ import annotations
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from datetime import timedelta
     from typing import Any, AsyncIterator, Sequence, Union, cast
 
     from agents import (

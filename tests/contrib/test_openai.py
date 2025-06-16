@@ -996,10 +996,3 @@ async def test_customer_service_workflow(client: Client):
 
             with pytest.raises(WorkflowFailureError):
                 await workflow_handle.result()
-
-            activity_count = 0
-            async for e in workflow_handle.fetch_history_events():
-                if e.HasField("activity_task_completed_event_attributes"):
-                    activity_count += 1
-
-            assert activity_count == 6

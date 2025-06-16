@@ -5,6 +5,8 @@ These are mostly Pydantic types. Some of them should be explicitly imported.
 
 from __future__ import annotations
 
+import importlib
+import inspect
 from typing import Any, Optional, Type, TypeVar
 
 from agents import Usage
@@ -13,6 +15,7 @@ from openai import NOT_GIVEN, BaseModel
 from pydantic import RootModel, TypeAdapter
 
 import temporalio.api.common.v1
+from temporalio import workflow
 from temporalio.converter import (
     CompositePayloadConverter,
     DataConverter,
@@ -109,13 +112,19 @@ class _OpenAIJSONPlainPayloadConverter(EncodingPayloadConverter):
         #     from .agent import Agent
         #
         # in the agents/items.py
-        wrapper.model_rebuild(
-            _types_namespace={
-                "TResponseOutputItem": TResponseOutputItem,
-                "Usage": Usage,
-            }
-        )
+        with workflow.unsafe.imports_passed_through():
+            wrapper.model_rebuild(_types_namespace=_get_openai_modules())
         return TypeAdapter(wrapper).validate_json(payload.data.decode()).root
+
+
+def _get_openai_modules() -> dict[Any, Any]:
+    def get_modules(module):
+        result_dict: dict[Any, Any] = {}
+        for _, mod in inspect.getmembers(module, inspect.ismodule):
+            result_dict = result_dict | mod.__dict__ | get_modules(mod)
+        return result_dict
+
+    return get_modules(importlib.import_module("openai.types"))
 
 
 class OpenAIPayloadConverter(CompositePayloadConverter):
