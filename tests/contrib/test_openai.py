@@ -7,7 +7,7 @@ from typing import Any, Optional, Union
 import pytest
 
 from temporalio import activity, workflow
-from temporalio.client import Client, WorkflowFailureError
+from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
 from temporalio.contrib.openai_agents.invoke_model_activity import (
     ModelActivity,
 )
@@ -996,3 +996,14 @@ async def test_customer_service_workflow(client: Client):
 
             with pytest.raises(WorkflowFailureError):
                 await workflow_handle.result()
+
+            activity_count = 0
+            async for e in WorkflowHandle(
+                client,
+                workflow_handle.id,
+                run_id=workflow_handle._first_execution_run_id,
+            ).fetch_history_events():
+                if e.HasField("activity_task_completed_event_attributes"):
+                    activity_count += 1
+
+            assert activity_count == 6
