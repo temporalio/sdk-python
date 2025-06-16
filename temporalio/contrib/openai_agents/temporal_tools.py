@@ -31,12 +31,12 @@ def activities_as_tools(*tools: Callable) -> list[Tool]:
         A list of OpenAI agent tools that wrap the provided activities.
 
     Example:
-        @activity.defn
-        def my_activity(input: str) -> str:
-            return f"Processed: {input}"
-
-        tools = activities_as_tools(my_activity)
-        # Use tools with an OpenAI agent
+        >>> @activity.defn
+        >>> def my_activity(input: str) -> str:
+        ...     return f"Processed: {input}"
+        >>> 
+        >>> tools = activities_as_tools(my_activity)
+        >>> # Use tools with an OpenAI agent
     """
     return [activity_as_tool(tool) for tool in tools]
 
@@ -73,18 +73,18 @@ def activity_as_tool(fn: Callable, **kwargs) -> Tool:
         ApplicationError: If the function is not properly decorated as a Temporal activity.
 
     Example:
-        @activity.defn
-        def process_data(input: str) -> str:
-            return f"Processed: {input}"
-
-        # Create tool with custom activity options
-        tool = activity_as_tool(
-            process_data,
-            start_to_close_timeout=timedelta(seconds=30),
-            retry_policy=RetryPolicy(maximum_attempts=3),
-            heartbeat_timeout=timedelta(seconds=10)
-        )
-        # Use tool with an OpenAI agent
+        >>> @activity.defn
+        >>> def process_data(input: str) -> str:
+        ...     return f"Processed: {input}"
+        >>> 
+        >>> # Create tool with custom activity options
+        >>> tool = activity_as_tool(
+        ...     process_data,
+        ...     start_to_close_timeout=timedelta(seconds=30),
+        ...     retry_policy=RetryPolicy(maximum_attempts=3),
+        ...     heartbeat_timeout=timedelta(seconds=10)
+        ... )
+        >>> # Use tool with an OpenAI agent
     """
     ret = activity._Definition.from_callable(fn)
     if not ret:

@@ -9,8 +9,6 @@ import importlib
 import inspect
 from typing import Any, Optional, Type, TypeVar
 
-from agents import Usage
-from agents.items import TResponseOutputItem
 from openai import NOT_GIVEN, BaseModel
 from pydantic import RootModel, TypeAdapter
 
