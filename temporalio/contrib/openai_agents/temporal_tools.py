@@ -37,7 +37,7 @@ def activities_as_tools(*tools: Callable) -> list[Tool]:
     return [activity_as_tool(tool) for tool in tools]
 
 
-def activity_as_tool(fn: Callable) -> Tool:
+def activity_as_tool(fn: Callable, **kwargs) -> Tool:
     """Convert a single Temporal activity function to an OpenAI agent tool.
 
     This function takes a Temporal activity function and converts it into an
@@ -74,7 +74,7 @@ def activity_as_tool(fn: Callable) -> Tool:
             await workflow.execute_activity(
                 fn,
                 input,
-                start_to_close_timeout=timedelta(seconds=10),
+                **kwargs,
             )
         )
 

@@ -29,9 +29,10 @@ class TemporalOpenAIRunner(Runner):
 
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs) -> None:
         """Initialize the Temporal OpenAI Runner."""
         self._runner = DEFAULT_RUNNER or DefaultRunner()
+        self.kwargs = kwargs
 
     async def _run_impl(
         self,
@@ -63,7 +64,7 @@ class TemporalOpenAIRunner(Runner):
                 "Temporal workflows require a model name to be a string in the run config."
             )
         updated_run_config = replace(
-            run_config, model=_TemporalModelStub(run_config.model)
+            run_config, model=_TemporalModelStub(run_config.model, **self.kwargs)
         )
 
         # TODO: Uncomment when Agent.tools type accepts Callable

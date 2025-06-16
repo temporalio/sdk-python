@@ -37,8 +37,9 @@ with workflow.unsafe.imports_passed_through():
 class _TemporalModelStub(Model):
     """A stub that allows invoking models as Temporal activities."""
 
-    def __init__(self, model_name: Union[str, None]) -> None:
+    def __init__(self, model_name: Union[str, None], **kwargs) -> None:
         self.model_name = model_name
+        self.kwargs = kwargs
 
     async def get_response(
         self,
@@ -137,9 +138,8 @@ class _TemporalModelStub(Model):
         return await workflow.execute_activity_method(
             ModelActivity.invoke_model_activity,
             activity_input,
-            start_to_close_timeout=timedelta(seconds=60),
-            heartbeat_timeout=timedelta(seconds=10),
             summary=get_summary(input),
+            **self.kwargs,
         )
 
     def stream_response(

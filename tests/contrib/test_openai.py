@@ -1,16 +1,20 @@
-import json
+import asyncio
 import sys
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Union, Optional
+from typing import Any, Optional, Union
 
 import pytest
 
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError
+from temporalio.common import RetryPolicy
 from temporalio.contrib.openai_agents.invoke_model_activity import (
     ModelActivity,
+)
+from temporalio.contrib.openai_agents.open_ai_data_converter import (
+    open_ai_data_converter,
 )
 from temporalio.contrib.openai_agents.temporal_openai_agents import (
     set_open_ai_agent_temporal_overrides,
@@ -219,7 +223,11 @@ class ToolsWorkflow:
         agent = Agent(
             name="Hello world",
             instructions="You are a helpful agent.",
-            tools=[activity_as_tool(get_weather)],
+            tools=[
+                activity_as_tool(
+                    get_weather, start_to_close_timeout=timedelta(seconds=10)
+                )
+            ],
         )  # type: Agent
         result = await Runner.run(agent, input=question)
         return result.final_output
@@ -229,7 +237,9 @@ async def test_tool_workflow(client: Client):
     if sys.version_info < (3, 11):
         pytest.skip("Open AI support has type errors on 3.9")
 
-    with set_open_ai_agent_temporal_overrides():
+    with set_open_ai_agent_temporal_overrides(
+        start_to_close_timeout=timedelta(seconds=10)
+    ):
         model_activity = ModelActivity(
             TestProvider(
                 TestWeatherModel(  # type: ignore
@@ -611,7 +621,13 @@ async def test_agents_as_tools_workflow(client: Client):
     if sys.version_info < (3, 11):
         pytest.skip("Open AI support has type errors on 3.9")
 
-    with set_open_ai_agent_temporal_overrides():
+    new_config = client.config()
+    new_config["data_converter"] = open_ai_data_converter
+    client = Client(**new_config)
+
+    with set_open_ai_agent_temporal_overrides(
+        start_to_close_timeout=timedelta(seconds=10)
+    ):
         model_activity = ModelActivity(
             TestProvider(
                 AgentAsToolsModel(  # type: ignore

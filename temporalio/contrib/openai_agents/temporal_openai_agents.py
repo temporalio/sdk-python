@@ -15,7 +15,7 @@ from temporalio.contrib.openai_agents._temporal_trace_provider import (
 
 
 @contextmanager
-def set_open_ai_agent_temporal_overrides():
+def set_open_ai_agent_temporal_overrides(**kwargs):
     """Configure Temporal-specific overrides for OpenAI agents.
 
     This context manager sets up the necessary Temporal-specific runners and trace providers
@@ -45,7 +45,7 @@ def set_open_ai_agent_temporal_overrides():
     previous_trace_provider: Optional[TraceProvider] = None
     try:
         previous_runner = get_default_runner()
-        set_default_runner(TemporalOpenAIRunner())
+        set_default_runner(TemporalOpenAIRunner(**kwargs))
 
         provider = TemporalTraceProvider()
         previous_trace_provider = get_trace_provider()
