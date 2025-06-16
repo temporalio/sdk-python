@@ -1,5 +1,6 @@
 from .nexus_pb2 import (
     CancelNexusTask,
+    NexusOperationCancellationType,
     NexusOperationResult,
     NexusTask,
     NexusTaskCancelReason,
@@ -8,6 +9,7 @@ from .nexus_pb2 import (
 
 __all__ = [
     "CancelNexusTask",
+    "NexusOperationCancellationType",
     "NexusOperationResult",
     "NexusTask",
     "NexusTaskCancelReason",

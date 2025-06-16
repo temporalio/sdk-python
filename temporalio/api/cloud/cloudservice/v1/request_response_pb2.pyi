@@ -963,6 +963,76 @@ class AddNamespaceRegionResponse(google.protobuf.message.Message):
 
 global___AddNamespaceRegionResponse = AddNamespaceRegionResponse
 
+class DeleteNamespaceRegionRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    REGION_FIELD_NUMBER: builtins.int
+    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
+    ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """The namespace to delete a region."""
+    region: builtins.str
+    """The id of the standby region to be deleted.
+    The GetRegions API can be used to get the list of valid region ids.
+    Example: "aws-us-west-2".
+    """
+    resource_version: builtins.str
+    """The version of the namespace for which this delete region operation is intended for.
+    The latest version can be found in the GetNamespace operation response.
+    """
+    async_operation_id: builtins.str
+    """The id to use for this async operation - optional."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        region: builtins.str = ...,
+        resource_version: builtins.str = ...,
+        async_operation_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "async_operation_id",
+            b"async_operation_id",
+            "namespace",
+            b"namespace",
+            "region",
+            b"region",
+            "resource_version",
+            b"resource_version",
+        ],
+    ) -> None: ...
+
+global___DeleteNamespaceRegionRequest = DeleteNamespaceRegionRequest
+
+class DeleteNamespaceRegionResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ASYNC_OPERATION_FIELD_NUMBER: builtins.int
+    @property
+    def async_operation(
+        self,
+    ) -> temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation:
+        """The async operation."""
+    def __init__(
+        self,
+        *,
+        async_operation: temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> None: ...
+
+global___DeleteNamespaceRegionResponse = DeleteNamespaceRegionResponse
+
 class GetRegionsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1690,11 +1760,27 @@ class GetUserGroupsRequest(google.protobuf.message.Message):
             field_name: typing_extensions.Literal["email_address", b"email_address"],
         ) -> None: ...
 
+    class SCIMGroupFilter(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        IDP_ID_FIELD_NUMBER: builtins.int
+        idp_id: builtins.str
+        """Filter groups by the SCIM IDP id - optional."""
+        def __init__(
+            self,
+            *,
+            idp_id: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self, field_name: typing_extensions.Literal["idp_id", b"idp_id"]
+        ) -> None: ...
+
     PAGE_SIZE_FIELD_NUMBER: builtins.int
     PAGE_TOKEN_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
     DISPLAY_NAME_FIELD_NUMBER: builtins.int
     GOOGLE_GROUP_FIELD_NUMBER: builtins.int
+    SCIM_GROUP_FIELD_NUMBER: builtins.int
     page_size: builtins.int
     """The requested size of the page to retrieve - optional.
     Cannot exceed 1000. Defaults to 100.
@@ -1708,6 +1794,9 @@ class GetUserGroupsRequest(google.protobuf.message.Message):
     @property
     def google_group(self) -> global___GetUserGroupsRequest.GoogleGroupFilter:
         """Filter groups by the google group specification - optional."""
+    @property
+    def scim_group(self) -> global___GetUserGroupsRequest.SCIMGroupFilter:
+        """Filter groups by the SCIM group specification - optional."""
     def __init__(
         self,
         *,
@@ -1716,9 +1805,13 @@ class GetUserGroupsRequest(google.protobuf.message.Message):
         namespace: builtins.str = ...,
         display_name: builtins.str = ...,
         google_group: global___GetUserGroupsRequest.GoogleGroupFilter | None = ...,
+        scim_group: global___GetUserGroupsRequest.SCIMGroupFilter | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["google_group", b"google_group"]
+        self,
+        field_name: typing_extensions.Literal[
+            "google_group", b"google_group", "scim_group", b"scim_group"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
@@ -1733,6 +1826,8 @@ class GetUserGroupsRequest(google.protobuf.message.Message):
             b"page_size",
             "page_token",
             b"page_token",
+            "scim_group",
+            b"scim_group",
         ],
     ) -> None: ...
 
@@ -2083,6 +2178,209 @@ class SetUserGroupNamespaceAccessResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___SetUserGroupNamespaceAccessResponse = SetUserGroupNamespaceAccessResponse
+
+class AddUserGroupMemberRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    GROUP_ID_FIELD_NUMBER: builtins.int
+    MEMBER_ID_FIELD_NUMBER: builtins.int
+    ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
+    group_id: builtins.str
+    """The id of the group to add the member for."""
+    @property
+    def member_id(
+        self,
+    ) -> temporalio.api.cloud.identity.v1.message_pb2.UserGroupMemberId:
+        """The member id to add to the group."""
+    async_operation_id: builtins.str
+    """The id to use for this async operation.
+    Optional, if not provided a random id will be generated.
+    """
+    def __init__(
+        self,
+        *,
+        group_id: builtins.str = ...,
+        member_id: temporalio.api.cloud.identity.v1.message_pb2.UserGroupMemberId
+        | None = ...,
+        async_operation_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["member_id", b"member_id"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "async_operation_id",
+            b"async_operation_id",
+            "group_id",
+            b"group_id",
+            "member_id",
+            b"member_id",
+        ],
+    ) -> None: ...
+
+global___AddUserGroupMemberRequest = AddUserGroupMemberRequest
+
+class AddUserGroupMemberResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ASYNC_OPERATION_FIELD_NUMBER: builtins.int
+    @property
+    def async_operation(
+        self,
+    ) -> temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation:
+        """The async operation."""
+    def __init__(
+        self,
+        *,
+        async_operation: temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> None: ...
+
+global___AddUserGroupMemberResponse = AddUserGroupMemberResponse
+
+class RemoveUserGroupMemberRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    GROUP_ID_FIELD_NUMBER: builtins.int
+    MEMBER_ID_FIELD_NUMBER: builtins.int
+    ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
+    group_id: builtins.str
+    """The id of the group to add the member for."""
+    @property
+    def member_id(
+        self,
+    ) -> temporalio.api.cloud.identity.v1.message_pb2.UserGroupMemberId:
+        """The member id to add to the group."""
+    async_operation_id: builtins.str
+    """The id to use for this async operation.
+    Optional, if not provided a random id will be generated.
+    """
+    def __init__(
+        self,
+        *,
+        group_id: builtins.str = ...,
+        member_id: temporalio.api.cloud.identity.v1.message_pb2.UserGroupMemberId
+        | None = ...,
+        async_operation_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["member_id", b"member_id"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "async_operation_id",
+            b"async_operation_id",
+            "group_id",
+            b"group_id",
+            "member_id",
+            b"member_id",
+        ],
+    ) -> None: ...
+
+global___RemoveUserGroupMemberRequest = RemoveUserGroupMemberRequest
+
+class RemoveUserGroupMemberResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ASYNC_OPERATION_FIELD_NUMBER: builtins.int
+    @property
+    def async_operation(
+        self,
+    ) -> temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation:
+        """The async operation."""
+    def __init__(
+        self,
+        *,
+        async_operation: temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> None: ...
+
+global___RemoveUserGroupMemberResponse = RemoveUserGroupMemberResponse
+
+class GetUserGroupMembersRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    PAGE_SIZE_FIELD_NUMBER: builtins.int
+    PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    GROUP_ID_FIELD_NUMBER: builtins.int
+    page_size: builtins.int
+    """The requested size of the page to retrieve - optional.
+    Cannot exceed 1000. Defaults to 100.
+    """
+    page_token: builtins.str
+    """The page token if this is continuing from another response - optional."""
+    group_id: builtins.str
+    """The group id to list members of."""
+    def __init__(
+        self,
+        *,
+        page_size: builtins.int = ...,
+        page_token: builtins.str = ...,
+        group_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "group_id",
+            b"group_id",
+            "page_size",
+            b"page_size",
+            "page_token",
+            b"page_token",
+        ],
+    ) -> None: ...
+
+global___GetUserGroupMembersRequest = GetUserGroupMembersRequest
+
+class GetUserGroupMembersResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    MEMBERS_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    @property
+    def members(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.cloud.identity.v1.message_pb2.UserGroupMember
+    ]:
+        """The list of group members"""
+    next_page_token: builtins.str
+    """The next page's token."""
+    def __init__(
+        self,
+        *,
+        members: collections.abc.Iterable[
+            temporalio.api.cloud.identity.v1.message_pb2.UserGroupMember
+        ]
+        | None = ...,
+        next_page_token: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "members", b"members", "next_page_token", b"next_page_token"
+        ],
+    ) -> None: ...
+
+global___GetUserGroupMembersResponse = GetUserGroupMembersResponse
 
 class CreateServiceAccountRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

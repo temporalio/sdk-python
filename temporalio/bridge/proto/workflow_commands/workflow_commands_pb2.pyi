@@ -26,6 +26,7 @@ import temporalio.api.failure.v1.message_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
+import temporalio.bridge.proto.nexus.nexus_pb2
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -1755,6 +1756,7 @@ class ScheduleNexusOperation(google.protobuf.message.Message):
     INPUT_FIELD_NUMBER: builtins.int
     SCHEDULE_TO_CLOSE_TIMEOUT_FIELD_NUMBER: builtins.int
     NEXUS_HEADER_FIELD_NUMBER: builtins.int
+    CANCELLATION_TYPE_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Lang's incremental sequence number, used as the operation identifier"""
     endpoint: builtins.str
@@ -1787,6 +1789,10 @@ class ScheduleNexusOperation(google.protobuf.message.Message):
         activities and child workflows, these are transmitted to Nexus operations that may be
         external and are not traditional payloads.
         """
+    cancellation_type: (
+        temporalio.bridge.proto.nexus.nexus_pb2.NexusOperationCancellationType.ValueType
+    )
+    """Defines behaviour of the underlying nexus operation when operation cancellation has been requested."""
     def __init__(
         self,
         *,
@@ -1797,6 +1803,7 @@ class ScheduleNexusOperation(google.protobuf.message.Message):
         input: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         schedule_to_close_timeout: google.protobuf.duration_pb2.Duration | None = ...,
         nexus_header: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
+        cancellation_type: temporalio.bridge.proto.nexus.nexus_pb2.NexusOperationCancellationType.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1807,6 +1814,8 @@ class ScheduleNexusOperation(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "cancellation_type",
+            b"cancellation_type",
             "endpoint",
             b"endpoint",
             "input",

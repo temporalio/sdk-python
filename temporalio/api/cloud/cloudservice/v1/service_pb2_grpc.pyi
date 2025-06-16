@@ -90,6 +90,11 @@ class CloudServiceStub:
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse,
     ]
     """Add a new region to a namespace"""
+    DeleteNamespaceRegion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse,
+    ]
+    """Delete a region from a namespace"""
     GetRegions: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsResponse,
@@ -180,6 +185,20 @@ class CloudServiceStub:
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessResponse,
     ]
     """Set a user group's access to a namespace"""
+    AddUserGroupMember: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberResponse,
+    ]
+    """Add a member to the group, can only be used with Cloud group types."""
+    RemoveUserGroupMember: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberResponse,
+    ]
+    """Remove a member from the group, can only be used with Cloud group types."""
+    GetUserGroupMembers: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersResponse,
+    ]
     CreateServiceAccount: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountResponse,
@@ -368,6 +387,13 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse:
         """Add a new region to a namespace"""
     @abc.abstractmethod
+    def DeleteNamespaceRegion(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse:
+        """Delete a region from a namespace"""
+    @abc.abstractmethod
     def GetRegions(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsRequest,
@@ -495,6 +521,26 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessResponse:
         """Set a user group's access to a namespace"""
+    @abc.abstractmethod
+    def AddUserGroupMember(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberResponse:
+        """Add a member to the group, can only be used with Cloud group types."""
+    @abc.abstractmethod
+    def RemoveUserGroupMember(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberResponse:
+        """Remove a member from the group, can only be used with Cloud group types."""
+    @abc.abstractmethod
+    def GetUserGroupMembers(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersResponse: ...
     @abc.abstractmethod
     def CreateServiceAccount(
         self,

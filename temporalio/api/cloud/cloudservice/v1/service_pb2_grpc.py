@@ -94,6 +94,11 @@ class CloudServiceStub(object):
             request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.AddNamespaceRegionRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.AddNamespaceRegionResponse.FromString,
         )
+        self.DeleteNamespaceRegion = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/DeleteNamespaceRegion",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteNamespaceRegionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteNamespaceRegionResponse.FromString,
+        )
         self.GetRegions = channel.unary_unary(
             "/temporal.api.cloud.cloudservice.v1.CloudService/GetRegions",
             request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetRegionsRequest.SerializeToString,
@@ -183,6 +188,21 @@ class CloudServiceStub(object):
             "/temporal.api.cloud.cloudservice.v1.CloudService/SetUserGroupNamespaceAccess",
             request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserGroupNamespaceAccessRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserGroupNamespaceAccessResponse.FromString,
+        )
+        self.AddUserGroupMember = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/AddUserGroupMember",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.AddUserGroupMemberRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.AddUserGroupMemberResponse.FromString,
+        )
+        self.RemoveUserGroupMember = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/RemoveUserGroupMember",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.RemoveUserGroupMemberRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.RemoveUserGroupMemberResponse.FromString,
+        )
+        self.GetUserGroupMembers = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetUserGroupMembers",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupMembersRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupMembersResponse.FromString,
         )
         self.CreateServiceAccount = channel.unary_unary(
             "/temporal.api.cloud.cloudservice.v1.CloudService/CreateServiceAccount",
@@ -351,6 +371,12 @@ class CloudServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def DeleteNamespaceRegion(self, request, context):
+        """Delete a region from a namespace"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def GetRegions(self, request, context):
         """Get all regions"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -455,6 +481,24 @@ class CloudServiceServicer(object):
 
     def SetUserGroupNamespaceAccess(self, request, context):
         """Set a user group's access to a namespace"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def AddUserGroupMember(self, request, context):
+        """Add a member to the group, can only be used with Cloud group types."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def RemoveUserGroupMember(self, request, context):
+        """Remove a member from the group, can only be used with Cloud group types."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetUserGroupMembers(self, request, context):
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -625,6 +669,11 @@ def add_CloudServiceServicer_to_server(servicer, server):
             request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.AddNamespaceRegionRequest.FromString,
             response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.AddNamespaceRegionResponse.SerializeToString,
         ),
+        "DeleteNamespaceRegion": grpc.unary_unary_rpc_method_handler(
+            servicer.DeleteNamespaceRegion,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteNamespaceRegionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteNamespaceRegionResponse.SerializeToString,
+        ),
         "GetRegions": grpc.unary_unary_rpc_method_handler(
             servicer.GetRegions,
             request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetRegionsRequest.FromString,
@@ -714,6 +763,21 @@ def add_CloudServiceServicer_to_server(servicer, server):
             servicer.SetUserGroupNamespaceAccess,
             request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserGroupNamespaceAccessRequest.FromString,
             response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserGroupNamespaceAccessResponse.SerializeToString,
+        ),
+        "AddUserGroupMember": grpc.unary_unary_rpc_method_handler(
+            servicer.AddUserGroupMember,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.AddUserGroupMemberRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.AddUserGroupMemberResponse.SerializeToString,
+        ),
+        "RemoveUserGroupMember": grpc.unary_unary_rpc_method_handler(
+            servicer.RemoveUserGroupMember,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.RemoveUserGroupMemberRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.RemoveUserGroupMemberResponse.SerializeToString,
+        ),
+        "GetUserGroupMembers": grpc.unary_unary_rpc_method_handler(
+            servicer.GetUserGroupMembers,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupMembersRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupMembersResponse.SerializeToString,
         ),
         "CreateServiceAccount": grpc.unary_unary_rpc_method_handler(
             servicer.CreateServiceAccount,
@@ -1223,6 +1287,35 @@ class CloudService(object):
             "/temporal.api.cloud.cloudservice.v1.CloudService/AddNamespaceRegion",
             temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.AddNamespaceRegionRequest.SerializeToString,
             temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.AddNamespaceRegionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DeleteNamespaceRegion(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/DeleteNamespaceRegion",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteNamespaceRegionRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteNamespaceRegionResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1745,6 +1838,93 @@ class CloudService(object):
             "/temporal.api.cloud.cloudservice.v1.CloudService/SetUserGroupNamespaceAccess",
             temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserGroupNamespaceAccessRequest.SerializeToString,
             temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserGroupNamespaceAccessResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def AddUserGroupMember(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/AddUserGroupMember",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.AddUserGroupMemberRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.AddUserGroupMemberResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def RemoveUserGroupMember(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/RemoveUserGroupMember",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.RemoveUserGroupMemberRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.RemoveUserGroupMemberResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetUserGroupMembers(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetUserGroupMembers",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupMembersRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupMembersResponse.FromString,
             options,
             channel_credentials,
             insecure,

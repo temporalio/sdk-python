@@ -53,12 +53,12 @@ class Region(google.protobuf.message.Message):
     cloud_provider_deprecated: builtins.str
     """The name of the cloud provider that's hosting the region.
     Currently only "aws" is supported.
-    Deprecated: Not supported after 2024-10-01-00 api version. Use cloud_provider instead. 
-    temporal:versioning:max_version=2024-10-01-00
+    Deprecated: Not supported after v0.3.0 api version. Use cloud_provider instead. 
+    temporal:versioning:max_version=v0.3.0
     """
     cloud_provider: global___Region.CloudProvider.ValueType
     """The cloud provider that's hosting the region.
-    temporal:versioning:min_version=2024-10-01-00
+    temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=cloud_provider_deprecated
     """
     cloud_provider_region: builtins.str
