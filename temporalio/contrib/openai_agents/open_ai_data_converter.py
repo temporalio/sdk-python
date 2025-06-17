@@ -9,6 +9,8 @@ import importlib
 import inspect
 from typing import Any, Optional, Type, TypeVar
 
+from agents import Usage
+from agents.items import TResponseOutputItem
 from openai import NOT_GIVEN, BaseModel
 from pydantic import RootModel, TypeAdapter
 
@@ -111,7 +113,11 @@ class _OpenAIJSONPlainPayloadConverter(EncodingPayloadConverter):
         #
         # in the agents/items.py
         with workflow.unsafe.imports_passed_through():
-            wrapper.model_rebuild(_types_namespace=_get_openai_modules())
+            with workflow.unsafe.sandbox_unrestricted():
+                wrapper.model_rebuild(
+                    _types_namespace=_get_openai_modules()
+                    | {"TResponseOutputItem": TResponseOutputItem, "Usage": Usage}
+                )
         return TypeAdapter(wrapper).validate_json(payload.data.decode()).root
 
 
