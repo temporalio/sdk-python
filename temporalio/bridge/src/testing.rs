@@ -46,7 +46,7 @@ pub fn start_dev_server<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
     config: DevServerConfig,
-) -> PyResult<&'a PyAny> {
+) -> PyResult<Bound<'a, PyAny>> {
     let opts: ephemeral_server::TemporalDevServerConfig = config.try_into()?;
     let runtime = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
@@ -63,7 +63,7 @@ pub fn start_test_server<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
     config: TestServerConfig,
-) -> PyResult<&'a PyAny> {
+) -> PyResult<Bound<'a, PyAny>> {
     let opts: ephemeral_server::TestServerConfig = config.try_into()?;
     let runtime = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
@@ -96,7 +96,7 @@ impl EphemeralServerRef {
         Ok(server.has_test_service)
     }
 
-    fn shutdown<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
+    fn shutdown<'p>(&mut self, py: Python<'p>) -> PyResult<Bound<'p, PyAny>> {
         let server = self.server.take();
         self.runtime.future_into_py(py, async move {
             if let Some(mut server) = server {

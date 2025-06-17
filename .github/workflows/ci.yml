@@ -6,6 +6,9 @@ on:
       - main
       - "releases/*"
 
+env:
+  COLUMNS: 120
+
 jobs:
   # Build and test the project
   build-lint-test:

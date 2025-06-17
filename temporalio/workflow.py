@@ -642,7 +642,12 @@ class _Runtime(ABC):
 
     @staticmethod
     def maybe_current() -> Optional[_Runtime]:
-        return getattr(asyncio.get_running_loop(), "__temporal_workflow_runtime", None)
+        try:
+            return getattr(
+                asyncio.get_running_loop(), "__temporal_workflow_runtime", None
+            )
+        except RuntimeError:
+            return None
 
     @staticmethod
     def set_on_loop(

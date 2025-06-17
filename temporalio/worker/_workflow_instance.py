@@ -301,24 +301,6 @@ class _WorkflowInstanceImpl(
             str, List[temporalio.bridge.proto.workflow_activation.SignalWorkflow]
         ] = {}
 
-        # Create interceptors. We do this with our runtime on the loop just in
-        # case they want to access info() during init().
-        temporalio.workflow._Runtime.set_on_loop(asyncio.get_running_loop(), self)
-        try:
-            root_inbound = _WorkflowInboundImpl(self)
-            self._inbound: WorkflowInboundInterceptor = root_inbound
-            for interceptor_class in reversed(list(det.interceptor_classes)):
-                self._inbound = interceptor_class(self._inbound)
-            # During init we set ourselves on the current loop
-            self._inbound.init(_WorkflowOutboundImpl(self))
-            self._outbound = root_inbound._outbound
-        finally:
-            # Remove our runtime from the loop
-            temporalio.workflow._Runtime.set_on_loop(asyncio.get_running_loop(), None)
-
-        # Set ourselves on our own loop
-        temporalio.workflow._Runtime.set_on_loop(self, self)
-
         # When we evict, we have to mark the workflow as deleting so we don't
         # add any commands and we swallow exceptions on tear down
         self._deleting = False
@@ -341,6 +323,24 @@ class _WorkflowInstanceImpl(
         self._dynamic_failure_exception_types: Optional[
             Sequence[type[BaseException]]
         ] = None
+
+        # Create interceptors. We do this with our runtime on the loop just in
+        # case they want to access info() during init(). This should remain at the end of the constructor so that variables are defined during interceptor creation
+        temporalio.workflow._Runtime.set_on_loop(asyncio.get_running_loop(), self)
+        try:
+            root_inbound = _WorkflowInboundImpl(self)
+            self._inbound: WorkflowInboundInterceptor = root_inbound
+            for interceptor_class in reversed(list(det.interceptor_classes)):
+                self._inbound = interceptor_class(self._inbound)
+            # During init we set ourselves on the current loop
+            self._inbound.init(_WorkflowOutboundImpl(self))
+            self._outbound = root_inbound._outbound
+        finally:
+            # Remove our runtime from the loop
+            temporalio.workflow._Runtime.set_on_loop(asyncio.get_running_loop(), None)
+
+        # Set ourselves on our own loop
+        temporalio.workflow._Runtime.set_on_loop(self, self)
 
     def get_thread_id(self) -> Optional[int]:
         return self._current_thread_id
@@ -447,7 +447,10 @@ class _WorkflowInstanceImpl(
             logger.warning(
                 f"Failed activation on workflow {self._info.workflow_type} with ID {self._info.workflow_id} and run ID {self._info.run_id}",
                 exc_info=activation_err,
-                extra={"temporal_workflow": self._info._logger_details()},
+                extra={
+                    "temporal_workflow": self._info._logger_details(),
+                    "__temporal_error_identifier": "WorkflowTaskFailure",
+                },
             )
             # Set completion failure
             self._current_completion.failed.failure.SetInParent()
