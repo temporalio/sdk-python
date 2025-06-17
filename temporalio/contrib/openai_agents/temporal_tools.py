@@ -34,7 +34,7 @@ def activities_as_tools(*tools: Callable) -> list[Tool]:
         >>> @activity.defn
         >>> def my_activity(input: str) -> str:
         ...     return f"Processed: {input}"
-        >>> 
+        >>>
         >>> tools = activities_as_tools(my_activity)
         >>> # Use tools with an OpenAI agent
     """
@@ -76,7 +76,7 @@ def activity_as_tool(fn: Callable, **kwargs) -> Tool:
         >>> @activity.defn
         >>> def process_data(input: str) -> str:
         ...     return f"Processed: {input}"
-        >>> 
+        >>>
         >>> # Create tool with custom activity options
         >>> tool = activity_as_tool(
         ...     process_data,
