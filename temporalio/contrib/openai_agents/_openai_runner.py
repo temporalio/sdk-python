@@ -15,11 +15,6 @@ from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
 from temporalio import workflow
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
 
-# TODO: Uncomment when Agent.tools type accepts Callable
-# def _activities_as_tools(tools: list[Tool]) -> list[Tool]:
-#     """Convert activities to tools."""
-#     return [activity_as_tool(tool) if isinstance(tool, Callable) else tool for tool in tools]
-
 
 class TemporalOpenAIRunner(AgentRunner):
     """Temporal Runner for OpenAI agents.
@@ -63,10 +58,6 @@ class TemporalOpenAIRunner(AgentRunner):
         updated_run_config = replace(
             run_config, model=_TemporalModelStub(run_config.model, **self.kwargs)
         )
-
-        # TODO: Uncomment when Agent.tools type accepts Callable
-        # tools = _activities_as_tools(starting_agent.tools) if starting_agent.tools else None
-        # updated_starting_agent = replace(starting_agent, tools=tools)
 
         with workflow.unsafe.imports_passed_through():
             return await self._runner.run(

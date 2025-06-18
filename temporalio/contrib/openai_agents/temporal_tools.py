@@ -13,34 +13,6 @@ with unsafe.imports_passed_through():
     from temporalio.exceptions import ApplicationError
 
 
-def activities_as_tools(*tools: Callable) -> list[Tool]:
-    """Convert multiple Temporal activities to OpenAI agent tools.
-
-    .. warning::
-        This API is experimental and may change in future versions.
-        Use with caution in production environments.
-
-    This function takes one or more Temporal activity functions and converts them
-    into OpenAI agent tools that can be used by the agent to execute activities
-    during workflow execution.
-
-    Args:
-        *tools: One or more Temporal activity functions to convert to tools.
-
-    Returns:
-        A list of OpenAI agent tools that wrap the provided activities.
-
-    Example:
-        >>> @activity.defn
-        >>> def my_activity(input: str) -> str:
-        ...     return f"Processed: {input}"
-        >>>
-        >>> tools = activities_as_tools(my_activity)
-        >>> # Use tools with an OpenAI agent
-    """
-    return [activity_as_tool(tool) for tool in tools]
-
-
 def activity_as_tool(fn: Callable, **kwargs) -> Tool:
     """Convert a single Temporal activity function to an OpenAI agent tool.
 

@@ -20,7 +20,8 @@ def set_open_ai_agent_temporal_overrides(**kwargs):
 
     .. warning::
         This API is experimental and may change in future versions.
-        Use with caution in production environments.
+        Use with caution in production environments. Future versions may wrap the worker directly
+        instead of requiring this context manager.
 
     This context manager sets up the necessary Temporal-specific runners and trace providers
     for running OpenAI agents within Temporal workflows. It should be called in the main
@@ -53,9 +54,6 @@ def set_open_ai_agent_temporal_overrides(**kwargs):
     Returns:
         A context manager that yields the configured TemporalTraceProvider.
 
-    Note:
-        This is a temporary solution. Future versions may wrap the worker directly
-        instead of requiring this context manager.
     """
     previous_runner: Optional[AgentRunner] = None
     previous_trace_provider: Optional[TraceProvider] = None

@@ -141,7 +141,7 @@ class HelloWorldAgent:
 
 async def test_hello_world_agent(client: Client):
     if sys.version_info < (3, 11):
-        pytest.skip("Open AI support has type errors on 3.9")
+        pytest.skip("Open AI support has type errors on 3.9 and 3.11")
 
     with set_open_ai_agent_temporal_overrides(
         start_to_close_timeout=timedelta(seconds=10)
@@ -238,7 +238,7 @@ class ToolsWorkflow:
 
 async def test_tool_workflow(client: Client):
     if sys.version_info < (3, 11):
-        pytest.skip("Open AI support has type errors on 3.9")
+        pytest.skip("Open AI support has type errors on 3.9 and 3.11")
 
     with set_open_ai_agent_temporal_overrides(
         start_to_close_timeout=timedelta(seconds=10)
@@ -263,13 +263,32 @@ async def test_tool_workflow(client: Client):
                 execution_timeout=timedelta(seconds=5),
             )
             result = await workflow_handle.result()
-            activity_count = 0
+            assert result == "Test weather result"
+
+            events = []
             async for e in workflow_handle.fetch_history_events():
                 if e.HasField("activity_task_completed_event_attributes"):
-                    activity_count += 1
+                    events.append(e)
 
-            assert activity_count == 3
-            assert result == "Test weather result"
+            assert len(events) == 3
+            assert (
+                "function_call"
+                in events[0]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Sunny with wind"
+                in events[1]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Test weather result"
+                in events[2]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
 
 
 class TestPlannerModel(OpenAIResponsesModel):
@@ -437,7 +456,7 @@ class ResearchWorkflow:
 
 async def test_research_workflow(client: Client):
     if sys.version_info < (3, 11):
-        pytest.skip("Open AI support has type errors on 3.9")
+        pytest.skip("Open AI support has type errors on 3.9 and 3.11")
 
     global response_index
     response_index = 0
@@ -465,12 +484,34 @@ async def test_research_workflow(client: Client):
                 execution_timeout=timedelta(seconds=10),
             )
             result = await workflow_handle.result()
-            activity_count = 0
+            assert result == "report"
+
+            events = []
             async for e in workflow_handle.fetch_history_events():
                 if e.HasField("activity_task_completed_event_attributes"):
-                    activity_count += 1
-            assert activity_count == 12
-            assert result == "report"
+                    events.append(e)
+
+            assert len(events) == 12
+            assert (
+                '"type":"output_text"'
+                in events[0]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            for i in range(1, 11):
+                assert (
+                    "web_search_call"
+                    in events[i]
+                    .activity_task_completed_event_attributes.result.payloads[0]
+                    .data.decode()
+                )
+
+            assert (
+                '"type":"output_text"'
+                in events[11]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
 
 
 def orchestrator_agent() -> Agent:
@@ -628,7 +669,7 @@ class AgentAsToolsModel(TestModel):
 
 async def test_agents_as_tools_workflow(client: Client):
     if sys.version_info < (3, 11):
-        pytest.skip("Open AI support has type errors on 3.9")
+        pytest.skip("Open AI support has type errors on 3.9 and 3.10")
 
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
@@ -657,12 +698,38 @@ async def test_agents_as_tools_workflow(client: Client):
                 execution_timeout=timedelta(seconds=30),
             )
             result = await workflow_handle.result()
-            activity_count = 0
+            assert result == 'The translation to Spanish is: "Estoy lleno."'
+
+            events = []
             async for e in workflow_handle.fetch_history_events():
                 if e.HasField("activity_task_completed_event_attributes"):
-                    activity_count += 1
-            assert activity_count == 4
-            assert result == 'The translation to Spanish is: "Estoy lleno."'
+                    events.append(e)
+
+            assert len(events) == 4
+            assert (
+                "function_call"
+                in events[0]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Estoy lleno"
+                in events[1]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "The translation to Spanish is:"
+                in events[2]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "The translation to Spanish is:"
+                in events[3]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
 
 
 class AirlineAgentContext(BaseModel):
@@ -961,7 +1028,7 @@ class CustomerServiceWorkflow:
 
 async def test_customer_service_workflow(client: Client):
     if sys.version_info < (3, 11):
-        pytest.skip("Open AI support has type errors on 3.9")
+        pytest.skip("Open AI support has type errors on 3.9 and 3.11")
 
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
@@ -1006,13 +1073,49 @@ async def test_customer_service_workflow(client: Client):
             with pytest.raises(WorkflowFailureError):
                 await workflow_handle.result()
 
-            activity_count = 0
+            events = []
             async for e in WorkflowHandle(
                 client,
                 workflow_handle.id,
                 run_id=workflow_handle._first_execution_run_id,
             ).fetch_history_events():
                 if e.HasField("activity_task_completed_event_attributes"):
-                    activity_count += 1
+                    events.append(e)
 
-            assert activity_count == 6
+            assert len(events) == 6
+            assert (
+                "Hi there! How can I assist you today?"
+                in events[0]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "transfer_to_seat_booking_agent"
+                in events[1]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Could you please provide your confirmation number?"
+                in events[2]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Thanks! What seat number would you like to change to?"
+                in events[3]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "update_seat"
+                in events[4]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Your seat has been updated to a window seat. If there's anything else you need, feel free to let me know!"
+                in events[5]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )

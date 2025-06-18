@@ -71,22 +71,5 @@ class ResearchManager:
             self.writer_agent,
             input,
         )
-        # update_messages = [
-        #     "Thinking about report...",
-        #     "Planning report structure...",
-        #     "Writing outline...",
-        #     "Creating sections...",
-        #     "Cleaning up formatting...",
-        #     "Finalizing report...",
-        #     "Finishing report...",
-        # ]
-        #
-        # last_update = time.time()
-        # next_message = 0
-        # async for _ in result.stream_events():
-        #     if time.time() - last_update > 5 and next_message < len(update_messages):
-        #         self.printer.update_item("writing", update_messages[next_message])
-        #         next_message += 1
-        #         last_update = time.time()
 
         return result.final_output_as(ReportData)
