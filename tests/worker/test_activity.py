@@ -1418,16 +1418,17 @@ async def test_activity_failure_trace_identifier(
         activity.logger.base_logger.removeHandler(CustomLogHandler())
 
 
-async def test_activity_heartbeat_context(
-    client: Client, worker: ExternalWorker
-):
+async def test_activity_heartbeat_context(client: Client, worker: ExternalWorker):
     @activity.defn
     async def heartbeat():
         if activity.info().attempt == 1:
-            context = activity._Context.current()
+            context: activity._Context = activity._Context.current()
+
             def heartbeat_task():
                 async def h():
-                    context.heartbeat("Some detail")
+                    if context.heartbeat is not None:
+                        context.heartbeat("Some detail")
+
                 asyncio.run(h())
 
             thread = threading.Thread(target=heartbeat_task)
@@ -1438,5 +1439,7 @@ async def test_activity_heartbeat_context(
             assert len(activity.info().heartbeat_details) == 1
             return "details: " + activity.info().heartbeat_details[0]
 
-    result = await _execute_workflow_with_activity(client, worker, heartbeat, retry_max_attempts=2)
+    result = await _execute_workflow_with_activity(
+        client, worker, heartbeat, retry_max_attempts=2
+    )
     assert result.result == "details: Some detail"
