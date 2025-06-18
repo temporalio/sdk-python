@@ -779,8 +779,7 @@ class _ActivityOutboundImpl(ActivityOutboundInterceptor):
         return self._info
 
     def heartbeat(self, *details: Any) -> None:
-        info = temporalio.activity.info()
-        self._worker._heartbeat(info.task_token, *details)
+        self._worker._heartbeat(self._info.task_token, *details)
 
 
 # This has to be defined at the top-level to be picklable for process executors
