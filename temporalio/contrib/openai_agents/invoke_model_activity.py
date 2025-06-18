@@ -38,7 +38,6 @@ class HandoffInput:
     tool_description: str
     input_json_schema: dict[str, Any]
     agent_name: str
-    # input_filter: HandoffInputFilter | None = None
     strict_json_schema: bool = True
 
 
@@ -49,7 +48,6 @@ class FunctionToolInput:
     name: str
     description: str
     params_json_schema: dict[str, Any]
-    # on_invoke_tool: Callable[[RunContextWrapper[Any], str], Awaitable[Any]]
     strict_json_schema: bool = True
 
 
@@ -129,8 +127,7 @@ class ModelActivity:
     @_auto_heartbeater
     async def invoke_model_activity(self, input: ActivityModelInput) -> ModelResponse:
         """Activity that invokes a model with the given input."""
-        with workflow.unsafe.sandbox_unrestricted():
-            model = self._model_provider.get_model(input.get("model_name"))
+        model = self._model_provider.get_model(input.get("model_name"))
 
         async def empty_on_invoke_tool(ctx: RunContextWrapper[Any], input: str) -> str:
             return ""
