@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import logging
+
 from temporalio import workflow
 
+logger = logging.getLogger(__name__)
+
 with workflow.unsafe.imports_passed_through():
-    from typing import Any, AsyncIterator, Sequence, Union, cast
+    from typing import Any, AsyncIterator, Optional, Sequence, Union, cast
 
     from agents import (
         AgentOutputSchema,
@@ -37,22 +41,22 @@ with workflow.unsafe.imports_passed_through():
 class _TemporalModelStub(Model):
     """A stub that allows invoking models as Temporal activities."""
 
-    def __init__(self, model_name: Union[str, None], **kwargs) -> None:
+    def __init__(self, model_name: Optional[str], **kwargs) -> None:
         self.model_name = model_name
         self.kwargs = kwargs
 
     async def get_response(
         self,
-        system_instructions: Union[str, None],
-        input: Union[str, list][TResponseInputItem],  # type: ignore
+        system_instructions: Optional[str],
+        input: Union[str, list[TResponseInputItem]],
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: Union[AgentOutputSchemaBase, None],
+        output_schema: Optional[AgentOutputSchemaBase],
         handoffs: list[Handoff],
         tracing: ModelTracing,
         *,
-        previous_response_id: Union[str, None],
-        prompt: ResponsePromptParam | None,
+        previous_response_id: Optional[str],
+        prompt: Optional[ResponsePromptParam],
     ) -> ModelResponse:
         def get_summary(input: Union[str, list[TResponseInputItem]]) -> str:
             ### Activity summary shown in the UI
@@ -71,7 +75,7 @@ class _TemporalModelStub(Model):
                 elif isinstance(input, dict):
                     return input.get("content", "")[:max_size]
             except Exception as e:
-                print(f"Error getting summary: {e}")
+                logger.error(f"Error getting summary: {e}")
             return ""
 
         def make_tool_info(tool: Tool) -> ToolInput:
@@ -111,7 +115,7 @@ class _TemporalModelStub(Model):
             raise TypeError(
                 f"Only AgentOutputSchema is supported by Temporal Model, got {type(output_schema).__name__}"
             )
-        agent_output_schema = cast(AgentOutputSchema, output_schema)
+        agent_output_schema = output_schema
         output_schema_input = (
             None
             if agent_output_schema is None
@@ -146,15 +150,15 @@ class _TemporalModelStub(Model):
 
     def stream_response(
         self,
-        system_instructions: Union[str, None],
+        system_instructions: Optional[str],
         input: Union[str, list][TResponseInputItem],  # type: ignore
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: Union[AgentOutputSchemaBase, None],
+        output_schema: Optional[AgentOutputSchemaBase],
         handoffs: list[Handoff],
         tracing: ModelTracing,
         *,
-        previous_response_id: Union[str, None],
+        previous_response_id: Optional[str],
         prompt: ResponsePromptParam | None,
     ) -> AsyncIterator[TResponseStreamEvent]:
         raise NotImplementedError("Temporal model doesn't support streams yet")

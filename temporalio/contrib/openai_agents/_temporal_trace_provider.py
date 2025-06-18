@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, Union, cast
+from typing import Any, Optional, Union, cast
 
 from agents import SpanData, Trace, TracingProcessor
 from agents.tracing import (
@@ -20,10 +20,10 @@ class ActivitySpanData(SpanData):
         activity_id: str,
         activity_type: str,
         task_queue: str,
-        schedule_to_close_timeout: Union[float, None] = None,
-        schedule_to_start_timeout: Union[float, None] = None,
-        start_to_close_timeout: Union[float, None] = None,
-        heartbeat_timeout: Union[float, None] = None,
+        schedule_to_close_timeout: Optional[float] = None,
+        schedule_to_start_timeout: Optional[float] = None,
+        start_to_close_timeout: Optional[float] = None,
+        heartbeat_timeout: Optional[float] = None,
     ):
         """Initialize an ActivitySpanData instance."""
         self.activity_id = activity_id
@@ -57,10 +57,7 @@ def activity_span(
     activity_id: str,
     activity_type: str,
     task_queue: str,
-    # schedule_to_close_timeout: float,
-    # schedule_to_start_timeout: float,
     start_to_close_timeout: float,
-    # heartbeat_timeout: float,
 ) -> Span[ActivitySpanData]:
     """Create a trace span for a Temporal activity."""
     return get_trace_provider().create_span(
@@ -68,14 +65,8 @@ def activity_span(
             activity_id=activity_id,
             activity_type=activity_type,
             task_queue=task_queue,
-            # schedule_to_close_timeout=schedule_to_close_timeout,
-            # schedule_to_start_timeout=schedule_to_start_timeout,
             start_to_close_timeout=start_to_close_timeout,
-            # heartbeat_timeout=heartbeat_timeout,
         ),
-        # span_id=span_id,
-        # parent=parent,
-        # disabled=disabled,
     )
 
 
@@ -171,5 +162,4 @@ class TemporalTraceProvider(DefaultTraceProvider):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Exit the context of the Temporal trace provider."""
-        # cleanup code
         self._multi_processor.shutdown()

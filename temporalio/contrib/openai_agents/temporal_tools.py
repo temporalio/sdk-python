@@ -1,16 +1,14 @@
 """Support for using Temporal activities as OpenAI agents tools."""
 
+from typing import Any, Callable
+
+from temporalio import activity, workflow
+from temporalio.exceptions import ApplicationError
 from temporalio.workflow import unsafe
 
 with unsafe.imports_passed_through():
-    from datetime import timedelta
-    from typing import Any, Callable
-
     from agents import FunctionTool, RunContextWrapper, Tool
     from agents.function_schema import function_schema
-
-    from temporalio import activity, workflow
-    from temporalio.exceptions import ApplicationError
 
 
 def activity_as_tool(fn: Callable, **kwargs) -> Tool:

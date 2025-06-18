@@ -105,13 +105,9 @@ class _OpenAIJSONPlainPayloadConverter(EncodingPayloadConverter):
             The type hint is used for validation but the actual type returned
             may be a Pydantic model instance.
         """
-        _type_hint = type_hint if type_hint is not None else Any
+        _type_hint = type_hint or Any
         wrapper = _WrapperModel[_type_hint]  # type: ignore[valid-type]
-        # Needed due to
-        # if TYPE_CHECKING:
-        #     from .agent import Agent
-        #
-        # in the agents/items.py
+
         with workflow.unsafe.imports_passed_through():
             with workflow.unsafe.sandbox_unrestricted():
                 wrapper.model_rebuild(
@@ -125,7 +121,7 @@ def _get_openai_modules() -> dict[Any, Any]:
     def get_modules(module):
         result_dict: dict[Any, Any] = {}
         for _, mod in inspect.getmembers(module, inspect.ismodule):
-            result_dict = result_dict | mod.__dict__ | get_modules(mod)
+            result_dict |= mod.__dict__ | get_modules(mod)
         return result_dict
 
     return get_modules(importlib.import_module("openai.types"))

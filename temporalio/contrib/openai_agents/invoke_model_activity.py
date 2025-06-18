@@ -60,9 +60,9 @@ ToolInput = Union[FunctionToolInput, FileSearchTool, WebSearchTool]
 class AgentOutputSchemaInput(AgentOutputSchemaBase):
     """Data conversion friendly representation of AgentOutputSchema."""
 
-    output_type_name: Union[str, None]
+    output_type_name: Optional[str]
     is_wrapped: bool
-    output_schema: Union[dict[str, Any], None]
+    output_schema: Optional[dict[str, Any]]
     strict_json_schema: bool
 
     def is_plain_text(self) -> bool:
@@ -121,7 +121,7 @@ class ActivityModelInput(TypedDict, total=False):
 class ModelActivity:
     """Class wrapper for model invocation activities to allow model customization."""
 
-    def __init__(self, model_provider: Union[ModelProvider, None] = None):
+    def __init__(self, model_provider: Optional[ModelProvider] = None):
         """Initialize the activity with a model provider."""
         self._model_provider = model_provider or MultiProvider()
 
@@ -142,7 +142,7 @@ class ModelActivity:
 
         # workaround for https://github.com/pydantic/pydantic/issues/9541
         # ValidatorIterator returned
-        input_json = json.dumps(input["input"], default=lambda o: str(o))
+        input_json = json.dumps(input["input"], default=str)
         input_input = json.loads(input_json)
 
         def make_tool(tool: ToolInput) -> Tool:

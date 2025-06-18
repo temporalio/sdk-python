@@ -55,14 +55,12 @@ def set_open_ai_agent_temporal_overrides(**kwargs):
         A context manager that yields the configured TemporalTraceProvider.
 
     """
-    previous_runner: Optional[AgentRunner] = None
-    previous_trace_provider: Optional[TraceProvider] = None
-    try:
-        previous_runner = get_default_agent_runner()
-        set_default_agent_runner(TemporalOpenAIRunner(**kwargs))
+    previous_runner = get_default_agent_runner()
+    previous_trace_provider = get_trace_provider()
+    provider = TemporalTraceProvider()
 
-        provider = TemporalTraceProvider()
-        previous_trace_provider = get_trace_provider()
+    try:
+        set_default_agent_runner(TemporalOpenAIRunner(**kwargs))
         set_trace_provider(provider)
         yield provider
     finally:
