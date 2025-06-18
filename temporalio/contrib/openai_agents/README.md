@@ -42,7 +42,7 @@ How do we apply the Temporal execution model to enable durable execution for AI 
 - Calls to the LLM provider, which are inherently non-deterministic, go into activities.
 - Calls to tools, which could contain arbitrary code, similarly go into activities.
 
-This module ensures that LLM calls and tool calls originating from the OpenAI Agents SDK in run as Temporal activities.
+This module ensures that LLM calls and tool calls originating from the OpenAI Agents SDK run as Temporal activities.
 It also ensures that their inputs and outputs are properly serialized.
 
 ## Basic Example
