@@ -64,13 +64,18 @@ def activity_as_tool(fn: Callable, **kwargs) -> Tool:
         )
 
     async def run_activity(ctx: RunContextWrapper[Any], input: str) -> Any:
-        return str(
-            await workflow.execute_activity(
-                fn,
-                input,
-                **kwargs,
+        try:
+            return str(
+                await workflow.execute_activity(
+                    fn,
+                    input,
+                    **kwargs,
+                )
             )
-        )
+        except Exception:
+            raise ApplicationError(
+                "You must return a string representation of the tool output, or something we can call str() on"
+            )
 
     schema = function_schema(fn)
     return FunctionTool(
