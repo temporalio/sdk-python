@@ -56,7 +56,7 @@ The first file, `hello_world_workflow.py`, defines an OpenAI agent within a Temp
 from temporalio import workflow
 
 # Trusted imports bypass the Temporal sandbox, which otherwise
-# layers on validation to expose non-deterministic execution.
+# prevents imports which may result in non-deterministic execution.
 with workflow.unsafe.imports_passed_through():
     from agents import Agent, Runner
 
