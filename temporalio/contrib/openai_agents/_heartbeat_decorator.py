@@ -8,8 +8,7 @@ F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 
 
 def _auto_heartbeater(fn: F) -> F:
-    # We want to ensure that the type hints from the original callable are
-    # available via our wrapper, so we use the functools wraps decorator
+    # Propagate type hints from the original callable.
     @wraps(fn)
     async def wrapper(*args, **kwargs):
         heartbeat_timeout = activity.info().heartbeat_timeout
@@ -25,7 +24,7 @@ def _auto_heartbeater(fn: F) -> F:
             if heartbeat_task:
                 heartbeat_task.cancel()
                 # Wait for heartbeat cancellation to complete
-                await asyncio.wait([heartbeat_task])
+                await heartbeat_task
 
     return cast(F, wrapper)
 
