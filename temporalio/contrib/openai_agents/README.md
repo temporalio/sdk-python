@@ -127,7 +127,7 @@ if __name__ == "__main__":
 ```
 
 We wrap the entire `worker_main` function body in the `set_open_ai_agent_temporal_overrides()` context manager.
-This creates a Temporal activity whenever the OpenAI Agents SDK invokes an LLM or calls a tool.
+This causes a Temporal activity to be invoked whenever the OpenAI Agents SDK invokes an LLM or calls a tool.
 We also pass the `open_ai_data_converter` to the Temporal Client, which ensures proper serialization of OpenAI Agents SDK data.
 We also create a `ModelActivity` which serves as a generic wrapper for LLM calls, and we register this wrapper's invocation point, `model_activity.invoke_model_activity`, with the workflow.
 
