@@ -48,6 +48,7 @@ with workflow.unsafe.imports_passed_through():
         ToolCallItem,
         ToolCallOutputItem,
     )
+    from agents.run import AgentRunner, DEFAULT_AGENT_RUNNER
     from openai import AsyncOpenAI, BaseModel
     from openai.types.responses import (
         ResponseFunctionToolCall,
@@ -132,7 +133,7 @@ class HelloWorldAgent:
             name="Assistant",
             instructions="You only respond in haikus.",
         )  # type: Agent
-        result = await Runner.run(agent, input=prompt)
+        result = await Runner.run(starting_agent=agent, input=prompt)
         return result.final_output
 
 
@@ -229,7 +230,7 @@ class ToolsWorkflow:
                 )
             ],
         )  # type: Agent
-        result = await Runner.run(agent, input=question)
+        result = await Runner.run(starting_agent=agent, input=question)
         return result.final_output
 
 
@@ -528,7 +529,9 @@ class AgentsAsToolsWorkflow:
             orchestrator = orchestrator_agent()
             synthesizer = synthesizer_agent()
 
-            orchestrator_result = await Runner.run(orchestrator, msg)
+            orchestrator_result = await Runner.run(
+                starting_agent=orchestrator, input=msg
+            )
 
             for item in orchestrator_result.new_items:
                 if isinstance(item, MessageOutputItem):
@@ -537,7 +540,7 @@ class AgentsAsToolsWorkflow:
                         print(f"  - Translation step: {text}")
 
             synthesizer_result = await Runner.run(
-                synthesizer, orchestrator_result.to_input_list()
+                starting_agent=synthesizer, input=orchestrator_result.to_input_list()
             )
 
         return synthesizer_result.final_output
@@ -912,7 +915,9 @@ class CustomerServiceWorkflow:
         with trace("Customer service", group_id=workflow.info().workflow_id):
             self.input_items.append({"content": input.user_input, "role": "user"})
             result = await Runner.run(
-                self.current_agent, self.input_items, context=self.context
+                starting_agent=self.current_agent,
+                input=self.input_items,
+                context=self.context,
             )
 
             for new_item in result.new_items:

@@ -4,6 +4,7 @@ from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from typing import Any, AsyncIterator, Sequence, Union, cast
+    from openai.types.responses.response_prompt_param import ResponsePromptParam
 
     from agents import (
         AgentOutputSchema,
@@ -51,6 +52,7 @@ class _TemporalModelStub(Model):
         tracing: ModelTracing,
         *,
         previous_response_id: Union[str, None],
+        prompt: ResponsePromptParam | None,
     ) -> ModelResponse:
         def get_summary(input: Union[str, list[TResponseInputItem]]) -> str:
             ### Activity summary shown in the UI
@@ -133,6 +135,7 @@ class _TemporalModelStub(Model):
             handoffs=handoff_infos,
             tracing=ModelTracingInput(tracing.value),
             previous_response_id=previous_response_id,
+            prompt=prompt,
         )
         return await workflow.execute_activity_method(
             ModelActivity.invoke_model_activity,
@@ -152,5 +155,6 @@ class _TemporalModelStub(Model):
         tracing: ModelTracing,
         *,
         previous_response_id: Union[str, None],
+        prompt: ResponsePromptParam | None,
     ) -> AsyncIterator[TResponseStreamEvent]:
         raise NotImplementedError("Temporal model doesn't support streams yet")

@@ -3,8 +3,8 @@
 from contextlib import contextmanager
 from typing import Optional
 
-from agents import set_default_runner, set_trace_provider
-from agents.run import Runner, get_default_runner
+from agents import set_trace_provider
+from agents.run import Runner, get_default_agent_runner, set_default_agent_runner
 from agents.tracing import TraceProvider, get_trace_provider
 from agents.tracing.provider import DefaultTraceProvider
 
@@ -60,13 +60,13 @@ def set_open_ai_agent_temporal_overrides(**kwargs):
     previous_runner: Optional[Runner] = None
     previous_trace_provider: Optional[TraceProvider] = None
     try:
-        previous_runner = get_default_runner()
-        set_default_runner(TemporalOpenAIRunner(**kwargs))
+        previous_runner = get_default_agent_runner()
+        set_default_agent_runner(TemporalOpenAIRunner(**kwargs))
 
         provider = TemporalTraceProvider()
         previous_trace_provider = get_trace_provider()
         set_trace_provider(provider)
         yield provider
     finally:
-        set_default_runner(previous_runner)
+        set_default_agent_runner(previous_runner)
         set_trace_provider(previous_trace_provider or DefaultTraceProvider())

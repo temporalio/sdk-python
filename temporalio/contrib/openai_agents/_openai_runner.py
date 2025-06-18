@@ -5,13 +5,13 @@ from agents import (
     Agent,
     RunConfig,
     RunHooks,
-    Runner,
     RunResult,
     RunResultStreaming,
     TContext,
     TResponseInputItem,
 )
-from agents.run import DEFAULT_MAX_TURNS, DEFAULT_RUNNER, DefaultRunner
+
+from agents.run import DEFAULT_MAX_TURNS, DEFAULT_AGENT_RUNNER, AgentRunner
 
 from temporalio import workflow
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
@@ -22,7 +22,7 @@ from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModel
 #     return [activity_as_tool(tool) if isinstance(tool, Callable) else tool for tool in tools]
 
 
-class TemporalOpenAIRunner(Runner):
+class TemporalOpenAIRunner(AgentRunner):
     """Temporal Runner for OpenAI agents.
 
     Forwards model calls to a Temporal activity.
@@ -31,10 +31,10 @@ class TemporalOpenAIRunner(Runner):
 
     def __init__(self, **kwargs) -> None:
         """Initialize the Temporal OpenAI Runner."""
-        self._runner = DEFAULT_RUNNER or DefaultRunner()
+        self._runner = DEFAULT_AGENT_RUNNER or AgentRunner()
         self.kwargs = kwargs
 
-    async def _run_impl(
+    async def run(
         self,
         starting_agent: Agent[TContext],
         input: Union[str, list[TResponseInputItem]],
@@ -72,7 +72,7 @@ class TemporalOpenAIRunner(Runner):
         # updated_starting_agent = replace(starting_agent, tools=tools)
 
         with workflow.unsafe.imports_passed_through():
-            return await self._runner._run_impl(
+            return await self._runner.run(
                 starting_agent=starting_agent,
                 input=input,
                 context=context,
@@ -82,7 +82,7 @@ class TemporalOpenAIRunner(Runner):
                 previous_response_id=previous_response_id,
             )
 
-    def _run_sync_impl(
+    def run_sync(
         self,
         starting_agent: Agent[TContext],
         input: Union[str, list[TResponseInputItem]],
@@ -105,7 +105,7 @@ class TemporalOpenAIRunner(Runner):
             )
         raise RuntimeError("Temporal workflows do not support synchronous model calls.")
 
-    def _run_streamed_impl(
+    def run_streamed(
         self,
         starting_agent: Agent[TContext],
         input: Union[str, list[TResponseInputItem]],
