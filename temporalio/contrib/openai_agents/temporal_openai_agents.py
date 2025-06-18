@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from typing import Optional
 
 from agents import set_trace_provider
-from agents.run import Runner, get_default_agent_runner, set_default_agent_runner
+from agents.run import AgentRunner, get_default_agent_runner, set_default_agent_runner
 from agents.tracing import TraceProvider, get_trace_provider
 from agents.tracing.provider import DefaultTraceProvider
 
@@ -57,7 +57,7 @@ def set_open_ai_agent_temporal_overrides(**kwargs):
         This is a temporary solution. Future versions may wrap the worker directly
         instead of requiring this context manager.
     """
-    previous_runner: Optional[Runner] = None
+    previous_runner: Optional[AgentRunner] = None
     previous_trace_provider: Optional[TraceProvider] = None
     try:
         previous_runner = get_default_agent_runner()

@@ -115,6 +115,7 @@ class ActivityModelInput(TypedDict, total=False):
     handoffs: list[HandoffInput]
     tracing: Required[ModelTracingInput]
     previous_response_id: Optional[str]
+    prompt: Optional[Any]
 
 
 class ModelActivity:
@@ -182,4 +183,5 @@ class ModelActivity:
             handoffs=handoffs,
             tracing=ModelTracing(input["tracing"]),
             previous_response_id=input.get("previous_response_id"),
+            prompt=input.get("prompt"),
         )

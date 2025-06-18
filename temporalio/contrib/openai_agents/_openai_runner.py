@@ -10,8 +10,7 @@ from agents import (
     TContext,
     TResponseInputItem,
 )
-
-from agents.run import DEFAULT_MAX_TURNS, DEFAULT_AGENT_RUNNER, AgentRunner
+from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
 
 from temporalio import workflow
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
@@ -38,24 +37,22 @@ class TemporalOpenAIRunner(AgentRunner):
         self,
         starting_agent: Agent[TContext],
         input: Union[str, list[TResponseInputItem]],
-        *,
-        context: Union[TContext, None] = None,
-        max_turns: int = DEFAULT_MAX_TURNS,
-        hooks: Union[RunHooks[TContext], None] = None,
-        run_config: Union[RunConfig, None] = None,
-        previous_response_id: Union[str, None] = None,
+        **kwargs,
     ) -> RunResult:
         """Run the agent in a Temporal workflow."""
         if not workflow.in_workflow():
-            return await self._runner._run_impl(
+            return await self._runner.run(
                 starting_agent,
                 input,
-                context=context,
-                max_turns=max_turns,
-                hooks=hooks,
-                run_config=run_config,
-                previous_response_id=previous_response_id,
+                **kwargs,
             )
+
+        context = kwargs.get("context")
+        max_turns = kwargs.get("max_turns", DEFAULT_MAX_TURNS)
+        hooks = kwargs.get("hooks")
+        run_config = kwargs.get("run_config")
+        previous_response_id = kwargs.get("previous_response_id")
+
         if run_config is None:
             run_config = RunConfig()
 
@@ -86,22 +83,14 @@ class TemporalOpenAIRunner(AgentRunner):
         self,
         starting_agent: Agent[TContext],
         input: Union[str, list[TResponseInputItem]],
-        *,
-        context: Union[TContext, None] = None,
-        max_turns: int = DEFAULT_MAX_TURNS,
-        hooks: Union[RunHooks[TContext], None] = None,
-        run_config: Union[RunConfig, None] = None,
-        previous_response_id: Union[str, None] = None,
+        **kwargs,
     ) -> RunResult:
+        """Run the agent synchronously (not supported in Temporal workflows)."""
         if not workflow.in_workflow():
-            return self._runner._run_sync_impl(
+            return self._runner.run_sync(
                 starting_agent,
                 input,
-                context=context,
-                max_turns=max_turns,
-                hooks=hooks,
-                run_config=run_config,
-                previous_response_id=previous_response_id,
+                **kwargs,
             )
         raise RuntimeError("Temporal workflows do not support synchronous model calls.")
 
@@ -109,20 +98,13 @@ class TemporalOpenAIRunner(AgentRunner):
         self,
         starting_agent: Agent[TContext],
         input: Union[str, list[TResponseInputItem]],
-        context: Union[TContext, None] = None,
-        max_turns: int = DEFAULT_MAX_TURNS,
-        hooks: Union[RunHooks[TContext], None] = None,
-        run_config: Union[RunConfig, None] = None,
-        previous_response_id: Union[str, None] = None,
+        **kwargs,
     ) -> RunResultStreaming:
+        """Run the agent with streaming responses (not supported in Temporal workflows)."""
         if not workflow.in_workflow():
-            return self._runner._run_streamed_impl(
+            return self._runner.run_streamed(
                 starting_agent,
                 input,
-                context=context,
-                max_turns=max_turns,
-                hooks=hooks,
-                run_config=run_config,
-                previous_response_id=previous_response_id,
+                **kwargs,
             )
         raise RuntimeError("Temporal workflows do not support streaming.")

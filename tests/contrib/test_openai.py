@@ -48,7 +48,7 @@ with workflow.unsafe.imports_passed_through():
         ToolCallItem,
         ToolCallOutputItem,
     )
-    from agents.run import AgentRunner, DEFAULT_AGENT_RUNNER
+    from agents.run import DEFAULT_AGENT_RUNNER, AgentRunner
     from openai import AsyncOpenAI, BaseModel
     from openai.types.responses import (
         ResponseFunctionToolCall,
@@ -56,6 +56,7 @@ with workflow.unsafe.imports_passed_through():
         ResponseOutputMessage,
         ResponseOutputText,
     )
+    from openai.types.responses.response_prompt_param import ResponsePromptParam
 
     from tests.contrib.research_agents.research_manager import ResearchManager
 
@@ -96,6 +97,7 @@ class TestModel(OpenAIResponsesModel):
         handoffs: list[Handoff],
         tracing: ModelTracing,
         previous_response_id: Union[str, None],
+        prompt: Union[ResponsePromptParam, None] = None,
     ) -> ModelResponse:
         global response_index
         response = self.responses[response_index]
@@ -290,6 +292,7 @@ class TestPlannerModel(OpenAIResponsesModel):
         handoffs: list[Handoff],
         tracing: ModelTracing,
         previous_response_id: Union[str, None],
+        prompt: Union[ResponsePromptParam, None] = None,
     ) -> ModelResponse:
         return ModelResponse(
             output=[
@@ -332,6 +335,7 @@ class TestReportModel(OpenAIResponsesModel):
         handoffs: list[Handoff],
         tracing: ModelTracing,
         previous_response_id: Union[str, None],
+        prompt: Union[ResponsePromptParam, None] = None,
     ) -> ModelResponse:
         return ModelResponse(
             output=[

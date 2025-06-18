@@ -4,7 +4,6 @@ from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from typing import Any, AsyncIterator, Sequence, Union, cast
-    from openai.types.responses.response_prompt_param import ResponsePromptParam
 
     from agents import (
         AgentOutputSchema,
@@ -22,6 +21,7 @@ with workflow.unsafe.imports_passed_through():
         WebSearchTool,
     )
     from agents.items import TResponseStreamEvent
+    from openai.types.responses.response_prompt_param import ResponsePromptParam
 
     from temporalio.contrib.openai_agents.invoke_model_activity import (
         ActivityModelInput,
