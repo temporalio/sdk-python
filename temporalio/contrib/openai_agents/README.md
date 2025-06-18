@@ -131,7 +131,7 @@ This creates a Temporal activity whenever the OpenAI Agents SDK invokes an LLM o
 We also pass the `open_ai_data_converter` to the Temporal Client, which ensures proper serialization of OpenAI Agents SDK data.
 We also create a `ModelActivity` which serves as a generic wrapper for LLM calls, and we register this wrapper's invocation point, `model_activity.invoke_model_activity`, with the workflow.
 
-In order to launch the agent, use the standard Temporal workflow invocation.
+In order to launch the agent, use the standard Temporal workflow invocation:
 
 ```python
 # File: run_hello_world_workflow.py
