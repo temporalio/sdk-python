@@ -45,7 +45,7 @@ How do we apply the Temporal execution model to enable durable execution for AI 
 This module ensures that LLM calls and tool calls originating from the OpenAI Agents SDK in run as Temporal activities.
 It also ensures that their inputs and outputs are properly serialized.
 
-## Examples
+## Basic Example
 
 Let's start with a simple example.
 
@@ -69,7 +69,7 @@ class HelloWorldAgent:
             instructions="You only respond in haikus.",
         )
 
-        result = await Runner.run(agent, input=prompt)
+        result = await Runner.run(starting_agent=agent, input=prompt)
         return result.final_output
 ```
 
@@ -89,10 +89,13 @@ This is a program that connects to the Temporal server and receives work to run,
 ```python
 # File: run_worker.py
 
-from temporalio import workflow
+import asyncio
+from datetime import timedelta
+
 from temporalio.client import Client
 from temporalio.contrib.openai_agents.invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents.open_ai_data_converter import open_ai_data_converter
+from temporalio.contrib.openai_agents.temporal_openai_agents import set_open_ai_agent_temporal_overrides
 from temporalio.worker import Worker
 
 from hello_world_workflow import HelloWorldAgent
@@ -100,7 +103,9 @@ from hello_world_workflow import HelloWorldAgent
 async def worker_main():
     # Configure the OpenAI Agents SDK to use Temporal activities for LLM API calls
     # and for tool calls.
-    with set_open_ai_agent_temporal_overrides():
+    with set_open_ai_agent_temporal_overrides(
+        start_to_close_timeout=timedelta(seconds=10)
+    ):
         # Create a Temporal client connected to server at the given address
         # Use the OpenAI data converter to ensure proper serialization/deserialization
         client = await Client.connect(
@@ -109,13 +114,11 @@ async def worker_main():
         )
 
         model_activity = ModelActivity(model_provider=None)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as activity_executor:
             worker = Worker(
                 client,
                 task_queue="my-task-queue",
                 workflows=[HelloWorldAgent],
                 activities=[model_activity.invoke_model_activity],
-                activity_executor=activity_executor,
             )
             await worker.run()
 
@@ -139,7 +142,7 @@ from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.contrib.openai_agents.open_ai_data_converter import open_ai_data_converter
 
-from openai_agents.workflows.hello_world_workflow import HelloWorldAgent
+from hello_world_workflow import HelloWorldAgent
 
 async def main():
     # Create client connected to server at the given address
@@ -157,12 +160,103 @@ async def main():
         id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
     )
     print(f"Result: {result}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 This launcher script executes the Temporal workflow to start the agent.
 
-You can find additional examples in the [Temporal Python Samples Repository](https://github.com/temporalio/samples-python/tree/main/openai_agents).
-These examples include:
 
-- [Executing Temporal activites as tools](https://github.com/temporalio/samples-python/tree/main/openai_agents/workflows/agents_as_tools_workflow.py)
-- [Multi-agent workflow](https://github.com/temporalio/samples-python/tree/main/openai_agents/workflows/research_bot_workflow.py)
+## Using Temporal Activities as OpenAI Agents Tools
+
+One of the powerful features of this integration is the ability to convert Temporal activities into OpenAI Agents tools using `activity_as_tool`.
+This allows your agent to leverage Temporal's durable execution for tool calls.
+
+In the example below, we apply the `@activity.defn` decorator to the `get_weather` function to create a Temporal activity.
+We then pass this through the `activity_as_tool` helper function to create an OpenAI Agents tool that is passed to the `Agent`.
+
+```python
+from dataclasses import dataclass
+from datetime import timedelta
+from temporalio import activity, workflow
+from temporalio.contrib.openai_agents.temporal_tools import activity_as_tool
+
+with workflow.unsafe.imports_passed_through():
+    from agents import Agent, Runner
+
+@dataclass
+class Weather:
+    city: str
+    temperature_range: str
+    conditions: str
+
+@activity.defn
+async def get_weather(city: str) -> Weather:
+    """Get the weather for a given city."""
+    return Weather(city=city, temperature_range="14-20C", conditions="Sunny with wind.")
+
+@workflow.defn
+class WeatherAgent:
+    @workflow.run
+    async def run(self, question: str) -> str:
+        agent = Agent(
+            name="Weather Assistant",
+            instructions="You are a helpful weather agent.",
+            tools=[
+                activity_as_tool(
+                    get_weather, 
+                    start_to_close_timeout=timedelta(seconds=10)
+                )
+            ],
+        )
+        result = await Runner.run(starting_agent=agent, input=question)
+        return result.final_output
+```
+
+
+### Agent Handoffs
+
+The OpenAI Agents SDK supports agent handoffs, where one agent can transfer control to another agent. This works seamlessly with Temporal:
+
+```python
+@workflow.defn
+class CustomerServiceWorkflow:
+    def __init__(self):
+        self.current_agent = self.init_agents()
+        self.context = CustomerContext()
+
+    def init_agents(self):
+        faq_agent = Agent(
+            name="FAQ Agent",
+            instructions="Answer frequently asked questions",
+        )
+        
+        booking_agent = Agent(
+            name="Booking Agent", 
+            instructions="Help with booking and seat changes",
+        )
+        
+        triage_agent = Agent(
+            name="Triage Agent",
+            instructions="Route customers to the right agent",
+            handoffs=[faq_agent, booking_agent],
+        )
+        
+        return triage_agent
+
+    @workflow.run
+    async def run(self, customer_message: str) -> str:
+        result = await Runner.run(
+            starting_agent=self.current_agent,
+            input=customer_message,
+            context=self.context,
+        )
+        return result.final_output
+```
+
+In this example, one workflow wraps the entire multi-agent system.
+
+## Additional Examples
+
+You can find additional examples in the [Temporal Python Samples Repository](https://github.com/temporalio/samples-python/tree/main/openai_agents).
