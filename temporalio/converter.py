@@ -516,7 +516,6 @@ class AdvancedJSONEncoder(json.JSONEncoder):
         # Support for UUID
         if isinstance(o, uuid.UUID):
             return str(o)
-
         return super().default(o)
 
 
