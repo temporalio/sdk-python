@@ -17,6 +17,13 @@ _worker_configs = [
         },
         id="max_concurrent_workflow_tasks_2_polls_2",
     ),
+    pytest.param(
+        {
+            "max_concurrent_workflow_task_polls": 10,
+            "nonsticky_to_sticky_poll_ratio": 0.5,
+        },
+        id="max_concurrent_workflow_task_polls_10_nonsticky_to_sticky_poll_ratio_0.5",
+    ),
 ]
 
 
