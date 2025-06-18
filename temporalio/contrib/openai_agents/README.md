@@ -75,7 +75,7 @@ class HelloWorldAgent:
 
 If you are familiar with Temporal and with Open AI Agents SDK, this code will look very familiar.
 We annotate the `HelloWorldAgent` class with `@workflow.defn` to define a workflow, then use the `@workflow.run` annotation to define the entrypoint.
-We use the `Agent` class to define a simple agent, one always responds with haikus.
+We use the `Agent` class to define a simple agent, one which always responds with haikus.
 Within the workflow, we start agent using the `Runner`, as is typical, passing through `prompt` as an argument.
 
 Perhaps the most interesting thing about this code is the `with workflow.unsafe.imports_passed_through():` statement that precedes the OpenAI Agents SDK imports.
