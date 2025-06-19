@@ -2,17 +2,23 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import multiprocessing
+import trace
+import typing
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Iterable, List, Optional
 
+import concurrent.futures
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import get_tracer
+from opentelemetry.trace import get_tracer, get_current_span
+from opentelemetry.context import get_current
 
 from temporalio import activity, workflow
+from temporalio.worker import SharedStateManager
 from temporalio.client import Client
 from temporalio.common import RetryPolicy
 from temporalio.contrib.opentelemetry import TracingInterceptor
@@ -392,3 +398,70 @@ async def test_opentelemetry_always_create_workflow_spans(client: Client):
 # * workflow failure and wft failure
 # * signal with start
 # * signal failure and wft failure from signal
+
+
+@workflow.defn
+class ActivityTracePropagationWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        retry_policy = RetryPolicy(initial_interval=timedelta(milliseconds=1))
+        return await workflow.execute_activity(
+            sync_activity,
+            {},
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=retry_policy,
+        )
+
+
+@activity.defn
+def sync_activity(param: typing.Any) -> str:
+    current_span = get_current_span()
+    is_recording = current_span.is_recording()
+    logging.debug("[sync_activity] Current span is recording: %s", is_recording)
+    # trace_context = get_current()
+    # logging.debug("Trace context:\n%s", "\n".join(trace_context))
+    inner_tracer = get_tracer("sync_activity")
+    with inner_tracer.start_as_current_span(
+        "child_span",
+    ):
+        return "done"
+
+
+async def test_activity_trace_propagation(
+    client: Client,
+    env: WorkflowEnvironment,
+):
+    # TODO: test all kinds of workers (just to check we haven't broken others)
+    # TODO: add spy interceptor to check `input.fn` wraps original metadata
+
+    # Create a tracer that has an in-memory exporter
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+
+    # Create a worker with an process pool activity executor
+    async with Worker(
+        client,
+        task_queue=f"task_queue_{uuid.uuid4()}",
+        workflows=[ActivityTracePropagationWorkflow],
+        activities=[sync_activity],
+        interceptors=[TracingInterceptor(tracer)],
+        activity_executor=concurrent.futures.ProcessPoolExecutor(max_workers=1),
+        shared_state_manager=SharedStateManager.create_from_multiprocessing(
+            multiprocessing.Manager()
+        ),
+    ) as worker:
+        assert "done" == await client.execute_workflow(
+            ActivityTracePropagationWorkflow.run,
+            id=f"workflow_{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+    # Expect the child span to be there
+    spans = exporter.get_finished_spans()
+    logging.debug("Spans:\n%s", "\n".join(dump_spans(spans, with_attributes=False)))
+    assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
+        "RunActivity:sync_activity",
+        "  child_span",
+    ]
