@@ -791,7 +791,7 @@ async def _test_start_operation(
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_services=[service_handler],
+        nexus_service_handlers=[service_handler],
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
         response = await service_client.start_operation(
@@ -818,7 +818,7 @@ async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: A
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_services=[MyServiceHandler()],
+        nexus_service_handlers=[MyServiceHandler()],
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
         response = await service_client.start_operation(
@@ -950,7 +950,7 @@ async def test_handler_instantiation(
             Worker(
                 client,
                 task_queue=task_queue,
-                nexus_services=[test_case.handler()],
+                nexus_service_handlers=[test_case.handler()],
                 nexus_task_executor=ThreadPoolExecutor()
                 if test_case.executor
                 else None,
@@ -959,7 +959,7 @@ async def test_handler_instantiation(
         Worker(
             client,
             task_queue=task_queue,
-            nexus_services=[test_case.handler()],
+            nexus_service_handlers=[test_case.handler()],
             nexus_task_executor=ThreadPoolExecutor() if test_case.executor else None,
         )
 
@@ -980,7 +980,7 @@ async def test_cancel_operation_with_invalid_token(env: WorkflowEnvironment):
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_services=[service_handler],
+        nexus_service_handlers=[service_handler],
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
         cancel_response = await service_client.cancel_operation(
@@ -1009,7 +1009,7 @@ async def test_request_id_is_received_by_sync_operation_handler(
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_services=[service_handler],
+        nexus_service_handlers=[service_handler],
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
         request_id = str(uuid.uuid4())
@@ -1060,7 +1060,7 @@ async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnviron
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_services=[service_handler],
+        nexus_service_handlers=[service_handler],
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
         request_id_1, request_id_2 = str(uuid.uuid4()), str(uuid.uuid4())

@@ -71,7 +71,7 @@ async def test_dynamic_creation_of_user_handler_classes(client: Client):
     async with Worker(
         client,
         task_queue=task_queue,
-        nexus_services=[handler_cls()],
+        nexus_service_handlers=[handler_cls()],
     ):
         async with httpx.AsyncClient() as http_client:
             response = await http_client.post(

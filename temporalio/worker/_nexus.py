@@ -48,7 +48,7 @@ class _NexusWorker:
         bridge_worker: Callable[[], temporalio.bridge.worker.Worker],
         client: temporalio.client.Client,
         task_queue: str,
-        nexus_services: Sequence[Any],
+        service_handlers: Sequence[Any],
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         metric_meter: temporalio.common.MetricMeter,
@@ -60,14 +60,14 @@ class _NexusWorker:
         self._client = client
         self._task_queue = task_queue
 
-        for service in nexus_services:
+        for service in service_handlers:
             if isinstance(service, type):
                 raise TypeError(
                     f"Expected a service instance, but got a class: {service}. "
                     "Nexus services must be passed as instances, not classes."
                 )
         self._handler = Handler(
-            nexus_services,
+            service_handlers,
             SyncExecutor(executor) if executor is not None else None,
         )
         self._data_converter = data_converter

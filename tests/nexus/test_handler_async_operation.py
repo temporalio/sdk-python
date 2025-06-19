@@ -154,7 +154,7 @@ async def test_async_operation_lifecycle(
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_services=[service_handler_cls(task_executor)],
+        nexus_service_handlers=[service_handler_cls(task_executor)],
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
         start_response = await service_client.start_operation(

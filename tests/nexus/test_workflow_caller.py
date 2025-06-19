@@ -435,7 +435,7 @@ async def test_sync_response(
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
-        nexus_services=[ServiceImpl()],
+        nexus_service_handlers=[ServiceImpl()],
         workflows=[CallerWorkflow, HandlerWorkflow],
         task_queue=task_queue,
         # TODO(dan): enable sandbox
@@ -510,7 +510,7 @@ async def test_async_response(
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
-        nexus_services=[ServiceImpl()],
+        nexus_service_handlers=[ServiceImpl()],
         workflows=[CallerWorkflow, HandlerWorkflow],
         task_queue=task_queue,
         workflow_runner=UnsandboxedWorkflowRunner(),
@@ -667,7 +667,7 @@ async def test_untyped_caller(
     async with Worker(
         client,
         workflows=[UntypedCallerWorkflow, HandlerWorkflow],
-        nexus_services=[ServiceImpl()],
+        nexus_service_handlers=[ServiceImpl()],
         task_queue=task_queue,
         workflow_runner=UnsandboxedWorkflowRunner(),
         workflow_failure_exception_types=[Exception],
@@ -839,7 +839,7 @@ async def test_service_interface_and_implementation_names(client: Client):
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
-        nexus_services=[
+        nexus_service_handlers=[
             ServiceImplWithNameOverride(),
             ServiceImplInterfaceWithNameOverride(),
             ServiceImplInterfaceWithoutNameOverride(),
