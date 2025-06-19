@@ -903,7 +903,7 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.26.0" },
     { name = "pytest-cov", specifier = ">=6.1.1" },
     { name = "pytest-pretty", specifier = ">=1.3.0" },
-    { name = "ruff", specifier = ">=0.11.7" },
+    { name = "ruff", specifier = ">=0.12.0" },
 ]
 
 [[package]]
