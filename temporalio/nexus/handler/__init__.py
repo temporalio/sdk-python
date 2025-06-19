@@ -17,7 +17,12 @@ from typing import (
 )
 
 import nexusrpc.handler
-from nexusrpc.handler import HandlerError, HandlerErrorType
+from nexusrpc.handler import (
+    CancelOperationContext,
+    HandlerError,
+    HandlerErrorType,
+    StartOperationContext,
+)
 from nexusrpc.types import (
     InputT,
     OutputT,
@@ -34,19 +39,11 @@ if TYPE_CHECKING:
 from collections.abc import Mapping
 from typing import MutableMapping
 
-from temporalio.nexus.handler._operation_context import (
-    CancelOperationContext as CancelOperationContext,
-)
-from temporalio.nexus.handler._operation_context import (
-    Context as Context,
-)
-from temporalio.nexus.handler._operation_context import (
-    StartOperationContext as StartOperationContext,
-)
-from temporalio.nexus.handler._operation_context import (
-    current_context,
-)
-from temporalio.nexus.handler._token import (
+from . import _operation_context
+from ._operation_context import _TemporalNexusOperationContext
+from ._operation_context import client as client
+from ._operation_context import task_queue as task_queue
+from ._token import (
     WorkflowOperationToken as WorkflowOperationToken,
 )
 
@@ -59,10 +56,10 @@ class LoggerAdapter(logging.LoggerAdapter):
         self, msg: Any, kwargs: MutableMapping[str, Any]
     ) -> tuple[Any, MutableMapping[str, Any]]:
         extra = dict(self.extra or {})
-        if ctx := current_context.get(None):
-            extra["service"] = ctx.operation_context.service
-            extra["operation"] = ctx.operation_context.operation
-            extra["task_queue"] = ctx.operation_context.task_queue
+        if ctx := _TemporalNexusOperationContext.current():
+            extra["service"] = ctx.nexus_operation_context.service
+            extra["operation"] = ctx.nexus_operation_context.operation
+            extra["task_queue"] = ctx.task_queue
         kwargs["extra"] = extra | kwargs.get("extra", {})
         return msg, kwargs
 
@@ -127,7 +124,7 @@ async def cancel_workflow(
     token: str,
     client: Optional[Client] = None,
 ) -> None:
-    client = client or ctx.client
+    client = client or _operation_context.client()
     try:
         decoded = WorkflowOperationToken.decode(token)
     except Exception as err:

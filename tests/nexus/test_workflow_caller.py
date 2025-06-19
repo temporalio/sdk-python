@@ -7,6 +7,11 @@ from typing import Any, Callable, Union
 import nexusrpc
 import nexusrpc.handler
 import pytest
+from nexusrpc.handler import (
+    CancelOperationContext,
+    FetchOperationInfoContext,
+    StartOperationContext,
+)
 
 import temporalio.api
 import temporalio.api.common
@@ -132,7 +137,7 @@ class HandlerWorkflow:
 
 class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput]):
     async def start(
-        self, ctx: temporalio.nexus.handler.StartOperationContext, input: OpInput
+        self, ctx: StartOperationContext, input: OpInput
     ) -> Union[
         nexusrpc.handler.StartOperationResultSync[OpOutput],
         nexusrpc.handler.StartOperationResultAsync,
@@ -149,11 +154,11 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
                 value=OpOutput(value="sync response")
             )
         elif isinstance(input.response_type, AsyncResponse):
-            wf_handle = await ctx.client.start_workflow(
+            wf_handle = await temporalio.nexus.handler.client().start_workflow(
                 HandlerWorkflow.run,
                 args=[HandlerWfInput(op_input=input)],
                 id=input.response_type.operation_workflow_id,
-                task_queue=ctx.task_queue,
+                task_queue=temporalio.nexus.handler.task_queue(),
             )
             return nexusrpc.handler.StartOperationResultAsync(
                 WorkflowOperationToken.from_workflow_handle(wf_handle).encode()
@@ -161,13 +166,11 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
         else:
             raise TypeError
 
-    async def cancel(
-        self, ctx: temporalio.nexus.handler.CancelOperationContext, token: str
-    ) -> None:
+    async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
         return await temporalio.nexus.handler.cancel_workflow(ctx, token)
 
     async def fetch_info(
-        self, ctx: nexusrpc.handler.FetchOperationInfoContext, token: str
+        self, ctx: FetchOperationInfoContext, token: str
     ) -> nexusrpc.handler.OperationInfo:
         raise NotImplementedError
 
@@ -187,7 +190,7 @@ class ServiceImpl:
 
     @nexusrpc.handler.sync_operation_handler
     async def sync_operation(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: OpInput
+        self, ctx: StartOperationContext, input: OpInput
     ) -> OpOutput:
         assert isinstance(input.response_type, SyncResponse)
         if input.response_type.exception_in_operation_start:
@@ -200,7 +203,7 @@ class ServiceImpl:
 
     @temporalio.nexus.handler.workflow_run_operation_handler
     async def async_operation(
-        self, ctx: temporalio.nexus.handler.StartOperationContext, input: OpInput
+        self, ctx: StartOperationContext, input: OpInput
     ) -> WorkflowHandle[HandlerWorkflow, HandlerWfOutput]:
         assert isinstance(input.response_type, AsyncResponse)
         if input.response_type.exception_in_operation_start:
@@ -209,11 +212,11 @@ class ServiceImpl:
                 RPCStatusCode.INVALID_ARGUMENT,
                 b"",
             )
-        return await ctx.client.start_workflow(
+        return await temporalio.nexus.handler.client().start_workflow(
             HandlerWorkflow.run,
             args=[HandlerWfInput(op_input=input)],
             id=input.response_type.operation_workflow_id,
-            task_queue=ctx.task_queue,
+            task_queue=temporalio.nexus.handler.task_queue(),
         )
 
 

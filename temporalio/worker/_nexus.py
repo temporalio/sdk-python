@@ -19,6 +19,10 @@ from typing import (
 import google.protobuf.json_format
 import nexusrpc.handler
 from nexusrpc import LazyValueAsync as LazyValue
+from nexusrpc.handler import (
+    CancelOperationContext,
+    StartOperationContext,
+)
 from nexusrpc.handler import HandlerAsync as Handler
 
 import temporalio.api.common.v1
@@ -33,6 +37,9 @@ import temporalio.converter
 import temporalio.nexus
 import temporalio.nexus.handler
 from temporalio.exceptions import ApplicationError
+from temporalio.nexus.handler import (
+    _TemporalNexusOperationContext,
+)
 from temporalio.service import RPCError, RPCStatusCode
 
 from ._interceptor import Interceptor
@@ -167,14 +174,16 @@ class _NexusWorker:
         Attempt to execute the user cancel_operation method. Handle errors and send the
         task completion.
         """
-        ctx = temporalio.nexus.handler.CancelOperationContext(
+        ctx = CancelOperationContext(
             service=request.service,
             operation=request.operation,
-            _client=self._client,
-            _task_queue=self._task_queue,
         )
-        temporalio.nexus.handler.current_context.set(
-            temporalio.nexus.handler.Context(operation_context=ctx)
+        _TemporalNexusOperationContext.set(
+            _TemporalNexusOperationContext(
+                nexus_operation_context=ctx,
+                client=self._client,
+                task_queue=self._task_queue,
+            )
         )
         # TODO(nexus-prerelease): headers
         try:
@@ -260,7 +269,7 @@ class _NexusWorker:
 
         All other exceptions are handled by a caller of this function.
         """
-        ctx = temporalio.nexus.handler.StartOperationContext(
+        ctx = StartOperationContext(
             service=start_request.service,
             operation=start_request.operation,
             headers=headers,
@@ -271,11 +280,13 @@ class _NexusWorker:
                 for link in start_request.links
             ],
             callback_headers=dict(start_request.callback_header),
-            _client=self._client,
-            _task_queue=self._task_queue,
         )
-        temporalio.nexus.handler.current_context.set(
-            temporalio.nexus.handler.Context(operation_context=ctx)
+        _TemporalNexusOperationContext.set(
+            _TemporalNexusOperationContext(
+                nexus_operation_context=ctx,
+                client=self._client,
+                task_queue=self._task_queue,
+            )
         )
         input = LazyValue(
             serializer=_DummyPayloadSerializer(

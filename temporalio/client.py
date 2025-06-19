@@ -58,6 +58,9 @@ import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
 from temporalio.activity import ActivityCancellationDetails
+from temporalio.nexus.handler import (
+    _TemporalNexusOperationContext,
+)
 from temporalio.service import (
     HttpConnectProxyConfig,
     KeepAliveConfig,
@@ -532,8 +535,8 @@ class Client:
             temporalio.workflow._Definition.get_name_and_result_type(workflow)
         )
         nexus_start_ctx = None
-        if nexus_ctx := temporalio.nexus.handler.current_context.get(None):
-            if nexus_start_ctx := nexus_ctx.start_operation_context:
+        if nexus_ctx := _TemporalNexusOperationContext.try_current():
+            if nexus_start_ctx := nexus_ctx.temporal_nexus_start_operation_context:
                 nexus_completion_callbacks = nexus_start_ctx.get_completion_callbacks()
                 workflow_event_links = nexus_start_ctx.get_workflow_event_links()
         else:
@@ -5885,9 +5888,12 @@ class _ClientImpl(OutboundInterceptor):
             req.workflow_task_timeout.FromTimedelta(input.task_timeout)
         req.identity = self._client.identity
         # Use Nexus request ID if we're handling a Nexus Start operation
-        if nexus_ctx := temporalio.nexus.handler.current_context.get(None):
-            if nexus_start_ctx := nexus_ctx.start_operation_context:
-                if nexus_request_id := nexus_start_ctx.request_id:
+        if nexus_ctx := _TemporalNexusOperationContext.try_current():
+            if nexus_start_ctx := nexus_ctx.temporal_nexus_start_operation_context:
+                if (
+                    nexus_request_id
+                    := nexus_start_ctx.nexus_operation_context.request_id
+                ):
                     req.request_id = nexus_request_id
         if not req.request_id:
             req.request_id = str(uuid.uuid4())

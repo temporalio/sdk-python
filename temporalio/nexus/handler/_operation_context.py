@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import contextvars
 import logging
 import re
 import urllib.parse
+from abc import ABC
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import (
@@ -13,6 +15,7 @@ from typing import (
 )
 
 import nexusrpc.handler
+from nexusrpc.handler import CancelOperationContext, StartOperationContext
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -24,35 +27,81 @@ if TYPE_CHECKING:
         WorkflowHandle,
     )
 
+
 logger = logging.getLogger(__name__)
 
-current_context: ContextVar[Context] = ContextVar("nexus-handler")
+
+def client() -> Client:
+    """The Temporal client in use by the worker handling this Nexus operation."""
+    return _TemporalNexusOperationContext.current().client
+
+
+def task_queue() -> str:
+    """The task queue of the worker handling this Nexus operation."""
+    return _TemporalNexusOperationContext.current().task_queue
+
+
+_current_context: ContextVar[_TemporalNexusOperationContext] = ContextVar(
+    "temporal-nexus-operation-context"
+)
 
 
 @dataclass
-class _OperationContext:
-    _client: Optional[Client] = None
-    _task_queue: Optional[str] = None
+class _TemporalNexusOperationContext(ABC):
+    """
+    Context for a Nexus operation being handled by a Temporal Nexus Worker.
+    """
+
+    nexus_operation_context: Union[StartOperationContext, CancelOperationContext]
+    client: Client
+    task_queue: str
+
+    @staticmethod
+    def try_current() -> Optional[_TemporalNexusOperationContext]:
+        return _current_context.get(None)
+
+    @staticmethod
+    def current() -> _TemporalNexusOperationContext:
+        context = _TemporalNexusOperationContext.try_current()
+        if not context:
+            raise RuntimeError("Not in Nexus operation context")
+        return context
+
+    @staticmethod
+    def set(context: _TemporalNexusOperationContext) -> contextvars.Token:
+        return _current_context.set(context)
+
+    @staticmethod
+    def reset(token: contextvars.Token) -> None:
+        _current_context.reset(token)
 
     @property
-    def client(self) -> Client:
-        if self._client is None:
-            raise RuntimeError("Client not set")
-        return self._client
+    def temporal_nexus_start_operation_context(
+        self,
+    ) -> Optional[_TemporalNexusStartOperationContext]:
+        ctx = self.nexus_operation_context
+        if not isinstance(ctx, StartOperationContext):
+            return None
+        return _TemporalNexusStartOperationContext(ctx)
 
     @property
-    def task_queue(self) -> str:
-        if self._task_queue is None:
-            raise RuntimeError("Task queue not set")
-        return self._task_queue
+    def temporal_nexus_cancel_operation_context(
+        self,
+    ) -> Optional[_TemporalNexusCancelOperationContext]:
+        ctx = self.nexus_operation_context
+        if not isinstance(ctx, CancelOperationContext):
+            return None
+        return _TemporalNexusCancelOperationContext(ctx)
 
 
-# TODO(nexus-prerelease) see https://github.com/temporalio/sdk-python/pull/740/files
 @dataclass
-class StartOperationContext(_OperationContext, nexusrpc.handler.StartOperationContext):
+class _TemporalNexusStartOperationContext:
+    nexus_operation_context: StartOperationContext
+
     def get_completion_callbacks(
         self,
     ) -> list[temporalio.common.NexusCompletionCallback]:
+        ctx = self.nexus_operation_context
         return (
             [
                 # TODO(nexus-prerelease): For WorkflowRunOperation, when it handles the Nexus
@@ -61,10 +110,11 @@ class StartOperationContext(_OperationContext, nexusrpc.handler.StartOperationCo
                 # (for backwards compatibility). PR reference in Go SDK:
                 # https://github.com/temporalio/sdk-go/pull/1945
                 temporalio.common.NexusCompletionCallback(
-                    url=self.callback_url, header=self.callback_headers
+                    url=ctx.callback_url,
+                    header=ctx.callback_headers,
                 )
             ]
-            if self.callback_url
+            if ctx.callback_url
             else []
         )
 
@@ -72,7 +122,7 @@ class StartOperationContext(_OperationContext, nexusrpc.handler.StartOperationCo
         self,
     ) -> list[temporalio.api.common.v1.Link.WorkflowEvent]:
         event_links = []
-        for inbound_link in self.inbound_links:
+        for inbound_link in self.nexus_operation_context.inbound_links:
             if link := _nexus_link_to_workflow_event(inbound_link):
                 event_links.append(link)
         return event_links
@@ -89,7 +139,7 @@ class StartOperationContext(_OperationContext, nexusrpc.handler.StartOperationCo
                 f"Failed to create WorkflowExecutionStarted event link for workflow {id}: {e}"
             )
         else:
-            self.outbound_links.append(
+            self.nexus_operation_context.outbound_links.append(
                 # TODO(nexus-prerelease): Before, WorkflowRunOperation was generating an EventReference
                 # link to send back to the caller. Now, it checks if the server returned
                 # the link in the StartWorkflowExecutionResponse, and if so, send the link
@@ -102,35 +152,8 @@ class StartOperationContext(_OperationContext, nexusrpc.handler.StartOperationCo
 
 
 @dataclass
-class CancelOperationContext(
-    _OperationContext, nexusrpc.handler.CancelOperationContext
-):
-    pass
-
-
-@dataclass
-class Context:
-    operation_context: Union[StartOperationContext, CancelOperationContext]
-
-    @property
-    def start_operation_context(self) -> Optional[StartOperationContext]:
-        if self.operation_context is None:
-            raise RuntimeError("Nexus handler operation context not set")
-        return (
-            self.operation_context
-            if isinstance(self.operation_context, StartOperationContext)
-            else None
-        )
-
-    @property
-    def cancel_operation_context(self) -> Optional[CancelOperationContext]:
-        if self.operation_context is None:
-            raise RuntimeError("Nexus handler operation context not set")
-        return (
-            self.operation_context
-            if isinstance(self.operation_context, CancelOperationContext)
-            else None
-        )
+class _TemporalNexusCancelOperationContext:
+    nexus_operation_context: CancelOperationContext
 
 
 # TODO(nexus-prerelease): confirm that it is correct not to use event_id in the following functions.
