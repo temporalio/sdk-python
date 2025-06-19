@@ -53,7 +53,7 @@ import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
-import temporalio.nexus
+import temporalio.nexus.handler
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
@@ -532,7 +532,7 @@ class Client:
             temporalio.workflow._Definition.get_name_and_result_type(workflow)
         )
         nexus_start_ctx = None
-        if nexus_ctx := temporalio.nexus.current_context.get(None):
+        if nexus_ctx := temporalio.nexus.handler.current_context.get(None):
             if nexus_start_ctx := nexus_ctx.start_operation_context:
                 nexus_completion_callbacks = nexus_start_ctx.get_completion_callbacks()
                 workflow_event_links = nexus_start_ctx.get_workflow_event_links()
@@ -5885,7 +5885,7 @@ class _ClientImpl(OutboundInterceptor):
             req.workflow_task_timeout.FromTimedelta(input.task_timeout)
         req.identity = self._client.identity
         # Use Nexus request ID if we're handling a Nexus Start operation
-        if nexus_ctx := temporalio.nexus.current_context.get(None):
+        if nexus_ctx := temporalio.nexus.handler.current_context.get(None):
             if nexus_start_ctx := nexus_ctx.start_operation_context:
                 if nexus_request_id := nexus_start_ctx.request_id:
                     req.request_id = nexus_request_id

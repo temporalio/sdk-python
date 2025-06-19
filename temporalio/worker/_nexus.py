@@ -123,7 +123,7 @@ class _NexusWorker:
                         # TODO(nexus-prerelease): when do we remove the entry from _running_operations?
                         _task.cancel()
                     else:
-                        temporalio.nexus.logger.warning(
+                        temporalio.nexus.handler.logger.warning(
                             f"Received cancel_task but no running operation exists for "
                             f"task token: {task.task_token}"
                         )
@@ -167,20 +167,20 @@ class _NexusWorker:
         Attempt to execute the user cancel_operation method. Handle errors and send the
         task completion.
         """
-        ctx = temporalio.nexus.CancelOperationContext(
+        ctx = temporalio.nexus.handler.CancelOperationContext(
             service=request.service,
             operation=request.operation,
             _client=self._client,
             _task_queue=self._task_queue,
         )
-        temporalio.nexus.current_context.set(
-            temporalio.nexus.Context(operation_context=ctx)
+        temporalio.nexus.handler.current_context.set(
+            temporalio.nexus.handler.Context(operation_context=ctx)
         )
         # TODO(nexus-prerelease): headers
         try:
             await self._handler.cancel_operation(ctx, request.operation_token)
         except Exception as err:
-            temporalio.nexus.logger.exception(
+            temporalio.nexus.handler.logger.exception(
                 "Failed to execute Nexus cancel operation method"
             )
             completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
@@ -200,7 +200,9 @@ class _NexusWorker:
         try:
             await self._bridge_worker().complete_nexus_task(completion)
         except Exception:
-            temporalio.nexus.logger.exception("Failed to send Nexus task completion")
+            temporalio.nexus.handler.logger.exception(
+                "Failed to send Nexus task completion"
+            )
 
     async def _handle_start_operation_task(
         self,
@@ -235,12 +237,14 @@ class _NexusWorker:
         try:
             await self._bridge_worker().complete_nexus_task(completion)
         except Exception:
-            temporalio.nexus.logger.exception("Failed to send Nexus task completion")
+            temporalio.nexus.handler.logger.exception(
+                "Failed to send Nexus task completion"
+            )
         finally:
             try:
                 del self._running_tasks[task_token]
             except KeyError:
-                temporalio.nexus.logger.exception(
+                temporalio.nexus.handler.logger.exception(
                     "Failed to remove completed Nexus operation"
                 )
 
@@ -256,7 +260,7 @@ class _NexusWorker:
 
         All other exceptions are handled by a caller of this function.
         """
-        ctx = temporalio.nexus.StartOperationContext(
+        ctx = temporalio.nexus.handler.StartOperationContext(
             service=start_request.service,
             operation=start_request.operation,
             headers=headers,
@@ -270,8 +274,8 @@ class _NexusWorker:
             _client=self._client,
             _task_queue=self._task_queue,
         )
-        temporalio.nexus.current_context.set(
-            temporalio.nexus.Context(operation_context=ctx)
+        temporalio.nexus.handler.current_context.set(
+            temporalio.nexus.handler.Context(operation_context=ctx)
         )
         input = LazyValue(
             serializer=_DummyPayloadSerializer(

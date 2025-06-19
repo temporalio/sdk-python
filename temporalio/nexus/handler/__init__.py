@@ -30,10 +30,45 @@ if TYPE_CHECKING:
         Client,
         WorkflowHandle,
     )
-from temporalio.nexus import CancelOperationContext, StartOperationContext
-from temporalio.nexus.token import WorkflowOperationToken
 
-logger = logging.getLogger(__name__)
+from collections.abc import Mapping
+from typing import MutableMapping
+
+from temporalio.nexus.handler._operation_context import (
+    CancelOperationContext as CancelOperationContext,
+)
+from temporalio.nexus.handler._operation_context import (
+    Context as Context,
+)
+from temporalio.nexus.handler._operation_context import (
+    StartOperationContext as StartOperationContext,
+)
+from temporalio.nexus.handler._operation_context import (
+    current_context,
+)
+from temporalio.nexus.handler._token import (
+    WorkflowOperationToken as WorkflowOperationToken,
+)
+
+
+class LoggerAdapter(logging.LoggerAdapter):
+    def __init__(self, logger: logging.Logger, extra: Optional[Mapping[str, Any]]):
+        super().__init__(logger, extra or {})
+
+    def process(
+        self, msg: Any, kwargs: MutableMapping[str, Any]
+    ) -> tuple[Any, MutableMapping[str, Any]]:
+        extra = dict(self.extra or {})
+        if ctx := current_context.get(None):
+            extra["service"] = ctx.operation_context.service
+            extra["operation"] = ctx.operation_context.operation
+            extra["task_queue"] = ctx.operation_context.task_queue
+        kwargs["extra"] = extra | kwargs.get("extra", {})
+        return msg, kwargs
+
+
+logger = LoggerAdapter(logging.getLogger(__name__), None)
+"""Logger that emits additional data describing the current Nexus operation."""
 
 
 # TODO(nexus-preview): demonstrate obtaining Temporal client in sync operation.

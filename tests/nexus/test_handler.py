@@ -38,7 +38,11 @@ from temporalio.client import Client, WorkflowHandle
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.converter import FailureConverter, PayloadConverter
 from temporalio.exceptions import ApplicationError
-from temporalio.nexus import CancelOperationContext, StartOperationContext, logger
+from temporalio.nexus.handler import (
+    CancelOperationContext,
+    StartOperationContext,
+    logger,
+)
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import ServiceClient, create_nexus_endpoint
@@ -838,7 +842,7 @@ async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: A
         (
             record
             for record in caplog.records
-            if record.name == "temporalio.nexus"
+            if record.name == "temporalio.nexus.handler"
             and record.getMessage() == "Logging from start method"
         ),
         None,
