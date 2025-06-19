@@ -122,7 +122,8 @@ def _get_workflow_run_start_method_input_and_output_type_annotations(
 async def cancel_workflow(
     ctx: CancelOperationContext,
     token: str,
-    client: Optional[Client] = None,
+    client: Optional[Client] = None,  # noqa
+    **kwargs: Any,
 ) -> None:
     client = client or _operation_context.client()
     try:
@@ -141,7 +142,7 @@ async def cancel_workflow(
             type=HandlerErrorType.NOT_FOUND,
             cause=err,
         )
-    await handle.cancel()
+    await handle.cancel(**kwargs)
 
 
 class WorkflowRunOperationHandler(
