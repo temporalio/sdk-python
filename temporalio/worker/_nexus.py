@@ -18,8 +18,8 @@ from typing import (
 
 import google.protobuf.json_format
 import nexusrpc.handler
-from nexusrpc.asyncio import LazyValue
-from nexusrpc.asyncio.handler import Handler
+from nexusrpc import LazyValueAsync as LazyValue
+from nexusrpc.handler import HandlerAsync as Handler
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -65,10 +65,7 @@ class _NexusWorker:
                     f"Expected a service instance, but got a class: {service}. "
                     "Nexus services must be passed as instances, not classes."
                 )
-        self._handler = Handler(
-            service_handlers,
-            executor,
-        )
+        self._handler = Handler(service_handlers, executor)
         self._data_converter = data_converter
         # TODO(nexus-prerelease): interceptors
         self._interceptors = interceptors
