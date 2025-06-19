@@ -20,7 +20,6 @@ import google.protobuf.json_format
 import nexusrpc.handler
 from nexusrpc.asyncio import LazyValue
 from nexusrpc.asyncio.handler import Handler
-from nexusrpc.handler import SyncExecutor
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -52,7 +51,7 @@ class _NexusWorker:
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         metric_meter: temporalio.common.MetricMeter,
-        executor: Optional[concurrent.futures.ThreadPoolExecutor],
+        executor: Optional[concurrent.futures.Executor],
     ) -> None:
         # TODO: make it possible to query task queue of bridge worker instead of passing
         # unused task_queue into _NexusWorker, _ActivityWorker, etc?
@@ -68,7 +67,7 @@ class _NexusWorker:
                 )
         self._handler = Handler(
             service_handlers,
-            SyncExecutor(executor) if executor is not None else None,
+            executor,
         )
         self._data_converter = data_converter
         # TODO(nexus-prerelease): interceptors
