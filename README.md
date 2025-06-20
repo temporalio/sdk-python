@@ -946,10 +946,11 @@ workflow will not progress until fixed.
 The sandbox is not foolproof and non-determinism can still occur. It is simply a best-effort way to catch bad code
 early. Users are encouraged to define their workflows in files with no other side effects.
 
-The sandbox offers a mechanism to pass through modules from outside the sandbox. By default this already includes all
+The sandbox offers a mechanism to "pass through" modules from outside the sandbox. By default this already includes all
 standard library modules and Temporal modules. **For performance and behavior reasons, users are encouraged to pass
-through all third party modules whose calls will be deterministic.** This includes modules containing the activities to
-be referenced in workflows. See "Passthrough Modules" below on how to do this.
+through all modules whose calls will be deterministic.** In particular, this advice extends to modules containing the
+activities to be referenced in workflows, and modules containing dataclasses and Pydantic models, which can be
+particularly expensive to import. See "Passthrough Modules" below on how to do this.
 
 If you are getting an error like:
 
@@ -957,8 +958,9 @@ If you are getting an error like:
 > http.client.IncompleteRead.\_\_mro_entries\_\_ from inside a workflow. If this is code from a module not used in a
 > workflow or known to only be used deterministically from a workflow, mark the import as pass through.
 
-Then you are either using an invalid construct from the workflow, this is a known limitation of the sandbox, or most
-commonly this is from a module that is safe to pass through (see "Passthrough Modules" section below).
+Then either:
+- [Most commonly] This is from a module that is safe to pass through (see "Passthrough Modules" section below).
+- You're using an invalid construct from the workflow, this is a known limitation of the sandbox, or
 
 ##### How the Sandbox Works
 
@@ -967,12 +969,13 @@ The sandbox is made up of two components that work closely together:
 * Global state isolation
 * Restrictions preventing known non-deterministic library calls
 
-Global state isolation is performed by using `exec`. Upon workflow start, the file that the workflow is defined in is
-imported into a new sandbox created for that workflow run. In order to keep the sandbox performant a known set of
-"passthrough modules" are passed through from outside of the sandbox when they are imported. These are expected to be
-side-effect free on import and have their non-deterministic aspects restricted. By default the entire Python standard
-library, `temporalio`, and a couple of other modules are passed through from outside of the sandbox. To update this
-list, see "Customizing the Sandbox".
+Global state isolation is performed by using `exec`. Upon workflow start, and every time that the workflow is replayed,
+the file that the workflow is defined in is re-imported into a new sandbox created for that workflow run. In order to
+keep the sandbox performant, not all modules are re-imported in this way: instead, a known set of "passthrough modules"
+are obtained as references to the already-imported module _outside_ the sandbox. These modules should be side-effect
+free on import and, if they make any non-deterministic calls, then these should be restricted by sandbox restriction
+rules. By default the entire Python standard library, `temporalio`, and a couple of other modules are "passed through"
+in this way from outside of the sandbox. To update this list, see "Customizing the Sandbox".
 
 Restrictions preventing known non-deterministic library calls are achieved using proxy objects on modules wrapped around
 the custom importer set in the sandbox. Many restrictions apply at workflow import time and workflow run time, while
@@ -984,7 +987,7 @@ and isn't restricted, see "Customizing the Sandbox".
 ##### Avoiding the Sandbox
 
 There are three increasingly-scoped ways to avoid the sandbox. Users are discouraged from avoiding the sandbox if
-possible.
+possible, except for passing through safe modules, which is recommended.
 
 To remove restrictions around a particular block of code, use `with temporalio.workflow.unsafe.sandbox_unrestricted():`.
 The workflow will still be running in the sandbox, but no restrictions for invalid library calls will be applied.
@@ -1011,11 +1014,12 @@ is immutable and contains three fields that can be customized, but only two have
 ###### Passthrough Modules
 
 By default the sandbox completely reloads non-standard-library and non-Temporal modules for every workflow run. To make
-the sandbox quicker and use less memory when importing known-side-effect-free third party modules, they can be marked
+the sandbox quicker and use less memory when importing known-side-effect-free modules, they can be marked
 as passthrough modules.
 
 **For performance and behavior reasons, users are encouraged to pass through all third party modules whose calls will be
-deterministic.**
+deterministic.** In particular, this advice extends to modules containing the activities to be referenced in workflows,
+and modules containing dataclasses and Pydantic models, which can be particularly expensive to import.
 
 One way to pass through a module is at import time in the workflow file using the `imports_passed_through` context
 manager like so:
