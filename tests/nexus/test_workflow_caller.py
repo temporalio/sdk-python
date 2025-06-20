@@ -33,6 +33,7 @@ from temporalio.client import (
 )
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import CancelledError, NexusHandlerError, NexusOperationError
+from temporalio.nexus.handler._operation_context import TemporalNexusOperationContext
 from temporalio.nexus.handler._token import WorkflowOperationToken
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
@@ -154,11 +155,12 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
                 value=OpOutput(value="sync response")
             )
         elif isinstance(input.response_type, AsyncResponse):
-            wf_handle = await temporalio.nexus.handler.client().start_workflow(
+            tctx = TemporalNexusOperationContext.current()
+            wf_handle = await tctx.client.start_workflow(
                 HandlerWorkflow.run,
                 args=[HandlerWfInput(op_input=input)],
                 id=input.response_type.operation_workflow_id,
-                task_queue=temporalio.nexus.handler.task_queue(),
+                task_queue=tctx.task_queue,
             )
             return nexusrpc.handler.StartOperationResultAsync(
                 WorkflowOperationToken.from_workflow_handle(wf_handle).encode()
@@ -212,11 +214,12 @@ class ServiceImpl:
                 RPCStatusCode.INVALID_ARGUMENT,
                 b"",
             )
-        return await temporalio.nexus.handler.client().start_workflow(
+        tctx = TemporalNexusOperationContext.current()
+        return await tctx.client.start_workflow(
             HandlerWorkflow.run,
             args=[HandlerWfInput(op_input=input)],
             id=input.response_type.operation_workflow_id,
-            task_queue=temporalio.nexus.handler.task_queue(),
+            task_queue=tctx.task_queue,
         )
 
 

@@ -45,6 +45,7 @@ from temporalio.exceptions import ApplicationError
 from temporalio.nexus.handler import (
     logger,
 )
+from temporalio.nexus.handler._operation_context import TemporalNexusOperationContext
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import ServiceClient, create_nexus_endpoint
@@ -210,11 +211,12 @@ class MyServiceHandler:
     async def workflow_run_operation(
         self, ctx: StartOperationContext, input: Input
     ) -> WorkflowHandle[Any, Output]:
-        return await temporalio.nexus.handler.client().start_workflow(
+        tctx = TemporalNexusOperationContext.current()
+        return await tctx.client.start_workflow(
             MyWorkflow.run,
             input,
             id=test_context.workflow_id or str(uuid.uuid4()),
-            task_queue=temporalio.nexus.handler.task_queue(),
+            task_queue=tctx.task_queue,
             id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
         )
 
@@ -254,11 +256,12 @@ class MyServiceHandler:
 
     @temporalio.nexus.handler.workflow_run_operation_handler
     async def workflow_run_operation_without_type_annotations(self, ctx, input):
-        return await temporalio.nexus.handler.client().start_workflow(
+        tctx = TemporalNexusOperationContext.current()
+        return await tctx.client.start_workflow(
             WorkflowWithoutTypeAnnotations.run,
             input,
             id=test_context.workflow_id or str(uuid.uuid4()),
-            task_queue=temporalio.nexus.handler.task_queue(),
+            task_queue=tctx.task_queue,
         )
 
     @temporalio.nexus.handler.workflow_run_operation_handler
@@ -271,11 +274,12 @@ class MyServiceHandler:
         assert ctx.request_id == "test-request-id-123", "Request ID mismatch"
         ctx.outbound_links.extend(ctx.inbound_links)
 
-        return await temporalio.nexus.handler.client().start_workflow(
+        tctx = TemporalNexusOperationContext.current()
+        return await tctx.client.start_workflow(
             MyLinkTestWorkflow.run,
             input,
             id=test_context.workflow_id or str(uuid.uuid4()),
-            task_queue=temporalio.nexus.handler.task_queue(),
+            task_queue=tctx.task_queue,
         )
 
     class OperationHandlerReturningUnwrappedResult(

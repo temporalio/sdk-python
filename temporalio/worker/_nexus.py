@@ -38,7 +38,7 @@ import temporalio.nexus
 import temporalio.nexus.handler
 from temporalio.exceptions import ApplicationError
 from temporalio.nexus.handler import (
-    _TemporalNexusOperationContext,
+    TemporalNexusOperationContext,
 )
 from temporalio.service import RPCError, RPCStatusCode
 
@@ -178,8 +178,8 @@ class _NexusWorker:
             service=request.service,
             operation=request.operation,
         )
-        _TemporalNexusOperationContext.set(
-            _TemporalNexusOperationContext(
+        TemporalNexusOperationContext.set(
+            TemporalNexusOperationContext(
                 nexus_operation_context=ctx,
                 client=self._client,
                 task_queue=self._task_queue,
@@ -281,8 +281,8 @@ class _NexusWorker:
             ],
             callback_headers=dict(start_request.callback_header),
         )
-        _TemporalNexusOperationContext.set(
-            _TemporalNexusOperationContext(
+        TemporalNexusOperationContext.set(
+            TemporalNexusOperationContext(
                 nexus_operation_context=ctx,
                 client=self._client,
                 task_queue=self._task_queue,

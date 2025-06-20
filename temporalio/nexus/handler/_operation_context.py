@@ -31,44 +31,38 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def client() -> Client:
-    """The Temporal client in use by the worker handling this Nexus operation."""
-    return _TemporalNexusOperationContext.current().client
-
-
-def task_queue() -> str:
-    """The task queue of the worker handling this Nexus operation."""
-    return _TemporalNexusOperationContext.current().task_queue
-
-
-_current_context: ContextVar[_TemporalNexusOperationContext] = ContextVar(
+_current_context: ContextVar[TemporalNexusOperationContext] = ContextVar(
     "temporal-nexus-operation-context"
 )
 
 
 @dataclass
-class _TemporalNexusOperationContext(ABC):
+class TemporalNexusOperationContext(ABC):
     """
     Context for a Nexus operation being handled by a Temporal Nexus Worker.
     """
 
     nexus_operation_context: Union[StartOperationContext, CancelOperationContext]
+
     client: Client
+    """The Temporal client in use by the worker handling this Nexus operation."""
+
     task_queue: str
+    """The task queue of the worker handling this Nexus operation."""
 
     @staticmethod
-    def try_current() -> Optional[_TemporalNexusOperationContext]:
+    def try_current() -> Optional[TemporalNexusOperationContext]:
         return _current_context.get(None)
 
     @staticmethod
-    def current() -> _TemporalNexusOperationContext:
-        context = _TemporalNexusOperationContext.try_current()
+    def current() -> TemporalNexusOperationContext:
+        context = TemporalNexusOperationContext.try_current()
         if not context:
             raise RuntimeError("Not in Nexus operation context")
         return context
 
     @staticmethod
-    def set(context: _TemporalNexusOperationContext) -> contextvars.Token:
+    def set(context: TemporalNexusOperationContext) -> contextvars.Token:
         return _current_context.set(context)
 
     @staticmethod
