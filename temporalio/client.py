@@ -5907,6 +5907,8 @@ class _ClientImpl(OutboundInterceptor):
             req.workflow_task_timeout.FromTimedelta(input.task_timeout)
         req.identity = self._client.identity
         # Use Nexus request ID if we're handling a Nexus Start operation
+        # TODO(prerelease): confirm that we should do this for every workflow started
+        # TODO(prerelease): add test coverage for multiple workflows started by a Nexus operation
         if nexus_ctx := TemporalNexusOperationContext.try_current():
             if nexus_start_ctx := nexus_ctx.temporal_nexus_start_operation_context:
                 if (
