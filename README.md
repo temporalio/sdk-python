@@ -952,15 +952,6 @@ through all modules whose calls will be deterministic.** In particular, this adv
 activities to be referenced in workflows, and modules containing dataclasses and Pydantic models, which can be
 particularly expensive to import. See "Passthrough Modules" below on how to do this.
 
-If you are getting an error like:
-
-> temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access
-> http.client.IncompleteRead.\_\_mro_entries\_\_ from inside a workflow. If this is code from a module not used in a
-> workflow or known to only be used deterministically from a workflow, mark the import as pass through.
-
-Then either:
-- [Most commonly] This is from a module that is safe to pass through (see "Passthrough Modules" section below).
-- You're using an invalid construct from the workflow (this is a known limitation of the sandbox).
 
 ##### How the Sandbox Works
 
