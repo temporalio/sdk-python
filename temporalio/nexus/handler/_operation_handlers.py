@@ -130,8 +130,18 @@ class WorkflowRunOperationResult(nexusrpc.handler.StartOperationResultAsync):
 
     @classmethod
     def from_workflow_handle(cls, workflow_handle: WorkflowHandle) -> Self:
+        """
+        Create a :class:`WorkflowRunOperationResult` from a :py:class:`~temporalio.client.WorkflowHandle`.
+        """
         token = WorkflowOperationToken.from_workflow_handle(workflow_handle).encode()
         return cls(token=token)
+
+    def to_workflow_handle(self) -> WorkflowHandle:
+        """
+        Create a :py:class:`~temporalio.client.WorkflowHandle` from a :class:`WorkflowRunOperationResult`.
+        """
+        tctx = TemporalNexusOperationContext.current()
+        return WorkflowOperationToken.decode(self.token).to_workflow_handle(tctx.client)
 
 
 @overload
