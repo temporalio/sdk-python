@@ -536,6 +536,11 @@ class Client:
         )
         nexus_start_ctx = None
         if nexus_ctx := TemporalNexusOperationContext.try_current():
+            # TODO(prerelease): I think this is too magical: what if a user implements a
+            # nexus handler by running one workflow to completion, and then starting a
+            # second workflow to act as the async operation itself?
+            # TODO(prerelease): What do we do if the Temporal Nexus context client
+            # (namespace) is not the same as the one being used to start this workflow?
             if nexus_start_ctx := nexus_ctx.temporal_nexus_start_operation_context:
                 nexus_completion_callbacks = nexus_start_ctx.get_completion_callbacks()
                 workflow_event_links = nexus_start_ctx.get_workflow_event_links()
