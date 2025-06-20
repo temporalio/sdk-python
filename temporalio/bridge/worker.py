@@ -392,8 +392,11 @@ async def decode_activation(
             for val in job.initialize_workflow.memo.fields.values():
                 # This uses API payload not bridge payload
                 new_payload = (await codec.decode([val]))[0]
+                # Make a shallow copy, in case new_payload.metadata and val.metadata are
+                # references to the same memory, e.g. decode() returns its input unchanged.
+                new_metadata = dict(new_payload.metadata)
                 val.metadata.clear()
-                val.metadata.update(new_payload.metadata)
+                val.metadata.update(new_metadata)
                 val.data = new_payload.data
         elif job.HasField("do_update"):
             await _decode_payloads(job.do_update.input, codec)
