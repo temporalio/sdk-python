@@ -2,6 +2,8 @@
 
 ⚠️ **Experimental** - This module is not yet stable and may change in the future.
 
+For questions, please join the [#python-sdk](https://temporalio.slack.com/archives/CTT84RS0P) Slack channel at [temporalio.slack.com](https://temporalio.slack.com/).
+
 This module provides a bridge between Temporal durable execution and the [OpenAI Agents SDK](https://github.com/openai/openai-agents-python).
 
 ## Background
