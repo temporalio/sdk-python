@@ -318,7 +318,7 @@ class Client:
         ] = None,
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
-        nexus_operation_context: Optional[TemporalNexusOperationContext] = None,
+        nexus_operation: Optional[TemporalNexusOperationContext] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -354,7 +354,7 @@ class Client:
         ] = None,
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
-        nexus_operation_context: Optional[TemporalNexusOperationContext] = None,
+        nexus_operation: Optional[TemporalNexusOperationContext] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -392,7 +392,7 @@ class Client:
         ] = None,
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
-        nexus_operation_context: Optional[TemporalNexusOperationContext] = None,
+        nexus_operation: Optional[TemporalNexusOperationContext] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -430,7 +430,7 @@ class Client:
         ] = None,
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
-        nexus_operation_context: Optional[TemporalNexusOperationContext] = None,
+        nexus_operation: Optional[TemporalNexusOperationContext] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -466,7 +466,7 @@ class Client:
         ] = None,
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
-        nexus_operation_context: Optional[TemporalNexusOperationContext] = None,
+        nexus_operation: Optional[TemporalNexusOperationContext] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -510,7 +510,7 @@ class Client:
                 UI/CLI. This can be in Temporal markdown format and can span multiple lines. This is
                 a fixed value on the workflow that cannot be updated. For details that can be
                 updated, use :py:meth:`temporalio.workflow.get_current_details` within the workflow.
-            nexus_operation_context: An optional
+            nexus_operation: An optional
                 :py:class:`temporalio.nexus.handler.TemporalNexusOperationContext`. If supplied, it means
                 that the started workflow is backing Nexus operation corresponding to the context.
                 This means that the workflow result is the Nexus operation result, and will be delivered
@@ -547,16 +547,14 @@ class Client:
             temporalio.workflow._Definition.get_name_and_result_type(workflow)
         )
         nexus_start_ctx = None
-        if nexus_operation_context:
+        if nexus_operation:
             # TODO(prerelease): check what sdk-typescript does regarding workflow
             # options for workflows being started by Nexus operations.
             # https://github.com/temporalio/sdk-typescript/blob/nexus/packages/nexus/src/context.ts#L96
-            nexus_start_ctx = (
-                nexus_operation_context.temporal_nexus_start_operation_context
-            )
+            nexus_start_ctx = nexus_operation.temporal_nexus_start_operation_context
             if not nexus_start_ctx:
                 raise RuntimeError(
-                    f"Nexus operation context {nexus_operation_context} is not a start operation context"
+                    f"Nexus operation context {nexus_operation} is not a start operation context"
                 )
             nexus_completion_callbacks = nexus_start_ctx.get_completion_callbacks()
             workflow_event_links = nexus_start_ctx.get_workflow_event_links()
