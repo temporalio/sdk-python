@@ -1538,6 +1538,31 @@ async def test_workflow_with_passthrough_codec(client: Client):
     await test_workflow_simple_activity(client)
 
 
+@workflow.defn
+class MemoDecodingWorkflow:
+    @workflow.run
+    async def run(self, memo_key: str) -> Any:
+        return workflow.memo_value(memo_key)
+
+
+async def test_workflow_memo_decoding_with_passthrough_codec(client: Client):
+    # This used to fail because activation decoding accidentally cleared the memo
+    # payload metadata (containing the encoding) due to memory sharing between the
+    # before-decoding and after-decoding value
+    config = client.config()
+    config["data_converter"] = DataConverter(payload_codec=PassThroughCodec())
+    client = Client(**config)
+    async with new_worker(client, MemoDecodingWorkflow) as worker:
+        memo_value = await client.execute_workflow(
+            MemoDecodingWorkflow.run,
+            "memokey",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            memo={"memokey": {"memoval_key": "memoval_value"}},
+        )
+        assert memo_value == {"memoval_key": "memoval_value"}
+
+
 class CustomWorkflowRunner(WorkflowRunner):
     def __init__(self) -> None:
         super().__init__()

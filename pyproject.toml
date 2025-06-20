@@ -1,6 +1,6 @@
 [project]
 name = "temporalio"
-version = "1.12.0"
+version = "1.13.0"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = "~=3.9"
@@ -11,7 +11,7 @@ keywords = [
     "workflow",
 ]
 dependencies = [
-    "protobuf>=3.20",
+    "protobuf>=3.20,<6",
     "python-dateutil>=2.8.2,<3 ; python_version < '3.11'",
     "types-protobuf>=3.20",
     "typing-extensions>=4.2.0,<5",
@@ -24,6 +24,7 @@ opentelemetry = [
     "opentelemetry-sdk>=1.11.1,<2",
 ]
 pydantic = ["pydantic>=2.0.0,<3"]
+openai-agents = ["openai-agents >= 0.0.19"]
 
 [project.urls]
 Homepage = "https://github.com/temporalio/sdk-python"

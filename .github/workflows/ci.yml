@@ -44,6 +44,10 @@ jobs:
             pythonOverride: "3.13.2"
           - os: macos-arm
             runsOn: macos-latest
+          # On 3.13.5, python3.lib is missing for the linker
+          - os: windows-latest
+            python: "3.13"
+            pythonOverride: "3.13.4"
     runs-on: ${{ matrix.runsOn || matrix.os }}
     steps:
       - uses: actions/checkout@v4
