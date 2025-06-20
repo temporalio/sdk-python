@@ -960,7 +960,7 @@ If you are getting an error like:
 
 Then either:
 - [Most commonly] This is from a module that is safe to pass through (see "Passthrough Modules" section below).
-- You're using an invalid construct from the workflow, this is a known limitation of the sandbox, or
+- You're using an invalid construct from the workflow, this is a known limitation of the sandbox
 
 ##### How the Sandbox Works
 
