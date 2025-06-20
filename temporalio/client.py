@@ -511,12 +511,12 @@ class Client:
                 a fixed value on the workflow that cannot be updated. For details that can be
                 updated, use :py:meth:`temporalio.workflow.get_current_details` within the workflow.
             nexus_operation: An optional
-                :py:class:`temporalio.nexus.handler.TemporalNexusOperationContext`. If supplied, it means
-                that the started workflow is backing Nexus operation corresponding to the context.
-                This means that the workflow result is the Nexus operation result, and will be delivered
-                to the Nexus caller on workflow completion, and that Nexus bidirectional links will be
-                established between the caller and the workflow. Do not supply this argument if the
-                workflow is not backing a Nexus operation.
+                :py:class:`temporalio.nexus.handler.TemporalNexusOperationContext`. If supplied,
+                it means that the started workflow is backing that Nexus operation. This means that
+                the workflow result is the Nexus operation result, and will be delivered to the Nexus
+                caller on workflow completion, and that Nexus bidirectional links will be established
+                between the caller and the workflow. Do not supply this argument if the workflow is
+                not backing a Nexus operation.
             start_delay: Amount of time to wait before starting the workflow.
                 This does not work with ``cron_schedule``.
             start_signal: If present, this signal is sent as signal-with-start
