@@ -136,12 +136,18 @@ class WorkflowRunOperationResult(nexusrpc.handler.StartOperationResultAsync):
         token = WorkflowOperationToken.from_workflow_handle(workflow_handle).encode()
         return cls(token=token)
 
-    def to_workflow_handle(self) -> WorkflowHandle:
+    def to_workflow_handle(self, client: Client) -> WorkflowHandle:
         """
         Create a :py:class:`~temporalio.client.WorkflowHandle` from a :class:`WorkflowRunOperationResult`.
         """
-        tctx = TemporalNexusOperationContext.current()
-        return WorkflowOperationToken.decode(self.token).to_workflow_handle(tctx.client)
+        workflow_operation_token = WorkflowOperationToken.decode(self.token)
+        if workflow_operation_token.namespace != client.namespace:
+            raise ValueError(
+                "Cannot create a workflow handle from a workflow operation result "
+                "with a client whose namespace is not the same as the namespace of the "
+                "workflow operation token."
+            )
+        return WorkflowOperationToken.decode(self.token).to_workflow_handle(client)
 
 
 @overload
