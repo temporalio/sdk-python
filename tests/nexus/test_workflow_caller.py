@@ -161,6 +161,7 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
                 args=[HandlerWfInput(op_input=input)],
                 id=input.response_type.operation_workflow_id,
                 task_queue=tctx.task_queue,
+                nexus_operation=tctx,
             )
             return nexusrpc.handler.StartOperationResultAsync(
                 WorkflowOperationToken.from_workflow_handle(wf_handle).encode()
@@ -220,6 +221,7 @@ class ServiceImpl:
             args=[HandlerWfInput(op_input=input)],
             id=input.response_type.operation_workflow_id,
             task_queue=tctx.task_queue,
+            nexus_operation=tctx,
         )
 
 
