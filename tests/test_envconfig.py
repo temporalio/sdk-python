@@ -75,7 +75,6 @@ def test_load_profile_from_file_default(base_config_file: Path):
 
     config = profile.to_connect_config()
     assert config.target_host == "default-address"
-    assert config.rpc_metadata["namespace"] == "default-namespace"
     assert not config.tls
     assert not config.rpc_metadata or "custom-header" not in config.rpc_metadata
 
@@ -93,7 +92,6 @@ def test_load_profile_from_file_custom(base_config_file: Path):
 
     config = profile.to_connect_config()
     assert config.target_host == "custom-address"
-    assert config.rpc_metadata["namespace"] == "custom-namespace"
     assert isinstance(config.tls, TLSConfig)
     assert config.tls.domain == "custom-server-name"
     assert config.rpc_metadata["custom-header"] == "custom-value"
@@ -108,7 +106,6 @@ def test_load_profile_from_data_default():
 
     config = profile.to_connect_config()
     assert config.target_host == "default-address"
-    assert config.rpc_metadata["namespace"] == "default-namespace"
     assert not config.tls
 
 
@@ -123,7 +120,6 @@ def test_load_profile_from_data_custom():
 
     config = profile.to_connect_config()
     assert config.target_host == "custom-address"
-    assert config.rpc_metadata["namespace"] == "custom-namespace"
     assert isinstance(config.tls, TLSConfig)
     assert config.tls.domain == "custom-server-name"
     assert config.rpc_metadata["custom-header"] == "custom-value"
@@ -143,7 +139,6 @@ def test_load_profile_from_data_env_overrides():
 
     config = profile.to_connect_config()
     assert config.target_host == "env-address"
-    assert config.rpc_metadata["namespace"] == "env-namespace"
 
 
 def test_load_profile_env_overrides(base_config_file: Path):
@@ -165,7 +160,6 @@ def test_load_profile_env_overrides(base_config_file: Path):
 
     config = profile.to_connect_config()
     assert config.target_host == "env-address"
-    assert config.rpc_metadata["namespace"] == "env-namespace"
     assert isinstance(config.tls, TLSConfig)
     assert config.api_key == "env-api-key"
     assert config.tls.domain == "env-server-name"

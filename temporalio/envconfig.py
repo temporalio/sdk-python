@@ -12,8 +12,9 @@ from typing import Any, Mapping, Optional, Union
 
 from typing_extensions import TypeAlias
 
+# from temporalio.service import ConnectConfig, TLSConfig
+import temporalio.service
 from temporalio.bridge.temporal_sdk_bridge import envconfig as _bridge_envconfig
-from temporalio.service import ConnectConfig, TLSConfig
 
 DataSource: TypeAlias = Union[
     str, bytes
@@ -40,7 +41,7 @@ def _read_source(source: Optional[DataSource]) -> Optional[bytes]:
 
 
 @dataclass(frozen=True)
-class ClientConfigTls:
+class ClientConfigTLS:
     """TLS configuration as specified as part of client configuration
 
     .. warning::
@@ -58,12 +59,12 @@ class ClientConfigTls:
     client_private_key: Optional[DataSource] = None
     """Client key source."""
 
-    def to_connect_tls_config(self) -> Union[bool, TLSConfig]:
+    def to_connect_tls_config(self) -> Union[bool, temporalio.service.TLSConfig]:
         """Create a `temporalio.service.TLSConfig` from this profile."""
         if self.disabled:
             return False
 
-        return TLSConfig(
+        return temporalio.service.TLSConfig(
             domain=self.server_name,
             server_root_ca_cert=_read_source(self.server_root_ca_cert),
             client_cert=_read_source(self.client_cert),
@@ -71,10 +72,10 @@ class ClientConfigTls:
         )
 
     @staticmethod
-    def _from_dict(d: Optional[Mapping[str, Any]]) -> Optional[ClientConfigTls]:
+    def _from_dict(d: Optional[Mapping[str, Any]]) -> Optional[ClientConfigTLS]:
         if not d:
             return None
-        return ClientConfigTls(
+        return ClientConfigTLS(
             disabled=d.get("disabled", False),
             server_name=d.get("server_name"),
             # Note: Bridge uses snake_case, but TOML uses kebab-case which is
@@ -103,23 +104,23 @@ class ClientConfigProfile:
     """Client namespace."""
     api_key: Optional[str] = None
     """Client API key."""
-    tls: Optional[ClientConfigTls] = None
+    tls: Optional[ClientConfigTLS] = None
     """TLS configuration."""
     grpc_meta: Mapping[str, str] = field(default_factory=dict)
     """gRPC metadata."""
 
     @staticmethod
     def from_dict(d: Mapping[str, Any]) -> ClientConfigProfile:
-        """Create a ClientConfigProfile from a dictionary from the bridge."""
+        """Create a ClientConfigProfile from a dictionary."""
         return ClientConfigProfile(
             address=d.get("address"),
             namespace=d.get("namespace"),
             api_key=d.get("api_key"),
-            tls=ClientConfigTls._from_dict(d.get("tls")),
+            tls=ClientConfigTLS._from_dict(d.get("tls")),
             grpc_meta=d.get("grpc_meta") or {},
         )
 
-    def to_connect_config(self) -> ConnectConfig:
+    def to_connect_config(self) -> temporalio.service.ConnectConfig:
         """Create a `temporalio.service.ConnectConfig` from this profile."""
         # Create a dictionary of kwargs for ConnectConfig
         kwargs: dict[str, Any] = {"api_key": self.api_key}
@@ -128,15 +129,15 @@ class ClientConfigProfile:
             kwargs["target_host"] = self.address
 
         rpc_metadata = dict(self.grpc_meta)
-        if self.namespace:
-            rpc_metadata["namespace"] = self.namespace
         if rpc_metadata:
             kwargs["rpc_metadata"] = rpc_metadata
 
         if self.tls:
             kwargs["tls"] = self.tls.to_connect_tls_config()
 
-        return ConnectConfig(**{k: v for k, v in kwargs.items() if v is not None})
+        return temporalio.service.ConnectConfig(
+            **{k: v for k, v in kwargs.items() if v is not None}
+        )
 
 
 @dataclass
