@@ -28,6 +28,8 @@ from temporalio.workflow import (
     UpdateMethodMultiParam,
 )
 
+DEFAULT_WORKER_KWARGS: dict[str, Any] = {}
+
 
 def new_worker(
     client: Client,
@@ -47,7 +49,7 @@ def new_worker(
         workflow_runner=workflow_runner,
         max_cached_workflows=max_cached_workflows,
         workflow_failure_exception_types=workflow_failure_exception_types,
-        **kwargs,
+        **(DEFAULT_WORKER_KWARGS | kwargs),
     )
 
 
