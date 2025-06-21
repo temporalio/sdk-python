@@ -86,6 +86,20 @@ class WorkflowRunOperationHandler(
         async def start(
             self, ctx: StartOperationContext, input: InputT
         ) -> WorkflowRunOperationResult:
+            # TODO(nexus-prerelease) It must be possible to start "normal" workflows in
+            # here, and then finish up with a "nexusified" workflow.
+            # TODO(nexus-prerelease) It should not be possible to construct a Nexus
+            # token for a non-nexusified workflow.
+            # TODO(nexus-prerelease) When `start` returns, must the workflow have been
+            # started? The answer is yes, but that's yes regarding the
+            # OperationHandler.start() method that is created by the decorator: it's OK
+            # for the shorthand method to return a lazily evaluated start_workflow; it
+            # will only ever be used in its transformed form. Note that in a
+            # `OperationHandler.start` method, a user should be able to create a token
+            # for a nexusified workflow and return it as a Nexus response:
+            #
+            # token = WorkflowOperationToken.from_workflow_handle(wf_handle).encode()
+            # return StartOperationResultAsync(token)
             wf_handle = await start_method(service, ctx, input)
             return WorkflowRunOperationResult.from_workflow_handle(wf_handle)
 
