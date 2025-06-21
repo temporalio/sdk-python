@@ -86,6 +86,7 @@ class ClientConfigTLS:
             client_private_key=_from_dict_to_source(d.get("client_key")),
         )
 
+
 class ClientConnectConfig(TypedDict, total=False):
     """Arguments for `temporalio.client.Client.connect` that are configurable via
     environment configuration.
@@ -94,11 +95,12 @@ class ClientConnectConfig(TypedDict, total=False):
         Experimental API.
     """
 
-    target_host: str
-    namespace: str
+    target_host: Optional[str]
+    namespace: Optional[str]
     api_key: Optional[str]
-    tls: Union[bool, temporalio.service.TLSConfig]
-    rpc_metadata: Mapping[str, str]
+    tls: Optional[Union[bool, temporalio.service.TLSConfig]]
+    rpc_metadata: Optional[Mapping[str, str]]
+
 
 @dataclass(frozen=True)
 class ClientConfigProfile:
@@ -351,3 +353,56 @@ class ClientConfig:
             env_vars=env_vars,
         )
         return ClientConfigProfile.from_dict(raw_profile)
+
+    @staticmethod
+    def load_client_connect_config(
+        profile: str = "default",
+        *,
+        env_vars: Optional[Mapping[str, str]] = None,
+        config_file: Optional[str] = None,
+        disable_file: bool = False,
+        disable_env: bool = False,
+        config_file_strict: bool = False,
+    ) -> ClientConnectConfig:
+        """Load a single client profile and convert to connect config.
+
+        This is a convenience function that combines loading a profile and
+        converting it to a connect config dictionary. This will use the current
+        process's environment for overrides unless disabled.
+
+        Args:
+            profile: The profile to load from the config. Defaults to "default".
+            env_vars: Environment variables to use. Defaults to ``os.environ``.
+            config_file: Path to a specific TOML config file. If not provided,
+                default file locations are used. This is ignored if
+                ``disable_file`` is true.
+            disable_file: If true, file loading is disabled.
+            disable_env: If true, environment variable loading and overriding
+                is disabled.
+            config_file_strict: If true, will error on unrecognized keys in the
+                TOML file.
+
+        Returns:
+            TypedDict of keyword arguments for
+            :py:meth:`temporalio.client.Client.connect`.
+        """
+        prof: ClientConfigProfile
+        if config_file and not disable_file:
+            # If file loading is enabled and provided, use it.
+            prof = ClientConfig.load_profile_from_file(
+                config_file,
+                profile=profile,
+                env_vars=env_vars,
+                disable_env=disable_env,
+                config_file_strict=config_file_strict,
+            )
+        else:
+            # Otherwise, use default file discovery
+            prof = ClientConfig.load_profile(
+                profile=profile,
+                env_vars=env_vars,
+                disable_file=disable_file,
+                disable_env=disable_env,
+                config_file_strict=config_file_strict,
+            )
+        return prof.to_client_connect_config()
