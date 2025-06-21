@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from temporalio.envconfig import ClientConfig
+from temporalio.envconfig import ClientConfig, ClientConfigProfile, ClientConfigTLS
 from temporalio.service import TLSConfig
 
 # A base TOML config with a default and a custom profile
@@ -367,11 +367,11 @@ def test_load_profile_tls_from_paths(tmp_path: Path):
     assert profile.tls is not None
     assert profile.tls.server_name == "custom-server"
     assert profile.tls.server_root_ca_cert is not None
-    assert profile.tls.server_root_ca_cert == ca_pem_path
+    assert profile.tls.server_root_ca_cert == Path(ca_pem_path)
     assert profile.tls.client_cert is not None
-    assert profile.tls.client_cert == client_crt_path
+    assert profile.tls.client_cert == Path(client_crt_path)
     assert profile.tls.client_private_key is not None
-    assert profile.tls.client_private_key == client_key_path
+    assert profile.tls.client_private_key == Path(client_key_path)
 
     config = profile.to_connect_config()
     assert isinstance(config.tls, TLSConfig)
@@ -379,6 +379,21 @@ def test_load_profile_tls_from_paths(tmp_path: Path):
     assert config.tls.server_root_ca_cert == b"ca-pem-data"
     assert config.tls.client_cert == b"client-crt-data"
     assert config.tls.client_private_key == b"client-key-data"
+
+def test_read_source_from_string_content():
+    """Test that _read_source correctly encodes string content."""
+    # Check the behavior of providing a string as a data
+    # source, ensuring it's treated as content and encoded to bytes.
+    # Note that string content can only be provided programmatically, as
+    # the TOML parser in core currently only supports reading file paths
+    # and file data as bytes in the config file.
+    profile = ClientConfigProfile(
+        address="localhost:1234",
+        tls=ClientConfigTLS(client_cert="string-as-cert-content"),
+    )
+    config = profile.to_connect_config()
+    assert isinstance(config.tls, TLSConfig)
+    assert config.tls.client_cert == b"string-as-cert-content"
 
 
 def test_load_profile_conflicting_cert_source_fails():

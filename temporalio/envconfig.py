@@ -12,13 +12,12 @@ from typing import Any, Mapping, Optional, Union
 
 from typing_extensions import TypeAlias
 
-# from temporalio.service import ConnectConfig, TLSConfig
 import temporalio.service
 from temporalio.bridge.temporal_sdk_bridge import envconfig as _bridge_envconfig
 
 DataSource: TypeAlias = Union[
-    str, bytes
-]  # str represents a file path, bytes represents raw data
+    Path, str, bytes
+]  # str represents a file contents, bytes represents raw data
 
 
 def _from_dict_to_source(d: Optional[Mapping[str, Any]]) -> Optional[DataSource]:
@@ -27,17 +26,19 @@ def _from_dict_to_source(d: Optional[Mapping[str, Any]]) -> Optional[DataSource]
     if "data" in d:
         return d["data"]
     if "path" in d:
-        return d["path"]
+        return Path(d["path"])
     return None
 
 
 def _read_source(source: Optional[DataSource]) -> Optional[bytes]:
-    if not source:
-        return None
-    if isinstance(source, str):
-        with open(Path(source), "rb") as f:
+    if isinstance(source, Path):
+        with open(source, "rb") as f:
             return f.read()
-    return source
+    if isinstance(source, str):
+        return source.encode("utf-8")
+    if isinstance(source, bytes):
+        return source
+    return None
 
 
 @dataclass(frozen=True)
