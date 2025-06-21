@@ -38,7 +38,7 @@ from nexusrpc.handler import (
 import temporalio.api.failure.v1
 import temporalio.nexus
 from temporalio import workflow
-from temporalio.client import Client, WorkflowHandle
+from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.converter import FailureConverter, PayloadConverter
 from temporalio.exceptions import ApplicationError
@@ -46,6 +46,7 @@ from temporalio.nexus.handler import (
     logger,
 )
 from temporalio.nexus.handler._operation_context import TemporalNexusOperationContext
+from temporalio.nexus.handler._operation_handlers import NexusStartWorkflowRequest
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import ServiceClient, create_nexus_endpoint
@@ -210,14 +211,16 @@ class MyServiceHandler:
     @temporalio.nexus.handler.workflow_run_operation_handler
     async def workflow_run_operation(
         self, ctx: StartOperationContext, input: Input
-    ) -> WorkflowHandle[Any, Output]:
+    ) -> NexusStartWorkflowRequest[Output]:
         tctx = TemporalNexusOperationContext.current()
-        return await tctx.client.start_workflow(
-            MyWorkflow.run,
-            input,
-            id=test_context.workflow_id or str(uuid.uuid4()),
-            task_queue=tctx.task_queue,
-            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+        return NexusStartWorkflowRequest(
+            tctx.client.start_workflow(
+                MyWorkflow.run,
+                input,
+                id=test_context.workflow_id or str(uuid.uuid4()),
+                task_queue=tctx.task_queue,
+                id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+            )
         )
 
     @nexusrpc.handler.sync_operation_handler
@@ -257,17 +260,19 @@ class MyServiceHandler:
     @temporalio.nexus.handler.workflow_run_operation_handler
     async def workflow_run_operation_without_type_annotations(self, ctx, input):
         tctx = TemporalNexusOperationContext.current()
-        return await tctx.client.start_workflow(
-            WorkflowWithoutTypeAnnotations.run,
-            input,
-            id=test_context.workflow_id or str(uuid.uuid4()),
-            task_queue=tctx.task_queue,
+        return NexusStartWorkflowRequest(
+            tctx.client.start_workflow(
+                WorkflowWithoutTypeAnnotations.run,
+                input,
+                id=test_context.workflow_id or str(uuid.uuid4()),
+                task_queue=tctx.task_queue,
+            )
         )
 
     @temporalio.nexus.handler.workflow_run_operation_handler
     async def workflow_run_op_link_test(
         self, ctx: StartOperationContext, input: Input
-    ) -> WorkflowHandle[Any, Output]:
+    ) -> NexusStartWorkflowRequest[Output]:
         assert any(
             link.url == "http://inbound-link/" for link in ctx.inbound_links
         ), "Inbound link not found"
@@ -275,11 +280,13 @@ class MyServiceHandler:
         ctx.outbound_links.extend(ctx.inbound_links)
 
         tctx = TemporalNexusOperationContext.current()
-        return await tctx.client.start_workflow(
-            MyLinkTestWorkflow.run,
-            input,
-            id=test_context.workflow_id or str(uuid.uuid4()),
-            task_queue=tctx.task_queue,
+        return NexusStartWorkflowRequest(
+            tctx.client.start_workflow(
+                MyLinkTestWorkflow.run,
+                input,
+                id=test_context.workflow_id or str(uuid.uuid4()),
+                task_queue=tctx.task_queue,
+            )
         )
 
     class OperationHandlerReturningUnwrappedResult(

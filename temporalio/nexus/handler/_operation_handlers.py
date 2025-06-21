@@ -9,6 +9,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Coroutine,
     Generic,
     Optional,
     Type,
@@ -21,13 +22,14 @@ from nexusrpc.handler import (
     HandlerError,
     HandlerErrorType,
     StartOperationContext,
+    StartOperationResultAsync,
 )
 from nexusrpc.types import (
     InputT,
     OutputT,
     ServiceHandlerT,
 )
-from typing_extensions import Self, overload
+from typing_extensions import overload
 
 from ._operation_context import TemporalNexusOperationContext
 from ._token import (
@@ -67,6 +69,47 @@ async def cancel_workflow(
     await handle.cancel(**kwargs)
 
 
+class NexusStartWorkflowRequest(Generic[OutputT]):
+    """
+    A request to start a workflow that will handle the Nexus operation.
+    """
+
+    def __init__(
+        self, start_workflow: Coroutine[Any, Any, WorkflowHandle[Any, OutputT]], /
+    ):
+        if start_workflow.__qualname__ != "Client.start_workflow":
+            raise ValueError(
+                "NexusStartWorkflowRequest must be initialized with the coroutine "
+                "object obtained by calling Client.start_workflow."
+            )
+        self._start_workflow = start_workflow
+
+    async def start_workflow(self) -> WorkflowHandle[Any, OutputT]:
+        # TODO(nexus-prerelease) set context such that nexus metadata is injected into request
+        return await self._start_workflow
+
+    # @classmethod
+    # def from_workflow_handle(cls, workflow_handle: WorkflowHandle) -> Self:
+    #     """
+    #     Create a :class:`WorkflowRunOperationResult` from a :py:class:`~temporalio.client.WorkflowHandle`.
+    #     """
+    #     token = WorkflowOperationToken.from_workflow_handle(workflow_handle).encode()
+    #     return cls(token=token)
+
+    # def to_workflow_handle(self, client: Client) -> WorkflowHandle:
+    #     """
+    #     Create a :py:class:`~temporalio.client.WorkflowHandle` from a :class:`WorkflowRunOperationResult`.
+    #     """
+    #     workflow_operation_token = WorkflowOperationToken.decode(self.token)
+    #     if workflow_operation_token.namespace != client.namespace:
+    #         raise ValueError(
+    #             "Cannot create a workflow handle from a workflow operation result "
+    #             "with a client whose namespace is not the same as the namespace of the "
+    #             "workflow operation token."
+    #         )
+    #     return WorkflowOperationToken.decode(self.token).to_workflow_handle(client)
+
+
 class WorkflowRunOperationHandler(
     nexusrpc.handler.OperationHandler[InputT, OutputT],
     Generic[InputT, OutputT, ServiceHandlerT],
@@ -76,7 +119,7 @@ class WorkflowRunOperationHandler(
         service: ServiceHandlerT,
         start_method: Callable[
             [ServiceHandlerT, StartOperationContext, InputT],
-            Awaitable[WorkflowHandle[Any, OutputT]],
+            Awaitable[NexusStartWorkflowRequest[OutputT]],
         ],
         output_type: Optional[Type] = None,
     ):
@@ -85,7 +128,7 @@ class WorkflowRunOperationHandler(
         @wraps(start_method)
         async def start(
             self, ctx: StartOperationContext, input: InputT
-        ) -> WorkflowRunOperationResult:
+        ) -> StartOperationResultAsync:
             # TODO(nexus-prerelease) It must be possible to start "normal" workflows in
             # here, and then finish up with a "nexusified" workflow.
             # TODO(nexus-prerelease) It should not be possible to construct a Nexus
@@ -100,8 +143,10 @@ class WorkflowRunOperationHandler(
             #
             # token = WorkflowOperationToken.from_workflow_handle(wf_handle).encode()
             # return StartOperationResultAsync(token)
-            wf_handle = await start_method(service, ctx, input)
-            return WorkflowRunOperationResult.from_workflow_handle(wf_handle)
+            start_wf_request = await start_method(service, ctx, input)
+            wf_handle = await start_wf_request.start_workflow()
+            token = WorkflowOperationToken.from_workflow_handle(wf_handle).encode()
+            return StartOperationResultAsync(token)
 
         self.start = types.MethodType(start, self)
 
@@ -133,42 +178,11 @@ class WorkflowRunOperationHandler(
         )
 
 
-class WorkflowRunOperationResult(nexusrpc.handler.StartOperationResultAsync):
-    """
-    A value returned by the start method of a :class:`WorkflowRunOperation`.
-
-    It indicates that the operation is responding asynchronously, and contains a token
-    that the handler can use to construct a :class:`~temporalio.client.WorkflowHandle` to
-    interact with the workflow.
-    """
-
-    @classmethod
-    def from_workflow_handle(cls, workflow_handle: WorkflowHandle) -> Self:
-        """
-        Create a :class:`WorkflowRunOperationResult` from a :py:class:`~temporalio.client.WorkflowHandle`.
-        """
-        token = WorkflowOperationToken.from_workflow_handle(workflow_handle).encode()
-        return cls(token=token)
-
-    def to_workflow_handle(self, client: Client) -> WorkflowHandle:
-        """
-        Create a :py:class:`~temporalio.client.WorkflowHandle` from a :class:`WorkflowRunOperationResult`.
-        """
-        workflow_operation_token = WorkflowOperationToken.decode(self.token)
-        if workflow_operation_token.namespace != client.namespace:
-            raise ValueError(
-                "Cannot create a workflow handle from a workflow operation result "
-                "with a client whose namespace is not the same as the namespace of the "
-                "workflow operation token."
-            )
-        return WorkflowOperationToken.decode(self.token).to_workflow_handle(client)
-
-
 @overload
 def workflow_run_operation_handler(
     start_method: Callable[
         [ServiceHandlerT, StartOperationContext, InputT],
-        Awaitable[WorkflowHandle[Any, OutputT]],
+        Awaitable[NexusStartWorkflowRequest[OutputT]],
     ],
 ) -> Callable[
     [ServiceHandlerT], WorkflowRunOperationHandler[InputT, OutputT, ServiceHandlerT]
@@ -183,7 +197,7 @@ def workflow_run_operation_handler(
     [
         Callable[
             [ServiceHandlerT, StartOperationContext, InputT],
-            Awaitable[WorkflowHandle[Any, OutputT]],
+            Awaitable[NexusStartWorkflowRequest[OutputT]],
         ]
     ],
     Callable[
@@ -196,7 +210,7 @@ def workflow_run_operation_handler(
     start_method: Optional[
         Callable[
             [ServiceHandlerT, StartOperationContext, InputT],
-            Awaitable[WorkflowHandle[Any, OutputT]],
+            Awaitable[NexusStartWorkflowRequest[OutputT]],
         ]
     ] = None,
     *,
@@ -209,7 +223,7 @@ def workflow_run_operation_handler(
         [
             Callable[
                 [ServiceHandlerT, StartOperationContext, InputT],
-                Awaitable[WorkflowHandle[Any, OutputT]],
+                Awaitable[NexusStartWorkflowRequest[OutputT]],
             ]
         ],
         Callable[
@@ -221,7 +235,7 @@ def workflow_run_operation_handler(
     def decorator(
         start_method: Callable[
             [ServiceHandlerT, StartOperationContext, InputT],
-            Awaitable[WorkflowHandle[Any, OutputT]],
+            Awaitable[NexusStartWorkflowRequest[OutputT]],
         ],
     ) -> Callable[
         [ServiceHandlerT], WorkflowRunOperationHandler[InputT, OutputT, ServiceHandlerT]
@@ -267,7 +281,7 @@ def workflow_run_operation_handler(
 def _get_workflow_run_start_method_input_and_output_type_annotations(
     start_method: Callable[
         [ServiceHandlerT, StartOperationContext, InputT],
-        Awaitable[WorkflowHandle[Any, OutputT]],
+        Awaitable[NexusStartWorkflowRequest[OutputT]],
     ],
 ) -> tuple[
     Optional[Type[InputT]],
@@ -278,29 +292,26 @@ def _get_workflow_run_start_method_input_and_output_type_annotations(
     `start_method` must be a type-annotated start method that returns a
     :py:class:`WorkflowHandle`.
     """
-    # TODO(nexus-preview) circular import
-    from temporalio.client import WorkflowHandle
-
     input_type, output_type = (
         nexusrpc.handler.get_start_method_input_and_output_types_annotations(
             start_method
         )
     )
     origin_type = typing.get_origin(output_type)
-    if not origin_type or not issubclass(origin_type, WorkflowHandle):
+    if not origin_type or not issubclass(origin_type, NexusStartWorkflowRequest):
         warnings.warn(
-            f"Expected return type of {start_method.__name__} to be a subclass of WorkflowHandle, "
+            f"Expected return type of {start_method.__name__} to be a subclass of NexusStartWorkflowRequest, "
             f"but is {output_type}"
         )
         output_type = None
 
     args = typing.get_args(output_type)
-    if len(args) != 2:
+    if len(args) != 1:
         warnings.warn(
-            f"Expected return type of {start_method.__name__} to have exactly two type parameters, "
+            f"Expected return type of {start_method.__name__} to have exactly one type parameter, "
             f"but has {len(args)}: {args}"
         )
         output_type = None
     else:
-        _wf_type, output_type = args
+        [output_type] = args
     return input_type, output_type
