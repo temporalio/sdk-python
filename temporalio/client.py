@@ -53,12 +53,11 @@ import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
-import temporalio.nexus.handler
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
 from temporalio.activity import ActivityCancellationDetails
-from temporalio.nexus.handler import (
+from temporalio.nexus.handler._operation_context import (
     TemporalNexusOperationContext,
 )
 from temporalio.service import (
