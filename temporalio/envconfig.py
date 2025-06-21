@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Optional, Union
 
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, TypedDict
 
 import temporalio.service
 from temporalio.bridge.temporal_sdk_bridge import envconfig as _bridge_envconfig
@@ -86,13 +86,26 @@ class ClientConfigTLS:
             client_private_key=_from_dict_to_source(d.get("client_key")),
         )
 
+class ClientConnectConfig(TypedDict, total=False):
+    """Arguments for `temporalio.client.Client.connect` that are configurable via
+    environment configuration.
+
+    .. warning::
+        Experimental API.
+    """
+
+    target_host: str
+    namespace: str
+    api_key: Optional[str]
+    tls: Union[bool, temporalio.service.TLSConfig]
+    rpc_metadata: Mapping[str, str]
 
 @dataclass(frozen=True)
 class ClientConfigProfile:
     """Represents a client configuration profile.
 
     This class holds the configuration as loaded from a file or environment.
-    See `to_connect_config` to transform the profile to `temporalio.service.ConnectConfig`,
+    See `to_connect_config` to transform the profile to `ClientConnectConfig`,
     which can be used to create a client.
 
     .. warning::
@@ -121,24 +134,20 @@ class ClientConfigProfile:
             grpc_meta=d.get("grpc_meta") or {},
         )
 
-    def to_connect_config(self) -> temporalio.service.ConnectConfig:
-        """Create a `temporalio.service.ConnectConfig` from this profile."""
-        # Create a dictionary of kwargs for ConnectConfig
-        kwargs: dict[str, Any] = {"api_key": self.api_key}
-
+    def to_client_connect_config(self) -> ClientConnectConfig:
+        """Create a `ClientConnectConfig` from this profile."""
+        config: ClientConnectConfig = {}
         if self.address:
-            kwargs["target_host"] = self.address
-
-        rpc_metadata = dict(self.grpc_meta)
-        if rpc_metadata:
-            kwargs["rpc_metadata"] = rpc_metadata
-
+            config["target_host"] = self.address
+        if self.namespace:
+            config["namespace"] = self.namespace
+        if self.api_key:
+            config["api_key"] = self.api_key
         if self.tls:
-            kwargs["tls"] = self.tls.to_connect_tls_config()
-
-        return temporalio.service.ConnectConfig(
-            **{k: v for k, v in kwargs.items() if v is not None}
-        )
+            config["tls"] = self.tls.to_connect_tls_config()
+        if self.grpc_meta:
+            config["rpc_metadata"] = self.grpc_meta
+        return config
 
 
 @dataclass
@@ -146,7 +155,7 @@ class ClientConfig:
     """Client configuration loaded from TOML and environment variables.
 
     This contains a mapping of profile names to client profiles. Use
-    `ClientConfigProfile.to_connect_config` to create a `temporalio.service.ConnectConfig`
+    `ClientConfigProfile.to_connect_config` to create a `ClientConnectConfig`
     from a profile. See `load_profile` to load an individual profile.
 
     .. warning::
@@ -240,7 +249,7 @@ class ClientConfig:
         """Load a single client profile from default sources, applying env
         overrides.
 
-        To get a `temporalio.service.ConnectConfig`, use the
+        To get a `ClientConnectConfig`, use the
         `ClientConfigProfile.to_connect_config` method on the returned profile.
 
         Args:
@@ -281,7 +290,7 @@ class ClientConfig:
     ) -> ClientConfigProfile:
         """Load a single client profile from a file, applying env overrides.
 
-        To get a `temporalio.service.ConnectConfig`, use the
+        To get a `ClientConnectConfig`, use the
         `ClientConfigProfile.to_connect_config` method on the returned profile.
 
         Args:
@@ -315,7 +324,7 @@ class ClientConfig:
     ) -> ClientConfigProfile:
         """Load a single client profile from data, applying env overrides.
 
-        To get a `temporalio.service.ConnectConfig`, use the
+        To get a `ClientConnectConfig`, use the
         `ClientConfigProfile.to_connect_config` method on the returned profile.
 
         Args:
