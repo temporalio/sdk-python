@@ -39,7 +39,7 @@ from temporalio.api.cloud.usage.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n9temporal/api/cloud/cloudservice/v1/request_response.proto\x12"temporal.api.cloud.cloudservice.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a-temporal/api/cloud/operation/v1/message.proto\x1a,temporal/api/cloud/identity/v1/message.proto\x1a-temporal/api/cloud/namespace/v1/message.proto\x1a)temporal/api/cloud/nexus/v1/message.proto\x1a*temporal/api/cloud/region/v1/message.proto\x1a+temporal/api/cloud/account/v1/message.proto\x1a)temporal/api/cloud/usage/v1/message.proto"Z\n\x0fGetUsersRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x12\n\npage_token\x18\x02 \x01(\t\x12\r\n\x05\x65mail\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t"`\n\x10GetUsersResponse\x12\x33\n\x05users\x18\x01 \x03(\x0b\x32$.temporal.api.cloud.identity.v1.User\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t"!\n\x0eGetUserRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t"E\n\x0fGetUserResponse\x12\x32\n\x04user\x18\x01 \x01(\x0b\x32$.temporal.api.cloud.identity.v1.User"g\n\x11\x43reateUserRequest\x12\x36\n\x04spec\x18\x01 \x01(\x0b\x32(.temporal.api.cloud.identity.v1.UserSpec\x12\x1a\n\x12\x61sync_operation_id\x18\x02 \x01(\t"o\n\x12\x43reateUserResponse\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12H\n\x0f\x61sync_operation\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\x92\x01\n\x11UpdateUserRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x36\n\x04spec\x18\x02 \x01(\x0b\x32(.temporal.api.cloud.identity.v1.UserSpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"^\n\x12UpdateUserResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"Z\n\x11\x44\x65leteUserRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"^\n\x12\x44\x65leteUserResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\xba\x01\n\x1dSetUserNamespaceAccessRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12?\n\x06\x61\x63\x63\x65ss\x18\x03 \x01(\x0b\x32/.temporal.api.cloud.identity.v1.NamespaceAccess\x12\x18\n\x10resource_version\x18\x04 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t"j\n\x1eSetUserNamespaceAccessResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"6\n\x18GetAsyncOperationRequest\x12\x1a\n\x12\x61sync_operation_id\x18\x01 \x01(\t"e\n\x19GetAsyncOperationResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"r\n\x16\x43reateNamespaceRequest\x12<\n\x04spec\x18\x02 \x01(\x0b\x32..temporal.api.cloud.namespace.v1.NamespaceSpec\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"v\n\x17\x43reateNamespaceResponse\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12H\n\x0f\x61sync_operation\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"K\n\x14GetNamespacesRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x12\n\npage_token\x18\x02 \x01(\t\x12\x0c\n\x04name\x18\x03 \x01(\t"p\n\x15GetNamespacesResponse\x12>\n\nnamespaces\x18\x01 \x03(\x0b\x32*.temporal.api.cloud.namespace.v1.Namespace\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t"(\n\x13GetNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t"U\n\x14GetNamespaceResponse\x12=\n\tnamespace\x18\x01 \x01(\x0b\x32*.temporal.api.cloud.namespace.v1.Namespace"\x9f\x01\n\x16UpdateNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\x04spec\x18\x02 \x01(\x0b\x32..temporal.api.cloud.namespace.v1.NamespaceSpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"c\n\x17UpdateNamespaceResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\xc6\x01\n"RenameCustomSearchAttributeRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12-\n%existing_custom_search_attribute_name\x18\x02 \x01(\t\x12(\n new_custom_search_attribute_name\x18\x03 \x01(\t\x12\x18\n\x10resource_version\x18\x04 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t"o\n#RenameCustomSearchAttributeResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"a\n\x16\x44\x65leteNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"c\n\x17\x44\x65leteNamespaceResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"_\n\x1e\x46\x61iloverNamespaceRegionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0e\n\x06region\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"k\n\x1f\x46\x61iloverNamespaceRegionResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"t\n\x19\x41\x64\x64NamespaceRegionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0e\n\x06region\x18\x02 \x01(\t\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"f\n\x1a\x41\x64\x64NamespaceRegionResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\x13\n\x11GetRegionsRequest"K\n\x12GetRegionsResponse\x12\x35\n\x07regions\x18\x01 \x03(\x0b\x32$.temporal.api.cloud.region.v1.Region""\n\x10GetRegionRequest\x12\x0e\n\x06region\x18\x01 \x01(\t"I\n\x11GetRegionResponse\x12\x34\n\x06region\x18\x01 \x01(\x0b\x32$.temporal.api.cloud.region.v1.Region"\xae\x01\n\x11GetApiKeysRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x12\n\npage_token\x18\x02 \x01(\t\x12\x10\n\x08owner_id\x18\x03 \x01(\t\x12!\n\x15owner_type_deprecated\x18\x04 \x01(\tB\x02\x18\x01\x12=\n\nowner_type\x18\x05 \x01(\x0e\x32).temporal.api.cloud.identity.v1.OwnerType"g\n\x12GetApiKeysResponse\x12\x38\n\x08\x61pi_keys\x18\x01 \x03(\x0b\x32&.temporal.api.cloud.identity.v1.ApiKey\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t""\n\x10GetApiKeyRequest\x12\x0e\n\x06key_id\x18\x01 \x01(\t"L\n\x11GetApiKeyResponse\x12\x37\n\x07\x61pi_key\x18\x01 \x01(\x0b\x32&.temporal.api.cloud.identity.v1.ApiKey"k\n\x13\x43reateApiKeyRequest\x12\x38\n\x04spec\x18\x01 \x01(\x0b\x32*.temporal.api.cloud.identity.v1.ApiKeySpec\x12\x1a\n\x12\x61sync_operation_id\x18\x02 \x01(\t"\x7f\n\x14\x43reateApiKeyResponse\x12\x0e\n\x06key_id\x18\x01 \x01(\t\x12\r\n\x05token\x18\x02 \x01(\t\x12H\n\x0f\x61sync_operation\x18\x03 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\x95\x01\n\x13UpdateApiKeyRequest\x12\x0e\n\x06key_id\x18\x01 \x01(\t\x12\x38\n\x04spec\x18\x02 \x01(\x0b\x32*.temporal.api.cloud.identity.v1.ApiKeySpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"`\n\x14UpdateApiKeyResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"[\n\x13\x44\x65leteApiKeyRequest\x12\x0e\n\x06key_id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"`\n\x14\x44\x65leteApiKeyResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\x87\x01\n\x18GetNexusEndpointsRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x12\n\npage_token\x18\x02 \x01(\t\x12\x1b\n\x13target_namespace_id\x18\x03 \x01(\t\x12\x19\n\x11target_task_queue\x18\x04 \x01(\t\x12\x0c\n\x04name\x18\x05 \x01(\t"n\n\x19GetNexusEndpointsResponse\x12\x38\n\tendpoints\x18\x01 \x03(\x0b\x32%.temporal.api.cloud.nexus.v1.Endpoint\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t".\n\x17GetNexusEndpointRequest\x12\x13\n\x0b\x65ndpoint_id\x18\x01 \x01(\t"S\n\x18GetNexusEndpointResponse\x12\x37\n\x08\x65ndpoint\x18\x01 \x01(\x0b\x32%.temporal.api.cloud.nexus.v1.Endpoint"q\n\x1a\x43reateNexusEndpointRequest\x12\x37\n\x04spec\x18\x01 \x01(\x0b\x32).temporal.api.cloud.nexus.v1.EndpointSpec\x12\x1a\n\x12\x61sync_operation_id\x18\x02 \x01(\t"|\n\x1b\x43reateNexusEndpointResponse\x12\x13\n\x0b\x65ndpoint_id\x18\x01 \x01(\t\x12H\n\x0f\x61sync_operation\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\xa0\x01\n\x1aUpdateNexusEndpointRequest\x12\x13\n\x0b\x65ndpoint_id\x18\x01 \x01(\t\x12\x37\n\x04spec\x18\x02 \x01(\x0b\x32).temporal.api.cloud.nexus.v1.EndpointSpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"g\n\x1bUpdateNexusEndpointResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"g\n\x1a\x44\x65leteNexusEndpointRequest\x12\x13\n\x0b\x65ndpoint_id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"g\n\x1b\x44\x65leteNexusEndpointResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\xf4\x01\n\x14GetUserGroupsRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x12\n\npage_token\x18\x02 \x01(\t\x12\x11\n\tnamespace\x18\x03 \x01(\t\x12\x14\n\x0c\x64isplay_name\x18\x04 \x01(\t\x12`\n\x0cgoogle_group\x18\x05 \x01(\x0b\x32J.temporal.api.cloud.cloudservice.v1.GetUserGroupsRequest.GoogleGroupFilter\x1a*\n\x11GoogleGroupFilter\x12\x15\n\remail_address\x18\x01 \x01(\t"k\n\x15GetUserGroupsResponse\x12\x39\n\x06groups\x18\x01 \x03(\x0b\x32).temporal.api.cloud.identity.v1.UserGroup\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t"\'\n\x13GetUserGroupRequest\x12\x10\n\x08group_id\x18\x01 \x01(\t"P\n\x14GetUserGroupResponse\x12\x38\n\x05group\x18\x01 \x01(\x0b\x32).temporal.api.cloud.identity.v1.UserGroup"q\n\x16\x43reateUserGroupRequest\x12;\n\x04spec\x18\x01 \x01(\x0b\x32-.temporal.api.cloud.identity.v1.UserGroupSpec\x12\x1a\n\x12\x61sync_operation_id\x18\x02 \x01(\t"u\n\x17\x43reateUserGroupResponse\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12H\n\x0f\x61sync_operation\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\x9d\x01\n\x16UpdateUserGroupRequest\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12;\n\x04spec\x18\x02 \x01(\x0b\x32-.temporal.api.cloud.identity.v1.UserGroupSpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"c\n\x17UpdateUserGroupResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"`\n\x16\x44\x65leteUserGroupRequest\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"c\n\x17\x44\x65leteUserGroupResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\xc0\x01\n"SetUserGroupNamespaceAccessRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x10\n\x08group_id\x18\x02 \x01(\t\x12?\n\x06\x61\x63\x63\x65ss\x18\x03 \x01(\x0b\x32/.temporal.api.cloud.identity.v1.NamespaceAccess\x12\x18\n\x10resource_version\x18\x04 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t"o\n#SetUserGroupNamespaceAccessResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"{\n\x1b\x43reateServiceAccountRequest\x12@\n\x04spec\x18\x01 \x01(\x0b\x32\x32.temporal.api.cloud.identity.v1.ServiceAccountSpec\x12\x1a\n\x12\x61sync_operation_id\x18\x02 \x01(\t"\x84\x01\n\x1c\x43reateServiceAccountResponse\x12\x1a\n\x12service_account_id\x18\x01 \x01(\t\x12H\n\x0f\x61sync_operation\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"6\n\x18GetServiceAccountRequest\x12\x1a\n\x12service_account_id\x18\x01 \x01(\t"d\n\x19GetServiceAccountResponse\x12G\n\x0fservice_account\x18\x01 \x01(\x0b\x32..temporal.api.cloud.identity.v1.ServiceAccount"B\n\x19GetServiceAccountsRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x12\n\npage_token\x18\x02 \x01(\t"~\n\x1aGetServiceAccountsResponse\x12G\n\x0fservice_account\x18\x01 \x03(\x0b\x32..temporal.api.cloud.identity.v1.ServiceAccount\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t"\xb1\x01\n\x1bUpdateServiceAccountRequest\x12\x1a\n\x12service_account_id\x18\x01 \x01(\t\x12@\n\x04spec\x18\x02 \x01(\x0b\x32\x32.temporal.api.cloud.identity.v1.ServiceAccountSpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"h\n\x1cUpdateServiceAccountResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"o\n\x1b\x44\x65leteServiceAccountRequest\x12\x1a\n\x12service_account_id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"h\n\x1c\x44\x65leteServiceAccountResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\xaa\x01\n\x0fGetUsageRequest\x12\x38\n\x14start_time_inclusive\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12\x65nd_time_exclusive\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x11\n\tpage_size\x18\x03 \x01(\x05\x12\x12\n\npage_token\x18\x04 \x01(\t"d\n\x10GetUsageResponse\x12\x37\n\tsummaries\x18\x01 \x03(\x0b\x32$.temporal.api.cloud.usage.v1.Summary\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t"\x13\n\x11GetAccountRequest"M\n\x12GetAccountResponse\x12\x37\n\x07\x61\x63\x63ount\x18\x01 \x01(\x0b\x32&.temporal.api.cloud.account.v1.Account"\x86\x01\n\x14UpdateAccountRequest\x12\x38\n\x04spec\x18\x01 \x01(\x0b\x32*.temporal.api.cloud.account.v1.AccountSpec\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"a\n\x15UpdateAccountResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\x90\x01\n CreateNamespaceExportSinkRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12=\n\x04spec\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.namespace.v1.ExportSinkSpec\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"m\n!CreateNamespaceExportSinkResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"@\n\x1dGetNamespaceExportSinkRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t"[\n\x1eGetNamespaceExportSinkResponse\x12\x39\n\x04sink\x18\x01 \x01(\x0b\x32+.temporal.api.cloud.namespace.v1.ExportSink"Z\n\x1eGetNamespaceExportSinksRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x12\n\npage_token\x18\x03 \x01(\t"v\n\x1fGetNamespaceExportSinksResponse\x12:\n\x05sinks\x18\x01 \x03(\x0b\x32+.temporal.api.cloud.namespace.v1.ExportSink\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t"\xaa\x01\n UpdateNamespaceExportSinkRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12=\n\x04spec\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.namespace.v1.ExportSinkSpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"m\n!UpdateNamespaceExportSinkResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"y\n DeleteNamespaceExportSinkRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"m\n!DeleteNamespaceExportSinkResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"v\n"ValidateNamespaceExportSinkRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12=\n\x04spec\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.namespace.v1.ExportSinkSpec"%\n#ValidateNamespaceExportSinkResponseB\xc8\x01\n%io.temporal.api.cloud.cloudservice.v1B\x14RequestResponseProtoP\x01Z5go.temporal.io/api/cloud/cloudservice/v1;cloudservice\xaa\x02$Temporalio.Api.Cloud.CloudService.V1\xea\x02(Temporalio::Api::Cloud::CloudService::V1b\x06proto3'
+    b'\n9temporal/api/cloud/cloudservice/v1/request_response.proto\x12"temporal.api.cloud.cloudservice.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a-temporal/api/cloud/operation/v1/message.proto\x1a,temporal/api/cloud/identity/v1/message.proto\x1a-temporal/api/cloud/namespace/v1/message.proto\x1a)temporal/api/cloud/nexus/v1/message.proto\x1a*temporal/api/cloud/region/v1/message.proto\x1a+temporal/api/cloud/account/v1/message.proto\x1a)temporal/api/cloud/usage/v1/message.proto"Z\n\x0fGetUsersRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x12\n\npage_token\x18\x02 \x01(\t\x12\r\n\x05\x65mail\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t"`\n\x10GetUsersResponse\x12\x33\n\x05users\x18\x01 \x03(\x0b\x32$.temporal.api.cloud.identity.v1.User\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t"!\n\x0eGetUserRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t"E\n\x0fGetUserResponse\x12\x32\n\x04user\x18\x01 \x01(\x0b\x32$.temporal.api.cloud.identity.v1.User"g\n\x11\x43reateUserRequest\x12\x36\n\x04spec\x18\x01 \x01(\x0b\x32(.temporal.api.cloud.identity.v1.UserSpec\x12\x1a\n\x12\x61sync_operation_id\x18\x02 \x01(\t"o\n\x12\x43reateUserResponse\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12H\n\x0f\x61sync_operation\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\x92\x01\n\x11UpdateUserRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x36\n\x04spec\x18\x02 \x01(\x0b\x32(.temporal.api.cloud.identity.v1.UserSpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"^\n\x12UpdateUserResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"Z\n\x11\x44\x65leteUserRequest\x12\x0f\n\x07user_id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"^\n\x12\x44\x65leteUserResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\xba\x01\n\x1dSetUserNamespaceAccessRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12?\n\x06\x61\x63\x63\x65ss\x18\x03 \x01(\x0b\x32/.temporal.api.cloud.identity.v1.NamespaceAccess\x12\x18\n\x10resource_version\x18\x04 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t"j\n\x1eSetUserNamespaceAccessResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"6\n\x18GetAsyncOperationRequest\x12\x1a\n\x12\x61sync_operation_id\x18\x01 \x01(\t"e\n\x19GetAsyncOperationResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"r\n\x16\x43reateNamespaceRequest\x12<\n\x04spec\x18\x02 \x01(\x0b\x32..temporal.api.cloud.namespace.v1.NamespaceSpec\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"v\n\x17\x43reateNamespaceResponse\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12H\n\x0f\x61sync_operation\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"K\n\x14GetNamespacesRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x12\n\npage_token\x18\x02 \x01(\t\x12\x0c\n\x04name\x18\x03 \x01(\t"p\n\x15GetNamespacesResponse\x12>\n\nnamespaces\x18\x01 \x03(\x0b\x32*.temporal.api.cloud.namespace.v1.Namespace\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t"(\n\x13GetNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t"U\n\x14GetNamespaceResponse\x12=\n\tnamespace\x18\x01 \x01(\x0b\x32*.temporal.api.cloud.namespace.v1.Namespace"\x9f\x01\n\x16UpdateNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\x04spec\x18\x02 \x01(\x0b\x32..temporal.api.cloud.namespace.v1.NamespaceSpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"c\n\x17UpdateNamespaceResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\xc6\x01\n"RenameCustomSearchAttributeRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12-\n%existing_custom_search_attribute_name\x18\x02 \x01(\t\x12(\n new_custom_search_attribute_name\x18\x03 \x01(\t\x12\x18\n\x10resource_version\x18\x04 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t"o\n#RenameCustomSearchAttributeResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"a\n\x16\x44\x65leteNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"c\n\x17\x44\x65leteNamespaceResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"_\n\x1e\x46\x61iloverNamespaceRegionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0e\n\x06region\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"k\n\x1f\x46\x61iloverNamespaceRegionResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"t\n\x19\x41\x64\x64NamespaceRegionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0e\n\x06region\x18\x02 \x01(\t\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"f\n\x1a\x41\x64\x64NamespaceRegionResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"w\n\x1c\x44\x65leteNamespaceRegionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0e\n\x06region\x18\x02 \x01(\t\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"i\n\x1d\x44\x65leteNamespaceRegionResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\x13\n\x11GetRegionsRequest"K\n\x12GetRegionsResponse\x12\x35\n\x07regions\x18\x01 \x03(\x0b\x32$.temporal.api.cloud.region.v1.Region""\n\x10GetRegionRequest\x12\x0e\n\x06region\x18\x01 \x01(\t"I\n\x11GetRegionResponse\x12\x34\n\x06region\x18\x01 \x01(\x0b\x32$.temporal.api.cloud.region.v1.Region"\xae\x01\n\x11GetApiKeysRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x12\n\npage_token\x18\x02 \x01(\t\x12\x10\n\x08owner_id\x18\x03 \x01(\t\x12!\n\x15owner_type_deprecated\x18\x04 \x01(\tB\x02\x18\x01\x12=\n\nowner_type\x18\x05 \x01(\x0e\x32).temporal.api.cloud.identity.v1.OwnerType"g\n\x12GetApiKeysResponse\x12\x38\n\x08\x61pi_keys\x18\x01 \x03(\x0b\x32&.temporal.api.cloud.identity.v1.ApiKey\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t""\n\x10GetApiKeyRequest\x12\x0e\n\x06key_id\x18\x01 \x01(\t"L\n\x11GetApiKeyResponse\x12\x37\n\x07\x61pi_key\x18\x01 \x01(\x0b\x32&.temporal.api.cloud.identity.v1.ApiKey"k\n\x13\x43reateApiKeyRequest\x12\x38\n\x04spec\x18\x01 \x01(\x0b\x32*.temporal.api.cloud.identity.v1.ApiKeySpec\x12\x1a\n\x12\x61sync_operation_id\x18\x02 \x01(\t"\x7f\n\x14\x43reateApiKeyResponse\x12\x0e\n\x06key_id\x18\x01 \x01(\t\x12\r\n\x05token\x18\x02 \x01(\t\x12H\n\x0f\x61sync_operation\x18\x03 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\x95\x01\n\x13UpdateApiKeyRequest\x12\x0e\n\x06key_id\x18\x01 \x01(\t\x12\x38\n\x04spec\x18\x02 \x01(\x0b\x32*.temporal.api.cloud.identity.v1.ApiKeySpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"`\n\x14UpdateApiKeyResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"[\n\x13\x44\x65leteApiKeyRequest\x12\x0e\n\x06key_id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"`\n\x14\x44\x65leteApiKeyResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\x87\x01\n\x18GetNexusEndpointsRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x12\n\npage_token\x18\x02 \x01(\t\x12\x1b\n\x13target_namespace_id\x18\x03 \x01(\t\x12\x19\n\x11target_task_queue\x18\x04 \x01(\t\x12\x0c\n\x04name\x18\x05 \x01(\t"n\n\x19GetNexusEndpointsResponse\x12\x38\n\tendpoints\x18\x01 \x03(\x0b\x32%.temporal.api.cloud.nexus.v1.Endpoint\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t".\n\x17GetNexusEndpointRequest\x12\x13\n\x0b\x65ndpoint_id\x18\x01 \x01(\t"S\n\x18GetNexusEndpointResponse\x12\x37\n\x08\x65ndpoint\x18\x01 \x01(\x0b\x32%.temporal.api.cloud.nexus.v1.Endpoint"q\n\x1a\x43reateNexusEndpointRequest\x12\x37\n\x04spec\x18\x01 \x01(\x0b\x32).temporal.api.cloud.nexus.v1.EndpointSpec\x12\x1a\n\x12\x61sync_operation_id\x18\x02 \x01(\t"|\n\x1b\x43reateNexusEndpointResponse\x12\x13\n\x0b\x65ndpoint_id\x18\x01 \x01(\t\x12H\n\x0f\x61sync_operation\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\xa0\x01\n\x1aUpdateNexusEndpointRequest\x12\x13\n\x0b\x65ndpoint_id\x18\x01 \x01(\t\x12\x37\n\x04spec\x18\x02 \x01(\x0b\x32).temporal.api.cloud.nexus.v1.EndpointSpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"g\n\x1bUpdateNexusEndpointResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"g\n\x1a\x44\x65leteNexusEndpointRequest\x12\x13\n\x0b\x65ndpoint_id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"g\n\x1b\x44\x65leteNexusEndpointResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\xf5\x02\n\x14GetUserGroupsRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x12\n\npage_token\x18\x02 \x01(\t\x12\x11\n\tnamespace\x18\x03 \x01(\t\x12\x14\n\x0c\x64isplay_name\x18\x04 \x01(\t\x12`\n\x0cgoogle_group\x18\x05 \x01(\x0b\x32J.temporal.api.cloud.cloudservice.v1.GetUserGroupsRequest.GoogleGroupFilter\x12\\\n\nscim_group\x18\x06 \x01(\x0b\x32H.temporal.api.cloud.cloudservice.v1.GetUserGroupsRequest.SCIMGroupFilter\x1a*\n\x11GoogleGroupFilter\x12\x15\n\remail_address\x18\x01 \x01(\t\x1a!\n\x0fSCIMGroupFilter\x12\x0e\n\x06idp_id\x18\x01 \x01(\t"k\n\x15GetUserGroupsResponse\x12\x39\n\x06groups\x18\x01 \x03(\x0b\x32).temporal.api.cloud.identity.v1.UserGroup\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t"\'\n\x13GetUserGroupRequest\x12\x10\n\x08group_id\x18\x01 \x01(\t"P\n\x14GetUserGroupResponse\x12\x38\n\x05group\x18\x01 \x01(\x0b\x32).temporal.api.cloud.identity.v1.UserGroup"q\n\x16\x43reateUserGroupRequest\x12;\n\x04spec\x18\x01 \x01(\x0b\x32-.temporal.api.cloud.identity.v1.UserGroupSpec\x12\x1a\n\x12\x61sync_operation_id\x18\x02 \x01(\t"u\n\x17\x43reateUserGroupResponse\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12H\n\x0f\x61sync_operation\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\x9d\x01\n\x16UpdateUserGroupRequest\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12;\n\x04spec\x18\x02 \x01(\x0b\x32-.temporal.api.cloud.identity.v1.UserGroupSpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"c\n\x17UpdateUserGroupResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"`\n\x16\x44\x65leteUserGroupRequest\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"c\n\x17\x44\x65leteUserGroupResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\xc0\x01\n"SetUserGroupNamespaceAccessRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x10\n\x08group_id\x18\x02 \x01(\t\x12?\n\x06\x61\x63\x63\x65ss\x18\x03 \x01(\x0b\x32/.temporal.api.cloud.identity.v1.NamespaceAccess\x12\x18\n\x10resource_version\x18\x04 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t"o\n#SetUserGroupNamespaceAccessResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\x8f\x01\n\x19\x41\x64\x64UserGroupMemberRequest\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\x44\n\tmember_id\x18\x02 \x01(\x0b\x32\x31.temporal.api.cloud.identity.v1.UserGroupMemberId\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"f\n\x1a\x41\x64\x64UserGroupMemberResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\x92\x01\n\x1cRemoveUserGroupMemberRequest\x12\x10\n\x08group_id\x18\x01 \x01(\t\x12\x44\n\tmember_id\x18\x02 \x01(\x0b\x32\x31.temporal.api.cloud.identity.v1.UserGroupMemberId\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"i\n\x1dRemoveUserGroupMemberResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"U\n\x1aGetUserGroupMembersRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x12\n\npage_token\x18\x02 \x01(\t\x12\x10\n\x08group_id\x18\x03 \x01(\t"x\n\x1bGetUserGroupMembersResponse\x12@\n\x07members\x18\x01 \x03(\x0b\x32/.temporal.api.cloud.identity.v1.UserGroupMember\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t"{\n\x1b\x43reateServiceAccountRequest\x12@\n\x04spec\x18\x01 \x01(\x0b\x32\x32.temporal.api.cloud.identity.v1.ServiceAccountSpec\x12\x1a\n\x12\x61sync_operation_id\x18\x02 \x01(\t"\x84\x01\n\x1c\x43reateServiceAccountResponse\x12\x1a\n\x12service_account_id\x18\x01 \x01(\t\x12H\n\x0f\x61sync_operation\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"6\n\x18GetServiceAccountRequest\x12\x1a\n\x12service_account_id\x18\x01 \x01(\t"d\n\x19GetServiceAccountResponse\x12G\n\x0fservice_account\x18\x01 \x01(\x0b\x32..temporal.api.cloud.identity.v1.ServiceAccount"B\n\x19GetServiceAccountsRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x12\n\npage_token\x18\x02 \x01(\t"~\n\x1aGetServiceAccountsResponse\x12G\n\x0fservice_account\x18\x01 \x03(\x0b\x32..temporal.api.cloud.identity.v1.ServiceAccount\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t"\xb1\x01\n\x1bUpdateServiceAccountRequest\x12\x1a\n\x12service_account_id\x18\x01 \x01(\t\x12@\n\x04spec\x18\x02 \x01(\x0b\x32\x32.temporal.api.cloud.identity.v1.ServiceAccountSpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"h\n\x1cUpdateServiceAccountResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"o\n\x1b\x44\x65leteServiceAccountRequest\x12\x1a\n\x12service_account_id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"h\n\x1c\x44\x65leteServiceAccountResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\xaa\x01\n\x0fGetUsageRequest\x12\x38\n\x14start_time_inclusive\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12\x65nd_time_exclusive\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x11\n\tpage_size\x18\x03 \x01(\x05\x12\x12\n\npage_token\x18\x04 \x01(\t"d\n\x10GetUsageResponse\x12\x37\n\tsummaries\x18\x01 \x03(\x0b\x32$.temporal.api.cloud.usage.v1.Summary\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t"\x13\n\x11GetAccountRequest"M\n\x12GetAccountResponse\x12\x37\n\x07\x61\x63\x63ount\x18\x01 \x01(\x0b\x32&.temporal.api.cloud.account.v1.Account"\x86\x01\n\x14UpdateAccountRequest\x12\x38\n\x04spec\x18\x01 \x01(\x0b\x32*.temporal.api.cloud.account.v1.AccountSpec\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"a\n\x15UpdateAccountResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"\x90\x01\n CreateNamespaceExportSinkRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12=\n\x04spec\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.namespace.v1.ExportSinkSpec\x12\x1a\n\x12\x61sync_operation_id\x18\x03 \x01(\t"m\n!CreateNamespaceExportSinkResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"@\n\x1dGetNamespaceExportSinkRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t"[\n\x1eGetNamespaceExportSinkResponse\x12\x39\n\x04sink\x18\x01 \x01(\x0b\x32+.temporal.api.cloud.namespace.v1.ExportSink"Z\n\x1eGetNamespaceExportSinksRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x12\n\npage_token\x18\x03 \x01(\t"v\n\x1fGetNamespaceExportSinksResponse\x12:\n\x05sinks\x18\x01 \x03(\x0b\x32+.temporal.api.cloud.namespace.v1.ExportSink\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t"\xaa\x01\n UpdateNamespaceExportSinkRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12=\n\x04spec\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.namespace.v1.ExportSinkSpec\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"m\n!UpdateNamespaceExportSinkResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"y\n DeleteNamespaceExportSinkRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x18\n\x10resource_version\x18\x03 \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x04 \x01(\t"m\n!DeleteNamespaceExportSinkResponse\x12H\n\x0f\x61sync_operation\x18\x01 \x01(\x0b\x32/.temporal.api.cloud.operation.v1.AsyncOperation"v\n"ValidateNamespaceExportSinkRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12=\n\x04spec\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.namespace.v1.ExportSinkSpec"%\n#ValidateNamespaceExportSinkResponseB\xc8\x01\n%io.temporal.api.cloud.cloudservice.v1B\x14RequestResponseProtoP\x01Z5go.temporal.io/api/cloud/cloudservice/v1;cloudservice\xaa\x02$Temporalio.Api.Cloud.CloudService.V1\xea\x02(Temporalio::Api::Cloud::CloudService::V1b\x06proto3'
 )
 
 
@@ -91,6 +91,12 @@ _ADDNAMESPACEREGIONREQUEST = DESCRIPTOR.message_types_by_name[
 _ADDNAMESPACEREGIONRESPONSE = DESCRIPTOR.message_types_by_name[
     "AddNamespaceRegionResponse"
 ]
+_DELETENAMESPACEREGIONREQUEST = DESCRIPTOR.message_types_by_name[
+    "DeleteNamespaceRegionRequest"
+]
+_DELETENAMESPACEREGIONRESPONSE = DESCRIPTOR.message_types_by_name[
+    "DeleteNamespaceRegionResponse"
+]
 _GETREGIONSREQUEST = DESCRIPTOR.message_types_by_name["GetRegionsRequest"]
 _GETREGIONSRESPONSE = DESCRIPTOR.message_types_by_name["GetRegionsResponse"]
 _GETREGIONREQUEST = DESCRIPTOR.message_types_by_name["GetRegionRequest"]
@@ -133,6 +139,9 @@ _GETUSERGROUPSREQUEST = DESCRIPTOR.message_types_by_name["GetUserGroupsRequest"]
 _GETUSERGROUPSREQUEST_GOOGLEGROUPFILTER = _GETUSERGROUPSREQUEST.nested_types_by_name[
     "GoogleGroupFilter"
 ]
+_GETUSERGROUPSREQUEST_SCIMGROUPFILTER = _GETUSERGROUPSREQUEST.nested_types_by_name[
+    "SCIMGroupFilter"
+]
 _GETUSERGROUPSRESPONSE = DESCRIPTOR.message_types_by_name["GetUserGroupsResponse"]
 _GETUSERGROUPREQUEST = DESCRIPTOR.message_types_by_name["GetUserGroupRequest"]
 _GETUSERGROUPRESPONSE = DESCRIPTOR.message_types_by_name["GetUserGroupResponse"]
@@ -147,6 +156,24 @@ _SETUSERGROUPNAMESPACEACCESSREQUEST = DESCRIPTOR.message_types_by_name[
 ]
 _SETUSERGROUPNAMESPACEACCESSRESPONSE = DESCRIPTOR.message_types_by_name[
     "SetUserGroupNamespaceAccessResponse"
+]
+_ADDUSERGROUPMEMBERREQUEST = DESCRIPTOR.message_types_by_name[
+    "AddUserGroupMemberRequest"
+]
+_ADDUSERGROUPMEMBERRESPONSE = DESCRIPTOR.message_types_by_name[
+    "AddUserGroupMemberResponse"
+]
+_REMOVEUSERGROUPMEMBERREQUEST = DESCRIPTOR.message_types_by_name[
+    "RemoveUserGroupMemberRequest"
+]
+_REMOVEUSERGROUPMEMBERRESPONSE = DESCRIPTOR.message_types_by_name[
+    "RemoveUserGroupMemberResponse"
+]
+_GETUSERGROUPMEMBERSREQUEST = DESCRIPTOR.message_types_by_name[
+    "GetUserGroupMembersRequest"
+]
+_GETUSERGROUPMEMBERSRESPONSE = DESCRIPTOR.message_types_by_name[
+    "GetUserGroupMembersResponse"
 ]
 _CREATESERVICEACCOUNTREQUEST = DESCRIPTOR.message_types_by_name[
     "CreateServiceAccountRequest"
@@ -548,6 +575,28 @@ AddNamespaceRegionResponse = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(AddNamespaceRegionResponse)
 
+DeleteNamespaceRegionRequest = _reflection.GeneratedProtocolMessageType(
+    "DeleteNamespaceRegionRequest",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _DELETENAMESPACEREGIONREQUEST,
+        "__module__": "temporal.api.cloud.cloudservice.v1.request_response_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.cloudservice.v1.DeleteNamespaceRegionRequest)
+    },
+)
+_sym_db.RegisterMessage(DeleteNamespaceRegionRequest)
+
+DeleteNamespaceRegionResponse = _reflection.GeneratedProtocolMessageType(
+    "DeleteNamespaceRegionResponse",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _DELETENAMESPACEREGIONRESPONSE,
+        "__module__": "temporal.api.cloud.cloudservice.v1.request_response_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.cloudservice.v1.DeleteNamespaceRegionResponse)
+    },
+)
+_sym_db.RegisterMessage(DeleteNamespaceRegionResponse)
+
 GetRegionsRequest = _reflection.GeneratedProtocolMessageType(
     "GetRegionsRequest",
     (_message.Message,),
@@ -825,6 +874,15 @@ GetUserGroupsRequest = _reflection.GeneratedProtocolMessageType(
                 # @@protoc_insertion_point(class_scope:temporal.api.cloud.cloudservice.v1.GetUserGroupsRequest.GoogleGroupFilter)
             },
         ),
+        "SCIMGroupFilter": _reflection.GeneratedProtocolMessageType(
+            "SCIMGroupFilter",
+            (_message.Message,),
+            {
+                "DESCRIPTOR": _GETUSERGROUPSREQUEST_SCIMGROUPFILTER,
+                "__module__": "temporal.api.cloud.cloudservice.v1.request_response_pb2",
+                # @@protoc_insertion_point(class_scope:temporal.api.cloud.cloudservice.v1.GetUserGroupsRequest.SCIMGroupFilter)
+            },
+        ),
         "DESCRIPTOR": _GETUSERGROUPSREQUEST,
         "__module__": "temporal.api.cloud.cloudservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.cloudservice.v1.GetUserGroupsRequest)
@@ -832,6 +890,7 @@ GetUserGroupsRequest = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(GetUserGroupsRequest)
 _sym_db.RegisterMessage(GetUserGroupsRequest.GoogleGroupFilter)
+_sym_db.RegisterMessage(GetUserGroupsRequest.SCIMGroupFilter)
 
 GetUserGroupsResponse = _reflection.GeneratedProtocolMessageType(
     "GetUserGroupsResponse",
@@ -953,6 +1012,72 @@ SetUserGroupNamespaceAccessResponse = _reflection.GeneratedProtocolMessageType(
     },
 )
 _sym_db.RegisterMessage(SetUserGroupNamespaceAccessResponse)
+
+AddUserGroupMemberRequest = _reflection.GeneratedProtocolMessageType(
+    "AddUserGroupMemberRequest",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _ADDUSERGROUPMEMBERREQUEST,
+        "__module__": "temporal.api.cloud.cloudservice.v1.request_response_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.cloudservice.v1.AddUserGroupMemberRequest)
+    },
+)
+_sym_db.RegisterMessage(AddUserGroupMemberRequest)
+
+AddUserGroupMemberResponse = _reflection.GeneratedProtocolMessageType(
+    "AddUserGroupMemberResponse",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _ADDUSERGROUPMEMBERRESPONSE,
+        "__module__": "temporal.api.cloud.cloudservice.v1.request_response_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.cloudservice.v1.AddUserGroupMemberResponse)
+    },
+)
+_sym_db.RegisterMessage(AddUserGroupMemberResponse)
+
+RemoveUserGroupMemberRequest = _reflection.GeneratedProtocolMessageType(
+    "RemoveUserGroupMemberRequest",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _REMOVEUSERGROUPMEMBERREQUEST,
+        "__module__": "temporal.api.cloud.cloudservice.v1.request_response_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.cloudservice.v1.RemoveUserGroupMemberRequest)
+    },
+)
+_sym_db.RegisterMessage(RemoveUserGroupMemberRequest)
+
+RemoveUserGroupMemberResponse = _reflection.GeneratedProtocolMessageType(
+    "RemoveUserGroupMemberResponse",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _REMOVEUSERGROUPMEMBERRESPONSE,
+        "__module__": "temporal.api.cloud.cloudservice.v1.request_response_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.cloudservice.v1.RemoveUserGroupMemberResponse)
+    },
+)
+_sym_db.RegisterMessage(RemoveUserGroupMemberResponse)
+
+GetUserGroupMembersRequest = _reflection.GeneratedProtocolMessageType(
+    "GetUserGroupMembersRequest",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _GETUSERGROUPMEMBERSREQUEST,
+        "__module__": "temporal.api.cloud.cloudservice.v1.request_response_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.cloudservice.v1.GetUserGroupMembersRequest)
+    },
+)
+_sym_db.RegisterMessage(GetUserGroupMembersRequest)
+
+GetUserGroupMembersResponse = _reflection.GeneratedProtocolMessageType(
+    "GetUserGroupMembersResponse",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _GETUSERGROUPMEMBERSRESPONSE,
+        "__module__": "temporal.api.cloud.cloudservice.v1.request_response_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.cloudservice.v1.GetUserGroupMembersResponse)
+    },
+)
+_sym_db.RegisterMessage(GetUserGroupMembersResponse)
 
 CreateServiceAccountRequest = _reflection.GeneratedProtocolMessageType(
     "CreateServiceAccountRequest",
@@ -1329,134 +1454,152 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _ADDNAMESPACEREGIONREQUEST._serialized_end = 3503
     _ADDNAMESPACEREGIONRESPONSE._serialized_start = 3505
     _ADDNAMESPACEREGIONRESPONSE._serialized_end = 3607
-    _GETREGIONSREQUEST._serialized_start = 3609
-    _GETREGIONSREQUEST._serialized_end = 3628
-    _GETREGIONSRESPONSE._serialized_start = 3630
-    _GETREGIONSRESPONSE._serialized_end = 3705
-    _GETREGIONREQUEST._serialized_start = 3707
-    _GETREGIONREQUEST._serialized_end = 3741
-    _GETREGIONRESPONSE._serialized_start = 3743
-    _GETREGIONRESPONSE._serialized_end = 3816
-    _GETAPIKEYSREQUEST._serialized_start = 3819
-    _GETAPIKEYSREQUEST._serialized_end = 3993
-    _GETAPIKEYSRESPONSE._serialized_start = 3995
-    _GETAPIKEYSRESPONSE._serialized_end = 4098
-    _GETAPIKEYREQUEST._serialized_start = 4100
-    _GETAPIKEYREQUEST._serialized_end = 4134
-    _GETAPIKEYRESPONSE._serialized_start = 4136
-    _GETAPIKEYRESPONSE._serialized_end = 4212
-    _CREATEAPIKEYREQUEST._serialized_start = 4214
-    _CREATEAPIKEYREQUEST._serialized_end = 4321
-    _CREATEAPIKEYRESPONSE._serialized_start = 4323
-    _CREATEAPIKEYRESPONSE._serialized_end = 4450
-    _UPDATEAPIKEYREQUEST._serialized_start = 4453
-    _UPDATEAPIKEYREQUEST._serialized_end = 4602
-    _UPDATEAPIKEYRESPONSE._serialized_start = 4604
-    _UPDATEAPIKEYRESPONSE._serialized_end = 4700
-    _DELETEAPIKEYREQUEST._serialized_start = 4702
-    _DELETEAPIKEYREQUEST._serialized_end = 4793
-    _DELETEAPIKEYRESPONSE._serialized_start = 4795
-    _DELETEAPIKEYRESPONSE._serialized_end = 4891
-    _GETNEXUSENDPOINTSREQUEST._serialized_start = 4894
-    _GETNEXUSENDPOINTSREQUEST._serialized_end = 5029
-    _GETNEXUSENDPOINTSRESPONSE._serialized_start = 5031
-    _GETNEXUSENDPOINTSRESPONSE._serialized_end = 5141
-    _GETNEXUSENDPOINTREQUEST._serialized_start = 5143
-    _GETNEXUSENDPOINTREQUEST._serialized_end = 5189
-    _GETNEXUSENDPOINTRESPONSE._serialized_start = 5191
-    _GETNEXUSENDPOINTRESPONSE._serialized_end = 5274
-    _CREATENEXUSENDPOINTREQUEST._serialized_start = 5276
-    _CREATENEXUSENDPOINTREQUEST._serialized_end = 5389
-    _CREATENEXUSENDPOINTRESPONSE._serialized_start = 5391
-    _CREATENEXUSENDPOINTRESPONSE._serialized_end = 5515
-    _UPDATENEXUSENDPOINTREQUEST._serialized_start = 5518
-    _UPDATENEXUSENDPOINTREQUEST._serialized_end = 5678
-    _UPDATENEXUSENDPOINTRESPONSE._serialized_start = 5680
-    _UPDATENEXUSENDPOINTRESPONSE._serialized_end = 5783
-    _DELETENEXUSENDPOINTREQUEST._serialized_start = 5785
-    _DELETENEXUSENDPOINTREQUEST._serialized_end = 5888
-    _DELETENEXUSENDPOINTRESPONSE._serialized_start = 5890
-    _DELETENEXUSENDPOINTRESPONSE._serialized_end = 5993
-    _GETUSERGROUPSREQUEST._serialized_start = 5996
-    _GETUSERGROUPSREQUEST._serialized_end = 6240
-    _GETUSERGROUPSREQUEST_GOOGLEGROUPFILTER._serialized_start = 6198
-    _GETUSERGROUPSREQUEST_GOOGLEGROUPFILTER._serialized_end = 6240
-    _GETUSERGROUPSRESPONSE._serialized_start = 6242
-    _GETUSERGROUPSRESPONSE._serialized_end = 6349
-    _GETUSERGROUPREQUEST._serialized_start = 6351
-    _GETUSERGROUPREQUEST._serialized_end = 6390
-    _GETUSERGROUPRESPONSE._serialized_start = 6392
-    _GETUSERGROUPRESPONSE._serialized_end = 6472
-    _CREATEUSERGROUPREQUEST._serialized_start = 6474
-    _CREATEUSERGROUPREQUEST._serialized_end = 6587
-    _CREATEUSERGROUPRESPONSE._serialized_start = 6589
-    _CREATEUSERGROUPRESPONSE._serialized_end = 6706
-    _UPDATEUSERGROUPREQUEST._serialized_start = 6709
-    _UPDATEUSERGROUPREQUEST._serialized_end = 6866
-    _UPDATEUSERGROUPRESPONSE._serialized_start = 6868
-    _UPDATEUSERGROUPRESPONSE._serialized_end = 6967
-    _DELETEUSERGROUPREQUEST._serialized_start = 6969
-    _DELETEUSERGROUPREQUEST._serialized_end = 7065
-    _DELETEUSERGROUPRESPONSE._serialized_start = 7067
-    _DELETEUSERGROUPRESPONSE._serialized_end = 7166
-    _SETUSERGROUPNAMESPACEACCESSREQUEST._serialized_start = 7169
-    _SETUSERGROUPNAMESPACEACCESSREQUEST._serialized_end = 7361
-    _SETUSERGROUPNAMESPACEACCESSRESPONSE._serialized_start = 7363
-    _SETUSERGROUPNAMESPACEACCESSRESPONSE._serialized_end = 7474
-    _CREATESERVICEACCOUNTREQUEST._serialized_start = 7476
-    _CREATESERVICEACCOUNTREQUEST._serialized_end = 7599
-    _CREATESERVICEACCOUNTRESPONSE._serialized_start = 7602
-    _CREATESERVICEACCOUNTRESPONSE._serialized_end = 7734
-    _GETSERVICEACCOUNTREQUEST._serialized_start = 7736
-    _GETSERVICEACCOUNTREQUEST._serialized_end = 7790
-    _GETSERVICEACCOUNTRESPONSE._serialized_start = 7792
-    _GETSERVICEACCOUNTRESPONSE._serialized_end = 7892
-    _GETSERVICEACCOUNTSREQUEST._serialized_start = 7894
-    _GETSERVICEACCOUNTSREQUEST._serialized_end = 7960
-    _GETSERVICEACCOUNTSRESPONSE._serialized_start = 7962
-    _GETSERVICEACCOUNTSRESPONSE._serialized_end = 8088
-    _UPDATESERVICEACCOUNTREQUEST._serialized_start = 8091
-    _UPDATESERVICEACCOUNTREQUEST._serialized_end = 8268
-    _UPDATESERVICEACCOUNTRESPONSE._serialized_start = 8270
-    _UPDATESERVICEACCOUNTRESPONSE._serialized_end = 8374
-    _DELETESERVICEACCOUNTREQUEST._serialized_start = 8376
-    _DELETESERVICEACCOUNTREQUEST._serialized_end = 8487
-    _DELETESERVICEACCOUNTRESPONSE._serialized_start = 8489
-    _DELETESERVICEACCOUNTRESPONSE._serialized_end = 8593
-    _GETUSAGEREQUEST._serialized_start = 8596
-    _GETUSAGEREQUEST._serialized_end = 8766
-    _GETUSAGERESPONSE._serialized_start = 8768
-    _GETUSAGERESPONSE._serialized_end = 8868
-    _GETACCOUNTREQUEST._serialized_start = 8870
-    _GETACCOUNTREQUEST._serialized_end = 8889
-    _GETACCOUNTRESPONSE._serialized_start = 8891
-    _GETACCOUNTRESPONSE._serialized_end = 8968
-    _UPDATEACCOUNTREQUEST._serialized_start = 8971
-    _UPDATEACCOUNTREQUEST._serialized_end = 9105
-    _UPDATEACCOUNTRESPONSE._serialized_start = 9107
-    _UPDATEACCOUNTRESPONSE._serialized_end = 9204
-    _CREATENAMESPACEEXPORTSINKREQUEST._serialized_start = 9207
-    _CREATENAMESPACEEXPORTSINKREQUEST._serialized_end = 9351
-    _CREATENAMESPACEEXPORTSINKRESPONSE._serialized_start = 9353
-    _CREATENAMESPACEEXPORTSINKRESPONSE._serialized_end = 9462
-    _GETNAMESPACEEXPORTSINKREQUEST._serialized_start = 9464
-    _GETNAMESPACEEXPORTSINKREQUEST._serialized_end = 9528
-    _GETNAMESPACEEXPORTSINKRESPONSE._serialized_start = 9530
-    _GETNAMESPACEEXPORTSINKRESPONSE._serialized_end = 9621
-    _GETNAMESPACEEXPORTSINKSREQUEST._serialized_start = 9623
-    _GETNAMESPACEEXPORTSINKSREQUEST._serialized_end = 9713
-    _GETNAMESPACEEXPORTSINKSRESPONSE._serialized_start = 9715
-    _GETNAMESPACEEXPORTSINKSRESPONSE._serialized_end = 9833
-    _UPDATENAMESPACEEXPORTSINKREQUEST._serialized_start = 9836
-    _UPDATENAMESPACEEXPORTSINKREQUEST._serialized_end = 10006
-    _UPDATENAMESPACEEXPORTSINKRESPONSE._serialized_start = 10008
-    _UPDATENAMESPACEEXPORTSINKRESPONSE._serialized_end = 10117
-    _DELETENAMESPACEEXPORTSINKREQUEST._serialized_start = 10119
-    _DELETENAMESPACEEXPORTSINKREQUEST._serialized_end = 10240
-    _DELETENAMESPACEEXPORTSINKRESPONSE._serialized_start = 10242
-    _DELETENAMESPACEEXPORTSINKRESPONSE._serialized_end = 10351
-    _VALIDATENAMESPACEEXPORTSINKREQUEST._serialized_start = 10353
-    _VALIDATENAMESPACEEXPORTSINKREQUEST._serialized_end = 10471
-    _VALIDATENAMESPACEEXPORTSINKRESPONSE._serialized_start = 10473
-    _VALIDATENAMESPACEEXPORTSINKRESPONSE._serialized_end = 10510
+    _DELETENAMESPACEREGIONREQUEST._serialized_start = 3609
+    _DELETENAMESPACEREGIONREQUEST._serialized_end = 3728
+    _DELETENAMESPACEREGIONRESPONSE._serialized_start = 3730
+    _DELETENAMESPACEREGIONRESPONSE._serialized_end = 3835
+    _GETREGIONSREQUEST._serialized_start = 3837
+    _GETREGIONSREQUEST._serialized_end = 3856
+    _GETREGIONSRESPONSE._serialized_start = 3858
+    _GETREGIONSRESPONSE._serialized_end = 3933
+    _GETREGIONREQUEST._serialized_start = 3935
+    _GETREGIONREQUEST._serialized_end = 3969
+    _GETREGIONRESPONSE._serialized_start = 3971
+    _GETREGIONRESPONSE._serialized_end = 4044
+    _GETAPIKEYSREQUEST._serialized_start = 4047
+    _GETAPIKEYSREQUEST._serialized_end = 4221
+    _GETAPIKEYSRESPONSE._serialized_start = 4223
+    _GETAPIKEYSRESPONSE._serialized_end = 4326
+    _GETAPIKEYREQUEST._serialized_start = 4328
+    _GETAPIKEYREQUEST._serialized_end = 4362
+    _GETAPIKEYRESPONSE._serialized_start = 4364
+    _GETAPIKEYRESPONSE._serialized_end = 4440
+    _CREATEAPIKEYREQUEST._serialized_start = 4442
+    _CREATEAPIKEYREQUEST._serialized_end = 4549
+    _CREATEAPIKEYRESPONSE._serialized_start = 4551
+    _CREATEAPIKEYRESPONSE._serialized_end = 4678
+    _UPDATEAPIKEYREQUEST._serialized_start = 4681
+    _UPDATEAPIKEYREQUEST._serialized_end = 4830
+    _UPDATEAPIKEYRESPONSE._serialized_start = 4832
+    _UPDATEAPIKEYRESPONSE._serialized_end = 4928
+    _DELETEAPIKEYREQUEST._serialized_start = 4930
+    _DELETEAPIKEYREQUEST._serialized_end = 5021
+    _DELETEAPIKEYRESPONSE._serialized_start = 5023
+    _DELETEAPIKEYRESPONSE._serialized_end = 5119
+    _GETNEXUSENDPOINTSREQUEST._serialized_start = 5122
+    _GETNEXUSENDPOINTSREQUEST._serialized_end = 5257
+    _GETNEXUSENDPOINTSRESPONSE._serialized_start = 5259
+    _GETNEXUSENDPOINTSRESPONSE._serialized_end = 5369
+    _GETNEXUSENDPOINTREQUEST._serialized_start = 5371
+    _GETNEXUSENDPOINTREQUEST._serialized_end = 5417
+    _GETNEXUSENDPOINTRESPONSE._serialized_start = 5419
+    _GETNEXUSENDPOINTRESPONSE._serialized_end = 5502
+    _CREATENEXUSENDPOINTREQUEST._serialized_start = 5504
+    _CREATENEXUSENDPOINTREQUEST._serialized_end = 5617
+    _CREATENEXUSENDPOINTRESPONSE._serialized_start = 5619
+    _CREATENEXUSENDPOINTRESPONSE._serialized_end = 5743
+    _UPDATENEXUSENDPOINTREQUEST._serialized_start = 5746
+    _UPDATENEXUSENDPOINTREQUEST._serialized_end = 5906
+    _UPDATENEXUSENDPOINTRESPONSE._serialized_start = 5908
+    _UPDATENEXUSENDPOINTRESPONSE._serialized_end = 6011
+    _DELETENEXUSENDPOINTREQUEST._serialized_start = 6013
+    _DELETENEXUSENDPOINTREQUEST._serialized_end = 6116
+    _DELETENEXUSENDPOINTRESPONSE._serialized_start = 6118
+    _DELETENEXUSENDPOINTRESPONSE._serialized_end = 6221
+    _GETUSERGROUPSREQUEST._serialized_start = 6224
+    _GETUSERGROUPSREQUEST._serialized_end = 6597
+    _GETUSERGROUPSREQUEST_GOOGLEGROUPFILTER._serialized_start = 6520
+    _GETUSERGROUPSREQUEST_GOOGLEGROUPFILTER._serialized_end = 6562
+    _GETUSERGROUPSREQUEST_SCIMGROUPFILTER._serialized_start = 6564
+    _GETUSERGROUPSREQUEST_SCIMGROUPFILTER._serialized_end = 6597
+    _GETUSERGROUPSRESPONSE._serialized_start = 6599
+    _GETUSERGROUPSRESPONSE._serialized_end = 6706
+    _GETUSERGROUPREQUEST._serialized_start = 6708
+    _GETUSERGROUPREQUEST._serialized_end = 6747
+    _GETUSERGROUPRESPONSE._serialized_start = 6749
+    _GETUSERGROUPRESPONSE._serialized_end = 6829
+    _CREATEUSERGROUPREQUEST._serialized_start = 6831
+    _CREATEUSERGROUPREQUEST._serialized_end = 6944
+    _CREATEUSERGROUPRESPONSE._serialized_start = 6946
+    _CREATEUSERGROUPRESPONSE._serialized_end = 7063
+    _UPDATEUSERGROUPREQUEST._serialized_start = 7066
+    _UPDATEUSERGROUPREQUEST._serialized_end = 7223
+    _UPDATEUSERGROUPRESPONSE._serialized_start = 7225
+    _UPDATEUSERGROUPRESPONSE._serialized_end = 7324
+    _DELETEUSERGROUPREQUEST._serialized_start = 7326
+    _DELETEUSERGROUPREQUEST._serialized_end = 7422
+    _DELETEUSERGROUPRESPONSE._serialized_start = 7424
+    _DELETEUSERGROUPRESPONSE._serialized_end = 7523
+    _SETUSERGROUPNAMESPACEACCESSREQUEST._serialized_start = 7526
+    _SETUSERGROUPNAMESPACEACCESSREQUEST._serialized_end = 7718
+    _SETUSERGROUPNAMESPACEACCESSRESPONSE._serialized_start = 7720
+    _SETUSERGROUPNAMESPACEACCESSRESPONSE._serialized_end = 7831
+    _ADDUSERGROUPMEMBERREQUEST._serialized_start = 7834
+    _ADDUSERGROUPMEMBERREQUEST._serialized_end = 7977
+    _ADDUSERGROUPMEMBERRESPONSE._serialized_start = 7979
+    _ADDUSERGROUPMEMBERRESPONSE._serialized_end = 8081
+    _REMOVEUSERGROUPMEMBERREQUEST._serialized_start = 8084
+    _REMOVEUSERGROUPMEMBERREQUEST._serialized_end = 8230
+    _REMOVEUSERGROUPMEMBERRESPONSE._serialized_start = 8232
+    _REMOVEUSERGROUPMEMBERRESPONSE._serialized_end = 8337
+    _GETUSERGROUPMEMBERSREQUEST._serialized_start = 8339
+    _GETUSERGROUPMEMBERSREQUEST._serialized_end = 8424
+    _GETUSERGROUPMEMBERSRESPONSE._serialized_start = 8426
+    _GETUSERGROUPMEMBERSRESPONSE._serialized_end = 8546
+    _CREATESERVICEACCOUNTREQUEST._serialized_start = 8548
+    _CREATESERVICEACCOUNTREQUEST._serialized_end = 8671
+    _CREATESERVICEACCOUNTRESPONSE._serialized_start = 8674
+    _CREATESERVICEACCOUNTRESPONSE._serialized_end = 8806
+    _GETSERVICEACCOUNTREQUEST._serialized_start = 8808
+    _GETSERVICEACCOUNTREQUEST._serialized_end = 8862
+    _GETSERVICEACCOUNTRESPONSE._serialized_start = 8864
+    _GETSERVICEACCOUNTRESPONSE._serialized_end = 8964
+    _GETSERVICEACCOUNTSREQUEST._serialized_start = 8966
+    _GETSERVICEACCOUNTSREQUEST._serialized_end = 9032
+    _GETSERVICEACCOUNTSRESPONSE._serialized_start = 9034
+    _GETSERVICEACCOUNTSRESPONSE._serialized_end = 9160
+    _UPDATESERVICEACCOUNTREQUEST._serialized_start = 9163
+    _UPDATESERVICEACCOUNTREQUEST._serialized_end = 9340
+    _UPDATESERVICEACCOUNTRESPONSE._serialized_start = 9342
+    _UPDATESERVICEACCOUNTRESPONSE._serialized_end = 9446
+    _DELETESERVICEACCOUNTREQUEST._serialized_start = 9448
+    _DELETESERVICEACCOUNTREQUEST._serialized_end = 9559
+    _DELETESERVICEACCOUNTRESPONSE._serialized_start = 9561
+    _DELETESERVICEACCOUNTRESPONSE._serialized_end = 9665
+    _GETUSAGEREQUEST._serialized_start = 9668
+    _GETUSAGEREQUEST._serialized_end = 9838
+    _GETUSAGERESPONSE._serialized_start = 9840
+    _GETUSAGERESPONSE._serialized_end = 9940
+    _GETACCOUNTREQUEST._serialized_start = 9942
+    _GETACCOUNTREQUEST._serialized_end = 9961
+    _GETACCOUNTRESPONSE._serialized_start = 9963
+    _GETACCOUNTRESPONSE._serialized_end = 10040
+    _UPDATEACCOUNTREQUEST._serialized_start = 10043
+    _UPDATEACCOUNTREQUEST._serialized_end = 10177
+    _UPDATEACCOUNTRESPONSE._serialized_start = 10179
+    _UPDATEACCOUNTRESPONSE._serialized_end = 10276
+    _CREATENAMESPACEEXPORTSINKREQUEST._serialized_start = 10279
+    _CREATENAMESPACEEXPORTSINKREQUEST._serialized_end = 10423
+    _CREATENAMESPACEEXPORTSINKRESPONSE._serialized_start = 10425
+    _CREATENAMESPACEEXPORTSINKRESPONSE._serialized_end = 10534
+    _GETNAMESPACEEXPORTSINKREQUEST._serialized_start = 10536
+    _GETNAMESPACEEXPORTSINKREQUEST._serialized_end = 10600
+    _GETNAMESPACEEXPORTSINKRESPONSE._serialized_start = 10602
+    _GETNAMESPACEEXPORTSINKRESPONSE._serialized_end = 10693
+    _GETNAMESPACEEXPORTSINKSREQUEST._serialized_start = 10695
+    _GETNAMESPACEEXPORTSINKSREQUEST._serialized_end = 10785
+    _GETNAMESPACEEXPORTSINKSRESPONSE._serialized_start = 10787
+    _GETNAMESPACEEXPORTSINKSRESPONSE._serialized_end = 10905
+    _UPDATENAMESPACEEXPORTSINKREQUEST._serialized_start = 10908
+    _UPDATENAMESPACEEXPORTSINKREQUEST._serialized_end = 11078
+    _UPDATENAMESPACEEXPORTSINKRESPONSE._serialized_start = 11080
+    _UPDATENAMESPACEEXPORTSINKRESPONSE._serialized_end = 11189
+    _DELETENAMESPACEEXPORTSINKREQUEST._serialized_start = 11191
+    _DELETENAMESPACEEXPORTSINKREQUEST._serialized_end = 11312
+    _DELETENAMESPACEEXPORTSINKRESPONSE._serialized_start = 11314
+    _DELETENAMESPACEEXPORTSINKRESPONSE._serialized_end = 11423
+    _VALIDATENAMESPACEEXPORTSINKREQUEST._serialized_start = 11425
+    _VALIDATENAMESPACEEXPORTSINKREQUEST._serialized_end = 11543
+    _VALIDATENAMESPACEEXPORTSINKRESPONSE._serialized_start = 11545
+    _VALIDATENAMESPACEEXPORTSINKRESPONSE._serialized_end = 11582
 # @@protoc_insertion_point(module_scope)

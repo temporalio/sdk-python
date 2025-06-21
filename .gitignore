@@ -9,3 +9,4 @@ temporalio/bridge/temporal_sdk_bridge*
 /.idea
 /sdk-python.iml
 /.zed
+*.DS_Store

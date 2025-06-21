@@ -22,7 +22,7 @@ from temporalio.api.cloud.resource.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n,temporal/api/cloud/identity/v1/message.proto\x12\x1etemporal.api.cloud.identity.v1\x1a,temporal/api/cloud/resource/v1/message.proto\x1a\x1fgoogle/protobuf/timestamp.proto"\xe7\x01\n\rAccountAccess\x12\x1b\n\x0frole_deprecated\x18\x01 \x01(\tB\x02\x18\x01\x12@\n\x04role\x18\x02 \x01(\x0e\x32\x32.temporal.api.cloud.identity.v1.AccountAccess.Role"w\n\x04Role\x12\x14\n\x10ROLE_UNSPECIFIED\x10\x00\x12\x0e\n\nROLE_OWNER\x10\x01\x12\x0e\n\nROLE_ADMIN\x10\x02\x12\x12\n\x0eROLE_DEVELOPER\x10\x03\x12\x16\n\x12ROLE_FINANCE_ADMIN\x10\x04\x12\r\n\tROLE_READ\x10\x05"\xef\x01\n\x0fNamespaceAccess\x12!\n\x15permission_deprecated\x18\x01 \x01(\tB\x02\x18\x01\x12N\n\npermission\x18\x02 \x01(\x0e\x32:.temporal.api.cloud.identity.v1.NamespaceAccess.Permission"i\n\nPermission\x12\x1a\n\x16PERMISSION_UNSPECIFIED\x10\x00\x12\x14\n\x10PERMISSION_ADMIN\x10\x01\x12\x14\n\x10PERMISSION_WRITE\x10\x02\x12\x13\n\x0fPERMISSION_READ\x10\x03"\x95\x02\n\x06\x41\x63\x63\x65ss\x12\x45\n\x0e\x61\x63\x63ount_access\x18\x01 \x01(\x0b\x32-.temporal.api.cloud.identity.v1.AccountAccess\x12Y\n\x12namespace_accesses\x18\x02 \x03(\x0b\x32=.temporal.api.cloud.identity.v1.Access.NamespaceAccessesEntry\x1ai\n\x16NamespaceAccessesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12>\n\x05value\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.identity.v1.NamespaceAccess:\x02\x38\x01"Q\n\x08UserSpec\x12\r\n\x05\x65mail\x18\x01 \x01(\t\x12\x36\n\x06\x61\x63\x63\x65ss\x18\x02 \x01(\x0b\x32&.temporal.api.cloud.identity.v1.Access"p\n\nInvitation\x12\x30\n\x0c\x63reated_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x30\n\x0c\x65xpired_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\x86\x03\n\x04User\x12\n\n\x02id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x36\n\x04spec\x18\x03 \x01(\x0b\x32(.temporal.api.cloud.identity.v1.UserSpec\x12\x1c\n\x10state_deprecated\x18\x04 \x01(\tB\x02\x18\x01\x12<\n\x05state\x18\t \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t\x12>\n\ninvitation\x18\x06 \x01(\x0b\x32*.temporal.api.cloud.identity.v1.Invitation\x12\x30\n\x0c\x63reated_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12last_modified_time\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"(\n\x0fGoogleGroupSpec\x12\x15\n\remail_address\x18\x01 \x01(\t"\xa4\x01\n\rUserGroupSpec\x12\x14\n\x0c\x64isplay_name\x18\x01 \x01(\t\x12\x36\n\x06\x61\x63\x63\x65ss\x18\x02 \x01(\x0b\x32&.temporal.api.cloud.identity.v1.Access\x12\x45\n\x0cgoogle_group\x18\x03 \x01(\x0b\x32/.temporal.api.cloud.identity.v1.GoogleGroupSpec"\xd0\x02\n\tUserGroup\x12\n\n\x02id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12;\n\x04spec\x18\x03 \x01(\x0b\x32-.temporal.api.cloud.identity.v1.UserGroupSpec\x12\x1c\n\x10state_deprecated\x18\x04 \x01(\tB\x02\x18\x01\x12<\n\x05state\x18\x08 \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t\x12\x30\n\x0c\x63reated_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12last_modified_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\xda\x02\n\x0eServiceAccount\x12\n\n\x02id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12@\n\x04spec\x18\x03 \x01(\x0b\x32\x32.temporal.api.cloud.identity.v1.ServiceAccountSpec\x12\x1c\n\x10state_deprecated\x18\x04 \x01(\tB\x02\x18\x01\x12<\n\x05state\x18\x08 \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t\x12\x30\n\x0c\x63reated_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12last_modified_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"o\n\x12ServiceAccountSpec\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x36\n\x06\x61\x63\x63\x65ss\x18\x02 \x01(\x0b\x32&.temporal.api.cloud.identity.v1.Access\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t"\xca\x02\n\x06\x41piKey\x12\n\n\x02id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x38\n\x04spec\x18\x03 \x01(\x0b\x32*.temporal.api.cloud.identity.v1.ApiKeySpec\x12\x1c\n\x10state_deprecated\x18\x04 \x01(\tB\x02\x18\x01\x12<\n\x05state\x18\x08 \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t\x12\x30\n\x0c\x63reated_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12last_modified_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\xee\x01\n\nApiKeySpec\x12\x10\n\x08owner_id\x18\x01 \x01(\t\x12!\n\x15owner_type_deprecated\x18\x02 \x01(\tB\x02\x18\x01\x12=\n\nowner_type\x18\x07 \x01(\x0e\x32).temporal.api.cloud.identity.v1.OwnerType\x12\x14\n\x0c\x64isplay_name\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\x12/\n\x0b\x65xpiry_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x10\n\x08\x64isabled\x18\x06 \x01(\x08*\\\n\tOwnerType\x12\x1a\n\x16OWNER_TYPE_UNSPECIFIED\x10\x00\x12\x13\n\x0fOWNER_TYPE_USER\x10\x01\x12\x1e\n\x1aOWNER_TYPE_SERVICE_ACCOUNT\x10\x02\x42\xac\x01\n!io.temporal.api.cloud.identity.v1B\x0cMessageProtoP\x01Z-go.temporal.io/api/cloud/identity/v1;identity\xaa\x02 Temporalio.Api.Cloud.Identity.V1\xea\x02$Temporalio::Api::Cloud::Identity::V1b\x06proto3'
+    b'\n,temporal/api/cloud/identity/v1/message.proto\x12\x1etemporal.api.cloud.identity.v1\x1a,temporal/api/cloud/resource/v1/message.proto\x1a\x1fgoogle/protobuf/timestamp.proto"\xe7\x01\n\rAccountAccess\x12\x1b\n\x0frole_deprecated\x18\x01 \x01(\tB\x02\x18\x01\x12@\n\x04role\x18\x02 \x01(\x0e\x32\x32.temporal.api.cloud.identity.v1.AccountAccess.Role"w\n\x04Role\x12\x14\n\x10ROLE_UNSPECIFIED\x10\x00\x12\x0e\n\nROLE_OWNER\x10\x01\x12\x0e\n\nROLE_ADMIN\x10\x02\x12\x12\n\x0eROLE_DEVELOPER\x10\x03\x12\x16\n\x12ROLE_FINANCE_ADMIN\x10\x04\x12\r\n\tROLE_READ\x10\x05"\xef\x01\n\x0fNamespaceAccess\x12!\n\x15permission_deprecated\x18\x01 \x01(\tB\x02\x18\x01\x12N\n\npermission\x18\x02 \x01(\x0e\x32:.temporal.api.cloud.identity.v1.NamespaceAccess.Permission"i\n\nPermission\x12\x1a\n\x16PERMISSION_UNSPECIFIED\x10\x00\x12\x14\n\x10PERMISSION_ADMIN\x10\x01\x12\x14\n\x10PERMISSION_WRITE\x10\x02\x12\x13\n\x0fPERMISSION_READ\x10\x03"\x95\x02\n\x06\x41\x63\x63\x65ss\x12\x45\n\x0e\x61\x63\x63ount_access\x18\x01 \x01(\x0b\x32-.temporal.api.cloud.identity.v1.AccountAccess\x12Y\n\x12namespace_accesses\x18\x02 \x03(\x0b\x32=.temporal.api.cloud.identity.v1.Access.NamespaceAccessesEntry\x1ai\n\x16NamespaceAccessesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12>\n\x05value\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.identity.v1.NamespaceAccess:\x02\x38\x01"k\n\x15NamespaceScopedAccess\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12?\n\x06\x61\x63\x63\x65ss\x18\x02 \x01(\x0b\x32/.temporal.api.cloud.identity.v1.NamespaceAccess"Q\n\x08UserSpec\x12\r\n\x05\x65mail\x18\x01 \x01(\t\x12\x36\n\x06\x61\x63\x63\x65ss\x18\x02 \x01(\x0b\x32&.temporal.api.cloud.identity.v1.Access"p\n\nInvitation\x12\x30\n\x0c\x63reated_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x30\n\x0c\x65xpired_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\x86\x03\n\x04User\x12\n\n\x02id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x36\n\x04spec\x18\x03 \x01(\x0b\x32(.temporal.api.cloud.identity.v1.UserSpec\x12\x1c\n\x10state_deprecated\x18\x04 \x01(\tB\x02\x18\x01\x12<\n\x05state\x18\t \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t\x12>\n\ninvitation\x18\x06 \x01(\x0b\x32*.temporal.api.cloud.identity.v1.Invitation\x12\x30\n\x0c\x63reated_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12last_modified_time\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"(\n\x0fGoogleGroupSpec\x12\x15\n\remail_address\x18\x01 \x01(\t"\x1f\n\rSCIMGroupSpec\x12\x0e\n\x06idp_id\x18\x01 \x01(\t"\x10\n\x0e\x43loudGroupSpec"\xc0\x02\n\rUserGroupSpec\x12\x14\n\x0c\x64isplay_name\x18\x01 \x01(\t\x12\x36\n\x06\x61\x63\x63\x65ss\x18\x02 \x01(\x0b\x32&.temporal.api.cloud.identity.v1.Access\x12G\n\x0cgoogle_group\x18\x03 \x01(\x0b\x32/.temporal.api.cloud.identity.v1.GoogleGroupSpecH\x00\x12\x43\n\nscim_group\x18\x04 \x01(\x0b\x32-.temporal.api.cloud.identity.v1.SCIMGroupSpecH\x00\x12\x45\n\x0b\x63loud_group\x18\x05 \x01(\x0b\x32..temporal.api.cloud.identity.v1.CloudGroupSpecH\x00\x42\x0c\n\ngroup_type"\xd0\x02\n\tUserGroup\x12\n\n\x02id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12;\n\x04spec\x18\x03 \x01(\x0b\x32-.temporal.api.cloud.identity.v1.UserGroupSpec\x12\x1c\n\x10state_deprecated\x18\x04 \x01(\tB\x02\x18\x01\x12<\n\x05state\x18\x08 \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t\x12\x30\n\x0c\x63reated_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12last_modified_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"5\n\x11UserGroupMemberId\x12\x11\n\x07user_id\x18\x01 \x01(\tH\x00\x42\r\n\x0bmember_type"\x89\x01\n\x0fUserGroupMember\x12\x44\n\tmember_id\x18\x01 \x01(\x0b\x32\x31.temporal.api.cloud.identity.v1.UserGroupMemberId\x12\x30\n\x0c\x63reated_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\xda\x02\n\x0eServiceAccount\x12\n\n\x02id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12@\n\x04spec\x18\x03 \x01(\x0b\x32\x32.temporal.api.cloud.identity.v1.ServiceAccountSpec\x12\x1c\n\x10state_deprecated\x18\x04 \x01(\tB\x02\x18\x01\x12<\n\x05state\x18\x08 \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t\x12\x30\n\x0c\x63reated_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12last_modified_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\xc7\x01\n\x12ServiceAccountSpec\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x36\n\x06\x61\x63\x63\x65ss\x18\x02 \x01(\x0b\x32&.temporal.api.cloud.identity.v1.Access\x12V\n\x17namespace_scoped_access\x18\x04 \x01(\x0b\x32\x35.temporal.api.cloud.identity.v1.NamespaceScopedAccess\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t"\xca\x02\n\x06\x41piKey\x12\n\n\x02id\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12\x38\n\x04spec\x18\x03 \x01(\x0b\x32*.temporal.api.cloud.identity.v1.ApiKeySpec\x12\x1c\n\x10state_deprecated\x18\x04 \x01(\tB\x02\x18\x01\x12<\n\x05state\x18\x08 \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t\x12\x30\n\x0c\x63reated_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12last_modified_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\xee\x01\n\nApiKeySpec\x12\x10\n\x08owner_id\x18\x01 \x01(\t\x12!\n\x15owner_type_deprecated\x18\x02 \x01(\tB\x02\x18\x01\x12=\n\nowner_type\x18\x07 \x01(\x0e\x32).temporal.api.cloud.identity.v1.OwnerType\x12\x14\n\x0c\x64isplay_name\x18\x03 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\x12/\n\x0b\x65xpiry_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x10\n\x08\x64isabled\x18\x06 \x01(\x08*\\\n\tOwnerType\x12\x1a\n\x16OWNER_TYPE_UNSPECIFIED\x10\x00\x12\x13\n\x0fOWNER_TYPE_USER\x10\x01\x12\x1e\n\x1aOWNER_TYPE_SERVICE_ACCOUNT\x10\x02\x42\xac\x01\n!io.temporal.api.cloud.identity.v1B\x0cMessageProtoP\x01Z-go.temporal.io/api/cloud/identity/v1;identity\xaa\x02 Temporalio.Api.Cloud.Identity.V1\xea\x02$Temporalio::Api::Cloud::Identity::V1b\x06proto3'
 )
 
 _OWNERTYPE = DESCRIPTOR.enum_types_by_name["OwnerType"]
@@ -36,12 +36,17 @@ _ACCOUNTACCESS = DESCRIPTOR.message_types_by_name["AccountAccess"]
 _NAMESPACEACCESS = DESCRIPTOR.message_types_by_name["NamespaceAccess"]
 _ACCESS = DESCRIPTOR.message_types_by_name["Access"]
 _ACCESS_NAMESPACEACCESSESENTRY = _ACCESS.nested_types_by_name["NamespaceAccessesEntry"]
+_NAMESPACESCOPEDACCESS = DESCRIPTOR.message_types_by_name["NamespaceScopedAccess"]
 _USERSPEC = DESCRIPTOR.message_types_by_name["UserSpec"]
 _INVITATION = DESCRIPTOR.message_types_by_name["Invitation"]
 _USER = DESCRIPTOR.message_types_by_name["User"]
 _GOOGLEGROUPSPEC = DESCRIPTOR.message_types_by_name["GoogleGroupSpec"]
+_SCIMGROUPSPEC = DESCRIPTOR.message_types_by_name["SCIMGroupSpec"]
+_CLOUDGROUPSPEC = DESCRIPTOR.message_types_by_name["CloudGroupSpec"]
 _USERGROUPSPEC = DESCRIPTOR.message_types_by_name["UserGroupSpec"]
 _USERGROUP = DESCRIPTOR.message_types_by_name["UserGroup"]
+_USERGROUPMEMBERID = DESCRIPTOR.message_types_by_name["UserGroupMemberId"]
+_USERGROUPMEMBER = DESCRIPTOR.message_types_by_name["UserGroupMember"]
 _SERVICEACCOUNT = DESCRIPTOR.message_types_by_name["ServiceAccount"]
 _SERVICEACCOUNTSPEC = DESCRIPTOR.message_types_by_name["ServiceAccountSpec"]
 _APIKEY = DESCRIPTOR.message_types_by_name["ApiKey"]
@@ -91,6 +96,17 @@ Access = _reflection.GeneratedProtocolMessageType(
 _sym_db.RegisterMessage(Access)
 _sym_db.RegisterMessage(Access.NamespaceAccessesEntry)
 
+NamespaceScopedAccess = _reflection.GeneratedProtocolMessageType(
+    "NamespaceScopedAccess",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _NAMESPACESCOPEDACCESS,
+        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.NamespaceScopedAccess)
+    },
+)
+_sym_db.RegisterMessage(NamespaceScopedAccess)
+
 UserSpec = _reflection.GeneratedProtocolMessageType(
     "UserSpec",
     (_message.Message,),
@@ -135,6 +151,28 @@ GoogleGroupSpec = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(GoogleGroupSpec)
 
+SCIMGroupSpec = _reflection.GeneratedProtocolMessageType(
+    "SCIMGroupSpec",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _SCIMGROUPSPEC,
+        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.SCIMGroupSpec)
+    },
+)
+_sym_db.RegisterMessage(SCIMGroupSpec)
+
+CloudGroupSpec = _reflection.GeneratedProtocolMessageType(
+    "CloudGroupSpec",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _CLOUDGROUPSPEC,
+        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.CloudGroupSpec)
+    },
+)
+_sym_db.RegisterMessage(CloudGroupSpec)
+
 UserGroupSpec = _reflection.GeneratedProtocolMessageType(
     "UserGroupSpec",
     (_message.Message,),
@@ -156,6 +194,28 @@ UserGroup = _reflection.GeneratedProtocolMessageType(
     },
 )
 _sym_db.RegisterMessage(UserGroup)
+
+UserGroupMemberId = _reflection.GeneratedProtocolMessageType(
+    "UserGroupMemberId",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _USERGROUPMEMBERID,
+        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.UserGroupMemberId)
+    },
+)
+_sym_db.RegisterMessage(UserGroupMemberId)
+
+UserGroupMember = _reflection.GeneratedProtocolMessageType(
+    "UserGroupMember",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _USERGROUPMEMBER,
+        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.UserGroupMember)
+    },
+)
+_sym_db.RegisterMessage(UserGroupMember)
 
 ServiceAccount = _reflection.GeneratedProtocolMessageType(
     "ServiceAccount",
@@ -224,8 +284,8 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _APIKEYSPEC.fields_by_name[
         "owner_type_deprecated"
     ]._serialized_options = b"\030\001"
-    _OWNERTYPE._serialized_start = 3089
-    _OWNERTYPE._serialized_end = 3181
+    _OWNERTYPE._serialized_start = 3689
+    _OWNERTYPE._serialized_end = 3781
     _ACCOUNTACCESS._serialized_start = 160
     _ACCOUNTACCESS._serialized_end = 391
     _ACCOUNTACCESS_ROLE._serialized_start = 272
@@ -238,24 +298,34 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _ACCESS._serialized_end = 913
     _ACCESS_NAMESPACEACCESSESENTRY._serialized_start = 808
     _ACCESS_NAMESPACEACCESSESENTRY._serialized_end = 913
-    _USERSPEC._serialized_start = 915
-    _USERSPEC._serialized_end = 996
-    _INVITATION._serialized_start = 998
-    _INVITATION._serialized_end = 1110
-    _USER._serialized_start = 1113
-    _USER._serialized_end = 1503
-    _GOOGLEGROUPSPEC._serialized_start = 1505
-    _GOOGLEGROUPSPEC._serialized_end = 1545
-    _USERGROUPSPEC._serialized_start = 1548
-    _USERGROUPSPEC._serialized_end = 1712
-    _USERGROUP._serialized_start = 1715
-    _USERGROUP._serialized_end = 2051
-    _SERVICEACCOUNT._serialized_start = 2054
-    _SERVICEACCOUNT._serialized_end = 2400
-    _SERVICEACCOUNTSPEC._serialized_start = 2402
-    _SERVICEACCOUNTSPEC._serialized_end = 2513
-    _APIKEY._serialized_start = 2516
-    _APIKEY._serialized_end = 2846
-    _APIKEYSPEC._serialized_start = 2849
-    _APIKEYSPEC._serialized_end = 3087
+    _NAMESPACESCOPEDACCESS._serialized_start = 915
+    _NAMESPACESCOPEDACCESS._serialized_end = 1022
+    _USERSPEC._serialized_start = 1024
+    _USERSPEC._serialized_end = 1105
+    _INVITATION._serialized_start = 1107
+    _INVITATION._serialized_end = 1219
+    _USER._serialized_start = 1222
+    _USER._serialized_end = 1612
+    _GOOGLEGROUPSPEC._serialized_start = 1614
+    _GOOGLEGROUPSPEC._serialized_end = 1654
+    _SCIMGROUPSPEC._serialized_start = 1656
+    _SCIMGROUPSPEC._serialized_end = 1687
+    _CLOUDGROUPSPEC._serialized_start = 1689
+    _CLOUDGROUPSPEC._serialized_end = 1705
+    _USERGROUPSPEC._serialized_start = 1708
+    _USERGROUPSPEC._serialized_end = 2028
+    _USERGROUP._serialized_start = 2031
+    _USERGROUP._serialized_end = 2367
+    _USERGROUPMEMBERID._serialized_start = 2369
+    _USERGROUPMEMBERID._serialized_end = 2422
+    _USERGROUPMEMBER._serialized_start = 2425
+    _USERGROUPMEMBER._serialized_end = 2562
+    _SERVICEACCOUNT._serialized_start = 2565
+    _SERVICEACCOUNT._serialized_end = 2911
+    _SERVICEACCOUNTSPEC._serialized_start = 2914
+    _SERVICEACCOUNTSPEC._serialized_end = 3113
+    _APIKEY._serialized_start = 3116
+    _APIKEY._serialized_end = 3446
+    _APIKEYSPEC._serialized_start = 3449
+    _APIKEYSPEC._serialized_end = 3687
 # @@protoc_insertion_point(module_scope)
