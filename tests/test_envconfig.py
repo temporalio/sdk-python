@@ -73,10 +73,10 @@ def test_load_profile_from_file_default(base_config_file: Path):
     assert profile.tls is None
     assert "custom-header" not in profile.grpc_meta
 
-    config = profile.to_connect_config()
-    assert config.target_host == "default-address"
-    assert not config.tls
-    assert not config.rpc_metadata or "custom-header" not in config.rpc_metadata
+    config = profile.to_client_connect_config()
+    assert config["target_host"] == "default-address"
+    assert "tls" not in config
+    assert "rpc_metadata" not in config or "custom-header" not in config["rpc_metadata"]
 
 
 def test_load_profile_from_file_custom(base_config_file: Path):
@@ -90,11 +90,12 @@ def test_load_profile_from_file_custom(base_config_file: Path):
     assert profile.tls.server_name == "custom-server-name"
     assert profile.grpc_meta["custom-header"] == "custom-value"
 
-    config = profile.to_connect_config()
-    assert config.target_host == "custom-address"
-    assert isinstance(config.tls, TLSConfig)
-    assert config.tls.domain == "custom-server-name"
-    assert config.rpc_metadata["custom-header"] == "custom-value"
+    config = profile.to_client_connect_config()
+    assert config["target_host"] == "custom-address"
+    tls_config = config["tls"]
+    assert isinstance(tls_config, TLSConfig)
+    assert tls_config.domain == "custom-server-name"
+    assert config["rpc_metadata"]["custom-header"] == "custom-value"
 
 
 def test_load_profile_from_data_default():
@@ -104,9 +105,9 @@ def test_load_profile_from_data_default():
     assert profile.namespace == "default-namespace"
     assert profile.tls is None
 
-    config = profile.to_connect_config()
-    assert config.target_host == "default-address"
-    assert not config.tls
+    config = profile.to_client_connect_config()
+    assert config["target_host"] == "default-address"
+    assert "tls" not in config
 
 
 def test_load_profile_from_data_custom():
@@ -118,11 +119,12 @@ def test_load_profile_from_data_custom():
     assert profile.tls.server_name == "custom-server-name"
     assert profile.grpc_meta["custom-header"] == "custom-value"
 
-    config = profile.to_connect_config()
-    assert config.target_host == "custom-address"
-    assert isinstance(config.tls, TLSConfig)
-    assert config.tls.domain == "custom-server-name"
-    assert config.rpc_metadata["custom-header"] == "custom-value"
+    config = profile.to_client_connect_config()
+    assert config["target_host"] == "custom-address"
+    tls_config = config["tls"]
+    assert isinstance(tls_config, TLSConfig)
+    assert tls_config.domain == "custom-server-name"
+    assert config["rpc_metadata"]["custom-header"] == "custom-value"
 
 
 def test_load_profile_from_data_env_overrides():
@@ -137,8 +139,8 @@ def test_load_profile_from_data_env_overrides():
     assert profile.address == "env-address"
     assert profile.namespace == "env-namespace"
 
-    config = profile.to_connect_config()
-    assert config.target_host == "env-address"
+    config = profile.to_client_connect_config()
+    assert config["target_host"] == "env-address"
 
 
 def test_load_profile_env_overrides(base_config_file: Path):
@@ -158,11 +160,12 @@ def test_load_profile_env_overrides(base_config_file: Path):
     assert profile.tls is not None
     assert profile.tls.server_name == "env-server-name"
 
-    config = profile.to_connect_config()
-    assert config.target_host == "env-address"
-    assert isinstance(config.tls, TLSConfig)
-    assert config.api_key == "env-api-key"
-    assert config.tls.domain == "env-server-name"
+    config = profile.to_client_connect_config()
+    assert config["target_host"] == "env-address"
+    assert config["api_key"] == "env-api-key"
+    tls_config = config["tls"]
+    assert isinstance(tls_config, TLSConfig)
+    assert tls_config.domain == "env-server-name"
 
 
 def test_load_profile_grpc_meta_env_overrides(base_config_file: Path):
@@ -179,9 +182,9 @@ def test_load_profile_grpc_meta_env_overrides(base_config_file: Path):
     assert profile.grpc_meta["custom-header"] == "env-value"
     assert profile.grpc_meta["another-header"] == "another-value"
 
-    config = profile.to_connect_config()
-    assert config.rpc_metadata["custom-header"] == "env-value"
-    assert config.rpc_metadata["another-header"] == "another-value"
+    config = profile.to_client_connect_config()
+    assert config["rpc_metadata"]["custom-header"] == "env-value"
+    assert config["rpc_metadata"]["another-header"] == "another-value"
 
 
 def test_load_profile_disable_env(base_config_file: Path):
@@ -192,8 +195,8 @@ def test_load_profile_disable_env(base_config_file: Path):
     )
     assert profile.address == "default-address"
 
-    config = profile.to_connect_config()
-    assert config.target_host == "default-address"
+    config = profile.to_client_connect_config()
+    assert config["target_host"] == "default-address"
 
 
 def test_load_profile_disable_file(monkeypatch):
@@ -203,8 +206,8 @@ def test_load_profile_disable_file(monkeypatch):
     profile = ClientConfig.load_profile(disable_file=True, env_vars=env)
     assert profile.address == "env-address"
 
-    config = profile.to_connect_config()
-    assert config.target_host == "env-address"
+    config = profile.to_client_connect_config()
+    assert config["target_host"] == "env-address"
 
 
 def test_load_profile_api_key_enables_tls(tmp_path: Path):
@@ -216,9 +219,9 @@ def test_load_profile_api_key_enables_tls(tmp_path: Path):
     assert profile.api_key == "my-key"
     assert profile.tls is not None
 
-    config = profile.to_connect_config()
-    assert config.tls
-    assert config.api_key == "my-key"
+    config = profile.to_client_connect_config()
+    assert config["tls"]
+    assert config["api_key"] == "my-key"
 
 
 def test_load_profile_not_found(base_config_file: Path):
@@ -236,16 +239,16 @@ def test_load_profiles_from_file_all(base_config_file: Path):
     assert "default" in client_config.profiles
     assert "custom" in client_config.profiles
     # Check that we can convert to a connect config
-    connect_config = client_config.profiles["default"].to_connect_config()
-    assert connect_config.target_host == "default-address"
+    connect_config = client_config.profiles["default"].to_client_connect_config()
+    assert connect_config["target_host"] == "default-address"
 
 
 def test_load_profiles_from_data_all():
     """Test loading all profiles from raw data."""
     client_config = ClientConfig.load_profiles_from_data(TOML_CONFIG_BASE)
     assert len(client_config.profiles) == 2
-    connect_config = client_config.profiles["custom"].to_connect_config()
-    assert connect_config.target_host == "custom-address"
+    connect_config = client_config.profiles["custom"].to_client_connect_config()
+    assert connect_config["target_host"] == "custom-address"
 
 
 def test_load_profiles_no_env_override(tmp_path: Path, monkeypatch):
@@ -257,8 +260,8 @@ def test_load_profiles_no_env_override(tmp_path: Path, monkeypatch):
         "TEMPORAL_ADDRESS": "env-address",  # This should be ignored
     }
     client_config = ClientConfig.load_profiles(env_vars=env)
-    connect_config = client_config.profiles["default"].to_connect_config()
-    assert connect_config.target_host == "default-address"
+    connect_config = client_config.profiles["default"].to_client_connect_config()
+    assert connect_config["target_host"] == "default-address"
 
 
 def test_load_profiles_no_config_file(monkeypatch):
@@ -316,8 +319,8 @@ def test_load_profile_tls_options():
     assert profile_disabled.tls is not None
     assert profile_disabled.tls.disabled is True
 
-    config_disabled = profile_disabled.to_connect_config()
-    assert not config_disabled.tls
+    config_disabled = profile_disabled.to_client_connect_config()
+    assert not config_disabled["tls"]
 
     # Test with TLS certs
     profile_certs = ClientConfig.load_profile_from_data(
@@ -332,12 +335,13 @@ def test_load_profile_tls_options():
     assert profile_certs.tls.client_private_key is not None
     assert profile_certs.tls.client_private_key == b"client-key-data"
 
-    config_certs = profile_certs.to_connect_config()
-    assert isinstance(config_certs.tls, TLSConfig)
-    assert config_certs.tls.domain == "custom-server"
-    assert config_certs.tls.server_root_ca_cert == b"ca-pem-data"
-    assert config_certs.tls.client_cert == b"client-crt-data"
-    assert config_certs.tls.client_private_key == b"client-key-data"
+    config_certs = profile_certs.to_client_connect_config()
+    tls_config_certs = config_certs["tls"]
+    assert isinstance(tls_config_certs, TLSConfig)
+    assert tls_config_certs.domain == "custom-server"
+    assert tls_config_certs.server_root_ca_cert == b"ca-pem-data"
+    assert tls_config_certs.client_cert == b"client-crt-data"
+    assert tls_config_certs.client_private_key == b"client-key-data"
 
 
 def test_load_profile_tls_from_paths(tmp_path: Path):
@@ -373,12 +377,13 @@ def test_load_profile_tls_from_paths(tmp_path: Path):
     assert profile.tls.client_private_key is not None
     assert profile.tls.client_private_key == Path(client_key_path)
 
-    config = profile.to_connect_config()
-    assert isinstance(config.tls, TLSConfig)
-    assert config.tls.domain == "custom-server"
-    assert config.tls.server_root_ca_cert == b"ca-pem-data"
-    assert config.tls.client_cert == b"client-crt-data"
-    assert config.tls.client_private_key == b"client-key-data"
+    config = profile.to_client_connect_config()
+    tls_config = config["tls"]
+    assert isinstance(tls_config, TLSConfig)
+    assert tls_config.domain == "custom-server"
+    assert tls_config.server_root_ca_cert == b"ca-pem-data"
+    assert tls_config.client_cert == b"client-crt-data"
+    assert tls_config.client_private_key == b"client-key-data"
 
 def test_read_source_from_string_content():
     """Test that _read_source correctly encodes string content."""
@@ -391,9 +396,10 @@ def test_read_source_from_string_content():
         address="localhost:1234",
         tls=ClientConfigTLS(client_cert="string-as-cert-content"),
     )
-    config = profile.to_connect_config()
-    assert isinstance(config.tls, TLSConfig)
-    assert config.tls.client_cert == b"string-as-cert-content"
+    config = profile.to_client_connect_config()
+    tls_config = config["tls"]
+    assert isinstance(tls_config, TLSConfig)
+    assert tls_config.client_cert == b"string-as-cert-content"
 
 
 def test_load_profile_conflicting_cert_source_fails():
