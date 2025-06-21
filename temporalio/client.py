@@ -318,6 +318,7 @@ class Client:
         ] = None,
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
+        nexus_operation: Optional[TemporalNexusOperationContext] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -353,6 +354,7 @@ class Client:
         ] = None,
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
+        nexus_operation: Optional[TemporalNexusOperationContext] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -390,6 +392,7 @@ class Client:
         ] = None,
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
+        nexus_operation: Optional[TemporalNexusOperationContext] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -427,6 +430,7 @@ class Client:
         ] = None,
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
+        nexus_operation: Optional[TemporalNexusOperationContext] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -462,6 +466,7 @@ class Client:
         ] = None,
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
+        nexus_operation: Optional[TemporalNexusOperationContext] = None,
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
@@ -505,6 +510,13 @@ class Client:
                 UI/CLI. This can be in Temporal markdown format and can span multiple lines. This is
                 a fixed value on the workflow that cannot be updated. For details that can be
                 updated, use :py:meth:`temporalio.workflow.get_current_details` within the workflow.
+            nexus_operation: An optional
+                :py:class:`temporalio.nexus.handler.TemporalNexusOperationContext`. If supplied,
+                it means that the started workflow is backing that Nexus operation. This means that
+                the workflow result is the Nexus operation result, and will be delivered to the Nexus
+                caller on workflow completion, and that Nexus bidirectional links will be established
+                between the caller and the workflow. Do not supply this argument if the workflow is
+                not backing a Nexus operation.
             start_delay: Amount of time to wait before starting the workflow.
                 This does not work with ``cron_schedule``.
             start_signal: If present, this signal is sent as signal-with-start
@@ -535,15 +547,17 @@ class Client:
             temporalio.workflow._Definition.get_name_and_result_type(workflow)
         )
         nexus_start_ctx = None
-        if nexus_ctx := TemporalNexusOperationContext.try_current():
-            # TODO(prerelease): I think this is too magical: what if a user implements a
-            # nexus handler by running one workflow to completion, and then starting a
-            # second workflow to act as the async operation itself?
-            # TODO(prerelease): What do we do if the Temporal Nexus context client
-            # (namespace) is not the same as the one being used to start this workflow?
-            if nexus_start_ctx := nexus_ctx.temporal_nexus_start_operation_context:
-                nexus_completion_callbacks = nexus_start_ctx.get_completion_callbacks()
-                workflow_event_links = nexus_start_ctx.get_workflow_event_links()
+        if nexus_operation:
+            # TODO(prerelease): check what sdk-typescript does regarding workflow
+            # options for workflows being started by Nexus operations.
+            # https://github.com/temporalio/sdk-typescript/blob/nexus/packages/nexus/src/context.ts#L96
+            nexus_start_ctx = nexus_operation.temporal_nexus_start_operation_context
+            if not nexus_start_ctx:
+                raise RuntimeError(
+                    f"Nexus operation context {nexus_operation} is not a start operation context"
+                )
+            nexus_completion_callbacks = nexus_start_ctx.get_completion_callbacks()
+            workflow_event_links = nexus_start_ctx.get_workflow_event_links()
         else:
             nexus_completion_callbacks = []
             workflow_event_links = []
