@@ -35,13 +35,16 @@ from ._token import (
 )
 
 if TYPE_CHECKING:
-    import temporalio.client
+    from temporalio.client import (
+        Client,
+        WorkflowHandle,
+    )
 
 
 async def cancel_workflow(
     ctx: CancelOperationContext,
     token: str,
-    client: Optional[temporalio.client.Client] = None,  # noqa
+    client: Optional[Client] = None,  # noqa
     **kwargs: Any,
 ) -> None:
     client = client or TemporalNexusOperationContext.current().client
@@ -73,7 +76,7 @@ class WorkflowRunOperationHandler(
         service: ServiceHandlerT,
         start_method: Callable[
             [ServiceHandlerT, StartOperationContext, InputT],
-            Awaitable[temporalio.client.WorkflowHandle[Any, OutputT]],
+            Awaitable[WorkflowHandle[Any, OutputT]],
         ],
         output_type: Optional[Type] = None,
     ):
@@ -126,18 +129,14 @@ class WorkflowRunOperationResult(nexusrpc.handler.StartOperationResultAsync):
     """
 
     @classmethod
-    def from_workflow_handle(
-        cls, workflow_handle: temporalio.client.WorkflowHandle[Any, Any]
-    ) -> Self:
+    def from_workflow_handle(cls, workflow_handle: WorkflowHandle) -> Self:
         """
         Create a :class:`WorkflowRunOperationResult` from a :py:class:`~temporalio.client.WorkflowHandle`.
         """
         token = WorkflowOperationToken.from_workflow_handle(workflow_handle).encode()
         return cls(token=token)
 
-    def to_workflow_handle(
-        self, client: temporalio.client.Client
-    ) -> temporalio.client.WorkflowHandle[Any, Any]:
+    def to_workflow_handle(self, client: Client) -> WorkflowHandle:
         """
         Create a :py:class:`~temporalio.client.WorkflowHandle` from a :class:`WorkflowRunOperationResult`.
         """
@@ -155,7 +154,7 @@ class WorkflowRunOperationResult(nexusrpc.handler.StartOperationResultAsync):
 def workflow_run_operation_handler(
     start_method: Callable[
         [ServiceHandlerT, StartOperationContext, InputT],
-        Awaitable[temporalio.client.WorkflowHandle[Any, OutputT]],
+        Awaitable[WorkflowHandle[Any, OutputT]],
     ],
 ) -> Callable[
     [ServiceHandlerT], WorkflowRunOperationHandler[InputT, OutputT, ServiceHandlerT]
@@ -170,7 +169,7 @@ def workflow_run_operation_handler(
     [
         Callable[
             [ServiceHandlerT, StartOperationContext, InputT],
-            Awaitable[temporalio.client.WorkflowHandle[Any, OutputT]],
+            Awaitable[WorkflowHandle[Any, OutputT]],
         ]
     ],
     Callable[
@@ -183,7 +182,7 @@ def workflow_run_operation_handler(
     start_method: Optional[
         Callable[
             [ServiceHandlerT, StartOperationContext, InputT],
-            Awaitable[temporalio.client.WorkflowHandle[Any, OutputT]],
+            Awaitable[WorkflowHandle[Any, OutputT]],
         ]
     ] = None,
     *,
@@ -196,7 +195,7 @@ def workflow_run_operation_handler(
         [
             Callable[
                 [ServiceHandlerT, StartOperationContext, InputT],
-                Awaitable[temporalio.client.WorkflowHandle[Any, OutputT]],
+                Awaitable[WorkflowHandle[Any, OutputT]],
             ]
         ],
         Callable[
@@ -208,7 +207,7 @@ def workflow_run_operation_handler(
     def decorator(
         start_method: Callable[
             [ServiceHandlerT, StartOperationContext, InputT],
-            Awaitable[temporalio.client.WorkflowHandle[Any, OutputT]],
+            Awaitable[WorkflowHandle[Any, OutputT]],
         ],
     ) -> Callable[
         [ServiceHandlerT], WorkflowRunOperationHandler[InputT, OutputT, ServiceHandlerT]
@@ -254,7 +253,7 @@ def workflow_run_operation_handler(
 def _get_workflow_run_start_method_input_and_output_type_annotations(
     start_method: Callable[
         [ServiceHandlerT, StartOperationContext, InputT],
-        Awaitable[temporalio.client.WorkflowHandle[Any, OutputT]],
+        Awaitable[WorkflowHandle[Any, OutputT]],
     ],
 ) -> tuple[
     Optional[Type[InputT]],
@@ -266,7 +265,7 @@ def _get_workflow_run_start_method_input_and_output_type_annotations(
     :py:class:`WorkflowHandle`.
     """
     # TODO(nexus-preview) circular import
-    import temporalio.client
+    from temporalio.client import WorkflowHandle
 
     input_type, output_type = (
         nexusrpc.handler.get_start_method_input_and_output_types_annotations(
@@ -274,7 +273,7 @@ def _get_workflow_run_start_method_input_and_output_type_annotations(
         )
     )
     origin_type = typing.get_origin(output_type)
-    if not origin_type or not issubclass(origin_type, temporalio.client.WorkflowHandle):
+    if not origin_type or not issubclass(origin_type, WorkflowHandle):
         warnings.warn(
             f"Expected return type of {start_method.__name__} to be a subclass of WorkflowHandle, "
             f"but is {output_type}"
