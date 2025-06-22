@@ -94,7 +94,6 @@ class WorkflowRunOperationHandler(
             [ServiceHandlerT, StartOperationContext, InputT],
             Awaitable[NexusStartWorkflowRequest[OutputT]],
         ],
-        output_type: Optional[Type] = None,
     ):
         self.service = service
 
@@ -222,9 +221,8 @@ def workflow_run_operation_handler(
         def factory(
             service: ServiceHandlerT,
         ) -> WorkflowRunOperationHandler[InputT, OutputT, ServiceHandlerT]:
-            return WorkflowRunOperationHandler(
-                service, start_method, output_type=output_type
-            )
+            # TODO(nexus-prerelease) I was passing output_type here; why?
+            return WorkflowRunOperationHandler(service, start_method)
 
         # TODO(nexus-prerelease): handle callable instances: __class__.__name__ as in sync_operation_handler
         method_name = getattr(start_method, "__name__", None)
