@@ -135,8 +135,9 @@ class _NexusWorker:
                 else:
                     raise NotImplementedError(f"Invalid Nexus task: {task}")
 
-            # TODO(nexus-prerelease): handle poller shutdown
-            # except temporalio.bridge.worker.PollShutdownError
+            except temporalio.bridge.worker.PollShutdownError:
+                exception_task.cancel()
+                return
 
             except Exception as err:
                 raise RuntimeError("Nexus worker failed") from err
