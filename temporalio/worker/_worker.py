@@ -146,6 +146,9 @@ class Worker:
         activity_task_poller_behavior: PollerBehavior = PollerBehaviorSimpleMaximum(
             maximum=5
         ),
+        nexus_task_poller_behavior: PollerBehavior = PollerBehaviorSimpleMaximum(
+            maximum=5
+        ),
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -305,9 +308,10 @@ class Worker:
                 Defaults to a 5-poller maximum.
             activity_task_poller_behavior: Specify the behavior of activity task polling.
                 Defaults to a 5-poller maximum.
+            nexus_task_poller_behavior: Specify the behavior of Nexus task polling.
+                Defaults to a 5-poller maximum.
         """
-        # TODO(nexus-prerelease): Support `nexus_task_poller_behavior` in bridge worker,
-        # with max_concurrent_nexus_tasks and max_concurrent_nexus_tasks
+        # TODO(nexus-prerelease): max_concurrent_nexus_tasks / tuner support
         if not (activities or nexus_service_handlers or workflows):
             raise ValueError(
                 "At least one activity, Nexus service, or workflow must be specified"
@@ -408,8 +412,6 @@ class Worker:
             )
         self._nexus_worker: Optional[_NexusWorker] = None
         if nexus_service_handlers:
-            # TODO(nexus-prerelease): consider not allowing / warning on max_workers <
-            # max_concurrent_nexus_operations? See warning above for activity worker.
             self._nexus_worker = _NexusWorker(
                 bridge_worker=lambda: self._bridge_worker,
                 client=client,
@@ -459,7 +461,6 @@ class Worker:
             )
 
         if tuner is not None:
-            # TODO(nexus-preview): Nexus tuner support
             if (
                 max_concurrent_workflow_tasks
                 or max_concurrent_activities
@@ -552,6 +553,7 @@ class Worker:
                 versioning_strategy=versioning_strategy,
                 workflow_task_poller_behavior=workflow_task_poller_behavior._to_bridge(),
                 activity_task_poller_behavior=activity_task_poller_behavior._to_bridge(),
+                nexus_task_poller_behavior=nexus_task_poller_behavior._to_bridge(),
             ),
         )
 
