@@ -4,7 +4,6 @@ import contextvars
 import logging
 import re
 import urllib.parse
-from abc import ABC
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import (
@@ -37,7 +36,7 @@ _current_context: ContextVar[TemporalNexusOperationContext] = ContextVar(
 
 
 @dataclass
-class TemporalNexusOperationContext(ABC):
+class TemporalNexusOperationContext:
     """
     Context for a Nexus operation being handled by a Temporal Nexus Worker.
     """
