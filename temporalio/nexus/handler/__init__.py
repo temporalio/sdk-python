@@ -23,17 +23,11 @@ from ._operation_context import (
     TemporalNexusOperationContext as TemporalNexusOperationContext,
 )
 from ._operation_handlers import (
-    NexusStartWorkflowRequest as NexusStartWorkflowRequest,
-)
-from ._operation_handlers import (
     WorkflowRunOperationHandler as WorkflowRunOperationHandler,
 )
 from ._operation_handlers import cancel_workflow as cancel_workflow
 from ._operation_handlers import (
     workflow_run_operation_handler as workflow_run_operation_handler,
-)
-from ._start_workflow import (
-    start_workflow as start_workflow,
 )
 from ._token import (
     WorkflowOperationToken as WorkflowOperationToken,
