@@ -60,6 +60,7 @@ pub struct WorkerConfig {
     graceful_shutdown_period_millis: u64,
     nondeterminism_as_workflow_fail: bool,
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
+    nexus_task_poller_behavior: PollerBehavior,
 }
 
 #[derive(FromPyObject)]
@@ -722,6 +723,7 @@ fn convert_worker_config(
                 })
                 .collect::<HashMap<String, HashSet<WorkflowErrorType>>>(),
         )
+        .nexus_task_poller_behavior(conf.nexus_task_poller_behavior)
         .build()
         .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {err}")))
 }
