@@ -41,6 +41,7 @@ if TYPE_CHECKING:
     )
 
 
+# TODO(nexus-prerelease): revise cancel implementation
 async def cancel_workflow(
     ctx: CancelOperationContext,
     token: str,
