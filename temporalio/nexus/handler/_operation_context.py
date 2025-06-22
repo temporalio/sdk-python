@@ -131,11 +131,43 @@ class TemporalOperationContext:
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> WorkflowOperationToken[ReturnType]:
+        """Start a workflow that will deliver the result of the Nexus operation.
+
+        The workflow will be started as usual, with the following modifications:
+
+        - On workflow completion, Temporal server will deliver the workflow result to
+          the Nexus operation caller, using the callback from the Nexus operation start
+          request.
+
+        - The request ID from the Nexus operation start request will be used as the
+          request ID for the start workflow request.
+
+        - Inbound links to the caller that were submitted in the Nexus start operation
+          request will be attached to the started workflow and, outbound links to the
+          started workflow will be added to the Nexus start operation response. If the
+          Nexus caller is itself a workflow, this means that the workflow in the caller
+          namespace web UI will contain links to the started workflow, and vice versa.
+
+        Args:
+            client: The client to use to start the workflow.
+
+        See :py:meth:`temporalio.client.Client.start_workflow` for all other arguments.
+        """
         start_operation_context = self.temporal_start_operation_context
         if not start_operation_context:
             raise RuntimeError(
-                "temporalio.nexus.handler.start_workflow() must be called from within a Nexus start operation context"
+                "temporalio.nexus.handler.start_workflow() must be called from "
+                "within a Nexus start operation context"
             )
+
+        # TODO(nexus-preview): When sdk-python supports on_conflict_options, Typescript does this:
+        # if (workflowOptions.workflowIdConflictPolicy === 'USE_EXISTING') {
+        #     internalOptions.onConflictOptions = {
+        #     attachLinks: true,
+        #     attachCompletionCallbacks: true,
+        #     attachRequestId: true,
+        #     };
+        # }
 
         # We must pass nexus_completion_callbacks and workflow_event_links, but these are
         # deliberately not exposed in overloads, hence the type-check violation.

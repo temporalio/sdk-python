@@ -14,7 +14,7 @@ def make_nexus_endpoint_name(task_queue: str) -> str:
     return f"nexus-endpoint-{task_queue}"
 
 
-# TODO(nexus-prerelease): How do we recommend that users create endpoints in their own tests?
+# TODO(nexus-preview): How do we recommend that users create endpoints in their own tests?
 # See https://github.com/temporalio/sdk-typescript/pull/1708/files?show-viewed-files=true&file-filters%5B%5D=&w=0#r2082549085
 async def create_nexus_endpoint(
     task_queue: str, client: Client

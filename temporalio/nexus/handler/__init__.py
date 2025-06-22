@@ -58,9 +58,3 @@ class LoggerAdapter(logging.LoggerAdapter):
 
 logger = LoggerAdapter(logging.getLogger(__name__), None)
 """Logger that emits additional data describing the current Nexus operation."""
-
-
-# TODO(nexus-prerelease): support request_id
-# See e.g. TS
-# packages/nexus/src/context.ts attachRequestId
-# packages/test/src/test-nexus-handler.ts ctx.requestId
