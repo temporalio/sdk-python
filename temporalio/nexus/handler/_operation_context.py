@@ -61,11 +61,13 @@ class TemporalNexusOperationContext:
         return context
 
     @staticmethod
-    def set(context: TemporalNexusOperationContext) -> contextvars.Token:
+    def set(
+        context: TemporalNexusOperationContext,
+    ) -> contextvars.Token[TemporalNexusOperationContext]:
         return _current_context.set(context)
 
     @staticmethod
-    def reset(token: contextvars.Token) -> None:
+    def reset(token: contextvars.Token[TemporalNexusOperationContext]) -> None:
         _current_context.reset(token)
 
     @property
