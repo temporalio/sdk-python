@@ -1049,6 +1049,28 @@ class ServiceHandlerForRequestIdTest:
             id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
         )
 
+    @temporalio.nexus.handler.workflow_run_operation_handler
+    async def operation_that_executes_a_workflow_before_starting_the_backing_workflow(
+        self, ctx: StartOperationContext, input: Input
+    ) -> WorkflowOperationToken[Output]:
+        tctx = TemporalNexusOperationContext.current()
+        await tctx.client.start_workflow(
+            EchoWorkflow.run,
+            input,
+            id=input.value,
+            task_queue=tctx.task_queue,
+        )
+        # This should fail. It will not fail if the Nexus request ID was incorrectly
+        # propagated to both StartWorkflow requests.
+        return await tctx.start_workflow(
+            EchoWorkflow.run,
+            input,
+            id=input.value,
+            client=tctx.client,
+            task_queue=tctx.task_queue,
+            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+        )
+
 
 async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnvironment):
     # We send two Nexus requests that would start a workflow with the same workflow ID,
@@ -1084,6 +1106,16 @@ async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnviron
                 assert op_info["token"]
                 assert op_info["state"] == nexusrpc.OperationState.RUNNING.value
 
+    async def start_two_workflows_in_a_single_operation(
+        request_id: str, status_code: int
+    ):
+        resp = await service_client.start_operation(
+            "operation_that_executes_a_workflow_before_starting_the_backing_workflow",
+            dataclass_as_dict(Input("test-workflow-id")),
+            {"Nexus-Request-Id": request_id},
+        )
+        assert resp.status_code == status_code
+
     async with Worker(
         env.client,
         task_queue=task_queue,
@@ -1101,6 +1133,8 @@ async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnviron
         await start_two_workflows_with_conflicting_workflow_ids(
             ((request_id_1, 201), (request_id_2, 500))
         )
+        # Two workflows started in the same operation should fail
+        await start_two_workflows_in_a_single_operation(request_id_1, 500)
 
 
 def server_address(env: WorkflowEnvironment) -> str:
