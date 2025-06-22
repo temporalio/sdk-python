@@ -99,7 +99,7 @@ class WorkflowRunOperationHandler(
 
         @wraps(start_method)
         async def start(
-            self, ctx: StartOperationContext, input: InputT
+            _, ctx: StartOperationContext, input: InputT
         ) -> StartOperationResultAsync:
             # TODO(nexus-prerelease) It must be possible to start "normal" workflows in
             # here, and then finish up with a "nexusified" workflow.
@@ -212,12 +212,6 @@ def workflow_run_operation_handler(
     ) -> Callable[
         [ServiceHandlerT], WorkflowRunOperationHandler[InputT, OutputT, ServiceHandlerT]
     ]:
-        input_type, output_type = (
-            _get_workflow_run_start_method_input_and_output_type_annotations(
-                start_method
-            )
-        )
-
         def factory(
             service: ServiceHandlerT,
         ) -> WorkflowRunOperationHandler[InputT, OutputT, ServiceHandlerT]:
@@ -234,11 +228,21 @@ def workflow_run_operation_handler(
                 f"expected {start_method} to be a function or callable instance."
             )
 
-        factory.__nexus_operation__ = nexusrpc.Operation(
-            name=name or method_name,
-            method_name=method_name,
-            input_type=input_type,
-            output_type=output_type,
+        input_type, output_type = (
+            _get_workflow_run_start_method_input_and_output_type_annotations(
+                start_method
+            )
+        )
+
+        setattr(
+            factory,
+            "__nexus_operation__",
+            nexusrpc.Operation(
+                name=name or method_name,
+                method_name=method_name,
+                input_type=input_type,
+                output_type=output_type,
+            ),
         )
 
         return factory
