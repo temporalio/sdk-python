@@ -157,12 +157,14 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
             )
         elif isinstance(input.response_type, AsyncResponse):
             tctx = TemporalNexusOperationContext.current()
-            wf_handle = await tctx.client.start_workflow(
+            start_request = NexusStartWorkflowRequest(  # type: ignore
+                tctx.client,
                 HandlerWorkflow.run,
-                args=[HandlerWfInput(op_input=input)],
+                HandlerWfInput(op_input=input),
                 id=input.response_type.operation_workflow_id,
                 task_queue=tctx.task_queue,
             )
+            wf_handle = await start_request.start_workflow()
             return nexusrpc.handler.StartOperationResultAsync(
                 WorkflowOperationToken.from_workflow_handle(wf_handle).encode()
             )
@@ -217,12 +219,11 @@ class ServiceImpl:
             )
         tctx = TemporalNexusOperationContext.current()
         return NexusStartWorkflowRequest(
-            tctx.client.start_workflow(
-                HandlerWorkflow.run,
-                args=[HandlerWfInput(op_input=input)],
-                id=input.response_type.operation_workflow_id,
-                task_queue=tctx.task_queue,
-            )
+            tctx.client,
+            HandlerWorkflow.run,
+            HandlerWfInput(op_input=input),
+            id=input.response_type.operation_workflow_id,
+            task_queue=tctx.task_queue,
         )
 
 
@@ -936,12 +937,11 @@ class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
         # result, give time for that incorrect behavior to occur.
         await asyncio.sleep(0.5)
         return NexusStartWorkflowRequest(
-            tctx.client.start_workflow(
-                EchoWorkflow.run,
-                f"{result_1}-result-2",
-                id=str(uuid.uuid4()),
-                task_queue=tctx.task_queue,
-            )
+            tctx.client,
+            EchoWorkflow.run,
+            f"{result_1}-result-2",
+            id=str(uuid.uuid4()),
+            task_queue=tctx.task_queue,
         )
 
 
