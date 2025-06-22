@@ -61,6 +61,7 @@ class WorkerConfig:
     graceful_shutdown_period_millis: int
     nondeterminism_as_workflow_fail: bool
     nondeterminism_as_workflow_fail_for_types: Set[str]
+    nexus_task_poller_behavior: PollerBehavior
 
 
 @dataclass
