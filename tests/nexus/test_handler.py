@@ -995,7 +995,7 @@ async def test_cancel_operation_with_invalid_token(env: WorkflowEnvironment):
         )
         assert cancel_response.status_code == 404
         failure = Failure(**cancel_response.json())
-        assert "failed to decode workflow operation token" in failure.message.lower()
+        assert "failed to decode operation token" in failure.message.lower()
 
 
 async def test_request_id_is_received_by_sync_operation_handler(

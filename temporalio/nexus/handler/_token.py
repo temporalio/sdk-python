@@ -29,13 +29,13 @@ class WorkflowOperationToken(Generic[OutputT]):
         """Create a :py:class:`temporalio.client.WorkflowHandle` from the token."""
         if client.namespace != self.namespace:
             raise ValueError(
-                f"Client namespace {client.namespace} does not match token namespace {self.namespace}"
+                f"Client namespace {client.namespace} does not match "
+                f"operation token namespace {self.namespace}"
             )
         return client.get_workflow_handle(self.workflow_id)
 
-    # TODO(nexus-preview): Is it helpful to parameterize WorkflowOperationToken by
-    # OutputT? The return type here should be dictated by the input workflow handle
-    # type.
+    # TODO(nexus-preview): The return type here should be dictated by the input workflow
+    # handle type.
     @classmethod
     def _unsafe_from_workflow_handle(
         cls, workflow_handle: WorkflowHandle[Any, OutputT]
