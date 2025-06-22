@@ -906,6 +906,85 @@ async def test_service_interface_and_implementation_names(client: Client):
         )
 
 
+@nexusrpc.service
+class ServiceWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
+    my_workflow_run_operation: nexusrpc.Operation[None, None]
+    my_manual_async_operation: nexusrpc.Operation[None, None]
+
+
+@workflow.defn
+class EchoWorkflow:
+    @workflow.run
+    async def run(self, input: str) -> str:
+        return input
+
+
+@nexusrpc.handler.service_handler
+class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
+    @temporalio.nexus.handler.workflow_run_operation_handler
+    async def my_workflow_run_operation(
+        self, ctx: StartOperationContext, input: None
+    ) -> NexusStartWorkflowRequest[str]:
+        tctx = TemporalNexusOperationContext.current()
+        result_1 = await tctx.client.execute_workflow(
+            EchoWorkflow.run,
+            "result-1",
+            id=str(uuid.uuid4()),
+            task_queue=tctx.task_queue,
+        )
+        # In case result_1 is incorrectly being delivered to the caller as the operation
+        # result, give time for that incorrect behavior to occur.
+        await asyncio.sleep(0.5)
+        return NexusStartWorkflowRequest(
+            tctx.client.start_workflow(
+                EchoWorkflow.run,
+                f"{result_1}-result-2",
+                id=str(uuid.uuid4()),
+                task_queue=tctx.task_queue,
+            )
+        )
+
+
+@workflow.defn
+class WorkflowCallingNexusOperationThatExecutesWorkflowBeforeStartingBackingWorkflow:
+    @workflow.run
+    async def run(self, input: str, task_queue: str) -> str:
+        nexus_client = workflow.NexusClient(
+            service=ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow,
+            endpoint=make_nexus_endpoint_name(task_queue),
+        )
+        return await nexus_client.execute_operation(
+            ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow.my_workflow_run_operation,
+            None,
+        )
+
+
+async def test_workflow_run_operation_can_execute_workflow_before_starting_backing_workflow(
+    client: Client,
+):
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client,
+        workflows=[
+            EchoWorkflow,
+            WorkflowCallingNexusOperationThatExecutesWorkflowBeforeStartingBackingWorkflow,
+        ],
+        nexus_service_handlers=[
+            ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow(),
+        ],
+        task_queue=task_queue,
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ):
+        await create_nexus_endpoint(task_queue, client)
+        result = await client.execute_workflow(
+            WorkflowCallingNexusOperationThatExecutesWorkflowBeforeStartingBackingWorkflow.run,
+            args=("result-1", task_queue),
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
+        )
+        assert result == "result-1-result-2"
+
+
 # TODO(dan): test invalid service interface implementations
 # TODO(dan): test caller passing output_type
 
