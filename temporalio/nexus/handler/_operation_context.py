@@ -103,9 +103,8 @@ class TemporalOperationContext:
         arg: ParamType,
         *,
         id: str,
-        # TODO(nexus-prerelease): Allow client and task queue to be omitted, defaulting to worker's?
+        # TODO(nexus-prerelease): Allow task queue to be omitted, defaulting to worker's?
         task_queue: str,
-        client: Client,
         execution_timeout: Optional[timedelta] = None,
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
@@ -171,7 +170,7 @@ class TemporalOperationContext:
 
         # We must pass nexus_completion_callbacks and workflow_event_links, but these are
         # deliberately not exposed in overloads, hence the type-check violation.
-        wf_handle = await client.start_workflow(  # type: ignore
+        wf_handle = await self.client.start_workflow(  # type: ignore
             workflow=workflow,
             arg=arg,
             id=id,
