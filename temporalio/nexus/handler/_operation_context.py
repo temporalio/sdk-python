@@ -37,13 +37,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-_current_context: ContextVar[TemporalNexusOperationContext] = ContextVar(
-    "temporal-nexus-operation-context"
+_current_context: ContextVar[TemporalOperationContext] = ContextVar(
+    "temporal-operation-context"
 )
 
 
 @dataclass
-class TemporalNexusOperationContext:
+class TemporalOperationContext:
     """
     Context for a Nexus operation being handled by a Temporal Nexus Worker.
     """
@@ -57,43 +57,43 @@ class TemporalNexusOperationContext:
     """The task queue of the worker handling this Nexus operation."""
 
     @staticmethod
-    def try_current() -> Optional[TemporalNexusOperationContext]:
+    def try_current() -> Optional[TemporalOperationContext]:
         return _current_context.get(None)
 
     @staticmethod
-    def current() -> TemporalNexusOperationContext:
-        context = TemporalNexusOperationContext.try_current()
+    def current() -> TemporalOperationContext:
+        context = TemporalOperationContext.try_current()
         if not context:
             raise RuntimeError("Not in Nexus operation context")
         return context
 
     @staticmethod
     def set(
-        context: TemporalNexusOperationContext,
-    ) -> contextvars.Token[TemporalNexusOperationContext]:
+        context: TemporalOperationContext,
+    ) -> contextvars.Token[TemporalOperationContext]:
         return _current_context.set(context)
 
     @staticmethod
-    def reset(token: contextvars.Token[TemporalNexusOperationContext]) -> None:
+    def reset(token: contextvars.Token[TemporalOperationContext]) -> None:
         _current_context.reset(token)
 
     @property
-    def temporal_nexus_start_operation_context(
+    def temporal_start_operation_context(
         self,
-    ) -> Optional[_TemporalNexusStartOperationContext]:
+    ) -> Optional[_TemporalStartOperationContext]:
         ctx = self.nexus_operation_context
         if not isinstance(ctx, StartOperationContext):
             return None
-        return _TemporalNexusStartOperationContext(ctx)
+        return _TemporalStartOperationContext(ctx)
 
     @property
-    def temporal_nexus_cancel_operation_context(
+    def temporal_cancel_operation_context(
         self,
-    ) -> Optional[_TemporalNexusCancelOperationContext]:
+    ) -> Optional[_TemporalCancelOperationContext]:
         ctx = self.nexus_operation_context
         if not isinstance(ctx, CancelOperationContext):
             return None
-        return _TemporalNexusCancelOperationContext(ctx)
+        return _TemporalCancelOperationContext(ctx)
 
     # Overload for single-param workflow
     # TODO(nexus-prerelease): support other overloads?
@@ -131,7 +131,7 @@ class TemporalNexusOperationContext:
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> WorkflowOperationToken[ReturnType]:
-        start_operation_context = self.temporal_nexus_start_operation_context
+        start_operation_context = self.temporal_start_operation_context
         if not start_operation_context:
             raise RuntimeError(
                 "temporalio.nexus.handler.start_workflow() must be called from within a Nexus start operation context"
@@ -176,7 +176,7 @@ class TemporalNexusOperationContext:
 
 
 @dataclass
-class _TemporalNexusStartOperationContext:
+class _TemporalStartOperationContext:
     nexus_operation_context: StartOperationContext
 
     def get_completion_callbacks(
@@ -233,7 +233,7 @@ class _TemporalNexusStartOperationContext:
 
 
 @dataclass
-class _TemporalNexusCancelOperationContext:
+class _TemporalCancelOperationContext:
     nexus_operation_context: CancelOperationContext
 
 
