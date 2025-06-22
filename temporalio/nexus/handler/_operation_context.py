@@ -165,6 +165,7 @@ class TemporalNexusOperationContext:
             versioning_override=versioning_override,
             nexus_completion_callbacks=start_operation_context.get_completion_callbacks(),
             workflow_event_links=start_operation_context.get_workflow_event_links(),
+            request_id=start_operation_context.nexus_operation_context.request_id,
         )
 
         start_operation_context.add_outbound_links(wf_handle)

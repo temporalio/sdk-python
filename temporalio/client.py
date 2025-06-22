@@ -58,9 +58,6 @@ import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
 from temporalio.activity import ActivityCancellationDetails
-from temporalio.nexus.handler import (
-    TemporalNexusOperationContext,
-)
 from temporalio.service import (
     HttpConnectProxyConfig,
     KeepAliveConfig,
@@ -477,6 +474,7 @@ class Client:
         workflow_event_links: Sequence[
             temporalio.api.common.v1.Link.WorkflowEvent
         ] = [],
+        request_id: Optional[str] = None,
         stack_level: int = 2,
     ) -> WorkflowHandle[Any, Any]:
         """Start a workflow and return its handle.
@@ -569,6 +567,7 @@ class Client:
                 priority=priority,
                 nexus_completion_callbacks=nexus_completion_callbacks,
                 workflow_event_links=workflow_event_links,
+                request_id=request_id,
             )
         )
 
@@ -5207,6 +5206,7 @@ class StartWorkflowInput:
     priority: temporalio.common.Priority
     nexus_completion_callbacks: Sequence[temporalio.common.NexusCompletionCallback]
     workflow_event_links: Sequence[temporalio.api.common.v1.Link.WorkflowEvent]
+    request_id: Optional[str]
     versioning_override: Optional[temporalio.common.VersioningOverride] = None
 
 
@@ -5822,6 +5822,9 @@ class _ClientImpl(OutboundInterceptor):
     ) -> temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest:
         req = temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest()
         req.request_eager_execution = input.request_eager_start
+        if input.request_id:
+            req.request_id = input.request_id
+
         await self._populate_start_workflow_execution_request(req, input)
         for callback in input.nexus_completion_callbacks:
             c = temporalio.api.common.v1.Callback()
@@ -5879,16 +5882,6 @@ class _ClientImpl(OutboundInterceptor):
         if input.task_timeout is not None:
             req.workflow_task_timeout.FromTimedelta(input.task_timeout)
         req.identity = self._client.identity
-        # Use Nexus request ID if we're handling a Nexus Start operation
-        # TODO(prerelease): confirm that we should do this for every workflow started
-        # TODO(prerelease): add test coverage for multiple workflows started by a Nexus operation
-        if nexus_ctx := TemporalNexusOperationContext.try_current():
-            if nexus_start_ctx := nexus_ctx.temporal_nexus_start_operation_context:
-                if (
-                    nexus_request_id
-                    := nexus_start_ctx.nexus_operation_context.request_id
-                ):
-                    req.request_id = nexus_request_id
         if not req.request_id:
             req.request_id = str(uuid.uuid4())
         req.workflow_id_reuse_policy = cast(
