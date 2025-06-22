@@ -23,7 +23,7 @@ from ._operation_context import TemporalOperationContext as TemporalOperationCon
 from ._operation_handlers import (
     WorkflowRunOperationHandler as WorkflowRunOperationHandler,
 )
-from ._operation_handlers import cancel_workflow as cancel_workflow
+from ._operation_handlers import cancel_operation as cancel_operation
 from ._operation_handlers import (
     workflow_run_operation_handler as workflow_run_operation_handler,
 )
