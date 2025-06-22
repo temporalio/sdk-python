@@ -107,14 +107,11 @@ class Worker:
         *,
         task_queue: str,
         activities: Sequence[Callable] = [],
-        # TODO(nexus-prerelease): for naming consistency this should be named
-        # nexus_service_handlers. That will prevent users from mistakenly trying to add
-        # their service definitions here.
         nexus_service_handlers: Sequence[Any] = [],
         workflows: Sequence[Type] = [],
         activity_executor: Optional[concurrent.futures.Executor] = None,
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
-        nexus_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
+        nexus_task_executor: Optional[concurrent.futures.Executor] = None,
         workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
         unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         interceptors: Sequence[Interceptor] = [],
@@ -183,6 +180,10 @@ class Worker:
                 otherwise. The default one will be properly shutdown, but if one
                 is provided, the caller is responsible for shutting it down after
                 the worker is shut down.
+            nexus_operation_executor: Executor to use for non-async
+                Nexus operations. This is required if any operation start methods
+                are non-`async def`. :py:class:`concurrent.futures.ThreadPoolExecutor`
+                is recommended.
             workflow_runner: Runner for workflows.
             unsandboxed_workflow_runner: Runner for workflows that opt-out of
                 sandboxing.
@@ -206,8 +207,6 @@ class Worker:
                 will ever be given to the activity worker concurrently. Mutually exclusive with ``tuner``.
             max_concurrent_local_activities: Maximum number of local activity
                 tasks that will ever be given to the activity worker concurrently. Mutually exclusive with ``tuner``.
-            max_concurrent_workflow_tasks: Maximum allowed number of
-                tasks that will ever be given to the workflow worker at one time. Mutually exclusive with ``tuner``.
             tuner:  Provide a custom :py:class:`WorkerTuner`. Mutually exclusive with the
                 ``max_concurrent_workflow_tasks``, ``max_concurrent_activities``, and
                 ``max_concurrent_local_activities`` arguments.
@@ -307,18 +306,8 @@ class Worker:
             activity_task_poller_behavior: Specify the behavior of activity task polling.
                 Defaults to a 5-poller maximum.
         """
-        # TODO(nexus-prerelease): non-async (executor-based) Nexus worker; honor
-        # max_concurrent_nexus_operations and nexus_operation_executor.
-        # nexus_operation_executor: Concurrent executor to use for non-async
-        #     Nexus operations. This is required if any operation start methods
-        #     are non-async. :py:class:`concurrent.futures.ThreadPoolExecutor`
-        #     is recommended. If this is a
-        #     :py:class:`concurrent.futures.ProcessPoolExecutor`, all non-async
-        #     start methods must be picklable. ``max_workers`` on the executor
-        #     should at least be ``max_concurrent_nexus_operations`` or a warning
-        #     is issued.
-        # max_concurrent_nexus_operations: Maximum number of Nexus operations that
-        #     will ever be given to the Nexus worker concurrently. Mutually exclusive with ``tuner``.
+        # TODO(nexus-prerelease): Support `nexus_task_poller_behavior` in bridge worker,
+        # with max_concurrent_nexus_tasks and max_concurrent_nexus_tasks
         if not (activities or nexus_service_handlers or workflows):
             raise ValueError(
                 "At least one activity, Nexus service, or workflow must be specified"
@@ -470,7 +459,7 @@ class Worker:
             )
 
         if tuner is not None:
-            # TODO(nexus-prerelease): Nexus tuner support
+            # TODO(nexus-preview): Nexus tuner support
             if (
                 max_concurrent_workflow_tasks
                 or max_concurrent_activities
@@ -731,7 +720,7 @@ class Worker:
         if self._nexus_worker:
             await self._nexus_worker.wait_all_completed()
 
-        # TODO(nexus-prerelease): check that we do all appropriate things for nexus worker that we do for activity worker
+        # TODO(nexus-preview): check that we do all appropriate things for nexus worker that we do for activity worker
 
         # Do final shutdown
         try:

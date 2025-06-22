@@ -62,9 +62,6 @@ logger = LoggerAdapter(logging.getLogger(__name__), None)
 """Logger that emits additional data describing the current Nexus operation."""
 
 
-# TODO(nexus-preview): demonstrate obtaining Temporal client in sync operation.
-
-
 # TODO(nexus-prerelease): support request_id
 # See e.g. TS
 # packages/nexus/src/context.ts attachRequestId

@@ -50,6 +50,7 @@ class ServiceClient:
         """
         Start a Nexus operation.
         """
+        # TODO(nexus-preview): Support callback URL as query param
         async with httpx.AsyncClient() as http_client:
             return await http_client.post(
                 f"{self.server_address}/nexus/endpoints/{self.endpoint}/services/{self.service}/{operation}",

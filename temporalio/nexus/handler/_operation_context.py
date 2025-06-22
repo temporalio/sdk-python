@@ -96,14 +96,14 @@ class TemporalNexusOperationContext:
         return _TemporalNexusCancelOperationContext(ctx)
 
     # Overload for single-param workflow
-    # TODO(nexus-preview): support other overloads?
+    # TODO(nexus-prerelease): support other overloads?
     async def start_workflow(
         self,
         workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
         arg: ParamType,
         *,
         id: str,
-        # TODO(nexus-preview): Allow client and task queue to be omitted, defaulting to worker's?
+        # TODO(nexus-prerelease): Allow client and task queue to be omitted, defaulting to worker's?
         task_queue: str,
         client: Client,
         execution_timeout: Optional[timedelta] = None,
@@ -131,17 +131,10 @@ class TemporalNexusOperationContext:
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
     ) -> WorkflowOperationToken[ReturnType]:
-        if nexus_ctx := TemporalNexusOperationContext.try_current():
-            if nexus_start_ctx := nexus_ctx.temporal_nexus_start_operation_context:
-                nexus_completion_callbacks = nexus_start_ctx.get_completion_callbacks()
-                workflow_event_links = nexus_start_ctx.get_workflow_event_links()
-            else:
-                raise RuntimeError(
-                    "temporalio.nexus.handler.start_workflow() must be called from within a Nexus start operation context"
-                )
-        else:
+        start_operation_context = self.temporal_nexus_start_operation_context
+        if not start_operation_context:
             raise RuntimeError(
-                "temporalio.nexus.handler.start_workflow() must be called from within a Nexus operation context"
+                "temporalio.nexus.handler.start_workflow() must be called from within a Nexus start operation context"
             )
 
         # We must pass nexus_completion_callbacks and workflow_event_links, but these are
@@ -170,11 +163,11 @@ class TemporalNexusOperationContext:
             request_eager_start=request_eager_start,
             priority=priority,
             versioning_override=versioning_override,
-            nexus_completion_callbacks=nexus_completion_callbacks,
-            workflow_event_links=workflow_event_links,
+            nexus_completion_callbacks=start_operation_context.get_completion_callbacks(),
+            workflow_event_links=start_operation_context.get_workflow_event_links(),
         )
 
-        nexus_start_ctx.add_outbound_links(wf_handle)
+        start_operation_context.add_outbound_links(wf_handle)
 
         return WorkflowOperationToken[ReturnType]._unsafe_from_workflow_handle(
             wf_handle
@@ -260,6 +253,7 @@ def _workflow_handle_to_workflow_execution_started_event_link(
         event_ref=temporalio.api.common.v1.Link.WorkflowEvent.EventReference(
             event_type=temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
         ),
+        # TODO(nexus-prerelease): RequestIdReference?
     )
 
 
