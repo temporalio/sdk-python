@@ -53,7 +53,6 @@ import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
-import temporalio.nexus.handler
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
@@ -468,9 +467,7 @@ class Client:
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
         # The following options are deliberately not exposed in overloads
-        nexus_completion_callbacks: Sequence[
-            temporalio.common.NexusCompletionCallback
-        ] = [],
+        nexus_completion_callbacks: Sequence[NexusCompletionCallback] = [],
         workflow_event_links: Sequence[
             temporalio.api.common.v1.Link.WorkflowEvent
         ] = [],
@@ -5204,7 +5201,7 @@ class StartWorkflowInput:
     rpc_timeout: Optional[timedelta]
     request_eager_start: bool
     priority: temporalio.common.Priority
-    nexus_completion_callbacks: Sequence[temporalio.common.NexusCompletionCallback]
+    nexus_completion_callbacks: Sequence[NexusCompletionCallback]
     workflow_event_links: Sequence[temporalio.api.common.v1.Link.WorkflowEvent]
     request_id: Optional[str]
     versioning_override: Optional[temporalio.common.VersioningOverride] = None
@@ -7257,6 +7254,17 @@ class CloudOperationsClient:
         # Update config and perform update
         self.service_client.config.api_key = value
         self.service_client.update_api_key(value)
+
+
+@dataclass(frozen=True)
+class NexusCompletionCallback:
+    """Nexus callback to attach to events such as workflow completion."""
+
+    url: str
+    """Callback URL."""
+
+    header: Mapping[str, str]
+    """Header to attach to callback request."""
 
 
 async def _encode_user_metadata(

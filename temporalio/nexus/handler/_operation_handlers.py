@@ -5,7 +5,6 @@ import typing
 import warnings
 from functools import wraps
 from typing import (
-    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -30,47 +29,12 @@ from nexusrpc.types import (
 )
 from typing_extensions import overload
 
+from temporalio.client import Client
 from temporalio.nexus.handler._operation_context import TemporalOperationContext
 
 from ._token import (
     WorkflowOperationToken as WorkflowOperationToken,
 )
-
-if TYPE_CHECKING:
-    from temporalio.client import (
-        Client,
-    )
-
-
-async def cancel_operation(
-    token: str,
-    client: Client,
-    **kwargs: Any,
-) -> None:
-    """Cancel a Nexus operation.
-
-    Args:
-        token: The token of the operation to cancel.
-        client: The client to use to cancel the operation.
-    """
-    try:
-        workflow_token = WorkflowOperationToken[Any].decode(token)
-    except Exception as err:
-        raise HandlerError(
-            "Failed to decode operation token as workflow operation token. "
-            "Canceling non-workflow operations is not supported.",
-            type=HandlerErrorType.NOT_FOUND,
-            cause=err,
-        )
-    try:
-        handle = workflow_token.to_workflow_handle(client)
-    except Exception as err:
-        raise HandlerError(
-            "Failed to construct workflow handle from workflow operation token",
-            type=HandlerErrorType.NOT_FOUND,
-            cause=err,
-        )
-    await handle.cancel(**kwargs)
 
 
 class WorkflowRunOperationHandler(
@@ -91,20 +55,6 @@ class WorkflowRunOperationHandler(
         async def start(
             _, ctx: StartOperationContext, input: InputT
         ) -> StartOperationResultAsync:
-            # TODO(nexus-prerelease) It must be possible to start "normal" workflows in
-            # here, and then finish up with a "nexusified" workflow.
-            # TODO(nexus-prerelease) It should not be possible to construct a Nexus
-            # token for a non-nexusified workflow.
-            # TODO(nexus-prerelease) When `start` returns, must the workflow have been
-            # started? The answer is yes, but that's yes regarding the
-            # OperationHandler.start() method that is created by the decorator: it's OK
-            # for the shorthand method to return a lazily evaluated start_workflow; it
-            # will only ever be used in its transformed form. Note that in a
-            # `OperationHandler.start` method, a user should be able to create a token
-            # for a nexusified workflow and return it as a Nexus response:
-            #
-            # token = WorkflowOperationToken.from_workflow_handle(wf_handle).encode()
-            # return StartOperationResultAsync(token)
             token = await start_method(service, ctx, input)
             return StartOperationResultAsync(token.encode())
 
@@ -279,3 +229,34 @@ def _get_workflow_run_start_method_input_and_output_type_annotations(
     else:
         [output_type] = args
     return input_type, output_type
+
+
+async def cancel_operation(
+    token: str,
+    client: Client,
+    **kwargs: Any,
+) -> None:
+    """Cancel a Nexus operation.
+
+    Args:
+        token: The token of the operation to cancel.
+        client: The client to use to cancel the operation.
+    """
+    try:
+        workflow_token = WorkflowOperationToken[Any].decode(token)
+    except Exception as err:
+        raise HandlerError(
+            "Failed to decode operation token as workflow operation token. "
+            "Canceling non-workflow operations is not supported.",
+            type=HandlerErrorType.NOT_FOUND,
+            cause=err,
+        )
+    try:
+        handle = workflow_token.to_workflow_handle(client)
+    except Exception as err:
+        raise HandlerError(
+            "Failed to construct workflow handle from workflow operation token",
+            type=HandlerErrorType.NOT_FOUND,
+            cause=err,
+        )
+    await handle.cancel(**kwargs)

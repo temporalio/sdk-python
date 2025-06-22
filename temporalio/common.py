@@ -197,37 +197,6 @@ class RawValue:
         )
 
 
-@dataclass(frozen=True)
-class NexusCompletionCallback:
-    """Nexus callback to attach to events such as workflow completion."""
-
-    url: str
-    """Callback URL."""
-
-    header: Mapping[str, str]
-    """Header to attach to callback request."""
-
-
-@dataclass(frozen=True)
-class WorkflowEventLink:
-    """A link to a history event that can be attached to a different history event."""
-
-    namespace: str
-    """Namespace of the workflow to link to."""
-
-    workflow_id: str
-    """ID of the workflow to link to."""
-
-    run_id: str
-    """Run ID of the workflow to link to."""
-
-    event_type: temporalio.api.enums.v1.EventType
-    """Type of the event to link to."""
-
-    event_id: int
-    """ID of the event to link to."""
-
-
 # We choose to make this a list instead of an sequence so we can catch if people
 # are not sending lists each time but maybe accidentally sending a string (which
 # is a sequence)

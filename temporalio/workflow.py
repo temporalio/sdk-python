@@ -4386,15 +4386,16 @@ async def execute_child_workflow(
     return await handle
 
 
+# TODO(nexus-prerelease): use types from nexusrpc
 I = TypeVar("I")
 O = TypeVar("O")
 S = TypeVar("S")
 
 
-# TODO(dan): ABC?
+# TODO(nexus-prerelease): ABC / inherit from asyncio.Task?
 class NexusOperationHandle(Generic[O]):
     def cancel(self) -> bool:
-        # TODO(dan): docstring
+        # TODO(nexus-prerelease): docstring
         """
         Call task.cancel() on the asyncio task that is backing this handle.
 
@@ -4409,7 +4410,7 @@ class NexusOperationHandle(Generic[O]):
     def __await__(self) -> Generator[Any, Any, O]:
         raise NotImplementedError
 
-    # TODO(dan): check SDK-wide philosophy on @property vs nullary accessor methods.
+    # TODO(nexus-prerelease): check SDK-wide consistency for @property vs nullary accessor methods.
     @property
     def operation_token(self) -> Optional[str]:
         raise NotImplementedError
@@ -5172,7 +5173,7 @@ class NexusClient(Generic[S]):
     def __init__(
         self,
         service: Union[
-            # TODO(dan): Type[S] is modeling the interface case as well the impl case, but
+            # TODO(nexus-prerelease): Type[S] is modeling the interface case as well the impl case, but
             # the typevar S is used below only in the impl case. I think this is OK, but
             # think about it again before deleting this TODO.
             Type[S],
@@ -5197,8 +5198,8 @@ class NexusClient(Generic[S]):
             )
         self._endpoint = endpoint
 
-    # TODO(dan): overloads: no-input, operation name, ret type
-    # TODO(dan): should it be an error to use a reference to a method on a class other than that supplied?
+    # TODO(nexus-prerelease): overloads: no-input, ret type
+    # TODO(nexus-prerelease): should it be an error to use a reference to a method on a class other than that supplied?
     async def start_operation(
         self,
         operation: Union[
@@ -5222,7 +5223,7 @@ class NexusClient(Generic[S]):
             headers=headers,
         )
 
-    # TODO(dan): overloads: no-input, operation name, ret type
+    # TODO(nexus-prerelease): overloads: no-input, ret type
     async def execute_operation(
         self,
         operation: Union[

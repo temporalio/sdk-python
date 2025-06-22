@@ -8,7 +8,6 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
-    TYPE_CHECKING,
     Any,
     Mapping,
     Optional,
@@ -22,6 +21,7 @@ from nexusrpc.handler import CancelOperationContext, StartOperationContext
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.common
+from temporalio.client import Client, NexusCompletionCallback, WorkflowHandle
 from temporalio.nexus.handler._token import WorkflowOperationToken
 from temporalio.types import (
     MethodAsyncSingleParam,
@@ -29,10 +29,6 @@ from temporalio.types import (
     ReturnType,
     SelfType,
 )
-
-if TYPE_CHECKING:
-    from temporalio.client import Client, WorkflowHandle
-
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +52,8 @@ class TemporalOperationContext:
     task_queue: str
     """The task queue of the worker handling this Nexus operation."""
 
+    # TODO(nexus-prerelease): I don't think I like these names. Perhaps .get(), or
+    # expose the contextvar directly in the public API.
     @staticmethod
     def try_current() -> Optional[TemporalOperationContext]:
         return _current_context.get(None)
@@ -132,7 +130,15 @@ class TemporalOperationContext:
         """Start a workflow that will deliver the result of the Nexus operation.
 
         The workflow will be started in the same namespace as the Nexus worker, using
-        the same client as the worker. If task queue is not specified, the worker's task queue will be used.
+        the same client as the worker. If task queue is not specified, the worker's task
+        queue will be used.
+
+        See :py:meth:`temporalio.client.Client.start_workflow` for all arguments.
+
+        The return value is :py:class:`temporalio.nexus.handler.WorkflowOperationToken`.
+        Use :py:meth:`temporalio.nexus.handler.WorkflowOperationToken.to_workflow_handle`
+        to get a :py:class:`temporalio.client.WorkflowHandle` for interacting with the
+        workflow.
 
         The workflow will be started as usual, with the following modifications:
 
@@ -148,8 +154,6 @@ class TemporalOperationContext:
           started workflow will be added to the Nexus start operation response. If the
           Nexus caller is itself a workflow, this means that the workflow in the caller
           namespace web UI will contain links to the started workflow, and vice versa.
-
-        See :py:meth:`temporalio.client.Client.start_workflow` for all arguments.
         """
         start_operation_context = self.temporal_start_operation_context
         if not start_operation_context:
@@ -167,8 +171,9 @@ class TemporalOperationContext:
         #     };
         # }
 
-        # We must pass nexus_completion_callbacks and workflow_event_links, but these are
-        # deliberately not exposed in overloads, hence the type-check violation.
+        # We must pass nexus_completion_callbacks, workflow_event_links, and request_id,
+        # but these are deliberately not exposed in overloads, hence the type-check
+        # violation.
         wf_handle = await self.client.start_workflow(  # type: ignore
             workflow=workflow,
             arg=arg,
@@ -211,7 +216,7 @@ class _TemporalStartOperationContext:
 
     def get_completion_callbacks(
         self,
-    ) -> list[temporalio.common.NexusCompletionCallback]:
+    ) -> list[NexusCompletionCallback]:
         ctx = self.nexus_operation_context
         return (
             [
@@ -220,7 +225,7 @@ class _TemporalStartOperationContext:
                 # StartWorkflowRequest.CompletionCallbacks and to StartWorkflowRequest.Links
                 # (for backwards compatibility). PR reference in Go SDK:
                 # https://github.com/temporalio/sdk-go/pull/1945
-                temporalio.common.NexusCompletionCallback(
+                NexusCompletionCallback(
                     url=ctx.callback_url,
                     header=ctx.callback_headers,
                 )
@@ -267,8 +272,6 @@ class _TemporalCancelOperationContext:
     nexus_operation_context: CancelOperationContext
 
 
-# TODO(nexus-prerelease): confirm that it is correct not to use event_id in the following functions.
-# Should the proto say explicitly that it's optional or how it behaves when it's missing?
 def _workflow_handle_to_workflow_execution_started_event_link(
     handle: WorkflowHandle[Any, Any],
 ) -> temporalio.api.common.v1.Link.WorkflowEvent:
@@ -282,6 +285,8 @@ def _workflow_handle_to_workflow_execution_started_event_link(
         workflow_id=handle.id,
         run_id=handle.first_execution_run_id,
         event_ref=temporalio.api.common.v1.Link.WorkflowEvent.EventReference(
+            # TODO(nexus-prerelease): confirm that it is correct not to use event_id.
+            # Should the proto say explicitly that it's optional or how it behaves when it's missing?
             event_type=temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
         ),
         # TODO(nexus-prerelease): RequestIdReference?
@@ -334,6 +339,8 @@ def _nexus_link_to_workflow_event(
             )
         [event_type_name] = query_params.get("eventType", [])
         event_ref = temporalio.api.common.v1.Link.WorkflowEvent.EventReference(
+            # TODO(nexus-prerelease): confirm that it is correct not to use event_id.
+            # Should the proto say explicitly that it's optional or how it behaves when it's missing?
             event_type=temporalio.api.enums.v1.EventType.Value(event_type_name)
         )
     except ValueError as err:
