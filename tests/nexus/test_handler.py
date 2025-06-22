@@ -209,7 +209,6 @@ class MyServiceHandler:
             MyWorkflow.run,
             input,
             id=str(uuid.uuid4()),
-            client=tctx.client,
             task_queue=tctx.task_queue,
             id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
         )
@@ -255,7 +254,6 @@ class MyServiceHandler:
             WorkflowWithoutTypeAnnotations.run,
             input,
             id=str(uuid.uuid4()),
-            client=tctx.client,
             task_queue=tctx.task_queue,
         )
 
@@ -274,7 +272,6 @@ class MyServiceHandler:
             MyLinkTestWorkflow.run,
             input,
             id=str(uuid.uuid4()),
-            client=tctx.client,
             task_queue=tctx.task_queue,
         )
 
@@ -1044,7 +1041,6 @@ class ServiceHandlerForRequestIdTest:
             EchoWorkflow.run,
             input,
             id=input.value,
-            client=tctx.client,
             task_queue=tctx.task_queue,
             id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
         )
@@ -1066,7 +1062,6 @@ class ServiceHandlerForRequestIdTest:
             EchoWorkflow.run,
             input,
             id=input.value,
-            client=tctx.client,
             task_queue=tctx.task_queue,
             id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
         )

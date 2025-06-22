@@ -160,7 +160,6 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
                 HandlerWfInput(op_input=input),
                 id=input.response_type.operation_workflow_id,
                 task_queue=tctx.task_queue,
-                client=tctx.client,
             )
             return nexusrpc.handler.StartOperationResultAsync(token.encode())
         else:
@@ -218,7 +217,6 @@ class ServiceImpl:
             HandlerWorkflow.run,
             HandlerWfInput(op_input=input),
             id=input.response_type.operation_workflow_id,
-            client=tctx.client,
             task_queue=tctx.task_queue,
         )
 
@@ -936,7 +934,6 @@ class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
             EchoWorkflow.run,
             f"{result_1}-result-2",
             id=str(uuid.uuid4()),
-            client=tctx.client,
             task_queue=tctx.task_queue,
         )
 
