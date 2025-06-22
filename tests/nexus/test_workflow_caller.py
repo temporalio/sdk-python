@@ -157,7 +157,7 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
             )
         elif isinstance(input.response_type, AsyncResponse):
             tctx = TemporalNexusOperationContext.current()
-            start_request = NexusStartWorkflowRequest(  # type: ignore
+            start_request = NexusStartWorkflowRequest[HandlerWfOutput](  # type: ignore
                 tctx.client,
                 HandlerWorkflow.run,
                 HandlerWfInput(op_input=input),
@@ -166,7 +166,9 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
             )
             wf_handle = await start_request.start_workflow()
             return nexusrpc.handler.StartOperationResultAsync(
-                WorkflowOperationToken.from_workflow_handle(wf_handle).encode()
+                WorkflowOperationToken[HandlerWfOutput]
+                .from_workflow_handle(wf_handle)
+                .encode()
             )
         else:
             raise TypeError
