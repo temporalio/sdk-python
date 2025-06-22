@@ -74,9 +74,9 @@ class _NexusWorker:
                 )
         self._handler = Handler(service_handlers, executor)
         self._data_converter = data_converter
-        # TODO(nexus-prerelease): interceptors
+        # TODO(nexus-preview): interceptors
         self._interceptors = interceptors
-        # TODO(nexus-prerelease): metric_meter
+        # TODO(nexus-preview): metric_meter
         self._metric_meter = metric_meter
         self._running_tasks: dict[bytes, asyncio.Task[Any]] = {}
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
@@ -162,7 +162,7 @@ class _NexusWorker:
     async def wait_all_completed(self) -> None:
         await asyncio.gather(*self._running_tasks.values(), return_exceptions=True)
 
-    # TODO(nexus-prerelease): stack trace pruning. See sdk-typescript NexusHandler.execute
+    # TODO(nexus-preview): stack trace pruning. See sdk-typescript NexusHandler.execute
     # "Any call up to this function and including this one will be trimmed out of stack traces.""
 
     async def _handle_cancel_operation_task(
@@ -359,7 +359,6 @@ class _NexusWorker:
         return temporalio.api.nexus.v1.HandlerError(
             error_type=err.type.value,
             failure=await self._exception_to_failure_proto(err),
-            # TODO(nexus-prerelease): is there a reason to support retryable=None?
             retry_behavior=(
                 temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
                 if err.retryable
@@ -410,7 +409,6 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.handler.HandlerE
             err.message,
             type=nexusrpc.handler.HandlerErrorType.INTERNAL,
             cause=err,
-            # TODO(nexus-prerelease): is there a reason to support retryable=None?
             retryable=not err.non_retryable,
         )
     elif isinstance(err, RPCError):
