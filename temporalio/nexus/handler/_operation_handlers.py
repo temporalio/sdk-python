@@ -30,7 +30,8 @@ from nexusrpc.types import (
 )
 from typing_extensions import overload
 
-from ._operation_context import TemporalOperationContext
+from temporalio.nexus.handler._operation_context import TemporalOperationContext
+
 from ._token import (
     WorkflowOperationToken as WorkflowOperationToken,
 )
@@ -41,24 +42,28 @@ if TYPE_CHECKING:
     )
 
 
-# TODO(nexus-prerelease): revise cancel implementation
-async def cancel_workflow(
-    ctx: CancelOperationContext,
+async def cancel_operation(
     token: str,
-    client: Optional[Client] = None,  # noqa
+    client: Client,
     **kwargs: Any,
 ) -> None:
-    client = client or TemporalOperationContext.current().client
+    """Cancel a Nexus operation.
+
+    Args:
+        token: The token of the operation to cancel.
+        client: The client to use to cancel the operation.
+    """
     try:
-        decoded = WorkflowOperationToken[Any].decode(token)
+        workflow_token = WorkflowOperationToken[Any].decode(token)
     except Exception as err:
         raise HandlerError(
-            "Failed to decode workflow operation token",
+            "Failed to decode operation token as workflow operation token. "
+            "Canceling non-workflow operations is not supported.",
             type=HandlerErrorType.NOT_FOUND,
             cause=err,
         )
     try:
-        handle = decoded.to_workflow_handle(client)
+        handle = workflow_token.to_workflow_handle(client)
     except Exception as err:
         raise HandlerError(
             "Failed to construct workflow handle from workflow operation token",
@@ -114,7 +119,8 @@ class WorkflowRunOperationHandler(
         )
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
-        await cancel_workflow(ctx, token)
+        tctx = TemporalOperationContext.current()
+        await cancel_operation(token, tctx.client)
 
     def fetch_info(
         self, ctx: nexusrpc.handler.FetchOperationInfoContext, token: str
