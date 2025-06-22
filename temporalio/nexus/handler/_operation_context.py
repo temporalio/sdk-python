@@ -103,8 +103,7 @@ class TemporalOperationContext:
         arg: ParamType,
         *,
         id: str,
-        # TODO(nexus-prerelease): Allow task queue to be omitted, defaulting to worker's?
-        task_queue: str,
+        task_queue: Optional[str] = None,
         execution_timeout: Optional[timedelta] = None,
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
@@ -132,6 +131,9 @@ class TemporalOperationContext:
     ) -> WorkflowOperationToken[ReturnType]:
         """Start a workflow that will deliver the result of the Nexus operation.
 
+        The workflow will be started in the same namespace as the Nexus worker, using
+        the same client as the worker. If task queue is not specified, the worker's task queue will be used.
+
         The workflow will be started as usual, with the following modifications:
 
         - On workflow completion, Temporal server will deliver the workflow result to
@@ -147,10 +149,7 @@ class TemporalOperationContext:
           Nexus caller is itself a workflow, this means that the workflow in the caller
           namespace web UI will contain links to the started workflow, and vice versa.
 
-        Args:
-            client: The client to use to start the workflow.
-
-        See :py:meth:`temporalio.client.Client.start_workflow` for all other arguments.
+        See :py:meth:`temporalio.client.Client.start_workflow` for all arguments.
         """
         start_operation_context = self.temporal_start_operation_context
         if not start_operation_context:
@@ -174,7 +173,7 @@ class TemporalOperationContext:
             workflow=workflow,
             arg=arg,
             id=id,
-            task_queue=task_queue,
+            task_queue=task_queue or self.task_queue,
             execution_timeout=execution_timeout,
             run_timeout=run_timeout,
             task_timeout=task_timeout,
