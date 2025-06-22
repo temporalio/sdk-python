@@ -52,7 +52,7 @@ async def cancel_workflow(
 ) -> None:
     client = client or TemporalNexusOperationContext.current().client
     try:
-        decoded = WorkflowOperationToken.decode(token)
+        decoded = WorkflowOperationToken[Any].decode(token)
     except Exception as err:
         raise HandlerError(
             "Failed to decode workflow operation token",
@@ -117,7 +117,9 @@ class WorkflowRunOperationHandler(
             # return StartOperationResultAsync(token)
             start_wf_request = await start_method(service, ctx, input)
             wf_handle = await start_wf_request.start_workflow()
-            token = WorkflowOperationToken.from_workflow_handle(wf_handle).encode()
+            token = (
+                WorkflowOperationToken[OutputT].from_workflow_handle(wf_handle).encode()
+            )
             return StartOperationResultAsync(token)
 
         self.start = types.MethodType(start, self)

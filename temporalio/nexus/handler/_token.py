@@ -3,7 +3,9 @@ from __future__ import annotations
 import base64
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Generic, Literal, Optional
+
+from nexusrpc.types import OutputT
 
 if TYPE_CHECKING:
     from temporalio.client import Client, WorkflowHandle
@@ -13,7 +15,7 @@ OperationTokenType = Literal[1]
 
 
 @dataclass(frozen=True)
-class WorkflowOperationToken:
+class WorkflowOperationToken(Generic[OutputT]):
     """Represents the structured data of a Nexus workflow operation token."""
 
     namespace: str
@@ -23,17 +25,20 @@ class WorkflowOperationToken:
     # serialized token; it's only used to reject newer token versions on load.
     version: Optional[int] = None
 
+    # TODO(nexus-preview): Is it helpful to parameterize WorkflowOperationToken by
+    # OutputT? The return type here should be dictated by the input workflow handle
+    # type.
     @classmethod
     def from_workflow_handle(
-        cls, workflow_handle: WorkflowHandle[Any, Any]
-    ) -> WorkflowOperationToken:
+        cls, workflow_handle: WorkflowHandle[Any, OutputT]
+    ) -> WorkflowOperationToken[OutputT]:
         """Creates a token from a workflow handle."""
         return cls(
             namespace=workflow_handle._client.namespace,
             workflow_id=workflow_handle.id,
         )
 
-    def to_workflow_handle(self, client: Client) -> WorkflowHandle[Any, Any]:
+    def to_workflow_handle(self, client: Client) -> WorkflowHandle[Any, OutputT]:
         """Creates a workflow handle from this token."""
         if client.namespace != self.namespace:
             raise ValueError(
@@ -54,7 +59,7 @@ class WorkflowOperationToken:
         )
 
     @classmethod
-    def decode(cls, token: str) -> WorkflowOperationToken:
+    def decode(cls, token: str) -> WorkflowOperationToken[OutputT]:
         """Decodes and validates a token from its base64url-encoded string representation."""
         if not token:
             raise TypeError("invalid workflow token: token is empty")
