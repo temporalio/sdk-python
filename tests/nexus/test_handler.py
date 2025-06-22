@@ -45,7 +45,7 @@ from temporalio.exceptions import ApplicationError
 from temporalio.nexus.handler import (
     logger,
 )
-from temporalio.nexus.handler._operation_context import TemporalNexusOperationContext
+from temporalio.nexus.handler._operation_context import TemporalOperationContext
 from temporalio.nexus.handler._token import WorkflowOperationToken
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
@@ -204,7 +204,7 @@ class MyServiceHandler:
     async def workflow_run_operation(
         self, ctx: StartOperationContext, input: Input
     ) -> WorkflowOperationToken[Output]:
-        tctx = TemporalNexusOperationContext.current()
+        tctx = TemporalOperationContext.current()
         return await tctx.start_workflow(
             MyWorkflow.run,
             input,
@@ -250,7 +250,7 @@ class MyServiceHandler:
 
     @temporalio.nexus.handler.workflow_run_operation_handler
     async def workflow_run_operation_without_type_annotations(self, ctx, input):
-        tctx = TemporalNexusOperationContext.current()
+        tctx = TemporalOperationContext.current()
         return await tctx.start_workflow(
             WorkflowWithoutTypeAnnotations.run,
             input,
@@ -269,7 +269,7 @@ class MyServiceHandler:
         assert ctx.request_id == "test-request-id-123", "Request ID mismatch"
         ctx.outbound_links.extend(ctx.inbound_links)
 
-        tctx = TemporalNexusOperationContext.current()
+        tctx = TemporalOperationContext.current()
         return await tctx.start_workflow(
             MyLinkTestWorkflow.run,
             input,
@@ -1039,7 +1039,7 @@ class ServiceHandlerForRequestIdTest:
     async def operation_backed_by_a_workflow(
         self, ctx: StartOperationContext, input: Input
     ) -> WorkflowOperationToken[Output]:
-        tctx = TemporalNexusOperationContext.current()
+        tctx = TemporalOperationContext.current()
         return await tctx.start_workflow(
             EchoWorkflow.run,
             input,
@@ -1053,7 +1053,7 @@ class ServiceHandlerForRequestIdTest:
     async def operation_that_executes_a_workflow_before_starting_the_backing_workflow(
         self, ctx: StartOperationContext, input: Input
     ) -> WorkflowOperationToken[Output]:
-        tctx = TemporalNexusOperationContext.current()
+        tctx = TemporalOperationContext.current()
         await tctx.client.start_workflow(
             EchoWorkflow.run,
             input,

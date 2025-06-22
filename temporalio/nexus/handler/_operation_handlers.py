@@ -30,7 +30,7 @@ from nexusrpc.types import (
 )
 from typing_extensions import overload
 
-from ._operation_context import TemporalNexusOperationContext
+from ._operation_context import TemporalOperationContext
 from ._token import (
     WorkflowOperationToken as WorkflowOperationToken,
 )
@@ -48,7 +48,7 @@ async def cancel_workflow(
     client: Optional[Client] = None,  # noqa
     **kwargs: Any,
 ) -> None:
-    client = client or TemporalNexusOperationContext.current().client
+    client = client or TemporalOperationContext.current().client
     try:
         decoded = WorkflowOperationToken[Any].decode(token)
     except Exception as err:
