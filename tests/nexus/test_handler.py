@@ -214,13 +214,12 @@ class MyServiceHandler:
     ) -> NexusStartWorkflowRequest[Output]:
         tctx = TemporalNexusOperationContext.current()
         return NexusStartWorkflowRequest(
-            tctx.client.start_workflow(
-                MyWorkflow.run,
-                input,
-                id=test_context.workflow_id or str(uuid.uuid4()),
-                task_queue=tctx.task_queue,
-                id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
-            )
+            tctx.client,
+            MyWorkflow.run,
+            input,
+            id=test_context.workflow_id or str(uuid.uuid4()),
+            task_queue=tctx.task_queue,
+            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
         )
 
     @nexusrpc.handler.sync_operation_handler
@@ -261,12 +260,11 @@ class MyServiceHandler:
     async def workflow_run_operation_without_type_annotations(self, ctx, input):
         tctx = TemporalNexusOperationContext.current()
         return NexusStartWorkflowRequest(
-            tctx.client.start_workflow(
-                WorkflowWithoutTypeAnnotations.run,
-                input,
-                id=test_context.workflow_id or str(uuid.uuid4()),
-                task_queue=tctx.task_queue,
-            )
+            tctx.client,
+            WorkflowWithoutTypeAnnotations.run,
+            input,
+            id=test_context.workflow_id or str(uuid.uuid4()),
+            task_queue=tctx.task_queue,
         )
 
     @temporalio.nexus.handler.workflow_run_operation_handler
@@ -281,12 +279,11 @@ class MyServiceHandler:
 
         tctx = TemporalNexusOperationContext.current()
         return NexusStartWorkflowRequest(
-            tctx.client.start_workflow(
-                MyLinkTestWorkflow.run,
-                input,
-                id=test_context.workflow_id or str(uuid.uuid4()),
-                task_queue=tctx.task_queue,
-            )
+            tctx.client,
+            MyLinkTestWorkflow.run,
+            input,
+            id=test_context.workflow_id or str(uuid.uuid4()),
+            task_queue=tctx.task_queue,
         )
 
     class OperationHandlerReturningUnwrappedResult(

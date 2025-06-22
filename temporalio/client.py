@@ -471,6 +471,12 @@ class Client:
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
         # The following options are deliberately not exposed in overloads
+        nexus_completion_callbacks: Sequence[
+            temporalio.common.NexusCompletionCallback
+        ] = [],
+        workflow_event_links: Sequence[
+            temporalio.api.common.v1.Link.WorkflowEvent
+        ] = [],
         stack_level: int = 2,
     ) -> WorkflowHandle[Any, Any]:
         """Start a workflow and return its handle.
@@ -534,21 +540,7 @@ class Client:
         name, result_type_from_type_hint = (
             temporalio.workflow._Definition.get_name_and_result_type(workflow)
         )
-        nexus_start_ctx = None
-        if nexus_ctx := TemporalNexusOperationContext.try_current():
-            # TODO(prerelease): I think this is too magical: what if a user implements a
-            # nexus handler by running one workflow to completion, and then starting a
-            # second workflow to act as the async operation itself?
-            # TODO(prerelease): What do we do if the Temporal Nexus context client
-            # (namespace) is not the same as the one being used to start this workflow?
-            if nexus_start_ctx := nexus_ctx.temporal_nexus_start_operation_context:
-                nexus_completion_callbacks = nexus_start_ctx.get_completion_callbacks()
-                workflow_event_links = nexus_start_ctx.get_workflow_event_links()
-        else:
-            nexus_completion_callbacks = []
-            workflow_event_links = []
-
-        wf_handle = await self._impl.start_workflow(
+        return await self._impl.start_workflow(
             StartWorkflowInput(
                 workflow=name,
                 args=temporalio.common._arg_or_args(arg, args),
@@ -579,11 +571,6 @@ class Client:
                 workflow_event_links=workflow_event_links,
             )
         )
-
-        if nexus_start_ctx:
-            nexus_start_ctx.add_outbound_links(wf_handle)
-
-        return wf_handle
 
     # Overload for no-param workflow
     @overload
