@@ -6,7 +6,7 @@ import pytest
 
 import temporalio.api.failure.v1
 import temporalio.nexus
-from temporalio.nexus.handler import NexusStartWorkflowRequest
+from temporalio.nexus.handler._token import WorkflowOperationToken
 
 HTTP_PORT = 7243
 
@@ -40,7 +40,7 @@ class ValidWorkflowRunImpl(_InterfaceImplementationTestCase):
         @temporalio.nexus.handler.workflow_run_operation_handler
         async def op(
             self, ctx: nexusrpc.handler.StartOperationContext, input: str
-        ) -> NexusStartWorkflowRequest[int]: ...
+        ) -> WorkflowOperationToken[int]: ...
 
     error_message = None
 

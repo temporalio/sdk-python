@@ -25,26 +25,31 @@ class WorkflowOperationToken(Generic[OutputT]):
     # serialized token; it's only used to reject newer token versions on load.
     version: Optional[int] = None
 
-    # TODO(nexus-preview): Is it helpful to parameterize WorkflowOperationToken by
-    # OutputT? The return type here should be dictated by the input workflow handle
-    # type.
-    @classmethod
-    def from_workflow_handle(
-        cls, workflow_handle: WorkflowHandle[Any, OutputT]
-    ) -> WorkflowOperationToken[OutputT]:
-        """Creates a token from a workflow handle."""
-        return cls(
-            namespace=workflow_handle._client.namespace,
-            workflow_id=workflow_handle.id,
-        )
-
     def to_workflow_handle(self, client: Client) -> WorkflowHandle[Any, OutputT]:
-        """Creates a workflow handle from this token."""
+        """Create a :py:class:`temporalio.client.WorkflowHandle` from the token."""
         if client.namespace != self.namespace:
             raise ValueError(
                 f"Client namespace {client.namespace} does not match token namespace {self.namespace}"
             )
         return client.get_workflow_handle(self.workflow_id)
+
+    # TODO(nexus-preview): Is it helpful to parameterize WorkflowOperationToken by
+    # OutputT? The return type here should be dictated by the input workflow handle
+    # type.
+    @classmethod
+    def _unsafe_from_workflow_handle(
+        cls, workflow_handle: WorkflowHandle[Any, OutputT]
+    ) -> WorkflowOperationToken[OutputT]:
+        """Create a :py:class:`WorkflowOperationToken` from a workflow handle.
+
+        This is a private method not intended to be used by users. It does not check
+        that the supplied WorkflowHandle references a workflow that has been
+        instrumented to supply the result of a Nexus operation.
+        """
+        return cls(
+            namespace=workflow_handle._client.namespace,
+            workflow_id=workflow_handle.id,
+        )
 
     def encode(self) -> str:
         return _base64url_encode_no_padding(
