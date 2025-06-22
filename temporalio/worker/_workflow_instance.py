@@ -3043,19 +3043,14 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
         return self._task.cancel()
 
     def _resolve_start_success(self, operation_token: Optional[str]) -> None:
-        print(f"🟢 _resolve_start_success: operation_id: {operation_token}")
         # We intentionally let this error if already done
         self._start_fut.set_result(operation_token)
 
     def _resolve_success(self, result: Any) -> None:
-        print(
-            f"🟢 _resolve_success: operation_id: {self.operation_token} result: {result}"
-        )
         # We intentionally let this error if already done
         self._result_fut.set_result(result)
 
     def _resolve_failure(self, err: BaseException) -> None:
-        print(f"🔴 _resolve_failure: operation_id: {self.operation_token} err: {err}")
         if self._start_fut.done():
             # We intentionally let this error if already done
             self._result_fut.set_exception(err)
@@ -3080,7 +3075,6 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
             )
         if self._input.headers:
             for key, val in self._input.headers.items():
-                print(f"🌈 adding nexus header: {key} = {val}")
                 v.nexus_header[key] = val
 
     def _apply_cancel_command(

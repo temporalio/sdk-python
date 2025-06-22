@@ -478,7 +478,6 @@ async def test_sync_response(
             assert isinstance(e.__cause__, NexusOperationError)
             assert isinstance(e.__cause__.__cause__, NexusHandlerError)
             # ID of first command
-            await print_history(caller_wf_handle)
             assert e.__cause__.scheduled_event_id == 5
             assert e.__cause__.endpoint == make_nexus_endpoint_name(task_queue)
             assert e.__cause__.service == "ServiceInterface"
@@ -508,7 +507,6 @@ async def test_async_response(
     op_definition_type: OpDefinitionType,
     caller_reference: CallerReference,
 ):
-    print(f"🌈 {'test_async_response':<24}: {request_cancel=} {op_definition_type=}")
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
@@ -1034,21 +1032,6 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
         link.workflow_event.event_ref.event_type
         == temporalio.api.enums.v1.EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED
     )
-
-
-async def print_history(handle: WorkflowHandle):
-    print("\n\n")
-    history = await handle.fetch_history()
-    for event in history.events:
-        try:
-            event_type_name = temporalio.api.enums.v1.EventType.Name(
-                event.event_type
-            ).replace("EVENT_TYPE_", "")
-        except ValueError:
-            # Handle unknown event types
-            event_type_name = f"Unknown({event.event_type})"
-        print(f"{event.event_id}. {event_type_name}")
-    print("\n\n")
 
 
 # When request_cancel is True, the NexusOperationHandle in the workflow evolves
