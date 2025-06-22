@@ -209,7 +209,6 @@ class MyServiceHandler:
             MyWorkflow.run,
             input,
             id=str(uuid.uuid4()),
-            task_queue=tctx.task_queue,
             id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
         )
 
@@ -254,7 +253,6 @@ class MyServiceHandler:
             WorkflowWithoutTypeAnnotations.run,
             input,
             id=str(uuid.uuid4()),
-            task_queue=tctx.task_queue,
         )
 
     @temporalio.nexus.handler.workflow_run_operation_handler
@@ -272,7 +270,6 @@ class MyServiceHandler:
             MyLinkTestWorkflow.run,
             input,
             id=str(uuid.uuid4()),
-            task_queue=tctx.task_queue,
         )
 
     class OperationHandlerReturningUnwrappedResult(
@@ -1041,7 +1038,6 @@ class ServiceHandlerForRequestIdTest:
             EchoWorkflow.run,
             input,
             id=input.value,
-            task_queue=tctx.task_queue,
             id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
         )
 
@@ -1062,7 +1058,6 @@ class ServiceHandlerForRequestIdTest:
             EchoWorkflow.run,
             input,
             id=input.value,
-            task_queue=tctx.task_queue,
             id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
         )
 
