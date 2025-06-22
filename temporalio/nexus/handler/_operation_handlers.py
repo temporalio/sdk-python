@@ -9,7 +9,6 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Coroutine,
     Generic,
     Optional,
     Type,
@@ -30,6 +29,8 @@ from nexusrpc.types import (
     ServiceHandlerT,
 )
 from typing_extensions import overload
+
+import temporalio.nexus.handler
 
 from ._operation_context import TemporalNexusOperationContext
 from ._token import (
@@ -74,40 +75,12 @@ class NexusStartWorkflowRequest(Generic[OutputT]):
     A request to start a workflow that will handle the Nexus operation.
     """
 
-    def __init__(
-        self, start_workflow: Coroutine[Any, Any, WorkflowHandle[Any, OutputT]], /
-    ):
-        if start_workflow.__qualname__ != "Client.start_workflow":
-            raise ValueError(
-                "NexusStartWorkflowRequest must be initialized with the coroutine "
-                "object obtained by calling Client.start_workflow."
-            )
-        self._start_workflow = start_workflow
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
 
     async def start_workflow(self) -> WorkflowHandle[Any, OutputT]:
-        # TODO(nexus-prerelease) set context such that nexus metadata is injected into request
-        return await self._start_workflow
-
-    # @classmethod
-    # def from_workflow_handle(cls, workflow_handle: WorkflowHandle) -> Self:
-    #     """
-    #     Create a :class:`WorkflowRunOperationResult` from a :py:class:`~temporalio.client.WorkflowHandle`.
-    #     """
-    #     token = WorkflowOperationToken.from_workflow_handle(workflow_handle).encode()
-    #     return cls(token=token)
-
-    # def to_workflow_handle(self, client: Client) -> WorkflowHandle:
-    #     """
-    #     Create a :py:class:`~temporalio.client.WorkflowHandle` from a :class:`WorkflowRunOperationResult`.
-    #     """
-    #     workflow_operation_token = WorkflowOperationToken.decode(self.token)
-    #     if workflow_operation_token.namespace != client.namespace:
-    #         raise ValueError(
-    #             "Cannot create a workflow handle from a workflow operation result "
-    #             "with a client whose namespace is not the same as the namespace of the "
-    #             "workflow operation token."
-    #         )
-    #     return WorkflowOperationToken.decode(self.token).to_workflow_handle(client)
+        return await temporalio.nexus.handler.start_workflow(*self.args, **self.kwargs)
 
 
 class WorkflowRunOperationHandler(
