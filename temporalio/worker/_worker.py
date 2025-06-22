@@ -802,7 +802,7 @@ class WorkerConfig(TypedDict, total=False):
     workflows: Sequence[Type]
     activity_executor: Optional[concurrent.futures.Executor]
     workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
-    nexus_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
+    nexus_task_executor: Optional[concurrent.futures.Executor]
     workflow_runner: WorkflowRunner
     unsandboxed_workflow_runner: WorkflowRunner
     interceptors: Sequence[Interceptor]

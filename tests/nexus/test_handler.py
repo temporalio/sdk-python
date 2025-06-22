@@ -1133,7 +1133,8 @@ async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnviron
         await start_two_workflows_with_conflicting_workflow_ids(
             ((request_id_1, 201), (request_id_2, 500))
         )
-        # Two workflows started in the same operation should fail
+        # Two workflows started in the same operation should fail, since the Nexus
+        # request ID should be propagated to the backing workflow only.
         await start_two_workflows_in_a_single_operation(request_id_1, 500)
 
 
