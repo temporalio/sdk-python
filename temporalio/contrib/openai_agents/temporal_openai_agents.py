@@ -61,9 +61,7 @@ def set_open_ai_agent_temporal_overrides(
     provider = TemporalTraceProvider()
 
     try:
-        set_default_agent_runner(
-            TemporalOpenAIRunner(model_params)
-        )
+        set_default_agent_runner(TemporalOpenAIRunner(model_params))
         set_trace_provider(provider)
         yield provider
     finally:

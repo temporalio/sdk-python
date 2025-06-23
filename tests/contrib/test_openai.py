@@ -141,12 +141,11 @@ class HelloWorldAgent:
 
 
 async def test_hello_world_agent(client: Client):
-    if sys.version_info < (3, 11):
-        pytest.skip("Open AI support has type errors on 3.9 and 3.11")
+    new_config = client.config()
+    new_config["data_converter"] = open_ai_data_converter
+    client = Client(**new_config)
 
-    model_params = ModelActivityParameters(
-        start_to_close_timeout=timedelta(seconds=10)
-    )
+    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=10))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
             TestProvider(
@@ -239,12 +238,11 @@ class ToolsWorkflow:
 
 
 async def test_tool_workflow(client: Client):
-    if sys.version_info < (3, 11):
-        pytest.skip("Open AI support has type errors on 3.9 and 3.11")
+    new_config = client.config()
+    new_config["data_converter"] = open_ai_data_converter
+    client = Client(**new_config)
 
-    model_params = ModelActivityParameters(
-        start_to_close_timeout=timedelta(seconds=10)
-    )
+    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=10))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
             TestProvider(
@@ -458,15 +456,14 @@ class ResearchWorkflow:
 
 
 async def test_research_workflow(client: Client):
-    if sys.version_info < (3, 11):
-        pytest.skip("Open AI support has type errors on 3.9 and 3.11")
+    new_config = client.config()
+    new_config["data_converter"] = open_ai_data_converter
+    client = Client(**new_config)
 
     global response_index
     response_index = 0
 
-    model_params = ModelActivityParameters(
-        start_to_close_timeout=timedelta(seconds=10)
-    )
+    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=10))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
             TestProvider(
@@ -672,16 +669,11 @@ class AgentAsToolsModel(TestModel):
 
 
 async def test_agents_as_tools_workflow(client: Client):
-    if sys.version_info < (3, 11):
-        pytest.skip("Open AI support has type errors on 3.9 and 3.10")
-
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
     client = Client(**new_config)
 
-    model_params = ModelActivityParameters(
-        start_to_close_timeout=timedelta(seconds=10)
-    )
+    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=10))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
             TestProvider(
@@ -1032,18 +1024,13 @@ class CustomerServiceWorkflow:
 
 
 async def test_customer_service_workflow(client: Client):
-    if sys.version_info < (3, 11):
-        pytest.skip("Open AI support has type errors on 3.9 and 3.11")
-
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
     client = Client(**new_config)
 
     questions = ["Hello", "Book me a flight to PDX", "11111", "Any window seat"]
 
-    model_params = ModelActivityParameters(
-        start_to_close_timeout=timedelta(seconds=10)
-    )
+    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=10))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
             TestProvider(
