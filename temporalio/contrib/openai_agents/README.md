@@ -33,7 +33,7 @@ To provide durable execution, Temporal needs to be able to recover from failures
 To do this, Temporal requires separating an application's deterministic (repeatable) and non-deterministic parts:
 
 1. Deterministic pieces, termed *workflows*, execute the same way if re-run with the same inputs.
-2. Non-deterministic pieces, termed *activies*, have no limitations—they may perform I/O and any other operations.
+2. Non-deterministic pieces, termed *activities*, have no limitations—they may perform I/O and any other operations.
 
 Temporal maintains a server-side execution history of all state state passing in and out of a workflow, using it to recover when needed. 
 See the [Temporal documentation](https://docs.temporal.io/evaluate/understanding-temporal#temporal-application-the-building-blocks) for more information.
@@ -78,14 +78,14 @@ class HelloWorldAgent:
 If you are familiar with Temporal and with Open AI Agents SDK, this code will look very familiar.
 We annotate the `HelloWorldAgent` class with `@workflow.defn` to define a workflow, then use the `@workflow.run` annotation to define the entrypoint.
 We use the `Agent` class to define a simple agent, one which always responds with haikus.
-Within the workflow, we start agent using the `Runner`, as is typical, passing through `prompt` as an argument.
+Within the workflow, we start the agent using the `Runner`, as is typical, passing through `prompt` as an argument.
 
 Perhaps the most interesting thing about this code is the `workflow.unsafe.imports_passed_through()` context manager that precedes the OpenAI Agents SDK imports.
 This statement tells Temporal to skip sandboxing for these trusted libraries.
 This is important because Python's dynamic nature forces Temporal's Python's sandbox to re-validate imports every time a workflow runs, which comes at a performance cost.
 The OpenAI Agents SDK also contains certain code that Temporal is not able to validate automatically for determinism.
 
-The second file, `run_worker.py`, lauches a Temporal worker.
+The second file, `run_worker.py`, launches a Temporal worker.
 This is a program that connects to the Temporal server and receives work to run, in this case `HelloWorldAgent` invocations.
 
 ```python
@@ -131,7 +131,7 @@ if __name__ == "__main__":
 We wrap the entire `worker_main` function body in the `set_open_ai_agent_temporal_overrides()` context manager.
 This causes a Temporal activity to be invoked whenever the OpenAI Agents SDK invokes an LLM or calls a tool.
 We also pass the `open_ai_data_converter` to the Temporal Client, which ensures proper serialization of OpenAI Agents SDK data.
-We create a `ModelActivity` which serves as a generic wrapper for LLM calls, and we register this wrapper's invocation point, `model_activity.invoke_model_activity`, with the workflow.
+We create a `ModelActivity` which serves as a generic wrapper for LLM calls, and we register this wrapper's invocation point, `model_activity.invoke_model_activity`, with the worker.
 
 In order to launch the agent, use the standard Temporal workflow invocation:
 
@@ -169,7 +169,7 @@ if __name__ == "__main__":
 
 This launcher script executes the Temporal workflow to start the agent.
 
-Note that this basic example works without providing the `open_ai_data_converter` to the Temporal client that executes the workflow, but we include it because morem complex uses will generally need it.
+Note that this basic example works without providing the `open_ai_data_converter` to the Temporal client that executes the workflow, but we include it because more complex uses will generally need it.
 
 
 ## Using Temporal Activities as OpenAI Agents Tools
