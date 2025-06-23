@@ -24,7 +24,10 @@ opentelemetry = [
     "opentelemetry-sdk>=1.11.1,<2",
 ]
 pydantic = ["pydantic>=2.0.0,<3"]
-openai-agents = ["openai-agents >= 0.0.19"]
+openai-agents = [
+    "openai-agents >= 0.0.19",
+    "eval-type-backport>=0.2.2"
+]
 
 [project.urls]
 Homepage = "https://github.com/temporalio/sdk-python"
