@@ -14,6 +14,8 @@ from typing import (
     Union,
 )
 
+from typing_extensions import overload
+
 import nexusrpc.handler
 from nexusrpc.handler import (
     CancelOperationContext,
@@ -27,8 +29,6 @@ from nexusrpc.types import (
     OutputT,
     ServiceHandlerT,
 )
-from typing_extensions import overload
-
 from temporalio.client import Client
 from temporalio.nexus.handler._operation_context import TemporalOperationContext
 
