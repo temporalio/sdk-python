@@ -1,6 +1,7 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
 from contextlib import contextmanager
+from datetime import timedelta
 from typing import Optional
 
 from agents import set_trace_provider
@@ -8,14 +9,29 @@ from agents.run import AgentRunner, get_default_agent_runner, set_default_agent_
 from agents.tracing import TraceProvider, get_trace_provider
 from agents.tracing.provider import DefaultTraceProvider
 
+from temporalio.common import Priority, RetryPolicy
 from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
     TemporalTraceProvider,
 )
+from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 
 @contextmanager
-def set_open_ai_agent_temporal_overrides(**kwargs):
+def set_open_ai_agent_temporal_overrides(
+    *,
+    task_queue: Optional[str] = None,
+    schedule_to_close_timeout: Optional[timedelta] = None,
+    schedule_to_start_timeout: Optional[timedelta] = None,
+    start_to_close_timeout: Optional[timedelta] = None,
+    heartbeat_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[RetryPolicy] = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
+    priority: Priority = Priority.default,
+):
     """Configure Temporal-specific overrides for OpenAI agents.
 
     .. warning::
@@ -33,13 +49,17 @@ def set_open_ai_agent_temporal_overrides(**kwargs):
     3. Restoring previous settings when the context exits
 
     Args:
-        **kwargs: Additional arguments to pass to the TemporalOpenAIRunner constructor.
-            These arguments are forwarded to workflow.execute_activity_method when
-            executing model calls. Common options include:
-            - start_to_close_timeout: Maximum time for the activity to complete
-            - schedule_to_close_timeout: Maximum time from scheduling to completion
-            - retry_policy: Policy for retrying failed activities
-            - task_queue: Specific task queue to use for model activities
+        task_queue: Specific task queue to use for model activities.
+        schedule_to_close_timeout: Maximum time from scheduling to completion.
+        schedule_to_start_timeout: Maximum time from scheduling to starting.
+        start_to_close_timeout: Maximum time for the activity to complete.
+        heartbeat_timeout: Maximum time between heartbeats.
+        retry_policy: Policy for retrying failed activities.
+        cancellation_type: How the activity handles cancellation.
+        activity_id: Unique identifier for the activity instance.
+        versioning_intent: Versioning intent for the activity.
+        summary: Summary for the activity execution.
+        priority: Priority for the activity execution.
 
     Example usage:
         with set_open_ai_agent_temporal_overrides(
@@ -60,7 +80,21 @@ def set_open_ai_agent_temporal_overrides(**kwargs):
     provider = TemporalTraceProvider()
 
     try:
-        set_default_agent_runner(TemporalOpenAIRunner(**kwargs))
+        set_default_agent_runner(
+            TemporalOpenAIRunner(
+                task_queue=task_queue,
+                schedule_to_close_timeout=schedule_to_close_timeout,
+                schedule_to_start_timeout=schedule_to_start_timeout,
+                start_to_close_timeout=start_to_close_timeout,
+                heartbeat_timeout=heartbeat_timeout,
+                retry_policy=retry_policy,
+                cancellation_type=cancellation_type,
+                activity_id=activity_id,
+                versioning_intent=versioning_intent,
+                summary=summary,
+                priority=priority,
+            )
+        )
         set_trace_provider(provider)
         yield provider
     finally:

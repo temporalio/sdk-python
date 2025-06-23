@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
+from typing import Optional
 
 from temporalio import workflow
+from temporalio.common import Priority, RetryPolicy
+from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +45,34 @@ with workflow.unsafe.imports_passed_through():
 class _TemporalModelStub(Model):
     """A stub that allows invoking models as Temporal activities."""
 
-    def __init__(self, model_name: Optional[str], **kwargs) -> None:
+    def __init__(
+        self,
+        model_name: Optional[str],
+        *,
+        task_queue: Optional[str] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        schedule_to_start_timeout: Optional[timedelta] = None,
+        start_to_close_timeout: Optional[timedelta] = None,
+        heartbeat_timeout: Optional[timedelta] = None,
+        retry_policy: Optional[RetryPolicy] = None,
+        cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+        activity_id: Optional[str] = None,
+        versioning_intent: Optional[VersioningIntent] = None,
+        summary: Optional[str] = None,
+        priority: Priority = Priority.default,
+    ) -> None:
         self.model_name = model_name
-        self.kwargs = kwargs
+        self.task_queue = task_queue
+        self.schedule_to_close_timeout = schedule_to_close_timeout
+        self.schedule_to_start_timeout = schedule_to_start_timeout
+        self.start_to_close_timeout = start_to_close_timeout
+        self.heartbeat_timeout = heartbeat_timeout
+        self.retry_policy = retry_policy
+        self.cancellation_type = cancellation_type
+        self.activity_id = activity_id
+        self.versioning_intent = versioning_intent
+        self.summary = summary
+        self.priority = priority
 
     async def get_response(
         self,
@@ -145,7 +174,16 @@ class _TemporalModelStub(Model):
             ModelActivity.invoke_model_activity,
             activity_input,
             summary=get_summary(input),
-            **self.kwargs,
+            task_queue=self.task_queue,
+            schedule_to_close_timeout=self.schedule_to_close_timeout,
+            schedule_to_start_timeout=self.schedule_to_start_timeout,
+            start_to_close_timeout=self.start_to_close_timeout,
+            heartbeat_timeout=self.heartbeat_timeout,
+            retry_policy=self.retry_policy,
+            cancellation_type=self.cancellation_type,
+            activity_id=self.activity_id,
+            versioning_intent=self.versioning_intent,
+            priority=self.priority,
         )
 
     def stream_response(
