@@ -6,6 +6,7 @@ from typing import Optional
 
 from temporalio import workflow
 from temporalio.common import Priority, RetryPolicy
+from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
 from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 logger = logging.getLogger(__name__)
@@ -49,30 +50,10 @@ class _TemporalModelStub(Model):
         self,
         model_name: Optional[str],
         *,
-        task_queue: Optional[str] = None,
-        schedule_to_close_timeout: Optional[timedelta] = None,
-        schedule_to_start_timeout: Optional[timedelta] = None,
-        start_to_close_timeout: Optional[timedelta] = None,
-        heartbeat_timeout: Optional[timedelta] = None,
-        retry_policy: Optional[RetryPolicy] = None,
-        cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-        activity_id: Optional[str] = None,
-        versioning_intent: Optional[VersioningIntent] = None,
-        summary: Optional[str] = None,
-        priority: Priority = Priority.default,
+        model_params: ModelActivityParameters,
     ) -> None:
         self.model_name = model_name
-        self.task_queue = task_queue
-        self.schedule_to_close_timeout = schedule_to_close_timeout
-        self.schedule_to_start_timeout = schedule_to_start_timeout
-        self.start_to_close_timeout = start_to_close_timeout
-        self.heartbeat_timeout = heartbeat_timeout
-        self.retry_policy = retry_policy
-        self.cancellation_type = cancellation_type
-        self.activity_id = activity_id
-        self.versioning_intent = versioning_intent
-        self.summary = summary
-        self.priority = priority
+        self.model_params = model_params
 
     async def get_response(
         self,
@@ -170,20 +151,20 @@ class _TemporalModelStub(Model):
             previous_response_id=previous_response_id,
             prompt=prompt,
         )
+        
         return await workflow.execute_activity_method(
             ModelActivity.invoke_model_activity,
             activity_input,
-            summary=get_summary(input),
-            task_queue=self.task_queue,
-            schedule_to_close_timeout=self.schedule_to_close_timeout,
-            schedule_to_start_timeout=self.schedule_to_start_timeout,
-            start_to_close_timeout=self.start_to_close_timeout,
-            heartbeat_timeout=self.heartbeat_timeout,
-            retry_policy=self.retry_policy,
-            cancellation_type=self.cancellation_type,
-            activity_id=self.activity_id,
-            versioning_intent=self.versioning_intent,
-            priority=self.priority,
+            summary=self.model_params.summary_override or get_summary(input),  
+            task_queue=self.model_params.task_queue,
+            schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
+            schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
+            start_to_close_timeout=self.model_params.start_to_close_timeout,
+            heartbeat_timeout=self.model_params.heartbeat_timeout,
+            retry_policy=self.model_params.retry_policy,
+            cancellation_type=self.model_params.cancellation_type,
+            versioning_intent=self.model_params.versioning_intent,
+            priority=self.model_params.priority,
         )
 
     def stream_response(

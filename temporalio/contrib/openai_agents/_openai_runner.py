@@ -16,6 +16,7 @@ from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
 from temporalio import workflow
 from temporalio.common import Priority, RetryPolicy
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
+from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
 from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 
@@ -26,34 +27,10 @@ class TemporalOpenAIRunner(AgentRunner):
 
     """
 
-    def __init__(
-        self,
-        *,
-        task_queue: Optional[str] = None,
-        schedule_to_close_timeout: Optional[timedelta] = None,
-        schedule_to_start_timeout: Optional[timedelta] = None,
-        start_to_close_timeout: Optional[timedelta] = None,
-        heartbeat_timeout: Optional[timedelta] = None,
-        retry_policy: Optional[RetryPolicy] = None,
-        cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-        activity_id: Optional[str] = None,
-        versioning_intent: Optional[VersioningIntent] = None,
-        summary: Optional[str] = None,
-        priority: Priority = Priority.default,
-    ) -> None:
+    def __init__(self, model_params: ModelActivityParameters) -> None:
         """Initialize the Temporal OpenAI Runner."""
         self._runner = DEFAULT_AGENT_RUNNER or AgentRunner()
-        self.task_queue = task_queue
-        self.schedule_to_close_timeout = schedule_to_close_timeout
-        self.schedule_to_start_timeout = schedule_to_start_timeout
-        self.start_to_close_timeout = start_to_close_timeout
-        self.heartbeat_timeout = heartbeat_timeout
-        self.retry_policy = retry_policy
-        self.cancellation_type = cancellation_type
-        self.activity_id = activity_id
-        self.versioning_intent = versioning_intent
-        self.summary = summary
-        self.priority = priority
+        self.model_params = model_params
 
     async def run(
         self,
@@ -86,17 +63,7 @@ class TemporalOpenAIRunner(AgentRunner):
             run_config,
             model=_TemporalModelStub(
                 run_config.model,
-                task_queue=self.task_queue,
-                schedule_to_close_timeout=self.schedule_to_close_timeout,
-                schedule_to_start_timeout=self.schedule_to_start_timeout,
-                start_to_close_timeout=self.start_to_close_timeout,
-                heartbeat_timeout=self.heartbeat_timeout,
-                retry_policy=self.retry_policy,
-                cancellation_type=self.cancellation_type,
-                activity_id=self.activity_id,
-                versioning_intent=self.versioning_intent,
-                summary=self.summary,
-                priority=self.priority,
+                model_params=self.model_params,
             ),
         )
 
