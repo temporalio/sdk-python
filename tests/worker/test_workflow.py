@@ -37,6 +37,7 @@ from typing import (
 )
 from urllib.request import urlopen
 
+import pydantic
 from google.protobuf.timestamp_pb2 import Timestamp
 from typing_extensions import Literal, Protocol, runtime_checkable
 
@@ -5194,6 +5195,30 @@ async def test_workflow_failure_types_configured(client: Client):
         )
 
 
+class Foo(pydantic.BaseModel):
+    bar: str
+
+
+@workflow.defn(failure_exception_types=[pydantic.ValidationError])
+class FailOnBadPydanticInputWorkflow:
+    @workflow.run
+    async def run(self, params: Foo) -> None:
+        pass
+
+
+async def test_workflow_fail_on_bad_pydantic_input(client: Client):
+    async with new_worker(client, FailOnBadPydanticInputWorkflow) as worker:
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                "FailOnBadPydanticInputWorkflow",
+                {"bar": 123},  # This should fail validation
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+    assert isinstance(err.value.cause, ApplicationError)
+    assert "1 validation error for Foo" in err.value.cause.message
+
+
 @workflow.defn(failure_exception_types=[Exception])
 class FailOnBadInputWorkflow:
     @workflow.run
@@ -5211,7 +5236,7 @@ async def test_workflow_fail_on_bad_input(client: Client):
                 task_queue=worker.task_queue,
             )
     assert isinstance(err.value.cause, ApplicationError)
-    assert "Failed decoding arguments" in err.value.cause.message
+    assert "Expected value to be str, was <class 'int'>" in err.value.cause.message
 
 
 @workflow.defn
