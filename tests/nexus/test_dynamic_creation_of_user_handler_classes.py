@@ -4,6 +4,7 @@ from typing import Any
 import httpx
 import nexusrpc.handler
 import pytest
+from nexusrpc.handler import SyncOperationHandler
 
 from temporalio.client import Client
 from temporalio.worker import Worker
@@ -32,19 +33,20 @@ def make_incrementer_user_service_definition_and_service_handler_classes(
     #
     # service handler
     #
-    async def _increment_op(
-        self: Any,
-        ctx: nexusrpc.handler.StartOperationContext,
-        input: int,
-    ) -> int:
-        return input + 1
+    def factory(self: Any) -> nexusrpc.handler.OperationHandler[int, int]:
+        async def _increment_op(
+            ctx: nexusrpc.handler.StartOperationContext,
+            input: int,
+        ) -> int:
+            return input + 1
+
+        return SyncOperationHandler(_increment_op)
 
     op_handler_factories = {
         # TODO(nexus-prerelease): check that name=name should be required here. Should the op factory
         # name not default to the name of the method attribute (i.e. key), as opposed to
         # the name of the method object (i.e. value.__name__)?
-        # TODO(nexus-prerelease): type error
-        name: nexusrpc.handler.sync_operation_handler(_increment_op, name=name)
+        name: nexusrpc.handler.operation_handler(name=name)(factory)
         for name in op_names
     }
 

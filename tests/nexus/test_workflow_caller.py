@@ -187,18 +187,21 @@ class ServiceImpl:
     ) -> nexusrpc.handler.OperationHandler[OpInput, OpOutput]:
         return SyncOrAsyncOperation()
 
-    @nexusrpc.handler.sync_operation_handler
-    async def sync_operation(
-        self, ctx: StartOperationContext, input: OpInput
-    ) -> OpOutput:
-        assert isinstance(input.response_type, SyncResponse)
-        if input.response_type.exception_in_operation_start:
-            raise RPCError(
-                "RPCError INVALID_ARGUMENT in Nexus operation",
-                RPCStatusCode.INVALID_ARGUMENT,
-                b"",
-            )
-        return OpOutput(value="sync response")
+    @nexusrpc.handler.operation_handler
+    def sync_operation(
+        self,
+    ) -> nexusrpc.handler.OperationHandler[OpInput, OpOutput]:
+        async def start(ctx: StartOperationContext, input: OpInput) -> OpOutput:
+            assert isinstance(input.response_type, SyncResponse)
+            if input.response_type.exception_in_operation_start:
+                raise RPCError(
+                    "RPCError INVALID_ARGUMENT in Nexus operation",
+                    RPCStatusCode.INVALID_ARGUMENT,
+                    b"",
+                )
+            return OpOutput(value="sync response")
+
+        return nexusrpc.handler.SyncOperationHandler(start)
 
     @temporalio.nexus.handler.workflow_run_operation_handler
     async def async_operation(
@@ -744,38 +747,58 @@ class ServiceInterfaceWithNameOverride:
 
 @nexusrpc.handler.service_handler
 class ServiceImplInterfaceWithNeitherInterfaceNorNameOverride:
-    @nexusrpc.handler.sync_operation_handler
-    async def op(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: None
-    ) -> ServiceClassNameOutput:
-        return ServiceClassNameOutput(self.__class__.__name__)
+    @nexusrpc.handler.operation_handler
+    def op(
+        self,
+    ) -> nexusrpc.handler.OperationHandler[None, ServiceClassNameOutput]:
+        async def start(
+            ctx: StartOperationContext, input: None
+        ) -> ServiceClassNameOutput:
+            return ServiceClassNameOutput(self.__class__.__name__)
+
+        return nexusrpc.handler.SyncOperationHandler(start)
 
 
 @nexusrpc.handler.service_handler(service=ServiceInterfaceWithoutNameOverride)
 class ServiceImplInterfaceWithoutNameOverride:
-    @nexusrpc.handler.sync_operation_handler
-    async def op(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: None
-    ) -> ServiceClassNameOutput:
-        return ServiceClassNameOutput(self.__class__.__name__)
+    @nexusrpc.handler.operation_handler
+    def op(
+        self,
+    ) -> nexusrpc.handler.OperationHandler[None, ServiceClassNameOutput]:
+        async def start(
+            ctx: StartOperationContext, input: None
+        ) -> ServiceClassNameOutput:
+            return ServiceClassNameOutput(self.__class__.__name__)
+
+        return nexusrpc.handler.SyncOperationHandler(start)
 
 
 @nexusrpc.handler.service_handler(service=ServiceInterfaceWithNameOverride)
 class ServiceImplInterfaceWithNameOverride:
-    @nexusrpc.handler.sync_operation_handler
-    async def op(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: None
-    ) -> ServiceClassNameOutput:
-        return ServiceClassNameOutput(self.__class__.__name__)
+    @nexusrpc.handler.operation_handler
+    def op(
+        self,
+    ) -> nexusrpc.handler.OperationHandler[None, ServiceClassNameOutput]:
+        async def start(
+            ctx: StartOperationContext, input: None
+        ) -> ServiceClassNameOutput:
+            return ServiceClassNameOutput(self.__class__.__name__)
+
+        return nexusrpc.handler.SyncOperationHandler(start)
 
 
 @nexusrpc.handler.service_handler(name="service-impl-🌈")
 class ServiceImplWithNameOverride:
-    @nexusrpc.handler.sync_operation_handler
-    async def op(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: None
-    ) -> ServiceClassNameOutput:
-        return ServiceClassNameOutput(self.__class__.__name__)
+    @nexusrpc.handler.operation_handler
+    def op(
+        self,
+    ) -> nexusrpc.handler.OperationHandler[None, ServiceClassNameOutput]:
+        async def start(
+            ctx: StartOperationContext, input: None
+        ) -> ServiceClassNameOutput:
+            return ServiceClassNameOutput(self.__class__.__name__)
+
+        return nexusrpc.handler.SyncOperationHandler(start)
 
 
 class NameOverride(IntEnum):
