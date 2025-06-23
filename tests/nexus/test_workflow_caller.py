@@ -203,23 +203,28 @@ class ServiceImpl:
 
         return nexusrpc.handler.SyncOperationHandler(start)
 
-    @temporalio.nexus.handler.workflow_run_operation_handler
-    async def async_operation(
-        self, ctx: StartOperationContext, input: OpInput
-    ) -> WorkflowOperationToken[HandlerWfOutput]:
-        assert isinstance(input.response_type, AsyncResponse)
-        if input.response_type.exception_in_operation_start:
-            raise RPCError(
-                "RPCError INVALID_ARGUMENT in Nexus operation",
-                RPCStatusCode.INVALID_ARGUMENT,
-                b"",
+    @nexusrpc.handler.operation_handler
+    def async_operation(
+        self,
+    ) -> nexusrpc.handler.OperationHandler[OpInput, HandlerWfOutput]:
+        async def start(
+            ctx: StartOperationContext, input: OpInput
+        ) -> WorkflowOperationToken[HandlerWfOutput]:
+            assert isinstance(input.response_type, AsyncResponse)
+            if input.response_type.exception_in_operation_start:
+                raise RPCError(
+                    "RPCError INVALID_ARGUMENT in Nexus operation",
+                    RPCStatusCode.INVALID_ARGUMENT,
+                    b"",
+                )
+            tctx = TemporalOperationContext.current()
+            return await tctx.start_workflow(
+                HandlerWorkflow.run,
+                HandlerWfInput(op_input=input),
+                id=input.response_type.operation_workflow_id,
             )
-        tctx = TemporalOperationContext.current()
-        return await tctx.start_workflow(
-            HandlerWorkflow.run,
-            HandlerWfInput(op_input=input),
-            id=input.response_type.operation_workflow_id,
-        )
+
+        return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
 
 
 # -----------------------------------------------------------------------------
@@ -935,25 +940,30 @@ class EchoWorkflow:
 
 @nexusrpc.handler.service_handler
 class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
-    @temporalio.nexus.handler.workflow_run_operation_handler
-    async def my_workflow_run_operation(
-        self, ctx: StartOperationContext, input: None
-    ) -> WorkflowOperationToken[str]:
-        tctx = TemporalOperationContext.current()
-        result_1 = await tctx.client.execute_workflow(
-            EchoWorkflow.run,
-            "result-1",
-            id=str(uuid.uuid4()),
-            task_queue=tctx.task_queue,
-        )
-        # In case result_1 is incorrectly being delivered to the caller as the operation
-        # result, give time for that incorrect behavior to occur.
-        await asyncio.sleep(0.5)
-        return await tctx.start_workflow(
-            EchoWorkflow.run,
-            f"{result_1}-result-2",
-            id=str(uuid.uuid4()),
-        )
+    @nexusrpc.handler.operation_handler
+    def my_workflow_run_operation(
+        self,
+    ) -> nexusrpc.handler.OperationHandler[None, str]:
+        async def start(
+            ctx: StartOperationContext, input: None
+        ) -> WorkflowOperationToken[str]:
+            tctx = TemporalOperationContext.current()
+            result_1 = await tctx.client.execute_workflow(
+                EchoWorkflow.run,
+                "result-1",
+                id=str(uuid.uuid4()),
+                task_queue=tctx.task_queue,
+            )
+            # In case result_1 is incorrectly being delivered to the caller as the operation
+            # result, give time for that incorrect behavior to occur.
+            await asyncio.sleep(0.5)
+            return await tctx.start_workflow(
+                EchoWorkflow.run,
+                f"{result_1}-result-2",
+                id=str(uuid.uuid4()),
+            )
+
+        return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
 
 
 @workflow.defn
