@@ -24,12 +24,7 @@ from ._operation_handlers import (
     WorkflowRunOperationHandler as WorkflowRunOperationHandler,
 )
 from ._operation_handlers import cancel_operation as cancel_operation
-from ._operation_handlers import (
-    workflow_run_operation_handler as workflow_run_operation_handler,
-)
-from ._token import (
-    WorkflowOperationToken as WorkflowOperationToken,
-)
+from ._token import WorkflowOperationToken as WorkflowOperationToken
 
 if TYPE_CHECKING:
     from temporalio.client import (

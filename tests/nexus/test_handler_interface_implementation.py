@@ -43,10 +43,13 @@ class ValidWorkflowRunImpl(_InterfaceImplementationTestCase):
         op: nexusrpc.Operation[str, int]
 
     class Impl:
-        @temporalio.nexus.handler.workflow_run_operation_handler
-        async def op(
-            self, ctx: nexusrpc.handler.StartOperationContext, input: str
-        ) -> WorkflowOperationToken[int]: ...
+        @nexusrpc.handler.operation_handler
+        def op(self) -> nexusrpc.handler.OperationHandler[str, int]:
+            async def start(
+                ctx: nexusrpc.handler.StartOperationContext, input: str
+            ) -> WorkflowOperationToken[int]: ...
+
+            return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
 
     error_message = None
 
