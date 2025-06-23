@@ -18,12 +18,8 @@ from typing import (
 
 import google.protobuf.json_format
 import nexusrpc.handler
-from nexusrpc import LazyValueAsync as LazyValue
-from nexusrpc.handler import (
-    CancelOperationContext,
-    StartOperationContext,
-)
-from nexusrpc.handler import HandlerAsync as Handler
+from nexusrpc import LazyValue
+from nexusrpc.handler import CancelOperationContext, Handler, StartOperationContext
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
