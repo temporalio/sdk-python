@@ -5,8 +5,8 @@ from datetime import timedelta
 from typing import Optional
 
 from agents import set_trace_provider
-from agents.run import AgentRunner, get_default_agent_runner, set_default_agent_runner
-from agents.tracing import TraceProvider, get_trace_provider
+from agents.run import get_default_agent_runner, set_default_agent_runner
+from agents.tracing import get_trace_provider
 from agents.tracing.provider import DefaultTraceProvider
 
 from temporalio.common import Priority, RetryPolicy
