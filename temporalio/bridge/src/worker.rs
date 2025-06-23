@@ -566,7 +566,7 @@ impl WorkerRef {
         })
     }
 
-    fn poll_nexus_task<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
+    fn poll_nexus_task<'p>(&self, py: Python<'p>) -> PyResult<Bound<'p, PyAny>> {
         let worker = self.worker.as_ref().unwrap().clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match worker.poll_nexus_task().await {
@@ -574,8 +574,7 @@ impl WorkerRef {
                 Err(PollError::ShutDown) => return Err(PollShutdownError::new_err(())),
                 Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {}", err))),
             };
-            let bytes: &[u8] = &bytes;
-            Ok(Python::with_gil(|py| bytes.into_py(py)))
+            Ok(bytes)
         })
     }
 
@@ -613,7 +612,10 @@ impl WorkerRef {
         })
     }
 
-    fn complete_nexus_task<'p>(&self, py: Python<'p>, proto: &PyBytes) -> PyResult<&'p PyAny> {
+    fn complete_nexus_task<'p>(&self,
+        py: Python<'p>,
+        proto: &Bound<'_, PyBytes>,
+) -> PyResult<Bound<'p, PyAny>> {
         let worker = self.worker.as_ref().unwrap().clone();
         let completion = NexusTaskCompletion::decode(proto.as_bytes())
             .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
