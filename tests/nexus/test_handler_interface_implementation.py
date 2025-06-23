@@ -3,10 +3,13 @@ from typing import Any, Optional, Type
 import nexusrpc
 import nexusrpc.handler
 import pytest
+from nexusrpc.handler import OperationHandler, SyncOperationHandler
 
 import temporalio.api.failure.v1
 import temporalio.nexus
-from temporalio.nexus.handler._token import WorkflowOperationToken
+from temporalio.nexus.handler import (
+    WorkflowOperationToken,
+)
 
 HTTP_PORT = 7243
 
@@ -23,10 +26,13 @@ class ValidImpl(_InterfaceImplementationTestCase):
         op: nexusrpc.Operation[None, None]
 
     class Impl:
-        @nexusrpc.handler.sync_operation_handler
-        async def op(
-            self, ctx: nexusrpc.handler.StartOperationContext, input: None
-        ) -> None: ...
+        @nexusrpc.handler.operation_handler
+        def op(self) -> OperationHandler[None, None]:
+            async def start(
+                ctx: nexusrpc.handler.StartOperationContext, input: None
+            ) -> None: ...
+
+            return SyncOperationHandler(start)
 
     error_message = None
 
