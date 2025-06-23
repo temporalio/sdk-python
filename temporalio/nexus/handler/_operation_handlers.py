@@ -26,7 +26,6 @@ from nexusrpc.types import (
     ServiceHandlerT,
 )
 
-from temporalio.client import Client
 from temporalio.nexus.handler._operation_context import TemporalOperationContext
 
 from ._token import (
@@ -63,8 +62,7 @@ class WorkflowRunOperationHandler(
         return StartOperationResultAsync(token.encode())
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
-        tctx = TemporalOperationContext.current()
-        await cancel_operation(token, tctx.client)
+        await cancel_operation(token)
 
     def fetch_info(
         self, ctx: nexusrpc.handler.FetchOperationInfoContext, token: str
@@ -124,7 +122,6 @@ def _get_workflow_run_start_method_input_and_output_type_annotations(
 
 async def cancel_operation(
     token: str,
-    client: Client,
     **kwargs: Any,
 ) -> None:
     """Cancel a Nexus operation.
@@ -142,8 +139,10 @@ async def cancel_operation(
             type=HandlerErrorType.NOT_FOUND,
             cause=err,
         )
+
+    tctx = TemporalOperationContext.current()
     try:
-        handle = workflow_token.to_workflow_handle(client)
+        handle = workflow_token.to_workflow_handle(tctx.client)
     except Exception as err:
         raise HandlerError(
             "Failed to construct workflow handle from workflow operation token",
