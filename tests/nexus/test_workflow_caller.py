@@ -165,8 +165,7 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
             raise TypeError
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
-        tctx = TemporalOperationContext.current()
-        return await temporalio.nexus.handler.cancel_operation(token, tctx.client)
+        return await temporalio.nexus.handler.cancel_operation(token)
 
     async def fetch_info(
         self, ctx: FetchOperationInfoContext, token: str
