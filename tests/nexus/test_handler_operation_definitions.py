@@ -1,5 +1,5 @@
 """
-Test that workflow_run_operation_handler decorator results in operation definitions with the correct name
+Test that operation_handler decorator results in operation definitions with the correct name
 and input/output types.
 """
 
@@ -32,15 +32,20 @@ class _TestCase:
 class NotCalled(_TestCase):
     @nexusrpc.handler.service_handler
     class Service:
-        @temporalio.nexus.handler.workflow_run_operation_handler
-        async def workflow_run_operation_handler(
-            self, ctx: nexusrpc.handler.StartOperationContext, input: Input
-        ) -> WorkflowOperationToken[Output]: ...
+        @nexusrpc.handler.operation_handler
+        def my_workflow_run_operation_handler(
+            self,
+        ) -> nexusrpc.handler.OperationHandler[Input, Output]:
+            async def start(
+                ctx: nexusrpc.handler.StartOperationContext, input: Input
+            ) -> WorkflowOperationToken[Output]: ...
+
+            return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
 
     expected_operations = {
-        "workflow_run_operation_handler": nexusrpc.Operation(
-            name="workflow_run_operation_handler",
-            method_name="workflow_run_operation_handler",
+        "my_workflow_run_operation_handler": nexusrpc.Operation(
+            name="my_workflow_run_operation_handler",
+            method_name="my_workflow_run_operation_handler",
             input_type=Input,
             output_type=Output,
         ),
@@ -50,10 +55,15 @@ class NotCalled(_TestCase):
 class CalledWithoutArgs(_TestCase):
     @nexusrpc.handler.service_handler
     class Service:
-        @temporalio.nexus.handler.workflow_run_operation_handler()
-        async def workflow_run_operation_handler(
-            self, ctx: nexusrpc.handler.StartOperationContext, input: Input
-        ) -> WorkflowOperationToken[Output]: ...
+        @nexusrpc.handler.operation_handler()
+        def my_workflow_run_operation_handler(
+            self,
+        ) -> nexusrpc.handler.OperationHandler[Input, Output]:
+            async def start(
+                ctx: nexusrpc.handler.StartOperationContext, input: Input
+            ) -> WorkflowOperationToken[Output]: ...
+
+            return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
 
     expected_operations = NotCalled.expected_operations
 
@@ -61,10 +71,15 @@ class CalledWithoutArgs(_TestCase):
 class CalledWithNameOverride(_TestCase):
     @nexusrpc.handler.service_handler
     class Service:
-        @temporalio.nexus.handler.workflow_run_operation_handler(name="operation-name")
-        async def workflow_run_operation_with_name_override(
-            self, ctx: nexusrpc.handler.StartOperationContext, input: Input
-        ) -> WorkflowOperationToken[Output]: ...
+        @nexusrpc.handler.operation_handler(name="operation-name")
+        def workflow_run_operation_with_name_override(
+            self,
+        ) -> nexusrpc.handler.OperationHandler[Input, Output]:
+            async def start(
+                ctx: nexusrpc.handler.StartOperationContext, input: Input
+            ) -> WorkflowOperationToken[Output]: ...
+
+            return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
 
     expected_operations = {
         "workflow_run_operation_with_name_override": nexusrpc.Operation(
