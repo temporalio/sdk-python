@@ -50,7 +50,7 @@ from temporalio.exceptions import ApplicationError
 from temporalio.nexus.handler import (
     logger,
 )
-from temporalio.nexus.handler._operation_context import TemporalOperationContext
+from temporalio.nexus.handler._operation_context import TemporalNexusOperationContext
 from temporalio.nexus.handler._token import WorkflowOperationToken
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
@@ -237,7 +237,7 @@ class MyServiceHandler:
         async def start(
             ctx: StartOperationContext, input: Input
         ) -> WorkflowOperationToken[Output]:
-            tctx = TemporalOperationContext.get()
+            tctx = TemporalNexusOperationContext.get()
             return await tctx.start_workflow(
                 MyWorkflow.run,
                 input,
@@ -298,7 +298,7 @@ class MyServiceHandler:
         self,
     ) -> nexusrpc.handler.OperationHandler[Input, Output]:
         async def start(ctx, input):
-            tctx = TemporalOperationContext.get()
+            tctx = TemporalNexusOperationContext.get()
             return await tctx.start_workflow(
                 WorkflowWithoutTypeAnnotations.run,
                 input,
@@ -320,7 +320,7 @@ class MyServiceHandler:
             assert ctx.request_id == "test-request-id-123", "Request ID mismatch"
             ctx.outbound_links.extend(ctx.inbound_links)
 
-            tctx = TemporalOperationContext.get()
+            tctx = TemporalNexusOperationContext.get()
             return await tctx.start_workflow(
                 MyLinkTestWorkflow.run,
                 input,
@@ -1130,7 +1130,7 @@ class ServiceHandlerForRequestIdTest:
         async def start(
             ctx: StartOperationContext, input: Input
         ) -> WorkflowOperationToken[Output]:
-            tctx = TemporalOperationContext.get()
+            tctx = TemporalNexusOperationContext.get()
             return await tctx.start_workflow(
                 EchoWorkflow.run,
                 input,
@@ -1147,7 +1147,7 @@ class ServiceHandlerForRequestIdTest:
         async def start(
             ctx: StartOperationContext, input: Input
         ) -> WorkflowOperationToken[Output]:
-            tctx = TemporalOperationContext.get()
+            tctx = TemporalNexusOperationContext.get()
             await tctx.client.start_workflow(
                 EchoWorkflow.run,
                 input,

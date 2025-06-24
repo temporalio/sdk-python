@@ -33,7 +33,10 @@ from temporalio.client import (
 )
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import CancelledError, NexusHandlerError, NexusOperationError
-from temporalio.nexus.handler import TemporalOperationContext, WorkflowOperationToken
+from temporalio.nexus.handler import (
+    TemporalNexusOperationContext,
+    WorkflowOperationToken,
+)
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
@@ -154,7 +157,7 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
                 value=OpOutput(value="sync response")
             )
         elif isinstance(input.response_type, AsyncResponse):
-            tctx = TemporalOperationContext.get()
+            tctx = TemporalNexusOperationContext.get()
             token = await tctx.start_workflow(
                 HandlerWorkflow.run,
                 HandlerWfInput(op_input=input),
@@ -216,7 +219,7 @@ class ServiceImpl:
                     RPCStatusCode.INVALID_ARGUMENT,
                     b"",
                 )
-            tctx = TemporalOperationContext.get()
+            tctx = TemporalNexusOperationContext.get()
             return await tctx.start_workflow(
                 HandlerWorkflow.run,
                 HandlerWfInput(op_input=input),
@@ -946,7 +949,7 @@ class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
         async def start(
             ctx: StartOperationContext, input: None
         ) -> WorkflowOperationToken[str]:
-            tctx = TemporalOperationContext.get()
+            tctx = TemporalNexusOperationContext.get()
             result_1 = await tctx.client.execute_workflow(
                 EchoWorkflow.run,
                 "result-1",
