@@ -35,6 +35,7 @@ from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import CancelledError, NexusHandlerError, NexusOperationError
 from temporalio.nexus.handler import (
     WorkflowOperationToken,
+    start_workflow,
     temporal_operation_context,
 )
 from temporalio.service import RPCError, RPCStatusCode
@@ -157,8 +158,7 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
                 value=OpOutput(value="sync response")
             )
         elif isinstance(input.response_type, AsyncResponse):
-            tctx = temporal_operation_context.get()
-            token = await tctx.start_workflow(
+            token = await start_workflow(
                 HandlerWorkflow.run,
                 HandlerWfInput(op_input=input),
                 id=input.response_type.operation_workflow_id,
@@ -219,8 +219,7 @@ class ServiceImpl:
                     RPCStatusCode.INVALID_ARGUMENT,
                     b"",
                 )
-            tctx = temporal_operation_context.get()
-            return await tctx.start_workflow(
+            return await start_workflow(
                 HandlerWorkflow.run,
                 HandlerWfInput(op_input=input),
                 id=input.response_type.operation_workflow_id,
@@ -959,7 +958,7 @@ class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
             # In case result_1 is incorrectly being delivered to the caller as the operation
             # result, give time for that incorrect behavior to occur.
             await asyncio.sleep(0.5)
-            return await tctx.start_workflow(
+            return await start_workflow(
                 EchoWorkflow.run,
                 f"{result_1}-result-2",
                 id=str(uuid.uuid4()),
