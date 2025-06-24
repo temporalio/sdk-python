@@ -53,7 +53,7 @@ class _TemporalNexusOperationContext:
     """The task queue of the worker handling this Nexus operation."""
 
     @property
-    def temporal_start_operation_context(
+    def _temporal_start_operation_context(
         self,
     ) -> Optional[_TemporalStartOperationContext]:
         ctx = self.nexus_operation_context
@@ -62,7 +62,7 @@ class _TemporalNexusOperationContext:
         return _TemporalStartOperationContext(ctx)
 
     @property
-    def temporal_cancel_operation_context(
+    def _temporal_cancel_operation_context(
         self,
     ) -> Optional[_TemporalCancelOperationContext]:
         ctx = self.nexus_operation_context
@@ -71,7 +71,7 @@ class _TemporalNexusOperationContext:
         return _TemporalCancelOperationContext(ctx)
 
     # Overload for single-param workflow
-    # TODO(nexus-prerelease): support other overloads?
+    # TODO(nexus-prerelease): bring over other overloads
     async def start_workflow(
         self,
         workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
@@ -132,7 +132,7 @@ class _TemporalNexusOperationContext:
           Nexus caller is itself a workflow, this means that the workflow in the caller
           namespace web UI will contain links to the started workflow, and vice versa.
         """
-        start_operation_context = self.temporal_start_operation_context
+        start_operation_context = self._temporal_start_operation_context
         if not start_operation_context:
             raise RuntimeError(
                 "temporalio.nexus.handler.start_workflow() must be called from "
