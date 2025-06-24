@@ -9,7 +9,6 @@ from typing import (
     Generic,
     Optional,
     Type,
-    Union,
 )
 
 import nexusrpc.handler
@@ -64,18 +63,16 @@ class WorkflowRunOperationHandler(
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
         await cancel_operation(token)
 
-    def fetch_info(
+    async def fetch_info(
         self, ctx: nexusrpc.handler.FetchOperationInfoContext, token: str
-    ) -> Union[
-        nexusrpc.handler.OperationInfo, Awaitable[nexusrpc.handler.OperationInfo]
-    ]:
+    ) -> nexusrpc.handler.OperationInfo:
         raise NotImplementedError(
             "Temporal Nexus operation handlers do not support fetching operation info."
         )
 
-    def fetch_result(
+    async def fetch_result(
         self, ctx: nexusrpc.handler.FetchOperationResultContext, token: str
-    ) -> Union[OutputT, Awaitable[OutputT]]:
+    ) -> OutputT:
         raise NotImplementedError(
             "Temporal Nexus operation handlers do not support fetching operation results."
         )
