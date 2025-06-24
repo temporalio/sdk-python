@@ -6,7 +6,7 @@ import pytest
 from nexusrpc.handler import OperationHandler, SyncOperationHandler
 
 import temporalio.api.failure.v1
-import temporalio.nexus
+import temporalio.nexus.handler
 from temporalio.nexus.handler import (
     WorkflowOperationToken,
 )

@@ -63,6 +63,9 @@ class WorkflowRunOperationHandler(
                 return WorkflowRunOperationHandler(start)
     """
 
+    # TODO(nexus-prerelease): I think we want this to be optional, so that the class can
+    # be used by subclassing, as well as by injecting the start method in the
+    # constructor.
     def __init__(
         self,
         start: Callable[
