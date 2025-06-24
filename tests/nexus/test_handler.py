@@ -311,7 +311,9 @@ class MyServiceHandler:
     def workflow_run_op_link_test(
         self,
     ) -> nexusrpc.handler.OperationHandler[Input, Output]:
-        async def start(ctx, input):
+        async def start(
+            ctx: StartOperationContext, input: Input
+        ) -> WorkflowOperationToken[Output]:
             assert any(
                 link.url == "http://inbound-link/" for link in ctx.inbound_links
             ), "Inbound link not found"
@@ -1122,7 +1124,9 @@ class ServiceHandlerForRequestIdTest:
     def operation_backed_by_a_workflow(
         self,
     ) -> nexusrpc.handler.OperationHandler[Input, Output]:
-        async def start(ctx, input) -> WorkflowOperationToken[Output]:
+        async def start(
+            ctx: StartOperationContext, input: Input
+        ) -> WorkflowOperationToken[Output]:
             tctx = TemporalOperationContext.current()
             return await tctx.start_workflow(
                 EchoWorkflow.run,
@@ -1137,7 +1141,9 @@ class ServiceHandlerForRequestIdTest:
     def operation_that_executes_a_workflow_before_starting_the_backing_workflow(
         self,
     ) -> nexusrpc.handler.OperationHandler[Input, Output]:
-        async def start(ctx, input) -> WorkflowOperationToken[Output]:
+        async def start(
+            ctx: StartOperationContext, input: Input
+        ) -> WorkflowOperationToken[Output]:
             tctx = TemporalOperationContext.current()
             await tctx.client.start_workflow(
                 EchoWorkflow.run,
