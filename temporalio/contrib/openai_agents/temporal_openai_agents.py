@@ -56,14 +56,20 @@ def set_open_ai_agent_temporal_overrides(
         A context manager that yields the configured TemporalTraceProvider.
 
     """
+    if (
+        not model_params.start_to_close_timeout
+        and not model_params.schedule_to_close_timeout
+    ):
+        raise ValueError(
+            "Activity must have start_to_close_timeout or schedule_to_close_timeout"
+        )
+
     previous_runner = get_default_agent_runner()
     previous_trace_provider = get_trace_provider()
     provider = TemporalTraceProvider()
 
     try:
-        set_default_agent_runner(
-            TemporalOpenAIRunner(model_params)
-        )
+        set_default_agent_runner(TemporalOpenAIRunner(model_params))
         set_trace_provider(provider)
         yield provider
     finally:

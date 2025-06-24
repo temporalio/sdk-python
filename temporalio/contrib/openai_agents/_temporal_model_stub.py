@@ -151,11 +151,11 @@ class _TemporalModelStub(Model):
             previous_response_id=previous_response_id,
             prompt=prompt,
         )
-        
+
         return await workflow.execute_activity_method(
             ModelActivity.invoke_model_activity,
             activity_input,
-            summary=self.model_params.summary_override or get_summary(input),  
+            summary=self.model_params.summary_override or get_summary(input),
             task_queue=self.model_params.task_queue,
             schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
             schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,

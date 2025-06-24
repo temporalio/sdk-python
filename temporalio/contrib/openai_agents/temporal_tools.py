@@ -41,17 +41,7 @@ def activity_as_tool(
 
     Args:
         fn: A Temporal activity function to convert to a tool.
-        task_queue: Specific task queue to use for this activity.
-        schedule_to_close_timeout: Maximum time from scheduling to completion.
-        schedule_to_start_timeout: Maximum time from scheduling to starting.
-        start_to_close_timeout: Maximum time for the activity to complete.
-        heartbeat_timeout: Maximum time between heartbeats.
-        retry_policy: Policy for retrying failed activities.
-        cancellation_type: How the activity handles cancellation.
-        activity_id: Unique identifier for the activity instance.
-        versioning_intent: Versioning intent for the activity.
-        summary: Summary for the activity execution.
-        priority: Priority for the activity execution.
+        For other arguments, refer to :py:mod:`workflow` :py:meth:`start_activity`
 
     Returns:
         An OpenAI agent tool that wraps the provided activity.
