@@ -53,6 +53,9 @@ class WorkflowRunOperationHandler(
         self._start = start
         if start.__doc__:
             self.start.__func__.__doc__ = start.__doc__
+        self._input_type, self._output_type = (
+            _get_workflow_run_start_method_input_and_output_type_annotations(start)
+        )
 
     async def start(
         self, ctx: StartOperationContext, input: InputT
@@ -74,13 +77,35 @@ class WorkflowRunOperationHandler(
         self, ctx: nexusrpc.handler.FetchOperationResultContext, token: str
     ) -> OutputT:
         raise NotImplementedError(
-            "Temporal Nexus operation handlers do not support fetching operation results."
+            "Temporal Nexus operation handlers do not support fetching operation result."
         )
+        # An implementation is provided for future reference:
+        try:
+            workflow_token = WorkflowOperationToken[OutputT].decode(token)
+        except Exception as err:
+            raise HandlerError(
+                "Failed to decode operation token as workflow operation token. "
+                "Fetching result for non-workflow operations is not supported.",
+                type=HandlerErrorType.NOT_FOUND,
+                cause=err,
+            )
+        tctx = TemporalOperationContext.current()
+        try:
+            handle = workflow_token.to_workflow_handle(
+                tctx.client, result_type=self._output_type
+            )
+        except Exception as err:
+            raise HandlerError(
+                "Failed to construct workflow handle from workflow operation token",
+                type=HandlerErrorType.NOT_FOUND,
+                cause=err,
+            )
+        return await handle.result()
 
 
 def _get_workflow_run_start_method_input_and_output_type_annotations(
     start_method: Callable[
-        [ServiceHandlerT, StartOperationContext, InputT],
+        [StartOperationContext, InputT],
         Awaitable[WorkflowOperationToken[OutputT]],
     ],
 ) -> tuple[
@@ -93,7 +118,7 @@ def _get_workflow_run_start_method_input_and_output_type_annotations(
     :py:class:`WorkflowHandle`.
     """
     input_type, output_type = (
-        nexusrpc.handler.get_start_method_input_and_output_types_annotations(
+        nexusrpc.handler.get_start_method_input_and_output_type_annotations(
             start_method
         )
     )
