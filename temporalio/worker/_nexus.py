@@ -308,14 +308,20 @@ class _NexusWorker:
         self,
         err: BaseException,
     ) -> temporalio.api.nexus.v1.Failure:
-        api_failure = temporalio.api.failure.v1.Failure()
-        await self._data_converter.encode_failure(err, api_failure)
-        api_failure = google.protobuf.json_format.MessageToDict(api_failure)
-        return temporalio.api.nexus.v1.Failure(
-            message=api_failure.pop("message", ""),
-            metadata={"type": "temporal.api.failure.v1.Failure"},
-            details=json.dumps(api_failure).encode("utf-8"),
-        )
+        try:
+            api_failure = temporalio.api.failure.v1.Failure()
+            await self._data_converter.encode_failure(err, api_failure)
+            api_failure = google.protobuf.json_format.MessageToDict(api_failure)
+            return temporalio.api.nexus.v1.Failure(
+                message=api_failure.pop("message", ""),
+                metadata={"type": "temporal.api.failure.v1.Failure"},
+                details=json.dumps(api_failure).encode("utf-8"),
+            )
+        except BaseException as err:
+            return temporalio.api.nexus.v1.Failure(
+                message=f"{err.__class__.__name__}: {err}",
+                metadata={"type": "temporal.api.failure.v1.Failure"},
+            )
 
     async def _operation_error_to_proto(
         self,
