@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import json
-import logging
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -31,14 +30,11 @@ import temporalio.client
 import temporalio.common
 import temporalio.converter
 import temporalio.nexus
-import temporalio.nexus.handler
 from temporalio.exceptions import ApplicationError
-from temporalio.nexus.handler import TemporalOperationContext
+from temporalio.nexus.handler import TemporalOperationContext, logger
 from temporalio.service import RPCError, RPCStatusCode
 
 from ._interceptor import Interceptor
-
-logger = logging.getLogger(__name__)
 
 
 class _NexusWorker:
@@ -124,7 +120,7 @@ class _NexusWorker:
                         # TODO(nexus-prerelease): when do we remove the entry from _running_operations?
                         _task.cancel()
                     else:
-                        temporalio.nexus.handler.logger.warning(
+                        logger.warning(
                             f"Received cancel_task but no running operation exists for "
                             f"task token: {task.task_token}"
                         )
@@ -184,9 +180,7 @@ class _NexusWorker:
         try:
             await self._handler.cancel_operation(ctx, request.operation_token)
         except Exception as err:
-            temporalio.nexus.handler.logger.exception(
-                "Failed to execute Nexus cancel operation method"
-            )
+            logger.exception("Failed to execute Nexus cancel operation method")
             completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
                 task_token=task_token,
                 error=await self._handler_error_to_proto(
@@ -204,9 +198,7 @@ class _NexusWorker:
         try:
             await self._bridge_worker().complete_nexus_task(completion)
         except Exception:
-            temporalio.nexus.handler.logger.exception(
-                "Failed to send Nexus task completion"
-            )
+            logger.exception("Failed to send Nexus task completion")
 
     async def _handle_start_operation_task(
         self,
@@ -241,16 +233,12 @@ class _NexusWorker:
         try:
             await self._bridge_worker().complete_nexus_task(completion)
         except Exception:
-            temporalio.nexus.handler.logger.exception(
-                "Failed to send Nexus task completion"
-            )
+            logger.exception("Failed to send Nexus task completion")
         finally:
             try:
                 del self._running_tasks[task_token]
             except KeyError:
-                temporalio.nexus.handler.logger.exception(
-                    "Failed to remove completed Nexus operation"
-                )
+                logger.exception("Failed to remove completed Nexus operation")
 
     async def _start_operation(
         self,
