@@ -21,6 +21,7 @@ from nexusrpc.types import (
     ServiceHandlerT,
 )
 
+from temporalio.client import WorkflowHandle
 from temporalio.nexus.handler._operation_context import (
     temporal_operation_context,
 )
@@ -60,6 +61,18 @@ class WorkflowRunOperationHandler(
         self, ctx: StartOperationContext, input: InputT
     ) -> nexusrpc.handler.StartOperationResultAsync:
         token = await self._start(ctx, input)
+        if not isinstance(token, WorkflowOperationToken):
+            if isinstance(token, WorkflowHandle):
+                raise RuntimeError(
+                    f"Expected {token} to be a WorkflowOperationToken, but got a WorkflowHandle. "
+                    f"You must use :py:meth:`temporalio.nexus.handler.start_workflow` "
+                    "to start a workflow that will deliver the result of the Nexus operation, "
+                    "not :py:meth:`temporalio.client.Client.start_workflow`."
+                )
+            raise RuntimeError(
+                f"Expected {token} to be a WorkflowOperationToken, but got {type(token)}. "
+                "This is a bug in the Nexus SDK. Please report it to the Temporal team."
+            )
         return StartOperationResultAsync(token.encode())
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
