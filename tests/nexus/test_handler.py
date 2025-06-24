@@ -860,25 +860,28 @@ async def _test_start_operation(
         ),
     )
 
-    decorator = (
-        nexusrpc.handler.service_handler(service=MyService)
-        if with_service_definition
-        else nexusrpc.handler.service_handler
-    )
-    service_handler = decorator(MyServiceHandler)()
-
-    async with Worker(
-        env.client,
-        task_queue=task_queue,
-        nexus_service_handlers=[service_handler],
-        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
-    ):
-        response = await service_client.start_operation(
-            test_case.operation,
-            dataclass_as_dict(test_case.input),
-            test_case.headers,
+    with pytest.WarningsRecorder() as warnings:
+        decorator = (
+            nexusrpc.handler.service_handler(service=MyService)
+            if with_service_definition
+            else nexusrpc.handler.service_handler
         )
-        test_case.check_response(response, with_service_definition)
+        service_handler = decorator(MyServiceHandler)()
+
+        async with Worker(
+            env.client,
+            task_queue=task_queue,
+            nexus_service_handlers=[service_handler],
+            nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+        ):
+            response = await service_client.start_operation(
+                test_case.operation,
+                dataclass_as_dict(test_case.input),
+                test_case.headers,
+            )
+            test_case.check_response(response, with_service_definition)
+
+    assert not any(warnings), [w.message for w in warnings]
 
 
 async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: Any):

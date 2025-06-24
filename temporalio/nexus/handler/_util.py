@@ -86,6 +86,10 @@ def _get_start_method_input_and_output_type_annotations(
             f"Expected decorated start method {start} to have type annotations"
         )
         return None, None
+
+    if not type_annotations:
+        return None, None
+
     output_type = type_annotations.pop("return", None)
 
     if len(type_annotations) != 2:
