@@ -208,13 +208,14 @@ class _NexusWorker:
 
         try:
             start_response = await self._start_operation(start_request, headers)
-        # TODO(nexus-prerelease): handle BrokenExecutor by failing the worker
         except BaseException as err:
             handler_err = _exception_to_handler_error(err)
             completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
                 task_token=task_token,
                 error=await self._handler_error_to_proto(handler_err),
             )
+            if isinstance(err, concurrent.futures.BrokenExecutor):
+                self._fail_worker_exception_queue.put_nowait(err)
         else:
             completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
                 task_token=task_token,
