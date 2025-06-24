@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, Literal, Optional
+from typing import TYPE_CHECKING, Any, Generic, Literal, Optional, Type
 
 from nexusrpc.types import OutputT
 
@@ -25,14 +25,16 @@ class WorkflowOperationToken(Generic[OutputT]):
     # serialized token; it's only used to reject newer token versions on load.
     version: Optional[int] = None
 
-    def to_workflow_handle(self, client: Client) -> WorkflowHandle[Any, OutputT]:
+    def to_workflow_handle(
+        self, client: Client, result_type: Optional[Type[OutputT]] = None
+    ) -> WorkflowHandle[Any, OutputT]:
         """Create a :py:class:`temporalio.client.WorkflowHandle` from the token."""
         if client.namespace != self.namespace:
             raise ValueError(
                 f"Client namespace {client.namespace} does not match "
                 f"operation token namespace {self.namespace}"
             )
-        return client.get_workflow_handle(self.workflow_id)
+        return client.get_workflow_handle(self.workflow_id, result_type=result_type)
 
     # TODO(nexus-preview): The return type here should be dictated by the input workflow
     # handle type.
