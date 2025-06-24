@@ -37,6 +37,32 @@ class WorkflowRunOperationHandler(
     nexusrpc.handler.OperationHandler[InputT, OutputT],
     Generic[InputT, OutputT, ServiceHandlerT],
 ):
+    """
+    Operation handler for Nexus operations that start a workflow.
+
+    Use this class to create an operation handler that starts a workflow by passing your
+    ``start`` method to the constructor. Your ``start`` method must use
+    :py:func:`temporalio.nexus.handler.start_workflow` to start the workflow.
+
+    Example:
+
+    .. code-block:: python
+
+        @service_handler(service=MyNexusService) class MyNexusServiceHandler:
+            @operation_handler def my_workflow_run_operation(
+                self,
+            ) -> OperationHandler[MyInput, MyOutput]:
+                async def start(
+                    ctx: StartOperationContext, input: MyInput
+                ) -> WorkflowOperationToken[MyOutput]:
+                    return await start_workflow(
+                        WorkflowStartedByNexusOperation.run, input,
+                        id=str(uuid.uuid4()),
+                    )
+
+                return WorkflowRunOperationHandler(start)
+    """
+
     def __init__(
         self,
         start: Callable[
@@ -60,6 +86,10 @@ class WorkflowRunOperationHandler(
     async def start(
         self, ctx: StartOperationContext, input: InputT
     ) -> nexusrpc.handler.StartOperationResultAsync:
+        """
+        Start the operation, by starting a workflow and completing asynchronously.
+        """
+
         token = await self._start(ctx, input)
         if not isinstance(token, WorkflowOperationToken):
             if isinstance(token, WorkflowHandle):
@@ -76,6 +106,7 @@ class WorkflowRunOperationHandler(
         return StartOperationResultAsync(token.encode())
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
+        """Cancel the operation, by cancelling the workflow."""
         await cancel_operation(token)
 
     async def fetch_info(
