@@ -7166,6 +7166,8 @@ class DeadlockInterruptibleWorkflow:
         try:
             while True:
                 pass
+        except BaseException as e:
+            print(f"🌈 DeadlockInterruptibleWorkflow: {e.__class__.__name__}({e})")
         finally:
             global deadlock_interruptible_completed
             deadlock_interruptible_completed += 1
@@ -7196,6 +7198,7 @@ async def test_workflow_deadlock_interruptible(client: Client):
 
         await assert_eventually(check_completed)
         completed_sec = time.monotonic()
+        await handle.result()
     # Confirm worker shutdown didn't hang
     assert time.monotonic() - completed_sec < 20
 
