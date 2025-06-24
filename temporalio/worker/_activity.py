@@ -177,7 +177,7 @@ class _ActivityWorker:
             except temporalio.bridge.worker.PollShutdownError:
                 exception_task.cancel()
                 return
-            except BaseException as err:
+            except Exception as err:
                 exception_task.cancel()
                 raise RuntimeError("Activity worker failed") from err
 
