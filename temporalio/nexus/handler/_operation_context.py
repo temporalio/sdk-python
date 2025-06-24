@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextvars
 import logging
 import re
 import urllib.parse
@@ -32,14 +31,15 @@ from temporalio.types import (
 
 logger = logging.getLogger(__name__)
 
+# TODO(nexus-prerelease): Confirm how exactly we want to expose Temporal Nexus operation context
 
-temporal_nexus_operation_context: ContextVar[TemporalNexusOperationContext] = (
-    ContextVar("temporal-nexus-operation-context")
+temporal_operation_context: ContextVar[_TemporalNexusOperationContext] = ContextVar(
+    "temporal-operation-context"
 )
 
 
 @dataclass
-class TemporalNexusOperationContext:
+class _TemporalNexusOperationContext:
     """
     Context for a Nexus operation being handled by a Temporal Nexus Worker.
     """
@@ -51,21 +51,6 @@ class TemporalNexusOperationContext:
 
     task_queue: str
     """The task queue of the worker handling this Nexus operation."""
-
-    # TODO(nexus-prerelease): Confirm how exactly we want to expose Temporal Nexus operation context
-    @staticmethod
-    def get() -> TemporalNexusOperationContext:
-        return temporal_nexus_operation_context.get()
-
-    @staticmethod
-    def set(
-        context: TemporalNexusOperationContext,
-    ) -> contextvars.Token[TemporalNexusOperationContext]:
-        return temporal_nexus_operation_context.set(context)
-
-    @staticmethod
-    def reset(token: contextvars.Token[TemporalNexusOperationContext]) -> None:
-        temporal_nexus_operation_context.reset(token)
 
     @property
     def temporal_start_operation_context(
