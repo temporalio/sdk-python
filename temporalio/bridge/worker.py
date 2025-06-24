@@ -35,7 +35,7 @@ import temporalio.exceptions
 from temporalio.bridge.temporal_sdk_bridge import (
     CustomSlotSupplier as BridgeCustomSlotSupplier,
 )
-from temporalio.bridge.temporal_sdk_bridge import PollShutdownError
+from temporalio.bridge.temporal_sdk_bridge import PollShutdownError  # noqa: F401
 
 
 @dataclass
