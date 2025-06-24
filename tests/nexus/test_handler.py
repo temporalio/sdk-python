@@ -47,12 +47,7 @@ from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.converter import FailureConverter, PayloadConverter
 from temporalio.exceptions import ApplicationError
-from temporalio.nexus.handler import (
-    logger,
-)
-from temporalio.nexus.handler._operation_context import (
-    temporal_operation_context,
-)
+from temporalio.nexus.handler import logger, start_workflow, temporal_operation_context
 from temporalio.nexus.handler._token import WorkflowOperationToken
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
@@ -239,8 +234,7 @@ class MyServiceHandler:
         async def start(
             ctx: StartOperationContext, input: Input
         ) -> WorkflowOperationToken[Output]:
-            tctx = temporal_operation_context.get()
-            return await tctx.start_workflow(
+            return await start_workflow(
                 MyWorkflow.run,
                 input,
                 id=str(uuid.uuid4()),
@@ -300,8 +294,7 @@ class MyServiceHandler:
         self,
     ) -> nexusrpc.handler.OperationHandler[Input, Output]:
         async def start(ctx, input):
-            tctx = temporal_operation_context.get()
-            return await tctx.start_workflow(
+            return await start_workflow(
                 WorkflowWithoutTypeAnnotations.run,
                 input,
                 id=str(uuid.uuid4()),
@@ -322,8 +315,7 @@ class MyServiceHandler:
             assert ctx.request_id == "test-request-id-123", "Request ID mismatch"
             ctx.outbound_links.extend(ctx.inbound_links)
 
-            tctx = temporal_operation_context.get()
-            return await tctx.start_workflow(
+            return await start_workflow(
                 MyLinkTestWorkflow.run,
                 input,
                 id=str(uuid.uuid4()),
@@ -1132,8 +1124,7 @@ class ServiceHandlerForRequestIdTest:
         async def start(
             ctx: StartOperationContext, input: Input
         ) -> WorkflowOperationToken[Output]:
-            tctx = temporal_operation_context.get()
-            return await tctx.start_workflow(
+            return await start_workflow(
                 EchoWorkflow.run,
                 input,
                 id=input.value,
@@ -1158,7 +1149,7 @@ class ServiceHandlerForRequestIdTest:
             )
             # This should fail. It will not fail if the Nexus request ID was incorrectly
             # propagated to both StartWorkflow requests.
-            return await tctx.start_workflow(
+            return await start_workflow(
                 EchoWorkflow.run,
                 input,
                 id=input.value,
