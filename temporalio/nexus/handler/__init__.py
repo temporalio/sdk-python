@@ -17,7 +17,10 @@ from nexusrpc.handler import (
 )
 
 from ._operation_context import (
-    TemporalNexusOperationContext as TemporalNexusOperationContext,
+    _TemporalNexusOperationContext as _TemporalNexusOperationContext,
+)
+from ._operation_context import (
+    temporal_operation_context as temporal_operation_context,
 )
 from ._operation_handlers import (
     WorkflowRunOperationHandler as WorkflowRunOperationHandler,
@@ -34,7 +37,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         self, msg: Any, kwargs: MutableMapping[str, Any]
     ) -> tuple[Any, MutableMapping[str, Any]]:
         extra = dict(self.extra or {})
-        if tctx := TemporalNexusOperationContext.get():
+        if tctx := temporal_operation_context.get(None):
             extra["service"] = tctx.nexus_operation_context.service
             extra["operation"] = tctx.nexus_operation_context.operation
             extra["task_queue"] = tctx.task_queue
