@@ -124,7 +124,7 @@ class _NexusWorker:
                 exception_task.cancel()
                 return
 
-            except Exception as err:
+            except BaseException as err:
                 raise RuntimeError("Nexus worker failed") from err
 
     # Only call this if run() raised an error
