@@ -113,8 +113,8 @@ class _NexusWorker:
                         # TODO(nexus-prerelease): when do we remove the entry from _running_operations?
                         _task.cancel()
                     else:
-                        logger.warning(
-                            f"Received cancel_task but no running operation exists for "
+                        logger.debug(
+                            f"Received cancel_task but no running task exists for "
                             f"task token: {task.task_token}"
                         )
                 else:
