@@ -1,10 +1,7 @@
-from __future__ import annotations
-
 import logging
-from collections.abc import Mapping
 from typing import (
-    TYPE_CHECKING,
     Any,
+    Mapping,
     MutableMapping,
     Optional,
 )
@@ -25,14 +22,6 @@ from ._operation_handlers import (
 )
 from ._operation_handlers import cancel_operation as cancel_operation
 from ._token import WorkflowOperationToken as WorkflowOperationToken
-
-if TYPE_CHECKING:
-    from temporalio.client import (
-        Client as Client,
-    )
-    from temporalio.client import (
-        WorkflowHandle as WorkflowHandle,
-    )
 
 
 class LoggerAdapter(logging.LoggerAdapter):
