@@ -16,7 +16,7 @@ OperationTokenType = Literal[1]
 
 @dataclass(frozen=True)
 class WorkflowOperationToken(Generic[OutputT]):
-    """Represents the structured data of a Nexus workflow operation token."""
+    """A Nexus operation token for an operation backed by a workflow."""
 
     namespace: str
     workflow_id: str
