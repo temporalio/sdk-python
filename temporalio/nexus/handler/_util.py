@@ -42,22 +42,26 @@ def get_workflow_run_start_method_input_and_output_type_annotations(
     """
     input_type, output_type = _get_start_method_input_and_output_type_annotations(start)
     origin_type = typing.get_origin(output_type)
-    if not origin_type or not issubclass(origin_type, WorkflowOperationToken):
+    if not origin_type:
+        output_type = None
+    elif not issubclass(origin_type, WorkflowOperationToken):
         warnings.warn(
             f"Expected return type of {start.__name__} to be a subclass of WorkflowOperationToken, "
             f"but is {output_type}"
         )
         output_type = None
 
-    args = typing.get_args(output_type)
-    if len(args) != 1:
-        warnings.warn(
-            f"Expected return type of {start.__name__} to have exactly one type parameter, "
-            f"but has {len(args)}: {args}"
-        )
-        output_type = None
-    else:
-        [output_type] = args
+    if output_type:
+        args = typing.get_args(output_type)
+        if len(args) != 1:
+            suffix = f": {args}" if args else ""
+            warnings.warn(
+                f"Expected return type {output_type} of {start.__name__} to have exactly one type parameter, "
+                f"but has {len(args)}{suffix}."
+            )
+            output_type = None
+        else:
+            [output_type] = args
     return input_type, output_type
 
 
