@@ -41,7 +41,7 @@ from nexusrpc.handler._common import (
 )
 
 import temporalio.api.failure.v1
-import temporalio.nexus
+import temporalio.nexus.handler
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
