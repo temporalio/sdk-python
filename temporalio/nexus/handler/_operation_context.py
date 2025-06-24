@@ -33,13 +33,13 @@ from temporalio.types import (
 logger = logging.getLogger(__name__)
 
 
-_current_context: ContextVar[TemporalOperationContext] = ContextVar(
-    "temporal-operation-context"
+temporal_nexus_operation_context: ContextVar[TemporalNexusOperationContext] = (
+    ContextVar("temporal-nexus-operation-context")
 )
 
 
 @dataclass
-class TemporalOperationContext:
+class TemporalNexusOperationContext:
     """
     Context for a Nexus operation being handled by a Temporal Nexus Worker.
     """
@@ -54,18 +54,18 @@ class TemporalOperationContext:
 
     # TODO(nexus-prerelease): Confirm how exactly we want to expose Temporal Nexus operation context
     @staticmethod
-    def get() -> TemporalOperationContext:
-        return _current_context.get()
+    def get() -> TemporalNexusOperationContext:
+        return temporal_nexus_operation_context.get()
 
     @staticmethod
     def set(
-        context: TemporalOperationContext,
-    ) -> contextvars.Token[TemporalOperationContext]:
-        return _current_context.set(context)
+        context: TemporalNexusOperationContext,
+    ) -> contextvars.Token[TemporalNexusOperationContext]:
+        return temporal_nexus_operation_context.set(context)
 
     @staticmethod
-    def reset(token: contextvars.Token[TemporalOperationContext]) -> None:
-        _current_context.reset(token)
+    def reset(token: contextvars.Token[TemporalNexusOperationContext]) -> None:
+        temporal_nexus_operation_context.reset(token)
 
     @property
     def temporal_start_operation_context(
