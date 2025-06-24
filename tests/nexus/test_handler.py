@@ -71,11 +71,10 @@ class NonSerializableOutput:
     callable: Callable[[], Any] = lambda: None
 
 
-# TODO: type check nexus implementation under mypy
-
+# TODO(nexus-prelease): Test attaching multiple callers to the same operation.
+# TODO(nexus-preview): type check nexus implementation under mypy
 # TODO(nexus-prerelease): test dynamic creation of a service from unsugared definition
 # TODO(nexus-prerelease): test malformed inbound_links and outbound_links
-
 # TODO(nexus-prerelease): test good error message on forgetting to add decorators etc
 
 
