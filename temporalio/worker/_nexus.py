@@ -55,13 +55,6 @@ class _NexusWorker:
         self._bridge_worker = bridge_worker
         self._client = client
         self._task_queue = task_queue
-
-        for service in service_handlers:
-            if isinstance(service, type):
-                raise TypeError(
-                    f"Expected a service instance, but got a class: {service}. "
-                    "Nexus services must be passed as instances, not classes."
-                )
         self._handler = Handler(service_handlers, executor)
         self._data_converter = data_converter
         # TODO(nexus-preview): interceptors
