@@ -5818,17 +5818,22 @@ class _ClientImpl(OutboundInterceptor):
         self, input: StartWorkflowInput
     ) -> temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest:
         req = temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest()
+        await self._populate_start_workflow_execution_request(req, input)
+        # _populate_start_workflow_execution_request is used for both StartWorkflowInput
+        # and UpdateWithStartStartWorkflowInput. UpdateWithStartStartWorkflowInput does
+        # not have the following two fields so they are handled here.
         req.request_eager_execution = input.request_eager_start
         if input.request_id:
             req.request_id = input.request_id
 
-        await self._populate_start_workflow_execution_request(req, input)
-        for callback in input.nexus_completion_callbacks:
-            c = temporalio.api.common.v1.Callback()
-            c.nexus.url = callback.url
-            c.nexus.header.update(callback.header)
-            req.completion_callbacks.append(c)
-
+        req.completion_callbacks.extend(
+            temporalio.api.common.v1.Callback(
+                nexus=temporalio.api.common.v1.Callback.Nexus(
+                    url=callback.url, header=callback.header
+                )
+            )
+            for callback in input.nexus_completion_callbacks
+        )
         req.links.extend(
             temporalio.api.common.v1.Link(workflow_event=link)
             for link in input.workflow_event_links
@@ -5879,8 +5884,7 @@ class _ClientImpl(OutboundInterceptor):
         if input.task_timeout is not None:
             req.workflow_task_timeout.FromTimedelta(input.task_timeout)
         req.identity = self._client.identity
-        if not req.request_id:
-            req.request_id = str(uuid.uuid4())
+        req.request_id = str(uuid.uuid4())
         req.workflow_id_reuse_policy = cast(
             "temporalio.api.enums.v1.WorkflowIdReusePolicy.ValueType",
             int(input.id_reuse_policy),
