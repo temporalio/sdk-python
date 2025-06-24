@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-import typing
-import warnings
 from typing import (
     Any,
     Awaitable,
     Callable,
     Generic,
-    Optional,
-    Type,
 )
 
 import nexusrpc.handler
@@ -26,11 +22,12 @@ from nexusrpc.types import (
 )
 
 from temporalio.nexus.handler._operation_context import TemporalOperationContext
+from temporalio.nexus.handler._token import WorkflowOperationToken
 
-from ._token import (
-    WorkflowOperationToken as WorkflowOperationToken,
+from ._util import (
+    get_workflow_run_start_method_input_and_output_type_annotations,
+    is_async_callable,
 )
-from ._util import is_async_callable
 
 
 class WorkflowRunOperationHandler(
@@ -54,7 +51,7 @@ class WorkflowRunOperationHandler(
         if start.__doc__:
             self.start.__func__.__doc__ = start.__doc__
         self._input_type, self._output_type = (
-            _get_workflow_run_start_method_input_and_output_type_annotations(start)
+            get_workflow_run_start_method_input_and_output_type_annotations(start)
         )
 
     async def start(
@@ -77,7 +74,7 @@ class WorkflowRunOperationHandler(
         self, ctx: nexusrpc.handler.FetchOperationResultContext, token: str
     ) -> OutputT:
         raise NotImplementedError(
-            "Temporal Nexus operation handlers do not support fetching operation result."
+            "Temporal Nexus operation handlers do not support fetching the operation result."
         )
         # An implementation is provided for future reference:
         try:
@@ -101,45 +98,6 @@ class WorkflowRunOperationHandler(
                 cause=err,
             )
         return await handle.result()
-
-
-def _get_workflow_run_start_method_input_and_output_type_annotations(
-    start_method: Callable[
-        [StartOperationContext, InputT],
-        Awaitable[WorkflowOperationToken[OutputT]],
-    ],
-) -> tuple[
-    Optional[Type[InputT]],
-    Optional[Type[OutputT]],
-]:
-    """Return operation input and output types.
-
-    `start_method` must be a type-annotated start method that returns a
-    :py:class:`WorkflowHandle`.
-    """
-    input_type, output_type = (
-        nexusrpc.handler.get_start_method_input_and_output_type_annotations(
-            start_method
-        )
-    )
-    origin_type = typing.get_origin(output_type)
-    if not origin_type or not issubclass(origin_type, WorkflowOperationToken):
-        warnings.warn(
-            f"Expected return type of {start_method.__name__} to be a subclass of WorkflowOperationToken, "
-            f"but is {output_type}"
-        )
-        output_type = None
-
-    args = typing.get_args(output_type)
-    if len(args) != 1:
-        warnings.warn(
-            f"Expected return type of {start_method.__name__} to have exactly one type parameter, "
-            f"but has {len(args)}: {args}"
-        )
-        output_type = None
-    else:
-        [output_type] = args
-    return input_type, output_type
 
 
 async def cancel_operation(
