@@ -52,18 +52,10 @@ class TemporalOperationContext:
     task_queue: str
     """The task queue of the worker handling this Nexus operation."""
 
-    # TODO(nexus-prerelease): I don't think I like these names. Perhaps .get(), or
-    # expose the contextvar directly in the public API.
+    # TODO(nexus-prerelease): Confirm how exactly we want to expose Temporal Nexus operation context
     @staticmethod
-    def try_current() -> Optional[TemporalOperationContext]:
-        return _current_context.get(None)
-
-    @staticmethod
-    def current() -> TemporalOperationContext:
-        context = TemporalOperationContext.try_current()
-        if not context:
-            raise RuntimeError("Not in Nexus operation context")
-        return context
+    def get() -> TemporalOperationContext:
+        return _current_context.get()
 
     @staticmethod
     def set(

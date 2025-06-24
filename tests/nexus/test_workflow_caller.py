@@ -154,7 +154,7 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
                 value=OpOutput(value="sync response")
             )
         elif isinstance(input.response_type, AsyncResponse):
-            tctx = TemporalOperationContext.current()
+            tctx = TemporalOperationContext.get()
             token = await tctx.start_workflow(
                 HandlerWorkflow.run,
                 HandlerWfInput(op_input=input),
@@ -216,7 +216,7 @@ class ServiceImpl:
                     RPCStatusCode.INVALID_ARGUMENT,
                     b"",
                 )
-            tctx = TemporalOperationContext.current()
+            tctx = TemporalOperationContext.get()
             return await tctx.start_workflow(
                 HandlerWorkflow.run,
                 HandlerWfInput(op_input=input),
@@ -946,7 +946,7 @@ class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
         async def start(
             ctx: StartOperationContext, input: None
         ) -> WorkflowOperationToken[str]:
-            tctx = TemporalOperationContext.current()
+            tctx = TemporalOperationContext.get()
             result_1 = await tctx.client.execute_workflow(
                 EchoWorkflow.run,
                 "result-1",

@@ -86,7 +86,7 @@ class WorkflowRunOperationHandler(
                 type=HandlerErrorType.NOT_FOUND,
                 cause=err,
             )
-        tctx = TemporalOperationContext.current()
+        tctx = TemporalOperationContext.get()
         try:
             handle = workflow_token.to_workflow_handle(
                 tctx.client, result_type=self._output_type
@@ -120,7 +120,7 @@ async def cancel_operation(
             cause=err,
         )
 
-    tctx = TemporalOperationContext.current()
+    tctx = TemporalOperationContext.get()
     try:
         handle = workflow_token.to_workflow_handle(tctx.client)
     except Exception as err:
