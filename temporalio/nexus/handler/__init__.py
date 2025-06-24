@@ -27,6 +27,7 @@ from ._operation_handlers import (
 )
 from ._operation_handlers import cancel_operation as cancel_operation
 from ._token import WorkflowOperationToken as WorkflowOperationToken
+from ._workflow import start_workflow as start_workflow
 
 
 class LoggerAdapter(logging.LoggerAdapter):
