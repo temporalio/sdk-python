@@ -961,6 +961,7 @@ class SyncStartHandler:
                 value=f"from start method on {self.__class__.__name__}: {input.value}"
             )
 
+        # TODO(nexus-prerelease) why is this test passing? start is not `async def`
         return nexusrpc.handler.SyncOperationHandler(start)
 
 
