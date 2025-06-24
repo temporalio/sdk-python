@@ -4,21 +4,15 @@ import functools
 import inspect
 from typing import (
     Any,
-    Awaitable,
-    Callable,
 )
-
-from typing_extensions import TypeGuard
 
 
 # Copied from https://github.com/modelcontextprotocol/python-sdk
 #
 # Copyright (c) 2024 Anthropic, PBC.
 #
-# Modified to use TypeGuard.
-#
 # This file is licensed under the MIT License.
-def is_async_callable(obj: Any) -> TypeGuard[Callable[..., Awaitable[Any]]]:
+def is_async_callable(obj: Any) -> bool:
     """
     Return True if `obj` is an async callable.
 
