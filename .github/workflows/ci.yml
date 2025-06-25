@@ -71,7 +71,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@v5
       - run: uv tool install poethepoet
-      - run: uv upgrade
+      - run: uv lock --upgrade
         if: ${{ matrix.dependencies == 'latest'}}
       - run: uv sync --all-extras
       - run: poe bridge-lint
