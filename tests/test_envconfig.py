@@ -509,3 +509,108 @@ def test_disables_raise_error():
     """Test that providing both disable_file and disable_env raises an error."""
     with pytest.raises(RuntimeError, match="Cannot disable both"):
         ClientConfigProfile.load(disable_file=True, disable_env=True)
+
+
+def test_client_config_profile_to_from_dict():
+    """Test round-trip ClientConfigProfile to and from a dictionary."""
+    # Profile with all fields
+    profile = ClientConfigProfile(
+        address="some-address",
+        namespace="some-namespace",
+        api_key="some-api-key",
+        tls=ClientConfigTLS(
+            disabled=False,
+            server_name="some-server-name",
+            server_root_ca_cert=b"ca-cert-data",
+            client_cert=Path("/path/to/client.crt"),
+            client_private_key="client-key-data",
+        ),
+        grpc_meta={"some-header": "some-value"},
+    )
+
+    profile_dict = profile.to_dict()
+
+    # Check dict representation. Note that disabled=False is not in the dict.
+    expected_dict = {
+        "address": "some-address",
+        "namespace": "some-namespace",
+        "api_key": "some-api-key",
+        "tls": {
+            "server_name": "some-server-name",
+            "server_ca_cert": {"data": "ca-cert-data"},
+            "client_cert": {"path": str(Path("/path/to/client.crt"))},
+            "client_key": {"data": "client-key-data"},
+        },
+        "grpc_meta": {"some-header": "some-value"},
+    }
+    assert profile_dict == expected_dict
+
+    # Convert back to profile
+    new_profile = ClientConfigProfile.from_dict(profile_dict)
+
+    # We expect the new profile to be the same, but with bytes-based data
+    # sources converted to strings. This is because to_dict converts
+    # bytes-based data to a string, suitable for TOML. So we only have
+    # a string representation to work with.
+    expected_new_profile = ClientConfigProfile(
+        address="some-address",
+        namespace="some-namespace",
+        api_key="some-api-key",
+        tls=ClientConfigTLS(
+            disabled=False,
+            server_name="some-server-name",
+            server_root_ca_cert="ca-cert-data",  # Was bytes, now str
+            client_cert=Path("/path/to/client.crt"),
+            client_private_key="client-key-data",
+        ),
+        grpc_meta={"some-header": "some-value"},
+    )
+    assert new_profile == expected_new_profile
+
+    # Test with minimal profile
+    profile_minimal = ClientConfigProfile()
+    profile_minimal_dict = profile_minimal.to_dict()
+    assert profile_minimal_dict == {}
+    new_profile_minimal = ClientConfigProfile.from_dict(profile_minimal_dict)
+    assert profile_minimal == new_profile_minimal
+
+
+def test_client_config_to_from_dict():
+    """Test round-trip ClientConfig to and from a dictionary."""
+    # Config with multiple profiles
+    profile1 = ClientConfigProfile(
+        address="some-address",
+        namespace="some-namespace",
+    )
+    profile2 = ClientConfigProfile(
+        address="another-address",
+        tls=ClientConfigTLS(server_name="some-server-name"),
+        grpc_meta={"some-header": "some-value"},
+    )
+    config = ClientConfig(profiles={"default": profile1, "custom": profile2})
+
+    config_dict = config.to_dict()
+
+    expected_dict = {
+        "default": {
+            "address": "some-address",
+            "namespace": "some-namespace",
+        },
+        "custom": {
+            "address": "another-address",
+            "tls": {"server_name": "some-server-name"},
+            "grpc_meta": {"some-header": "some-value"},
+        },
+    }
+    assert config_dict == expected_dict
+
+    # Convert back to config
+    new_config = ClientConfig.from_dict(config_dict)
+    assert config == new_config
+
+    # Test empty config
+    empty_config = ClientConfig(profiles={})
+    empty_config_dict = empty_config.to_dict()
+    assert empty_config_dict == {}
+    new_empty_config = ClientConfig.from_dict(empty_config_dict)
+    assert empty_config == new_empty_config
