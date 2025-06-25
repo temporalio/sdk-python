@@ -5,10 +5,9 @@ import nexusrpc.handler
 import pytest
 from nexusrpc.handler import OperationHandler, SyncOperationHandler
 
-import temporalio.api.failure.v1
-import temporalio.nexus.handler
 from temporalio.nexus.handler import (
     WorkflowOperationToken,
+    WorkflowRunOperationHandler,
 )
 
 HTTP_PORT = 7243
@@ -32,7 +31,7 @@ class ValidImpl(_InterfaceImplementationTestCase):
                 ctx: nexusrpc.handler.StartOperationContext, input: None
             ) -> None: ...
 
-            return SyncOperationHandler(start)
+            return SyncOperationHandler.from_callable(start)
 
     error_message = None
 
@@ -49,9 +48,7 @@ class ValidWorkflowRunImpl(_InterfaceImplementationTestCase):
                 ctx: nexusrpc.handler.StartOperationContext, input: str
             ) -> WorkflowOperationToken[int]: ...
 
-            return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
-                start
-            )
+            return WorkflowRunOperationHandler.from_start_workflow(start)
 
     error_message = None
 
