@@ -40,7 +40,7 @@ def make_incrementer_user_service_definition_and_service_handler_classes(
         ) -> int:
             return input + 1
 
-        return SyncOperationHandler(_increment_op)
+        return SyncOperationHandler.from_callable(_increment_op)
 
     op_handler_factories = {
         # TODO(nexus-prerelease): check that name=name should be required here. Should the op factory
