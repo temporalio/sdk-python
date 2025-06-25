@@ -83,13 +83,13 @@ class MtlsAuthSpec(google.protobuf.message.Message):
     This must only be one value, but the CA can have a chain.
 
     (-- api-linter: core::0140::base64=disabled --)
-    Deprecated: Not supported after 2024-05-13-00 api version. Use accepted_client_ca instead.
-    temporal:versioning:max_version=2024-05-13-00
+    Deprecated: Not supported after v0.2.0 api version. Use accepted_client_ca instead.
+    temporal:versioning:max_version=v0.2.0
     """
     accepted_client_ca: builtins.bytes
     """The ca cert(s) in PEM format that the clients can use for authentication and authorization.
     This must only be one value, but the CA can have a chain.
-    temporal:versioning:min_version=2024-05-13-00
+    temporal:versioning:min_version=v0.2.0
     """
     @property
     def certificate_filters(
@@ -104,7 +104,7 @@ class MtlsAuthSpec(google.protobuf.message.Message):
     enabled: builtins.bool
     """Flag to enable mTLS auth (default: disabled).
     Note: disabling mTLS auth will cause existing mTLS connections to fail.
-    temporal:versioning:min_version=2024-05-13-00
+    temporal:versioning:min_version=v0.2.0
     """
     def __init__(
         self,
@@ -153,25 +153,82 @@ global___ApiKeyAuthSpec = ApiKeyAuthSpec
 class CodecServerSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class CustomErrorMessage(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        class ErrorMessage(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            MESSAGE_FIELD_NUMBER: builtins.int
+            LINK_FIELD_NUMBER: builtins.int
+            message: builtins.str
+            """A message to display."""
+            link: builtins.str
+            """A link that is displayed along side the configured message."""
+            def __init__(
+                self,
+                *,
+                message: builtins.str = ...,
+                link: builtins.str = ...,
+            ) -> None: ...
+            def ClearField(
+                self,
+                field_name: typing_extensions.Literal[
+                    "link", b"link", "message", b"message"
+                ],
+            ) -> None: ...
+
+        DEFAULT_FIELD_NUMBER: builtins.int
+        @property
+        def default(self) -> global___CodecServerSpec.CustomErrorMessage.ErrorMessage:
+            """The error message to display by default for any remote codec server errors."""
+        def __init__(
+            self,
+            *,
+            default: global___CodecServerSpec.CustomErrorMessage.ErrorMessage
+            | None = ...,
+        ) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["default", b"default"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self, field_name: typing_extensions.Literal["default", b"default"]
+        ) -> None: ...
+
     ENDPOINT_FIELD_NUMBER: builtins.int
     PASS_ACCESS_TOKEN_FIELD_NUMBER: builtins.int
     INCLUDE_CROSS_ORIGIN_CREDENTIALS_FIELD_NUMBER: builtins.int
+    CUSTOM_ERROR_MESSAGE_FIELD_NUMBER: builtins.int
     endpoint: builtins.str
     """The codec server endpoint."""
     pass_access_token: builtins.bool
     """Whether to pass the user access token with your endpoint."""
     include_cross_origin_credentials: builtins.bool
     """Whether to include cross-origin credentials."""
+    @property
+    def custom_error_message(self) -> global___CodecServerSpec.CustomErrorMessage:
+        """A custom error message to display for remote codec server errors.
+        temporal:versioning:min_version=v0.5.1
+        """
     def __init__(
         self,
         *,
         endpoint: builtins.str = ...,
         pass_access_token: builtins.bool = ...,
         include_cross_origin_credentials: builtins.bool = ...,
+        custom_error_message: global___CodecServerSpec.CustomErrorMessage | None = ...,
     ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "custom_error_message", b"custom_error_message"
+        ],
+    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "custom_error_message",
+            b"custom_error_message",
             "endpoint",
             b"endpoint",
             "include_cross_origin_credentials",
@@ -182,6 +239,46 @@ class CodecServerSpec(google.protobuf.message.Message):
     ) -> None: ...
 
 global___CodecServerSpec = CodecServerSpec
+
+class LifecycleSpec(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENABLE_DELETE_PROTECTION_FIELD_NUMBER: builtins.int
+    enable_delete_protection: builtins.bool
+    """Flag to enable delete protection for the namespace."""
+    def __init__(
+        self,
+        *,
+        enable_delete_protection: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "enable_delete_protection", b"enable_delete_protection"
+        ],
+    ) -> None: ...
+
+global___LifecycleSpec = LifecycleSpec
+
+class HighAvailabilitySpec(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DISABLE_MANAGED_FAILOVER_FIELD_NUMBER: builtins.int
+    disable_managed_failover: builtins.bool
+    """Flag to disable managed failover for the namespace."""
+    def __init__(
+        self,
+        *,
+        disable_managed_failover: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "disable_managed_failover", b"disable_managed_failover"
+        ],
+    ) -> None: ...
+
+global___HighAvailabilitySpec = HighAvailabilitySpec
 
 class NamespaceSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -268,6 +365,8 @@ class NamespaceSpec(google.protobuf.message.Message):
     CUSTOM_SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     CODEC_SERVER_FIELD_NUMBER: builtins.int
+    LIFECYCLE_FIELD_NUMBER: builtins.int
+    HIGH_AVAILABILITY_FIELD_NUMBER: builtins.int
     name: builtins.str
     """The name to use for the namespace.
     This will create a namespace that's available at '<name>.<account>.tmprl.cloud:7233'.
@@ -300,7 +399,7 @@ class NamespaceSpec(google.protobuf.message.Message):
     def api_key_auth(self) -> global___ApiKeyAuthSpec:
         """The API key auth configuration for the namespace.
         If unspecified, API keys will be disabled.
-        temporal:versioning:min_version=2024-05-13-00
+        temporal:versioning:min_version=v0.2.0
         """
     @property
     def custom_search_attributes(
@@ -311,8 +410,8 @@ class NamespaceSpec(google.protobuf.message.Message):
         Supported attribute types: text, keyword, int, double, bool, datetime, keyword_list.
         NOTE: currently deleting a search attribute is not supported.
         Optional, default is empty.
-        Deprecated: Not supported after 2024-10-01-00 api version. Use search_attributes instead.
-        temporal:versioning:max_version=2024-10-01-00
+        Deprecated: Not supported after v0.3.0 api version. Use search_attributes instead.
+        temporal:versioning:max_version=v0.3.0
         """
     @property
     def search_attributes(
@@ -324,13 +423,23 @@ class NamespaceSpec(google.protobuf.message.Message):
         The name of the attribute is the key and the type is the value.
         Note: currently deleting a search attribute is not supported.
         Optional, default is empty.
-        temporal:versioning:min_version=2024-10-01-00
+        temporal:versioning:min_version=v0.3.0
         temporal:enums:replaces=custom_search_attributes
         """
     @property
     def codec_server(self) -> global___CodecServerSpec:
         """Codec server spec used by UI to decode payloads for all users interacting with this namespace.
         Optional, default is unset.
+        """
+    @property
+    def lifecycle(self) -> global___LifecycleSpec:
+        """The lifecycle configuration for the namespace.
+        temporal:versioning:min_version=v0.4.0
+        """
+    @property
+    def high_availability(self) -> global___HighAvailabilitySpec:
+        """The high availability configuration for the namespace.
+        temporal:versioning:min_version=v0.4.0
         """
     def __init__(
         self,
@@ -347,6 +456,8 @@ class NamespaceSpec(google.protobuf.message.Message):
         ]
         | None = ...,
         codec_server: global___CodecServerSpec | None = ...,
+        lifecycle: global___LifecycleSpec | None = ...,
+        high_availability: global___HighAvailabilitySpec | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -355,6 +466,10 @@ class NamespaceSpec(google.protobuf.message.Message):
             b"api_key_auth",
             "codec_server",
             b"codec_server",
+            "high_availability",
+            b"high_availability",
+            "lifecycle",
+            b"lifecycle",
             "mtls_auth",
             b"mtls_auth",
         ],
@@ -368,6 +483,10 @@ class NamespaceSpec(google.protobuf.message.Message):
             b"codec_server",
             "custom_search_attributes",
             b"custom_search_attributes",
+            "high_availability",
+            b"high_availability",
+            "lifecycle",
+            b"lifecycle",
             "mtls_auth",
             b"mtls_auth",
             "name",
@@ -551,13 +670,13 @@ class Namespace(google.protobuf.message.Message):
         """The namespace specification."""
     state_deprecated: builtins.str
     """The current state of the namespace.
-    Deprecated: Not supported after 2024-10-01-00 api version. Use state instead.
-    temporal:versioning:max_version=2024-10-01-00
+    Deprecated: Not supported after v0.3.0 api version. Use state instead.
+    temporal:versioning:max_version=v0.3.0
     """
     state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
     """The current state of the namespace.
     For any failed state, reach out to Temporal Cloud support for remediation.
-    temporal:versioning:min_version=2024-10-01-00
+    temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=state_deprecated
     """
     async_operation_id: builtins.str
@@ -710,12 +829,12 @@ class NamespaceRegionStatus(google.protobuf.message.Message):
     """The current state of the namespace region.
     Possible values: adding, active, passive, removing, failed.
     For any failed state, reach out to Temporal Cloud support for remediation.
-    Deprecated: Not supported after 2024-10-01-00 api version. Use state instead.
-    temporal:versioning:max_version=2024-10-01-00
+    Deprecated: Not supported after v0.3.0 api version. Use state instead.
+    temporal:versioning:max_version=v0.3.0
     """
     state: global___NamespaceRegionStatus.State.ValueType
     """The current state of the namespace region.
-    temporal:versioning:min_version=2024-10-01-00
+    temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=state_deprecated
     """
     async_operation_id: builtins.str
@@ -757,9 +876,7 @@ class ExportSinkSpec(google.protobuf.message.Message):
         """The S3 configuration details when destination_type is S3."""
     @property
     def gcs(self) -> temporalio.api.cloud.sink.v1.message_pb2.GCSSpec:
-        """This is a feature under development. We will allow GCS sink support for GCP Namespaces.
-        The GCS configuration details when destination_type is GCS.
-        """
+        """The GCS configuration details when destination_type is GCS."""
     def __init__(
         self,
         *,

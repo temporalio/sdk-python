@@ -829,6 +829,12 @@ class CloudService:
             clv1.AddNamespaceRegionResponse,
             service="cloud",
         )
+        self.add_user_group_member = client._new_call(
+            "add_user_group_member",
+            clv1.AddUserGroupMemberRequest,
+            clv1.AddUserGroupMemberResponse,
+            service="cloud",
+        )
         self.create_api_key = client._new_call(
             "create_api_key",
             clv1.CreateApiKeyRequest,
@@ -887,6 +893,12 @@ class CloudService:
             "delete_namespace_export_sink",
             clv1.DeleteNamespaceExportSinkRequest,
             clv1.DeleteNamespaceExportSinkResponse,
+            service="cloud",
+        )
+        self.delete_namespace_region = client._new_call(
+            "delete_namespace_region",
+            clv1.DeleteNamespaceRegionRequest,
+            clv1.DeleteNamespaceRegionResponse,
             service="cloud",
         )
         self.delete_nexus_endpoint = client._new_call(
@@ -1015,6 +1027,12 @@ class CloudService:
             clv1.GetUserGroupResponse,
             service="cloud",
         )
+        self.get_user_group_members = client._new_call(
+            "get_user_group_members",
+            clv1.GetUserGroupMembersRequest,
+            clv1.GetUserGroupMembersResponse,
+            service="cloud",
+        )
         self.get_user_groups = client._new_call(
             "get_user_groups",
             clv1.GetUserGroupsRequest,
@@ -1031,6 +1049,12 @@ class CloudService:
             "get_users",
             clv1.GetUsersRequest,
             clv1.GetUsersResponse,
+            service="cloud",
+        )
+        self.remove_user_group_member = client._new_call(
+            "remove_user_group_member",
+            clv1.RemoveUserGroupMemberRequest,
+            clv1.RemoveUserGroupMemberResponse,
             service="cloud",
         )
         self.rename_custom_search_attribute = client._new_call(
