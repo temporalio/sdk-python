@@ -130,107 +130,61 @@ fn load_client_connect_config_inner(
 }
 
 #[pyfunction]
-#[pyo3(signature = (disable_file, config_file_strict, env_vars = None))]
+#[pyo3(signature = (path, data, disable_file, config_file_strict, env_vars = None))]
 pub fn load_client_config(
     py: Python,
+    path: Option<String>,
+    data: Option<Vec<u8>>,
     disable_file: bool,
     config_file_strict: bool,
     env_vars: Option<HashMap<String, String>>,
 ) -> PyResult<PyObject> {
-    load_client_config_inner(py, None, config_file_strict, disable_file, env_vars)
-}
-
-#[pyfunction]
-#[pyo3(signature = (path, config_file_strict, env_vars = None))]
-pub fn load_client_config_from_file(
-    py: Python,
-    path: String,
-    config_file_strict: bool,
-    env_vars: Option<HashMap<String, String>>,
-) -> PyResult<PyObject> {
+    let config_source = match (path, data) {
+        (Some(p), None) => Some(DataSource::Path(p)),
+        (None, Some(d)) => Some(DataSource::Data(d)),
+        (None, None) => None,
+        (Some(_), Some(_)) => {
+            return Err(ConfigError::new_err(
+                "Cannot specify both path and data for config source",
+            ))
+        }
+    };
     load_client_config_inner(
         py,
-        Some(DataSource::Path(path)),
+        config_source,
         config_file_strict,
-        false,
+        disable_file,
         env_vars,
     )
 }
 
 #[pyfunction]
-#[pyo3(signature = (data, config_file_strict, env_vars = None))]
-pub fn load_client_config_from_data(
-    py: Python,
-    data: Vec<u8>,
-    config_file_strict: bool,
-    env_vars: Option<HashMap<String, String>>,
-) -> PyResult<PyObject> {
-    load_client_config_inner(
-        py,
-        Some(DataSource::Data(data)),
-        config_file_strict,
-        false,
-        env_vars,
-    )
-}
-
-#[pyfunction]
-#[pyo3(signature = (profile, disable_file, disable_env, config_file_strict, env_vars = None))]
+#[pyo3(signature = (profile, path, data, disable_file, disable_env, config_file_strict, env_vars = None))]
 pub fn load_client_connect_config(
     py: Python,
     profile: Option<String>,
+    path: Option<String>,
+    data: Option<Vec<u8>>,
     disable_file: bool,
     disable_env: bool,
     config_file_strict: bool,
     env_vars: Option<HashMap<String, String>>,
 ) -> PyResult<PyObject> {
+    let config_source = match (path, data) {
+        (Some(p), None) => Some(DataSource::Path(p)),
+        (None, Some(d)) => Some(DataSource::Data(d)),
+        (None, None) => None,
+        (Some(_), Some(_)) => {
+            return Err(ConfigError::new_err(
+                "Cannot specify both path and data for config source",
+            ))
+        }
+    };
     load_client_connect_config_inner(
         py,
-        None,
+        config_source,
         profile,
         disable_file,
-        disable_env,
-        config_file_strict,
-        env_vars,
-    )
-}
-
-#[pyfunction]
-#[pyo3(signature = (path, profile, disable_env, config_file_strict, env_vars = None))]
-pub fn load_client_connect_config_from_file(
-    py: Python,
-    path: String,
-    profile: Option<String>,
-    disable_env: bool,
-    config_file_strict: bool,
-    env_vars: Option<HashMap<String, String>>,
-) -> PyResult<PyObject> {
-    load_client_connect_config_inner(
-        py,
-        Some(DataSource::Path(path)),
-        profile,
-        false,
-        disable_env,
-        config_file_strict,
-        env_vars,
-    )
-}
-
-#[pyfunction]
-#[pyo3(signature = (data, profile, disable_env, config_file_strict, env_vars = None))]
-pub fn load_client_connect_config_from_data(
-    py: Python,
-    data: Vec<u8>,
-    profile: Option<String>,
-    disable_env: bool,
-    config_file_strict: bool,
-    env_vars: Option<HashMap<String, String>>,
-) -> PyResult<PyObject> {
-    load_client_connect_config_inner(
-        py,
-        Some(DataSource::Data(data)),
-        profile,
-        false,
         disable_env,
         config_file_strict,
         env_vars,

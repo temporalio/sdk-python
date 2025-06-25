@@ -61,23 +61,7 @@ fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     envconfig_module.add("ConfigError", py.get_type::<envconfig::ConfigError>())?;
     envconfig_module.add_function(wrap_pyfunction!(envconfig::load_client_config, m)?)?;
     envconfig_module.add_function(wrap_pyfunction!(
-        envconfig::load_client_config_from_data,
-        m
-    )?)?;
-    envconfig_module.add_function(wrap_pyfunction!(
-        envconfig::load_client_config_from_file,
-        m
-    )?)?;
-    envconfig_module.add_function(wrap_pyfunction!(
         envconfig::load_client_connect_config,
-        m
-    )?)?;
-    envconfig_module.add_function(wrap_pyfunction!(
-        envconfig::load_client_connect_config_from_data,
-        m
-    )?)?;
-    envconfig_module.add_function(wrap_pyfunction!(
-        envconfig::load_client_connect_config_from_file,
         m
     )?)?;
     m.add_submodule(&envconfig_module)?;

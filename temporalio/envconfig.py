@@ -30,6 +30,25 @@ def _from_dict_to_source(d: Optional[Mapping[str, Any]]) -> Optional[DataSource]
     return None
 
 
+def _source_to_path_and_data(
+    source: Optional[DataSource],
+) -> tuple[Optional[str], Optional[bytes]]:
+    path: Optional[str] = None
+    data: Optional[bytes] = None
+    if isinstance(source, Path):
+        path = str(source)
+    elif isinstance(source, str):
+        data = source.encode("utf-8")
+    elif isinstance(source, bytes):
+        data = source
+    elif source is not None:
+        raise TypeError(
+            "config_source must be one of pathlib.Path, str, bytes, or None, "
+            f"but got {type(source).__name__}"
+        )
+    return path, data
+
+
 def _read_source(source: Optional[DataSource]) -> Optional[bytes]:
     if source is None:
         return None
@@ -155,6 +174,54 @@ class ClientConfigProfile:
             config["rpc_metadata"] = self.grpc_meta
         return config
 
+    @staticmethod
+    def load(
+        profile: str = "default",
+        *,
+        config_source: Optional[DataSource] = None,
+        disable_file: bool = False,
+        disable_env: bool = False,
+        config_file_strict: bool = False,
+        env_vars: Optional[Mapping[str, str]] = None,
+    ) -> ClientConfigProfile:
+        """Load a single client profile from given sources, applying env
+        overrides.
+
+        To get a :py:class:`ClientConnectConfig`, use the
+        :py:meth:`to_client_connect_config` method on the returned profile.
+
+        Args:
+            profile: Profile to load from the config.
+            config_source: If present, this is used as the configuration source
+                instead of default file locations. This can be a path to the file
+                or the string/byte contents of the file.
+            disable_file: If true, file loading is disabled. This is only used
+                when ``config_source`` is not present.
+            disable_env: If true, environment variable loading and overriding
+                is disabled. This takes precedence over the ``env_vars``
+                parameter.
+            config_file_strict: If true, will error on unrecognized keys.
+            env_vars: The environment to use for loading and overrides. If not
+                provided, environment variables are not used for overrides. To
+                use the current process's environment, :py:attr:`os.environ` can be
+                passed explicitly.
+
+        Returns:
+            The client configuration profile.
+        """
+        path, data = _source_to_path_and_data(config_source)
+
+        raw_profile = _bridge_envconfig.load_client_connect_config(
+            profile=profile,
+            path=path,
+            data=data,
+            disable_file=disable_file,
+            disable_env=disable_env,
+            config_file_strict=config_file_strict,
+            env_vars=env_vars,
+        )
+        return ClientConfigProfile.from_dict(raw_profile)
+
 
 @dataclass
 class ClientConfig:
@@ -182,181 +249,44 @@ class ClientConfig:
         )
 
     @staticmethod
-    def load_profiles(
+    def load(
         *,
+        config_source: Optional[DataSource] = None,
         disable_file: bool = False,
         config_file_strict: bool = False,
         env_vars: Optional[Mapping[str, str]] = None,
     ) -> ClientConfig:
-        """Load all client profiles from default file locations and environment variables.
+        """Load all client profiles from given sources.
 
         This does not apply environment variable overrides to the profiles, it
         only uses an environment variable to find the default config file path
-        (`TEMPORAL_CONFIG_FILE`). To get a single profile with environment variables
-        applied, use `load_profile`.
+        (``TEMPORAL_CONFIG_FILE``). To get a single profile with environment variables
+        applied, use :py:meth:`ClientConfigProfile.load`.
 
         Args:
-            disable_file: If true, file loading is disabled. Will create a default
-                configuration.
+            config_source: If present, this is used as the configuration source
+                instead of default file locations. This can be a path to the file
+                or the string/byte contents of the file.
+            disable_file: If true, file loading is disabled. This is only used
+                when ``config_source`` is not present.
             config_file_strict: If true, will TOML file parsing will error on
                 unrecognized keys.
             env_vars: The environment variables to use for locating the default config
-                file. If not provided, `TEMPORAL_CONFIG_FILE` is not checked
-                and only the default path is used (./temporal/temporal.toml). To use
-                the current process's environment, `os.environ` can be passed explicitly.
+                file. If not provided, ``TEMPORAL_CONFIG_FILE`` is not checked
+                and only the default path is used (e.g. ``~/.config/temporalio/temporal.toml``).
+                To use the current process's environment, :py:attr:`os.environ` can be passed
+                explicitly.
         """
+        path, data = _source_to_path_and_data(config_source)
+
         loaded_profiles = _bridge_envconfig.load_client_config(
+            path=path,
+            data=data,
             disable_file=disable_file,
             config_file_strict=config_file_strict,
             env_vars=env_vars,
         )
         return ClientConfig._from_bridge_profiles(loaded_profiles)
-
-    @staticmethod
-    def load_profiles_from_file(
-        config_file: str,
-        *,
-        config_file_strict: bool = False,
-    ) -> ClientConfig:
-        """Load all client profiles from a specific file."""
-        loaded_profiles = _bridge_envconfig.load_client_config_from_file(
-            path=config_file,
-            config_file_strict=config_file_strict,
-        )
-        return ClientConfig._from_bridge_profiles(loaded_profiles)
-
-    @staticmethod
-    def load_profiles_from_data(
-        config_file_data: Union[str, bytes],
-        *,
-        config_file_strict: bool = False,
-    ) -> ClientConfig:
-        """Load all client profiles from specific data."""
-        data_bytes = (
-            config_file_data.encode("utf-8")
-            if isinstance(config_file_data, str)
-            else config_file_data
-        )
-        loaded_profiles = _bridge_envconfig.load_client_config_from_data(
-            data=data_bytes,
-            config_file_strict=config_file_strict,
-        )
-        return ClientConfig._from_bridge_profiles(loaded_profiles)
-
-    @staticmethod
-    def load_profile(
-        profile: str = "default",
-        *,
-        disable_file: bool = False,
-        disable_env: bool = False,
-        config_file_strict: bool = False,
-        env_vars: Optional[Mapping[str, str]] = None,
-    ) -> ClientConfigProfile:
-        """Load a single client profile from default sources, applying env
-        overrides.
-
-        To get a `ClientConnectConfig`, use the
-        `ClientConfigProfile.to_connect_config` method on the returned profile.
-
-        Args:
-            profile: Profile to load from the config.
-            disable_file: If true, file loading is disabled.
-            disable_env: If true, environment variable loading and overriding
-                is disabled. This takes precedence over the ``env_vars``
-                parameter.
-            config_file_strict: If true, will error on unrecognized keys.
-            env_vars: The environment to use for loading and overrides. If not
-                provided, environment variables are not used for overrides. To
-                use the current process's environment, `os.environ` can be
-                passed explicitly.
-
-        Returns:
-            The client configuration profile.
-        """
-        if disable_file and disable_env:
-            raise ValueError("Cannot disable both file and environment loading")
-
-        raw_profile = _bridge_envconfig.load_client_connect_config(
-            profile=profile,
-            disable_file=disable_file,
-            disable_env=disable_env,
-            config_file_strict=config_file_strict,
-            env_vars=env_vars,
-        )
-        return ClientConfigProfile.from_dict(raw_profile)
-
-    @staticmethod
-    def load_profile_from_file(
-        config_file: str,
-        profile: str = "default",
-        *,
-        disable_env: bool = False,
-        config_file_strict: bool = False,
-        env_vars: Optional[Mapping[str, str]] = None,
-    ) -> ClientConfigProfile:
-        """Load a single client profile from a file, applying env overrides.
-
-        To get a `ClientConnectConfig`, use the
-        `ClientConfigProfile.to_connect_config` method on the returned profile.
-
-        Args:
-            config_file: Path to the TOML config file.
-            profile: Profile to load from the config.
-            disable_env: If true, environment variable overriding is disabled.
-                This takes precedence over the `env_vars` parameter.
-            config_file_strict: If true, will error on unrecognized keys.
-            env_vars: The environment to use for overrides. If not provided,
-                environment variables are not used for overrides. To use the
-                current process's environment, `os.environ` can be
-                passed explicitly.
-        """
-        raw_profile = _bridge_envconfig.load_client_connect_config_from_file(
-            profile=profile,
-            path=config_file,
-            disable_env=disable_env,
-            config_file_strict=config_file_strict,
-            env_vars=env_vars,
-        )
-        return ClientConfigProfile.from_dict(raw_profile)
-
-    @staticmethod
-    def load_profile_from_data(
-        config_file_data: Union[str, bytes],
-        profile: str = "default",
-        *,
-        disable_env: bool = False,
-        config_file_strict: bool = False,
-        env_vars: Optional[Mapping[str, str]] = None,
-    ) -> ClientConfigProfile:
-        """Load a single client profile from data, applying env overrides.
-
-        To get a `ClientConnectConfig`, use the
-        `ClientConfigProfile.to_connect_config` method on the returned profile.
-
-        Args:
-            config_file_data: Raw string TOML config.
-            profile: Profile to load from the config.
-            disable_env: If true, environment variable overriding is disabled.
-                This takes precedence over the ``env_vars`` parameter.
-            config_file_strict: If true, will error on unrecognized keys.
-            env_vars: The environment to use for overrides. If not provided,
-                environment variables are not used for overrides. To use the
-                current process's environment, `os.environ` can be
-                passed explicitly.
-        """
-        data_bytes = (
-            config_file_data.encode("utf-8")
-            if isinstance(config_file_data, str)
-            else config_file_data
-        )
-        raw_profile = _bridge_envconfig.load_client_connect_config_from_data(
-            profile=profile,
-            data=data_bytes,
-            disable_env=disable_env,
-            config_file_strict=config_file_strict,
-            env_vars=env_vars,
-        )
-        return ClientConfigProfile.from_dict(raw_profile)
 
     @staticmethod
     def load_client_connect_config(
@@ -391,23 +321,16 @@ class ClientConfig:
             TypedDict of keyword arguments for
             :py:meth:`temporalio.client.Client.connect`.
         """
-        prof: ClientConfigProfile
+        config_source: Optional[DataSource] = None
         if config_file and not disable_file:
-            # If file loading is enabled and provided, use it.
-            prof = ClientConfig.load_profile_from_file(
-                config_file,
-                profile=profile,
-                env_vars=override_env_vars,
-                disable_env=disable_env,
-                config_file_strict=config_file_strict,
-            )
-        else:
-            # Otherwise, use default file discovery
-            prof = ClientConfig.load_profile(
-                profile=profile,
-                env_vars=override_env_vars,
-                disable_file=disable_file,
-                disable_env=disable_env,
-                config_file_strict=config_file_strict,
-            )
+            config_source = Path(config_file)
+
+        prof = ClientConfigProfile.load(
+            profile=profile,
+            config_source=config_source,
+            disable_file=disable_file,
+            disable_env=disable_env,
+            config_file_strict=config_file_strict,
+            env_vars=override_env_vars,
+        )
         return prof.to_client_connect_config()
