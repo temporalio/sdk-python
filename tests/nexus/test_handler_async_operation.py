@@ -15,12 +15,12 @@ from typing import Any, Type, Union
 import nexusrpc
 import nexusrpc.handler
 import pytest
+from nexusrpc import OperationInfo
 from nexusrpc.handler import (
     CancelOperationContext,
     FetchOperationInfoContext,
     FetchOperationResultContext,
     OperationHandler,
-    OperationInfo,
     StartOperationContext,
     StartOperationResultAsync,
 )

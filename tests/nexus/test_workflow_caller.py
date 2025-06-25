@@ -11,6 +11,7 @@ from nexusrpc.handler import (
     CancelOperationContext,
     FetchOperationInfoContext,
     StartOperationContext,
+    SyncOperationHandler,
 )
 
 import temporalio.api
@@ -35,10 +36,10 @@ from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import CancelledError, NexusHandlerError, NexusOperationError
 from temporalio.nexus.handler import (
     WorkflowOperationToken,
+    WorkflowRunOperationHandler,
     start_workflow,
     temporal_operation_context,
 )
-from temporalio.nexus.handler._operation_handlers import WorkflowRunOperationHandler
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
@@ -173,7 +174,7 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
 
     async def fetch_info(
         self, ctx: FetchOperationInfoContext, token: str
-    ) -> nexusrpc.handler.OperationInfo:
+    ) -> nexusrpc.OperationInfo:
         raise NotImplementedError
 
     async def fetch_result(
@@ -204,7 +205,7 @@ class ServiceImpl:
                 )
             return OpOutput(value="sync response")
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
     @nexusrpc.handler.operation_handler
     def async_operation(
@@ -763,7 +764,7 @@ class ServiceImplInterfaceWithNeitherInterfaceNorNameOverride:
         ) -> ServiceClassNameOutput:
             return ServiceClassNameOutput(self.__class__.__name__)
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
 
 @nexusrpc.handler.service_handler(service=ServiceInterfaceWithoutNameOverride)
@@ -777,7 +778,7 @@ class ServiceImplInterfaceWithoutNameOverride:
         ) -> ServiceClassNameOutput:
             return ServiceClassNameOutput(self.__class__.__name__)
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
 
 @nexusrpc.handler.service_handler(service=ServiceInterfaceWithNameOverride)
@@ -791,7 +792,7 @@ class ServiceImplInterfaceWithNameOverride:
         ) -> ServiceClassNameOutput:
             return ServiceClassNameOutput(self.__class__.__name__)
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
 
 @nexusrpc.handler.service_handler(name="service-impl-🌈")
@@ -805,7 +806,7 @@ class ServiceImplWithNameOverride:
         ) -> ServiceClassNameOutput:
             return ServiceClassNameOutput(self.__class__.__name__)
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
 
 class NameOverride(IntEnum):

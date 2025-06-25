@@ -115,7 +115,7 @@ class WorkflowRunOperationHandler(
 
     async def fetch_info(
         self, ctx: nexusrpc.handler.FetchOperationInfoContext, token: str
-    ) -> nexusrpc.handler.OperationInfo:
+    ) -> nexusrpc.OperationInfo:
         raise NotImplementedError(
             "Temporal Nexus operation handlers do not support fetching operation info."
         )

@@ -9,9 +9,10 @@ from typing import Any, Type
 import nexusrpc.handler
 import pytest
 
-import temporalio.nexus.handler
-from temporalio.nexus.handler._operation_handlers import WorkflowRunOperationHandler
-from temporalio.nexus.handler._token import WorkflowOperationToken
+from temporalio.nexus.handler import (
+    WorkflowOperationToken,
+    WorkflowRunOperationHandler,
+)
 
 
 @dataclass
@@ -41,9 +42,7 @@ class NotCalled(_TestCase):
                 ctx: nexusrpc.handler.StartOperationContext, input: Input
             ) -> WorkflowOperationToken[Output]: ...
 
-            return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
-                start
-            )
+            return WorkflowRunOperationHandler.from_start_workflow(start)
 
     expected_operations = {
         "my_workflow_run_operation_handler": nexusrpc.Operation(
