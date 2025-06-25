@@ -18,6 +18,7 @@ jobs:
       matrix:
         python: ["3.9", "3.13"]
         os: [ubuntu-latest, ubuntu-arm, macos-intel, macos-arm, windows-latest]
+        dependencies: ["locked"]
         include:
           # On 3.9 there is a problem with import errors caused by pytests' loader that surface due
           # to a bug in CPython (https://github.com/python/cpython/issues/91351), so we avoid using
@@ -48,6 +49,9 @@ jobs:
           - os: windows-latest
             python: "3.13"
             pythonOverride: "3.13.4"
+          - os: ubuntu-latest
+            python: "3.13"
+            dependencies: "latest"
     runs-on: ${{ matrix.runsOn || matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -67,6 +71,8 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@v5
       - run: uv tool install poethepoet
+      - run: uv upgrade
+        if: ${{ matrix.dependencies == 'latest'}}
       - run: uv sync --all-extras
       - run: poe bridge-lint
         if: ${{ matrix.clippyLinter }}
