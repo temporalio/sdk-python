@@ -160,6 +160,7 @@ pub fn load_client_config(
 
 #[pyfunction]
 #[pyo3(signature = (profile, path, data, disable_file, disable_env, config_file_strict, env_vars = None))]
+#[allow(clippy::too_many_arguments)]
 pub fn load_client_connect_config(
     py: Python,
     profile: Option<String>,

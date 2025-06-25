@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Optional, Union
+from typing import Any, Mapping, Optional, Union, cast
 
 from typing_extensions import TypeAlias, TypedDict
 
@@ -314,12 +314,16 @@ class ClientConfig:
         return {k: v.to_dict() for k, v in self.profiles.items()}
 
     @staticmethod
-    def _from_bridge_profiles(
-        bridge_profiles: Mapping[str, Mapping[str, Any]],
+    def from_dict(
+        d: Mapping[str, Mapping[str, Any]],
     ) -> ClientConfig:
+        """Create a ClientConfig from a dictionary."""
+        # We must cast the inner dictionary because the source is often a plain
+        # Mapping[str, Any] from the bridge or other sources.
         return ClientConfig(
             profiles={
-                k: ClientConfigProfile.from_dict(v) for k, v in bridge_profiles.items()
+                k: ClientConfigProfile.from_dict(cast(ClientConfigProfileDict, v))
+                for k, v in d.items()
             }
         )
 
@@ -409,12 +413,3 @@ class ClientConfig:
             env_vars=override_env_vars,
         )
         return prof.to_client_connect_config()
-
-    @staticmethod
-    def from_dict(
-        d: Mapping[str, ClientConfigProfileDict],
-    ) -> ClientConfig:
-        """Create a ClientConfig from a dictionary."""
-        return ClientConfig(
-            profiles={k: ClientConfigProfile.from_dict(v) for k, v in d.items()}
-        )

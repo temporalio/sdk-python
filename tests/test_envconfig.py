@@ -447,9 +447,9 @@ custom-header = "custom-value"
 
     # Test with explicit file path, default profile
     config = ClientConfig.load_client_connect_config(config_file=str(config_file))
-    assert config["target_host"] == target_host
-    assert config["namespace"] == namespace
-    new_client = await Client.connect(**config)
+    assert config.get("target_host") == target_host
+    assert config.get("namespace") == namespace
+    new_client = await Client.connect(**config)  # type: ignore
     assert new_client.service_client.config.target_host == target_host
     assert new_client.namespace == namespace
 
@@ -457,12 +457,12 @@ custom-header = "custom-value"
     config = ClientConfig.load_client_connect_config(
         config_file=str(config_file), profile="custom"
     )
-    assert config["target_host"] == target_host
-    assert config["namespace"] == "custom-namespace"
+    assert config.get("target_host") == target_host
+    assert config.get("namespace") == "custom-namespace"
     rpc_metadata = config.get("rpc_metadata")
     assert rpc_metadata
     assert "custom-header" in rpc_metadata
-    new_client = await Client.connect(**config)
+    new_client = await Client.connect(**config)  # type: ignore
     assert new_client.service_client.config.target_host == target_host
     assert new_client.namespace == "custom-namespace"
     assert (
@@ -474,9 +474,9 @@ custom-header = "custom-value"
     config = ClientConfig.load_client_connect_config(
         config_file=str(config_file), override_env_vars=env
     )
-    assert config["target_host"] == target_host
-    assert config["namespace"] == "env-namespace-override"
-    new_client = await Client.connect(**config)
+    assert config.get("target_host") == target_host
+    assert config.get("namespace") == "env-namespace-override"
+    new_client = await Client.connect(**config)  # type: ignore
     assert new_client.namespace == "env-namespace-override"
 
     # Test with env overrides disabled
@@ -485,9 +485,9 @@ custom-header = "custom-value"
         override_env_vars={"TEMPORAL_NAMESPACE": "ignored"},
         disable_env=True,
     )
-    assert config["target_host"] == target_host
-    assert config["namespace"] == namespace
-    new_client = await Client.connect(**config)
+    assert config.get("target_host") == target_host
+    assert config.get("namespace") == namespace
+    new_client = await Client.connect(**config)  # type: ignore
     assert new_client.namespace == namespace
 
     # Test with file loading disabled (so only env is used)
@@ -498,9 +498,9 @@ custom-header = "custom-value"
     config = ClientConfig.load_client_connect_config(
         disable_file=True, override_env_vars=env
     )
-    assert config["target_host"] == target_host
-    assert config["namespace"] == "env-only-namespace"
-    new_client = await Client.connect(**config)
+    assert config.get("target_host") == target_host
+    assert config.get("namespace") == "env-only-namespace"
+    new_client = await Client.connect(**config)  # type: ignore
     assert new_client.service_client.config.target_host == target_host
     assert new_client.namespace == "env-only-namespace"
 
