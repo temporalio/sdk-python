@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Type
 
 import pytest
+from nexusrpc import Operation, service
 from nexusrpc.handler import (
     OperationHandler,
     StartOperationContext,
@@ -51,10 +52,31 @@ class SubclassingHappyPath:
         return MyOperation()
 
 
+@service
+class Service:
+    op: Operation[Input, str]
+
+
+@service_handler
+class SubclassingNoInputOutputTypeAnnotationsWithoutServiceDefinition:
+    @operation_handler
+    def op(self) -> OperationHandler:
+        return MyOperation()
+
+
+@service_handler(service=Service)
+class SubclassingNoInputOutputTypeAnnotationsWithServiceDefinition:
+    @operation_handler
+    def op(self) -> OperationHandler[Input, str]:
+        return MyOperation()
+
+
 @pytest.mark.parametrize(
     "service_handler_cls",
     [
         SubclassingHappyPath,
+        SubclassingNoInputOutputTypeAnnotationsWithoutServiceDefinition,
+        SubclassingNoInputOutputTypeAnnotationsWithServiceDefinition,
     ],
 )
 async def test_workflow_run_operation(
