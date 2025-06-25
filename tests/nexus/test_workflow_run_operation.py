@@ -1,6 +1,8 @@
 import uuid
 from dataclasses import dataclass
+from typing import Any, Type
 
+import pytest
 from nexusrpc.handler import (
     OperationHandler,
     StartOperationContext,
@@ -43,24 +45,33 @@ class MyOperation(WorkflowRunOperationHandler):
 
 
 @service_handler
-class MyService:
+class SubclassingHappyPath:
     @operation_handler
     def op(self) -> OperationHandler[Input, str]:
         return MyOperation()
 
 
-async def test_workflow_run_operation_via_subclassing(env: WorkflowEnvironment):
+@pytest.mark.parametrize(
+    "service_handler_cls",
+    [
+        SubclassingHappyPath,
+    ],
+)
+async def test_workflow_run_operation(
+    env: WorkflowEnvironment,
+    service_handler_cls: Type[Any],
+):
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
     service_client = ServiceClient(
         server_address=server_address(env),
         endpoint=endpoint,
-        service=MyService.__name__,
+        service=service_handler_cls.__name__,
     )
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_service_handlers=[MyService()],
+        nexus_service_handlers=[service_handler_cls()],
     ):
         resp = await service_client.start_operation(
             "op",
