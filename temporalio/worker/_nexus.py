@@ -213,6 +213,7 @@ class _NexusWorker:
         try:
             start_response = await self._start_operation(start_request, headers)
         except BaseException as err:
+            logger.exception("Failed to execute Nexus start operation method")
             handler_err = _exception_to_handler_error(err)
             completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
                 task_token=task_token,
