@@ -41,17 +41,6 @@ def set_open_ai_agent_temporal_overrides(
     Args:
         model_params: Configuration parameters for Temporal activity execution of model calls.
 
-    Example usage:
-        model_params = ModelActivityParameters(
-            start_to_close_timeout=timedelta(seconds=30),
-            retry_policy=RetryPolicy(maximum_attempts=3)
-        )
-        with set_open_ai_agent_temporal_overrides(model_params):
-            # Initialize Temporal client and worker here
-            client = await Client.connect("localhost:7233")
-            worker = Worker(client, task_queue="my-task-queue")
-            await worker.run()
-
     Returns:
         A context manager that yields the configured TemporalTraceProvider.
 
