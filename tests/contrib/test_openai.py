@@ -167,6 +167,7 @@ async def test_hello_world_agent(client: Client):
             )
             assert result == "test"
 
+
 async def test_end_to_end(client: Client):
     if "OPENAI_API_KEY" not in os.environ:
         pytest.skip("No openai API key")
