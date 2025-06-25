@@ -27,6 +27,7 @@ from nexusrpc.types import (
 import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.common
+import temporalio.nexus.handler
 import temporalio.workflow
 from temporalio.workflow import VersioningIntent
 
@@ -299,6 +300,10 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
     operation: Union[
         nexusrpc.Operation[InputT, OutputT],
         Callable[[Any], nexusrpc.handler.OperationHandler[InputT, OutputT]],
+        Callable[
+            [Any, nexusrpc.handler.StartOperationContext, InputT],
+            temporalio.nexus.handler.WorkflowOperationToken[OutputT],
+        ],
         str,
     ]
     input: InputT
@@ -309,6 +314,7 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
     _operation_name: str = field(init=False, repr=False)
     _input_type: Optional[Type[InputT]] = field(init=False, repr=False)
 
+    # TODO(nexus-prerelease): update this logic to handle service impl start methods
     def __post_init__(self) -> None:
         if isinstance(self.operation, str):
             self._operation_name = self.operation
@@ -318,7 +324,7 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
             self._input_type = self.operation.input_type
             self.output_type = self.operation.output_type
         elif isinstance(self.operation, Callable):
-            op = getattr(self.operation, "__nexus_operation__", None)
+            _, op = nexusrpc.handler.get_operation_factory(self.operation)
             if isinstance(op, nexusrpc.Operation):
                 self._operation_name = op.name
                 self._input_type = op.input_type
