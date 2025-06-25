@@ -1,3 +1,4 @@
+import os
 import sys
 import uuid
 from dataclasses import dataclass
@@ -165,6 +166,23 @@ async def test_hello_world_agent(client: Client):
                 execution_timeout=timedelta(seconds=5),
             )
             assert result == "test"
+
+async def test_end_to_end(client: Client):
+    if "OPENAI_API_KEY" not in os.environ:
+        pytest.skip("No openai API key")
+    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=10))
+    with set_open_ai_agent_temporal_overrides(model_params):
+        async with new_worker(
+            client, HelloWorldAgent, activities=[ModelActivity().invoke_model_activity]
+        ) as worker:
+            result = await client.execute_workflow(
+                HelloWorldAgent.run,
+                "Tell me about recursion in programming. Include the word 'function'",
+                id=f"hello-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=5),
+            )
+            assert "function" in result.lower()
 
 
 @dataclass
