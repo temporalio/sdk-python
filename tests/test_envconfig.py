@@ -447,18 +447,18 @@ def test_load_client_connect_config(base_config_file: Path):
     # Test with env overrides
     env = {"TEMPORAL_ADDRESS": "env-address"}
     config = ClientConfig.load_client_connect_config(
-        config_file=str(base_config_file), env_vars=env
+        config_file=str(base_config_file), override_env_vars=env
     )
     assert config.get("target_host") == "env-address"
 
     # Test with env overrides disabled
     config = ClientConfig.load_client_connect_config(
-        config_file=str(base_config_file), env_vars=env, disable_env=True
+        config_file=str(base_config_file), override_env_vars=env, disable_env=True
     )
     assert config.get("target_host") == "default-address"
 
     # Test with file loading disabled
-    config = ClientConfig.load_client_connect_config(disable_file=True, env_vars=env)
+    config = ClientConfig.load_client_connect_config(disable_file=True, override_env_vars=env)
     assert config.get("target_host") == "env-address"
     assert "namespace" not in config
 

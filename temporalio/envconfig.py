@@ -362,11 +362,11 @@ class ClientConfig:
     def load_client_connect_config(
         profile: str = "default",
         *,
-        env_vars: Optional[Mapping[str, str]] = None,
         config_file: Optional[str] = None,
         disable_file: bool = False,
         disable_env: bool = False,
         config_file_strict: bool = False,
+        override_env_vars: Optional[Mapping[str, str]] = None,
     ) -> ClientConnectConfig:
         """Load a single client profile and convert to connect config.
 
@@ -376,7 +376,6 @@ class ClientConfig:
 
         Args:
             profile: The profile to load from the config. Defaults to "default".
-            env_vars: Environment variables to use. Defaults to ``os.environ``.
             config_file: Path to a specific TOML config file. If not provided,
                 default file locations are used. This is ignored if
                 ``disable_file`` is true.
@@ -385,6 +384,8 @@ class ClientConfig:
                 is disabled.
             config_file_strict: If true, will error on unrecognized keys in the
                 TOML file.
+            override_env_vars: A dictionary of environment variables to use for
+                loading and overrides.
 
         Returns:
             TypedDict of keyword arguments for
@@ -396,7 +397,7 @@ class ClientConfig:
             prof = ClientConfig.load_profile_from_file(
                 config_file,
                 profile=profile,
-                env_vars=env_vars,
+                env_vars=override_env_vars,
                 disable_env=disable_env,
                 config_file_strict=config_file_strict,
             )
@@ -404,7 +405,7 @@ class ClientConfig:
             # Otherwise, use default file discovery
             prof = ClientConfig.load_profile(
                 profile=profile,
-                env_vars=env_vars,
+                env_vars=override_env_vars,
                 disable_file=disable_file,
                 disable_env=disable_env,
                 config_file_strict=config_file_strict,
