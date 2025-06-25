@@ -1617,7 +1617,7 @@ grpc = [
     { name = "grpcio" },
 ]
 openai-agents = [
-    { name = "eval-type-backport" },
+    { name = "eval-type-backport", marker = "python_full_version < '3.10'" },
     { name = "openai-agents" },
 ]
 opentelemetry = [
@@ -1650,9 +1650,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "eval-type-backport", marker = "extra == 'openai-agents'", specifier = ">=0.2.2" },
+    { name = "eval-type-backport", marker = "python_full_version < '3.10' and extra == 'openai-agents'", specifier = ">=0.2.2" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.48.2,<2" },
-    { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.0.19" },
+    { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.0.19,<0.1" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
     { name = "protobuf", specifier = ">=3.20,<6" },
