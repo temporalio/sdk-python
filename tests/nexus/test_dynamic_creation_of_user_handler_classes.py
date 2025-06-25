@@ -1,10 +1,10 @@
 import uuid
-from typing import Any
 
 import httpx
 import nexusrpc.handler
 import pytest
-from nexusrpc.handler import SyncOperationHandler
+from nexusrpc.handler import sync_operation_handler
+from nexusrpc.handler._util import get_operation_factory
 
 from temporalio.client import Client
 from temporalio.worker import Worker
@@ -33,22 +33,19 @@ def make_incrementer_user_service_definition_and_service_handler_classes(
     #
     # service handler
     #
-    def factory(self: Any) -> nexusrpc.handler.OperationHandler[int, int]:
-        async def _increment_op(
-            ctx: nexusrpc.handler.StartOperationContext,
-            input: int,
-        ) -> int:
-            return input + 1
+    @sync_operation_handler
+    async def _increment_op(
+        self,
+        ctx: nexusrpc.handler.StartOperationContext,
+        input: int,
+    ) -> int:
+        return input + 1
 
-        return SyncOperationHandler.from_callable(_increment_op)
-
-    op_handler_factories = {
-        # TODO(nexus-prerelease): check that name=name should be required here. Should the op factory
-        # name not default to the name of the method attribute (i.e. key), as opposed to
-        # the name of the method object (i.e. value.__name__)?
-        name: nexusrpc.handler.operation_handler(name=name)(factory)
-        for name in op_names
-    }
+    op_handler_factories = {}
+    for name in op_names:
+        op_handler_factory, _ = get_operation_factory(_increment_op)
+        assert op_handler_factory
+        op_handler_factories[name] = op_handler_factory
 
     handler_cls = nexusrpc.handler.service_handler(service=service_cls)(
         type("ServiceImpl", (), op_handler_factories)
