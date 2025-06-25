@@ -30,14 +30,13 @@ import nexusrpc
 import nexusrpc.handler.syncio
 import pytest
 from google.protobuf import json_format
+from nexusrpc import OperationInfo
 from nexusrpc.handler import (
     CancelOperationContext,
-    StartOperationContext,
-)
-from nexusrpc.handler._common import (
     FetchOperationInfoContext,
     FetchOperationResultContext,
-    OperationInfo,
+    StartOperationContext,
+    SyncOperationHandler,
 )
 
 import temporalio.api.failure.v1
@@ -47,8 +46,12 @@ from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.converter import FailureConverter, PayloadConverter
 from temporalio.exceptions import ApplicationError
-from temporalio.nexus.handler import logger, start_workflow, temporal_operation_context
-from temporalio.nexus.handler._token import WorkflowOperationToken
+from temporalio.nexus.handler import (
+    WorkflowOperationToken,
+    logger,
+    start_workflow,
+    temporal_operation_context,
+)
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import ServiceClient, create_nexus_endpoint, dataclass_as_dict
@@ -141,7 +144,7 @@ class MyServiceHandler:
                 value=f"from start method on {self.__class__.__name__}: {input.value}"
             )
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
     @nexusrpc.handler.operation_handler
     def hang(self) -> nexusrpc.handler.OperationHandler[Input, Output]:
@@ -149,7 +152,7 @@ class MyServiceHandler:
             await asyncio.Future()
             return Output(value="won't reach here")
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
     @nexusrpc.handler.operation_handler
     def non_retryable_application_error(
@@ -164,7 +167,7 @@ class MyServiceHandler:
                 non_retryable=True,
             )
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
     @nexusrpc.handler.operation_handler
     def retryable_application_error(
@@ -178,7 +181,7 @@ class MyServiceHandler:
                 non_retryable=False,
             )
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
     @nexusrpc.handler.operation_handler
     def handler_error_internal(
@@ -192,7 +195,7 @@ class MyServiceHandler:
                 cause=RuntimeError("cause message"),
             )
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
     @nexusrpc.handler.operation_handler
     def operation_error_failed(
@@ -204,7 +207,7 @@ class MyServiceHandler:
                 state=nexusrpc.handler.OperationErrorState.FAILED,
             )
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
     @nexusrpc.handler.operation_handler
     def check_operation_timeout_header(
@@ -216,7 +219,7 @@ class MyServiceHandler:
                 value=f"from start method on {self.__class__.__name__}: {input.value}"
             )
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
     @nexusrpc.handler.operation_handler
     def log(self) -> nexusrpc.handler.OperationHandler[Input, Output]:
@@ -224,7 +227,7 @@ class MyServiceHandler:
             logger.info("Logging from start method", extra={"input_value": input.value})
             return Output(value=f"logged: {input.value}")
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
     @nexusrpc.handler.operation_handler
     def workflow_run_operation(
@@ -253,7 +256,7 @@ class MyServiceHandler:
                 value=f"from start method on {self.__class__.__name__}: {input.value}"
             )
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
     if False:
         # TODO(nexus-prerelease): fix tests of callable instances
@@ -270,7 +273,7 @@ class MyServiceHandler:
                         value=f"from start method on {self.__class__.__name__}: {input.value}"
                     )
 
-            return nexusrpc.handler.syncio.SyncOperationHandler(start())
+            return SyncOperationHandler.from_callable(start())
 
         _sync_operation_with_non_async_callable_instance = (
             nexusrpc.handler.operation_handler(
@@ -288,7 +291,7 @@ class MyServiceHandler:
                 value=f"from start method on {self.__class__.__name__} without type annotations: {input}"
             )
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
     @nexusrpc.handler.operation_handler
     def workflow_run_operation_without_type_annotations(
@@ -368,7 +371,7 @@ class MyServiceHandler:
         async def start(ctx: StartOperationContext, input: None) -> Output:
             return Output(value=f"request_id: {ctx.request_id}")
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
     @nexusrpc.handler.operation_handler
     def non_serializable_output(
@@ -379,7 +382,7 @@ class MyServiceHandler:
         ) -> NonSerializableOutput:
             return NonSerializableOutput()
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
 
 @dataclass
@@ -955,7 +958,7 @@ class SyncStartHandler:
             )
 
         # TODO(nexus-prerelease) why is this test passing? start is not `async def`
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
 
 @nexusrpc.handler.service_handler(service=EchoService)
@@ -967,7 +970,7 @@ class DefaultCancelHandler:
                 value=f"from start method on {self.__class__.__name__}: {input.value}"
             )
 
-        return nexusrpc.handler.SyncOperationHandler(start)
+        return SyncOperationHandler.from_callable(start)
 
 
 @nexusrpc.handler.service_handler(service=EchoService)
@@ -1015,7 +1018,7 @@ class SyncCancel(_InstantiationCase):
     handler = SyncCancelHandler
     executor = False
     exception = RuntimeError
-    match = "cancel must be an `async def`"
+    match = "cancel method must be an `async def`"
 
 
 @pytest.mark.parametrize(
