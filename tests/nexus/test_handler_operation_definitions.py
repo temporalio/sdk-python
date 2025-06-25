@@ -42,7 +42,7 @@ class NotCalled(_TestCase):
                 ctx: nexusrpc.handler.StartOperationContext, input: Input
             ) -> WorkflowOperationToken[Output]: ...
 
-            return WorkflowRunOperationHandler.from_start_workflow(start)
+            return WorkflowRunOperationHandler.from_callable(start)
 
     expected_operations = {
         "my_workflow_run_operation_handler": nexusrpc.Operation(
@@ -65,7 +65,7 @@ class CalledWithoutArgs(_TestCase):
                 ctx: nexusrpc.handler.StartOperationContext, input: Input
             ) -> WorkflowOperationToken[Output]: ...
 
-            return WorkflowRunOperationHandler.from_start_workflow(start)
+            return WorkflowRunOperationHandler.from_callable(start)
 
     expected_operations = NotCalled.expected_operations
 
@@ -81,7 +81,7 @@ class CalledWithNameOverride(_TestCase):
                 ctx: nexusrpc.handler.StartOperationContext, input: Input
             ) -> WorkflowOperationToken[Output]: ...
 
-            return WorkflowRunOperationHandler.from_start_workflow(start)
+            return WorkflowRunOperationHandler.from_callable(start)
 
     expected_operations = {
         "workflow_run_operation_with_name_override": nexusrpc.Operation(

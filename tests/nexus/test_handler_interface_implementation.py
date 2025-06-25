@@ -48,7 +48,7 @@ class ValidWorkflowRunImpl(_InterfaceImplementationTestCase):
                 ctx: nexusrpc.handler.StartOperationContext, input: str
             ) -> WorkflowOperationToken[int]: ...
 
-            return WorkflowRunOperationHandler.from_start_workflow(start)
+            return WorkflowRunOperationHandler.from_callable(start)
 
     error_message = None
 

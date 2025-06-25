@@ -243,9 +243,7 @@ class MyServiceHandler:
                 id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
             )
 
-        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
-            start
-        )
+        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_callable(start)
 
     @nexusrpc.handler.operation_handler
     def sync_operation_with_non_async_def(
@@ -304,9 +302,7 @@ class MyServiceHandler:
                 id=str(uuid.uuid4()),
             )
 
-        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
-            start
-        )
+        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_callable(start)
 
     @nexusrpc.handler.operation_handler
     def workflow_run_op_link_test(
@@ -327,9 +323,7 @@ class MyServiceHandler:
                 id=str(uuid.uuid4()),
             )
 
-        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
-            start
-        )
+        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_callable(start)
 
     class OperationHandlerReturningUnwrappedResult(
         nexusrpc.handler.OperationHandler[Input, Output]
@@ -1128,9 +1122,7 @@ class ServiceHandlerForRequestIdTest:
                 id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
             )
 
-        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
-            start
-        )
+        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_callable(start)
 
     @nexusrpc.handler.operation_handler
     def operation_that_executes_a_workflow_before_starting_the_backing_workflow(
@@ -1155,9 +1147,7 @@ class ServiceHandlerForRequestIdTest:
                 id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
             )
 
-        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
-            start
-        )
+        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_callable(start)
 
 
 async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnvironment):
