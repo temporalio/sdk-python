@@ -91,7 +91,7 @@ class WorkflowRunOperationHandler(
             self._start = self._input_type = self._output_type = None
 
     @classmethod
-    def from_start_workflow(
+    def from_callable(
         cls,
         start_workflow: Callable[
             [StartOperationContext, InputT],

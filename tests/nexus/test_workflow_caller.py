@@ -227,7 +227,7 @@ class ServiceImpl:
                 id=input.response_type.operation_workflow_id,
             )
 
-        return WorkflowRunOperationHandler.from_start_workflow(start)
+        return WorkflowRunOperationHandler.from_callable(start)
 
 
 # -----------------------------------------------------------------------------
@@ -966,9 +966,7 @@ class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
                 id=str(uuid.uuid4()),
             )
 
-        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
-            start
-        )
+        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_callable(start)
 
 
 @workflow.defn
