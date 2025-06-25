@@ -51,7 +51,7 @@ from temporalio.nexus.handler import logger, start_workflow, temporal_operation_
 from temporalio.nexus.handler._token import WorkflowOperationToken
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers.nexus import ServiceClient, create_nexus_endpoint
+from tests.helpers.nexus import ServiceClient, create_nexus_endpoint, dataclass_as_dict
 
 HTTP_PORT = 7243
 
@@ -240,7 +240,9 @@ class MyServiceHandler:
                 id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
             )
 
-        return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
+        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
+            start
+        )
 
     @nexusrpc.handler.operation_handler
     def sync_operation_with_non_async_def(
@@ -299,7 +301,9 @@ class MyServiceHandler:
                 id=str(uuid.uuid4()),
             )
 
-        return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
+        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
+            start
+        )
 
     @nexusrpc.handler.operation_handler
     def workflow_run_op_link_test(
@@ -320,7 +324,9 @@ class MyServiceHandler:
                 id=str(uuid.uuid4()),
             )
 
-        return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
+        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
+            start
+        )
 
     class OperationHandlerReturningUnwrappedResult(
         nexusrpc.handler.OperationHandler[Input, Output]
@@ -925,18 +931,6 @@ async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: A
     assert getattr(record, "operation", None) == operation_name
 
 
-def dataclass_as_dict(dataclass: Any) -> dict[str, Any]:
-    """
-    Return a shallow dict of the dataclass's fields.
-
-    dataclasses.as_dict goes too far (attempts to pickle values)
-    """
-    return {
-        field.name: getattr(dataclass, field.name)
-        for field in dataclasses.fields(dataclass)
-    }
-
-
 class _InstantiationCase:
     executor: bool
     handler: Callable[[], Any]
@@ -1131,7 +1125,9 @@ class ServiceHandlerForRequestIdTest:
                 id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
             )
 
-        return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
+        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
+            start
+        )
 
     @nexusrpc.handler.operation_handler
     def operation_that_executes_a_workflow_before_starting_the_backing_workflow(
@@ -1156,7 +1152,9 @@ class ServiceHandlerForRequestIdTest:
                 id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
             )
 
-        return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
+        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
+            start
+        )
 
 
 async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnvironment):

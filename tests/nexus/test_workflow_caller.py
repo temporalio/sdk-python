@@ -38,6 +38,7 @@ from temporalio.nexus.handler import (
     start_workflow,
     temporal_operation_context,
 )
+from temporalio.nexus.handler._operation_handlers import WorkflowRunOperationHandler
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
@@ -225,7 +226,7 @@ class ServiceImpl:
                 id=input.response_type.operation_workflow_id,
             )
 
-        return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
+        return WorkflowRunOperationHandler.from_start_workflow(start)
 
 
 # -----------------------------------------------------------------------------
@@ -964,7 +965,9 @@ class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
                 id=str(uuid.uuid4()),
             )
 
-        return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
+        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
+            start
+        )
 
 
 @workflow.defn

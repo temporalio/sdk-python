@@ -1,3 +1,4 @@
+import dataclasses
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
@@ -93,3 +94,15 @@ class ServiceClient:
                 # Token can also be sent as "Nexus-Operation-Token" header
                 params={"token": token},
             )
+
+
+def dataclass_as_dict(dataclass: Any) -> dict[str, Any]:
+    """
+    Return a shallow dict of the dataclass's fields.
+
+    dataclasses.as_dict goes too far (attempts to pickle values)
+    """
+    return {
+        field.name: getattr(dataclass, field.name)
+        for field in dataclasses.fields(dataclass)
+    }
