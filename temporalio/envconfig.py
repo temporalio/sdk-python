@@ -31,6 +31,8 @@ def _from_dict_to_source(d: Optional[Mapping[str, Any]]) -> Optional[DataSource]
 
 
 def _read_source(source: Optional[DataSource]) -> Optional[bytes]:
+    if source is None:
+        return None
     if isinstance(source, Path):
         with open(source, "rb") as f:
             return f.read()
@@ -38,7 +40,9 @@ def _read_source(source: Optional[DataSource]) -> Optional[bytes]:
         return source.encode("utf-8")
     if isinstance(source, bytes):
         return source
-    return None
+    raise TypeError(
+        f"Source must be one of pathlib.Path, str, or bytes, but got {type(source).__name__}"
+    )
 
 
 @dataclass(frozen=True)
