@@ -13,7 +13,8 @@ from nexusrpc.handler import (
 )
 
 from temporalio import workflow
-from temporalio.nexus.handler import WorkflowRunOperationHandler, start_workflow
+from temporalio.nexus.handler import start_workflow
+from temporalio.nexus.handler._operation_handlers import WorkflowRunOperationHandler
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import ServiceClient, create_nexus_endpoint, dataclass_as_dict
@@ -33,7 +34,13 @@ class EchoWorkflow:
         return input
 
 
+# TODO(nexus-prerelease): this test dates from a point at which we were encouraging
+# subclassing WorkflowRunOperationHandler as part of the public API. Leaving it in for
+# now.
 class MyOperation(WorkflowRunOperationHandler):
+    def __init__(self):
+        pass
+
     async def start(
         self, ctx: StartOperationContext, input: Input
     ) -> StartOperationResultAsync:

@@ -57,6 +57,7 @@ from temporalio.nexus.handler import (
     logger,
     start_workflow,
     temporal_operation_context,
+    workflow_run_operation_handler,
 )
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
@@ -211,7 +212,7 @@ class MyServiceHandler:
         logger.info("Logging from start method", extra={"input_value": input.value})
         return Output(value=f"logged: {input.value}")
 
-    @sync_operation_handler
+    @workflow_run_operation_handler
     async def workflow_run_operation(
         self, ctx: StartOperationContext, input: Input
     ) -> WorkflowOperationToken[Output]:
@@ -262,39 +263,29 @@ class MyServiceHandler:
             value=f"from start method on {self.__class__.__name__} without type annotations: {input}"
         )
 
-    @operation_handler
-    def workflow_run_operation_without_type_annotations(
-        self,
-    ) -> OperationHandler[Input, Output]:
-        async def start(ctx, input):
-            return await start_workflow(
-                WorkflowWithoutTypeAnnotations.run,
-                input,
-                id=str(uuid.uuid4()),
-            )
+    @workflow_run_operation_handler
+    async def workflow_run_operation_without_type_annotations(self, ctx, input):
+        return await start_workflow(
+            WorkflowWithoutTypeAnnotations.run,
+            input,
+            id=str(uuid.uuid4()),
+        )
 
-        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_callable(start)
+    @workflow_run_operation_handler
+    async def workflow_run_op_link_test(
+        self, ctx: StartOperationContext, input: Input
+    ) -> WorkflowOperationToken[Output]:
+        assert any(
+            link.url == "http://inbound-link/" for link in ctx.inbound_links
+        ), "Inbound link not found"
+        assert ctx.request_id == "test-request-id-123", "Request ID mismatch"
+        ctx.outbound_links.extend(ctx.inbound_links)
 
-    @operation_handler
-    def workflow_run_op_link_test(
-        self,
-    ) -> OperationHandler[Input, Output]:
-        async def start(
-            ctx: StartOperationContext, input: Input
-        ) -> WorkflowOperationToken[Output]:
-            assert any(
-                link.url == "http://inbound-link/" for link in ctx.inbound_links
-            ), "Inbound link not found"
-            assert ctx.request_id == "test-request-id-123", "Request ID mismatch"
-            ctx.outbound_links.extend(ctx.inbound_links)
-
-            return await start_workflow(
-                MyLinkTestWorkflow.run,
-                input,
-                id=str(uuid.uuid4()),
-            )
-
-        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_callable(start)
+        return await start_workflow(
+            MyLinkTestWorkflow.run,
+            input,
+            id=str(uuid.uuid4()),
+        )
 
     class OperationHandlerReturningUnwrappedResult(OperationHandler[Input, Output]):
         async def start(
@@ -609,7 +600,8 @@ class OperationHandlerReturningUnwrappedResultError(_FailureTestCase):
         retryable_header=False,
         failure_message=(
             "Operation start method must return either "
-            "StartOperationResultSync or StartOperationResultAsync."
+            "nexusrpc.handler.StartOperationResultSync or "
+            "nexusrpc.handler.StartOperationResultAsync."
         ),
     )
 
@@ -823,12 +815,12 @@ async def _test_start_operation(
             if with_service_definition
             else service_handler
         )
-        service_handler = decorator(MyServiceHandler)()
+        user_service_handler = decorator(MyServiceHandler)()
 
         async with Worker(
             env.client,
             task_queue=task_queue,
-            nexus_service_handlers=[service_handler],
+            nexus_service_handlers=[user_service_handler],
             nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
         ):
             response = await service_client.start_operation(
@@ -1063,46 +1055,36 @@ class EchoWorkflow:
 
 @service_handler
 class ServiceHandlerForRequestIdTest:
-    @operation_handler
-    def operation_backed_by_a_workflow(
-        self,
-    ) -> OperationHandler[Input, Output]:
-        async def start(
-            ctx: StartOperationContext, input: Input
-        ) -> WorkflowOperationToken[Output]:
-            return await start_workflow(
-                EchoWorkflow.run,
-                input,
-                id=input.value,
-                id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
-            )
+    @workflow_run_operation_handler
+    async def operation_backed_by_a_workflow(
+        self, ctx: StartOperationContext, input: Input
+    ) -> WorkflowOperationToken[Output]:
+        return await start_workflow(
+            EchoWorkflow.run,
+            input,
+            id=input.value,
+            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+        )
 
-        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_callable(start)
-
-    @operation_handler
-    def operation_that_executes_a_workflow_before_starting_the_backing_workflow(
-        self,
-    ) -> OperationHandler[Input, Output]:
-        async def start(
-            ctx: StartOperationContext, input: Input
-        ) -> WorkflowOperationToken[Output]:
-            tctx = temporal_operation_context.get()
-            await tctx.client.start_workflow(
-                EchoWorkflow.run,
-                input,
-                id=input.value,
-                task_queue=tctx.task_queue,
-            )
-            # This should fail. It will not fail if the Nexus request ID was incorrectly
-            # propagated to both StartWorkflow requests.
-            return await start_workflow(
-                EchoWorkflow.run,
-                input,
-                id=input.value,
-                id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
-            )
-
-        return temporalio.nexus.handler.WorkflowRunOperationHandler.from_callable(start)
+    @workflow_run_operation_handler
+    async def operation_that_executes_a_workflow_before_starting_the_backing_workflow(
+        self, ctx: StartOperationContext, input: Input
+    ) -> WorkflowOperationToken[Output]:
+        tctx = temporal_operation_context.get()
+        await tctx.client.start_workflow(
+            EchoWorkflow.run,
+            input,
+            id=input.value,
+            task_queue=tctx.task_queue,
+        )
+        # This should fail. It will not fail if the Nexus request ID was incorrectly
+        # propagated to both StartWorkflow requests.
+        return await start_workflow(
+            EchoWorkflow.run,
+            input,
+            id=input.value,
+            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+        )
 
 
 async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnvironment):

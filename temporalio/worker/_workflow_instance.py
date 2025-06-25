@@ -59,6 +59,7 @@ import temporalio.bridge.proto.workflow_completion
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.nexus.handler
 import temporalio.workflow
 from temporalio.service import __version__
 
@@ -1500,6 +1501,10 @@ class _WorkflowInstanceImpl(
         operation: Union[
             nexusrpc.Operation[I, O],
             Callable[[Any], nexusrpc.handler.OperationHandler[I, O]],
+            Callable[
+                [Any, nexusrpc.handler.StartOperationContext, I],
+                temporalio.nexus.handler.WorkflowOperationToken[O],
+            ],
             str,
         ],
         input: Any,

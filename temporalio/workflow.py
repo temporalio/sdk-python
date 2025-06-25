@@ -56,6 +56,7 @@ import temporalio.bridge.proto.workflow_commands
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.nexus.handler
 import temporalio.workflow
 
 from .types import (
@@ -856,6 +857,10 @@ class _Runtime(ABC):
         operation: Union[
             nexusrpc.Operation[I, O],
             Callable[[Any], nexusrpc.handler.OperationHandler[I, O]],
+            Callable[
+                [S, nexusrpc.handler.StartOperationContext, I],
+                temporalio.nexus.handler.WorkflowOperationToken[O],
+            ],
             str,
         ],
         input: Any,
@@ -4422,6 +4427,10 @@ async def start_nexus_operation(
     operation: Union[
         nexusrpc.Operation[I, O],
         Callable[[Any], nexusrpc.handler.OperationHandler[I, O]],
+        Callable[
+            [S, nexusrpc.handler.StartOperationContext, I],
+            temporalio.nexus.handler.WorkflowOperationToken[O],
+        ],
         str,
     ],
     input: Any,
@@ -5205,6 +5214,10 @@ class NexusClient(Generic[S]):
         operation: Union[
             nexusrpc.Operation[I, O],
             Callable[[S], nexusrpc.handler.OperationHandler[I, O]],
+            Callable[
+                [S, nexusrpc.handler.StartOperationContext, I],
+                temporalio.nexus.handler.WorkflowOperationToken[O],
+            ],
             str,
         ],
         input: I,
@@ -5229,6 +5242,10 @@ class NexusClient(Generic[S]):
         operation: Union[
             nexusrpc.Operation[I, O],
             Callable[[S], nexusrpc.handler.OperationHandler[I, O]],
+            Callable[
+                [S, nexusrpc.handler.StartOperationContext, I],
+                temporalio.nexus.handler.WorkflowOperationToken[O],
+            ],
             str,
         ],
         input: I,

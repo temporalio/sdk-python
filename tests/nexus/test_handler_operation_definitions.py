@@ -8,10 +8,11 @@ from typing import Any, Type
 
 import nexusrpc.handler
 import pytest
+from nexusrpc.handler import StartOperationContext
 
 from temporalio.nexus.handler import (
     WorkflowOperationToken,
-    WorkflowRunOperationHandler,
+    workflow_run_operation_handler,
 )
 
 
@@ -34,15 +35,10 @@ class _TestCase:
 class NotCalled(_TestCase):
     @nexusrpc.handler.service_handler
     class Service:
-        @nexusrpc.handler.operation_handler
-        def my_workflow_run_operation_handler(
-            self,
-        ) -> nexusrpc.handler.OperationHandler[Input, Output]:
-            async def start(
-                ctx: nexusrpc.handler.StartOperationContext, input: Input
-            ) -> WorkflowOperationToken[Output]: ...
-
-            return WorkflowRunOperationHandler.from_callable(start)
+        @workflow_run_operation_handler
+        async def my_workflow_run_operation_handler(
+            self, ctx: StartOperationContext, input: Input
+        ) -> WorkflowOperationToken[Output]: ...
 
     expected_operations = {
         "my_workflow_run_operation_handler": nexusrpc.Operation(
@@ -57,15 +53,10 @@ class NotCalled(_TestCase):
 class CalledWithoutArgs(_TestCase):
     @nexusrpc.handler.service_handler
     class Service:
-        @nexusrpc.handler.operation_handler()
-        def my_workflow_run_operation_handler(
-            self,
-        ) -> nexusrpc.handler.OperationHandler[Input, Output]:
-            async def start(
-                ctx: nexusrpc.handler.StartOperationContext, input: Input
-            ) -> WorkflowOperationToken[Output]: ...
-
-            return WorkflowRunOperationHandler.from_callable(start)
+        @workflow_run_operation_handler
+        async def my_workflow_run_operation_handler(
+            self, ctx: StartOperationContext, input: Input
+        ) -> WorkflowOperationToken[Output]: ...
 
     expected_operations = NotCalled.expected_operations
 
@@ -73,15 +64,10 @@ class CalledWithoutArgs(_TestCase):
 class CalledWithNameOverride(_TestCase):
     @nexusrpc.handler.service_handler
     class Service:
-        @nexusrpc.handler.operation_handler(name="operation-name")
-        def workflow_run_operation_with_name_override(
-            self,
-        ) -> nexusrpc.handler.OperationHandler[Input, Output]:
-            async def start(
-                ctx: nexusrpc.handler.StartOperationContext, input: Input
-            ) -> WorkflowOperationToken[Output]: ...
-
-            return WorkflowRunOperationHandler.from_callable(start)
+        @workflow_run_operation_handler(name="operation-name")
+        async def workflow_run_operation_with_name_override(
+            self, ctx: StartOperationContext, input: Input
+        ) -> WorkflowOperationToken[Output]: ...
 
     expected_operations = {
         "workflow_run_operation_with_name_override": nexusrpc.Operation(
@@ -111,7 +97,9 @@ async def test_collected_operation_names(
     assert isinstance(service, nexusrpc.ServiceDefinition)
     assert service.name == "Service"
     for method_name, expected_op in test_case.expected_operations.items():
-        actual_op = getattr(test_case.Service, method_name).__nexus_operation__
+        _, actual_op = nexusrpc.handler.get_operation_factory(
+            getattr(test_case.Service, method_name)
+        )
         assert isinstance(actual_op, nexusrpc.Operation)
         assert actual_op.name == expected_op.name
         assert actual_op.input_type == expected_op.input_type

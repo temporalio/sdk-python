@@ -1,18 +1,21 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import (
     Any,
     Awaitable,
     Callable,
     Optional,
+    Type,
 )
 
-import nexusrpc.handler
+from nexusrpc import OperationInfo
 from nexusrpc.handler import (
     CancelOperationContext,
+    FetchOperationInfoContext,
+    FetchOperationResultContext,
     HandlerError,
     HandlerErrorType,
+    OperationHandler,
     StartOperationContext,
     StartOperationResultAsync,
 )
@@ -28,15 +31,11 @@ from temporalio.nexus.handler._operation_context import (
 from temporalio.nexus.handler._token import WorkflowOperationToken
 
 from ._util import (
-    get_workflow_run_start_method_input_and_output_type_annotations,
     is_async_callable,
 )
 
 
-class WorkflowRunOperationHandler(
-    nexusrpc.handler.OperationHandler[InputT, OutputT],
-    ABC,
-):
+class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
     """
     Operation handler for Nexus operations that start a workflow.
 
@@ -67,61 +66,58 @@ class WorkflowRunOperationHandler(
 
     def __init__(
         self,
-        start: Optional[
-            Callable[
-                [StartOperationContext, InputT],
-                Awaitable[WorkflowOperationToken[OutputT]],
-            ]
-        ] = None,
-    ) -> None:
-        if start is not None:
-            if not is_async_callable(start):
-                raise RuntimeError(
-                    f"{start} is not an `async def` method. "
-                    "WorkflowRunOperationHandler must be initialized with an "
-                    "`async def` start method."
-                )
-            self._start = start
-            if start.__doc__:
-                self.start.__func__.__doc__ = start.__doc__
-            self._input_type, self._output_type = (
-                get_workflow_run_start_method_input_and_output_type_annotations(start)
-            )
-        else:
-            self._start = self._input_type = self._output_type = None
-
-    @classmethod
-    def from_callable(
-        cls,
-        start_workflow: Callable[
+        start: Callable[
             [StartOperationContext, InputT],
             Awaitable[WorkflowOperationToken[OutputT]],
         ],
-    ) -> WorkflowRunOperationHandler[InputT, OutputT]:
-        return _WorkflowRunOperationHandler(start_workflow)
+        input_type: Optional[Type[InputT]],
+        output_type: Optional[Type[OutputT]],
+    ) -> None:
+        if not is_async_callable(start):
+            raise RuntimeError(
+                f"{start} is not an `async def` method. "
+                "WorkflowRunOperationHandler must be initialized with an "
+                "`async def` start method."
+            )
+        self._start = start
+        if start.__doc__:
+            self.start.__func__.__doc__ = start.__doc__
+        self._input_type = input_type
+        self._output_type = output_type
 
-    @abstractmethod
     async def start(
         self, ctx: StartOperationContext, input: InputT
-    ) -> nexusrpc.handler.StartOperationResultAsync:
+    ) -> StartOperationResultAsync:
         """
         Start the operation, by starting a workflow and completing asynchronously.
         """
-        ...
+        token = await self._start(ctx, input)
+        if not isinstance(token, WorkflowOperationToken):
+            if isinstance(token, WorkflowHandle):
+                raise RuntimeError(
+                    f"Expected {token} to be a WorkflowOperationToken, but got a WorkflowHandle. "
+                    f"You must use :py:meth:`temporalio.nexus.handler.start_workflow` "
+                    "to start a workflow that will deliver the result of the Nexus operation, "
+                    "not :py:meth:`temporalio.client.Client.start_workflow`."
+                )
+            raise RuntimeError(
+                f"Expected {token} to be a WorkflowOperationToken, but got {type(token)}. "
+            )
+        return StartOperationResultAsync(token.encode())
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
         """Cancel the operation, by cancelling the workflow."""
         await cancel_operation(token)
 
     async def fetch_info(
-        self, ctx: nexusrpc.handler.FetchOperationInfoContext, token: str
-    ) -> nexusrpc.OperationInfo:
+        self, ctx: FetchOperationInfoContext, token: str
+    ) -> OperationInfo:
         raise NotImplementedError(
             "Temporal Nexus operation handlers do not support fetching operation info."
         )
 
     async def fetch_result(
-        self, ctx: nexusrpc.handler.FetchOperationResultContext, token: str
+        self, ctx: FetchOperationResultContext, token: str
     ) -> OutputT:
         raise NotImplementedError(
             "Temporal Nexus operation handlers do not support fetching the operation result."
@@ -148,35 +144,6 @@ class WorkflowRunOperationHandler(
                 cause=err,
             )
         return await handle.result()
-
-
-class _WorkflowRunOperationHandler(WorkflowRunOperationHandler[InputT, OutputT]):
-    async def start(
-        self, ctx: StartOperationContext, input: InputT
-    ) -> nexusrpc.handler.StartOperationResultAsync:
-        """
-        Start the operation, by starting a workflow and completing asynchronously.
-        """
-
-        if self._start is None:
-            raise RuntimeError(
-                "Do not use _WorkflowRunOperationHandler directly. "
-                "Use WorkflowRunOperationHandler.from_start_workflow instead."
-            )
-
-        token = await self._start(ctx, input)
-        if not isinstance(token, WorkflowOperationToken):
-            if isinstance(token, WorkflowHandle):
-                raise RuntimeError(
-                    f"Expected {token} to be a WorkflowOperationToken, but got a WorkflowHandle. "
-                    f"You must use :py:meth:`temporalio.nexus.handler.start_workflow` "
-                    "to start a workflow that will deliver the result of the Nexus operation, "
-                    "not :py:meth:`temporalio.client.Client.start_workflow`."
-                )
-            raise RuntimeError(
-                f"Expected {token} to be a WorkflowOperationToken, but got {type(token)}. "
-            )
-        return StartOperationResultAsync(token.encode())
 
 
 async def cancel_operation(
