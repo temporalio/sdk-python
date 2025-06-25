@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
+from typing import Optional
 
 from temporalio import workflow
+from temporalio.common import Priority, RetryPolicy
+from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
+from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +46,14 @@ with workflow.unsafe.imports_passed_through():
 class _TemporalModelStub(Model):
     """A stub that allows invoking models as Temporal activities."""
 
-    def __init__(self, model_name: Optional[str], **kwargs) -> None:
+    def __init__(
+        self,
+        model_name: Optional[str],
+        *,
+        model_params: ModelActivityParameters,
+    ) -> None:
         self.model_name = model_name
-        self.kwargs = kwargs
+        self.model_params = model_params
 
     async def get_response(
         self,
@@ -141,11 +151,20 @@ class _TemporalModelStub(Model):
             previous_response_id=previous_response_id,
             prompt=prompt,
         )
+
         return await workflow.execute_activity_method(
             ModelActivity.invoke_model_activity,
             activity_input,
-            summary=get_summary(input),
-            **self.kwargs,
+            summary=self.model_params.summary_override or get_summary(input),
+            task_queue=self.model_params.task_queue,
+            schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
+            schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
+            start_to_close_timeout=self.model_params.start_to_close_timeout,
+            heartbeat_timeout=self.model_params.heartbeat_timeout,
+            retry_policy=self.model_params.retry_policy,
+            cancellation_type=self.model_params.cancellation_type,
+            versioning_intent=self.model_params.versioning_intent,
+            priority=self.model_params.priority,
         )
 
     def stream_response(

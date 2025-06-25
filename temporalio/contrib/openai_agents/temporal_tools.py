@@ -1,17 +1,33 @@
 """Support for using Temporal activities as OpenAI agents tools."""
 
-from typing import Any, Callable
+from datetime import timedelta
+from typing import Any, Callable, Optional
 
 from temporalio import activity, workflow
+from temporalio.common import Priority, RetryPolicy
 from temporalio.exceptions import ApplicationError
-from temporalio.workflow import unsafe
+from temporalio.workflow import ActivityCancellationType, VersioningIntent, unsafe
 
 with unsafe.imports_passed_through():
     from agents import FunctionTool, RunContextWrapper, Tool
     from agents.function_schema import function_schema
 
 
-def activity_as_tool(fn: Callable, **kwargs) -> Tool:
+def activity_as_tool(
+    fn: Callable,
+    *,
+    task_queue: Optional[str] = None,
+    schedule_to_close_timeout: Optional[timedelta] = None,
+    schedule_to_start_timeout: Optional[timedelta] = None,
+    start_to_close_timeout: Optional[timedelta] = None,
+    heartbeat_timeout: Optional[timedelta] = None,
+    retry_policy: Optional[RetryPolicy] = None,
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: Optional[str] = None,
+    versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
+    priority: Priority = Priority.default,
+) -> Tool:
     """Convert a single Temporal activity function to an OpenAI agent tool.
 
     .. warning::
@@ -25,16 +41,7 @@ def activity_as_tool(fn: Callable, **kwargs) -> Tool:
 
     Args:
         fn: A Temporal activity function to convert to a tool.
-        **kwargs: Additional arguments to pass to workflow.execute_activity.
-            These arguments configure how the activity is executed. Common options include:
-            - start_to_close_timeout: Maximum time for the activity to complete
-            - schedule_to_close_timeout: Maximum time from scheduling to completion
-            - schedule_to_start_timeout: Maximum time from scheduling to starting
-            - heartbeat_timeout: Maximum time between heartbeats
-            - retry_policy: Policy for retrying failed activities
-            - task_queue: Specific task queue to use for this activity
-            - cancellation_type: How the activity handles cancellation
-            - workflow_id_reuse_policy: Policy for workflow ID reuse
+        For other arguments, refer to :py:mod:`workflow` :py:meth:`start_activity`
 
     Returns:
         An OpenAI agent tool that wraps the provided activity.
@@ -69,7 +76,17 @@ def activity_as_tool(fn: Callable, **kwargs) -> Tool:
                 await workflow.execute_activity(
                     fn,
                     input,
-                    **kwargs,
+                    task_queue=task_queue,
+                    schedule_to_close_timeout=schedule_to_close_timeout,
+                    schedule_to_start_timeout=schedule_to_start_timeout,
+                    start_to_close_timeout=start_to_close_timeout,
+                    heartbeat_timeout=heartbeat_timeout,
+                    retry_policy=retry_policy,
+                    cancellation_type=cancellation_type,
+                    activity_id=activity_id,
+                    versioning_intent=versioning_intent,
+                    summary=summary,
+                    priority=priority,
                 )
             )
         except Exception:

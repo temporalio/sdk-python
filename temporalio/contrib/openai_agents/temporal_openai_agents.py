@@ -1,21 +1,27 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
 from contextlib import contextmanager
+from datetime import timedelta
 from typing import Optional
 
 from agents import set_trace_provider
-from agents.run import AgentRunner, get_default_agent_runner, set_default_agent_runner
-from agents.tracing import TraceProvider, get_trace_provider
+from agents.run import get_default_agent_runner, set_default_agent_runner
+from agents.tracing import get_trace_provider
 from agents.tracing.provider import DefaultTraceProvider
 
+from temporalio.common import Priority, RetryPolicy
 from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
     TemporalTraceProvider,
 )
+from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
+from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 
 @contextmanager
-def set_open_ai_agent_temporal_overrides(**kwargs):
+def set_open_ai_agent_temporal_overrides(
+    model_params: ModelActivityParameters,
+):
     """Configure Temporal-specific overrides for OpenAI agents.
 
     .. warning::
@@ -33,34 +39,26 @@ def set_open_ai_agent_temporal_overrides(**kwargs):
     3. Restoring previous settings when the context exits
 
     Args:
-        **kwargs: Additional arguments to pass to the TemporalOpenAIRunner constructor.
-            These arguments are forwarded to workflow.execute_activity_method when
-            executing model calls. Common options include:
-            - start_to_close_timeout: Maximum time for the activity to complete
-            - schedule_to_close_timeout: Maximum time from scheduling to completion
-            - retry_policy: Policy for retrying failed activities
-            - task_queue: Specific task queue to use for model activities
-
-    Example usage:
-        with set_open_ai_agent_temporal_overrides(
-            start_to_close_timeout=timedelta(seconds=30),
-            retry_policy=RetryPolicy(maximum_attempts=3)
-        ):
-            # Initialize Temporal client and worker here
-            client = await Client.connect("localhost:7233")
-            worker = Worker(client, task_queue="my-task-queue")
-            await worker.run()
+        model_params: Configuration parameters for Temporal activity execution of model calls.
 
     Returns:
         A context manager that yields the configured TemporalTraceProvider.
 
     """
+    if (
+        not model_params.start_to_close_timeout
+        and not model_params.schedule_to_close_timeout
+    ):
+        raise ValueError(
+            "Activity must have start_to_close_timeout or schedule_to_close_timeout"
+        )
+
     previous_runner = get_default_agent_runner()
     previous_trace_provider = get_trace_provider()
     provider = TemporalTraceProvider()
 
     try:
-        set_default_agent_runner(TemporalOpenAIRunner(**kwargs))
+        set_default_agent_runner(TemporalOpenAIRunner(model_params))
         set_trace_provider(provider)
         yield provider
     finally:

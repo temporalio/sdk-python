@@ -1,5 +1,6 @@
 from dataclasses import replace
-from typing import Union
+from datetime import timedelta
+from typing import Optional, Union
 
 from agents import (
     Agent,
@@ -13,7 +14,10 @@ from agents import (
 from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
 
 from temporalio import workflow
+from temporalio.common import Priority, RetryPolicy
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
+from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
+from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 
 class TemporalOpenAIRunner(AgentRunner):
@@ -23,10 +27,10 @@ class TemporalOpenAIRunner(AgentRunner):
 
     """
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, model_params: ModelActivityParameters) -> None:
         """Initialize the Temporal OpenAI Runner."""
         self._runner = DEFAULT_AGENT_RUNNER or AgentRunner()
-        self.kwargs = kwargs
+        self.model_params = model_params
 
     async def run(
         self,
@@ -56,7 +60,11 @@ class TemporalOpenAIRunner(AgentRunner):
                 "Temporal workflows require a model name to be a string in the run config."
             )
         updated_run_config = replace(
-            run_config, model=_TemporalModelStub(run_config.model, **self.kwargs)
+            run_config,
+            model=_TemporalModelStub(
+                run_config.model,
+                model_params=self.model_params,
+            ),
         )
 
         with workflow.unsafe.imports_passed_through():
