@@ -79,15 +79,15 @@ jobs:
       - run: poe lint
       - run: poe build-develop
       - run: mkdir junit-xml
-      - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+      - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--${{ matrix.dependencies }}.xml
         timeout-minutes: 10
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
-        run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
+        run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--${{ matrix.dependencies }}--time-skipping.xml
         timeout-minutes: 10
       # Check cloud if proper target and not on fork
       - if: ${{ matrix.cloudTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
-        run: poe test ${{matrix.pytestExtraArgs}} -s -k test_cloud_client --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--cloud.xml
+        run: poe test ${{matrix.pytestExtraArgs}} -s -k test_cloud_client --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--${{ matrix.dependencies }}--cloud.xml
         timeout-minutes: 10
         env:
           TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
@@ -97,7 +97,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: junit-xml--${{github.run_id}}--${{github.run_attempt}}--${{ matrix.python }}--${{ matrix.os }}
+          name: junit-xml--${{github.run_id}}--${{github.run_attempt}}--${{ matrix.python }}--${{ matrix.os }}--${{ matrix.dependencies }}
           path: junit-xml
           retention-days: 14
 
