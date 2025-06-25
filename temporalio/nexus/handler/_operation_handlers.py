@@ -4,7 +4,6 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Generic,
 )
 
 import nexusrpc.handler
@@ -18,7 +17,6 @@ from nexusrpc.handler import (
 from nexusrpc.types import (
     InputT,
     OutputT,
-    ServiceHandlerT,
 )
 
 from temporalio.client import WorkflowHandle
@@ -35,7 +33,6 @@ from ._util import (
 
 class WorkflowRunOperationHandler(
     nexusrpc.handler.OperationHandler[InputT, OutputT],
-    Generic[InputT, OutputT, ServiceHandlerT],
 ):
     """
     Operation handler for Nexus operations that start a workflow.
