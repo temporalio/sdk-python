@@ -247,7 +247,7 @@ class WorkflowEnvironment:
         download_dest_dir: Optional[str] = None,
         runtime: Optional[temporalio.runtime.Runtime] = None,
         test_server_existing_path: Optional[str] = None,
-        test_server_download_version: str = "v1.30.0-RC1",
+        test_server_download_version: str = "v1.29.0",
         test_server_extra_args: Sequence[str] = [],
         test_server_download_ttl: Optional[timedelta] = None,
     ) -> WorkflowEnvironment:
