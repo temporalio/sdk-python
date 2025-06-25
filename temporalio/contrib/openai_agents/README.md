@@ -96,6 +96,7 @@ from datetime import timedelta
 
 from temporalio.client import Client
 from temporalio.contrib.openai_agents.invoke_model_activity import ModelActivity
+from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents.open_ai_data_converter import open_ai_data_converter
 from temporalio.contrib.openai_agents.temporal_openai_agents import set_open_ai_agent_temporal_overrides
 from temporalio.worker import Worker
@@ -105,9 +106,10 @@ from hello_world_workflow import HelloWorldAgent
 async def worker_main():
     # Configure the OpenAI Agents SDK to use Temporal activities for LLM API calls
     # and for tool calls.
-    with set_open_ai_agent_temporal_overrides(
+    model_params = ModelActivityParameters(
         start_to_close_timeout=timedelta(seconds=10)
-    ):
+    )
+    with set_open_ai_agent_temporal_overrides(model_params):
         # Create a Temporal client connected to server at the given address
         # Use the OpenAI data converter to ensure proper serialization/deserialization
         client = await Client.connect(
