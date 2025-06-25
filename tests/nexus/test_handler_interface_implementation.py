@@ -49,7 +49,9 @@ class ValidWorkflowRunImpl(_InterfaceImplementationTestCase):
                 ctx: nexusrpc.handler.StartOperationContext, input: str
             ) -> WorkflowOperationToken[int]: ...
 
-            return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
+            return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
+                start
+            )
 
     error_message = None
 

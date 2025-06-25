@@ -10,6 +10,7 @@ import nexusrpc.handler
 import pytest
 
 import temporalio.nexus.handler
+from temporalio.nexus.handler._operation_handlers import WorkflowRunOperationHandler
 from temporalio.nexus.handler._token import WorkflowOperationToken
 
 
@@ -40,7 +41,9 @@ class NotCalled(_TestCase):
                 ctx: nexusrpc.handler.StartOperationContext, input: Input
             ) -> WorkflowOperationToken[Output]: ...
 
-            return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
+            return temporalio.nexus.handler.WorkflowRunOperationHandler.from_start_workflow(
+                start
+            )
 
     expected_operations = {
         "my_workflow_run_operation_handler": nexusrpc.Operation(
@@ -63,7 +66,7 @@ class CalledWithoutArgs(_TestCase):
                 ctx: nexusrpc.handler.StartOperationContext, input: Input
             ) -> WorkflowOperationToken[Output]: ...
 
-            return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
+            return WorkflowRunOperationHandler.from_start_workflow(start)
 
     expected_operations = NotCalled.expected_operations
 
@@ -79,7 +82,7 @@ class CalledWithNameOverride(_TestCase):
                 ctx: nexusrpc.handler.StartOperationContext, input: Input
             ) -> WorkflowOperationToken[Output]: ...
 
-            return temporalio.nexus.handler.WorkflowRunOperationHandler(start)
+            return WorkflowRunOperationHandler.from_start_workflow(start)
 
     expected_operations = {
         "workflow_run_operation_with_name_override": nexusrpc.Operation(
