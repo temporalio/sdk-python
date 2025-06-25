@@ -3,7 +3,7 @@ from typing import Any, Optional, Type
 import nexusrpc
 import nexusrpc.handler
 import pytest
-from nexusrpc.handler import OperationHandler, SyncOperationHandler
+from nexusrpc.handler import StartOperationContext, sync_operation_handler
 
 from temporalio.nexus.handler import (
     WorkflowOperationToken,
@@ -25,13 +25,8 @@ class ValidImpl(_InterfaceImplementationTestCase):
         op: nexusrpc.Operation[None, None]
 
     class Impl:
-        @nexusrpc.handler.operation_handler
-        def op(self) -> OperationHandler[None, None]:
-            async def start(
-                ctx: nexusrpc.handler.StartOperationContext, input: None
-            ) -> None: ...
-
-            return SyncOperationHandler.from_callable(start)
+        @sync_operation_handler
+        async def op(self, ctx: StartOperationContext, input: None) -> None: ...
 
     error_message = None
 

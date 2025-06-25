@@ -15,9 +15,9 @@ from nexusrpc.handler import (
     StartOperationContext,
     StartOperationResultAsync,
     StartOperationResultSync,
-    SyncOperationHandler,
     operation_handler,
     service_handler,
+    sync_operation_handler,
 )
 
 import temporalio.api
@@ -195,21 +195,18 @@ class ServiceImpl:
     ) -> OperationHandler[OpInput, OpOutput]:
         return SyncOrAsyncOperation()
 
-    @operation_handler
-    def sync_operation(
-        self,
-    ) -> OperationHandler[OpInput, OpOutput]:
-        async def start(ctx: StartOperationContext, input: OpInput) -> OpOutput:
-            assert isinstance(input.response_type, SyncResponse)
-            if input.response_type.exception_in_operation_start:
-                raise RPCError(
-                    "RPCError INVALID_ARGUMENT in Nexus operation",
-                    RPCStatusCode.INVALID_ARGUMENT,
-                    b"",
-                )
-            return OpOutput(value="sync response")
-
-        return SyncOperationHandler.from_callable(start)
+    @sync_operation_handler
+    async def sync_operation(
+        self, ctx: StartOperationContext, input: OpInput
+    ) -> OpOutput:
+        assert isinstance(input.response_type, SyncResponse)
+        if input.response_type.exception_in_operation_start:
+            raise RPCError(
+                "RPCError INVALID_ARGUMENT in Nexus operation",
+                RPCStatusCode.INVALID_ARGUMENT,
+                b"",
+            )
+        return OpOutput(value="sync response")
 
     @operation_handler
     def async_operation(
@@ -759,58 +756,38 @@ class ServiceInterfaceWithNameOverride:
 
 @service_handler
 class ServiceImplInterfaceWithNeitherInterfaceNorNameOverride:
-    @operation_handler
-    def op(
-        self,
-    ) -> OperationHandler[None, ServiceClassNameOutput]:
-        async def start(
-            ctx: StartOperationContext, input: None
-        ) -> ServiceClassNameOutput:
-            return ServiceClassNameOutput(self.__class__.__name__)
-
-        return SyncOperationHandler.from_callable(start)
+    @sync_operation_handler
+    async def op(
+        self, ctx: StartOperationContext, input: None
+    ) -> ServiceClassNameOutput:
+        return ServiceClassNameOutput(self.__class__.__name__)
 
 
 @service_handler(service=ServiceInterfaceWithoutNameOverride)
 class ServiceImplInterfaceWithoutNameOverride:
-    @operation_handler
-    def op(
-        self,
-    ) -> OperationHandler[None, ServiceClassNameOutput]:
-        async def start(
-            ctx: StartOperationContext, input: None
-        ) -> ServiceClassNameOutput:
-            return ServiceClassNameOutput(self.__class__.__name__)
-
-        return SyncOperationHandler.from_callable(start)
+    @sync_operation_handler
+    async def op(
+        self, ctx: StartOperationContext, input: None
+    ) -> ServiceClassNameOutput:
+        return ServiceClassNameOutput(self.__class__.__name__)
 
 
 @service_handler(service=ServiceInterfaceWithNameOverride)
 class ServiceImplInterfaceWithNameOverride:
-    @operation_handler
-    def op(
-        self,
-    ) -> OperationHandler[None, ServiceClassNameOutput]:
-        async def start(
-            ctx: StartOperationContext, input: None
-        ) -> ServiceClassNameOutput:
-            return ServiceClassNameOutput(self.__class__.__name__)
-
-        return SyncOperationHandler.from_callable(start)
+    @sync_operation_handler
+    async def op(
+        self, ctx: StartOperationContext, input: None
+    ) -> ServiceClassNameOutput:
+        return ServiceClassNameOutput(self.__class__.__name__)
 
 
 @service_handler(name="service-impl-🌈")
 class ServiceImplWithNameOverride:
-    @operation_handler
-    def op(
-        self,
-    ) -> OperationHandler[None, ServiceClassNameOutput]:
-        async def start(
-            ctx: StartOperationContext, input: None
-        ) -> ServiceClassNameOutput:
-            return ServiceClassNameOutput(self.__class__.__name__)
-
-        return SyncOperationHandler.from_callable(start)
+    @sync_operation_handler
+    async def op(
+        self, ctx: StartOperationContext, input: None
+    ) -> ServiceClassNameOutput:
+        return ServiceClassNameOutput(self.__class__.__name__)
 
 
 class NameOverride(IntEnum):
