@@ -18,7 +18,6 @@ jobs:
       matrix:
         python: ["3.9", "3.13"]
         os: [ubuntu-latest, ubuntu-arm, macos-intel, macos-arm, windows-latest]
-        dependencies: ["locked"]
         include:
           # On 3.9 there is a problem with import errors caused by pytests' loader that surface due
           # to a bug in CPython (https://github.com/python/cpython/issues/91351), so we avoid using
