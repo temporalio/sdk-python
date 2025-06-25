@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from typing import (
     Any,
     Awaitable,
     Callable,
+    Optional,
 )
 
 import nexusrpc.handler
@@ -33,6 +35,7 @@ from ._util import (
 
 class WorkflowRunOperationHandler(
     nexusrpc.handler.OperationHandler[InputT, OutputT],
+    ABC,
 ):
     """
     Operation handler for Nexus operations that start a workflow.
@@ -45,8 +48,10 @@ class WorkflowRunOperationHandler(
 
     .. code-block:: python
 
-        @service_handler(service=MyNexusService) class MyNexusServiceHandler:
-            @operation_handler def my_workflow_run_operation(
+        @service_handler(service=MyNexusService)
+        class MyNexusServiceHandler:
+            @operation_handler
+            def my_workflow_run_operation(
                 self,
             ) -> OperationHandler[MyInput, MyOutput]:
                 async def start(
@@ -57,53 +62,52 @@ class WorkflowRunOperationHandler(
                         id=str(uuid.uuid4()),
                     )
 
-                return WorkflowRunOperationHandler(start)
+                return WorkflowRunOperationHandler.from_start_workflow(start)
     """
 
-    # TODO(nexus-prerelease): I think we want this to be optional, so that the class can
-    # be used by subclassing, as well as by injecting the start method in the
-    # constructor.
     def __init__(
         self,
-        start: Callable[
+        start: Optional[
+            Callable[
+                [StartOperationContext, InputT],
+                Awaitable[WorkflowOperationToken[OutputT]],
+            ]
+        ] = None,
+    ) -> None:
+        if start is not None:
+            if not is_async_callable(start):
+                raise RuntimeError(
+                    f"{start} is not an `async def` method. "
+                    "WorkflowRunOperationHandler must be initialized with an "
+                    "`async def` start method."
+                )
+            self._start = start
+            if start.__doc__:
+                self.start.__func__.__doc__ = start.__doc__
+            self._input_type, self._output_type = (
+                get_workflow_run_start_method_input_and_output_type_annotations(start)
+            )
+        else:
+            self._start = self._input_type = self._output_type = None
+
+    @classmethod
+    def from_start_workflow(
+        cls,
+        start_workflow: Callable[
             [StartOperationContext, InputT],
             Awaitable[WorkflowOperationToken[OutputT]],
         ],
-    ):
-        if not is_async_callable(start):
-            raise RuntimeError(
-                f"{start} is not an `async def` method. "
-                "WorkflowRunOperationHandler must be initialized with an "
-                "`async def` start method."
-            )
-        self._start = start
-        if start.__doc__:
-            self.start.__func__.__doc__ = start.__doc__
-        self._input_type, self._output_type = (
-            get_workflow_run_start_method_input_and_output_type_annotations(start)
-        )
+    ) -> WorkflowRunOperationHandler[InputT, OutputT]:
+        return _WorkflowRunOperationHandler(start_workflow)
 
+    @abstractmethod
     async def start(
         self, ctx: StartOperationContext, input: InputT
     ) -> nexusrpc.handler.StartOperationResultAsync:
         """
         Start the operation, by starting a workflow and completing asynchronously.
         """
-
-        token = await self._start(ctx, input)
-        if not isinstance(token, WorkflowOperationToken):
-            if isinstance(token, WorkflowHandle):
-                raise RuntimeError(
-                    f"Expected {token} to be a WorkflowOperationToken, but got a WorkflowHandle. "
-                    f"You must use :py:meth:`temporalio.nexus.handler.start_workflow` "
-                    "to start a workflow that will deliver the result of the Nexus operation, "
-                    "not :py:meth:`temporalio.client.Client.start_workflow`."
-                )
-            raise RuntimeError(
-                f"Expected {token} to be a WorkflowOperationToken, but got {type(token)}. "
-                "This is a bug in the Nexus SDK. Please report it to the Temporal team."
-            )
-        return StartOperationResultAsync(token.encode())
+        ...
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
         """Cancel the operation, by cancelling the workflow."""
@@ -144,6 +148,35 @@ class WorkflowRunOperationHandler(
                 cause=err,
             )
         return await handle.result()
+
+
+class _WorkflowRunOperationHandler(WorkflowRunOperationHandler[InputT, OutputT]):
+    async def start(
+        self, ctx: StartOperationContext, input: InputT
+    ) -> nexusrpc.handler.StartOperationResultAsync:
+        """
+        Start the operation, by starting a workflow and completing asynchronously.
+        """
+
+        if self._start is None:
+            raise RuntimeError(
+                "Do not use _WorkflowRunOperationHandler directly. "
+                "Use WorkflowRunOperationHandler.from_start_workflow instead."
+            )
+
+        token = await self._start(ctx, input)
+        if not isinstance(token, WorkflowOperationToken):
+            if isinstance(token, WorkflowHandle):
+                raise RuntimeError(
+                    f"Expected {token} to be a WorkflowOperationToken, but got a WorkflowHandle. "
+                    f"You must use :py:meth:`temporalio.nexus.handler.start_workflow` "
+                    "to start a workflow that will deliver the result of the Nexus operation, "
+                    "not :py:meth:`temporalio.client.Client.start_workflow`."
+                )
+            raise RuntimeError(
+                f"Expected {token} to be a WorkflowOperationToken, but got {type(token)}. "
+            )
+        return StartOperationResultAsync(token.encode())
 
 
 async def cancel_operation(
