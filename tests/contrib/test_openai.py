@@ -11,6 +11,7 @@ from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
 from temporalio.contrib.openai_agents.invoke_model_activity import (
     ModelActivity,
 )
+from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents.open_ai_data_converter import (
     open_ai_data_converter,
 )
@@ -140,12 +141,12 @@ class HelloWorldAgent:
 
 
 async def test_hello_world_agent(client: Client):
-    if sys.version_info < (3, 11):
-        pytest.skip("Open AI support has type errors on 3.9 and 3.11")
+    new_config = client.config()
+    new_config["data_converter"] = open_ai_data_converter
+    client = Client(**new_config)
 
-    with set_open_ai_agent_temporal_overrides(
-        start_to_close_timeout=timedelta(seconds=10)
-    ):
+    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=10))
+    with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
             TestProvider(
                 TestHelloModel(  # type: ignore
@@ -237,12 +238,12 @@ class ToolsWorkflow:
 
 
 async def test_tool_workflow(client: Client):
-    if sys.version_info < (3, 11):
-        pytest.skip("Open AI support has type errors on 3.9 and 3.11")
+    new_config = client.config()
+    new_config["data_converter"] = open_ai_data_converter
+    client = Client(**new_config)
 
-    with set_open_ai_agent_temporal_overrides(
-        start_to_close_timeout=timedelta(seconds=10)
-    ):
+    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=10))
+    with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
             TestProvider(
                 TestWeatherModel(  # type: ignore
@@ -455,15 +456,15 @@ class ResearchWorkflow:
 
 
 async def test_research_workflow(client: Client):
-    if sys.version_info < (3, 11):
-        pytest.skip("Open AI support has type errors on 3.9 and 3.11")
+    new_config = client.config()
+    new_config["data_converter"] = open_ai_data_converter
+    client = Client(**new_config)
 
     global response_index
     response_index = 0
 
-    with set_open_ai_agent_temporal_overrides(
-        start_to_close_timeout=timedelta(seconds=10)
-    ):
+    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=10))
+    with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
             TestProvider(
                 TestResearchModel(  # type: ignore
@@ -668,16 +669,12 @@ class AgentAsToolsModel(TestModel):
 
 
 async def test_agents_as_tools_workflow(client: Client):
-    if sys.version_info < (3, 11):
-        pytest.skip("Open AI support has type errors on 3.9 and 3.10")
-
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
     client = Client(**new_config)
 
-    with set_open_ai_agent_temporal_overrides(
-        start_to_close_timeout=timedelta(seconds=10)
-    ):
+    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=10))
+    with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
             TestProvider(
                 AgentAsToolsModel(  # type: ignore
@@ -1027,18 +1024,14 @@ class CustomerServiceWorkflow:
 
 
 async def test_customer_service_workflow(client: Client):
-    if sys.version_info < (3, 11):
-        pytest.skip("Open AI support has type errors on 3.9 and 3.11")
-
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
     client = Client(**new_config)
 
     questions = ["Hello", "Book me a flight to PDX", "11111", "Any window seat"]
 
-    with set_open_ai_agent_temporal_overrides(
-        start_to_close_timeout=timedelta(seconds=10)
-    ):
+    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=10))
+    with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
             TestProvider(
                 CustomerServiceModel(  # type: ignore
