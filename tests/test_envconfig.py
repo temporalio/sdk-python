@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from temporalio.client import Client
 from temporalio.envconfig import ClientConfig, ClientConfigProfile, ClientConfigTLS
 from temporalio.service import TLSConfig
 
@@ -427,41 +428,86 @@ def test_load_profile_conflicting_cert_source_fails():
         ClientConfig.load_profile_from_data(toml_config)
 
 
-def test_load_client_connect_config(base_config_file: Path):
-    """Test the load_client_connect_config."""
+async def test_load_client_connect_config(client: Client, tmp_path: Path):
+    """Test the load_client_connect_config for various scenarios."""
+    # Get connection details from the fixture client
+    target_host = client.service_client.config.target_host
+    namespace = client.namespace
+
+    # Create a TOML file with profiles pointing to the test server
+    config_content = f"""
+[profile.default]
+address = "{target_host}"
+namespace = "{namespace}"
+
+[profile.custom]
+address = "{target_host}"
+namespace = "custom-namespace"
+[profile.custom.grpc_meta]
+custom-header = "custom-value"
+    """
+    config_file = tmp_path / "temporal.toml"
+    config_file.write_text(config_content)
+
     # Test with explicit file path, default profile
-    config = ClientConfig.load_client_connect_config(config_file=str(base_config_file))
-    assert config.get("target_host") == "default-address"
-    assert config.get("namespace") == "default-namespace"
+    config = ClientConfig.load_client_connect_config(config_file=str(config_file))
+    assert config.get("target_host") == target_host
+    assert config.get("namespace") == namespace
+    new_client = await Client.connect(**config)
+    assert new_client.service_client.config.target_host == target_host
+    assert new_client.namespace == namespace
 
     # Test with explicit file path, custom profile
     config = ClientConfig.load_client_connect_config(
-        config_file=str(base_config_file), profile="custom"
+        config_file=str(config_file), profile="custom"
     )
-    assert config.get("target_host") == "custom-address"
+    assert config.get("target_host") == target_host
     assert config.get("namespace") == "custom-namespace"
     rpc_metadata = config.get("rpc_metadata")
     assert rpc_metadata
     assert "custom-header" in rpc_metadata
+    new_client = await Client.connect(**config)
+    assert new_client.service_client.config.target_host == target_host
+    assert new_client.namespace == "custom-namespace"
+    assert (
+        new_client.service_client.config.rpc_metadata["custom-header"]
+        == "custom-value"
+    )
 
     # Test with env overrides
-    env = {"TEMPORAL_ADDRESS": "env-address"}
+    env = {"TEMPORAL_NAMESPACE": "env-namespace-override"}
     config = ClientConfig.load_client_connect_config(
-        config_file=str(base_config_file), override_env_vars=env
+        config_file=str(config_file), override_env_vars=env
     )
-    assert config.get("target_host") == "env-address"
+    assert config.get("target_host") == target_host
+    assert config.get("namespace") == "env-namespace-override"
+    new_client = await Client.connect(**config)
+    assert new_client.namespace == "env-namespace-override"
 
     # Test with env overrides disabled
     config = ClientConfig.load_client_connect_config(
-        config_file=str(base_config_file), override_env_vars=env, disable_env=True
+        config_file=str(config_file),
+        override_env_vars={"TEMPORAL_NAMESPACE": "ignored"},
+        disable_env=True,
     )
-    assert config.get("target_host") == "default-address"
+    assert config.get("target_host") == target_host
+    assert config.get("namespace") == namespace
+    new_client = await Client.connect(**config)
+    assert new_client.namespace == namespace
 
-    # Test with file loading disabled
-    config = ClientConfig.load_client_connect_config(disable_file=True, override_env_vars=env)
-    assert config.get("target_host") == "env-address"
-    assert "namespace" not in config
-
+    # Test with file loading disabled (so only env is used)
+    env = {
+        "TEMPORAL_ADDRESS": target_host,
+        "TEMPORAL_NAMESPACE": "env-only-namespace",
+    }
+    config = ClientConfig.load_client_connect_config(
+        disable_file=True, override_env_vars=env
+    )
+    assert config.get("target_host") == target_host
+    assert config.get("namespace") == "env-only-namespace"
+    new_client = await Client.connect(**config)
+    assert new_client.service_client.config.target_host == target_host
+    assert new_client.namespace == "env-only-namespace"
 
 def test_disables_raise_error():
     """Test that providing both disable_file and disable_env raises an error."""
