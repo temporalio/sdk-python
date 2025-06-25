@@ -10,8 +10,14 @@ import pytest
 from nexusrpc.handler import (
     CancelOperationContext,
     FetchOperationInfoContext,
+    FetchOperationResultContext,
+    OperationHandler,
     StartOperationContext,
+    StartOperationResultAsync,
+    StartOperationResultSync,
     SyncOperationHandler,
+    operation_handler,
+    service_handler,
 )
 
 import temporalio.api
@@ -141,12 +147,12 @@ class HandlerWorkflow:
 # TODO: make types pass pyright strict mode
 
 
-class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput]):
+class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
     async def start(
         self, ctx: StartOperationContext, input: OpInput
     ) -> Union[
-        nexusrpc.handler.StartOperationResultSync[OpOutput],
-        nexusrpc.handler.StartOperationResultAsync,
+        StartOperationResultSync[OpOutput],
+        StartOperationResultAsync,
     ]:
         if input.response_type.exception_in_operation_start:
             # TODO(dan): don't think RPCError should be used here
@@ -156,16 +162,14 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
                 b"",
             )
         if isinstance(input.response_type, SyncResponse):
-            return nexusrpc.handler.StartOperationResultSync(
-                value=OpOutput(value="sync response")
-            )
+            return StartOperationResultSync(value=OpOutput(value="sync response"))
         elif isinstance(input.response_type, AsyncResponse):
             token = await start_workflow(
                 HandlerWorkflow.run,
                 HandlerWfInput(op_input=input),
                 id=input.response_type.operation_workflow_id,
             )
-            return nexusrpc.handler.StartOperationResultAsync(token.encode())
+            return StartOperationResultAsync(token.encode())
         else:
             raise TypeError
 
@@ -178,23 +182,23 @@ class SyncOrAsyncOperation(nexusrpc.handler.OperationHandler[OpInput, OpOutput])
         raise NotImplementedError
 
     async def fetch_result(
-        self, ctx: nexusrpc.handler.FetchOperationResultContext, token: str
+        self, ctx: FetchOperationResultContext, token: str
     ) -> OpOutput:
         raise NotImplementedError
 
 
-@nexusrpc.handler.service_handler(service=ServiceInterface)
+@service_handler(service=ServiceInterface)
 class ServiceImpl:
-    @nexusrpc.handler.operation_handler
+    @operation_handler
     def sync_or_async_operation(
         self,
-    ) -> nexusrpc.handler.OperationHandler[OpInput, OpOutput]:
+    ) -> OperationHandler[OpInput, OpOutput]:
         return SyncOrAsyncOperation()
 
-    @nexusrpc.handler.operation_handler
+    @operation_handler
     def sync_operation(
         self,
-    ) -> nexusrpc.handler.OperationHandler[OpInput, OpOutput]:
+    ) -> OperationHandler[OpInput, OpOutput]:
         async def start(ctx: StartOperationContext, input: OpInput) -> OpOutput:
             assert isinstance(input.response_type, SyncResponse)
             if input.response_type.exception_in_operation_start:
@@ -207,10 +211,10 @@ class ServiceImpl:
 
         return SyncOperationHandler.from_callable(start)
 
-    @nexusrpc.handler.operation_handler
+    @operation_handler
     def async_operation(
         self,
-    ) -> nexusrpc.handler.OperationHandler[OpInput, HandlerWfOutput]:
+    ) -> OperationHandler[OpInput, HandlerWfOutput]:
         async def start(
             ctx: StartOperationContext, input: OpInput
         ) -> WorkflowOperationToken[HandlerWfOutput]:
@@ -309,7 +313,7 @@ class CallerWorkflow:
         op_input: OpInput,
     ) -> Union[
         nexusrpc.Operation[OpInput, OpOutput],
-        Callable[[Any], nexusrpc.handler.OperationHandler[OpInput, OpOutput]],
+        Callable[[Any], OperationHandler[OpInput, OpOutput]],
     ]:
         return {
             (
@@ -753,12 +757,12 @@ class ServiceInterfaceWithNameOverride:
     op: nexusrpc.Operation[None, ServiceClassNameOutput]
 
 
-@nexusrpc.handler.service_handler
+@service_handler
 class ServiceImplInterfaceWithNeitherInterfaceNorNameOverride:
-    @nexusrpc.handler.operation_handler
+    @operation_handler
     def op(
         self,
-    ) -> nexusrpc.handler.OperationHandler[None, ServiceClassNameOutput]:
+    ) -> OperationHandler[None, ServiceClassNameOutput]:
         async def start(
             ctx: StartOperationContext, input: None
         ) -> ServiceClassNameOutput:
@@ -767,12 +771,12 @@ class ServiceImplInterfaceWithNeitherInterfaceNorNameOverride:
         return SyncOperationHandler.from_callable(start)
 
 
-@nexusrpc.handler.service_handler(service=ServiceInterfaceWithoutNameOverride)
+@service_handler(service=ServiceInterfaceWithoutNameOverride)
 class ServiceImplInterfaceWithoutNameOverride:
-    @nexusrpc.handler.operation_handler
+    @operation_handler
     def op(
         self,
-    ) -> nexusrpc.handler.OperationHandler[None, ServiceClassNameOutput]:
+    ) -> OperationHandler[None, ServiceClassNameOutput]:
         async def start(
             ctx: StartOperationContext, input: None
         ) -> ServiceClassNameOutput:
@@ -781,12 +785,12 @@ class ServiceImplInterfaceWithoutNameOverride:
         return SyncOperationHandler.from_callable(start)
 
 
-@nexusrpc.handler.service_handler(service=ServiceInterfaceWithNameOverride)
+@service_handler(service=ServiceInterfaceWithNameOverride)
 class ServiceImplInterfaceWithNameOverride:
-    @nexusrpc.handler.operation_handler
+    @operation_handler
     def op(
         self,
-    ) -> nexusrpc.handler.OperationHandler[None, ServiceClassNameOutput]:
+    ) -> OperationHandler[None, ServiceClassNameOutput]:
         async def start(
             ctx: StartOperationContext, input: None
         ) -> ServiceClassNameOutput:
@@ -795,12 +799,12 @@ class ServiceImplInterfaceWithNameOverride:
         return SyncOperationHandler.from_callable(start)
 
 
-@nexusrpc.handler.service_handler(name="service-impl-🌈")
+@service_handler(name="service-impl-🌈")
 class ServiceImplWithNameOverride:
-    @nexusrpc.handler.operation_handler
+    @operation_handler
     def op(
         self,
-    ) -> nexusrpc.handler.OperationHandler[None, ServiceClassNameOutput]:
+    ) -> OperationHandler[None, ServiceClassNameOutput]:
         async def start(
             ctx: StartOperationContext, input: None
         ) -> ServiceClassNameOutput:
@@ -941,12 +945,12 @@ class EchoWorkflow:
         return input
 
 
-@nexusrpc.handler.service_handler
+@service_handler
 class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
-    @nexusrpc.handler.operation_handler
+    @operation_handler
     def my_workflow_run_operation(
         self,
-    ) -> nexusrpc.handler.OperationHandler[None, str]:
+    ) -> OperationHandler[None, str]:
         async def start(
             ctx: StartOperationContext, input: None
         ) -> WorkflowOperationToken[str]:
