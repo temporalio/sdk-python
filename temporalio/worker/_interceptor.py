@@ -29,7 +29,6 @@ import temporalio.api.common.v1
 import temporalio.common
 import temporalio.nexus
 import temporalio.workflow
-from temporalio.nexus import WorkflowRunOperationContext
 from temporalio.workflow import VersioningIntent
 
 
@@ -298,22 +297,7 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
 
     endpoint: str
     service: str
-    operation: Union[
-        nexusrpc.Operation[InputT, OutputT],
-        Callable[[Any], nexusrpc.handler.OperationHandler[InputT, OutputT]],
-        Callable[
-            [
-                Any,
-                Union[
-                    nexusrpc.handler.StartOperationContext,
-                    WorkflowRunOperationContext,
-                ],
-                InputT,
-            ],
-            Awaitable[temporalio.nexus.WorkflowHandle[OutputT]],
-        ],
-        str,
-    ]
+    operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]]
     input: InputT
     schedule_to_close_timeout: Optional[timedelta]
     headers: Optional[Mapping[str, str]]
@@ -324,13 +308,13 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
 
     # TODO(nexus-prerelease): update this logic to handle service impl start methods
     def __post_init__(self) -> None:
-        if isinstance(self.operation, str):
-            self._operation_name = self.operation
-            self._input_type = None
-        elif isinstance(self.operation, nexusrpc.Operation):
+        if isinstance(self.operation, nexusrpc.Operation):
             self._operation_name = self.operation.name
             self._input_type = self.operation.input_type
             self.output_type = self.operation.output_type
+        elif isinstance(self.operation, str):
+            self._operation_name = self.operation
+            self._input_type = None
         elif isinstance(self.operation, Callable):
             _, op = nexusrpc.handler.get_operation_factory(self.operation)
             if isinstance(op, nexusrpc.Operation):
