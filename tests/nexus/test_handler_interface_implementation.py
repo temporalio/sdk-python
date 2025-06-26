@@ -3,7 +3,7 @@ from typing import Any, Optional, Type
 import nexusrpc
 import nexusrpc.handler
 import pytest
-from nexusrpc.handler import StartOperationContext, sync_operation_handler
+from nexusrpc.handler import StartOperationContext, sync_operation
 
 from temporalio import nexus
 
@@ -22,7 +22,7 @@ class ValidImpl(_InterfaceImplementationTestCase):
         op: nexusrpc.Operation[None, None]
 
     class Impl:
-        @sync_operation_handler
+        @sync_operation
         async def op(self, ctx: StartOperationContext, input: None) -> None: ...
 
     error_message = None

@@ -42,7 +42,7 @@ from nexusrpc.handler import (
     StartOperationContext,
     operation_handler,
     service_handler,
-    sync_operation_handler,
+    sync_operation,
 )
 
 import temporalio.api.failure.v1
@@ -134,7 +134,7 @@ class MyLinkTestWorkflow:
 
 # The service_handler decorator is applied by the test
 class MyServiceHandler:
-    @sync_operation_handler
+    @sync_operation
     async def echo(self, ctx: StartOperationContext, input: Input) -> Output:
         assert ctx.headers["test-header-key"] == "test-header-value"
         ctx.outbound_links.extend(ctx.inbound_links)
@@ -142,12 +142,12 @@ class MyServiceHandler:
             value=f"from start method on {self.__class__.__name__}: {input.value}"
         )
 
-    @sync_operation_handler
+    @sync_operation
     async def hang(self, ctx: StartOperationContext, input: Input) -> Output:
         await asyncio.Future()
         return Output(value="won't reach here")
 
-    @sync_operation_handler
+    @sync_operation
     async def non_retryable_application_error(
         self, ctx: StartOperationContext, input: Input
     ) -> Output:
@@ -159,7 +159,7 @@ class MyServiceHandler:
             non_retryable=True,
         )
 
-    @sync_operation_handler
+    @sync_operation
     async def retryable_application_error(
         self, ctx: StartOperationContext, input: Input
     ) -> Output:
@@ -170,7 +170,7 @@ class MyServiceHandler:
             non_retryable=False,
         )
 
-    @sync_operation_handler
+    @sync_operation
     async def handler_error_internal(
         self, ctx: StartOperationContext, input: Input
     ) -> Output:
@@ -181,7 +181,7 @@ class MyServiceHandler:
             cause=RuntimeError("cause message"),
         )
 
-    @sync_operation_handler
+    @sync_operation
     async def operation_error_failed(
         self, ctx: StartOperationContext, input: Input
     ) -> Output:
@@ -190,7 +190,7 @@ class MyServiceHandler:
             state=OperationErrorState.FAILED,
         )
 
-    @sync_operation_handler
+    @sync_operation
     async def check_operation_timeout_header(
         self, ctx: StartOperationContext, input: Input
     ) -> Output:
@@ -199,7 +199,7 @@ class MyServiceHandler:
             value=f"from start method on {self.__class__.__name__}: {input.value}"
         )
 
-    @sync_operation_handler
+    @sync_operation
     async def log(self, ctx: StartOperationContext, input: Input) -> Output:
         nexus.logger.info(
             "Logging from start method", extra={"input_value": input.value}
@@ -217,7 +217,7 @@ class MyServiceHandler:
             id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
         )
 
-    @sync_operation_handler
+    @sync_operation
     async def sync_operation_with_non_async_def(
         self, ctx: StartOperationContext, input: Input
     ) -> Output:
@@ -240,7 +240,7 @@ class MyServiceHandler:
                         value=f"from start method on {self.__class__.__name__}: {input.value}"
                     )
 
-            return sync_operation_handler(start())
+            return sync_operation(start())
 
         _sync_operation_with_non_async_callable_instance = operation_handler(
             name="sync_operation_with_non_async_callable_instance",
@@ -248,7 +248,7 @@ class MyServiceHandler:
             sync_operation_with_non_async_callable_instance,
         )
 
-    @sync_operation_handler
+    @sync_operation
     async def sync_operation_without_type_annotations(
         self, ctx: StartOperationContext, input: Input
     ) -> Output:
@@ -312,13 +312,13 @@ class MyServiceHandler:
     ) -> OperationHandler[Input, Output]:
         return MyServiceHandler.OperationHandlerReturningUnwrappedResult()
 
-    @sync_operation_handler
+    @sync_operation
     async def idempotency_check(
         self, ctx: StartOperationContext, input: None
     ) -> Output:
         return Output(value=f"request_id: {ctx.request_id}")
 
-    @sync_operation_handler
+    @sync_operation
     async def non_serializable_output(
         self, ctx: StartOperationContext, input: Input
     ) -> NonSerializableOutput:
@@ -890,7 +890,7 @@ class EchoService:
 @service_handler(service=EchoService)
 class SyncStartHandler:
     # TODO(nexus-prerelease): why is this test passing? start is not `async def`
-    @sync_operation_handler
+    @sync_operation
     def echo(self, ctx: StartOperationContext, input: Input) -> Output:
         assert ctx.headers["test-header-key"] == "test-header-value"
         ctx.outbound_links.extend(ctx.inbound_links)
@@ -901,7 +901,7 @@ class SyncStartHandler:
 
 @service_handler(service=EchoService)
 class DefaultCancelHandler:
-    @sync_operation_handler
+    @sync_operation
     async def echo(self, ctx: StartOperationContext, input: Input) -> Output:
         return Output(
             value=f"from start method on {self.__class__.__name__}: {input.value}"
@@ -1012,7 +1012,7 @@ async def test_cancel_operation_with_invalid_token(env: WorkflowEnvironment):
         assert "failed to decode operation token" in failure.message.lower()
 
 
-async def test_request_id_is_received_by_sync_operation_handler(
+async def test_request_id_is_received_by_sync_operation(
     env: WorkflowEnvironment,
 ):
     task_queue = str(uuid.uuid4())

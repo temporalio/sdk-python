@@ -17,7 +17,7 @@ from nexusrpc.handler import (
     StartOperationResultSync,
     operation_handler,
     service_handler,
-    sync_operation_handler,
+    sync_operation,
 )
 
 import temporalio.api
@@ -187,7 +187,7 @@ class ServiceImpl:
     ) -> OperationHandler[OpInput, OpOutput]:
         return SyncOrAsyncOperation()
 
-    @sync_operation_handler
+    @sync_operation
     async def sync_operation(
         self, ctx: StartOperationContext, input: OpInput
     ) -> OpOutput:
@@ -743,7 +743,7 @@ class ServiceInterfaceWithNameOverride:
 
 @service_handler
 class ServiceImplInterfaceWithNeitherInterfaceNorNameOverride:
-    @sync_operation_handler
+    @sync_operation
     async def op(
         self, ctx: StartOperationContext, input: None
     ) -> ServiceClassNameOutput:
@@ -752,7 +752,7 @@ class ServiceImplInterfaceWithNeitherInterfaceNorNameOverride:
 
 @service_handler(service=ServiceInterfaceWithoutNameOverride)
 class ServiceImplInterfaceWithoutNameOverride:
-    @sync_operation_handler
+    @sync_operation
     async def op(
         self, ctx: StartOperationContext, input: None
     ) -> ServiceClassNameOutput:
@@ -761,7 +761,7 @@ class ServiceImplInterfaceWithoutNameOverride:
 
 @service_handler(service=ServiceInterfaceWithNameOverride)
 class ServiceImplInterfaceWithNameOverride:
-    @sync_operation_handler
+    @sync_operation
     async def op(
         self, ctx: StartOperationContext, input: None
     ) -> ServiceClassNameOutput:
@@ -770,7 +770,7 @@ class ServiceImplInterfaceWithNameOverride:
 
 @service_handler(name="service-impl-🌈")
 class ServiceImplWithNameOverride:
-    @sync_operation_handler
+    @sync_operation
     async def op(
         self, ctx: StartOperationContext, input: None
     ) -> ServiceClassNameOutput:
