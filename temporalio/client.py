@@ -466,7 +466,9 @@ class Client:
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
-        # The following options are deliberately not exposed in overloads
+        # The following options should not be considered part of the public API. They
+        # are deliberately not exposed in overloads, and are not subject to any
+        # backwards compatibility guarantees.
         nexus_completion_callbacks: Sequence[NexusCompletionCallback] = [],
         workflow_event_links: Sequence[
             temporalio.api.common.v1.Link.WorkflowEvent
