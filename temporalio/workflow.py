@@ -58,6 +58,7 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.nexus
 import temporalio.workflow
+from temporalio.nexus import WorkflowRunOperationContext
 
 from .types import (
     AnyType,
@@ -858,7 +859,14 @@ class _Runtime(ABC):
             nexusrpc.Operation[I, O],
             Callable[[Any], nexusrpc.handler.OperationHandler[I, O]],
             Callable[
-                [S, nexusrpc.handler.StartOperationContext, I],
+                [
+                    S,
+                    Union[
+                        nexusrpc.handler.StartOperationContext,
+                        WorkflowRunOperationContext,
+                    ],
+                    I,
+                ],
                 Awaitable[temporalio.nexus.WorkflowHandle[O]],
             ],
             str,
@@ -4428,7 +4436,13 @@ async def start_nexus_operation(
         nexusrpc.Operation[I, O],
         Callable[[Any], nexusrpc.handler.OperationHandler[I, O]],
         Callable[
-            [S, nexusrpc.handler.StartOperationContext, I],
+            [
+                S,
+                Union[
+                    nexusrpc.handler.StartOperationContext, WorkflowRunOperationContext
+                ],
+                I,
+            ],
             Awaitable[temporalio.nexus.WorkflowHandle[O]],
         ],
         str,
@@ -5214,7 +5228,14 @@ class NexusClient(Generic[S]):
             nexusrpc.Operation[I, O],
             Callable[[S], nexusrpc.handler.OperationHandler[I, O]],
             Callable[
-                [S, nexusrpc.handler.StartOperationContext, I],
+                [
+                    S,
+                    Union[
+                        nexusrpc.handler.StartOperationContext,
+                        WorkflowRunOperationContext,
+                    ],
+                    I,
+                ],
                 Awaitable[temporalio.nexus.WorkflowHandle[O]],
             ],
             str,
@@ -5242,7 +5263,14 @@ class NexusClient(Generic[S]):
             nexusrpc.Operation[I, O],
             Callable[[S], nexusrpc.handler.OperationHandler[I, O]],
             Callable[
-                [S, nexusrpc.handler.StartOperationContext, I],
+                [
+                    S,
+                    Union[
+                        nexusrpc.handler.StartOperationContext,
+                        WorkflowRunOperationContext,
+                    ],
+                    I,
+                ],
                 Awaitable[temporalio.nexus.WorkflowHandle[O]],
             ],
             str,

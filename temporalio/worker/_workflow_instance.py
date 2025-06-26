@@ -61,6 +61,7 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.nexus
 import temporalio.workflow
+from temporalio.nexus import WorkflowRunOperationContext
 from temporalio.service import __version__
 
 from ._interceptor import (
@@ -1502,7 +1503,14 @@ class _WorkflowInstanceImpl(
             nexusrpc.Operation[I, O],
             Callable[[Any], nexusrpc.handler.OperationHandler[I, O]],
             Callable[
-                [Any, nexusrpc.handler.StartOperationContext, I],
+                [
+                    Any,
+                    Union[
+                        nexusrpc.handler.StartOperationContext,
+                        WorkflowRunOperationContext,
+                    ],
+                    I,
+                ],
                 Awaitable[temporalio.nexus.WorkflowHandle[O]],
             ],
             str,

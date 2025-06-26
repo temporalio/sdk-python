@@ -29,6 +29,7 @@ import temporalio.api.common.v1
 import temporalio.common
 import temporalio.nexus
 import temporalio.workflow
+from temporalio.nexus import WorkflowRunOperationContext
 from temporalio.workflow import VersioningIntent
 
 
@@ -301,7 +302,14 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
         nexusrpc.Operation[InputT, OutputT],
         Callable[[Any], nexusrpc.handler.OperationHandler[InputT, OutputT]],
         Callable[
-            [Any, nexusrpc.handler.StartOperationContext, InputT],
+            [
+                Any,
+                Union[
+                    nexusrpc.handler.StartOperationContext,
+                    WorkflowRunOperationContext,
+                ],
+                InputT,
+            ],
             Awaitable[temporalio.nexus.WorkflowHandle[OutputT]],
         ],
         str,
