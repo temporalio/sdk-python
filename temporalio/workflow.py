@@ -5197,8 +5197,6 @@ class NexusClient(Generic[S]):
             self._service_name = service
         elif service_defn := getattr(service, "__nexus_service__", None):
             self._service_name = service_defn.name
-        elif service_metadata := getattr(service, "__nexus_service_metadata__", None):
-            self._service_name = service_metadata.name
         else:
             raise ValueError(
                 f"`service` may be a name (str), or a class decorated with either "
