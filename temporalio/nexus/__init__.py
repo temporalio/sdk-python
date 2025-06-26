@@ -7,10 +7,15 @@ from typing import (
 )
 
 from ._decorators import workflow_run_operation as workflow_run_operation
+from ._operation_context import Info as Info
+from ._operation_context import (
+    _temporal_operation_context as _temporal_operation_context,
+)
 from ._operation_context import (
     _TemporalNexusOperationContext as _TemporalNexusOperationContext,
 )
-from ._operation_context import temporal_operation_context as temporal_operation_context
+from ._operation_context import client as client
+from ._operation_context import info as info
 from ._operation_handlers import cancel_operation as cancel_operation
 from ._token import WorkflowHandle as WorkflowHandle
 from ._workflow import start_workflow as start_workflow
@@ -24,10 +29,10 @@ class LoggerAdapter(logging.LoggerAdapter):
         self, msg: Any, kwargs: MutableMapping[str, Any]
     ) -> tuple[Any, MutableMapping[str, Any]]:
         extra = dict(self.extra or {})
-        if tctx := temporal_operation_context.get(None):
+        if tctx := _temporal_operation_context.get(None):
             extra["service"] = tctx.nexus_operation_context.service
             extra["operation"] = tctx.nexus_operation_context.operation
-            extra["task_queue"] = tctx.task_queue
+            extra["task_queue"] = tctx.info().task_queue
         kwargs["extra"] = extra | kwargs.get("extra", {})
         return msg, kwargs
 

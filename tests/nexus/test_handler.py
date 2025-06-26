@@ -1065,12 +1065,11 @@ class ServiceHandlerForRequestIdTest:
     async def operation_that_executes_a_workflow_before_starting_the_backing_workflow(
         self, ctx: StartOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
-        tctx = nexus.temporal_operation_context.get()
-        await tctx.client.start_workflow(
+        await nexus.client().start_workflow(
             EchoWorkflow.run,
             input,
             id=input.value,
-            task_queue=tctx.task_queue,
+            task_queue=nexus.info().task_queue,
         )
         # This should fail. It will not fail if the Nexus request ID was incorrectly
         # propagated to both StartWorkflow requests.
@@ -1097,10 +1096,10 @@ async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnviron
     )
 
     async def start_two_workflows_with_conflicting_workflow_ids(
-        request_ids: tuple[tuple[str, int], tuple[str, int]],
+        request_ids: tuple[tuple[str, int, str], tuple[str, int, str]],
     ):
         workflow_id = str(uuid.uuid4())
-        for request_id, status_code in request_ids:
+        for request_id, status_code, error_message in request_ids:
             resp = await service_client.start_operation(
                 "operation_backed_by_a_workflow",
                 dataclass_as_dict(Input(workflow_id)),
@@ -1111,13 +1110,18 @@ async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnviron
                 f"but got {resp.status_code} for response content "
                 f"{pprint.pformat(resp.content.decode())}"
             )
-            if status_code == 201:
+            if not error_message:
+                assert status_code == 201
                 op_info = resp.json()
                 assert op_info["token"]
                 assert op_info["state"] == nexusrpc.OperationState.RUNNING.value
+            else:
+                assert status_code >= 400
+                failure = Failure(**resp.json())
+                assert failure.message == error_message
 
     async def start_two_workflows_in_a_single_operation(
-        request_id: str, status_code: int
+        request_id: str, status_code: int, error_message: str
     ):
         resp = await service_client.start_operation(
             "operation_that_executes_a_workflow_before_starting_the_backing_workflow",
@@ -1125,6 +1129,9 @@ async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnviron
             {"Nexus-Request-Id": request_id},
         )
         assert resp.status_code == status_code
+        if error_message:
+            failure = Failure(**resp.json())
+            assert failure.message == error_message
 
     async with Worker(
         env.client,
@@ -1135,17 +1142,22 @@ async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnviron
         request_id_1, request_id_2 = str(uuid.uuid4()), str(uuid.uuid4())
         # Reusing the same request ID does not fail
         await start_two_workflows_with_conflicting_workflow_ids(
-            ((request_id_1, 201), (request_id_1, 201))
+            ((request_id_1, 201, ""), (request_id_1, 201, ""))
         )
         # Using a different request ID does fail
         # TODO(nexus-prerelease) I think that this should be a 409 per the spec. Go and
         # Java are not doing that.
         await start_two_workflows_with_conflicting_workflow_ids(
-            ((request_id_1, 201), (request_id_2, 500))
+            (
+                (request_id_1, 201, ""),
+                (request_id_2, 500, "Workflow execution already started"),
+            )
         )
         # Two workflows started in the same operation should fail, since the Nexus
         # request ID should be propagated to the backing workflow only.
-        await start_two_workflows_in_a_single_operation(request_id_1, 500)
+        await start_two_workflows_in_a_single_operation(
+            request_id_1, 500, "Workflow execution already started"
+        )
 
 
 def server_address(env: WorkflowEnvironment) -> str:

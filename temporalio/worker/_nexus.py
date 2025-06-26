@@ -32,9 +32,10 @@ import temporalio.converter
 import temporalio.nexus
 from temporalio.exceptions import ApplicationError
 from temporalio.nexus import (
+    Info,
+    _temporal_operation_context,
     _TemporalNexusOperationContext,
     logger,
-    temporal_operation_context,
 )
 from temporalio.service import RPCError, RPCStatusCode
 
@@ -166,11 +167,11 @@ class _NexusWorker:
             service=request.service,
             operation=request.operation,
         )
-        temporal_operation_context.set(
+        _temporal_operation_context.set(
             _TemporalNexusOperationContext(
+                info=lambda: Info(task_queue=self._task_queue),
                 nexus_operation_context=ctx,
                 client=self._client,
-                task_queue=self._task_queue,
             )
         )
         # TODO(nexus-prerelease): headers
@@ -263,11 +264,11 @@ class _NexusWorker:
             ],
             callback_headers=dict(start_request.callback_header),
         )
-        temporal_operation_context.set(
+        _temporal_operation_context.set(
             _TemporalNexusOperationContext(
                 nexus_operation_context=ctx,
                 client=self._client,
-                task_queue=self._task_queue,
+                info=lambda: Info(task_queue=self._task_queue),
             )
         )
         input = LazyValue(

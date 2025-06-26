@@ -12,7 +12,7 @@ from typing import (
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.common
-from temporalio.nexus._operation_context import temporal_operation_context
+from temporalio.nexus._operation_context import _TemporalNexusOperationContext
 from temporalio.nexus._token import WorkflowHandle
 from temporalio.types import (
     MethodAsyncSingleParam,
@@ -83,8 +83,8 @@ async def start_workflow(
         Nexus caller is itself a workflow, this means that the workflow in the caller
         namespace web UI will contain links to the started workflow, and vice versa.
     """
-    ctx = temporal_operation_context.get()
-    start_operation_context = ctx._temporal_start_operation_context
+    tctx = _TemporalNexusOperationContext.get()
+    start_operation_context = tctx._temporal_start_operation_context
     if not start_operation_context:
         raise RuntimeError(
             "temporalio.nexus.start_workflow() must be called from "
@@ -103,11 +103,11 @@ async def start_workflow(
     # We must pass nexus_completion_callbacks, workflow_event_links, and request_id,
     # but these are deliberately not exposed in overloads, hence the type-check
     # violation.
-    wf_handle = await ctx.client.start_workflow(  # type: ignore
+    wf_handle = await tctx.client.start_workflow(  # type: ignore
         workflow=workflow,
         arg=arg,
         id=id,
-        task_queue=task_queue or ctx.task_queue,
+        task_queue=task_queue or tctx.info().task_queue,
         execution_timeout=execution_timeout,
         run_timeout=run_timeout,
         task_timeout=task_timeout,
