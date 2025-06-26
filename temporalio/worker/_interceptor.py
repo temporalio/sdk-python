@@ -302,7 +302,7 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
         Callable[[Any], nexusrpc.handler.OperationHandler[InputT, OutputT]],
         Callable[
             [Any, nexusrpc.handler.StartOperationContext, InputT],
-            Awaitable[temporalio.nexus.WorkflowOperationToken[OutputT]],
+            Awaitable[temporalio.nexus.WorkflowHandle[OutputT]],
         ],
         str,
     ]

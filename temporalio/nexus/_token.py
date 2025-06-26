@@ -14,8 +14,8 @@ OperationTokenType = Literal[1]
 
 
 @dataclass(frozen=True)
-class WorkflowOperationToken(Generic[OutputT]):
-    """A Nexus operation token for an operation backed by a workflow."""
+class WorkflowHandle(Generic[OutputT]):
+    """A handle to a workflow that is backing a Nexus operation."""
 
     namespace: str
     workflow_id: str
@@ -40,8 +40,8 @@ class WorkflowOperationToken(Generic[OutputT]):
     @classmethod
     def _unsafe_from_client_workflow_handle(
         cls, workflow_handle: client.WorkflowHandle[Any, OutputT]
-    ) -> WorkflowOperationToken[OutputT]:
-        """Create a :py:class:`WorkflowOperationToken` from a workflow handle.
+    ) -> WorkflowHandle[OutputT]:
+        """Create a :py:class:`WorkflowHandle` from a :py:class:`temporalio.client.WorkflowHandle`.
 
         This is a private method not intended to be used by users. It does not check
         that the supplied client.WorkflowHandle references a workflow that has been
@@ -65,7 +65,7 @@ class WorkflowOperationToken(Generic[OutputT]):
         )
 
     @classmethod
-    def decode(cls, token: str) -> WorkflowOperationToken[OutputT]:
+    def decode(cls, token: str) -> WorkflowHandle[OutputT]:
         """Decodes and validates a token from its base64url-encoded string representation."""
         if not token:
             raise TypeError("invalid workflow token: token is empty")

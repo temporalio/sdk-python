@@ -13,7 +13,7 @@ import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.common
 from temporalio.nexus._operation_context import temporal_operation_context
-from temporalio.nexus._token import WorkflowOperationToken
+from temporalio.nexus._token import WorkflowHandle
 from temporalio.types import (
     MethodAsyncSingleParam,
     ParamType,
@@ -54,7 +54,7 @@ async def start_workflow(
     request_eager_start: bool = False,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
     versioning_override: Optional[temporalio.common.VersioningOverride] = None,
-) -> WorkflowOperationToken[ReturnType]:
+) -> WorkflowHandle[ReturnType]:
     """Start a workflow that will deliver the result of the Nexus operation.
 
     The workflow will be started in the same namespace as the Nexus worker, using
@@ -134,6 +134,4 @@ async def start_workflow(
 
     start_operation_context.add_outbound_links(wf_handle)
 
-    return WorkflowOperationToken[ReturnType]._unsafe_from_client_workflow_handle(
-        wf_handle
-    )
+    return WorkflowHandle[ReturnType]._unsafe_from_client_workflow_handle(wf_handle)
