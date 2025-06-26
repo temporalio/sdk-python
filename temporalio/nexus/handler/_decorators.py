@@ -112,6 +112,7 @@ def workflow_run_operation_handler(
             _start.__doc__ = start.__doc__
             return WorkflowRunOperationHandler(_start, input_type, output_type)
 
+        # TODO(preview): make double-underscore attrs private to nexusrpc and expose getters/setters
         operation_handler_factory.__nexus_operation__ = nexusrpc.Operation(
             name=name or start.__name__,
             method_name=start.__name__,
