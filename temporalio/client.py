@@ -5203,6 +5203,7 @@ class StartWorkflowInput:
     rpc_timeout: Optional[timedelta]
     request_eager_start: bool
     priority: temporalio.common.Priority
+    # The following options are experimental and unstable.
     nexus_completion_callbacks: Sequence[NexusCompletionCallback]
     workflow_event_links: Sequence[temporalio.api.common.v1.Link.WorkflowEvent]
     request_id: Optional[str]
@@ -7264,7 +7265,11 @@ class CloudOperationsClient:
 
 @dataclass(frozen=True)
 class NexusCompletionCallback:
-    """Nexus callback to attach to events such as workflow completion."""
+    """Nexus callback to attach to events such as workflow completion.
+
+    .. warning::
+        This option is experimental and unstable.
+    """
 
     url: str
     """Callback URL."""
