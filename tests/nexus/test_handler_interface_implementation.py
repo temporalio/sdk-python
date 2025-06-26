@@ -34,7 +34,7 @@ class ValidWorkflowRunImpl(_InterfaceImplementationTestCase):
         op: nexusrpc.Operation[str, int]
 
     class Impl:
-        @nexus.workflow_run_operation_handler
+        @nexus.workflow_run_operation
         async def op(
             self, ctx: StartOperationContext, input: str
         ) -> nexus.WorkflowHandle[int]: ...

@@ -200,7 +200,7 @@ class ServiceImpl:
             )
         return OpOutput(value="sync response")
 
-    @nexus.workflow_run_operation_handler
+    @nexus.workflow_run_operation
     async def async_operation(
         self, ctx: StartOperationContext, input: OpInput
     ) -> nexus.WorkflowHandle[HandlerWfOutput]:
@@ -911,7 +911,7 @@ class EchoWorkflow:
 
 @service_handler
 class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
-    @nexus.workflow_run_operation_handler
+    @nexus.workflow_run_operation
     async def my_workflow_run_operation(
         self, ctx: StartOperationContext, input: None
     ) -> nexus.WorkflowHandle[str]:

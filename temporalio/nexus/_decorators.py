@@ -28,7 +28,7 @@ from temporalio.nexus._util import (
 
 
 @overload
-def workflow_run_operation_handler(
+def workflow_run_operation(
     start: Callable[
         [ServiceHandlerT, StartOperationContext, InputT],
         Awaitable[WorkflowHandle[OutputT]],
@@ -40,7 +40,7 @@ def workflow_run_operation_handler(
 
 
 @overload
-def workflow_run_operation_handler(
+def workflow_run_operation(
     *,
     name: Optional[str] = None,
 ) -> Callable[
@@ -57,7 +57,7 @@ def workflow_run_operation_handler(
 ]: ...
 
 
-def workflow_run_operation_handler(
+def workflow_run_operation(
     start: Optional[
         Callable[
             [ServiceHandlerT, StartOperationContext, InputT],
