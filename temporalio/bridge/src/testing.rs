@@ -52,7 +52,7 @@ pub fn start_dev_server<'a>(
     runtime_ref.runtime.future_into_py(py, async move {
         Ok(EphemeralServerRef {
             server: Some(opts.start_server().await.map_err(|err| {
-                PyRuntimeError::new_err(format!("Failed starting Temporal dev server: {}", err))
+                PyRuntimeError::new_err(format!("Failed starting Temporal dev server: {err}"))
             })?),
             runtime,
         })
@@ -69,7 +69,7 @@ pub fn start_test_server<'a>(
     runtime_ref.runtime.future_into_py(py, async move {
         Ok(EphemeralServerRef {
             server: Some(opts.start_server().await.map_err(|err| {
-                PyRuntimeError::new_err(format!("Failed starting test server: {}", err))
+                PyRuntimeError::new_err(format!("Failed starting test server: {err}"))
             })?),
             runtime,
         })
@@ -101,7 +101,7 @@ impl EphemeralServerRef {
         self.runtime.future_into_py(py, async move {
             if let Some(mut server) = server {
                 server.shutdown().await.map_err(|err| {
-                    PyRuntimeError::new_err(format!("Failed shutting down Temporalite: {}", err))
+                    PyRuntimeError::new_err(format!("Failed shutting down Temporalite: {err}"))
                 })?;
             }
             Ok(())
@@ -138,7 +138,7 @@ impl TryFrom<DevServerConfig> for ephemeral_server::TemporalDevServerConfig {
             .log((conf.log_format, conf.log_level))
             .extra_args(conf.extra_args)
             .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid Temporalite config: {}", err)))
+            .map_err(|err| PyValueError::new_err(format!("Invalid Temporalite config: {err}")))
     }
 }
 
@@ -166,6 +166,6 @@ impl TryFrom<TestServerConfig> for ephemeral_server::TestServerConfig {
             .port(conf.port)
             .extra_args(conf.extra_args)
             .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid test server config: {}", err)))
+            .map_err(|err| PyValueError::new_err(format!("Invalid test server config: {err}")))
     }
 }

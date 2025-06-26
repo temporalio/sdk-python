@@ -366,8 +366,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
                 Ok(f) => f,
                 Err(e) => {
                     error!(
-                        "Unexpected error in custom slot supplier `reserve_slot`: {}",
-                        e
+                        "Unexpected error in custom slot supplier `reserve_slot`: {e}"
                     );
                     continue;
                 }
@@ -402,8 +401,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
         })
         .unwrap_or_else(|e| {
             error!(
-                "Uncaught error in custom slot supplier `try_reserve_slot`: {}",
-                e
+                "Uncaught error in custom slot supplier `try_reserve_slot`: {e}"
             );
             None
         })
@@ -427,8 +425,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
             PyResult::Ok(())
         }) {
             error!(
-                "Uncaught error in custom slot supplier `mark_slot_used`: {}",
-                e
+                "Uncaught error in custom slot supplier `mark_slot_used`: {e}"
             );
         }
     }
@@ -450,8 +447,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
             PyResult::Ok(())
         }) {
             error!(
-                "Uncaught error in custom slot supplier `release_slot`: {}",
-                e
+                "Uncaught error in custom slot supplier `release_slot`: {e}"
             );
         }
     }
@@ -509,7 +505,7 @@ pub fn new_replay_worker<'a>(
     let worker = WorkerRef {
         worker: Some(Arc::new(
             temporal_sdk_core::init_replay_worker(ReplayWorkerInput::new(config, stream)).map_err(
-                |err| PyValueError::new_err(format!("Failed creating replay worker: {}", err)),
+                |err| PyValueError::new_err(format!("Failed creating replay worker: {err}")),
             )?,
         )),
         event_loop_task_locals: Default::default(),
@@ -551,7 +547,7 @@ impl WorkerRef {
             let bytes = match worker.poll_workflow_activation().await {
                 Ok(act) => act.encode_to_vec(),
                 Err(PollError::ShutDown) => return Err(PollShutdownError::new_err(())),
-                Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {}", err))),
+                Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {err}"))),
             };
             Ok(bytes)
         })
@@ -563,7 +559,7 @@ impl WorkerRef {
             let bytes = match worker.poll_activity_task().await {
                 Ok(task) => task.encode_to_vec(),
                 Err(PollError::ShutDown) => return Err(PollShutdownError::new_err(())),
-                Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {}", err))),
+                Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {err}"))),
             };
             Ok(bytes)
         })
@@ -576,7 +572,7 @@ impl WorkerRef {
     ) -> PyResult<Bound<'p, PyAny>> {
         let worker = self.worker.as_ref().unwrap().clone();
         let completion = WorkflowActivationCompletion::decode(proto.as_bytes())
-            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
+            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
         self.runtime.future_into_py(py, async move {
             worker
                 .complete_workflow_activation(completion)
@@ -593,7 +589,7 @@ impl WorkerRef {
     ) -> PyResult<Bound<'p, PyAny>> {
         let worker = self.worker.as_ref().unwrap().clone();
         let completion = ActivityTaskCompletion::decode(proto.as_bytes())
-            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
+            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
         self.runtime.future_into_py(py, async move {
             worker
                 .complete_activity_task(completion)
@@ -606,7 +602,7 @@ impl WorkerRef {
     fn record_activity_heartbeat(&self, proto: &Bound<'_, PyBytes>) -> PyResult<()> {
         enter_sync!(self.runtime);
         let heartbeat = ActivityHeartbeat::decode(proto.as_bytes())
-            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
+            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
         self.worker
             .as_ref()
             .unwrap()
@@ -701,7 +697,7 @@ fn convert_worker_config(
                 .collect::<HashMap<String, HashSet<WorkflowErrorType>>>(),
         )
         .build()
-        .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {}", err)))
+        .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {err}")))
 }
 
 fn convert_tuner_holder(
@@ -770,7 +766,7 @@ fn convert_tuner_holder(
         )?);
     Ok(options
         .build()
-        .map_err(|e| PyValueError::new_err(format!("Invalid tuner holder options: {}", e)))?
+        .map_err(|e| PyValueError::new_err(format!("Invalid tuner holder options: {e}")))?
         .build_tuner_holder()
         .context("Failed building tuner holder")?)
 }
@@ -863,7 +859,7 @@ impl HistoryPusher {
         history_proto: &Bound<'_, PyBytes>,
     ) -> PyResult<Bound<'p, PyAny>> {
         let history = History::decode(history_proto.as_bytes())
-            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
+            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
         let wfid = workflow_id.to_string();
         let tx = if let Some(tx) = self.tx.as_ref() {
             tx.clone()
