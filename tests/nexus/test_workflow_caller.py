@@ -28,7 +28,6 @@ import temporalio.api.nexus
 import temporalio.api.nexus.v1
 import temporalio.api.operatorservice
 import temporalio.api.operatorservice.v1
-import temporalio.nexus
 from temporalio import nexus, workflow
 from temporalio.client import (
     Client,
@@ -157,7 +156,7 @@ class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
         if isinstance(input.response_type, SyncResponse):
             return StartOperationResultSync(value=OpOutput(value="sync response"))
         elif isinstance(input.response_type, AsyncResponse):
-            token = await start_workflow(
+            token = await nexus.start_workflow(
                 HandlerWorkflow.run,
                 HandlerWfInput(op_input=input),
                 id=input.response_type.operation_workflow_id,
@@ -167,7 +166,7 @@ class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
             raise TypeError
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
-        return await cancel_operation(token)
+        return await nexus.cancel_operation(token)
 
     async def fetch_info(
         self, ctx: FetchOperationInfoContext, token: str
@@ -212,7 +211,7 @@ class ServiceImpl:
                 RPCStatusCode.INVALID_ARGUMENT,
                 b"",
             )
-        return await start_workflow(
+        return await nexus.start_workflow(
             HandlerWorkflow.run,
             HandlerWfInput(op_input=input),
             id=input.response_type.operation_workflow_id,
