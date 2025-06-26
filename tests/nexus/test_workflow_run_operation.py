@@ -12,8 +12,7 @@ from nexusrpc.handler import (
     service_handler,
 )
 
-from temporalio import workflow
-from temporalio.nexus import start_workflow
+from temporalio import nexus, workflow
 from temporalio.nexus._operation_handlers import WorkflowRunOperationHandler
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
@@ -44,7 +43,7 @@ class MyOperation(WorkflowRunOperationHandler):
     async def start(
         self, ctx: StartOperationContext, input: Input
     ) -> StartOperationResultAsync:
-        token = await start_workflow(
+        token = await nexus.start_workflow(
             EchoWorkflow.run,
             input.value,
             id=str(uuid.uuid4()),
