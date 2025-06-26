@@ -319,7 +319,7 @@ async def test_tool_workflow(client: Client):
         ) as worker:
             workflow_handle = await client.start_workflow(
                 ToolsWorkflow.run,
-                "What is the weather in Seattle, WA?",
+                "What is the weather in Tokio?",
                 id=f"tools-workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=5),
