@@ -15,13 +15,13 @@ from nexusrpc.handler import (
 )
 from nexusrpc.types import InputT, OutputT, ServiceHandlerT
 
-from temporalio.nexus.handler._operation_handlers import (
+from temporalio.nexus._operation_handlers import (
     WorkflowRunOperationHandler,
 )
-from temporalio.nexus.handler._token import (
+from temporalio.nexus._token import (
     WorkflowOperationToken,
 )
-from temporalio.nexus.handler._util import (
+from temporalio.nexus._util import (
     get_callable_name,
     get_workflow_run_start_method_input_and_output_type_annotations,
 )
