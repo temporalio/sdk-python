@@ -25,16 +25,17 @@ from temporalio.nexus._util import (
     get_callable_name,
     get_workflow_run_start_method_input_and_output_type_annotations,
 )
+from temporalio.nexus._workflow import WorkflowRunOperationContext
 
 
 @overload
 def workflow_run_operation(
     start: Callable[
-        [ServiceHandlerT, StartOperationContext, InputT],
+        [ServiceHandlerT, WorkflowRunOperationContext, InputT],
         Awaitable[WorkflowHandle[OutputT]],
     ],
 ) -> Callable[
-    [ServiceHandlerT, StartOperationContext, InputT],
+    [ServiceHandlerT, WorkflowRunOperationContext, InputT],
     Awaitable[WorkflowHandle[OutputT]],
 ]: ...
 
@@ -46,12 +47,12 @@ def workflow_run_operation(
 ) -> Callable[
     [
         Callable[
-            [ServiceHandlerT, StartOperationContext, InputT],
+            [ServiceHandlerT, WorkflowRunOperationContext, InputT],
             Awaitable[WorkflowHandle[OutputT]],
         ]
     ],
     Callable[
-        [ServiceHandlerT, StartOperationContext, InputT],
+        [ServiceHandlerT, WorkflowRunOperationContext, InputT],
         Awaitable[WorkflowHandle[OutputT]],
     ],
 ]: ...
@@ -60,7 +61,7 @@ def workflow_run_operation(
 def workflow_run_operation(
     start: Optional[
         Callable[
-            [ServiceHandlerT, StartOperationContext, InputT],
+            [ServiceHandlerT, WorkflowRunOperationContext, InputT],
             Awaitable[WorkflowHandle[OutputT]],
         ]
     ] = None,
@@ -68,18 +69,18 @@ def workflow_run_operation(
     name: Optional[str] = None,
 ) -> Union[
     Callable[
-        [ServiceHandlerT, StartOperationContext, InputT],
+        [ServiceHandlerT, WorkflowRunOperationContext, InputT],
         Awaitable[WorkflowHandle[OutputT]],
     ],
     Callable[
         [
             Callable[
-                [ServiceHandlerT, StartOperationContext, InputT],
+                [ServiceHandlerT, WorkflowRunOperationContext, InputT],
                 Awaitable[WorkflowHandle[OutputT]],
             ]
         ],
         Callable[
-            [ServiceHandlerT, StartOperationContext, InputT],
+            [ServiceHandlerT, WorkflowRunOperationContext, InputT],
             Awaitable[WorkflowHandle[OutputT]],
         ],
     ],
@@ -90,11 +91,11 @@ def workflow_run_operation(
 
     def decorator(
         start: Callable[
-            [ServiceHandlerT, StartOperationContext, InputT],
+            [ServiceHandlerT, WorkflowRunOperationContext, InputT],
             Awaitable[WorkflowHandle[OutputT]],
         ],
     ) -> Callable[
-        [ServiceHandlerT, StartOperationContext, InputT],
+        [ServiceHandlerT, WorkflowRunOperationContext, InputT],
         Awaitable[WorkflowHandle[OutputT]],
     ]:
         (
@@ -108,7 +109,7 @@ def workflow_run_operation(
             async def _start(
                 ctx: StartOperationContext, input: InputT
             ) -> WorkflowHandle[OutputT]:
-                return await start(self, ctx, input)
+                return await start(self, WorkflowRunOperationContext(ctx), input)
 
             _start.__doc__ = start.__doc__
             return WorkflowRunOperationHandler(_start, input_type, output_type)
