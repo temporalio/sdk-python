@@ -27,15 +27,13 @@ from typing import Any, Callable, Mapping, Optional, Type, Union
 import httpx
 import nexusrpc
 import pytest
-from nexusrpc import OperationInfo
+from nexusrpc import OperationError, OperationErrorState, OperationInfo
 from nexusrpc.handler import (
     CancelOperationContext,
     FetchOperationInfoContext,
     FetchOperationResultContext,
     HandlerError,
     HandlerErrorType,
-    OperationError,
-    OperationErrorState,
     OperationHandler,
     StartOperationContext,
     service_handler,
