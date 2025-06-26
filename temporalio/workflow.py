@@ -58,7 +58,6 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.nexus
 import temporalio.workflow
-from temporalio.nexus import WorkflowRunOperationContext
 
 from .types import (
     AnyType,
@@ -855,22 +854,7 @@ class _Runtime(ABC):
         self,
         endpoint: str,
         service: str,
-        operation: Union[
-            nexusrpc.Operation[I, O],
-            Callable[[Any], nexusrpc.handler.OperationHandler[I, O]],
-            Callable[
-                [
-                    S,
-                    Union[
-                        nexusrpc.handler.StartOperationContext,
-                        WorkflowRunOperationContext,
-                    ],
-                    I,
-                ],
-                Awaitable[temporalio.nexus.WorkflowHandle[O]],
-            ],
-            str,
-        ],
+        operation: Union[nexusrpc.Operation[I, O], str, Callable[..., Any]],
         input: Any,
         output_type: Optional[Type[O]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
@@ -4432,21 +4416,7 @@ class NexusOperationHandle(Generic[O]):
 async def start_nexus_operation(
     endpoint: str,
     service: str,
-    operation: Union[
-        nexusrpc.Operation[I, O],
-        Callable[[Any], nexusrpc.handler.OperationHandler[I, O]],
-        Callable[
-            [
-                S,
-                Union[
-                    nexusrpc.handler.StartOperationContext, WorkflowRunOperationContext
-                ],
-                I,
-            ],
-            Awaitable[temporalio.nexus.WorkflowHandle[O]],
-        ],
-        str,
-    ],
+    operation: Union[nexusrpc.Operation[I, O], str, Callable[..., Any]],
     input: Any,
     *,
     output_type: Optional[Type[O]] = None,
@@ -5224,22 +5194,7 @@ class NexusClient(Generic[S]):
     # TODO(nexus-prerelease): should it be an error to use a reference to a method on a class other than that supplied?
     async def start_operation(
         self,
-        operation: Union[
-            nexusrpc.Operation[I, O],
-            Callable[[S], nexusrpc.handler.OperationHandler[I, O]],
-            Callable[
-                [
-                    S,
-                    Union[
-                        nexusrpc.handler.StartOperationContext,
-                        WorkflowRunOperationContext,
-                    ],
-                    I,
-                ],
-                Awaitable[temporalio.nexus.WorkflowHandle[O]],
-            ],
-            str,
-        ],
+        operation: Union[nexusrpc.Operation[I, O], str, Callable[..., Any]],
         input: I,
         *,
         output_type: Optional[Type[O]] = None,
@@ -5259,22 +5214,7 @@ class NexusClient(Generic[S]):
     # TODO(nexus-prerelease): overloads: no-input, ret type
     async def execute_operation(
         self,
-        operation: Union[
-            nexusrpc.Operation[I, O],
-            Callable[[S], nexusrpc.handler.OperationHandler[I, O]],
-            Callable[
-                [
-                    S,
-                    Union[
-                        nexusrpc.handler.StartOperationContext,
-                        WorkflowRunOperationContext,
-                    ],
-                    I,
-                ],
-                Awaitable[temporalio.nexus.WorkflowHandle[O]],
-            ],
-            str,
-        ],
+        operation: Union[nexusrpc.Operation[I, O], str, Callable[..., Any]],
         input: I,
         *,
         output_type: Optional[Type[O]] = None,
