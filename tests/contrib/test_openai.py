@@ -174,6 +174,11 @@ async def test_hello_world_agent(client: Client):
 async def test_end_to_end(client: Client):
     if "OPENAI_API_KEY" not in os.environ:
         pytest.skip("No openai API key")
+
+    new_config = client.config()
+    new_config["data_converter"] = open_ai_data_converter
+    client = Client(**new_config)
+
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=10))
     with set_open_ai_agent_temporal_overrides(model_params):
         async with new_worker(
