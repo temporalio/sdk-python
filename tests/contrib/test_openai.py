@@ -189,6 +189,7 @@ async def get_weather_country(city: str, country: str) -> Weather:
     """
     return Weather(city=city, temperature_range="14-20C", conditions="Sunny with wind.")
 
+
 @dataclass
 class WeatherInput:
     city: str

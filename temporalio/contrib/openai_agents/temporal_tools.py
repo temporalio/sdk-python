@@ -71,13 +71,17 @@ def activity_as_tool(
             "invalid_tool",
         )
     schema = function_schema(fn)
+
     async def run_activity(ctx: RunContextWrapper[Any], input: str) -> Any:
-        json_data = json.loads(input)
+        try:
+            json_data = json.loads(input)
+        except Exception as e:
+            raise ApplicationError(
+                f"Invalid JSON input for tool {schema.name}: {input}"
+            ) from e
 
         # Activities don't support keyword only arguments, so we can ignore the kwargs_dict return
-        args, _ = schema.to_call_args(
-            schema.params_pydantic_model(**json_data)
-        )
+        args, _ = schema.to_call_args(schema.params_pydantic_model(**json_data))
         result = await workflow.execute_activity(
             fn,
             args=args,
@@ -95,10 +99,10 @@ def activity_as_tool(
         )
         try:
             return str(result)
-        except Exception:
+        except Exception as e:
             raise ApplicationError(
                 "You must return a string representation of the tool output, or something we can call str() on"
-            )
+            ) from e
 
     return FunctionTool(
         name=schema.name,
