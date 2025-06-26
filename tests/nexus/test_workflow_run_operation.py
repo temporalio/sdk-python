@@ -8,9 +8,9 @@ from nexusrpc.handler import (
     OperationHandler,
     StartOperationContext,
     StartOperationResultAsync,
-    operation_handler,
     service_handler,
 )
+from nexusrpc.handler._decorators import operation_handler
 
 from temporalio import nexus, workflow
 from temporalio.nexus._operation_handlers import WorkflowRunOperationHandler

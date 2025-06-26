@@ -23,7 +23,9 @@ from nexusrpc.handler import (
     OperationHandler,
     StartOperationContext,
     StartOperationResultAsync,
+    service_handler,
 )
+from nexusrpc.handler._decorators import operation_handler
 
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
@@ -109,21 +111,21 @@ class AsyncOperationWithNonAsyncDefs(OperationHandler[Input, Output]):
 
 
 @dataclass
-@nexusrpc.handler.service_handler
+@service_handler
 class MyServiceHandlerWithAsyncDefs:
     executor: TaskExecutor
 
-    @nexusrpc.handler.operation_handler
+    @operation_handler
     def async_operation(self) -> OperationHandler[Input, Output]:
         return AsyncOperationWithAsyncDefs(self.executor)
 
 
 @dataclass
-@nexusrpc.handler.service_handler
+@service_handler
 class MyServiceHandlerWithNonAsyncDefs:
     executor: TaskExecutor
 
-    @nexusrpc.handler.operation_handler
+    @operation_handler
     def async_operation(self) -> OperationHandler[Input, Output]:
         return AsyncOperationWithNonAsyncDefs(self.executor)
 
