@@ -15,7 +15,6 @@ Failure object.
 
 import asyncio
 import concurrent.futures
-import dataclasses
 import json
 import logging
 import pprint
@@ -28,7 +27,6 @@ from typing import Any, Callable, Mapping, Optional, Type, Union
 import httpx
 import nexusrpc
 import pytest
-from google.protobuf import json_format
 from nexusrpc import OperationInfo
 from nexusrpc.handler import (
     CancelOperationContext,
@@ -45,16 +43,19 @@ from nexusrpc.handler import (
 )
 from nexusrpc.handler._decorators import operation_handler
 
-import temporalio.api.failure.v1
 from temporalio import nexus, workflow
 from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
-from temporalio.converter import FailureConverter, PayloadConverter
 from temporalio.exceptions import ApplicationError
 from temporalio.nexus import workflow_run_operation
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers.nexus import ServiceClient, create_nexus_endpoint, dataclass_as_dict
+from tests.helpers.nexus import (
+    Failure,
+    ServiceClient,
+    create_nexus_endpoint,
+    dataclass_as_dict,
+)
 
 HTTP_PORT = 7243
 
@@ -323,37 +324,6 @@ class MyServiceHandler:
         self, ctx: StartOperationContext, input: Input
     ) -> NonSerializableOutput:
         return NonSerializableOutput()
-
-
-@dataclass
-class Failure:
-    """A Nexus Failure object, with details parsed into an exception.
-
-    https://github.com/nexus-rpc/api/blob/main/SPEC.md#failure
-    """
-
-    message: str = ""
-    metadata: Optional[dict[str, str]] = None
-    details: Optional[dict[str, Any]] = None
-
-    exception_from_details: Optional[BaseException] = dataclasses.field(
-        init=False, default=None
-    )
-
-    def __post_init__(self) -> None:
-        if self.metadata and (error_type := self.metadata.get("type")):
-            self.exception_from_details = self._instantiate_exception(
-                error_type, self.details
-            )
-
-    def _instantiate_exception(
-        self, error_type: str, details: Optional[dict[str, Any]]
-    ) -> BaseException:
-        proto = {
-            "temporal.api.failure.v1.Failure": temporalio.api.failure.v1.Failure,
-        }[error_type]()
-        json_format.ParseDict(self.details, proto, ignore_unknown_fields=True)
-        return FailureConverter.default.from_failure(proto, PayloadConverter.default)
 
 
 # Immutable dicts that can be used as dataclass field defaults

@@ -3,11 +3,13 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
 import httpx
+from google.protobuf import json_format
 
 import temporalio.api
 import temporalio.api.nexus.v1
 import temporalio.api.operatorservice.v1
 from temporalio.client import Client
+from temporalio.converter import FailureConverter, PayloadConverter
 
 
 def make_nexus_endpoint_name(task_queue: str) -> str:
@@ -106,3 +108,34 @@ def dataclass_as_dict(dataclass: Any) -> dict[str, Any]:
         field.name: getattr(dataclass, field.name)
         for field in dataclasses.fields(dataclass)
     }
+
+
+@dataclass
+class Failure:
+    """A Nexus Failure object, with details parsed into an exception.
+
+    https://github.com/nexus-rpc/api/blob/main/SPEC.md#failure
+    """
+
+    message: str = ""
+    metadata: Optional[dict[str, str]] = None
+    details: Optional[dict[str, Any]] = None
+
+    exception_from_details: Optional[BaseException] = dataclasses.field(
+        init=False, default=None
+    )
+
+    def __post_init__(self) -> None:
+        if self.metadata and (error_type := self.metadata.get("type")):
+            self.exception_from_details = self._instantiate_exception(
+                error_type, self.details
+            )
+
+    def _instantiate_exception(
+        self, error_type: str, details: Optional[dict[str, Any]]
+    ) -> BaseException:
+        proto = {
+            "temporal.api.failure.v1.Failure": temporalio.api.failure.v1.Failure,
+        }[error_type]()
+        json_format.ParseDict(self.details, proto, ignore_unknown_fields=True)
+        return FailureConverter.default.from_failure(proto, PayloadConverter.default)
