@@ -406,7 +406,10 @@ class TestResearchModel(TestModel):
             ModelResponse(
                 output=[
                     ResponseFunctionWebSearch(
-                        id="", status="completed", type="web_search_call", action=ActionSearch(query="", type="search", domains=None)
+                        id="",
+                        status="completed",
+                        type="web_search_call",
+                        action=ActionSearch(query="", type="search", domains=None),
                     ),
                     ResponseOutputMessage(
                         id="",
