@@ -206,7 +206,7 @@ class MyServiceHandler:
         )
         return Output(value=f"logged: {input.value}")
 
-    @nexus.workflow_run_operation_handler
+    @nexus.workflow_run_operation
     async def workflow_run_operation(
         self, ctx: StartOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
@@ -257,7 +257,7 @@ class MyServiceHandler:
             value=f"from start method on {self.__class__.__name__} without type annotations: {input}"
         )
 
-    @nexus.workflow_run_operation_handler
+    @nexus.workflow_run_operation
     async def workflow_run_operation_without_type_annotations(self, ctx, input):
         return await nexus.start_workflow(
             WorkflowWithoutTypeAnnotations.run,
@@ -265,7 +265,7 @@ class MyServiceHandler:
             id=str(uuid.uuid4()),
         )
 
-    @nexus.workflow_run_operation_handler
+    @nexus.workflow_run_operation
     async def workflow_run_op_link_test(
         self, ctx: StartOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
@@ -1049,7 +1049,7 @@ class EchoWorkflow:
 
 @service_handler
 class ServiceHandlerForRequestIdTest:
-    @nexus.workflow_run_operation_handler
+    @nexus.workflow_run_operation
     async def operation_backed_by_a_workflow(
         self, ctx: StartOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
@@ -1060,7 +1060,7 @@ class ServiceHandlerForRequestIdTest:
             id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
         )
 
-    @nexus.workflow_run_operation_handler
+    @nexus.workflow_run_operation
     async def operation_that_executes_a_workflow_before_starting_the_backing_workflow(
         self, ctx: StartOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
