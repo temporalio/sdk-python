@@ -5195,6 +5195,7 @@ class NexusClient(Generic[S]):
         # class.
         if isinstance(service, str):
             self._service_name = service
+        # TODO(preview): make double-underscore attrs private to nexusrpc and expose getters/setters
         elif service_defn := getattr(service, "__nexus_service__", None):
             self._service_name = service_defn.name
         else:
