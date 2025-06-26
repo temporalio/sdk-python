@@ -71,17 +71,16 @@ def activity_as_tool(
             "invalid_tool",
         )
     schema = function_schema(fn)
-
     async def run_activity(ctx: RunContextWrapper[Any], input: str) -> Any:
         json_data = json.loads(input)
-        args, kwargs_dict = schema.to_call_args(
+
+        # Activities don't support keyword only arguments, so we can ignore the kwargs_dict return
+        args, _ = schema.to_call_args(
             schema.params_pydantic_model(**json_data)
         )
-
         result = await workflow.execute_activity(
             fn,
-            *args,
-            **kwargs_dict,
+            args=args,
             task_queue=task_queue,
             schedule_to_close_timeout=schedule_to_close_timeout,
             schedule_to_start_timeout=schedule_to_start_timeout,

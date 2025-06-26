@@ -182,6 +182,13 @@ async def get_weather(city: str) -> Weather:
     return Weather(city=city, temperature_range="14-20C", conditions="Sunny with wind.")
 
 
+@activity.defn
+async def get_weather_country(city: str, country: str) -> Weather:
+    """
+    Get the weather for a given city in a country.
+    """
+    return Weather(city=city, temperature_range="14-20C", conditions="Sunny with wind.")
+
 @dataclass
 class WeatherInput:
     city: str
@@ -229,6 +236,20 @@ class TestWeatherModel(TestModel):
         ),
         ModelResponse(
             output=[
+                ResponseFunctionToolCall(
+                    arguments='{"city":"Tokyo","country":"Japan"}',
+                    call_id="call",
+                    name="get_weather_country",
+                    type="function_call",
+                    id="id",
+                    status="completed",
+                )
+            ],
+            usage=Usage(),
+            response_id=None,
+        ),
+        ModelResponse(
+            output=[
                 ResponseOutputMessage(
                     id="",
                     content=[
@@ -263,6 +284,9 @@ class ToolsWorkflow:
                 activity_as_tool(
                     get_weather_object, start_to_close_timeout=timedelta(seconds=10)
                 ),
+                activity_as_tool(
+                    get_weather_country, start_to_close_timeout=timedelta(seconds=10)
+                ),
             ],
         )  # type: Agent
         result = await Runner.run(starting_agent=agent, input=question)
@@ -290,11 +314,12 @@ async def test_tool_workflow(client: Client):
                 model_activity.invoke_model_activity,
                 get_weather,
                 get_weather_object,
+                get_weather_country,
             ],
         ) as worker:
             workflow_handle = await client.start_workflow(
                 ToolsWorkflow.run,
-                "What is the weather in Tokio?",
+                "What is the weather in Seattle, WA?",
                 id=f"tools-workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=5),
@@ -307,7 +332,7 @@ async def test_tool_workflow(client: Client):
                 if e.HasField("activity_task_completed_event_attributes"):
                     events.append(e)
 
-            assert len(events) == 5
+            assert len(events) == 7
             assert (
                 "function_call"
                 in events[0]
@@ -326,7 +351,6 @@ async def test_tool_workflow(client: Client):
                 .activity_task_completed_event_attributes.result.payloads[0]
                 .data.decode()
             )
-
             assert (
                 "Sunny with wind"
                 in events[3]
@@ -334,8 +358,20 @@ async def test_tool_workflow(client: Client):
                 .data.decode()
             )
             assert (
-                "Test weather result"
+                "function_call"
                 in events[4]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Sunny with wind"
+                in events[5]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Test weather result"
+                in events[6]
                 .activity_task_completed_event_attributes.result.payloads[0]
                 .data.decode()
             )
