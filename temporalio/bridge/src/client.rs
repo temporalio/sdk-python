@@ -89,7 +89,7 @@ pub fn connect_client<'a>(
                 .connect_no_namespace(runtime.core.telemetry().get_temporal_metric_meter())
                 .await
                 .map_err(|err| {
-                    PyRuntimeError::new_err(format!("Failed client connect: {}", err))
+                    PyRuntimeError::new_err(format!("Failed client connect: {err}"))
                 })?,
             runtime,
         })
@@ -518,14 +518,14 @@ impl ClientRef {
 
 fn rpc_req<P: prost::Message + Default>(call: RpcCall) -> PyResult<tonic::Request<P>> {
     let proto = P::decode(&*call.req)
-        .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
+        .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
     let mut req = tonic::Request::new(proto);
     for (k, v) in call.metadata {
         req.metadata_mut().insert(
             MetadataKey::from_str(k.as_str())
-                .map_err(|err| PyValueError::new_err(format!("Invalid metadata key: {}", err)))?,
+                .map_err(|err| PyValueError::new_err(format!("Invalid metadata key: {err}")))?,
             v.parse()
-                .map_err(|err| PyValueError::new_err(format!("Invalid metadata value: {}", err)))?,
+                .map_err(|err| PyValueError::new_err(format!("Invalid metadata value: {err}")))?,
         );
     }
     if let Some(timeout_millis) = call.timeout_millis {
@@ -561,7 +561,7 @@ impl TryFrom<ClientConfig> for ClientOptions {
         gateway_opts
             .target_url(
                 Url::parse(&opts.target_url)
-                    .map_err(|err| PyValueError::new_err(format!("invalid target URL: {}", err)))?,
+                    .map_err(|err| PyValueError::new_err(format!("invalid target URL: {err}")))?,
             )
             .client_name(opts.client_name)
             .client_version(opts.client_version)
@@ -581,7 +581,7 @@ impl TryFrom<ClientConfig> for ClientOptions {
         }
         gateway_opts
             .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid client config: {}", err)))
+            .map_err(|err| PyValueError::new_err(format!("Invalid client config: {err}")))
     }
 }
 
