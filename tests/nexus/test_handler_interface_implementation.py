@@ -6,6 +6,7 @@ import pytest
 from nexusrpc.handler import StartOperationContext, sync_operation
 
 from temporalio import nexus
+from temporalio.nexus import workflow_run_operation
 
 HTTP_PORT = 7243
 
@@ -34,7 +35,7 @@ class ValidWorkflowRunImpl(_InterfaceImplementationTestCase):
         op: nexusrpc.Operation[str, int]
 
     class Impl:
-        @nexus.workflow_run_operation
+        @workflow_run_operation
         async def op(
             self, ctx: StartOperationContext, input: str
         ) -> nexus.WorkflowHandle[int]: ...

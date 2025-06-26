@@ -51,6 +51,7 @@ from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.converter import FailureConverter, PayloadConverter
 from temporalio.exceptions import ApplicationError
+from temporalio.nexus import workflow_run_operation
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import ServiceClient, create_nexus_endpoint, dataclass_as_dict
@@ -89,7 +90,7 @@ class MyService:
     # )
     hang: nexusrpc.Operation[Input, Output]
     log: nexusrpc.Operation[Input, Output]
-    workflow_run_operation: nexusrpc.Operation[Input, Output]
+    workflow_run_operation_happy_path: nexusrpc.Operation[Input, Output]
     workflow_run_operation_without_type_annotations: nexusrpc.Operation[Input, Output]
     sync_operation_without_type_annotations: nexusrpc.Operation[Input, Output]
     sync_operation_with_non_async_def: nexusrpc.Operation[Input, Output]
@@ -206,8 +207,8 @@ class MyServiceHandler:
         )
         return Output(value=f"logged: {input.value}")
 
-    @nexus.workflow_run_operation
-    async def workflow_run_operation(
+    @workflow_run_operation
+    async def workflow_run_operation_happy_path(
         self, ctx: StartOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
         return await nexus.start_workflow(
@@ -257,7 +258,7 @@ class MyServiceHandler:
             value=f"from start method on {self.__class__.__name__} without type annotations: {input}"
         )
 
-    @nexus.workflow_run_operation
+    @workflow_run_operation
     async def workflow_run_operation_without_type_annotations(self, ctx, input):
         return await nexus.start_workflow(
             WorkflowWithoutTypeAnnotations.run,
@@ -265,7 +266,7 @@ class MyServiceHandler:
             id=str(uuid.uuid4()),
         )
 
-    @nexus.workflow_run_operation
+    @workflow_run_operation
     async def workflow_run_op_link_test(
         self, ctx: StartOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
@@ -537,7 +538,7 @@ class SyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
 
 
 class AsyncHandlerHappyPath(_TestCase):
-    operation = "workflow_run_operation"
+    operation = "workflow_run_operation_happy_path"
     input = Input("hello")
     headers = {"Operation-Timeout": "777s"}
     expected = SuccessfulResponse(
@@ -1004,7 +1005,7 @@ async def test_cancel_operation_with_invalid_token(env: WorkflowEnvironment):
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
         cancel_response = await service_client.cancel_operation(
-            "workflow_run_operation",
+            "workflow_run_operation_happy_path",
             token="this-is-not-a-valid-token",
         )
         assert cancel_response.status_code == 404
@@ -1049,7 +1050,7 @@ class EchoWorkflow:
 
 @service_handler
 class ServiceHandlerForRequestIdTest:
-    @nexus.workflow_run_operation
+    @workflow_run_operation
     async def operation_backed_by_a_workflow(
         self, ctx: StartOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
@@ -1060,7 +1061,7 @@ class ServiceHandlerForRequestIdTest:
             id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
         )
 
-    @nexus.workflow_run_operation
+    @workflow_run_operation
     async def operation_that_executes_a_workflow_before_starting_the_backing_workflow(
         self, ctx: StartOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
