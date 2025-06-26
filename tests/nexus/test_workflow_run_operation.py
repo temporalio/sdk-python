@@ -13,8 +13,8 @@ from nexusrpc.handler import (
 )
 
 from temporalio import workflow
-from temporalio.nexus.handler import start_workflow
-from temporalio.nexus.handler._operation_handlers import WorkflowRunOperationHandler
+from temporalio.nexus import start_workflow
+from temporalio.nexus._operation_handlers import WorkflowRunOperationHandler
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import ServiceClient, create_nexus_endpoint, dataclass_as_dict

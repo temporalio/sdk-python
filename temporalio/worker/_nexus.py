@@ -31,7 +31,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.nexus
 from temporalio.exceptions import ApplicationError
-from temporalio.nexus.handler import (
+from temporalio.nexus import (
     _TemporalNexusOperationContext,
     logger,
     temporal_operation_context,

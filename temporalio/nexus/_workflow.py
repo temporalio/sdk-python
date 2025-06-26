@@ -12,8 +12,8 @@ from typing import (
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.common
-from temporalio.nexus.handler._operation_context import temporal_operation_context
-from temporalio.nexus.handler._token import WorkflowOperationToken
+from temporalio.nexus._operation_context import temporal_operation_context
+from temporalio.nexus._token import WorkflowOperationToken
 from temporalio.types import (
     MethodAsyncSingleParam,
     ParamType,
@@ -63,8 +63,8 @@ async def start_workflow(
 
     See :py:meth:`temporalio.client.Client.start_workflow` for all arguments.
 
-    The return value is :py:class:`temporalio.nexus.handler.WorkflowOperationToken`.
-    Use :py:meth:`temporalio.nexus.handler.WorkflowOperationToken.to_workflow_handle`
+    The return value is :py:class:`temporalio.nexus.WorkflowOperationToken`.
+    Use :py:meth:`temporalio.nexus.WorkflowOperationToken.to_workflow_handle`
     to get a :py:class:`temporalio.client.WorkflowHandle` for interacting with the
     workflow.
 
@@ -87,7 +87,7 @@ async def start_workflow(
     start_operation_context = ctx._temporal_start_operation_context
     if not start_operation_context:
         raise RuntimeError(
-            "temporalio.nexus.handler.start_workflow() must be called from "
+            "temporalio.nexus.start_workflow() must be called from "
             "within a Nexus start operation context"
         )
 

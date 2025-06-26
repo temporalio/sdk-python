@@ -29,7 +29,6 @@ import temporalio.api.nexus.v1
 import temporalio.api.operatorservice
 import temporalio.api.operatorservice.v1
 import temporalio.nexus
-import temporalio.nexus.handler
 from temporalio import workflow
 from temporalio.client import (
     Client,
@@ -40,8 +39,9 @@ from temporalio.client import (
 )
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import CancelledError, NexusHandlerError, NexusOperationError
-from temporalio.nexus.handler import (
+from temporalio.nexus import (
     WorkflowOperationToken,
+    cancel_operation,
     start_workflow,
     temporal_operation_context,
     workflow_run_operation_handler,
@@ -174,7 +174,7 @@ class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
             raise TypeError
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
-        return await temporalio.nexus.handler.cancel_operation(token)
+        return await cancel_operation(token)
 
     async def fetch_info(
         self, ctx: FetchOperationInfoContext, token: str
