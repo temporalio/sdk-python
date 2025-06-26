@@ -124,10 +124,10 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
     let mut core = CoreRuntime::new(
         telemetry_build
             .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid telemetry config: {}", err)))?,
+            .map_err(|err| PyValueError::new_err(format!("Invalid telemetry config: {err}")))?,
         TokioRuntimeBuilder::default(),
     )
-    .map_err(|err| PyRuntimeError::new_err(format!("Failed initializing telemetry: {}", err)))?;
+    .map_err(|err| PyRuntimeError::new_err(format!("Failed initializing telemetry: {err}")))?;
 
     // We late-bind the metrics after core runtime is created since it needs
     // the Tokio handle
@@ -314,7 +314,7 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
             build
                 .url(
                     Url::parse(&otel_conf.url).map_err(|err| {
-                        PyValueError::new_err(format!("Invalid OTel URL: {}", err))
+                        PyValueError::new_err(format!("Invalid OTel URL: {err}"))
                     })?,
                 )
                 .headers(otel_conf.headers)
@@ -333,9 +333,9 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
             }
             let otel_options = build
                 .build()
-                .map_err(|err| PyValueError::new_err(format!("Invalid OTel config: {}", err)))?;
+                .map_err(|err| PyValueError::new_err(format!("Invalid OTel config: {err}")))?;
             Ok(Arc::new(build_otlp_metric_exporter(otel_options).map_err(
-                |err| PyValueError::new_err(format!("Failed building OTel exporter: {}", err)),
+                |err| PyValueError::new_err(format!("Failed building OTel exporter: {err}")),
             )?))
         } else if let Some(prom_conf) = conf.prometheus {
             // Start prom exporter
@@ -343,7 +343,7 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
             build
                 .socket_addr(
                     SocketAddr::from_str(&prom_conf.bind_address).map_err(|err| {
-                        PyValueError::new_err(format!("Invalid Prometheus address: {}", err))
+                        PyValueError::new_err(format!("Invalid Prometheus address: {err}"))
                     })?,
                 )
                 .counters_total_suffix(prom_conf.counters_total_suffix)
@@ -358,11 +358,11 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
                 );
             }
             let prom_options = build.build().map_err(|err| {
-                PyValueError::new_err(format!("Invalid Prometheus config: {}", err))
+                PyValueError::new_err(format!("Invalid Prometheus config: {err}"))
             })?;
             Ok(start_prometheus_metric_exporter(prom_options)
                 .map_err(|err| {
-                    PyValueError::new_err(format!("Failed starting Prometheus exporter: {}", err))
+                    PyValueError::new_err(format!("Failed starting Prometheus exporter: {err}"))
                 })?
                 .meter)
         } else {
