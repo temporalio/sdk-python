@@ -100,7 +100,7 @@ fn load_client_config_inner(
             config_file_strict,
         };
         core_load_client_config(options, env_vars.as_ref())
-            .map_err(|e| ConfigError::new_err(format!("{}", e)))?
+            .map_err(|e| ConfigError::new_err(format!("{e}")))?
     };
 
     core_config_to_dict(py, &core_config)
@@ -124,7 +124,7 @@ fn load_client_connect_config_inner(
     };
 
     let profile = core_load_client_config_profile(options, env_vars.as_ref())
-        .map_err(|e| ConfigError::new_err(format!("{}", e)))?;
+        .map_err(|e| ConfigError::new_err(format!("{e}")))?;
 
     profile_to_dict(py, &profile)
 }
