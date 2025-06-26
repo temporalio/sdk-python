@@ -3,7 +3,7 @@ import uuid
 import httpx
 import nexusrpc.handler
 import pytest
-from nexusrpc.handler import sync_operation_handler
+from nexusrpc.handler import sync_operation
 from nexusrpc.handler._util import get_operation_factory
 
 from temporalio.client import Client
@@ -33,7 +33,7 @@ def make_incrementer_user_service_definition_and_service_handler_classes(
     #
     # service handler
     #
-    @sync_operation_handler
+    @sync_operation
     async def _increment_op(
         self,
         ctx: nexusrpc.handler.StartOperationContext,
