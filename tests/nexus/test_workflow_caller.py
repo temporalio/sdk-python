@@ -38,6 +38,7 @@ from temporalio.client import (
 )
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import CancelledError, NexusHandlerError, NexusOperationError
+from temporalio.nexus import workflow_run_operation
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
@@ -200,7 +201,7 @@ class ServiceImpl:
             )
         return OpOutput(value="sync response")
 
-    @nexus.workflow_run_operation
+    @workflow_run_operation
     async def async_operation(
         self, ctx: StartOperationContext, input: OpInput
     ) -> nexus.WorkflowHandle[HandlerWfOutput]:
@@ -911,7 +912,7 @@ class EchoWorkflow:
 
 @service_handler
 class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
-    @nexus.workflow_run_operation
+    @workflow_run_operation
     async def my_workflow_run_operation(
         self, ctx: StartOperationContext, input: None
     ) -> nexus.WorkflowHandle[str]:

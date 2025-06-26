@@ -11,6 +11,7 @@ import pytest
 from nexusrpc.handler import StartOperationContext
 
 from temporalio import nexus
+from temporalio.nexus import workflow_run_operation
 
 
 @dataclass
@@ -32,7 +33,7 @@ class _TestCase:
 class NotCalled(_TestCase):
     @nexusrpc.handler.service_handler
     class Service:
-        @nexus.workflow_run_operation
+        @workflow_run_operation
         async def my_workflow_run_operation_handler(
             self, ctx: StartOperationContext, input: Input
         ) -> nexus.WorkflowHandle[Output]: ...
@@ -50,7 +51,7 @@ class NotCalled(_TestCase):
 class CalledWithoutArgs(_TestCase):
     @nexusrpc.handler.service_handler
     class Service:
-        @nexus.workflow_run_operation
+        @workflow_run_operation
         async def my_workflow_run_operation_handler(
             self, ctx: StartOperationContext, input: Input
         ) -> nexus.WorkflowHandle[Output]: ...
@@ -61,7 +62,7 @@ class CalledWithoutArgs(_TestCase):
 class CalledWithNameOverride(_TestCase):
     @nexusrpc.handler.service_handler
     class Service:
-        @nexus.workflow_run_operation(name="operation-name")
+        @workflow_run_operation(name="operation-name")
         async def workflow_run_operation_with_name_override(
             self, ctx: StartOperationContext, input: Input
         ) -> nexus.WorkflowHandle[Output]: ...
