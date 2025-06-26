@@ -168,7 +168,7 @@ async def cancel_operation(
 
     ctx = temporal_operation_context.get()
     try:
-        handle = workflow_token.to_workflow_handle(ctx.client)
+        handle = workflow_token._to_client_workflow_handle(ctx.client)
     except Exception as err:
         raise HandlerError(
             "Failed to construct workflow handle from workflow operation token",
