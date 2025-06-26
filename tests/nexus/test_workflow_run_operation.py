@@ -94,7 +94,7 @@ async def test_workflow_run_operation(
     service_client = ServiceClient(
         server_address=server_address(env),
         endpoint=endpoint,
-        service=service_handler_cls.__name__,
+        service=service_handler_cls.__nexus_service__.name,
     )
     async with Worker(
         env.client,
