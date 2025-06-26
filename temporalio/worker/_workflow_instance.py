@@ -1503,7 +1503,7 @@ class _WorkflowInstanceImpl(
             Callable[[Any], nexusrpc.handler.OperationHandler[I, O]],
             Callable[
                 [Any, nexusrpc.handler.StartOperationContext, I],
-                Awaitable[temporalio.nexus.WorkflowOperationToken[O]],
+                Awaitable[temporalio.nexus.WorkflowHandle[O]],
             ],
             str,
         ],

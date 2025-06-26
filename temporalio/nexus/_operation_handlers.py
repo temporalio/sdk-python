@@ -28,7 +28,7 @@ from temporalio import client
 from temporalio.nexus._operation_context import (
     temporal_operation_context,
 )
-from temporalio.nexus._token import WorkflowOperationToken
+from temporalio.nexus._token import WorkflowHandle
 
 from ._util import (
     is_async_callable,
@@ -68,7 +68,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         self,
         start: Callable[
             [StartOperationContext, InputT],
-            Awaitable[WorkflowOperationToken[OutputT]],
+            Awaitable[WorkflowHandle[OutputT]],
         ],
         input_type: Optional[Type[InputT]],
         output_type: Optional[Type[OutputT]],
@@ -92,7 +92,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         Start the operation, by starting a workflow and completing asynchronously.
         """
         token = await self._start(ctx, input)
-        if not isinstance(token, WorkflowOperationToken):
+        if not isinstance(token, WorkflowHandle):
             if isinstance(token, client.WorkflowHandle):
                 raise RuntimeError(
                     f"Expected {token} to be a WorkflowOperationToken, but got a client.WorkflowHandle. "
@@ -124,7 +124,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         )
         # An implementation is provided for future reference:
         try:
-            workflow_token = WorkflowOperationToken[OutputT].decode(token)
+            workflow_token = WorkflowHandle[OutputT].decode(token)
         except Exception as err:
             raise HandlerError(
                 "Failed to decode operation token as workflow operation token. "
@@ -157,7 +157,7 @@ async def cancel_operation(
         client: The client to use to cancel the operation.
     """
     try:
-        workflow_token = WorkflowOperationToken[Any].decode(token)
+        workflow_token = WorkflowHandle[Any].decode(token)
     except Exception as err:
         raise HandlerError(
             "Failed to decode operation token as workflow operation token. "

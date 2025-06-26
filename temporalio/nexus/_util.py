@@ -23,14 +23,14 @@ from nexusrpc.types import (
 )
 
 from ._token import (
-    WorkflowOperationToken as WorkflowOperationToken,
+    WorkflowHandle as WorkflowHandle,
 )
 
 
 def get_workflow_run_start_method_input_and_output_type_annotations(
     start: Callable[
         [ServiceHandlerT, StartOperationContext, InputT],
-        Awaitable[WorkflowOperationToken[OutputT]],
+        Awaitable[WorkflowHandle[OutputT]],
     ],
 ) -> tuple[
     Optional[Type[InputT]],
@@ -39,13 +39,13 @@ def get_workflow_run_start_method_input_and_output_type_annotations(
     """Return operation input and output types.
 
     `start` must be a type-annotated start method that returns a
-    :py:class:`WorkflowHandle`.
+    :py:class:`temporalio.nexus.WorkflowHandle`.
     """
     input_type, output_type = get_start_method_input_and_output_type_annotations(start)
     origin_type = typing.get_origin(output_type)
     if not origin_type:
         output_type = None
-    elif not issubclass(origin_type, WorkflowOperationToken):
+    elif not issubclass(origin_type, WorkflowHandle):
         warnings.warn(
             f"Expected return type of {start.__name__} to be a subclass of WorkflowOperationToken, "
             f"but is {output_type}"
