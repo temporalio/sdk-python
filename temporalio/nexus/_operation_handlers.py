@@ -24,7 +24,7 @@ from nexusrpc.types import (
     OutputT,
 )
 
-from temporalio.client import WorkflowHandle
+from temporalio import client
 from temporalio.nexus._operation_context import (
     temporal_operation_context,
 )
@@ -93,12 +93,12 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         """
         token = await self._start(ctx, input)
         if not isinstance(token, WorkflowOperationToken):
-            if isinstance(token, WorkflowHandle):
+            if isinstance(token, client.WorkflowHandle):
                 raise RuntimeError(
-                    f"Expected {token} to be a WorkflowOperationToken, but got a WorkflowHandle. "
-                    f"You must use :py:meth:`temporalio.nexus.start_workflow` "
+                    f"Expected {token} to be a WorkflowOperationToken, but got a client.WorkflowHandle. "
+                    f"You must use temporalio.nexus.start_workflow "
                     "to start a workflow that will deliver the result of the Nexus operation, "
-                    "not :py:meth:`temporalio.client.Client.start_workflow`."
+                    "not client.Client.start_workflow."
                 )
             raise RuntimeError(
                 f"Expected {token} to be a WorkflowOperationToken, but got {type(token)}. "
