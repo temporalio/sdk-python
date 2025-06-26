@@ -306,7 +306,7 @@ class _NexusWorker:
                         "nexusrpc.handler.StartOperationResultAsync."
                     )
                 )
-        except nexusrpc.handler.OperationError as err:
+        except nexusrpc.OperationError as err:
             return temporalio.api.nexus.v1.StartOperationResponse(
                 operation_error=await self._operation_error_to_proto(err),
             )
@@ -332,7 +332,7 @@ class _NexusWorker:
 
     async def _operation_error_to_proto(
         self,
-        err: nexusrpc.handler.OperationError,
+        err: nexusrpc.OperationError,
     ) -> temporalio.api.nexus.v1.UnsuccessfulOperationError:
         cause = err.__cause__
         if cause is None:
