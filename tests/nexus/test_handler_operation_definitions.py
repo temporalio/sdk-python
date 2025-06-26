@@ -10,7 +10,7 @@ import nexusrpc.handler
 import pytest
 from nexusrpc.handler import StartOperationContext
 
-from temporalio.nexus.handler import (
+from temporalio.nexus import (
     WorkflowOperationToken,
     workflow_run_operation_handler,
 )

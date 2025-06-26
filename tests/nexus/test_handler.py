@@ -46,13 +46,12 @@ from nexusrpc.handler import (
 )
 
 import temporalio.api.failure.v1
-import temporalio.nexus.handler
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.converter import FailureConverter, PayloadConverter
 from temporalio.exceptions import ApplicationError
-from temporalio.nexus.handler import (
+from temporalio.nexus import (
     WorkflowOperationToken,
     logger,
     start_workflow,
@@ -869,7 +868,7 @@ async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: A
         (
             record
             for record in caplog.records
-            if record.name == "temporalio.nexus.handler"
+            if record.name == "temporalio.nexus"
             and record.getMessage() == "Logging from start method"
         ),
         None,
