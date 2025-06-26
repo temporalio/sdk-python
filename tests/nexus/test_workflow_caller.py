@@ -39,6 +39,7 @@ from temporalio.client import (
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import CancelledError, NexusHandlerError, NexusOperationError
 from temporalio.nexus import workflow_run_operation
+from temporalio.nexus._workflow import WorkflowRunOperationContext
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
@@ -157,7 +158,11 @@ class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
         if isinstance(input.response_type, SyncResponse):
             return StartOperationResultSync(value=OpOutput(value="sync response"))
         elif isinstance(input.response_type, AsyncResponse):
-            handle = await nexus.start_workflow(
+            # TODO(nexus-preview): this is a hack; perhaps it should be should be called
+            # temporalio.nexus.StartOperationContext instead of
+            # WorkflowRunOperationContext.
+            tctx = WorkflowRunOperationContext(ctx)
+            handle = await tctx.start_workflow(
                 HandlerWorkflow.run,
                 HandlerWfInput(op_input=input),
                 id=input.response_type.operation_workflow_id,
@@ -203,7 +208,7 @@ class ServiceImpl:
 
     @workflow_run_operation
     async def async_operation(
-        self, ctx: StartOperationContext, input: OpInput
+        self, ctx: WorkflowRunOperationContext, input: OpInput
     ) -> nexus.WorkflowHandle[HandlerWfOutput]:
         assert isinstance(input.response_type, AsyncResponse)
         if input.response_type.exception_in_operation_start:
@@ -212,7 +217,7 @@ class ServiceImpl:
                 RPCStatusCode.INVALID_ARGUMENT,
                 b"",
             )
-        return await nexus.start_workflow(
+        return await ctx.start_workflow(
             HandlerWorkflow.run,
             HandlerWfInput(op_input=input),
             id=input.response_type.operation_workflow_id,
@@ -914,7 +919,7 @@ class EchoWorkflow:
 class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
     @workflow_run_operation
     async def my_workflow_run_operation(
-        self, ctx: StartOperationContext, input: None
+        self, ctx: WorkflowRunOperationContext, input: None
     ) -> nexus.WorkflowHandle[str]:
         result_1 = await nexus.client().execute_workflow(
             EchoWorkflow.run,
@@ -925,7 +930,7 @@ class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
         # In case result_1 is incorrectly being delivered to the caller as the operation
         # result, give time for that incorrect behavior to occur.
         await asyncio.sleep(0.5)
-        return await nexus.start_workflow(
+        return await ctx.start_workflow(
             EchoWorkflow.run,
             f"{result_1}-result-2",
             id=str(uuid.uuid4()),
