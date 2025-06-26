@@ -46,7 +46,7 @@ def get_workflow_run_start_method_input_and_output_type_annotations(
         output_type = None
     elif not issubclass(origin_type, WorkflowHandle):
         warnings.warn(
-            f"Expected return type of {start.__name__} to be a subclass of WorkflowOperationToken, "
+            f"Expected return type of {start.__name__} to be a subclass of WorkflowHandle, "
             f"but is {output_type}"
         )
         output_type = None
