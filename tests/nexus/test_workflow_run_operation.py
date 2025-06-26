@@ -16,7 +16,12 @@ from temporalio import nexus, workflow
 from temporalio.nexus._operation_handlers import WorkflowRunOperationHandler
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers.nexus import ServiceClient, create_nexus_endpoint, dataclass_as_dict
+from tests.helpers.nexus import (
+    Failure,
+    ServiceClient,
+    create_nexus_endpoint,
+    dataclass_as_dict,
+)
 
 HTTP_PORT = 7243
 
@@ -69,11 +74,16 @@ class SubclassingNoInputOutputTypeAnnotationsWithoutServiceDefinition:
     def op(self) -> OperationHandler:
         return MyOperation()
 
+    __expected__error__ = 500, "'dict' object has no attribute 'value'"
+
 
 @service_handler(service=Service)
 class SubclassingNoInputOutputTypeAnnotationsWithServiceDefinition:
+    # Despite the lack of annotations on the service impl, the service definition
+    # provides the type needed to deserialize the input into Input so that input.value
+    # succeeds.
     @operation_handler
-    def op(self) -> OperationHandler[Input, str]:
+    def op(self) -> OperationHandler:
         return MyOperation()
 
 
@@ -105,7 +115,13 @@ async def test_workflow_run_operation(
             "op",
             dataclass_as_dict(Input(value="test")),
         )
-        assert resp.status_code == 201
+        if hasattr(service_handler_cls, "__expected__error__"):
+            status_code, message = service_handler_cls.__expected__error__
+            assert resp.status_code == status_code
+            failure = Failure(**resp.json())
+            assert failure.message == message
+        else:
+            assert resp.status_code == 201
 
 
 def server_address(env: WorkflowEnvironment) -> str:
