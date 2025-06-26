@@ -186,6 +186,7 @@ exclude = [
   "temporalio/bridge/metric.py",
   "temporalio/bridge/runtime.py",
   "temporalio/bridge/testing.py",
+  "temporalio/envconfig.py",
 ]
 
 [tool.ruff]
