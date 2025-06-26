@@ -40,7 +40,7 @@ from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import CancelledError, NexusHandlerError, NexusOperationError
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.service import RPCError, RPCStatusCode
-from temporalio.worker import UnsandboxedWorkflowRunner, Worker
+from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 # TODO(dan): test availability of Temporal client etc in async context set by worker
@@ -444,8 +444,6 @@ async def test_sync_response(
         nexus_service_handlers=[ServiceImpl()],
         workflows=[CallerWorkflow, HandlerWorkflow],
         task_queue=task_queue,
-        # TODO(dan): enable sandbox
-        workflow_runner=UnsandboxedWorkflowRunner(),
         workflow_failure_exception_types=[Exception],
     ):
         await create_nexus_endpoint(task_queue, client)
@@ -517,7 +515,6 @@ async def test_async_response(
         nexus_service_handlers=[ServiceImpl()],
         workflows=[CallerWorkflow, HandlerWorkflow],
         task_queue=task_queue,
-        workflow_runner=UnsandboxedWorkflowRunner(),
         workflow_failure_exception_types=[Exception],
     ):
         caller_wf_handle, handler_wf_handle = await _start_wf_and_nexus_op(
@@ -673,7 +670,6 @@ async def test_untyped_caller(
         workflows=[UntypedCallerWorkflow, HandlerWorkflow],
         nexus_service_handlers=[ServiceImpl()],
         task_queue=task_queue,
-        workflow_runner=UnsandboxedWorkflowRunner(),
         workflow_failure_exception_types=[Exception],
     ):
         if response_type == SyncResponse:
@@ -851,7 +847,6 @@ async def test_service_interface_and_implementation_names(client: Client):
         ],
         workflows=[ServiceInterfaceAndImplCallerWorkflow],
         task_queue=task_queue,
-        workflow_runner=UnsandboxedWorkflowRunner(),
         workflow_failure_exception_types=[Exception],
     ):
         await create_nexus_endpoint(task_queue, client)
@@ -965,7 +960,6 @@ async def test_workflow_run_operation_can_execute_workflow_before_starting_backi
             ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow(),
         ],
         task_queue=task_queue,
-        workflow_runner=UnsandboxedWorkflowRunner(),
     ):
         await create_nexus_endpoint(task_queue, client)
         result = await client.execute_workflow(
