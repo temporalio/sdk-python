@@ -44,7 +44,7 @@ class WorkflowOperationToken(Generic[OutputT]):
         """Create a :py:class:`WorkflowOperationToken` from a workflow handle.
 
         This is a private method not intended to be used by users. It does not check
-        that the supplied WorkflowHandle references a workflow that has been
+        that the supplied client.WorkflowHandle references a workflow that has been
         instrumented to supply the result of a Nexus operation.
         """
         return cls(
