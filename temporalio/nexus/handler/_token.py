@@ -3,12 +3,11 @@ from __future__ import annotations
 import base64
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, Literal, Optional, Type
+from typing import Any, Generic, Literal, Optional, Type
 
 from nexusrpc.types import OutputT
 
-if TYPE_CHECKING:
-    from temporalio.client import Client, WorkflowHandle
+from temporalio import client
 
 OPERATION_TOKEN_TYPE_WORKFLOW = 1
 OperationTokenType = Literal[1]
@@ -25,9 +24,9 @@ class WorkflowOperationToken(Generic[OutputT]):
     # serialized token; it's only used to reject newer token versions on load.
     version: Optional[int] = None
 
-    def to_workflow_handle(
-        self, client: Client, result_type: Optional[Type[OutputT]] = None
-    ) -> WorkflowHandle[Any, OutputT]:
+    def _to_client_workflow_handle(
+        self, client: client.Client, result_type: Optional[Type[OutputT]] = None
+    ) -> client.WorkflowHandle[Any, OutputT]:
         """Create a :py:class:`temporalio.client.WorkflowHandle` from the token."""
         if client.namespace != self.namespace:
             raise ValueError(
@@ -39,8 +38,8 @@ class WorkflowOperationToken(Generic[OutputT]):
     # TODO(nexus-preview): The return type here should be dictated by the input workflow
     # handle type.
     @classmethod
-    def _unsafe_from_workflow_handle(
-        cls, workflow_handle: WorkflowHandle[Any, OutputT]
+    def _unsafe_from_client_workflow_handle(
+        cls, workflow_handle: client.WorkflowHandle[Any, OutputT]
     ) -> WorkflowOperationToken[OutputT]:
         """Create a :py:class:`WorkflowOperationToken` from a workflow handle.
 

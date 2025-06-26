@@ -134,4 +134,6 @@ async def start_workflow(
 
     start_operation_context.add_outbound_links(wf_handle)
 
-    return WorkflowOperationToken[ReturnType]._unsafe_from_workflow_handle(wf_handle)
+    return WorkflowOperationToken[ReturnType]._unsafe_from_client_workflow_handle(
+        wf_handle
+    )
