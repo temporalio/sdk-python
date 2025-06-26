@@ -1,5 +1,6 @@
 """Support for using Temporal activities as OpenAI agents tools."""
 
+import json
 from datetime import timedelta
 from typing import Any, Callable, Optional
 
@@ -69,32 +70,40 @@ def activity_as_tool(
             "Bare function without tool and activity decorators is not supported",
             "invalid_tool",
         )
+    schema = function_schema(fn)
 
     async def run_activity(ctx: RunContextWrapper[Any], input: str) -> Any:
         try:
-            return str(
-                await workflow.execute_activity(
-                    fn,
-                    input,
-                    task_queue=task_queue,
-                    schedule_to_close_timeout=schedule_to_close_timeout,
-                    schedule_to_start_timeout=schedule_to_start_timeout,
-                    start_to_close_timeout=start_to_close_timeout,
-                    heartbeat_timeout=heartbeat_timeout,
-                    retry_policy=retry_policy,
-                    cancellation_type=cancellation_type,
-                    activity_id=activity_id,
-                    versioning_intent=versioning_intent,
-                    summary=summary,
-                    priority=priority,
-                )
-            )
-        except Exception:
+            json_data = json.loads(input)
+        except Exception as e:
+            raise ApplicationError(
+                f"Invalid JSON input for tool {schema.name}: {input}"
+            ) from e
+
+        # Activities don't support keyword only arguments, so we can ignore the kwargs_dict return
+        args, _ = schema.to_call_args(schema.params_pydantic_model(**json_data))
+        result = await workflow.execute_activity(
+            fn,
+            args=args,
+            task_queue=task_queue,
+            schedule_to_close_timeout=schedule_to_close_timeout,
+            schedule_to_start_timeout=schedule_to_start_timeout,
+            start_to_close_timeout=start_to_close_timeout,
+            heartbeat_timeout=heartbeat_timeout,
+            retry_policy=retry_policy,
+            cancellation_type=cancellation_type,
+            activity_id=activity_id,
+            versioning_intent=versioning_intent,
+            summary=summary,
+            priority=priority,
+        )
+        try:
+            return str(result)
+        except Exception as e:
             raise ApplicationError(
                 "You must return a string representation of the tool output, or something we can call str() on"
-            )
+            ) from e
 
-    schema = function_schema(fn)
     return FunctionTool(
         name=schema.name,
         description=schema.description or "",
