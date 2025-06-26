@@ -946,7 +946,7 @@ class SyncHandlerNoExecutor(_InstantiationCase):
     handler = SyncStartHandler
     executor = False
     exception = RuntimeError
-    match = "is not an `async def` method"
+    match = "must be an `async def`"
 
 
 class DefaultCancel(_InstantiationCase):
