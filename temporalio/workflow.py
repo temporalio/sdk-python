@@ -42,6 +42,7 @@ from typing import (
 
 import nexusrpc
 import nexusrpc.handler
+from nexusrpc import InputT, OutputT
 from typing_extensions import (
     Concatenate,
     Literal,
@@ -854,12 +855,12 @@ class _Runtime(ABC):
         self,
         endpoint: str,
         service: str,
-        operation: Union[nexusrpc.Operation[I, O], str, Callable[..., Any]],
+        operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
         input: Any,
-        output_type: Optional[Type[O]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
-    ) -> NexusOperationHandle[Any]: ...
+    ) -> NexusOperationHandle[OutputT]: ...
 
     @abstractmethod
     def workflow_time_ns(self) -> int: ...
@@ -4383,14 +4384,8 @@ async def execute_child_workflow(
     return await handle
 
 
-# TODO(nexus-prerelease): use types from nexusrpc
-I = TypeVar("I")
-O = TypeVar("O")
-S = TypeVar("S")
-
-
 # TODO(nexus-prerelease): ABC / inherit from asyncio.Task?
-class NexusOperationHandle(Generic[O]):
+class NexusOperationHandle(Generic[OutputT]):
     def cancel(self) -> bool:
         # TODO(nexus-prerelease): docstring
         """
@@ -4404,7 +4399,7 @@ class NexusOperationHandle(Generic[O]):
         """
         raise NotImplementedError
 
-    def __await__(self) -> Generator[Any, Any, O]:
+    def __await__(self) -> Generator[Any, Any, OutputT]:
         raise NotImplementedError
 
     # TODO(nexus-prerelease): check SDK-wide consistency for @property vs nullary accessor methods.
@@ -4416,13 +4411,13 @@ class NexusOperationHandle(Generic[O]):
 async def start_nexus_operation(
     endpoint: str,
     service: str,
-    operation: Union[nexusrpc.Operation[I, O], str, Callable[..., Any]],
+    operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
     input: Any,
     *,
-    output_type: Optional[Type[O]] = None,
+    output_type: Optional[Type[OutputT]] = None,
     schedule_to_close_timeout: Optional[timedelta] = None,
     headers: Optional[Mapping[str, str]] = None,
-) -> NexusOperationHandle[Any]:
+) -> NexusOperationHandle[OutputT]:
     """Start a Nexus operation and return its handle.
 
     Args:
@@ -5161,17 +5156,13 @@ class VersioningIntent(Enum):
 
 # Nexus
 
+ServiceT = TypeVar("ServiceT")
 
-class NexusClient(Generic[S]):
+
+class NexusClient(Generic[ServiceT]):
     def __init__(
         self,
-        service: Union[
-            # TODO(nexus-prerelease): Type[S] is modeling the interface case as well the impl case, but
-            # the typevar S is used below only in the impl case. I think this is OK, but
-            # think about it again before deleting this TODO.
-            Type[S],
-            str,
-        ],
+        service: Union[Type[ServiceT], str],
         *,
         endpoint: str,
     ) -> None:
@@ -5194,13 +5185,13 @@ class NexusClient(Generic[S]):
     # TODO(nexus-prerelease): should it be an error to use a reference to a method on a class other than that supplied?
     async def start_operation(
         self,
-        operation: Union[nexusrpc.Operation[I, O], str, Callable[..., Any]],
-        input: I,
+        operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
+        input: InputT,
         *,
-        output_type: Optional[Type[O]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
-    ) -> NexusOperationHandle[O]:
+    ) -> NexusOperationHandle[OutputT]:
         return await temporalio.workflow.start_nexus_operation(
             endpoint=self._endpoint,
             service=self._service_name,
@@ -5214,14 +5205,14 @@ class NexusClient(Generic[S]):
     # TODO(nexus-prerelease): overloads: no-input, ret type
     async def execute_operation(
         self,
-        operation: Union[nexusrpc.Operation[I, O], str, Callable[..., Any]],
-        input: I,
+        operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
+        input: InputT,
         *,
-        output_type: Optional[Type[O]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
-    ) -> O:
-        handle: NexusOperationHandle[O] = await self.start_operation(
+    ) -> OutputT:
+        handle: NexusOperationHandle[OutputT] = await self.start_operation(
             operation,
             input,
             output_type=output_type,

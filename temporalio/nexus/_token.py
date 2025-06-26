@@ -5,7 +5,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Generic, Literal, Optional, Type
 
-from nexusrpc.types import OutputT
+from nexusrpc import OutputT
 
 from temporalio import client
 
