@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Optional, Union, cast
+from typing import Any, Literal, Mapping, Optional, Union, cast
 
 from typing_extensions import TypeAlias, TypedDict
 
@@ -21,7 +21,7 @@ DataSource: TypeAlias = Union[
 
 
 # We define typed dictionaries for what these configs look like as TOML.
-class ClientTLSConfigDict(TypedDict, total=False):
+class ClientConfigTLSDict(TypedDict, total=False):
     """Dictionary representation of TLS config for TOML."""
 
     disabled: bool
@@ -37,7 +37,7 @@ class ClientConfigProfileDict(TypedDict, total=False):
     address: str
     namespace: str
     api_key: str
-    tls: ClientTLSConfigDict
+    tls: ClientConfigTLSDict
     grpc_meta: Mapping[str, str]
 
 
@@ -116,23 +116,25 @@ class ClientConfigTLS:
     client_private_key: Optional[DataSource] = None
     """Client key source."""
 
-    def to_dict(self) -> ClientTLSConfigDict:
+    def to_dict(self) -> ClientConfigTLSDict:
         """Convert to a dictionary that can be used for TOML serialization."""
-        d: dict[str, Any] = {}
+        d: ClientConfigTLSDict = {}
         if self.disabled:
             d["disabled"] = self.disabled
         if self.server_name is not None:
             d["server_name"] = self.server_name
 
-        if self.server_root_ca_cert is not None:
-            d["server_ca_cert"] = _source_to_dict(self.server_root_ca_cert)
-        if self.client_cert is not None:
-            d["client_cert"] = _source_to_dict(self.client_cert)
-        if self.client_private_key is not None:
-            d["client_key"] = _source_to_dict(self.client_private_key)
-        # To please the type checker, we have to cast. This is because
-        # ClientTLSConfigDict is a TypedDict and d is a regular dict.
-        return d  # type: ignore
+        def set_source(
+            key: Literal["server_ca_cert", "client_cert", "client_key"],
+            source: Optional[DataSource],
+        ):
+            if source is not None and (val := _source_to_dict(source)):
+                d[key] = val
+
+        set_source("server_ca_cert", self.server_root_ca_cert)
+        set_source("client_cert", self.client_cert)
+        set_source("client_key", self.client_private_key)
+        return d
 
     def to_connect_tls_config(self) -> Union[bool, temporalio.service.TLSConfig]:
         """Create a `temporalio.service.TLSConfig` from this profile."""
@@ -147,7 +149,7 @@ class ClientConfigTLS:
         )
 
     @staticmethod
-    def from_dict(d: Optional[ClientTLSConfigDict]) -> Optional[ClientConfigTLS]:
+    def from_dict(d: Optional[ClientConfigTLSDict]) -> Optional[ClientConfigTLS]:
         """Create a ClientConfigTLS from a dictionary."""
         if not d:
             return None
@@ -213,22 +215,18 @@ class ClientConfigProfile:
 
     def to_dict(self) -> ClientConfigProfileDict:
         """Convert to a dictionary that can be used for TOML serialization."""
-        d: dict[str, Any] = {}
+        d: ClientConfigProfileDict = {}
         if self.address is not None:
             d["address"] = self.address
         if self.namespace is not None:
             d["namespace"] = self.namespace
         if self.api_key is not None:
             d["api_key"] = self.api_key
-        if self.tls is not None:
-            tls_dict = self.tls.to_dict()
-            if tls_dict:
-                d["tls"] = tls_dict
+        if self.tls and (tls_dict := self.tls.to_dict()):
+            d["tls"] = tls_dict
         if self.grpc_meta:
             d["grpc_meta"] = self.grpc_meta
-        # To please the type checker, we have to cast. This is because
-        # ClientConfigProfileDict is a TypedDict and d is a regular dict.
-        return d  # type: ignore
+        return d
 
     def to_client_connect_config(self) -> ClientConnectConfig:
         """Create a `ClientConnectConfig` from this profile."""
