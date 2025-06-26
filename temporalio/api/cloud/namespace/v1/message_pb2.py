@@ -24,7 +24,7 @@ from temporalio.api.cloud.sink.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n-temporal/api/cloud/namespace/v1/message.proto\x12\x1ftemporal.api.cloud.namespace.v1\x1a,temporal/api/cloud/resource/v1/message.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(temporal/api/cloud/sink/v1/message.proto"\x81\x01\n\x15\x43\x65rtificateFilterSpec\x12\x13\n\x0b\x63ommon_name\x18\x01 \x01(\t\x12\x14\n\x0corganization\x18\x02 \x01(\t\x12\x1b\n\x13organizational_unit\x18\x03 \x01(\t\x12 \n\x18subject_alternative_name\x18\x04 \x01(\t"\xb7\x01\n\x0cMtlsAuthSpec\x12%\n\x1d\x61\x63\x63\x65pted_client_ca_deprecated\x18\x01 \x01(\t\x12\x1a\n\x12\x61\x63\x63\x65pted_client_ca\x18\x04 \x01(\x0c\x12S\n\x13\x63\x65rtificate_filters\x18\x02 \x03(\x0b\x32\x36.temporal.api.cloud.namespace.v1.CertificateFilterSpec\x12\x0f\n\x07\x65nabled\x18\x03 \x01(\x08"!\n\x0e\x41piKeyAuthSpec\x12\x0f\n\x07\x65nabled\x18\x01 \x01(\x08"h\n\x0f\x43odecServerSpec\x12\x10\n\x08\x65ndpoint\x18\x01 \x01(\t\x12\x19\n\x11pass_access_token\x18\x02 \x01(\x08\x12(\n include_cross_origin_credentials\x18\x03 \x01(\x08"\xd5\x07\n\rNamespaceSpec\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07regions\x18\x02 \x03(\t\x12\x16\n\x0eretention_days\x18\x03 \x01(\x05\x12@\n\tmtls_auth\x18\x04 \x01(\x0b\x32-.temporal.api.cloud.namespace.v1.MtlsAuthSpec\x12\x45\n\x0c\x61pi_key_auth\x18\x07 \x01(\x0b\x32/.temporal.api.cloud.namespace.v1.ApiKeyAuthSpec\x12p\n\x18\x63ustom_search_attributes\x18\x05 \x03(\x0b\x32J.temporal.api.cloud.namespace.v1.NamespaceSpec.CustomSearchAttributesEntryB\x02\x18\x01\x12_\n\x11search_attributes\x18\x08 \x03(\x0b\x32\x44.temporal.api.cloud.namespace.v1.NamespaceSpec.SearchAttributesEntry\x12\x46\n\x0c\x63odec_server\x18\x06 \x01(\x0b\x32\x30.temporal.api.cloud.namespace.v1.CodecServerSpec\x1a=\n\x1b\x43ustomSearchAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a{\n\x15SearchAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12Q\n\x05value\x18\x02 \x01(\x0e\x32\x42.temporal.api.cloud.namespace.v1.NamespaceSpec.SearchAttributeType:\x02\x38\x01"\xac\x02\n\x13SearchAttributeType\x12%\n!SEARCH_ATTRIBUTE_TYPE_UNSPECIFIED\x10\x00\x12\x1e\n\x1aSEARCH_ATTRIBUTE_TYPE_TEXT\x10\x01\x12!\n\x1dSEARCH_ATTRIBUTE_TYPE_KEYWORD\x10\x02\x12\x1d\n\x19SEARCH_ATTRIBUTE_TYPE_INT\x10\x03\x12 \n\x1cSEARCH_ATTRIBUTE_TYPE_DOUBLE\x10\x04\x12\x1e\n\x1aSEARCH_ATTRIBUTE_TYPE_BOOL\x10\x05\x12"\n\x1eSEARCH_ATTRIBUTE_TYPE_DATETIME\x10\x06\x12&\n"SEARCH_ATTRIBUTE_TYPE_KEYWORD_LIST\x10\x07"Q\n\tEndpoints\x12\x13\n\x0bweb_address\x18\x01 \x01(\t\x12\x19\n\x11mtls_grpc_address\x18\x02 \x01(\t\x12\x14\n\x0cgrpc_address\x18\x03 \x01(\t"*\n\x06Limits\x12 \n\x18\x61\x63tions_per_second_limit\x18\x01 \x01(\x05"X\n\x12\x41WSPrivateLinkInfo\x12\x1e\n\x16\x61llowed_principal_arns\x18\x01 \x03(\t\x12"\n\x1avpc_endpoint_service_names\x18\x02 \x03(\t"t\n\x13PrivateConnectivity\x12\x0e\n\x06region\x18\x01 \x01(\t\x12M\n\x10\x61ws_private_link\x18\x02 \x01(\x0b\x32\x33.temporal.api.cloud.namespace.v1.AWSPrivateLinkInfo"\xff\x05\n\tNamespace\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12<\n\x04spec\x18\x03 \x01(\x0b\x32..temporal.api.cloud.namespace.v1.NamespaceSpec\x12\x1c\n\x10state_deprecated\x18\x04 \x01(\tB\x02\x18\x01\x12<\n\x05state\x18\r \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t\x12=\n\tendpoints\x18\x06 \x01(\x0b\x32*.temporal.api.cloud.namespace.v1.Endpoints\x12\x15\n\ractive_region\x18\x07 \x01(\t\x12\x37\n\x06limits\x18\x08 \x01(\x0b\x32\'.temporal.api.cloud.namespace.v1.Limits\x12T\n\x16private_connectivities\x18\t \x03(\x0b\x32\x34.temporal.api.cloud.namespace.v1.PrivateConnectivity\x12\x30\n\x0c\x63reated_time\x18\n \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12last_modified_time\x18\x0b \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12S\n\rregion_status\x18\x0c \x03(\x0b\x32<.temporal.api.cloud.namespace.v1.Namespace.RegionStatusEntry\x1ak\n\x11RegionStatusEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x45\n\x05value\x18\x02 \x01(\x0b\x32\x36.temporal.api.cloud.namespace.v1.NamespaceRegionStatus:\x02\x38\x01"\x9b\x02\n\x15NamespaceRegionStatus\x12\x1c\n\x10state_deprecated\x18\x01 \x01(\tB\x02\x18\x01\x12K\n\x05state\x18\x03 \x01(\x0e\x32<.temporal.api.cloud.namespace.v1.NamespaceRegionStatus.State\x12\x1a\n\x12\x61sync_operation_id\x18\x02 \x01(\t"{\n\x05State\x12\x15\n\x11STATE_UNSPECIFIED\x10\x00\x12\x10\n\x0cSTATE_ADDING\x10\x01\x12\x10\n\x0cSTATE_ACTIVE\x10\x02\x12\x11\n\rSTATE_PASSIVE\x10\x03\x12\x12\n\x0eSTATE_REMOVING\x10\x04\x12\x10\n\x0cSTATE_FAILED\x10\x05"\x91\x01\n\x0e\x45xportSinkSpec\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07\x65nabled\x18\x02 \x01(\x08\x12.\n\x02s3\x18\x03 \x01(\x0b\x32".temporal.api.cloud.sink.v1.S3Spec\x12\x30\n\x03gcs\x18\x04 \x01(\x0b\x32#.temporal.api.cloud.sink.v1.GCSSpec"\xf6\x03\n\nExportSink\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12<\n\x05state\x18\x03 \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12=\n\x04spec\x18\x04 \x01(\x0b\x32/.temporal.api.cloud.namespace.v1.ExportSinkSpec\x12\x42\n\x06health\x18\x05 \x01(\x0e\x32\x32.temporal.api.cloud.namespace.v1.ExportSink.Health\x12\x15\n\rerror_message\x18\x06 \x01(\t\x12;\n\x17latest_data_export_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12:\n\x16last_health_check_time\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"o\n\x06Health\x12\x16\n\x12HEALTH_UNSPECIFIED\x10\x00\x12\r\n\tHEALTH_OK\x10\x01\x12\x19\n\x15HEALTH_ERROR_INTERNAL\x10\x02\x12#\n\x1fHEALTH_ERROR_USER_CONFIGURATION\x10\x03\x42\xb1\x01\n"io.temporal.api.cloud.namespace.v1B\x0cMessageProtoP\x01Z/go.temporal.io/api/cloud/namespace/v1;namespace\xaa\x02!Temporalio.Api.Cloud.Namespace.V1\xea\x02%Temporalio::Api::Cloud::Namespace::V1b\x06proto3'
+    b'\n-temporal/api/cloud/namespace/v1/message.proto\x12\x1ftemporal.api.cloud.namespace.v1\x1a,temporal/api/cloud/resource/v1/message.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(temporal/api/cloud/sink/v1/message.proto"\x81\x01\n\x15\x43\x65rtificateFilterSpec\x12\x13\n\x0b\x63ommon_name\x18\x01 \x01(\t\x12\x14\n\x0corganization\x18\x02 \x01(\t\x12\x1b\n\x13organizational_unit\x18\x03 \x01(\t\x12 \n\x18subject_alternative_name\x18\x04 \x01(\t"\xb7\x01\n\x0cMtlsAuthSpec\x12%\n\x1d\x61\x63\x63\x65pted_client_ca_deprecated\x18\x01 \x01(\t\x12\x1a\n\x12\x61\x63\x63\x65pted_client_ca\x18\x04 \x01(\x0c\x12S\n\x13\x63\x65rtificate_filters\x18\x02 \x03(\x0b\x32\x36.temporal.api.cloud.namespace.v1.CertificateFilterSpec\x12\x0f\n\x07\x65nabled\x18\x03 \x01(\x08"!\n\x0e\x41piKeyAuthSpec\x12\x0f\n\x07\x65nabled\x18\x01 \x01(\x08"\xf4\x02\n\x0f\x43odecServerSpec\x12\x10\n\x08\x65ndpoint\x18\x01 \x01(\t\x12\x19\n\x11pass_access_token\x18\x02 \x01(\x08\x12(\n include_cross_origin_credentials\x18\x03 \x01(\x08\x12\x61\n\x14\x63ustom_error_message\x18\x04 \x01(\x0b\x32\x43.temporal.api.cloud.namespace.v1.CodecServerSpec.CustomErrorMessage\x1a\xa6\x01\n\x12\x43ustomErrorMessage\x12\x61\n\x07\x64\x65\x66\x61ult\x18\x01 \x01(\x0b\x32P.temporal.api.cloud.namespace.v1.CodecServerSpec.CustomErrorMessage.ErrorMessage\x1a-\n\x0c\x45rrorMessage\x12\x0f\n\x07message\x18\x01 \x01(\t\x12\x0c\n\x04link\x18\x02 \x01(\t"1\n\rLifecycleSpec\x12 \n\x18\x65nable_delete_protection\x18\x01 \x01(\x08"8\n\x14HighAvailabilitySpec\x12 \n\x18\x64isable_managed_failover\x18\x01 \x01(\x08"\xea\x08\n\rNamespaceSpec\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07regions\x18\x02 \x03(\t\x12\x16\n\x0eretention_days\x18\x03 \x01(\x05\x12@\n\tmtls_auth\x18\x04 \x01(\x0b\x32-.temporal.api.cloud.namespace.v1.MtlsAuthSpec\x12\x45\n\x0c\x61pi_key_auth\x18\x07 \x01(\x0b\x32/.temporal.api.cloud.namespace.v1.ApiKeyAuthSpec\x12p\n\x18\x63ustom_search_attributes\x18\x05 \x03(\x0b\x32J.temporal.api.cloud.namespace.v1.NamespaceSpec.CustomSearchAttributesEntryB\x02\x18\x01\x12_\n\x11search_attributes\x18\x08 \x03(\x0b\x32\x44.temporal.api.cloud.namespace.v1.NamespaceSpec.SearchAttributesEntry\x12\x46\n\x0c\x63odec_server\x18\x06 \x01(\x0b\x32\x30.temporal.api.cloud.namespace.v1.CodecServerSpec\x12\x41\n\tlifecycle\x18\t \x01(\x0b\x32..temporal.api.cloud.namespace.v1.LifecycleSpec\x12P\n\x11high_availability\x18\n \x01(\x0b\x32\x35.temporal.api.cloud.namespace.v1.HighAvailabilitySpec\x1a=\n\x1b\x43ustomSearchAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a{\n\x15SearchAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12Q\n\x05value\x18\x02 \x01(\x0e\x32\x42.temporal.api.cloud.namespace.v1.NamespaceSpec.SearchAttributeType:\x02\x38\x01"\xac\x02\n\x13SearchAttributeType\x12%\n!SEARCH_ATTRIBUTE_TYPE_UNSPECIFIED\x10\x00\x12\x1e\n\x1aSEARCH_ATTRIBUTE_TYPE_TEXT\x10\x01\x12!\n\x1dSEARCH_ATTRIBUTE_TYPE_KEYWORD\x10\x02\x12\x1d\n\x19SEARCH_ATTRIBUTE_TYPE_INT\x10\x03\x12 \n\x1cSEARCH_ATTRIBUTE_TYPE_DOUBLE\x10\x04\x12\x1e\n\x1aSEARCH_ATTRIBUTE_TYPE_BOOL\x10\x05\x12"\n\x1eSEARCH_ATTRIBUTE_TYPE_DATETIME\x10\x06\x12&\n"SEARCH_ATTRIBUTE_TYPE_KEYWORD_LIST\x10\x07"Q\n\tEndpoints\x12\x13\n\x0bweb_address\x18\x01 \x01(\t\x12\x19\n\x11mtls_grpc_address\x18\x02 \x01(\t\x12\x14\n\x0cgrpc_address\x18\x03 \x01(\t"*\n\x06Limits\x12 \n\x18\x61\x63tions_per_second_limit\x18\x01 \x01(\x05"X\n\x12\x41WSPrivateLinkInfo\x12\x1e\n\x16\x61llowed_principal_arns\x18\x01 \x03(\t\x12"\n\x1avpc_endpoint_service_names\x18\x02 \x03(\t"t\n\x13PrivateConnectivity\x12\x0e\n\x06region\x18\x01 \x01(\t\x12M\n\x10\x61ws_private_link\x18\x02 \x01(\x0b\x32\x33.temporal.api.cloud.namespace.v1.AWSPrivateLinkInfo"\xff\x05\n\tNamespace\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12<\n\x04spec\x18\x03 \x01(\x0b\x32..temporal.api.cloud.namespace.v1.NamespaceSpec\x12\x1c\n\x10state_deprecated\x18\x04 \x01(\tB\x02\x18\x01\x12<\n\x05state\x18\r \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12\x1a\n\x12\x61sync_operation_id\x18\x05 \x01(\t\x12=\n\tendpoints\x18\x06 \x01(\x0b\x32*.temporal.api.cloud.namespace.v1.Endpoints\x12\x15\n\ractive_region\x18\x07 \x01(\t\x12\x37\n\x06limits\x18\x08 \x01(\x0b\x32\'.temporal.api.cloud.namespace.v1.Limits\x12T\n\x16private_connectivities\x18\t \x03(\x0b\x32\x34.temporal.api.cloud.namespace.v1.PrivateConnectivity\x12\x30\n\x0c\x63reated_time\x18\n \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12last_modified_time\x18\x0b \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12S\n\rregion_status\x18\x0c \x03(\x0b\x32<.temporal.api.cloud.namespace.v1.Namespace.RegionStatusEntry\x1ak\n\x11RegionStatusEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x45\n\x05value\x18\x02 \x01(\x0b\x32\x36.temporal.api.cloud.namespace.v1.NamespaceRegionStatus:\x02\x38\x01"\x9b\x02\n\x15NamespaceRegionStatus\x12\x1c\n\x10state_deprecated\x18\x01 \x01(\tB\x02\x18\x01\x12K\n\x05state\x18\x03 \x01(\x0e\x32<.temporal.api.cloud.namespace.v1.NamespaceRegionStatus.State\x12\x1a\n\x12\x61sync_operation_id\x18\x02 \x01(\t"{\n\x05State\x12\x15\n\x11STATE_UNSPECIFIED\x10\x00\x12\x10\n\x0cSTATE_ADDING\x10\x01\x12\x10\n\x0cSTATE_ACTIVE\x10\x02\x12\x11\n\rSTATE_PASSIVE\x10\x03\x12\x12\n\x0eSTATE_REMOVING\x10\x04\x12\x10\n\x0cSTATE_FAILED\x10\x05"\x91\x01\n\x0e\x45xportSinkSpec\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07\x65nabled\x18\x02 \x01(\x08\x12.\n\x02s3\x18\x03 \x01(\x0b\x32".temporal.api.cloud.sink.v1.S3Spec\x12\x30\n\x03gcs\x18\x04 \x01(\x0b\x32#.temporal.api.cloud.sink.v1.GCSSpec"\xf6\x03\n\nExportSink\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x18\n\x10resource_version\x18\x02 \x01(\t\x12<\n\x05state\x18\x03 \x01(\x0e\x32-.temporal.api.cloud.resource.v1.ResourceState\x12=\n\x04spec\x18\x04 \x01(\x0b\x32/.temporal.api.cloud.namespace.v1.ExportSinkSpec\x12\x42\n\x06health\x18\x05 \x01(\x0e\x32\x32.temporal.api.cloud.namespace.v1.ExportSink.Health\x12\x15\n\rerror_message\x18\x06 \x01(\t\x12;\n\x17latest_data_export_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12:\n\x16last_health_check_time\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"o\n\x06Health\x12\x16\n\x12HEALTH_UNSPECIFIED\x10\x00\x12\r\n\tHEALTH_OK\x10\x01\x12\x19\n\x15HEALTH_ERROR_INTERNAL\x10\x02\x12#\n\x1fHEALTH_ERROR_USER_CONFIGURATION\x10\x03\x42\xb1\x01\n"io.temporal.api.cloud.namespace.v1B\x0cMessageProtoP\x01Z/go.temporal.io/api/cloud/namespace/v1;namespace\xaa\x02!Temporalio.Api.Cloud.Namespace.V1\xea\x02%Temporalio::Api::Cloud::Namespace::V1b\x06proto3'
 )
 
 
@@ -32,6 +32,14 @@ _CERTIFICATEFILTERSPEC = DESCRIPTOR.message_types_by_name["CertificateFilterSpec
 _MTLSAUTHSPEC = DESCRIPTOR.message_types_by_name["MtlsAuthSpec"]
 _APIKEYAUTHSPEC = DESCRIPTOR.message_types_by_name["ApiKeyAuthSpec"]
 _CODECSERVERSPEC = DESCRIPTOR.message_types_by_name["CodecServerSpec"]
+_CODECSERVERSPEC_CUSTOMERRORMESSAGE = _CODECSERVERSPEC.nested_types_by_name[
+    "CustomErrorMessage"
+]
+_CODECSERVERSPEC_CUSTOMERRORMESSAGE_ERRORMESSAGE = (
+    _CODECSERVERSPEC_CUSTOMERRORMESSAGE.nested_types_by_name["ErrorMessage"]
+)
+_LIFECYCLESPEC = DESCRIPTOR.message_types_by_name["LifecycleSpec"]
+_HIGHAVAILABILITYSPEC = DESCRIPTOR.message_types_by_name["HighAvailabilitySpec"]
 _NAMESPACESPEC = DESCRIPTOR.message_types_by_name["NamespaceSpec"]
 _NAMESPACESPEC_CUSTOMSEARCHATTRIBUTESENTRY = _NAMESPACESPEC.nested_types_by_name[
     "CustomSearchAttributesEntry"
@@ -90,12 +98,54 @@ CodecServerSpec = _reflection.GeneratedProtocolMessageType(
     "CodecServerSpec",
     (_message.Message,),
     {
+        "CustomErrorMessage": _reflection.GeneratedProtocolMessageType(
+            "CustomErrorMessage",
+            (_message.Message,),
+            {
+                "ErrorMessage": _reflection.GeneratedProtocolMessageType(
+                    "ErrorMessage",
+                    (_message.Message,),
+                    {
+                        "DESCRIPTOR": _CODECSERVERSPEC_CUSTOMERRORMESSAGE_ERRORMESSAGE,
+                        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+                        # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.CodecServerSpec.CustomErrorMessage.ErrorMessage)
+                    },
+                ),
+                "DESCRIPTOR": _CODECSERVERSPEC_CUSTOMERRORMESSAGE,
+                "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+                # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.CodecServerSpec.CustomErrorMessage)
+            },
+        ),
         "DESCRIPTOR": _CODECSERVERSPEC,
         "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.CodecServerSpec)
     },
 )
 _sym_db.RegisterMessage(CodecServerSpec)
+_sym_db.RegisterMessage(CodecServerSpec.CustomErrorMessage)
+_sym_db.RegisterMessage(CodecServerSpec.CustomErrorMessage.ErrorMessage)
+
+LifecycleSpec = _reflection.GeneratedProtocolMessageType(
+    "LifecycleSpec",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _LIFECYCLESPEC,
+        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.LifecycleSpec)
+    },
+)
+_sym_db.RegisterMessage(LifecycleSpec)
+
+HighAvailabilitySpec = _reflection.GeneratedProtocolMessageType(
+    "HighAvailabilitySpec",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _HIGHAVAILABILITYSPEC,
+        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.HighAvailabilitySpec)
+    },
+)
+_sym_db.RegisterMessage(HighAvailabilitySpec)
 
 NamespaceSpec = _reflection.GeneratedProtocolMessageType(
     "NamespaceSpec",
@@ -251,36 +301,44 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _MTLSAUTHSPEC._serialized_end = 519
     _APIKEYAUTHSPEC._serialized_start = 521
     _APIKEYAUTHSPEC._serialized_end = 554
-    _CODECSERVERSPEC._serialized_start = 556
-    _CODECSERVERSPEC._serialized_end = 660
-    _NAMESPACESPEC._serialized_start = 663
-    _NAMESPACESPEC._serialized_end = 1644
-    _NAMESPACESPEC_CUSTOMSEARCHATTRIBUTESENTRY._serialized_start = 1155
-    _NAMESPACESPEC_CUSTOMSEARCHATTRIBUTESENTRY._serialized_end = 1216
-    _NAMESPACESPEC_SEARCHATTRIBUTESENTRY._serialized_start = 1218
-    _NAMESPACESPEC_SEARCHATTRIBUTESENTRY._serialized_end = 1341
-    _NAMESPACESPEC_SEARCHATTRIBUTETYPE._serialized_start = 1344
-    _NAMESPACESPEC_SEARCHATTRIBUTETYPE._serialized_end = 1644
-    _ENDPOINTS._serialized_start = 1646
-    _ENDPOINTS._serialized_end = 1727
-    _LIMITS._serialized_start = 1729
-    _LIMITS._serialized_end = 1771
-    _AWSPRIVATELINKINFO._serialized_start = 1773
-    _AWSPRIVATELINKINFO._serialized_end = 1861
-    _PRIVATECONNECTIVITY._serialized_start = 1863
-    _PRIVATECONNECTIVITY._serialized_end = 1979
-    _NAMESPACE._serialized_start = 1982
-    _NAMESPACE._serialized_end = 2749
-    _NAMESPACE_REGIONSTATUSENTRY._serialized_start = 2642
-    _NAMESPACE_REGIONSTATUSENTRY._serialized_end = 2749
-    _NAMESPACEREGIONSTATUS._serialized_start = 2752
-    _NAMESPACEREGIONSTATUS._serialized_end = 3035
-    _NAMESPACEREGIONSTATUS_STATE._serialized_start = 2912
-    _NAMESPACEREGIONSTATUS_STATE._serialized_end = 3035
-    _EXPORTSINKSPEC._serialized_start = 3038
-    _EXPORTSINKSPEC._serialized_end = 3183
-    _EXPORTSINK._serialized_start = 3186
-    _EXPORTSINK._serialized_end = 3688
-    _EXPORTSINK_HEALTH._serialized_start = 3577
-    _EXPORTSINK_HEALTH._serialized_end = 3688
+    _CODECSERVERSPEC._serialized_start = 557
+    _CODECSERVERSPEC._serialized_end = 929
+    _CODECSERVERSPEC_CUSTOMERRORMESSAGE._serialized_start = 763
+    _CODECSERVERSPEC_CUSTOMERRORMESSAGE._serialized_end = 929
+    _CODECSERVERSPEC_CUSTOMERRORMESSAGE_ERRORMESSAGE._serialized_start = 884
+    _CODECSERVERSPEC_CUSTOMERRORMESSAGE_ERRORMESSAGE._serialized_end = 929
+    _LIFECYCLESPEC._serialized_start = 931
+    _LIFECYCLESPEC._serialized_end = 980
+    _HIGHAVAILABILITYSPEC._serialized_start = 982
+    _HIGHAVAILABILITYSPEC._serialized_end = 1038
+    _NAMESPACESPEC._serialized_start = 1041
+    _NAMESPACESPEC._serialized_end = 2171
+    _NAMESPACESPEC_CUSTOMSEARCHATTRIBUTESENTRY._serialized_start = 1682
+    _NAMESPACESPEC_CUSTOMSEARCHATTRIBUTESENTRY._serialized_end = 1743
+    _NAMESPACESPEC_SEARCHATTRIBUTESENTRY._serialized_start = 1745
+    _NAMESPACESPEC_SEARCHATTRIBUTESENTRY._serialized_end = 1868
+    _NAMESPACESPEC_SEARCHATTRIBUTETYPE._serialized_start = 1871
+    _NAMESPACESPEC_SEARCHATTRIBUTETYPE._serialized_end = 2171
+    _ENDPOINTS._serialized_start = 2173
+    _ENDPOINTS._serialized_end = 2254
+    _LIMITS._serialized_start = 2256
+    _LIMITS._serialized_end = 2298
+    _AWSPRIVATELINKINFO._serialized_start = 2300
+    _AWSPRIVATELINKINFO._serialized_end = 2388
+    _PRIVATECONNECTIVITY._serialized_start = 2390
+    _PRIVATECONNECTIVITY._serialized_end = 2506
+    _NAMESPACE._serialized_start = 2509
+    _NAMESPACE._serialized_end = 3276
+    _NAMESPACE_REGIONSTATUSENTRY._serialized_start = 3169
+    _NAMESPACE_REGIONSTATUSENTRY._serialized_end = 3276
+    _NAMESPACEREGIONSTATUS._serialized_start = 3279
+    _NAMESPACEREGIONSTATUS._serialized_end = 3562
+    _NAMESPACEREGIONSTATUS_STATE._serialized_start = 3439
+    _NAMESPACEREGIONSTATUS_STATE._serialized_end = 3562
+    _EXPORTSINKSPEC._serialized_start = 3565
+    _EXPORTSINKSPEC._serialized_end = 3710
+    _EXPORTSINK._serialized_start = 3713
+    _EXPORTSINK._serialized_end = 4215
+    _EXPORTSINK_HEALTH._serialized_start = 4104
+    _EXPORTSINK_HEALTH._serialized_end = 4215
 # @@protoc_insertion_point(module_scope)
