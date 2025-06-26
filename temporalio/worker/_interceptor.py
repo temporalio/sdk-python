@@ -19,10 +19,7 @@ from typing import (
 )
 
 import nexusrpc.handler
-from nexusrpc.types import (
-    InputT,
-    OutputT,
-)
+from nexusrpc import InputT, OutputT
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -464,7 +461,7 @@ class WorkflowOutboundInterceptor:
         return self.next.start_local_activity(input)
 
     async def start_nexus_operation(
-        self, input: StartNexusOperationInput
-    ) -> temporalio.workflow.NexusOperationHandle[Any]:
+        self, input: StartNexusOperationInput[InputT, OutputT]
+    ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
         """Called for every :py:func:`temporalio.workflow.start_nexus_operation` call."""
         return await self.next.start_nexus_operation(input)

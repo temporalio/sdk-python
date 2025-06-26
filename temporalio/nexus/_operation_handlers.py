@@ -8,7 +8,11 @@ from typing import (
     Type,
 )
 
-from nexusrpc import OperationInfo
+from nexusrpc import (
+    InputT,
+    OperationInfo,
+    OutputT,
+)
 from nexusrpc.handler import (
     CancelOperationContext,
     FetchOperationInfoContext,
@@ -18,10 +22,6 @@ from nexusrpc.handler import (
     OperationHandler,
     StartOperationContext,
     StartOperationResultAsync,
-)
-from nexusrpc.types import (
-    InputT,
-    OutputT,
 )
 
 from temporalio import client

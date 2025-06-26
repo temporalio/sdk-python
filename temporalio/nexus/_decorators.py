@@ -4,16 +4,17 @@ from typing import (
     Awaitable,
     Callable,
     Optional,
+    TypeVar,
     Union,
     overload,
 )
 
 import nexusrpc
+from nexusrpc import InputT, OutputT
 from nexusrpc.handler import (
     OperationHandler,
     StartOperationContext,
 )
-from nexusrpc.types import InputT, OutputT, ServiceHandlerT
 
 from temporalio.nexus._operation_context import WorkflowRunOperationContext
 from temporalio.nexus._operation_handlers import (
@@ -26,6 +27,8 @@ from temporalio.nexus._util import (
     get_callable_name,
     get_workflow_run_start_method_input_and_output_type_annotations,
 )
+
+ServiceHandlerT = TypeVar("ServiceHandlerT")
 
 
 @overload

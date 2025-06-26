@@ -44,6 +44,7 @@ from typing import (
 )
 
 import nexusrpc.handler
+from nexusrpc import InputT, OutputT
 from typing_extensions import Self, TypeAlias, TypedDict
 
 import temporalio.activity
@@ -1498,12 +1499,12 @@ class _WorkflowInstanceImpl(
         self,
         endpoint: str,
         service: str,
-        operation: Union[nexusrpc.Operation[I, O], str, Callable[..., Any]],
+        operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
         input: Any,
-        output_type: Optional[Type[O]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
-    ) -> temporalio.workflow.NexusOperationHandle[Any]:
+    ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
         # start_nexus_operation
         return await self._outbound.start_nexus_operation(
             StartNexusOperationInput(
@@ -1822,8 +1823,8 @@ class _WorkflowInstanceImpl(
                 apply_child_cancel_error()
 
     async def _outbound_start_nexus_operation(
-        self, input: StartNexusOperationInput
-    ) -> _NexusOperationHandle[Any]:
+        self, input: StartNexusOperationInput[Any, OutputT]
+    ) -> _NexusOperationHandle[OutputT]:
         # A Nexus operation handle contains two futures: self._start_fut is resolved as a
         # result of the Nexus operation starting (activation job:
         # resolve_nexus_operation_start), and self._result_fut is resolved as a result of
@@ -1838,9 +1839,9 @@ class _WorkflowInstanceImpl(
         # and start will be resolved with an operation token). See comments in
         # tests/worker/test_nexus.py for worked examples of the evolution of the resulting
         # handle state machine in the sync and async Nexus response cases.
-        handle: _NexusOperationHandle
+        handle: _NexusOperationHandle[OutputT]
 
-        async def operation_handle_fn() -> Any:
+        async def operation_handle_fn() -> OutputT:
             while True:
                 try:
                     return await asyncio.shield(handle._result_fut)
@@ -2599,8 +2600,8 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
         return await self._instance._outbound_start_child_workflow(input)
 
     async def start_nexus_operation(
-        self, input: StartNexusOperationInput
-    ) -> temporalio.workflow.NexusOperationHandle[Any]:
+        self, input: StartNexusOperationInput[Any, OutputT]
+    ) -> _NexusOperationHandle[OutputT]:
         return await self._instance._outbound_start_nexus_operation(input)
 
     def start_local_activity(
@@ -2989,27 +2990,23 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         await self._instance._cancel_external_workflow(command)
 
 
-I = TypeVar("I")
-O = TypeVar("O")
-
-
 # TODO(dan): are we sure we don't want to inherit from asyncio.Task as ActivityHandle and
 # ChildWorkflowHandle do? I worry that we should provide .done(), .result(), .exception()
 # etc for consistency.
-class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
+class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
     def __init__(
         self,
         instance: _WorkflowInstanceImpl,
         seq: int,
-        input: StartNexusOperationInput,
-        fn: Coroutine[Any, Any, O],
+        input: StartNexusOperationInput[Any, OutputT],
+        fn: Coroutine[Any, Any, OutputT],
     ):
         self._instance = instance
         self._seq = seq
         self._input = input
         self._task = asyncio.Task(fn)
         self._start_fut: asyncio.Future[Optional[str]] = instance.create_future()
-        self._result_fut: asyncio.Future[Optional[O]] = instance.create_future()
+        self._result_fut: asyncio.Future[Optional[OutputT]] = instance.create_future()
 
     @property
     def operation_token(self) -> Optional[str]:
@@ -3023,10 +3020,10 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
         except BaseException:
             return None
 
-    async def result(self) -> O:
+    async def result(self) -> OutputT:
         return await self._task
 
-    def __await__(self) -> Generator[Any, Any, O]:
+    def __await__(self) -> Generator[Any, Any, OutputT]:
         return self._task.__await__()
 
     def __repr__(self) -> str:
@@ -3043,7 +3040,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[O]):
         # We intentionally let this error if already done
         self._start_fut.set_result(operation_token)
 
-    def _resolve_success(self, result: Any) -> None:
+    def _resolve_success(self, result: OutputT) -> None:
         # We intentionally let this error if already done
         self._result_fut.set_result(result)
 
