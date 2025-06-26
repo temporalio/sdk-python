@@ -57,6 +57,7 @@ with workflow.unsafe.imports_passed_through():
         ResponseOutputMessage,
         ResponseOutputText,
     )
+    from openai.types.responses.response_function_web_search import ActionSearch
     from openai.types.responses.response_prompt_param import ResponsePromptParam
 
     from tests.contrib.research_agents.research_manager import ResearchManager
@@ -405,7 +406,7 @@ class TestResearchModel(TestModel):
             ModelResponse(
                 output=[
                     ResponseFunctionWebSearch(
-                        id="", status="completed", type="web_search_call"
+                        id="", status="completed", type="web_search_call", action=ActionSearch(query="", type="search", domains=None)
                     ),
                     ResponseOutputMessage(
                         id="",
