@@ -52,7 +52,7 @@ class WorkflowHandle(Generic[OutputT]):
             workflow_id=workflow_handle.id,
         )
 
-    def encode(self) -> str:
+    def to_token(self) -> str:
         return _base64url_encode_no_padding(
             json.dumps(
                 {
@@ -65,7 +65,7 @@ class WorkflowHandle(Generic[OutputT]):
         )
 
     @classmethod
-    def decode(cls, token: str) -> WorkflowHandle[OutputT]:
+    def from_token(cls, token: str) -> WorkflowHandle[OutputT]:
         """Decodes and validates a token from its base64url-encoded string representation."""
         if not token:
             raise TypeError("invalid workflow token: token is empty")

@@ -43,12 +43,12 @@ class MyOperation(WorkflowRunOperationHandler):
     async def start(
         self, ctx: StartOperationContext, input: Input
     ) -> StartOperationResultAsync:
-        token = await nexus.start_workflow(
+        handle = await nexus.start_workflow(
             EchoWorkflow.run,
             input.value,
             id=str(uuid.uuid4()),
         )
-        return StartOperationResultAsync(token.encode())
+        return StartOperationResultAsync(handle.to_token())
 
 
 @service_handler

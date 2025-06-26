@@ -156,12 +156,12 @@ class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
         if isinstance(input.response_type, SyncResponse):
             return StartOperationResultSync(value=OpOutput(value="sync response"))
         elif isinstance(input.response_type, AsyncResponse):
-            token = await nexus.start_workflow(
+            handle = await nexus.start_workflow(
                 HandlerWorkflow.run,
                 HandlerWfInput(op_input=input),
                 id=input.response_type.operation_workflow_id,
             )
-            return StartOperationResultAsync(token.encode())
+            return StartOperationResultAsync(handle.to_token())
         else:
             raise TypeError
 
@@ -572,7 +572,7 @@ async def test_async_response(
                 if op_definition_type == OpDefinitionType.SHORTHAND
                 else "sync_or_async_operation"
             )
-            assert nexus.WorkflowHandle.decode(
+            assert nexus.WorkflowHandle.from_token(
                 e.__cause__.operation_token
             ) == nexus.WorkflowHandle(
                 namespace=handler_wf_handle._client.namespace,
