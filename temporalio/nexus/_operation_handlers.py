@@ -91,19 +91,19 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         """
         Start the operation, by starting a workflow and completing asynchronously.
         """
-        token = await self._start(ctx, input)
-        if not isinstance(token, WorkflowHandle):
-            if isinstance(token, client.WorkflowHandle):
+        handle = await self._start(ctx, input)
+        if not isinstance(handle, WorkflowHandle):
+            if isinstance(handle, client.WorkflowHandle):
                 raise RuntimeError(
-                    f"Expected {token} to be a WorkflowOperationToken, but got a client.WorkflowHandle. "
+                    f"Expected {handle} to be a WorkflowOperationToken, but got a client.WorkflowHandle. "
                     f"You must use temporalio.nexus.start_workflow "
                     "to start a workflow that will deliver the result of the Nexus operation, "
                     "not client.Client.start_workflow."
                 )
             raise RuntimeError(
-                f"Expected {token} to be a WorkflowOperationToken, but got {type(token)}. "
+                f"Expected {handle} to be a WorkflowOperationToken, but got {type(handle)}. "
             )
-        return StartOperationResultAsync(token.encode())
+        return StartOperationResultAsync(handle.to_token())
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
         """Cancel the operation, by cancelling the workflow."""
@@ -124,7 +124,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         )
         # An implementation is provided for future reference:
         try:
-            workflow_token = WorkflowHandle[OutputT].decode(token)
+            nexus_handle = WorkflowHandle[OutputT].from_token(token)
         except Exception as err:
             raise HandlerError(
                 "Failed to decode operation token as workflow operation token. "
@@ -134,7 +134,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
             )
         ctx = temporal_operation_context.get()
         try:
-            handle = workflow_token.to_workflow_handle(
+            client_handle = nexus_handle.to_workflow_handle(
                 ctx.client, result_type=self._output_type
             )
         except Exception as err:
@@ -143,7 +143,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
                 type=HandlerErrorType.NOT_FOUND,
                 cause=err,
             )
-        return await handle.result()
+        return await client_handle.result()
 
 
 async def cancel_operation(
@@ -157,7 +157,7 @@ async def cancel_operation(
         client: The client to use to cancel the operation.
     """
     try:
-        workflow_token = WorkflowHandle[Any].decode(token)
+        nexus_workflow_handle = WorkflowHandle[Any].from_token(token)
     except Exception as err:
         raise HandlerError(
             "Failed to decode operation token as workflow operation token. "
@@ -168,11 +168,13 @@ async def cancel_operation(
 
     ctx = temporal_operation_context.get()
     try:
-        handle = workflow_token._to_client_workflow_handle(ctx.client)
+        client_workflow_handle = nexus_workflow_handle._to_client_workflow_handle(
+            ctx.client
+        )
     except Exception as err:
         raise HandlerError(
             "Failed to construct workflow handle from workflow operation token",
             type=HandlerErrorType.NOT_FOUND,
             cause=err,
         )
-    await handle.cancel(**kwargs)
+    await client_workflow_handle.cancel(**kwargs)
