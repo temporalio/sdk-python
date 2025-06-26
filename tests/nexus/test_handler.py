@@ -40,10 +40,10 @@ from nexusrpc.handler import (
     OperationErrorState,
     OperationHandler,
     StartOperationContext,
-    operation_handler,
     service_handler,
     sync_operation,
 )
+from nexusrpc.handler._decorators import operation_handler
 
 import temporalio.api.failure.v1
 from temporalio import nexus, workflow
