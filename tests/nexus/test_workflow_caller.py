@@ -15,10 +15,10 @@ from nexusrpc.handler import (
     StartOperationContext,
     StartOperationResultAsync,
     StartOperationResultSync,
-    operation_handler,
     service_handler,
     sync_operation,
 )
+from nexusrpc.handler._decorators import operation_handler
 
 import temporalio.api
 import temporalio.api.common
