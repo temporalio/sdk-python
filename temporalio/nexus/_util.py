@@ -13,12 +13,13 @@ from typing import (
     Union,
 )
 
-from nexusrpc.handler import StartOperationContext
 from nexusrpc.types import (
     InputT,
     OutputT,
     ServiceHandlerT,
 )
+
+from temporalio.nexus._workflow import WorkflowRunOperationContext
 
 from ._token import (
     WorkflowHandle as WorkflowHandle,
@@ -27,7 +28,7 @@ from ._token import (
 
 def get_workflow_run_start_method_input_and_output_type_annotations(
     start: Callable[
-        [ServiceHandlerT, StartOperationContext, InputT],
+        [ServiceHandlerT, WorkflowRunOperationContext, InputT],
         Awaitable[WorkflowHandle[OutputT]],
     ],
 ) -> tuple[

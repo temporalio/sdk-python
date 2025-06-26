@@ -45,7 +45,7 @@ from temporalio import nexus, workflow
 from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import ApplicationError
-from temporalio.nexus import workflow_run_operation
+from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import (
@@ -208,9 +208,9 @@ class MyServiceHandler:
 
     @workflow_run_operation
     async def workflow_run_operation_happy_path(
-        self, ctx: StartOperationContext, input: Input
+        self, ctx: WorkflowRunOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
-        return await nexus.start_workflow(
+        return await ctx.start_workflow(
             MyWorkflow.run,
             input,
             id=str(uuid.uuid4()),
@@ -258,7 +258,7 @@ class MyServiceHandler:
 
     @workflow_run_operation
     async def workflow_run_operation_without_type_annotations(self, ctx, input):
-        return await nexus.start_workflow(
+        return await ctx.start_workflow(
             WorkflowWithoutTypeAnnotations.run,
             input,
             id=str(uuid.uuid4()),
@@ -266,15 +266,16 @@ class MyServiceHandler:
 
     @workflow_run_operation
     async def workflow_run_op_link_test(
-        self, ctx: StartOperationContext, input: Input
+        self, ctx: WorkflowRunOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
+        nctx = ctx.start_operation_context
         assert any(
-            link.url == "http://inbound-link/" for link in ctx.inbound_links
+            link.url == "http://inbound-link/" for link in nctx.inbound_links
         ), "Inbound link not found"
-        assert ctx.request_id == "test-request-id-123", "Request ID mismatch"
-        ctx.outbound_links.extend(ctx.inbound_links)
+        assert nctx.request_id == "test-request-id-123", "Request ID mismatch"
+        nctx.outbound_links.extend(nctx.inbound_links)
 
-        return await nexus.start_workflow(
+        return await ctx.start_workflow(
             MyLinkTestWorkflow.run,
             input,
             id=str(uuid.uuid4()),
@@ -1019,9 +1020,9 @@ class EchoWorkflow:
 class ServiceHandlerForRequestIdTest:
     @workflow_run_operation
     async def operation_backed_by_a_workflow(
-        self, ctx: StartOperationContext, input: Input
+        self, ctx: WorkflowRunOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
-        return await nexus.start_workflow(
+        return await ctx.start_workflow(
             EchoWorkflow.run,
             input,
             id=input.value,
@@ -1030,7 +1031,7 @@ class ServiceHandlerForRequestIdTest:
 
     @workflow_run_operation
     async def operation_that_executes_a_workflow_before_starting_the_backing_workflow(
-        self, ctx: StartOperationContext, input: Input
+        self, ctx: WorkflowRunOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
         await nexus.client().start_workflow(
             EchoWorkflow.run,
@@ -1040,7 +1041,7 @@ class ServiceHandlerForRequestIdTest:
         )
         # This should fail. It will not fail if the Nexus request ID was incorrectly
         # propagated to both StartWorkflow requests.
-        return await nexus.start_workflow(
+        return await ctx.start_workflow(
             EchoWorkflow.run,
             input,
             id=input.value,
