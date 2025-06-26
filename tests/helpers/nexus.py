@@ -2,14 +2,16 @@ import dataclasses
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
-import httpx
-from google.protobuf import json_format
-
 import temporalio.api
 import temporalio.api.nexus.v1
 import temporalio.api.operatorservice.v1
+import temporalio.workflow
 from temporalio.client import Client
 from temporalio.converter import FailureConverter, PayloadConverter
+
+with temporalio.workflow.unsafe.imports_passed_through():
+    import httpx
+    from google.protobuf import json_format
 
 
 def make_nexus_endpoint_name(task_queue: str) -> str:
