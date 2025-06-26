@@ -255,8 +255,7 @@ fn metric_key_value_from_py(
         metrics::MetricValue::Float(v)
     } else {
         return Err(PyTypeError::new_err(format!(
-            "Invalid value type for key {}, must be str, int, float, or bool",
-            k
+            "Invalid value type for key {k}, must be str, int, float, or bool"
         )));
     };
     Ok(metrics::MetricKeyValue::new(k, val))
