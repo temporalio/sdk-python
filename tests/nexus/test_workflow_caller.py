@@ -916,12 +916,11 @@ class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
     async def my_workflow_run_operation(
         self, ctx: StartOperationContext, input: None
     ) -> nexus.WorkflowHandle[str]:
-        tctx = nexus.temporal_operation_context.get()
-        result_1 = await tctx.client.execute_workflow(
+        result_1 = await nexus.client().execute_workflow(
             EchoWorkflow.run,
             "result-1",
             id=str(uuid.uuid4()),
-            task_queue=tctx.task_queue,
+            task_queue=nexus.info().task_queue,
         )
         # In case result_1 is incorrectly being delivered to the caller as the operation
         # result, give time for that incorrect behavior to occur.
