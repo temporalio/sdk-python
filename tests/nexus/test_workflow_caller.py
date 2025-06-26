@@ -29,7 +29,7 @@ import temporalio.api.nexus.v1
 import temporalio.api.operatorservice
 import temporalio.api.operatorservice.v1
 import temporalio.nexus
-from temporalio import workflow
+from temporalio import nexus, workflow
 from temporalio.client import (
     Client,
     WithStartWorkflowOperation,
@@ -39,13 +39,6 @@ from temporalio.client import (
 )
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import CancelledError, NexusHandlerError, NexusOperationError
-from temporalio.nexus import (
-    WorkflowOperationToken,
-    cancel_operation,
-    start_workflow,
-    temporal_operation_context,
-    workflow_run_operation_handler,
-)
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
@@ -208,10 +201,10 @@ class ServiceImpl:
             )
         return OpOutput(value="sync response")
 
-    @workflow_run_operation_handler
+    @nexus.workflow_run_operation_handler
     async def async_operation(
         self, ctx: StartOperationContext, input: OpInput
-    ) -> WorkflowOperationToken[HandlerWfOutput]:
+    ) -> nexus.WorkflowOperationToken[HandlerWfOutput]:
         assert isinstance(input.response_type, AsyncResponse)
         if input.response_type.exception_in_operation_start:
             raise RPCError(
@@ -580,9 +573,9 @@ async def test_async_response(
                 if op_definition_type == OpDefinitionType.SHORTHAND
                 else "sync_or_async_operation"
             )
-            assert WorkflowOperationToken.decode(
+            assert nexus.WorkflowOperationToken.decode(
                 e.__cause__.operation_token
-            ) == WorkflowOperationToken(
+            ) == nexus.WorkflowOperationToken(
                 namespace=handler_wf_handle._client.namespace,
                 workflow_id=handler_wf_handle.id,
             )
@@ -919,11 +912,11 @@ class EchoWorkflow:
 
 @service_handler
 class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
-    @workflow_run_operation_handler
+    @nexus.workflow_run_operation_handler
     async def my_workflow_run_operation(
         self, ctx: StartOperationContext, input: None
-    ) -> WorkflowOperationToken[str]:
-        tctx = temporal_operation_context.get()
+    ) -> nexus.WorkflowOperationToken[str]:
+        tctx = nexus.temporal_operation_context.get()
         result_1 = await tctx.client.execute_workflow(
             EchoWorkflow.run,
             "result-1",
@@ -933,7 +926,7 @@ class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
         # In case result_1 is incorrectly being delivered to the caller as the operation
         # result, give time for that incorrect behavior to occur.
         await asyncio.sleep(0.5)
-        return await start_workflow(
+        return await nexus.start_workflow(
             EchoWorkflow.run,
             f"{result_1}-result-2",
             id=str(uuid.uuid4()),
