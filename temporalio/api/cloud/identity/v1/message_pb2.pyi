@@ -95,12 +95,12 @@ class AccountAccess(google.protobuf.message.Message):
     developer - gives access to create namespaces on the account
     financeadmin - gives read only access and write access for billing
     read - gives read only access to the account
-    Deprecated: Not supported after 2024-10-01-00 api version. Use role instead.
-    temporal:versioning:max_version=2024-10-01-00
+    Deprecated: Not supported after v0.3.0 api version. Use role instead.
+    temporal:versioning:max_version=v0.3.0
     """
     role: global___AccountAccess.Role.ValueType
     """The role on the account.
-    temporal:versioning:min_version=2024-10-01-00
+    temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=role_deprecated
     """
     def __init__(
@@ -156,12 +156,12 @@ class NamespaceAccess(google.protobuf.message.Message):
     admin - gives full access to the namespace, including assigning namespace access to other users
     write - gives write access to the namespace configuration and workflows within the namespace
     read - gives read only access to the namespace configuration and workflows within the namespace
-    Deprecated: Not supported after 2024-10-01-00 api version. Use permission instead.
-    temporal:versioning:max_version=2024-10-01-00
+    Deprecated: Not supported after v0.3.0 api version. Use permission instead.
+    temporal:versioning:max_version=v0.3.0
     """
     permission: global___NamespaceAccess.Permission.ValueType
     """The permission to the namespace.
-    temporal:versioning:min_version=2024-10-01-00
+    temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=permission_deprecated
     """
     def __init__(
@@ -245,6 +245,34 @@ class Access(google.protobuf.message.Message):
 
 global___Access = Access
 
+class NamespaceScopedAccess(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    ACCESS_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """The namespace the service account is assigned to - immutable."""
+    @property
+    def access(self) -> global___NamespaceAccess:
+        """The namespace access assigned to the service account - mutable."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        access: global___NamespaceAccess | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["access", b"access"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "access", b"access", "namespace", b"namespace"
+        ],
+    ) -> None: ...
+
+global___NamespaceScopedAccess = NamespaceScopedAccess
+
 class UserSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -326,13 +354,13 @@ class User(google.protobuf.message.Message):
         """The user specification"""
     state_deprecated: builtins.str
     """The current state of the user
-    Deprecated: Not supported after 2024-10-01-00 api version. Use state instead.
-    temporal:versioning:max_version=2024-10-01-00
+    Deprecated: Not supported after v0.3.0 api version. Use state instead.
+    temporal:versioning:max_version=v0.3.0
     """
     state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
     """The current state of the user.
     For any failed state, reach out to Temporal Cloud support for remediation.
-    temporal:versioning:min_version=2024-10-01-00
+    temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=state_deprecated
     """
     async_operation_id: builtins.str
@@ -419,12 +447,40 @@ class GoogleGroupSpec(google.protobuf.message.Message):
 
 global___GoogleGroupSpec = GoogleGroupSpec
 
+class SCIMGroupSpec(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IDP_ID_FIELD_NUMBER: builtins.int
+    idp_id: builtins.str
+    """The id used in the upstream identity provider."""
+    def __init__(
+        self,
+        *,
+        idp_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["idp_id", b"idp_id"]
+    ) -> None: ...
+
+global___SCIMGroupSpec = SCIMGroupSpec
+
+class CloudGroupSpec(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___CloudGroupSpec = CloudGroupSpec
+
 class UserGroupSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     DISPLAY_NAME_FIELD_NUMBER: builtins.int
     ACCESS_FIELD_NUMBER: builtins.int
     GOOGLE_GROUP_FIELD_NUMBER: builtins.int
+    SCIM_GROUP_FIELD_NUMBER: builtins.int
+    CLOUD_GROUP_FIELD_NUMBER: builtins.int
     display_name: builtins.str
     """The display name of the group."""
     @property
@@ -432,8 +488,16 @@ class UserGroupSpec(google.protobuf.message.Message):
         """The access assigned to the group."""
     @property
     def google_group(self) -> global___GoogleGroupSpec:
-        """The specification of the google group that this group is associated with.
-        For now only google groups are supported, and this field is required.
+        """The specification of the google group that this group is associated with."""
+    @property
+    def scim_group(self) -> global___SCIMGroupSpec:
+        """The specification of the SCIM group that this group is associated with.
+        SCIM groups cannot be created or deleted directly, but their access can be managed.
+        """
+    @property
+    def cloud_group(self) -> global___CloudGroupSpec:
+        """The specification for a Cloud group. Cloud groups can manage members using
+        the add and remove member APIs.
         """
     def __init__(
         self,
@@ -441,11 +505,22 @@ class UserGroupSpec(google.protobuf.message.Message):
         display_name: builtins.str = ...,
         access: global___Access | None = ...,
         google_group: global___GoogleGroupSpec | None = ...,
+        scim_group: global___SCIMGroupSpec | None = ...,
+        cloud_group: global___CloudGroupSpec | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "access", b"access", "google_group", b"google_group"
+            "access",
+            b"access",
+            "cloud_group",
+            b"cloud_group",
+            "google_group",
+            b"google_group",
+            "group_type",
+            b"group_type",
+            "scim_group",
+            b"scim_group",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -453,12 +528,23 @@ class UserGroupSpec(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "access",
             b"access",
+            "cloud_group",
+            b"cloud_group",
             "display_name",
             b"display_name",
             "google_group",
             b"google_group",
+            "group_type",
+            b"group_type",
+            "scim_group",
+            b"scim_group",
         ],
     ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["group_type", b"group_type"]
+    ) -> (
+        typing_extensions.Literal["google_group", "scim_group", "cloud_group"] | None
+    ): ...
 
 global___UserGroupSpec = UserGroupSpec
 
@@ -484,13 +570,13 @@ class UserGroup(google.protobuf.message.Message):
         """The group specification"""
     state_deprecated: builtins.str
     """The current state of the group.
-    Deprecated: Not supported after 2024-10-01-00 api version. Use state instead.
-    temporal:versioning:max_version=2024-10-01-00
+    Deprecated: Not supported after v0.3.0 api version. Use state instead.
+    temporal:versioning:max_version=v0.3.0
     """
     state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
     """The current state of the group.
     For any failed state, reach out to Temporal Cloud support for remediation.
-    temporal:versioning:min_version=2024-10-01-00
+    temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=state_deprecated
     """
     async_operation_id: builtins.str
@@ -550,6 +636,64 @@ class UserGroup(google.protobuf.message.Message):
 
 global___UserGroup = UserGroup
 
+class UserGroupMemberId(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    USER_ID_FIELD_NUMBER: builtins.int
+    user_id: builtins.str
+    def __init__(
+        self,
+        *,
+        user_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "member_type", b"member_type", "user_id", b"user_id"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "member_type", b"member_type", "user_id", b"user_id"
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["member_type", b"member_type"]
+    ) -> typing_extensions.Literal["user_id"] | None: ...
+
+global___UserGroupMemberId = UserGroupMemberId
+
+class UserGroupMember(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    MEMBER_ID_FIELD_NUMBER: builtins.int
+    CREATED_TIME_FIELD_NUMBER: builtins.int
+    @property
+    def member_id(self) -> global___UserGroupMemberId: ...
+    @property
+    def created_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+    def __init__(
+        self,
+        *,
+        member_id: global___UserGroupMemberId | None = ...,
+        created_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "created_time", b"created_time", "member_id", b"member_id"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "created_time", b"created_time", "member_id", b"member_id"
+        ],
+    ) -> None: ...
+
+global___UserGroupMember = UserGroupMember
+
 class ServiceAccount(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -574,13 +718,13 @@ class ServiceAccount(google.protobuf.message.Message):
     """The current state of the service account.
     Possible values: activating, activationfailed, active, updating, updatefailed, deleting, deletefailed, deleted, suspending, suspendfailed, suspended.
     For any failed state, reach out to Temporal Cloud support for remediation.
-    Deprecated: Not supported after 2024-10-01-00 api version. Use state instead.
-    temporal:versioning:max_version=2024-10-01-00
+    Deprecated: Not supported after v0.3.0 api version. Use state instead.
+    temporal:versioning:max_version=v0.3.0
     """
     state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
     """The current state of the service account.
     For any failed state, reach out to Temporal Cloud support for remediation.
-    temporal:versioning:min_version=2024-10-01-00
+    temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=state_deprecated
     """
     async_operation_id: builtins.str
@@ -645,6 +789,7 @@ class ServiceAccountSpec(google.protobuf.message.Message):
 
     NAME_FIELD_NUMBER: builtins.int
     ACCESS_FIELD_NUMBER: builtins.int
+    NAMESPACE_SCOPED_ACCESS_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
     name: builtins.str
     """The name associated with the service account.
@@ -652,8 +797,17 @@ class ServiceAccountSpec(google.protobuf.message.Message):
     """
     @property
     def access(self) -> global___Access:
-        """The access assigned to the service account.
+        """Note: one of `Access` or `NamespaceScopedAccess` must be provided, but not both.
+        The access assigned to the service account.
+        If set, creates an account scoped service account.
         The access is mutable.
+        """
+    @property
+    def namespace_scoped_access(self) -> global___NamespaceScopedAccess:
+        """The namespace scoped access assigned to the service account.
+        If set, creates a namespace scoped service account (limited to a single namespace).
+        The namespace scoped access is partially mutable.
+        Refer to `NamespaceScopedAccess` for details.
         """
     description: builtins.str
     """The description associated with the service account - optional.
@@ -664,15 +818,26 @@ class ServiceAccountSpec(google.protobuf.message.Message):
         *,
         name: builtins.str = ...,
         access: global___Access | None = ...,
+        namespace_scoped_access: global___NamespaceScopedAccess | None = ...,
         description: builtins.str = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["access", b"access"]
+        self,
+        field_name: typing_extensions.Literal[
+            "access", b"access", "namespace_scoped_access", b"namespace_scoped_access"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "access", b"access", "description", b"description", "name", b"name"
+            "access",
+            b"access",
+            "description",
+            b"description",
+            "name",
+            b"name",
+            "namespace_scoped_access",
+            b"namespace_scoped_access",
         ],
     ) -> None: ...
 
@@ -702,12 +867,12 @@ class ApiKey(google.protobuf.message.Message):
     """The current state of the API key.
     Possible values: activating, activationfailed, active, updating, updatefailed, deleting, deletefailed, deleted, suspending, suspendfailed, suspended.
     For any failed state, reach out to Temporal Cloud support for remediation.
-    Deprecated: Not supported after 2024-10-01-00 api version. Use state instead.
-    temporal:versioning:max_version=2024-10-01-00
+    Deprecated: Not supported after v0.3.0 api version. Use state instead.
+    temporal:versioning:max_version=v0.3.0
     """
     state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
     """The current state of the API key.
-    temporal:versioning:min_version=2024-10-01-00
+    temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=state_deprecated
     """
     async_operation_id: builtins.str
@@ -787,12 +952,12 @@ class ApiKeySpec(google.protobuf.message.Message):
     """The type of the owner to create the API key for.
     The owner type is immutable. Once set during creation, it cannot be changed.
     Possible values: user, service-account.
-    Deprecated: Not supported after 2024-10-01-00 api version. Use owner_type instead.
-    temporal:versioning:max_version=2024-10-01-00
+    Deprecated: Not supported after v0.3.0 api version. Use owner_type instead.
+    temporal:versioning:max_version=v0.3.0
     """
     owner_type: global___OwnerType.ValueType
     """The type of the owner to create the API key for.
-    temporal:versioning:min_version=2024-10-01-00
+    temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=owner_type_deprecated
     """
     display_name: builtins.str

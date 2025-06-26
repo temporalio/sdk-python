@@ -24,7 +24,10 @@ opentelemetry = [
     "opentelemetry-sdk>=1.11.1,<2",
 ]
 pydantic = ["pydantic>=2.0.0,<3"]
-openai-agents = ["openai-agents >= 0.0.19"]
+openai-agents = [
+    "openai-agents >= 0.0.19,<0.1",
+    "eval-type-backport>=0.2.2; python_version < '3.10'"
+]
 
 [project.urls]
 Homepage = "https://github.com/temporalio/sdk-python"
@@ -183,6 +186,7 @@ exclude = [
   "temporalio/bridge/metric.py",
   "temporalio/bridge/runtime.py",
   "temporalio/bridge/testing.py",
+  "temporalio/envconfig.py",
 ]
 
 [tool.ruff]
