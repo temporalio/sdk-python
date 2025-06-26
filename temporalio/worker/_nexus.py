@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import (
     Any,
     Callable,
+    Mapping,
     NoReturn,
     Optional,
     Sequence,
@@ -105,7 +106,9 @@ class _NexusWorker:
                         # tasks as we do start operation tasks?
                         asyncio.create_task(
                             self._handle_cancel_operation_task(
-                                task.request.cancel_operation, task.task_token
+                                task.task_token,
+                                task.request.cancel_operation,
+                                dict(task.request.header),
                             )
                         )
                     else:
@@ -155,7 +158,10 @@ class _NexusWorker:
     # "Any call up to this function and including this one will be trimmed out of stack traces.""
 
     async def _handle_cancel_operation_task(
-        self, request: temporalio.api.nexus.v1.CancelOperationRequest, task_token: bytes
+        self,
+        task_token: bytes,
+        request: temporalio.api.nexus.v1.CancelOperationRequest,
+        headers: Mapping[str, str],
     ) -> None:
         """
         Handle a cancel operation task.
@@ -163,9 +169,11 @@ class _NexusWorker:
         Attempt to execute the user cancel_operation method. Handle errors and send the
         task completion.
         """
+        # TODO(nexus-prerelease): headers
         ctx = CancelOperationContext(
             service=request.service,
             operation=request.operation,
+            headers=headers,
         )
         _temporal_operation_context.set(
             _TemporalNexusOperationContext(
@@ -174,7 +182,6 @@ class _NexusWorker:
                 client=self._client,
             )
         )
-        # TODO(nexus-prerelease): headers
         try:
             await self._handler.cancel_operation(ctx, request.operation_token)
         except Exception as err:
@@ -202,7 +209,7 @@ class _NexusWorker:
         self,
         task_token: bytes,
         start_request: temporalio.api.nexus.v1.StartOperationRequest,
-        headers: dict[str, str],
+        headers: Mapping[str, str],
     ) -> None:
         """
         Handle a start operation task.
@@ -243,7 +250,7 @@ class _NexusWorker:
     async def _start_operation(
         self,
         start_request: temporalio.api.nexus.v1.StartOperationRequest,
-        headers: dict[str, str],
+        headers: Mapping[str, str],
     ) -> temporalio.api.nexus.v1.StartOperationResponse:
         """
         Invoke the Nexus handler's start_operation method and construct the StartOperationResponse.
