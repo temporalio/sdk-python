@@ -17,7 +17,7 @@ from nexusrpc.handler import CancelOperationContext, StartOperationContext
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.common
-from temporalio.client import Client, NexusCompletionCallback, WorkflowHandle
+from temporalio import client
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class _TemporalNexusOperationContext:
 
     nexus_operation_context: Union[StartOperationContext, CancelOperationContext]
 
-    client: Client
+    client: client.Client
     """The Temporal client in use by the worker handling this Nexus operation."""
 
     task_queue: str
@@ -67,7 +67,7 @@ class _TemporalStartOperationContext:
 
     def get_completion_callbacks(
         self,
-    ) -> list[NexusCompletionCallback]:
+    ) -> list[client.NexusCompletionCallback]:
         ctx = self.nexus_operation_context
         return (
             [
@@ -76,7 +76,7 @@ class _TemporalStartOperationContext:
                 # StartWorkflowRequest.CompletionCallbacks and to StartWorkflowRequest.Links
                 # (for backwards compatibility). PR reference in Go SDK:
                 # https://github.com/temporalio/sdk-go/pull/1945
-                NexusCompletionCallback(
+                client.NexusCompletionCallback(
                     url=ctx.callback_url,
                     header=ctx.callback_headers,
                 )
@@ -94,7 +94,7 @@ class _TemporalStartOperationContext:
                 event_links.append(link)
         return event_links
 
-    def add_outbound_links(self, workflow_handle: WorkflowHandle[Any, Any]):
+    def add_outbound_links(self, workflow_handle: client.WorkflowHandle[Any, Any]):
         try:
             link = _workflow_event_to_nexus_link(
                 _workflow_handle_to_workflow_execution_started_event_link(
@@ -124,7 +124,7 @@ class _TemporalCancelOperationContext:
 
 
 def _workflow_handle_to_workflow_execution_started_event_link(
-    handle: WorkflowHandle[Any, Any],
+    handle: client.WorkflowHandle[Any, Any],
 ) -> temporalio.api.common.v1.Link.WorkflowEvent:
     if handle.first_execution_run_id is None:
         raise ValueError(
