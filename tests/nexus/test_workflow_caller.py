@@ -203,7 +203,7 @@ class ServiceImpl:
     @nexus.workflow_run_operation_handler
     async def async_operation(
         self, ctx: StartOperationContext, input: OpInput
-    ) -> nexus.WorkflowOperationToken[HandlerWfOutput]:
+    ) -> nexus.WorkflowHandle[HandlerWfOutput]:
         assert isinstance(input.response_type, AsyncResponse)
         if input.response_type.exception_in_operation_start:
             raise RPCError(
@@ -572,9 +572,9 @@ async def test_async_response(
                 if op_definition_type == OpDefinitionType.SHORTHAND
                 else "sync_or_async_operation"
             )
-            assert nexus.WorkflowOperationToken.decode(
+            assert nexus.WorkflowHandle.decode(
                 e.__cause__.operation_token
-            ) == nexus.WorkflowOperationToken(
+            ) == nexus.WorkflowHandle(
                 namespace=handler_wf_handle._client.namespace,
                 workflow_id=handler_wf_handle.id,
             )
@@ -914,7 +914,7 @@ class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
     @nexus.workflow_run_operation_handler
     async def my_workflow_run_operation(
         self, ctx: StartOperationContext, input: None
-    ) -> nexus.WorkflowOperationToken[str]:
+    ) -> nexus.WorkflowHandle[str]:
         tctx = nexus.temporal_operation_context.get()
         result_1 = await tctx.client.execute_workflow(
             EchoWorkflow.run,

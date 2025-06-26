@@ -16,7 +16,7 @@ from ._operation_context import (
     temporal_operation_context as temporal_operation_context,
 )
 from ._operation_handlers import cancel_operation as cancel_operation
-from ._token import WorkflowOperationToken as WorkflowOperationToken
+from ._token import WorkflowHandle as WorkflowHandle
 from ._workflow import start_workflow as start_workflow
 
 
