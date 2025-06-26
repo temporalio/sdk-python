@@ -250,10 +250,9 @@ class MyServiceHandler:
         )
 
     @sync_operation
-    async def sync_operation_without_type_annotations(
-        self, ctx: StartOperationContext, input: Input
-    ) -> Output:
-        # The input type from the op definition in the service definition is used to deserialize the input.
+    async def sync_operation_without_type_annotations(self, ctx, input):
+        # Despite the lack of type annotations, the input type from the op definition in
+        # the service definition is used to deserialize the input.
         return Output(
             value=f"from start method on {self.__class__.__name__} without type annotations: {input}"
         )
