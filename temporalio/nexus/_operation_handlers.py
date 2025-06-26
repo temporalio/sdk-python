@@ -25,10 +25,10 @@ from nexusrpc.types import (
 )
 
 from temporalio.client import WorkflowHandle
-from temporalio.nexus.handler._operation_context import (
+from temporalio.nexus._operation_context import (
     temporal_operation_context,
 )
-from temporalio.nexus.handler._token import WorkflowOperationToken
+from temporalio.nexus._token import WorkflowOperationToken
 
 from ._util import (
     is_async_callable,
@@ -41,7 +41,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
 
     Use this class to create an operation handler that starts a workflow by passing your
     ``start`` method to the constructor. Your ``start`` method must use
-    :py:func:`temporalio.nexus.handler.start_workflow` to start the workflow.
+    :py:func:`temporalio.nexus.start_workflow` to start the workflow.
 
     Example:
 
@@ -96,7 +96,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
             if isinstance(token, WorkflowHandle):
                 raise RuntimeError(
                     f"Expected {token} to be a WorkflowOperationToken, but got a WorkflowHandle. "
-                    f"You must use :py:meth:`temporalio.nexus.handler.start_workflow` "
+                    f"You must use :py:meth:`temporalio.nexus.start_workflow` "
                     "to start a workflow that will deliver the result of the Nexus operation, "
                     "not :py:meth:`temporalio.client.Client.start_workflow`."
                 )
