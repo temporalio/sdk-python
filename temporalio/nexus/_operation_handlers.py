@@ -42,26 +42,6 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
     Use this class to create an operation handler that starts a workflow by passing your
     ``start`` method to the constructor. Your ``start`` method must use
     :py:func:`temporalio.nexus.start_workflow` to start the workflow.
-
-    Example:
-
-    .. code-block:: python
-
-        @service_handler(service=MyNexusService)
-        class MyNexusServiceHandler:
-            @operation_handler
-            def my_workflow_run_operation(
-                self,
-            ) -> OperationHandler[MyInput, MyOutput]:
-                async def start(
-                    ctx: StartOperationContext, input: MyInput
-                ) -> WorkflowOperationToken[MyOutput]:
-                    return await start_workflow(
-                        WorkflowStartedByNexusOperation.run, input,
-                        id=str(uuid.uuid4()),
-                    )
-
-                return WorkflowRunOperationHandler.from_start_workflow(start)
     """
 
     def __init__(
@@ -95,13 +75,13 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         if not isinstance(handle, WorkflowHandle):
             if isinstance(handle, client.WorkflowHandle):
                 raise RuntimeError(
-                    f"Expected {handle} to be a WorkflowOperationToken, but got a client.WorkflowHandle. "
-                    f"You must use temporalio.nexus.start_workflow "
+                    f"Expected {handle} to be a nexus.WorkflowHandle, but got a client.WorkflowHandle. "
+                    f"You must use WorkflowRunOperationContext.start_workflow "
                     "to start a workflow that will deliver the result of the Nexus operation, "
                     "not client.Client.start_workflow."
                 )
             raise RuntimeError(
-                f"Expected {handle} to be a WorkflowOperationToken, but got {type(handle)}. "
+                f"Expected {handle} to be a nexus.WorkflowHandle, but got {type(handle)}. "
             )
         return StartOperationResultAsync(handle.to_token())
 
