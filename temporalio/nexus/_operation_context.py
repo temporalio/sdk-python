@@ -7,6 +7,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import (
     Any,
+    Callable,
     Optional,
     Union,
 )
@@ -16,16 +17,39 @@ from nexusrpc.handler import CancelOperationContext, StartOperationContext
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
+import temporalio.client
 import temporalio.common
-from temporalio import client
 
 logger = logging.getLogger(__name__)
 
-# TODO(nexus-prerelease): Confirm how exactly we want to expose Temporal Nexus operation context
-
-temporal_operation_context: ContextVar[_TemporalNexusOperationContext] = ContextVar(
+_temporal_operation_context: ContextVar[_TemporalNexusOperationContext] = ContextVar(
     "temporal-operation-context"
 )
+
+
+@dataclass(frozen=True)
+class Info:
+    """Information about the running Nexus operation.
+
+    Retrieved inside a Nexus operation handler via :py:func:`info`.
+    """
+
+    task_queue: str
+    """The task queue of the worker handling this Nexus operation."""
+
+
+def info() -> Info:
+    """
+    Get the current Nexus operation information.
+    """
+    return _TemporalNexusOperationContext.get().info()
+
+
+def client() -> temporalio.client.Client:
+    """
+    Get the Temporal client used by the worker handling the current Nexus operation.
+    """
+    return _TemporalNexusOperationContext.get().client
 
 
 @dataclass
@@ -34,13 +58,20 @@ class _TemporalNexusOperationContext:
     Context for a Nexus operation being handled by a Temporal Nexus Worker.
     """
 
+    info: Callable[[], Info]
+    """Information about the running Nexus operation."""
+
     nexus_operation_context: Union[StartOperationContext, CancelOperationContext]
 
-    client: client.Client
+    client: temporalio.client.Client
     """The Temporal client in use by the worker handling this Nexus operation."""
 
-    task_queue: str
-    """The task queue of the worker handling this Nexus operation."""
+    @classmethod
+    def get(cls) -> _TemporalNexusOperationContext:
+        ctx = _temporal_operation_context.get(None)
+        if ctx is None:
+            raise RuntimeError("Not in Nexus operation context.")
+        return ctx
 
     @property
     def _temporal_start_operation_context(
@@ -67,7 +98,7 @@ class _TemporalStartOperationContext:
 
     def get_completion_callbacks(
         self,
-    ) -> list[client.NexusCompletionCallback]:
+    ) -> list[temporalio.client.NexusCompletionCallback]:
         ctx = self.nexus_operation_context
         return (
             [
@@ -76,7 +107,7 @@ class _TemporalStartOperationContext:
                 # StartWorkflowRequest.CompletionCallbacks and to StartWorkflowRequest.Links
                 # (for backwards compatibility). PR reference in Go SDK:
                 # https://github.com/temporalio/sdk-go/pull/1945
-                client.NexusCompletionCallback(
+                temporalio.client.NexusCompletionCallback(
                     url=ctx.callback_url,
                     header=ctx.callback_headers,
                 )
@@ -94,7 +125,9 @@ class _TemporalStartOperationContext:
                 event_links.append(link)
         return event_links
 
-    def add_outbound_links(self, workflow_handle: client.WorkflowHandle[Any, Any]):
+    def add_outbound_links(
+        self, workflow_handle: temporalio.client.WorkflowHandle[Any, Any]
+    ):
         try:
             link = _workflow_event_to_nexus_link(
                 _workflow_handle_to_workflow_execution_started_event_link(
@@ -124,7 +157,7 @@ class _TemporalCancelOperationContext:
 
 
 def _workflow_handle_to_workflow_execution_started_event_link(
-    handle: client.WorkflowHandle[Any, Any],
+    handle: temporalio.client.WorkflowHandle[Any, Any],
 ) -> temporalio.api.common.v1.Link.WorkflowEvent:
     if handle.first_execution_run_id is None:
         raise ValueError(
