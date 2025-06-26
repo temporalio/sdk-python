@@ -10,13 +10,13 @@ from typing import (
     Callable,
     Optional,
     Type,
+    TypeVar,
     Union,
 )
 
-from nexusrpc.types import (
+from nexusrpc import (
     InputT,
     OutputT,
-    ServiceHandlerT,
 )
 
 from temporalio.nexus._operation_context import WorkflowRunOperationContext
@@ -24,6 +24,8 @@ from temporalio.nexus._operation_context import WorkflowRunOperationContext
 from ._token import (
     WorkflowHandle as WorkflowHandle,
 )
+
+ServiceHandlerT = TypeVar("ServiceHandlerT")
 
 
 def get_workflow_run_start_method_input_and_output_type_annotations(
