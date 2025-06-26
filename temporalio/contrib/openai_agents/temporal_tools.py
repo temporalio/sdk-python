@@ -1,5 +1,6 @@
 """Support for using Temporal activities as OpenAI agents tools."""
 
+import json
 from datetime import timedelta
 from typing import Any, Callable, Optional
 
@@ -69,32 +70,37 @@ def activity_as_tool(
             "Bare function without tool and activity decorators is not supported",
             "invalid_tool",
         )
+    schema = function_schema(fn)
 
     async def run_activity(ctx: RunContextWrapper[Any], input: str) -> Any:
+        json_data = json.loads(input)
+        args, kwargs_dict = schema.to_call_args(
+            schema.params_pydantic_model(**json_data)
+        )
+
+        result = await workflow.execute_activity(
+            fn,
+            *args,
+            **kwargs_dict,
+            task_queue=task_queue,
+            schedule_to_close_timeout=schedule_to_close_timeout,
+            schedule_to_start_timeout=schedule_to_start_timeout,
+            start_to_close_timeout=start_to_close_timeout,
+            heartbeat_timeout=heartbeat_timeout,
+            retry_policy=retry_policy,
+            cancellation_type=cancellation_type,
+            activity_id=activity_id,
+            versioning_intent=versioning_intent,
+            summary=summary,
+            priority=priority,
+        )
         try:
-            return str(
-                await workflow.execute_activity(
-                    fn,
-                    input,
-                    task_queue=task_queue,
-                    schedule_to_close_timeout=schedule_to_close_timeout,
-                    schedule_to_start_timeout=schedule_to_start_timeout,
-                    start_to_close_timeout=start_to_close_timeout,
-                    heartbeat_timeout=heartbeat_timeout,
-                    retry_policy=retry_policy,
-                    cancellation_type=cancellation_type,
-                    activity_id=activity_id,
-                    versioning_intent=versioning_intent,
-                    summary=summary,
-                    priority=priority,
-                )
-            )
+            return str(result)
         except Exception:
             raise ApplicationError(
                 "You must return a string representation of the tool output, or something we can call str() on"
             )
 
-    schema = function_schema(fn)
     return FunctionTool(
         name=schema.name,
         description=schema.description or "",
