@@ -13,6 +13,7 @@ import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
 import temporalio.api.cloud.resource.v1.message_pb2
+import temporalio.api.common.v1.message_pb2
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -27,6 +28,7 @@ class EndpointSpec(google.protobuf.message.Message):
     NAME_FIELD_NUMBER: builtins.int
     TARGET_SPEC_FIELD_NUMBER: builtins.int
     POLICY_SPECS_FIELD_NUMBER: builtins.int
+    DESCRIPTION_DEPRECATED_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
     name: builtins.str
     """The name of the endpoint. Must be unique within an account.
@@ -46,8 +48,15 @@ class EndpointSpec(google.protobuf.message.Message):
         must match with at least one of the specs to be accepted by the endpoint.
         This field is mutable.
         """
-    description: builtins.str
-    """The markdown description of the endpoint - optional."""
+    description_deprecated: builtins.str
+    """Deprecated: Not supported after v0.4.0 api version. Use description instead.
+    temporal:versioning:max_version=v0.4.0
+    """
+    @property
+    def description(self) -> temporalio.api.common.v1.message_pb2.Payload:
+        """The markdown description of the endpoint - optional.
+        temporal:versioning:min_version=v0.4.0
+        """
     def __init__(
         self,
         *,
@@ -55,16 +64,22 @@ class EndpointSpec(google.protobuf.message.Message):
         target_spec: global___EndpointTargetSpec | None = ...,
         policy_specs: collections.abc.Iterable[global___EndpointPolicySpec]
         | None = ...,
-        description: builtins.str = ...,
+        description_deprecated: builtins.str = ...,
+        description: temporalio.api.common.v1.message_pb2.Payload | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["target_spec", b"target_spec"]
+        self,
+        field_name: typing_extensions.Literal[
+            "description", b"description", "target_spec", b"target_spec"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
             "description",
             b"description",
+            "description_deprecated",
+            b"description_deprecated",
             "name",
             b"name",
             "policy_specs",
