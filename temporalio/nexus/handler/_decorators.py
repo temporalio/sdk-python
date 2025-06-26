@@ -22,6 +22,7 @@ from temporalio.nexus.handler._token import (
     WorkflowOperationToken,
 )
 from temporalio.nexus.handler._util import (
+    get_callable_name,
     get_workflow_run_start_method_input_and_output_type_annotations,
 )
 
@@ -112,10 +113,11 @@ def workflow_run_operation_handler(
             _start.__doc__ = start.__doc__
             return WorkflowRunOperationHandler(_start, input_type, output_type)
 
+        method_name = get_callable_name(start)
         # TODO(preview): make double-underscore attrs private to nexusrpc and expose getters/setters
         operation_handler_factory.__nexus_operation__ = nexusrpc.Operation(
-            name=name or start.__name__,
-            method_name=start.__name__,
+            name=name or method_name,
+            method_name=method_name,
             input_type=input_type,
             output_type=output_type,
         )
