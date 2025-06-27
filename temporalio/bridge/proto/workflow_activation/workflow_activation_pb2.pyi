@@ -1302,13 +1302,13 @@ class ResolveNexusOperationStart(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SEQ_FIELD_NUMBER: builtins.int
-    OPERATION_ID_FIELD_NUMBER: builtins.int
+    OPERATION_TOKEN_FIELD_NUMBER: builtins.int
     STARTED_SYNC_FIELD_NUMBER: builtins.int
     CANCELLED_BEFORE_START_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Sequence number as provided by lang in the corresponding ScheduleNexusOperation command"""
-    operation_id: builtins.str
-    """The operation started asynchronously. Contains an ID that can be used to perform
+    operation_token: builtins.str
+    """The operation started asynchronously. Contains a token that can be used to perform
     operations on the started operation by, ex, clients. A `ResolveNexusOperation` job will
     follow at some point.
     """
@@ -1326,7 +1326,7 @@ class ResolveNexusOperationStart(google.protobuf.message.Message):
         self,
         *,
         seq: builtins.int = ...,
-        operation_id: builtins.str = ...,
+        operation_token: builtins.str = ...,
         started_sync: builtins.bool = ...,
         cancelled_before_start: temporalio.api.failure.v1.message_pb2.Failure
         | None = ...,
@@ -1336,8 +1336,8 @@ class ResolveNexusOperationStart(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "cancelled_before_start",
             b"cancelled_before_start",
-            "operation_id",
-            b"operation_id",
+            "operation_token",
+            b"operation_token",
             "started_sync",
             b"started_sync",
             "status",
@@ -1349,8 +1349,8 @@ class ResolveNexusOperationStart(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "cancelled_before_start",
             b"cancelled_before_start",
-            "operation_id",
-            b"operation_id",
+            "operation_token",
+            b"operation_token",
             "seq",
             b"seq",
             "started_sync",
@@ -1363,7 +1363,7 @@ class ResolveNexusOperationStart(google.protobuf.message.Message):
         self, oneof_group: typing_extensions.Literal["status", b"status"]
     ) -> (
         typing_extensions.Literal[
-            "operation_id", "started_sync", "cancelled_before_start"
+            "operation_token", "started_sync", "cancelled_before_start"
         ]
         | None
     ): ...
