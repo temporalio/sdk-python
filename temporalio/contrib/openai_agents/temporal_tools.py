@@ -6,12 +6,15 @@ from typing import Any, Callable, Optional
 
 from temporalio import activity, workflow
 from temporalio.common import Priority, RetryPolicy
-from temporalio.exceptions import ApplicationError
+from temporalio.exceptions import ApplicationError, FailureError
 from temporalio.workflow import ActivityCancellationType, VersioningIntent, unsafe
 
 with unsafe.imports_passed_through():
     from agents import FunctionTool, RunContextWrapper, Tool
     from agents.function_schema import function_schema
+
+class ToolSerializationError(FailureError):
+    """Error that occurs when a tool output could not be serialized."""
 
 
 def activity_as_tool(
@@ -100,7 +103,7 @@ def activity_as_tool(
         try:
             return str(result)
         except Exception as e:
-            raise ApplicationError(
+            raise ToolSerializationError(
                 "You must return a string representation of the tool output, or something we can call str() on"
             ) from e
 
