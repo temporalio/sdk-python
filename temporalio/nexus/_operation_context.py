@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 import re
 import urllib.parse
@@ -168,17 +169,28 @@ class TemporalStartOperationContext:
         return workflow_handle
 
 
-@dataclass
-class WorkflowRunOperationContext:
-    temporal_context: TemporalStartOperationContext
+@dataclass(frozen=True)
+class WorkflowRunOperationContext(StartOperationContext):
+    _temporal_context: Optional[TemporalStartOperationContext] = None
+
+    @property
+    def temporal_context(self) -> TemporalStartOperationContext:
+        if not self._temporal_context:
+            raise RuntimeError("Temporal context not set")
+        return self._temporal_context
 
     @property
     def nexus_context(self) -> StartOperationContext:
         return self.temporal_context.nexus_context
 
     @classmethod
-    def get(cls) -> WorkflowRunOperationContext:
-        return cls(TemporalStartOperationContext.get())
+    def from_start_operation_context(
+        cls, ctx: StartOperationContext
+    ) -> WorkflowRunOperationContext:
+        return cls(
+            _temporal_context=TemporalStartOperationContext.get(),
+            **{f.name: getattr(ctx, f.name) for f in dataclasses.fields(ctx)},
+        )
 
     # Overload for single-param workflow
     # TODO(nexus-prerelease): bring over other overloads
