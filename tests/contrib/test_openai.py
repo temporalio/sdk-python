@@ -1,3 +1,4 @@
+import os
 import sys
 import uuid
 from dataclasses import dataclass
@@ -19,6 +20,9 @@ from temporalio.contrib.openai_agents.temporal_openai_agents import (
     set_open_ai_agent_temporal_overrides,
 )
 from temporalio.contrib.openai_agents.temporal_tools import activity_as_tool
+from temporalio.contrib.openai_agents.trace_interceptor import (
+    OpenAIAgentsTracingInterceptor,
+)
 from tests.helpers import new_worker
 
 with workflow.unsafe.imports_passed_through():
@@ -167,6 +171,32 @@ async def test_hello_world_agent(client: Client):
             assert result == "test"
 
 
+async def test_end_to_end(client: Client):
+    if "OPENAI_API_KEY" not in os.environ:
+        pytest.skip("No openai API key")
+
+    new_config = client.config()
+    new_config["data_converter"] = open_ai_data_converter
+    client = Client(**new_config)
+
+    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=10))
+    with set_open_ai_agent_temporal_overrides(model_params):
+        async with new_worker(
+            client,
+            HelloWorldAgent,
+            activities=[ModelActivity().invoke_model_activity],
+            interceptors=[OpenAIAgentsTracingInterceptor()],
+        ) as worker:
+            result = await client.execute_workflow(
+                HelloWorldAgent.run,
+                "Tell me about recursion in programming. Include the word 'function'",
+                id=f"hello-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+            assert "function" in result.lower()
+
+
 @dataclass
 class Weather:
     city: str
@@ -225,7 +255,7 @@ class ToolsWorkflow:
     @workflow.run
     async def run(self, question: str) -> str:
         agent = Agent(
-            name="Hello world",
+            name="Tools Workflow",
             instructions="You are a helpful agent.",
             tools=[
                 activity_as_tool(
@@ -255,6 +285,7 @@ async def test_tool_workflow(client: Client):
             client,
             ToolsWorkflow,
             activities=[model_activity.invoke_model_activity, get_weather],
+            interceptors=[OpenAIAgentsTracingInterceptor()],
         ) as worker:
             workflow_handle = await client.start_workflow(
                 ToolsWorkflow.run,
@@ -476,6 +507,7 @@ async def test_research_workflow(client: Client):
             client,
             ResearchWorkflow,
             activities=[model_activity.invoke_model_activity, get_weather],
+            interceptors=[OpenAIAgentsTracingInterceptor()],
         ) as worker:
             workflow_handle = await client.start_workflow(
                 ResearchWorkflow.run,
@@ -686,6 +718,7 @@ async def test_agents_as_tools_workflow(client: Client):
             client,
             AgentsAsToolsWorkflow,
             activities=[model_activity.invoke_model_activity],
+            interceptors=[OpenAIAgentsTracingInterceptor()],
         ) as worker:
             workflow_handle = await client.start_workflow(
                 AgentsAsToolsWorkflow.run,
@@ -1043,6 +1076,7 @@ async def test_customer_service_workflow(client: Client):
             client,
             CustomerServiceWorkflow,
             activities=[model_activity.invoke_model_activity],
+            interceptors=[OpenAIAgentsTracingInterceptor()],
         ) as worker:
             workflow_handle = await client.start_workflow(
                 CustomerServiceWorkflow.run,
