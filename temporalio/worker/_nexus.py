@@ -341,6 +341,8 @@ class _NexusWorker:
         self,
         err: nexusrpc.OperationError,
     ) -> temporalio.api.nexus.v1.UnsuccessfulOperationError:
+        # TODO(nexus-prerelease): why are we accessing __cause__ here for OperationError
+        # and not for HandlerError?
         cause = err.__cause__
         if cause is None:
             cause = Exception(*err.args).with_traceback(err.__traceback__)
