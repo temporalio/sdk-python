@@ -15,6 +15,7 @@ from nexusrpc.handler import (
 )
 from nexusrpc.types import InputT, OutputT, ServiceHandlerT
 
+from temporalio.nexus._operation_context import WorkflowRunOperationContext
 from temporalio.nexus._operation_handlers import (
     WorkflowRunOperationHandler,
 )
@@ -25,7 +26,6 @@ from temporalio.nexus._util import (
     get_callable_name,
     get_workflow_run_start_method_input_and_output_type_annotations,
 )
-from temporalio.nexus._workflow import WorkflowRunOperationContext
 
 
 @overload
