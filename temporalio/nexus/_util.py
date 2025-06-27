@@ -19,7 +19,7 @@ from nexusrpc.types import (
     ServiceHandlerT,
 )
 
-from temporalio.nexus._workflow import WorkflowRunOperationContext
+from temporalio.nexus._operation_context import WorkflowRunOperationContext
 
 from ._token import (
     WorkflowHandle as WorkflowHandle,
