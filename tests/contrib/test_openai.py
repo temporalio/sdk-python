@@ -30,7 +30,9 @@ with workflow.unsafe.imports_passed_through():
     from agents import (
         Agent,
         AgentOutputSchemaBase,
+        GuardrailFunctionOutput,
         Handoff,
+        InputGuardrailTripwireTriggered,
         ItemHelpers,
         MessageOutputItem,
         Model,
@@ -39,6 +41,7 @@ with workflow.unsafe.imports_passed_through():
         ModelSettings,
         ModelTracing,
         OpenAIResponsesModel,
+        OutputGuardrailTripwireTriggered,
         RunContextWrapper,
         Runner,
         Tool,
@@ -46,12 +49,9 @@ with workflow.unsafe.imports_passed_through():
         Usage,
         function_tool,
         handoff,
-        trace,
         input_guardrail,
-        GuardrailFunctionOutput,
-        InputGuardrailTripwireTriggered,
         output_guardrail,
-        OutputGuardrailTripwireTriggered,
+        trace,
     )
     from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
     from agents.items import (
@@ -1285,7 +1285,7 @@ class MathHomeworkOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-guardrail_agent = Agent(
+guardrail_agent: Agent = Agent(
     name="Guardrail check",
     instructions="Check if the user is asking you to do their math homework.",
     output_type=MathHomeworkOutput,
