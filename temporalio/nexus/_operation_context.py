@@ -35,7 +35,7 @@ from temporalio.types import (
 # CancelOperationContext and passes it as the first parameter to the nexusrpc operation
 # handler. In addition, it sets one of the following context vars.
 
-_temporal_start_operation_context: ContextVar[_TemporalStartOperationContext] = (
+_temporal_start_operation_context: ContextVar[TemporalStartOperationContext] = (
     ContextVar("temporal-start-operation-context")
 )
 
@@ -70,7 +70,7 @@ def client() -> temporalio.client.Client:
 
 
 def _temporal_context() -> (
-    Union[_TemporalStartOperationContext, _TemporalCancelOperationContext]
+    Union[TemporalStartOperationContext, _TemporalCancelOperationContext]
 ):
     ctx = _try_temporal_context()
     if ctx is None:
@@ -79,7 +79,7 @@ def _temporal_context() -> (
 
 
 def _try_temporal_context() -> (
-    Optional[Union[_TemporalStartOperationContext, _TemporalCancelOperationContext]]
+    Optional[Union[TemporalStartOperationContext, _TemporalCancelOperationContext]]
 ):
     start_ctx = _temporal_start_operation_context.get(None)
     cancel_ctx = _temporal_cancel_operation_context.get(None)
@@ -89,7 +89,7 @@ def _try_temporal_context() -> (
 
 
 @dataclass
-class _TemporalStartOperationContext:
+class TemporalStartOperationContext:
     """
     Context for a Nexus start operation being handled by a Temporal Nexus Worker.
     """
@@ -104,7 +104,7 @@ class _TemporalStartOperationContext:
     """The Temporal client in use by the worker handling this Nexus operation."""
 
     @classmethod
-    def get(cls) -> _TemporalStartOperationContext:
+    def get(cls) -> TemporalStartOperationContext:
         ctx = _temporal_start_operation_context.get(None)
         if ctx is None:
             raise RuntimeError("Not in Nexus operation context.")
@@ -170,7 +170,7 @@ class _TemporalStartOperationContext:
 
 @dataclass
 class WorkflowRunOperationContext:
-    temporal_context: _TemporalStartOperationContext
+    temporal_context: TemporalStartOperationContext
 
     @property
     def nexus_context(self) -> StartOperationContext:
@@ -178,7 +178,7 @@ class WorkflowRunOperationContext:
 
     @classmethod
     def get(cls) -> WorkflowRunOperationContext:
-        return cls(_TemporalStartOperationContext.get())
+        return cls(TemporalStartOperationContext.get())
 
     # Overload for single-param workflow
     # TODO(nexus-prerelease): bring over other overloads
