@@ -30,7 +30,6 @@ from temporalio.types import (
     SelfType,
 )
 
-logger = logging.getLogger(__name__)
 
 _temporal_operation_context: ContextVar[_TemporalNexusOperationContext] = ContextVar(
     "temporal-operation-context"
@@ -367,3 +366,23 @@ def _nexus_link_to_workflow_event(
         run_id=urllib.parse.unquote(groups["run_id"]),
         event_ref=event_ref,
     )
+
+
+class _LoggerAdapter(logging.LoggerAdapter):
+    def __init__(self, logger: logging.Logger, extra: Optional[Mapping[str, Any]]):
+        super().__init__(logger, extra or {})
+
+    def process(
+        self, msg: Any, kwargs: MutableMapping[str, Any]
+    ) -> tuple[Any, MutableMapping[str, Any]]:
+        extra = dict(self.extra or {})
+        if tctx := _temporal_operation_context.get(None):
+            extra["service"] = tctx.nexus_operation_context.service
+            extra["operation"] = tctx.nexus_operation_context.operation
+            extra["task_queue"] = tctx.info().task_queue
+        kwargs["extra"] = extra | kwargs.get("extra", {})
+        return msg, kwargs
+
+
+logger = _LoggerAdapter(logging.getLogger("temporalio.nexus"), None)
+"""Logger that emits additional data describing the current Nexus operation."""
