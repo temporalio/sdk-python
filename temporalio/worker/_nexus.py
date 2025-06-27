@@ -34,8 +34,8 @@ import temporalio.nexus
 from temporalio.exceptions import ApplicationError
 from temporalio.nexus import (
     Info,
-    _temporal_operation_context,
-    _TemporalNexusOperationContext,
+    _TemporalCancelOperationContext,
+    _TemporalStartOperationContext,
     logger,
 )
 from temporalio.service import RPCError, RPCStatusCode
@@ -175,13 +175,11 @@ class _NexusWorker:
             operation=request.operation,
             headers=headers,
         )
-        _temporal_operation_context.set(
-            _TemporalNexusOperationContext(
-                info=lambda: Info(task_queue=self._task_queue),
-                nexus_operation_context=ctx,
-                client=self._client,
-            )
-        )
+        _TemporalCancelOperationContext(
+            info=lambda: Info(task_queue=self._task_queue),
+            nexus_context=ctx,
+            client=self._client,
+        ).set()
         try:
             await self._handler.cancel_operation(ctx, request.operation_token)
         except Exception as err:
@@ -271,13 +269,11 @@ class _NexusWorker:
             ],
             callback_headers=dict(start_request.callback_header),
         )
-        _temporal_operation_context.set(
-            _TemporalNexusOperationContext(
-                nexus_operation_context=ctx,
-                client=self._client,
-                info=lambda: Info(task_queue=self._task_queue),
-            )
-        )
+        _TemporalStartOperationContext(
+            nexus_context=ctx,
+            client=self._client,
+            info=lambda: Info(task_queue=self._task_queue),
+        ).set()
         input = LazyValue(
             serializer=_DummyPayloadSerializer(
                 data_converter=self._data_converter,
