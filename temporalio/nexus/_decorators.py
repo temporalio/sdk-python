@@ -17,7 +17,6 @@ from nexusrpc.handler import (
 )
 
 from temporalio.nexus._operation_context import (
-    TemporalStartOperationContext,
     WorkflowRunOperationContext,
 )
 from temporalio.nexus._operation_handlers import (
@@ -115,8 +114,11 @@ def workflow_run_operation(
             async def _start(
                 ctx: StartOperationContext, input: InputT
             ) -> WorkflowHandle[OutputT]:
-                tctx = TemporalStartOperationContext.get()
-                return await start(self, WorkflowRunOperationContext(tctx), input)
+                return await start(
+                    self,
+                    WorkflowRunOperationContext.from_start_operation_context(ctx),
+                    input,
+                )
 
             _start.__doc__ = start.__doc__
             return WorkflowRunOperationHandler(_start, input_type, output_type)
