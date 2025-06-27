@@ -4,10 +4,10 @@ from ._operation_context import (
     WorkflowRunOperationContext as WorkflowRunOperationContext,
 )
 from ._operation_context import (
-    _temporal_operation_context as _temporal_operation_context,
+    _TemporalCancelOperationContext as _TemporalCancelOperationContext,
 )
 from ._operation_context import (
-    _TemporalNexusOperationContext as _TemporalNexusOperationContext,
+    _TemporalStartOperationContext as _TemporalStartOperationContext,
 )
 from ._operation_context import client as client
 from ._operation_context import info as info
