@@ -422,7 +422,7 @@ class TestResearchModel(TestModel):
                             text='{"searches":[{"query":"best Caribbean surfing spots April","reason":"Identify locations with optimal surfing conditions in the Caribbean during April."},{"query":"top Caribbean islands for hiking April","reason":"Find Caribbean islands with excellent hiking opportunities that are ideal in April."},{"query":"Caribbean water sports destinations April","reason":"Locate Caribbean destinations offering a variety of water sports activities in April."},{"query":"surfing conditions Caribbean April","reason":"Understand the surfing conditions and which islands are suitable for surfing in April."},{"query":"Caribbean adventure travel hiking surfing","reason":"Explore adventure travel options that combine hiking and surfing in the Caribbean."},{"query":"best beaches for surfing Caribbean April","reason":"Identify which Caribbean beaches are renowned for surfing in April."},{"query":"Caribbean islands with national parks hiking","reason":"Find islands with national parks or reserves that offer hiking trails."},{"query":"Caribbean weather April surfing conditions","reason":"Research the weather conditions in April affecting surfing in the Caribbean."},{"query":"Caribbean water sports rentals April","reason":"Look for places where water sports equipment can be rented in the Caribbean during April."},{"query":"Caribbean multi-activity vacation packages","reason":"Look for vacation packages that offer a combination of surfing, hiking, and water sports."}]}',
                             annotations=[],
                             type="output_text",
-                        )  # type: ignore
+                        )
                     ],
                     role="assistant",
                     status="completed",
@@ -440,8 +440,9 @@ class TestResearchModel(TestModel):
                     ResponseFunctionWebSearch(
                         id="",
                         status="completed",
-                        action=ActionSearch(query="", type="search"),  # type: ignore
-                    ),  # type: ignore
+                        type="web_search_call",
+                        action=ActionSearch(query="", type="search"),
+                    ),
                     ResponseOutputMessage(
                         id="",
                         content=[
