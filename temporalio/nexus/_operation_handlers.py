@@ -26,7 +26,7 @@ from nexusrpc.handler import (
 
 from temporalio import client
 from temporalio.nexus._operation_context import (
-    _temporal_start_operation_context,
+    _temporal_cancel_operation_context,
 )
 from temporalio.nexus._token import WorkflowHandle
 
@@ -105,27 +105,27 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         )
         # An implementation is provided for future reference:
         # TODO: honor `wait` param and Request-Timeout header
-        try:
-            nexus_handle = WorkflowHandle[OutputT].from_token(token)
-        except Exception as err:
-            raise HandlerError(
-                "Failed to decode operation token as workflow operation token. "
-                "Fetching result for non-workflow operations is not supported.",
-                type=HandlerErrorType.NOT_FOUND,
-                cause=err,
-            )
-        ctx = _temporal_start_operation_context.get()
-        try:
-            client_handle = nexus_handle.to_workflow_handle(
-                ctx.client, result_type=self._output_type
-            )
-        except Exception as err:
-            raise HandlerError(
-                "Failed to construct workflow handle from workflow operation token",
-                type=HandlerErrorType.NOT_FOUND,
-                cause=err,
-            )
-        return await client_handle.result()
+        # try:
+        #     nexus_handle = WorkflowHandle[OutputT].from_token(token)
+        # except Exception as err:
+        #     raise HandlerError(
+        #         "Failed to decode operation token as workflow operation token. "
+        #         "Fetching result for non-workflow operations is not supported.",
+        #         type=HandlerErrorType.NOT_FOUND,
+        #         cause=err,
+        #     )
+        # ctx = _temporal_fetch_operation_context.get()
+        # try:
+        #     client_handle = nexus_handle.to_workflow_handle(
+        #         ctx.client, result_type=self._output_type
+        #     )
+        # except Exception as err:
+        #     raise HandlerError(
+        #         "Failed to construct workflow handle from workflow operation token",
+        #         type=HandlerErrorType.NOT_FOUND,
+        #         cause=err,
+        #     )
+        # return await client_handle.result()
 
 
 async def cancel_operation(
@@ -148,7 +148,7 @@ async def cancel_operation(
             cause=err,
         )
 
-    ctx = _temporal_start_operation_context.get()
+    ctx = _temporal_cancel_operation_context.get()
     try:
         client_workflow_handle = nexus_workflow_handle._to_client_workflow_handle(
             ctx.client
