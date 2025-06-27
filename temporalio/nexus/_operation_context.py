@@ -36,7 +36,7 @@ from temporalio.types import (
 # CancelOperationContext and passes it as the first parameter to the nexusrpc operation
 # handler. In addition, it sets one of the following context vars.
 
-_temporal_start_operation_context: ContextVar[TemporalStartOperationContext] = (
+_temporal_start_operation_context: ContextVar[_TemporalStartOperationContext] = (
     ContextVar("temporal-start-operation-context")
 )
 
@@ -71,7 +71,7 @@ def client() -> temporalio.client.Client:
 
 
 def _temporal_context() -> (
-    Union[TemporalStartOperationContext, _TemporalCancelOperationContext]
+    Union[_TemporalStartOperationContext, _TemporalCancelOperationContext]
 ):
     ctx = _try_temporal_context()
     if ctx is None:
@@ -80,7 +80,7 @@ def _temporal_context() -> (
 
 
 def _try_temporal_context() -> (
-    Optional[Union[TemporalStartOperationContext, _TemporalCancelOperationContext]]
+    Optional[Union[_TemporalStartOperationContext, _TemporalCancelOperationContext]]
 ):
     start_ctx = _temporal_start_operation_context.get(None)
     cancel_ctx = _temporal_cancel_operation_context.get(None)
@@ -90,7 +90,7 @@ def _try_temporal_context() -> (
 
 
 @dataclass
-class TemporalStartOperationContext:
+class _TemporalStartOperationContext:
     """
     Context for a Nexus start operation being handled by a Temporal Nexus Worker.
     """
@@ -105,7 +105,7 @@ class TemporalStartOperationContext:
     """The Temporal client in use by the worker handling this Nexus operation."""
 
     @classmethod
-    def get(cls) -> TemporalStartOperationContext:
+    def get(cls) -> _TemporalStartOperationContext:
         ctx = _temporal_start_operation_context.get(None)
         if ctx is None:
             raise RuntimeError("Not in Nexus operation context.")
@@ -171,10 +171,10 @@ class TemporalStartOperationContext:
 
 @dataclass(frozen=True)
 class WorkflowRunOperationContext(StartOperationContext):
-    _temporal_context: Optional[TemporalStartOperationContext] = None
+    _temporal_context: Optional[_TemporalStartOperationContext] = None
 
     @property
-    def temporal_context(self) -> TemporalStartOperationContext:
+    def temporal_context(self) -> _TemporalStartOperationContext:
         if not self._temporal_context:
             raise RuntimeError("Temporal context not set")
         return self._temporal_context
@@ -188,7 +188,7 @@ class WorkflowRunOperationContext(StartOperationContext):
         cls, ctx: StartOperationContext
     ) -> WorkflowRunOperationContext:
         return cls(
-            _temporal_context=TemporalStartOperationContext.get(),
+            _temporal_context=_TemporalStartOperationContext.get(),
             **{f.name: getattr(ctx, f.name) for f in dataclasses.fields(ctx)},
         )
 
