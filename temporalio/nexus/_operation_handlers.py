@@ -104,6 +104,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
             "Temporal Nexus operation handlers do not support fetching the operation result."
         )
         # An implementation is provided for future reference:
+        # TODO: honor `wait` param and Request-Timeout header
         try:
             nexus_handle = WorkflowHandle[OutputT].from_token(token)
         except Exception as err:
