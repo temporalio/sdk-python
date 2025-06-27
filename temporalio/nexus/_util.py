@@ -19,7 +19,7 @@ from nexusrpc import (
     OutputT,
 )
 
-from temporalio.nexus._operation_context import TemporalStartOperationContext
+from temporalio.nexus._operation_context import WorkflowRunOperationContext
 
 from ._token import (
     WorkflowHandle as WorkflowHandle,
@@ -30,7 +30,7 @@ ServiceHandlerT = TypeVar("ServiceHandlerT")
 
 def get_workflow_run_start_method_input_and_output_type_annotations(
     start: Callable[
-        [ServiceHandlerT, TemporalStartOperationContext, InputT],
+        [ServiceHandlerT, WorkflowRunOperationContext, InputT],
         Awaitable[WorkflowHandle[OutputT]],
     ],
 ) -> tuple[
@@ -70,7 +70,7 @@ def get_workflow_run_start_method_input_and_output_type_annotations(
 
 def _get_start_method_input_and_output_type_annotations(
     start: Callable[
-        [ServiceHandlerT, TemporalStartOperationContext, InputT],
+        [ServiceHandlerT, WorkflowRunOperationContext, InputT],
         Union[OutputT, Awaitable[OutputT]],
     ],
 ) -> tuple[
@@ -102,11 +102,11 @@ def _get_start_method_input_and_output_type_annotations(
         input_type = None
     else:
         ctx_type, input_type = type_annotations.values()
-        if not issubclass(ctx_type, TemporalStartOperationContext):
+        if not issubclass(ctx_type, WorkflowRunOperationContext):
             # TODO(preview): stacklevel
             warnings.warn(
                 f"Expected first parameter of {start} to be an instance of "
-                f"TemporalStartOperationContext, but is {ctx_type}."
+                f"WorkflowRunOperationContext, but is {ctx_type}."
             )
             input_type = None
 
