@@ -1296,7 +1296,7 @@ guardrail_agent: Agent = Agent(
 async def math_guardrail(
     context: RunContextWrapper[None],
     agent: Agent,
-    input: str | list[TResponseInputItem],
+    input: Union[str, list[TResponseInputItem]],
 ) -> GuardrailFunctionOutput:
     """This is an input guardrail function, which happens to call an agent to check if the input
     is a math homework question.
@@ -1415,7 +1415,7 @@ class MessageOutput(BaseModel):
         description="Thoughts on how to respond to the user's message"
     )
     response: str = Field(description="The response to the user's message")
-    user_name: str | None = Field(
+    user_name: Optional[str] = Field(
         description="The name of the user who sent the message, if known"
     )
     model_config = ConfigDict(extra="forbid")
