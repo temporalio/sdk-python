@@ -9,6 +9,9 @@ from typing import (
 from ._decorators import workflow_run_operation as workflow_run_operation
 from ._operation_context import Info as Info
 from ._operation_context import (
+    WorkflowRunOperationContext as WorkflowRunOperationContext,
+)
+from ._operation_context import (
     _temporal_operation_context as _temporal_operation_context,
 )
 from ._operation_context import (
@@ -18,7 +21,6 @@ from ._operation_context import client as client
 from ._operation_context import info as info
 from ._operation_handlers import cancel_operation as cancel_operation
 from ._token import WorkflowHandle as WorkflowHandle
-from ._workflow import WorkflowRunOperationContext as WorkflowRunOperationContext
 
 
 class LoggerAdapter(logging.LoggerAdapter):
