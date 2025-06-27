@@ -167,6 +167,19 @@ class TemporalStartOperationContext:
             )
         return workflow_handle
 
+
+@dataclass
+class WorkflowRunOperationContext:
+    temporal_context: TemporalStartOperationContext
+
+    @property
+    def nexus_context(self) -> StartOperationContext:
+        return self.temporal_context.nexus_context
+
+    @classmethod
+    def get(cls) -> WorkflowRunOperationContext:
+        return cls(TemporalStartOperationContext.get())
+
     # Overload for single-param workflow
     # TODO(nexus-prerelease): bring over other overloads
     async def start_workflow(
@@ -238,11 +251,11 @@ class TemporalStartOperationContext:
         # We must pass nexus_completion_callbacks, workflow_event_links, and request_id,
         # but these are deliberately not exposed in overloads, hence the type-check
         # violation.
-        wf_handle = await self.client.start_workflow(  # type: ignore
+        wf_handle = await self.temporal_context.client.start_workflow(  # type: ignore
             workflow=workflow,
             arg=arg,
             id=id,
-            task_queue=task_queue or self.info().task_queue,
+            task_queue=task_queue or self.temporal_context.info().task_queue,
             execution_timeout=execution_timeout,
             run_timeout=run_timeout,
             task_timeout=task_timeout,
@@ -262,12 +275,12 @@ class TemporalStartOperationContext:
             request_eager_start=request_eager_start,
             priority=priority,
             versioning_override=versioning_override,
-            nexus_completion_callbacks=self.get_completion_callbacks(),
-            workflow_event_links=self.get_workflow_event_links(),
-            request_id=self.nexus_context.request_id,
+            nexus_completion_callbacks=self.temporal_context.get_completion_callbacks(),
+            workflow_event_links=self.temporal_context.get_workflow_event_links(),
+            request_id=self.temporal_context.nexus_context.request_id,
         )
 
-        self.add_outbound_links(wf_handle)
+        self.temporal_context.add_outbound_links(wf_handle)
 
         return WorkflowHandle[ReturnType]._unsafe_from_client_workflow_handle(wf_handle)
 

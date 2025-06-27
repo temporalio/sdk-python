@@ -45,7 +45,7 @@ from temporalio import nexus, workflow
 from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import ApplicationError
-from temporalio.nexus import TemporalStartOperationContext, workflow_run_operation
+from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import (
@@ -208,7 +208,7 @@ class MyServiceHandler:
 
     @workflow_run_operation
     async def workflow_run_operation_happy_path(
-        self, ctx: TemporalStartOperationContext, input: Input
+        self, ctx: WorkflowRunOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
         return await ctx.start_workflow(
             MyWorkflow.run,
@@ -266,7 +266,7 @@ class MyServiceHandler:
 
     @workflow_run_operation
     async def workflow_run_op_link_test(
-        self, ctx: TemporalStartOperationContext, input: Input
+        self, ctx: WorkflowRunOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
         assert any(
             link.url == "http://inbound-link/"
@@ -1022,7 +1022,7 @@ class EchoWorkflow:
 class ServiceHandlerForRequestIdTest:
     @workflow_run_operation
     async def operation_backed_by_a_workflow(
-        self, ctx: TemporalStartOperationContext, input: Input
+        self, ctx: WorkflowRunOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
         return await ctx.start_workflow(
             EchoWorkflow.run,
@@ -1033,7 +1033,7 @@ class ServiceHandlerForRequestIdTest:
 
     @workflow_run_operation
     async def operation_that_executes_a_workflow_before_starting_the_backing_workflow(
-        self, ctx: TemporalStartOperationContext, input: Input
+        self, ctx: WorkflowRunOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
         await nexus.client().start_workflow(
             EchoWorkflow.run,

@@ -41,7 +41,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
 
     Use this class to create an operation handler that starts a workflow by passing your
     ``start`` method to the constructor. Your ``start`` method must use
-    :py:func:`temporalio.nexus.TemporalStartOperationContext.start_workflow` to start the
+    :py:func:`temporalio.nexus.WorkflowRunOperationContext.start_workflow` to start the
     workflow.
     """
 
@@ -77,7 +77,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
             if isinstance(handle, client.WorkflowHandle):
                 raise RuntimeError(
                     f"Expected {handle} to be a nexus.WorkflowHandle, but got a client.WorkflowHandle. "
-                    f"You must use TemporalStartOperationContext.start_workflow "
+                    f"You must use WorkflowRunOperationContext.start_workflow "
                     "to start a workflow that will deliver the result of the Nexus operation, "
                     "not client.Client.start_workflow."
                 )

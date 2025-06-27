@@ -38,7 +38,7 @@ from temporalio.client import (
 )
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import CancelledError, NexusHandlerError, NexusOperationError
-from temporalio.nexus import TemporalStartOperationContext, workflow_run_operation
+from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
@@ -160,7 +160,7 @@ class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
             # TODO(nexus-preview): what do we want the DX to be for a user who is
             # starting a Nexus backing workflow from a custom start method? (They may
             # need to do this in order to customize the cancel method).
-            handle = await TemporalStartOperationContext.get().start_workflow(
+            handle = await WorkflowRunOperationContext.get().start_workflow(
                 HandlerWorkflow.run,
                 HandlerWfInput(op_input=input),
                 id=input.response_type.operation_workflow_id,
@@ -206,7 +206,7 @@ class ServiceImpl:
 
     @workflow_run_operation
     async def async_operation(
-        self, ctx: TemporalStartOperationContext, input: OpInput
+        self, ctx: WorkflowRunOperationContext, input: OpInput
     ) -> nexus.WorkflowHandle[HandlerWfOutput]:
         assert isinstance(input.response_type, AsyncResponse)
         if input.response_type.exception_in_operation_start:
@@ -912,7 +912,7 @@ class EchoWorkflow:
 class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
     @workflow_run_operation
     async def my_workflow_run_operation(
-        self, ctx: TemporalStartOperationContext, input: None
+        self, ctx: WorkflowRunOperationContext, input: None
     ) -> nexus.WorkflowHandle[str]:
         result_1 = await nexus.client().execute_workflow(
             EchoWorkflow.run,
