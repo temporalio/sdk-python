@@ -49,8 +49,7 @@ class MyOperation(WorkflowRunOperationHandler):
     async def start(
         self, ctx: StartOperationContext, input: Input
     ) -> StartOperationResultAsync:
-        tctx = WorkflowRunOperationContext(ctx)
-        handle = await tctx.start_workflow(
+        handle = await WorkflowRunOperationContext.get().start_workflow(
             EchoWorkflow.run,
             input.value,
             id=str(uuid.uuid4()),
