@@ -157,11 +157,10 @@ class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
         if isinstance(input.response_type, SyncResponse):
             return StartOperationResultSync(value=OpOutput(value="sync response"))
         elif isinstance(input.response_type, AsyncResponse):
-            # TODO(nexus-preview): this is a hack; perhaps it should be should be called
-            # temporalio.nexus.StartOperationContext instead of
-            # WorkflowRunOperationContext.
-            tctx = WorkflowRunOperationContext(ctx)
-            handle = await tctx.start_workflow(
+            # TODO(nexus-preview): what do we want the DX to be for a user who is
+            # starting a Nexus backing workflow from a custom start method? (They may
+            # need to do this in order to customize the cancel method).
+            handle = await WorkflowRunOperationContext.get().start_workflow(
                 HandlerWorkflow.run,
                 HandlerWfInput(op_input=input),
                 id=input.response_type.operation_workflow_id,

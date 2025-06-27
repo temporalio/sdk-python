@@ -26,7 +26,7 @@ from nexusrpc.handler import (
 
 from temporalio import client
 from temporalio.nexus._operation_context import (
-    _temporal_operation_context,
+    _temporal_start_operation_context,
 )
 from temporalio.nexus._token import WorkflowHandle
 
@@ -114,7 +114,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
                 type=HandlerErrorType.NOT_FOUND,
                 cause=err,
             )
-        ctx = _temporal_operation_context.get()
+        ctx = _temporal_start_operation_context.get()
         try:
             client_handle = nexus_handle.to_workflow_handle(
                 ctx.client, result_type=self._output_type
@@ -148,7 +148,7 @@ async def cancel_operation(
             cause=err,
         )
 
-    ctx = _temporal_operation_context.get()
+    ctx = _temporal_start_operation_context.get()
     try:
         client_workflow_handle = nexus_workflow_handle._to_client_workflow_handle(
             ctx.client
