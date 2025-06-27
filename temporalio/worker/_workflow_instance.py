@@ -856,11 +856,10 @@ class _WorkflowInstanceImpl(
             raise RuntimeError(
                 f"Failed to find nexus operation handle for job sequence number {job.seq}"
             )
-        # TODO(dan): change core protos to use operation_token instead of operation_id
-        if job.HasField("operation_id"):
+        if job.HasField("operation_token"):
             # The Nexus operation started asynchronously. A `ResolveNexusOperation` job
             # will follow in a future activation.
-            handle._resolve_start_success(job.operation_id)
+            handle._resolve_start_success(job.operation_token)
         elif job.HasField("started_sync"):
             # The Nexus operation 'started' in the sense that it's already resolved. A
             # `ResolveNexusOperation` job will be in the same activation.
