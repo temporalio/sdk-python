@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any, Callable, Union
+from typing import Any, Callable, Literal, Union
 
 import nexusrpc
 import nexusrpc.handler
@@ -28,6 +28,7 @@ import temporalio.api.nexus
 import temporalio.api.nexus.v1
 import temporalio.api.operatorservice
 import temporalio.api.operatorservice.v1
+import temporalio.exceptions
 from temporalio import nexus, workflow
 from temporalio.client import (
     Client,
@@ -1082,3 +1083,94 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 #         f"{self._result_fut} "
 #         f"Task[{self._task._state}] fut_waiter = {self._task._fut_waiter}) ({self._task._must_cancel})"
 #     )
+
+
+# Handler
+
+ActionInSyncOp = Literal["raise_handler_error", "raise_operation_error"]
+
+
+@dataclass
+class ErrorTestInput:
+    task_queue: str
+    action_in_sync_op: ActionInSyncOp
+
+
+@nexusrpc.handler.service_handler
+class ErrorTestService:
+    @sync_operation
+    async def op(self, ctx: StartOperationContext, input: ErrorTestInput) -> None:
+        if input.action_in_sync_op == "raise_handler_error":
+            raise nexusrpc.handler.HandlerError(
+                "test",
+                type=nexusrpc.handler.HandlerErrorType.INTERNAL,
+            )
+        elif input.action_in_sync_op == "raise_operation_error":
+            raise nexusrpc.OperationError(
+                "test", state=nexusrpc.OperationErrorState.FAILED
+            )
+        else:
+            raise NotImplementedError(
+                f"Unhandled action_in_sync_op: {input.action_in_sync_op}"
+            )
+
+
+# Caller
+
+
+@workflow.defn(sandboxed=False)
+class ErrorTestCallerWorkflow:
+    @workflow.init
+    def __init__(self, input: ErrorTestInput):
+        self.nexus_client = workflow.NexusClient(
+            service=ErrorTestService,
+            endpoint=make_nexus_endpoint_name(input.task_queue),
+        )
+
+    @workflow.run
+    async def run(self, input: ErrorTestInput) -> list[str]:
+        try:
+            await self.nexus_client.execute_operation(
+                # TODO(nexus-preview): why wasn't this a type error?
+                #            ErrorTestService.op, ErrorTestCallerWfInput()
+                ErrorTestService.op,
+                # TODO(nexus-preview): why wasn't this a type error?
+                # None
+                input,
+            )
+        except Exception as err:
+            return [str(type(err).__name__), str(type(err.__cause__).__name__)]
+        assert False, "Unreachable"
+
+
+@pytest.mark.parametrize(
+    "action_in_sync_op", ["raise_handler_error", "raise_operation_error"]
+)
+async def test_errors_raised_by_nexus_operation(
+    client: Client, action_in_sync_op: ActionInSyncOp
+):
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client,
+        nexus_service_handlers=[ErrorTestService()],
+        workflows=[ErrorTestCallerWorkflow],
+        task_queue=task_queue,
+    ):
+        await create_nexus_endpoint(task_queue, client)
+        result = await client.execute_workflow(
+            ErrorTestCallerWorkflow.run,
+            ErrorTestInput(
+                task_queue=task_queue,
+                action_in_sync_op=action_in_sync_op,
+            ),
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
+        )
+        if action_in_sync_op == "raise_handler_error":
+            assert result == ["NexusOperationError", "NexusHandlerError"]
+        elif action_in_sync_op == "raise_operation_error":
+            assert result == ["NexusOperationError", "ApplicationError"]
+        else:
+            raise NotImplementedError(
+                f"Unhandled action_in_sync_op: {action_in_sync_op}"
+            )
