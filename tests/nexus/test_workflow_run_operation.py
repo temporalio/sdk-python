@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Type
 
+import nexusrpc
 import pytest
 from nexusrpc import Operation, service
 from nexusrpc.handler import (
@@ -103,10 +104,11 @@ async def test_workflow_run_operation(
 ):
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    assert (service_defn := nexusrpc.get_service_definition(service_handler_cls))
     service_client = ServiceClient(
         server_address=server_address(env),
         endpoint=endpoint,
-        service=service_handler_cls.__nexus_service__.name,
+        service=service_defn.name,
     )
     async with Worker(
         env.client,

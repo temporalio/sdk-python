@@ -66,7 +66,8 @@ async def test_dynamic_creation_of_user_handler_classes(client: Client):
         )
     )
 
-    service_name = service_cls.__nexus_service__.name
+    assert (service_defn := nexusrpc.get_service_definition(service_cls))
+    service_name = service_defn.name
 
     endpoint = (await create_nexus_endpoint(task_queue, client)).endpoint.id
     async with Worker(

@@ -88,11 +88,9 @@ class CalledWithNameOverride(_TestCase):
 async def test_collected_operation_names(
     test_case: Type[_TestCase],
 ):
-    service: nexusrpc.ServiceDefinition = getattr(
-        test_case.Service, "__nexus_service__"
-    )
-    assert isinstance(service, nexusrpc.ServiceDefinition)
-    assert service.name == "Service"
+    service_defn = nexusrpc.get_service_definition(test_case.Service)
+    assert isinstance(service_defn, nexusrpc.ServiceDefinition)
+    assert service_defn.name == "Service"
     for method_name, expected_op in test_case.expected_operations.items():
         _, actual_op = nexusrpc.handler.get_operation_factory(
             getattr(test_case.Service, method_name)
