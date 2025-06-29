@@ -1055,8 +1055,9 @@ requires-dist = [{ name = "typing-extensions", specifier = ">=4.12.2" }]
 [package.metadata.requires-dev]
 dev = [
     { name = "mypy", specifier = ">=1.15.0" },
+    { name = "poethepoet", specifier = ">=0.35.0" },
     { name = "pydoctor", specifier = ">=25.4.0" },
-    { name = "pyright", specifier = ">=1.1.400" },
+    { name = "pyright", specifier = ">=1.1.402" },
     { name = "pytest", specifier = ">=8.3.5" },
     { name = "pytest-asyncio", specifier = ">=0.26.0" },
     { name = "pytest-cov", specifier = ">=6.1.1" },

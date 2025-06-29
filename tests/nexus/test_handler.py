@@ -42,9 +42,9 @@ from nexusrpc.handler import (
     StartOperationContext,
     service_handler,
     sync_operation,
-    syncio,
 )
 from nexusrpc.handler._decorators import operation_handler
+from nexusrpc.syncio.handler import sync_operation as syncio_sync_operation
 
 from temporalio import nexus, workflow
 from temporalio.client import Client
@@ -870,7 +870,7 @@ class EchoService:
 
 @service_handler(service=EchoService)
 class SyncStartHandler:
-    @syncio.sync_operation
+    @syncio_sync_operation
     def echo(self, ctx: StartOperationContext, input: Input) -> Output:
         assert ctx.headers["test-header-key"] == "test-header-value"
         ctx.outbound_links.extend(ctx.inbound_links)
