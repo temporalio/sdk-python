@@ -201,7 +201,7 @@ class _ActivityWorker:
 
     # Only call this after run()/drain_poll_queue() have returned. This will not
     # raise an exception.
-    # TODO(dan): based on the comment above it looks like the intention may have been to use
+    # TODO(nexus-prerelease): based on the comment above it looks like the intention may have been to use
     # return_exceptions=True
     async def wait_all_completed(self) -> None:
         running_tasks = [v.task for v in self._running_activities.values() if v.task]

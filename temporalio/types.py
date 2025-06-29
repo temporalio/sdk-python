@@ -81,8 +81,9 @@ class MethodAsyncSingleParam(
 ):
     """Generic callable type."""
 
+    # TODO(nexus-prerelease): review changes to signatures in this file
     def __call__(
-        self, __self: ProtocolSelfType, __arg: ProtocolParamType, /
+        self, __self: ProtocolSelfType, __arg: ProtocolParamType
     ) -> Awaitable[ProtocolReturnType]:
         """Generic callable type callback."""
         ...
@@ -94,7 +95,7 @@ class MethodSyncSingleParam(
     """Generic callable type."""
 
     def __call__(
-        self, __self: ProtocolSelfType, __arg: ProtocolParamType, /
+        self, __self: ProtocolSelfType, __arg: ProtocolParamType
     ) -> ProtocolReturnType:
         """Generic callable type callback."""
         ...
@@ -116,7 +117,7 @@ class MethodSyncOrAsyncSingleParam(
     """Generic callable type."""
 
     def __call__(
-        self, __self: ProtocolSelfType, __param: ProtocolParamType, /
+        self, __self: ProtocolSelfType, __param: ProtocolParamType
     ) -> Union[ProtocolReturnType, Awaitable[ProtocolReturnType]]:
         """Generic callable type callback."""
         ...

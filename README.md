@@ -94,6 +94,7 @@ informal introduction to the features and their implementation.
         - [Heartbeating and Cancellation](#heartbeating-and-cancellation)
         - [Worker Shutdown](#worker-shutdown)
       - [Testing](#testing-1)
+    - [Nexus](#nexus)
     - [Workflow Replay](#workflow-replay)
     - [Observability](#observability)
       - [Metrics](#metrics)
@@ -1307,6 +1308,7 @@ affect calls activity code might make to functions on the `temporalio.activity` 
 * `on_heartbeat` property can be set to handle `activity.heartbeat()` calls
 * `cancel()` can be invoked to simulate a cancellation of the activity
 * `worker_shutdown()` can be invoked to simulate a worker shutdown during execution of the activity
+
 
 ### Workflow Replay
 

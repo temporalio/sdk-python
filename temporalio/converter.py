@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
 from itertools import zip_longest
+from logging import getLogger
 from typing import (
     Any,
     Awaitable,
@@ -40,6 +41,7 @@ import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.message
 import google.protobuf.symbol_database
+import nexusrpc
 import typing_extensions
 
 import temporalio.api.common.v1
@@ -59,6 +61,8 @@ if sys.version_info >= (3, 11):
 
 if sys.version_info >= (3, 10):
     from types import UnionType
+
+logger = getLogger(__name__)
 
 
 class PayloadConverter(ABC):
@@ -911,6 +915,12 @@ class DefaultFailureConverter(FailureConverter):
             failure.child_workflow_execution_failure_info.retry_state = (
                 temporalio.api.enums.v1.RetryState.ValueType(error.retry_state or 0)
             )
+        # TODO(nexus-prerelease): test coverage for this
+        elif isinstance(error, temporalio.exceptions.NexusOperationError):
+            failure.nexus_operation_execution_failure_info.SetInParent()
+            failure.nexus_operation_execution_failure_info.operation_token = (
+                error.operation_token
+            )
 
     def from_failure(
         self,
@@ -1005,6 +1015,33 @@ class DefaultFailureConverter(FailureConverter):
                 )
                 if child_info.retry_state
                 else None,
+            )
+        elif failure.HasField("nexus_handler_failure_info"):
+            nexus_handler_failure_info = failure.nexus_handler_failure_info
+            try:
+                _type = nexusrpc.HandlerErrorType[nexus_handler_failure_info.type]
+            except KeyError:
+                logger.warning(
+                    f"Unknown Nexus HandlerErrorType: {nexus_handler_failure_info.type}"
+                )
+                _type = nexusrpc.HandlerErrorType.INTERNAL
+            return nexusrpc.HandlerError(
+                failure.message or "Nexus handler error",
+                type=_type,
+                retryable={
+                    temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE: True,
+                    temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE: False,
+                }.get(nexus_handler_failure_info.retry_behavior),
+            )
+        elif failure.HasField("nexus_operation_execution_failure_info"):
+            nexus_op_failure_info = failure.nexus_operation_execution_failure_info
+            err = temporalio.exceptions.NexusOperationError(
+                failure.message or "Nexus operation error",
+                scheduled_event_id=nexus_op_failure_info.scheduled_event_id,
+                endpoint=nexus_op_failure_info.endpoint,
+                service=nexus_op_failure_info.service,
+                operation=nexus_op_failure_info.operation,
+                operation_token=nexus_op_failure_info.operation_token,
             )
         else:
             err = temporalio.exceptions.FailureError(failure.message or "Failure error")
