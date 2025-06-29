@@ -362,22 +362,6 @@ class ChildWorkflowError(FailureError):
         return self._retry_state
 
 
-class NexusHandlerError(FailureError):
-    """Error raised on Nexus handler failure."""
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        type: str,
-        retryable: Optional[bool] = None,
-    ):
-        """Initialize a Nexus handler error."""
-        super().__init__(message)
-        self._type = type
-        self._retryable = retryable
-
-
 class NexusOperationError(FailureError):
     """Error raised on Nexus operation failure."""
 

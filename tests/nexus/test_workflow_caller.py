@@ -38,7 +38,7 @@ from temporalio.client import (
     WorkflowHandle,
 )
 from temporalio.common import WorkflowIDConflictPolicy
-from temporalio.exceptions import CancelledError, NexusHandlerError, NexusOperationError
+from temporalio.exceptions import CancelledError, NexusOperationError
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import Worker
@@ -479,7 +479,7 @@ async def test_sync_response(
             e = ei.value
             assert isinstance(e, WorkflowFailureError)
             assert isinstance(e.__cause__, NexusOperationError)
-            assert isinstance(e.__cause__.__cause__, NexusHandlerError)
+            assert isinstance(e.__cause__.__cause__, nexusrpc.HandlerError)
             # ID of first command
             assert e.__cause__.scheduled_event_id == 5
             assert e.__cause__.endpoint == make_nexus_endpoint_name(task_queue)
@@ -532,7 +532,7 @@ async def test_async_response(
             e = ei.value
             assert isinstance(e, WorkflowFailureError)
             assert isinstance(e.__cause__, NexusOperationError)
-            assert isinstance(e.__cause__.__cause__, NexusHandlerError)
+            assert isinstance(e.__cause__.__cause__, nexusrpc.HandlerError)
             # ID of first command after update accepted
             assert e.__cause__.scheduled_event_id == 6
             assert e.__cause__.endpoint == make_nexus_endpoint_name(task_queue)
@@ -709,7 +709,7 @@ async def test_untyped_caller(
             e = ei.value
             assert isinstance(e, WorkflowFailureError)
             assert isinstance(e.__cause__, NexusOperationError)
-            assert isinstance(e.__cause__.__cause__, NexusHandlerError)
+            assert isinstance(e.__cause__.__cause__, nexusrpc.HandlerError)
         else:
             result = await caller_wf_handle.result()
             assert result.op_output.value == (
@@ -1167,7 +1167,7 @@ async def test_errors_raised_by_nexus_operation(
             task_queue=task_queue,
         )
         if action_in_sync_op == "raise_handler_error":
-            assert result == ["NexusOperationError", "NexusHandlerError"]
+            assert result == ["NexusOperationError", "HandlerError"]
         elif action_in_sync_op == "raise_operation_error":
             assert result == ["NexusOperationError", "ApplicationError"]
         else:
