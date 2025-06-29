@@ -42,6 +42,7 @@ from nexusrpc.handler import (
     StartOperationContext,
     service_handler,
     sync_operation,
+    syncio,
 )
 from nexusrpc.handler._decorators import operation_handler
 
@@ -864,8 +865,7 @@ class EchoService:
 
 @service_handler(service=EchoService)
 class SyncStartHandler:
-    # TODO(nexus-prerelease): why is this test passing? start is not `async def`
-    @sync_operation
+    @syncio.sync_operation
     def echo(self, ctx: StartOperationContext, input: Input) -> Output:
         assert ctx.headers["test-header-key"] == "test-header-value"
         ctx.outbound_links.extend(ctx.inbound_links)
