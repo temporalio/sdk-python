@@ -92,7 +92,7 @@ async def test_collected_operation_names(
     assert isinstance(service_defn, nexusrpc.ServiceDefinition)
     assert service_defn.name == "Service"
     for method_name, expected_op in test_case.expected_operations.items():
-        _, actual_op = nexusrpc.handler.get_operation_factory(
+        _, actual_op = nexusrpc.get_operation_factory(
             getattr(test_case.Service, method_name)
         )
         assert isinstance(actual_op, nexusrpc.Operation)
