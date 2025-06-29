@@ -112,8 +112,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         #         "Failed to decode operation token as workflow operation token. "
         #         "Fetching result for non-workflow operations is not supported.",
         #         type=HandlerErrorType.NOT_FOUND,
-        #         cause=err,
-        #     )
+        #     ) from err
         # ctx = _temporal_fetch_operation_context.get()
         # try:
         #     client_handle = nexus_handle.to_workflow_handle(
@@ -123,8 +122,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         #     raise HandlerError(
         #         "Failed to construct workflow handle from workflow operation token",
         #         type=HandlerErrorType.NOT_FOUND,
-        #         cause=err,
-        #     )
+        #     ) from err
         # return await client_handle.result()
 
 
@@ -145,8 +143,7 @@ async def cancel_operation(
             "Failed to decode operation token as workflow operation token. "
             "Canceling non-workflow operations is not supported.",
             type=HandlerErrorType.NOT_FOUND,
-            cause=err,
-        )
+        ) from err
 
     ctx = _temporal_cancel_operation_context.get()
     try:
@@ -157,6 +154,5 @@ async def cancel_operation(
         raise HandlerError(
             "Failed to construct workflow handle from workflow operation token",
             type=HandlerErrorType.NOT_FOUND,
-            cause=err,
-        )
+        ) from err
     await client_workflow_handle.cancel(**kwargs)
