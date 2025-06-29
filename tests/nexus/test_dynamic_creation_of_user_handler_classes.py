@@ -3,8 +3,8 @@ import uuid
 import httpx
 import nexusrpc.handler
 import pytest
+from nexusrpc import get_operation_factory
 from nexusrpc.handler import sync_operation
-from nexusrpc.handler._util import get_operation_factory
 
 from temporalio.client import Client
 from temporalio.worker import Worker
