@@ -9,6 +9,8 @@ from typing import (
 )
 
 from nexusrpc import (
+    HandlerError,
+    HandlerErrorType,
     InputT,
     OperationInfo,
     OutputT,
@@ -17,8 +19,6 @@ from nexusrpc.handler import (
     CancelOperationContext,
     FetchOperationInfoContext,
     FetchOperationResultContext,
-    HandlerError,
-    HandlerErrorType,
     OperationHandler,
     StartOperationContext,
     StartOperationResultAsync,

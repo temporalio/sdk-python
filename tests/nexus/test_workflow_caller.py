@@ -1101,9 +1101,9 @@ class ErrorTestService:
     @sync_operation
     async def op(self, ctx: StartOperationContext, input: ErrorTestInput) -> None:
         if input.action_in_sync_op == "raise_handler_error":
-            raise nexusrpc.handler.HandlerError(
+            raise nexusrpc.HandlerError(
                 "test",
-                type=nexusrpc.handler.HandlerErrorType.INTERNAL,
+                type=nexusrpc.HandlerErrorType.INTERNAL,
             )
         elif input.action_in_sync_op == "raise_operation_error":
             raise nexusrpc.OperationError(
