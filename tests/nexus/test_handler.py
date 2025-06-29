@@ -89,9 +89,9 @@ class NonSerializableOutput:
 class MyService:
     echo: nexusrpc.Operation[Input, Output]
     # TODO(nexus-prerelease): support renamed operations!
-    # echo_renamed: nexusrpc.Operation[Input, Output] = (
-    #     nexusrpc.Operation(name="echo-renamed")
-    # )
+    echo_renamed: nexusrpc.Operation[Input, Output] = nexusrpc.Operation(
+        name="echo-renamed"
+    )
     hang: nexusrpc.Operation[Input, Output]
     log: nexusrpc.Operation[Input, Output]
     workflow_run_operation_happy_path: nexusrpc.Operation[Input, Output]
@@ -146,6 +146,17 @@ class MyServiceHandler:
         return Output(
             value=f"from start method on {self.__class__.__name__}: {input.value}"
         )
+
+    # The name override is prsent in the service definition. But the test below submits
+    # the same operation name in the request whether using a service definition or now.
+    # The name override here is necessary when the test is not using the service
+    # definition. It should be permitted when the service definition is in effect, as
+    # long as the name override is the same as that in the service definition.
+    # TODO(nexus-prerelease): implement in nexusrpc the check that operation handler
+    # name overrides must be consistent with service definition overrides.
+    @sync_operation(name="echo-renamed")
+    async def echo_renamed(self, ctx: StartOperationContext, input: Input) -> Output:
+        return await self.echo(ctx, input)
 
     @sync_operation
     async def hang(self, ctx: StartOperationContext, input: Input) -> Output:
@@ -467,13 +478,8 @@ class SyncHandlerHappyPath(_TestCase):
     ), "Nexus-Link header not echoed correctly."
 
 
-class SyncHandlerHappyPathRenamed(_TestCase):
+class SyncHandlerHappyPathRenamed(SyncHandlerHappyPath):
     operation = "echo-renamed"
-    input = Input("hello")
-    expected = SuccessfulResponse(
-        status_code=200,
-        body_json={"value": "from start method on MyServiceHandler: hello"},
-    )
 
 
 class SyncHandlerHappyPathNonAsyncDef(_TestCase):
@@ -707,8 +713,7 @@ class NonSerializableOutputFailure(_FailureTestCase):
     "test_case",
     [
         SyncHandlerHappyPath,
-        # TODO(nexus-prerelease): support renamed operations!
-        # SyncHandlerHappyPathRenamed,
+        SyncHandlerHappyPathRenamed,
         SyncHandlerHappyPathNonAsyncDef,
         # TODO(nexus-prerelease): make callable instance work
         # SyncHandlerHappyPathWithNonAsyncCallableInstance,
