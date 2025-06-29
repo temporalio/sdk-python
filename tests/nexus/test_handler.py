@@ -194,8 +194,7 @@ class MyServiceHandler:
             message="deliberate internal handler error",
             type=HandlerErrorType.INTERNAL,
             retryable=False,
-            cause=RuntimeError("cause message"),
-        )
+        ) from RuntimeError("cause message")
 
     @sync_operation
     async def operation_error_failed(

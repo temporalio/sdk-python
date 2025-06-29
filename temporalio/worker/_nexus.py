@@ -381,7 +381,6 @@ class _DummyPayloadSerializer:
             raise nexusrpc.HandlerError(
                 "Data converter failed to decode Nexus operation input",
                 type=nexusrpc.HandlerErrorType.BAD_REQUEST,
-                cause=err,
                 retryable=False,
             ) from err
 
@@ -393,36 +392,32 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
     if isinstance(err, nexusrpc.HandlerError):
         return err
     elif isinstance(err, ApplicationError):
-        return nexusrpc.HandlerError(
+        handler_err = nexusrpc.HandlerError(
             # TODO(nexus-prerelease): what should message be?
             err.message,
             type=nexusrpc.HandlerErrorType.INTERNAL,
-            cause=err,
             retryable=not err.non_retryable,
         )
     elif isinstance(err, RPCError):
         if err.status == RPCStatusCode.INVALID_ARGUMENT:
-            return nexusrpc.HandlerError(
+            handler_err = nexusrpc.HandlerError(
                 err.message,
                 type=nexusrpc.HandlerErrorType.BAD_REQUEST,
-                cause=err,
             )
         elif err.status in [
             RPCStatusCode.ALREADY_EXISTS,
             RPCStatusCode.FAILED_PRECONDITION,
             RPCStatusCode.OUT_OF_RANGE,
         ]:
-            return nexusrpc.HandlerError(
+            handler_err = nexusrpc.HandlerError(
                 err.message,
                 type=nexusrpc.HandlerErrorType.INTERNAL,
-                cause=err,
                 retryable=False,
             )
         elif err.status in [RPCStatusCode.ABORTED, RPCStatusCode.UNAVAILABLE]:
-            return nexusrpc.HandlerError(
+            handler_err = nexusrpc.HandlerError(
                 err.message,
                 type=nexusrpc.HandlerErrorType.UNAVAILABLE,
-                cause=err,
             )
         elif err.status in [
             RPCStatusCode.CANCELLED,
@@ -436,37 +431,36 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
             # we convert to internal because this is not a client auth error and happens
             # when the handler fails to auth with Temporal and should be considered
             # retryable.
-            return nexusrpc.HandlerError(
-                err.message, type=nexusrpc.HandlerErrorType.INTERNAL, cause=err
+            handler_err = nexusrpc.HandlerError(
+                err.message, type=nexusrpc.HandlerErrorType.INTERNAL
             )
         elif err.status == RPCStatusCode.NOT_FOUND:
-            return nexusrpc.HandlerError(
-                err.message, type=nexusrpc.HandlerErrorType.NOT_FOUND, cause=err
+            handler_err = nexusrpc.HandlerError(
+                err.message, type=nexusrpc.HandlerErrorType.NOT_FOUND
             )
         elif err.status == RPCStatusCode.RESOURCE_EXHAUSTED:
-            return nexusrpc.HandlerError(
+            handler_err = nexusrpc.HandlerError(
                 err.message,
                 type=nexusrpc.HandlerErrorType.RESOURCE_EXHAUSTED,
-                cause=err,
             )
         elif err.status == RPCStatusCode.UNIMPLEMENTED:
-            return nexusrpc.HandlerError(
+            handler_err = nexusrpc.HandlerError(
                 err.message,
                 type=nexusrpc.HandlerErrorType.NOT_IMPLEMENTED,
-                cause=err,
             )
         elif err.status == RPCStatusCode.DEADLINE_EXCEEDED:
-            return nexusrpc.HandlerError(
+            handler_err = nexusrpc.HandlerError(
                 err.message,
                 type=nexusrpc.HandlerErrorType.UPSTREAM_TIMEOUT,
-                cause=err,
             )
         else:
-            return nexusrpc.HandlerError(
+            handler_err = nexusrpc.HandlerError(
                 f"Unhandled RPC error status: {err.status}",
                 type=nexusrpc.HandlerErrorType.INTERNAL,
-                cause=err,
             )
-    return nexusrpc.HandlerError(
-        str(err), type=nexusrpc.HandlerErrorType.INTERNAL, cause=err
-    )
+    else:
+        handler_err = nexusrpc.HandlerError(
+            str(err), type=nexusrpc.HandlerErrorType.INTERNAL
+        )
+    handler_err.__cause__ = err
+    return handler_err
