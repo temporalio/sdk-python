@@ -919,7 +919,7 @@ class SyncHandlerNoExecutor(_InstantiationCase):
     handler = SyncStartHandler
     executor = False
     exception = RuntimeError
-    match = "must be an `async def`"
+    match = "Use nexusrpc.syncio.handler.Handler instead"
 
 
 class DefaultCancel(_InstantiationCase):
@@ -932,7 +932,7 @@ class SyncCancel(_InstantiationCase):
     handler = SyncCancelHandler
     executor = False
     exception = RuntimeError
-    match = "cancel method must be an `async def`"
+    match = "Use nexusrpc.syncio.handler.Handler instead"
 
 
 @pytest.mark.parametrize(
