@@ -25,6 +25,7 @@ import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.common
 import temporalio.nexus
+import temporalio.nexus._util
 import temporalio.workflow
 from temporalio.workflow import VersioningIntent
 
@@ -313,7 +314,7 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
             self._operation_name = self.operation
             self._input_type = None
         elif isinstance(self.operation, Callable):
-            _, op = nexusrpc.get_operation_factory(self.operation)
+            _, op = temporalio.nexus._util.get_operation_factory(self.operation)
             if isinstance(op, nexusrpc.Operation):
                 self._operation_name = op.name
                 self._input_type = op.input_type
