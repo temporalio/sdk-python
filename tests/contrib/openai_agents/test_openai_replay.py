@@ -5,7 +5,9 @@ import pytest
 
 from temporalio.client import WorkflowHistory
 from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
-from temporalio.contrib.openai_agents.open_ai_data_converter import open_ai_data_converter
+from temporalio.contrib.openai_agents.open_ai_data_converter import (
+    open_ai_data_converter,
+)
 from temporalio.contrib.openai_agents.temporal_openai_agents import (
     set_open_ai_agent_temporal_overrides,
 )
@@ -51,5 +53,5 @@ async def test_replay(file_name: str) -> None:
                     InputGuardrailWorkflow,
                     OutputGuardrailWorkflow,
                 ],
-                data_converter=open_ai_data_converter
+                data_converter=open_ai_data_converter,
             ).replay_workflow(WorkflowHistory.from_json("fake", history_json))
