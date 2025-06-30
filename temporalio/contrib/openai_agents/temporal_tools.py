@@ -13,6 +13,7 @@ with unsafe.imports_passed_through():
     from agents import FunctionTool, RunContextWrapper, Tool
     from agents.function_schema import function_schema
 
+
 class ToolSerializationError(TemporalError):
     """Error that occurs when a tool output could not be serialized."""
 
