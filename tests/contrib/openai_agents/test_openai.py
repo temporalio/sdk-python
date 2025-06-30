@@ -1116,10 +1116,6 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
                 await workflow_handle.result()
             assert isinstance(err.value.cause, CancelledError)
 
-            hhistory = await workflow_handle.fetch_history()
-            with open("customer-service-workflow-history.json", "w") as f:
-                f.write(hhistory.to_json())
-
             if use_local_model:
                 events = []
                 async for e in WorkflowHandle(
