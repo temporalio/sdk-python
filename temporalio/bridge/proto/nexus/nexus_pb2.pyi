@@ -60,17 +60,17 @@ class _NexusOperationCancellationTypeEnumTypeWrapper(
     builtins.type,
 ):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-    ABANDON: _NexusOperationCancellationType.ValueType  # 0
+    WAIT_CANCELLATION_COMPLETED: _NexusOperationCancellationType.ValueType  # 0
+    """Wait for operation cancellation completion. Default."""
+    ABANDON: _NexusOperationCancellationType.ValueType  # 1
     """Do not request cancellation of the nexus operation if already scheduled"""
-    TRY_CANCEL: _NexusOperationCancellationType.ValueType  # 1
+    TRY_CANCEL: _NexusOperationCancellationType.ValueType  # 2
     """Initiate a cancellation request for the Nexus operation and immediately report cancellation
     to the caller. Note that it doesn't guarantee that cancellation is delivered to the operation if calling workflow exits before the delivery is done.
     If you want to ensure that cancellation is delivered to the operation, use WAIT_CANCELLATION_REQUESTED.
     """
-    WAIT_CANCELLATION_REQUESTED: _NexusOperationCancellationType.ValueType  # 2
+    WAIT_CANCELLATION_REQUESTED: _NexusOperationCancellationType.ValueType  # 3
     """Request cancellation of the operation and wait for confirmation that the request was received."""
-    WAIT_CANCELLATION_COMPLETED: _NexusOperationCancellationType.ValueType  # 3
-    """Wait for operation cancellation completion. Default."""
 
 class NexusOperationCancellationType(
     _NexusOperationCancellationType,
@@ -78,17 +78,17 @@ class NexusOperationCancellationType(
 ):
     """Controls at which point to report back to lang when a nexus operation is cancelled"""
 
-ABANDON: NexusOperationCancellationType.ValueType  # 0
+WAIT_CANCELLATION_COMPLETED: NexusOperationCancellationType.ValueType  # 0
+"""Wait for operation cancellation completion. Default."""
+ABANDON: NexusOperationCancellationType.ValueType  # 1
 """Do not request cancellation of the nexus operation if already scheduled"""
-TRY_CANCEL: NexusOperationCancellationType.ValueType  # 1
+TRY_CANCEL: NexusOperationCancellationType.ValueType  # 2
 """Initiate a cancellation request for the Nexus operation and immediately report cancellation
 to the caller. Note that it doesn't guarantee that cancellation is delivered to the operation if calling workflow exits before the delivery is done.
 If you want to ensure that cancellation is delivered to the operation, use WAIT_CANCELLATION_REQUESTED.
 """
-WAIT_CANCELLATION_REQUESTED: NexusOperationCancellationType.ValueType  # 2
+WAIT_CANCELLATION_REQUESTED: NexusOperationCancellationType.ValueType  # 3
 """Request cancellation of the operation and wait for confirmation that the request was received."""
-WAIT_CANCELLATION_COMPLETED: NexusOperationCancellationType.ValueType  # 3
-"""Wait for operation cancellation completion. Default."""
 global___NexusOperationCancellationType = NexusOperationCancellationType
 
 class NexusOperationResult(google.protobuf.message.Message):
