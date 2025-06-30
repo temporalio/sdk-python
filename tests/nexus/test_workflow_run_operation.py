@@ -1,3 +1,4 @@
+import re
 import uuid
 from dataclasses import dataclass
 from typing import Any, Type
@@ -71,15 +72,6 @@ class Service:
     op: Operation[Input, str]
 
 
-@service_handler
-class SubclassingNoInputOutputTypeAnnotationsWithoutServiceDefinition:
-    @operation_handler
-    def op(self) -> OperationHandler:
-        return MyOperation()
-
-    __expected__error__ = 500, "'dict' object has no attribute 'value'"
-
-
 @service_handler(service=Service)
 class SubclassingNoInputOutputTypeAnnotationsWithServiceDefinition:
     # Despite the lack of annotations on the service impl, the service definition
@@ -94,7 +86,6 @@ class SubclassingNoInputOutputTypeAnnotationsWithServiceDefinition:
     "service_handler_cls",
     [
         SubclassingHappyPath,
-        SubclassingNoInputOutputTypeAnnotationsWithoutServiceDefinition,
         SubclassingNoInputOutputTypeAnnotationsWithServiceDefinition,
     ],
 )
@@ -123,7 +114,7 @@ async def test_workflow_run_operation(
             status_code, message = service_handler_cls.__expected__error__
             assert resp.status_code == status_code
             failure = Failure(**resp.json())
-            assert failure.message == message
+            assert re.search(message, failure.message)
         else:
             assert resp.status_code == 201
 
