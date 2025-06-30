@@ -125,6 +125,40 @@ def get_callable_name(fn: Callable[..., Any]) -> str:
     return method_name
 
 
+# TODO(nexus-preview) Copied from nexusrpc
+def get_operation_factory(
+    obj: Any,
+) -> tuple[
+    Optional[Callable[[Any], OperationHandler[InputT, OutputT]]],
+    Optional[nexusrpc.Operation[InputT, OutputT]],
+]:
+    """Return the :py:class:`Operation` for the object along with the factory function.
+
+    ``obj`` should be a decorated operation start method.
+    """
+    op_defn = get_operation_definition(obj)
+    if op_defn:
+        factory = obj
+    else:
+        if factory := getattr(obj, "__nexus_operation_factory__", None):
+            op_defn = get_operation_definition(factory)
+    if not isinstance(op_defn, nexusrpc.Operation):
+        return None, None
+    return factory, op_defn
+
+
+# TODO(nexus-preview) Copied from nexusrpc
+def set_operation_factory(
+    obj: Any,
+    operation_factory: Callable[[Any], OperationHandler[InputT, OutputT]],
+) -> None:
+    """Set the :py:class:`OperationHandler` factory for this object.
+
+    ``obj`` should be an operation start method.
+    """
+    setattr(obj, "__nexus_operation_factory__", operation_factory)
+
+
 # Copied from https://github.com/modelcontextprotocol/python-sdk
 #
 # Copyright (c) 2024 Anthropic, PBC.
