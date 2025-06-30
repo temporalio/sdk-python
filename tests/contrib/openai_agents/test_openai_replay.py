@@ -14,7 +14,7 @@ from tests.contrib.openai_agents.test_openai import (
     ToolsWorkflow,
     CustomerServiceWorkflow,
     AgentsAsToolsWorkflow,
-    HelloWorldAgent,
+    HelloWorldAgent, InputGuardrailWorkflow, OutputGuardrailWorkflow,
 )
 
 
@@ -24,6 +24,8 @@ from tests.contrib.openai_agents.test_openai import (
         "agents-as-tools-workflow-history.json",
         "customer-service-workflow-history.json",
         "hello-workflow-history.json",
+        "input-guardrail-workflow-history.json",
+        "output-guardrail-workflow-history.json",
         "research-workflow-history.json",
         "tools-workflow-history.json",
     ],
@@ -43,5 +45,7 @@ async def test_replay(file_name: str) -> None:
                     CustomerServiceWorkflow,
                     AgentsAsToolsWorkflow,
                     HelloWorldAgent,
+                    InputGuardrailWorkflow,
+                    OutputGuardrailWorkflow,
                 ]
             ).replay_workflow(WorkflowHistory.from_json("fake", history_json))
