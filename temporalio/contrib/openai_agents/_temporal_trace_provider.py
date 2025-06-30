@@ -7,7 +7,10 @@ from agents import SpanData, Trace, TracingProcessor
 from agents.tracing import (
     get_trace_provider,
 )
-from agents.tracing.provider import DefaultTraceProvider
+from agents.tracing.provider import (
+    DefaultTraceProvider,
+    SynchronousMultiTracingProcessor,
+)
 from agents.tracing.spans import Span
 
 from temporalio import workflow
@@ -72,10 +75,16 @@ def activity_span(
     )
 
 
-class _TemporalTracingProcessor(TracingProcessor):
-    def __init__(self, impl: TracingProcessor):
+class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
+    def __init__(self, impl: SynchronousMultiTracingProcessor):
         super().__init__()
         self._impl = impl
+
+    def add_tracing_processor(self, tracing_processor: TracingProcessor):
+        self._impl.add_tracing_processor(tracing_processor)
+
+    def set_processors(self, processors: list[TracingProcessor]):
+        self._impl.set_processors(processors)
 
     def on_trace_start(self, trace: Trace) -> None:
         if workflow.in_workflow() and workflow.unsafe.is_replaying():
@@ -118,7 +127,7 @@ class TemporalTraceProvider(DefaultTraceProvider):
         """Initialize the TemporalTraceProvider."""
         super().__init__()
         self._original_provider = cast(DefaultTraceProvider, get_trace_provider())
-        self._multi_processor = _TemporalTracingProcessor(  # type: ignore[assignment]
+        self._multi_processor = _TemporalTracingProcessor(
             self._original_provider._multi_processor
         )
 
