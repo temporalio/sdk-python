@@ -3,7 +3,7 @@ import sys
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, no_type_check
 
 import pytest
 
@@ -61,6 +61,7 @@ with workflow.unsafe.imports_passed_through():
         ResponseOutputMessage,
         ResponseOutputText,
     )
+    from openai.types.responses.response_function_web_search import ActionSearch
     from openai.types.responses.response_prompt_param import ResponsePromptParam
 
     from tests.contrib.research_agents.research_manager import ResearchManager
@@ -495,6 +496,7 @@ class TestReportModel(OpenAIResponsesModel):
         )
 
 
+@no_type_check
 class TestResearchModel(TestModel):
     responses = [
         ModelResponse(
@@ -522,7 +524,10 @@ class TestResearchModel(TestModel):
             ModelResponse(
                 output=[
                     ResponseFunctionWebSearch(
-                        id="", status="completed", type="web_search_call"
+                        id="",
+                        status="completed",
+                        type="web_search_call",
+                        action=ActionSearch(query="", type="search"),
                     ),
                     ResponseOutputMessage(
                         id="",
