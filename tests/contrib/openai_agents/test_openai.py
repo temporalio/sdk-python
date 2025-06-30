@@ -525,10 +525,6 @@ async def test_research_workflow(client: Client, use_local_model: bool):
             )
             result = await workflow_handle.result()
 
-            hhistory = await workflow_handle.fetch_history()
-            with open("research-workflow-history.json", "w") as f:
-                f.write(hhistory.to_json())
-
             if use_local_model:
                 assert result == "report"
 
