@@ -14,6 +14,7 @@ from typing import (
     Union,
 )
 
+import nexusrpc
 from nexusrpc import (
     InputT,
     OutputT,
@@ -129,19 +130,19 @@ def get_callable_name(fn: Callable[..., Any]) -> str:
 def get_operation_factory(
     obj: Any,
 ) -> tuple[
-    Optional[Callable[[Any], OperationHandler[InputT, OutputT]]],
-    Optional[nexusrpc.Operation[InputT, OutputT]],
+    Optional[Callable[[Any], Any]],
+    Optional[nexusrpc.Operation[Any, Any]],
 ]:
     """Return the :py:class:`Operation` for the object along with the factory function.
 
     ``obj`` should be a decorated operation start method.
     """
-    op_defn = get_operation_definition(obj)
+    op_defn = nexusrpc.get_operation_definition(obj)
     if op_defn:
         factory = obj
     else:
         if factory := getattr(obj, "__nexus_operation_factory__", None):
-            op_defn = get_operation_definition(factory)
+            op_defn = nexusrpc.get_operation_definition(factory)
     if not isinstance(op_defn, nexusrpc.Operation):
         return None, None
     return factory, op_defn
@@ -150,7 +151,7 @@ def get_operation_factory(
 # TODO(nexus-preview) Copied from nexusrpc
 def set_operation_factory(
     obj: Any,
-    operation_factory: Callable[[Any], OperationHandler[InputT, OutputT]],
+    operation_factory: Callable[[Any], Any],
 ) -> None:
     """Set the :py:class:`OperationHandler` factory for this object.
 

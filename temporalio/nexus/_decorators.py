@@ -28,6 +28,7 @@ from temporalio.nexus._token import (
 from temporalio.nexus._util import (
     get_callable_name,
     get_workflow_run_start_method_input_and_output_type_annotations,
+    set_operation_factory,
 )
 
 ServiceHandlerT = TypeVar("ServiceHandlerT")
@@ -124,15 +125,17 @@ def workflow_run_operation(
             return WorkflowRunOperationHandler(_start, input_type, output_type)
 
         method_name = get_callable_name(start)
-        # TODO(nexus-preview): make double-underscore attrs private to nexusrpc and expose getters/setters
-        operation_handler_factory.__nexus_operation__ = nexusrpc.Operation(
-            name=name or method_name,
-            method_name=method_name,
-            input_type=input_type,
-            output_type=output_type,
+        nexusrpc.set_operation_definition(
+            operation_handler_factory,
+            nexusrpc.Operation(
+                name=name or method_name,
+                method_name=method_name,
+                input_type=input_type,
+                output_type=output_type,
+            ),
         )
 
-        start.__nexus_operation_factory__ = operation_handler_factory
+        set_operation_factory(start, operation_handler_factory)
         return start
 
     if start is None:
