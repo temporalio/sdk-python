@@ -359,49 +359,49 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
                     if e.HasField("activity_task_completed_event_attributes"):
                         events.append(e)
 
-            assert len(events) == 7
-            assert (
-                "function_call"
-                in events[0]
-                .activity_task_completed_event_attributes.result.payloads[0]
-                .data.decode()
-            )
-            assert (
-                "Sunny with wind"
-                in events[1]
-                .activity_task_completed_event_attributes.result.payloads[0]
-                .data.decode()
-            )
-            assert (
-                "function_call"
-                in events[2]
-                .activity_task_completed_event_attributes.result.payloads[0]
-                .data.decode()
-            )
-            assert (
-                "Sunny with wind"
-                in events[3]
-                .activity_task_completed_event_attributes.result.payloads[0]
-                .data.decode()
-            )
-            assert (
-                "function_call"
-                in events[4]
-                .activity_task_completed_event_attributes.result.payloads[0]
-                .data.decode()
-            )
-            assert (
-                "Sunny with wind"
-                in events[5]
-                .activity_task_completed_event_attributes.result.payloads[0]
-                .data.decode()
-            )
-            assert (
-                "Test weather result"
-                in events[6]
-                .activity_task_completed_event_attributes.result.payloads[0]
-                .data.decode()
-            )
+                assert len(events) == 7
+                assert (
+                    "function_call"
+                    in events[0]
+                    .activity_task_completed_event_attributes.result.payloads[0]
+                    .data.decode()
+                )
+                assert (
+                    "Sunny with wind"
+                    in events[1]
+                    .activity_task_completed_event_attributes.result.payloads[0]
+                    .data.decode()
+                )
+                assert (
+                    "function_call"
+                    in events[2]
+                    .activity_task_completed_event_attributes.result.payloads[0]
+                    .data.decode()
+                )
+                assert (
+                    "Sunny with wind"
+                    in events[3]
+                    .activity_task_completed_event_attributes.result.payloads[0]
+                    .data.decode()
+                )
+                assert (
+                    "function_call"
+                    in events[4]
+                    .activity_task_completed_event_attributes.result.payloads[0]
+                    .data.decode()
+                )
+                assert (
+                    "Sunny with wind"
+                    in events[5]
+                    .activity_task_completed_event_attributes.result.payloads[0]
+                    .data.decode()
+                )
+                assert (
+                    "Test weather result"
+                    in events[6]
+                    .activity_task_completed_event_attributes.result.payloads[0]
+                    .data.decode()
+                )
 
 
 class TestPlannerModel(OpenAIResponsesModel):
