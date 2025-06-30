@@ -89,6 +89,9 @@ class _TemporalModelStub(Model):
             return ""
 
         def make_tool_info(tool: Tool) -> ToolInput:
+            print(tool)
+            if not hasattr(tool, "__temporal_tool_definition"):
+                raise ValueError("Provided tool is not a temporal tool, use @openai_agents.workflow.tool")
             if isinstance(tool, FileSearchTool):
                 return cast(FileSearchTool, tool)
             elif isinstance(tool, WebSearchTool):

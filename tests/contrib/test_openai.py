@@ -1,5 +1,4 @@
 import os
-import sys
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -10,20 +9,8 @@ from pydantic import ConfigDict, Field
 
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
-from temporalio.contrib.openai_agents.invoke_model_activity import (
-    ModelActivity,
-)
-from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
-from temporalio.contrib.openai_agents.open_ai_data_converter import (
-    open_ai_data_converter,
-)
-from temporalio.contrib.openai_agents.temporal_openai_agents import (
-    set_open_ai_agent_temporal_overrides,
-)
-from temporalio.contrib.openai_agents.temporal_tools import activity_as_tool
-from temporalio.contrib.openai_agents.trace_interceptor import (
-    OpenAIAgentsTracingInterceptor,
-)
+from temporalio.contrib import openai_agents
+from temporalio.contrib.openai_agents import open_ai_data_converter, OpenAIAgentsTracingInterceptor, ModelActivity, ModelActivityParameters, set_open_ai_agent_temporal_overrides
 from tests.helpers import new_worker
 
 with workflow.unsafe.imports_passed_through():
@@ -47,7 +34,6 @@ with workflow.unsafe.imports_passed_through():
         Tool,
         TResponseInputItem,
         Usage,
-        function_tool,
         handoff,
         input_guardrail,
         output_guardrail,
@@ -59,7 +45,6 @@ with workflow.unsafe.imports_passed_through():
         ToolCallItem,
         ToolCallOutputItem,
     )
-    from agents.run import DEFAULT_AGENT_RUNNER, AgentRunner
     from openai import AsyncOpenAI, BaseModel
     from openai.types.responses import (
         ResponseFunctionToolCall,
@@ -265,7 +250,7 @@ class ToolsWorkflow:
             name="Tools Workflow",
             instructions="You are a helpful agent.",
             tools=[
-                activity_as_tool(
+                openai_agents.workflow.activity_as_tool(
                     get_weather, start_to_close_timeout=timedelta(seconds=10)
                 )
             ],
@@ -780,7 +765,7 @@ class AirlineAgentContext(BaseModel):
     flight_number: Optional[str] = None
 
 
-@function_tool(
+@openai_agents.workflow.tool(
     name_override="faq_lookup_tool",
     description_override="Lookup frequently asked questions.",
 )
@@ -802,7 +787,7 @@ async def faq_lookup_tool(question: str) -> str:
     return "I'm sorry, I don't know the answer to that question."
 
 
-@function_tool
+@openai_agents.workflow.tool
 async def update_seat(
     context: RunContextWrapper[AirlineAgentContext],
     confirmation_number: str,
