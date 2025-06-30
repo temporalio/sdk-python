@@ -1385,7 +1385,9 @@ async def test_input_guardrail(client: Client, use_local_model: bool):
                 InputGuardrailModel(  # type: ignore
                     "", openai_client=AsyncOpenAI(api_key="Fake key")
                 )
-            ) if use_local_model else None
+            )
+            if use_local_model
+            else None
         )
         async with new_worker(
             client,
@@ -1500,7 +1502,9 @@ async def test_output_guardrail(client: Client, use_local_model: bool):
                 OutputGuardrailModel(  # type: ignore
                     "", openai_client=AsyncOpenAI(api_key="Fake key")
                 )
-            ) if use_local_model else None
+            )
+            if use_local_model
+            else None
         )
         async with new_worker(
             client,
@@ -1518,4 +1522,3 @@ async def test_output_guardrail(client: Client, use_local_model: bool):
 
             if use_local_model:
                 assert not result
-

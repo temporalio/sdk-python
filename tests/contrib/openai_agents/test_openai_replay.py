@@ -10,11 +10,13 @@ from temporalio.contrib.openai_agents.temporal_openai_agents import (
 )
 from temporalio.worker import Replayer
 from tests.contrib.openai_agents.test_openai import (
+    AgentsAsToolsWorkflow,
+    CustomerServiceWorkflow,
+    HelloWorldAgent,
+    InputGuardrailWorkflow,
+    OutputGuardrailWorkflow,
     ResearchWorkflow,
     ToolsWorkflow,
-    CustomerServiceWorkflow,
-    AgentsAsToolsWorkflow,
-    HelloWorldAgent, InputGuardrailWorkflow, OutputGuardrailWorkflow,
 )
 
 
