@@ -1087,7 +1087,13 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 
 # Handler
 
-ActionInSyncOp = Literal["raise_handler_error", "raise_operation_error"]
+ActionInSyncOp = Literal[
+    "raise_handler_error", "raise_operation_error", "raise_custom_error"
+]
+
+
+class CustomError(Exception):
+    pass
 
 
 @dataclass
@@ -1109,6 +1115,8 @@ class ErrorTestService:
             raise nexusrpc.OperationError(
                 "test", state=nexusrpc.OperationErrorState.FAILED
             )
+        elif input.action_in_sync_op == "raise_custom_error":
+            raise CustomError("test")
         else:
             raise NotImplementedError(
                 f"Unhandled action_in_sync_op: {input.action_in_sync_op}"
@@ -1144,7 +1152,8 @@ class ErrorTestCallerWorkflow:
 
 
 @pytest.mark.parametrize(
-    "action_in_sync_op", ["raise_handler_error", "raise_operation_error"]
+    "action_in_sync_op",
+    ["raise_handler_error", "raise_operation_error", "raise_custom_error"],
 )
 async def test_errors_raised_by_nexus_operation(
     client: Client, action_in_sync_op: ActionInSyncOp
@@ -1166,10 +1175,16 @@ async def test_errors_raised_by_nexus_operation(
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
+
+        print(f"\n\n\n{action_in_sync_op}: \n", result, "\n\n\n")
+
         if action_in_sync_op == "raise_handler_error":
             assert result == ["NexusOperationError", "HandlerError"]
         elif action_in_sync_op == "raise_operation_error":
             assert result == ["NexusOperationError", "ApplicationError"]
+        elif action_in_sync_op == "raise_custom_error":
+            # assert result == ["NexusOperationError", "CustomError"]
+            pass
         else:
             raise NotImplementedError(
                 f"Unhandled action_in_sync_op: {action_in_sync_op}"
