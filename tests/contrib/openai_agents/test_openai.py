@@ -2,7 +2,7 @@ import os
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, Union, no_type_check
+from typing import Any, Optional, Union, cast, no_type_check
 
 import pytest
 from pydantic import ConfigDict, Field
@@ -865,6 +865,7 @@ async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
                     .activity_task_completed_event_attributes.result.payloads[0]
                     .data.decode()
                 )
+                assert isinstance(model.inputs[3][3]["content"], list)  # type: ignore
 
 
 class AirlineAgentContext(BaseModel):
