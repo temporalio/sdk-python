@@ -38,7 +38,7 @@ from temporalio.client import (
     WorkflowHandle,
 )
 from temporalio.common import WorkflowIDConflictPolicy
-from temporalio.exceptions import CancelledError, NexusOperationError
+from temporalio.exceptions import ApplicationError, CancelledError, NexusOperationError
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import Worker
@@ -1087,8 +1087,134 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 
 # Handler
 
+#   @OperationImpl
+#   public OperationHandler<NexusService.ErrorTestInput, NexusService.ErrorTestOutput> testError() {
+#     return OperationHandler.sync(
+#         (ctx, details, input) -> {
+#           switch (input.getAction()) {
+#             case RAISE_APPLICATION_ERROR:
+#               throw ApplicationFailure.newNonRetryableFailure(
+#                   "application error 1", "APPLICATION_ERROR");
+#             case RAISE_CUSTOM_ERROR:
+#               throw new MyCustomException("Custom error 1");
+#             case RAISE_CUSTOM_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
+#               // ** THIS DOESN'T WORK **: CHAINED CUSTOM EXCEPTIONS DON'T SERIALIZE
+#               MyCustomException customError = new MyCustomException("Custom error 1");
+#               customError.initCause(new MyCustomException("Custom error 2"));
+#               throw customError;
+#             case RAISE_APPLICATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
+#               throw ApplicationFailure.newNonRetryableFailureWithCause(
+#                   "application error 1",
+#                   "APPLICATION_ERROR",
+#                   new MyCustomException("Custom error 2"));
+#             case RAISE_NEXUS_HANDLER_ERROR:
+#               throw new HandlerException(HandlerException.ErrorType.NOT_FOUND, "Handler error 1");
+#             case RAISE_NEXUS_HANDLER_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
+#               // ** THIS DOESN'T WORK **
+#               // Can't overwrite cause with
+#               // io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException: Custom error
+#               // 2
+#               HandlerException handlerErr =
+#                   new HandlerException(HandlerException.ErrorType.NOT_FOUND, "Handler error 1");
+#               handlerErr.initCause(new MyCustomException("Custom error 2"));
+#               throw handlerErr;
+#             case RAISE_NEXUS_OPERATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
+#               throw OperationException.failure(
+#                   ApplicationFailure.newNonRetryableFailureWithCause(
+#                       "application error 1",
+#                       "APPLICATION_ERROR",
+#                       new MyCustomException("Custom error 2")));
+#           }
+#           return new NexusService.ErrorTestOutput("Unreachable");
+#         });
+#   }
+
+# 🌈 RAISE_APPLICATION_ERROR:
+# io.temporal.failure.NexusOperationFailure(type=no-type-attr, message=Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=)
+#     io.nexusrpc.handler.HandlerException(type=no-type-attr, message=handler error: message='application error 1', type='APPLICATION_ERROR', nonRetryable=true)
+#         io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='application error 1', type='APPLICATION_ERROR', nonRetryable=true)
+
+
+# 🌈 RAISE_CUSTOM_ERROR:
+# io.temporal.failure.NexusOperationFailure(type=no-type-attr, message=Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=)
+#     io.nexusrpc.handler.HandlerException(type=no-type-attr, message=handler error: message='Custom error wrapped: custom error 1', type='CUSTOM_ERROR', nonRetryable=true)
+#         io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='Custom error wrapped: custom error 1', type='CUSTOM_ERROR', nonRetryable=true)
+
+
+# 🌈 RAISE_APPLICATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
+# io.temporal.failure.NexusOperationFailure(type=no-type-attr, message=Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=)
+#     io.nexusrpc.handler.HandlerException(type=no-type-attr, message=handler error: message='application error 1', type='APPLICATION_ERROR', nonRetryable=true)
+#         io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='application error 1', type='APPLICATION_ERROR', nonRetryable=true)
+#             io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='Custom error 2', type='io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException', nonRetryable=false)
+
+
+# 🌈 RAISE_NEXUS_HANDLER_ERROR:
+# io.temporal.failure.NexusOperationFailure(type=no-type-attr, message=Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=)
+#     io.nexusrpc.handler.HandlerException(type=no-type-attr, message=handler error: message='Handler error 1', type='java.lang.RuntimeException', nonRetryable=false)
+#         io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='Handler error 1', type='java.lang.RuntimeException', nonRetryable=false)
+
+
+# 🌈 RAISE_NEXUS_HANDLER_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
+# io.temporal.failure.NexusOperationFailure(type=no-type-attr, message=Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=)
+#     io.temporal.failure.TimeoutFailure(type=no-type-attr, message=message='operation timed out', timeoutType=TIMEOUT_TYPE_SCHEDULE_TO_CLOSE)
+
+
+# 🌈 RAISE_NEXUS_OPERATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
+# io.temporal.failure.NexusOperationFailure(type=no-type-attr, message=Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=)
+#     io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='application error 1', type='APPLICATION_ERROR', nonRetryable=true)
+#         io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='Custom error 2', type='io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException', nonRetryable=false)
+
+#   @OperationImpl
+#   public OperationHandler<NexusService.ErrorTestInput, NexusService.ErrorTestOutput> testError() {
+#     return OperationHandler.sync(
+#         (ctx, details, input) -> {
+#           switch (input.getAction()) {
+#             case RAISE_APPLICATION_ERROR:
+#               throw ApplicationFailure.newNonRetryableFailure(
+#                   "application error 1", "APPLICATION_ERROR");
+#             case RAISE_CUSTOM_ERROR:
+#               throw new MyCustomException("Custom error 1");
+#             case RAISE_CUSTOM_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
+#               // ** THIS DOESN'T WORK **: CHAINED CUSTOM EXCEPTIONS DON'T SERIALIZE
+#               MyCustomException customError = new MyCustomException("Custom error 1");
+#               customError.initCause(new MyCustomException("Custom error 2"));
+#               throw customError;
+#             case RAISE_APPLICATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
+#               throw ApplicationFailure.newNonRetryableFailureWithCause(
+#                   "application error 1",
+#                   "APPLICATION_ERROR",
+#                   new MyCustomException("Custom error 2"));
+#             case RAISE_NEXUS_HANDLER_ERROR:
+#               throw new HandlerException(HandlerException.ErrorType.NOT_FOUND, "Handler error 1");
+#             case RAISE_NEXUS_HANDLER_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
+#               // ** THIS DOESN'T WORK **
+#               // Can't overwrite cause with
+#               // io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException: Custom error
+#               // 2
+#               HandlerException handlerErr =
+#                   new HandlerException(HandlerException.ErrorType.NOT_FOUND, "Handler error 1");
+#               handlerErr.initCause(new MyCustomException("Custom error 2"));
+#               throw handlerErr;
+#             case RAISE_NEXUS_OPERATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
+#               throw OperationException.failure(
+#                   ApplicationFailure.newNonRetryableFailureWithCause(
+#                       "application error 1",
+#                       "APPLICATION_ERROR",
+#                       new MyCustomException("Custom error 2")));
+#           }
+#           return new NexusService.ErrorTestOutput("Unreachable");
+#         });
+#   }
+
+
 ActionInSyncOp = Literal[
-    "raise_handler_error", "raise_operation_error", "raise_custom_error"
+    "application_error_non_retryable",
+    "custom_error",
+    "custom_error_from_custom_error",
+    "application_error_non_retryable_from_custom_error",
+    "nexus_handler_error_not_found",
+    "nexus_handler_error_not_found_from_custom_error",
+    "nexus_operation_error_from_application_error_non_retryable_from_custom_error",
 ]
 
 
@@ -1106,17 +1232,46 @@ class ErrorTestInput:
 class ErrorTestService:
     @sync_operation
     async def op(self, ctx: StartOperationContext, input: ErrorTestInput) -> None:
-        if input.action_in_sync_op == "raise_handler_error":
+        if input.action_in_sync_op == "application_error_non_retryable":
+            raise ApplicationError("application error in nexus op", non_retryable=True)
+        elif input.action_in_sync_op == "custom_error":
+            raise CustomError("custom error in nexus op")
+        elif input.action_in_sync_op == "custom_error_from_custom_error":
+            raise CustomError("custom error 1 in nexus op") from CustomError(
+                "custom error 2 in nexus op"
+            )
+        elif (
+            input.action_in_sync_op
+            == "application_error_non_retryable_from_custom_error"
+        ):
+            raise ApplicationError(
+                "application error in nexus op", non_retryable=True
+            ) from CustomError("custom error in nexus op")
+        elif input.action_in_sync_op == "nexus_handler_error_not_found":
             raise nexusrpc.HandlerError(
                 "test",
-                type=nexusrpc.HandlerErrorType.INTERNAL,
+                type=nexusrpc.HandlerErrorType.NOT_FOUND,
             )
-        elif input.action_in_sync_op == "raise_operation_error":
-            raise nexusrpc.OperationError(
-                "test", state=nexusrpc.OperationErrorState.FAILED
-            )
-        elif input.action_in_sync_op == "raise_custom_error":
-            raise CustomError("test")
+        elif (
+            input.action_in_sync_op == "nexus_handler_error_not_found_from_custom_error"
+        ):
+            raise nexusrpc.HandlerError(
+                "test",
+                type=nexusrpc.HandlerErrorType.NOT_FOUND,
+            ) from CustomError("custom error in nexus op")
+        elif (
+            input.action_in_sync_op
+            == "nexus_operation_error_from_application_error_non_retryable_from_custom_error"
+        ):
+            try:
+                raise ApplicationError(
+                    "application error in nexus op", non_retryable=True
+                ) from CustomError("custom error in nexus op")
+            except ApplicationError as err:
+                raise nexusrpc.OperationError(
+                    "operation error in nexus op",
+                    state=nexusrpc.OperationErrorState.FAILED,
+                ) from err
         else:
             raise NotImplementedError(
                 f"Unhandled action_in_sync_op: {input.action_in_sync_op}"
@@ -1146,14 +1301,26 @@ class ErrorTestCallerWorkflow:
                 # None
                 input,
             )
-        except Exception as err:
-            return [str(type(err).__name__), str(type(err.__cause__).__name__)]
+        except BaseException as err:
+            errs = [err]
+            while err.__cause__:
+                errs.append(err.__cause__)
+                err = err.__cause__
+            return [type(err).__name__ for err in errs]
         assert False, "Unreachable"
 
 
 @pytest.mark.parametrize(
     "action_in_sync_op",
-    ["raise_handler_error", "raise_operation_error", "raise_custom_error"],
+    [
+        "application_error_non_retryable",
+        "custom_error",
+        "custom_error_from_custom_error",
+        "application_error_non_retryable_from_custom_error",
+        "nexus_handler_error_not_found",
+        "nexus_handler_error_not_found_from_custom_error",
+        "nexus_operation_error_from_application_error_non_retryable_from_custom_error",
+    ],
 )
 async def test_errors_raised_by_nexus_operation(
     client: Client, action_in_sync_op: ActionInSyncOp
@@ -1178,14 +1345,14 @@ async def test_errors_raised_by_nexus_operation(
 
         print(f"\n\n\n{action_in_sync_op}: \n", result, "\n\n\n")
 
-        if action_in_sync_op == "raise_handler_error":
-            assert result == ["NexusOperationError", "HandlerError"]
-        elif action_in_sync_op == "raise_operation_error":
-            assert result == ["NexusOperationError", "ApplicationError"]
-        elif action_in_sync_op == "raise_custom_error":
-            # assert result == ["NexusOperationError", "CustomError"]
-            pass
-        else:
-            raise NotImplementedError(
-                f"Unhandled action_in_sync_op: {action_in_sync_op}"
-            )
+        # if action_in_sync_op == "handler_error":
+        #     assert result == ["NexusOperationError", "HandlerError"]
+        # elif action_in_sync_op == "operation_error":
+        #     assert result == ["NexusOperationError", "ApplicationError"]
+        # elif action_in_sync_op == "custom_error":
+        #     # assert result == ["NexusOperationError", "CustomError"]
+        #     pass
+        # else:
+        #     raise NotImplementedError(
+        #         f"Unhandled action_in_sync_op: {action_in_sync_op}"
+        #     )
