@@ -4,13 +4,16 @@ import asyncio
 
 from agents import Runner, custom_span, gen_trace_id, trace
 
-from tests.contrib.research_agents.planner_agent import (
+from tests.contrib.openai_agents.research_agents.planner_agent import (
     WebSearchItem,
     WebSearchPlan,
     new_planner_agent,
 )
-from tests.contrib.research_agents.search_agent import new_search_agent
-from tests.contrib.research_agents.writer_agent import ReportData, new_writer_agent
+from tests.contrib.openai_agents.research_agents.search_agent import new_search_agent
+from tests.contrib.openai_agents.research_agents.writer_agent import (
+    ReportData,
+    new_writer_agent,
+)
 
 
 class ResearchManager:
@@ -26,11 +29,6 @@ class ResearchManager:
             search_results = await self._perform_searches(search_plan)
             report = await self._write_report(query, search_results)
 
-        print("\n\n=====REPORT=====\n\n")
-        print(f"Report: {report.markdown_report}")
-        print("\n\n=====FOLLOW UP QUESTIONS=====\n\n")
-        follow_up_questions = "\n".join(report.follow_up_questions)
-        print(f"Follow up questions: {follow_up_questions}")
         return report.markdown_report
 
     async def _plan_searches(self, query: str) -> WebSearchPlan:
