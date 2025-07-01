@@ -791,12 +791,12 @@ async def _test_start_operation_without_service_definition(
 
 
 @nexusrpc.service
-class MyServiceWithOperationsWithoutTypeAnnotations(MyService):
+class MyServiceWithOperationsWithoutTypeAnnotations:
     workflow_run_operation_without_type_annotations: nexusrpc.Operation[Input, Output]
     sync_operation_without_type_annotations: nexusrpc.Operation[Input, Output]
 
 
-class MyServiceHandlerWithOperationsWithoutTypeAnnotations(MyServiceHandler):
+class MyServiceHandlerWithOperationsWithoutTypeAnnotations:
     @sync_operation
     async def sync_operation_without_type_annotations(self, ctx, input):
         # Despite the lack of type annotations, the input type from the op definition in
@@ -820,13 +820,7 @@ class SyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
     expected = SuccessfulResponse(
         status_code=200,
         body_json={
-            "value": "from start method on MyServiceHandler without type annotations: Input(value='hello')"
-        },
-    )
-    expected_without_service_definition = SuccessfulResponse(
-        status_code=200,
-        body_json={
-            "value": "from start method on MyServiceHandler without type annotations: {'value': 'hello'}"
+            "value": "from start method on MyServiceHandlerWithOperationsWithoutTypeAnnotations without type annotations: Input(value='hello')"
         },
     )
 
@@ -837,6 +831,60 @@ class AsyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
     expected = SuccessfulResponse(
         status_code=201,
     )
+
+
+# Attempting to use the service_handler decorator on a class containing an operation
+# without type annotations is a validation error (test coverage in nexusrpc)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SyncHandlerHappyPathWithoutTypeAnnotations,
+        AsyncHandlerHappyPathWithoutTypeAnnotations,
+    ],
+)
+async def test_start_operation_without_type_annotations(
+    test_case: Type[_TestCase], env: WorkflowEnvironment
+):
+    if test_case.skip:
+        pytest.skip(test_case.skip)
+    task_queue = str(uuid.uuid4())
+    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    service_client = ServiceClient(
+        server_address=server_address(env),
+        endpoint=endpoint,
+        service=MyServiceWithOperationsWithoutTypeAnnotations.__name__,
+    )
+
+    with pytest.WarningsRecorder() as warnings:
+        decorator = service_handler(
+            service=MyServiceWithOperationsWithoutTypeAnnotations
+        )
+        user_service_handler = decorator(
+            MyServiceHandlerWithOperationsWithoutTypeAnnotations
+        )()
+
+        async with Worker(
+            env.client,
+            task_queue=task_queue,
+            nexus_service_handlers=[user_service_handler],
+            nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+        ):
+            response = await service_client.start_operation(
+                test_case.operation,
+                dataclass_as_dict(test_case.input),
+                test_case.headers,
+            )
+            test_case.check_response(response, with_service_definition=True)
+
+    assert not any(warnings), [w.message for w in warnings]
+
+
+def test_operation_without_type_annotations_without_service_definition_raises_validation_error():
+    with pytest.raises(
+        ValueError,
+        match=r"has no input type.+has no output type",
+    ):
+        service_handler(MyServiceHandlerWithOperationsWithoutTypeAnnotations)
 
 
 async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: Any):
