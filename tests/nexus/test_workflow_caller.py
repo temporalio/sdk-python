@@ -1164,47 +1164,211 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 #     io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='application error 1', type='APPLICATION_ERROR', nonRetryable=true)
 #         io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='Custom error 2', type='io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException', nonRetryable=false)
 
-#   @OperationImpl
-#   public OperationHandler<NexusService.ErrorTestInput, NexusService.ErrorTestOutput> testError() {
-#     return OperationHandler.sync(
-#         (ctx, details, input) -> {
-#           switch (input.getAction()) {
-#             case RAISE_APPLICATION_ERROR:
-#               throw ApplicationFailure.newNonRetryableFailure(
-#                   "application error 1", "APPLICATION_ERROR");
-#             case RAISE_CUSTOM_ERROR:
-#               throw new MyCustomException("Custom error 1");
-#             case RAISE_CUSTOM_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
-#               // ** THIS DOESN'T WORK **: CHAINED CUSTOM EXCEPTIONS DON'T SERIALIZE
-#               MyCustomException customError = new MyCustomException("Custom error 1");
-#               customError.initCause(new MyCustomException("Custom error 2"));
-#               throw customError;
-#             case RAISE_APPLICATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
-#               throw ApplicationFailure.newNonRetryableFailureWithCause(
-#                   "application error 1",
-#                   "APPLICATION_ERROR",
-#                   new MyCustomException("Custom error 2"));
-#             case RAISE_NEXUS_HANDLER_ERROR:
-#               throw new HandlerException(HandlerException.ErrorType.NOT_FOUND, "Handler error 1");
-#             case RAISE_NEXUS_HANDLER_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
-#               // ** THIS DOESN'T WORK **
-#               // Can't overwrite cause with
-#               // io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException: Custom error
-#               // 2
-#               HandlerException handlerErr =
-#                   new HandlerException(HandlerException.ErrorType.NOT_FOUND, "Handler error 1");
-#               handlerErr.initCause(new MyCustomException("Custom error 2"));
-#               throw handlerErr;
-#             case RAISE_NEXUS_OPERATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
-#               throw OperationException.failure(
-#                   ApplicationFailure.newNonRetryableFailureWithCause(
-#                       "application error 1",
-#                       "APPLICATION_ERROR",
-#                       new MyCustomException("Custom error 2")));
-#           }
-#           return new NexusService.ErrorTestOutput("Unreachable");
-#         });
-#   }
+
+@dataclass
+class ErrorConversionTestCase:
+    name: str
+    java_behavior: list[tuple[type[Exception], dict[str, Any]]]
+
+
+error_conversion_test_cases = []
+
+
+# application_error_non_retryable:
+_ = ["NexusOperationError", "HandlerError"]
+# Java
+_ = [
+    "NexusOperationError",
+    "HandlerError('handler error: application error', type='APPLICATION_ERROR', non_retryable=True)",
+    "ApplicationError('application error', type='APPLICATION_ERROR', non_retryable=True)",
+]
+
+error_conversion_test_cases.append(
+    ErrorConversionTestCase(
+        name="application_error_non_retryable",
+        java_behavior=[
+            (NexusOperationError, {}),
+            (
+                nexusrpc.HandlerError,
+                {
+                    "message": "application error",
+                    "type": "APPLICATION_ERROR",
+                    "non_retryable": True,
+                },
+            ),
+            (
+                ApplicationError,
+                {
+                    "message": "application error",
+                    "type": "APPLICATION_ERROR",
+                    "non_retryable": True,
+                },
+            ),
+        ],
+    )
+)
+
+
+# custom_error:
+_ = ["NexusOperationError", "HandlerError"]
+# Java
+_ = [
+    "NexusOperationError",
+    "HandlerError('Custom error wrapped: custom error', type='CUSTOM_ERROR', non_retryable=True)",
+    "ApplicationError('Custom error wrapped: custom error', type='CUSTOM_ERROR', non_retryable=True)",
+]
+error_conversion_test_cases.append(
+    ErrorConversionTestCase(
+        name="custom_error",
+        java_behavior=[
+            (NexusOperationError, {}),
+            (
+                nexusrpc.HandlerError,
+                {
+                    "message": "Custom error wrapped: custom error",
+                    "type": "CUSTOM_ERROR",
+                    "non_retryable": True,
+                },
+            ),
+            (
+                ApplicationError,
+                {
+                    "message": "Custom error wrapped: custom error",
+                    "type": "CUSTOM_ERROR",
+                    "non_retryable": True,
+                },
+            ),
+        ],
+    )
+)
+
+
+# custom_error_from_custom_error:
+_ = ["NexusOperationError", "HandlerError"]
+# Java
+# [Not possible]
+
+# application_error_non_retryable_from_custom_error:
+_ = ["NexusOperationError", "HandlerError"]
+# Java
+_ = [
+    "NexusOperationError",
+    "HandlerError('handler error: application error', type='APPLICATION_ERROR', non_retryable=True)",
+    "ApplicationError('application error', type='APPLICATION_ERROR', non_retryable=True)",
+    "ApplicationError('custom error', type='MyCustomException', non_retryable=False)",
+]
+
+error_conversion_test_cases.append(
+    ErrorConversionTestCase(
+        name="application_error_non_retryable_from_custom_error",
+        java_behavior=[
+            (NexusOperationError, {}),
+            (
+                nexusrpc.HandlerError,
+                {
+                    "message": "handler error: application error",
+                    "type": "APPLICATION_ERROR",
+                    "non_retryable": True,
+                },
+            ),
+            (
+                ApplicationError,
+                {
+                    "message": "application error",
+                    "type": "APPLICATION_ERROR",
+                    "non_retryable": True,
+                },
+            ),
+            (
+                ApplicationError,
+                {
+                    "message": "custom error",
+                    "type": "MyCustomException",
+                    "non_retryable": False,
+                },
+            ),
+        ],
+    )
+)
+
+# nexus_handler_error_not_found:
+_ = ["NexusOperationError", "HandlerError"]
+# Java
+_ = [
+    "NexusOperationError",
+    "HandlerError('handler error: handler error', type='RuntimeException', non_retryable=False)",
+    "ApplicationError('handler error', type='RuntimeException', non_retryable=False)",
+]
+
+error_conversion_test_cases.append(
+    ErrorConversionTestCase(
+        name="application_error_non_retryable_from_custom_error",
+        java_behavior=[
+            (NexusOperationError, {}),
+            (
+                nexusrpc.HandlerError,
+                {
+                    "message": "handler error: handler error",
+                    "type": "RuntimeException",
+                    "non_retryable": False,
+                },
+            ),
+            (
+                ApplicationError,
+                {
+                    "message": "handler error",
+                    "type": "RuntimeException",
+                    "non_retryable": False,
+                },
+            ),
+        ],
+    )
+)
+
+# nexus_handler_error_not_found_from_custom_error:
+_ = ["NexusOperationError", "HandlerError"]
+# Java
+# [Not possible]
+error_conversion_test_cases.append(
+    ErrorConversionTestCase(
+        name="nexus_handler_error_not_found",
+        java_behavior=[],  # [Not possible]
+    )
+)
+
+
+# nexus_operation_error_from_application_error_non_retryable_from_custom_error:
+_ = ["NexusOperationError", "ApplicationError", "ApplicationError", "ApplicationError"]
+# Java
+_ = [
+    "NexusOperationError",
+    "ApplicationError('application error', type='APPLICATION_ERROR', non_retryable=True)",
+    "ApplicationError('custom error', type='MyCustomException', non_retryable=False)",
+]
+error_conversion_test_cases.append(
+    ErrorConversionTestCase(
+        name="nexus_operation_error_from_application_error_non_retryable_from_custom_error",
+        java_behavior=[
+            (NexusOperationError, {}),
+            (
+                ApplicationError,
+                {
+                    "message": "application error",
+                    "type": "APPLICATION_ERROR",
+                    "non_retryable": True,
+                },
+            ),
+            (
+                ApplicationError,
+                {
+                    "message": "custom error",
+                    "type": "MyCustomException",
+                    "non_retryable": False,
+                },
+            ),
+        ],
+    )
+)
 
 
 ActionInSyncOp = Literal[
@@ -1344,15 +1508,3 @@ async def test_errors_raised_by_nexus_operation(
         )
 
         print(f"\n\n\n{action_in_sync_op}: \n", result, "\n\n\n")
-
-        # if action_in_sync_op == "handler_error":
-        #     assert result == ["NexusOperationError", "HandlerError"]
-        # elif action_in_sync_op == "operation_error":
-        #     assert result == ["NexusOperationError", "ApplicationError"]
-        # elif action_in_sync_op == "custom_error":
-        #     # assert result == ["NexusOperationError", "CustomError"]
-        #     pass
-        # else:
-        #     raise NotImplementedError(
-        #         f"Unhandled action_in_sync_op: {action_in_sync_op}"
-        #     )
