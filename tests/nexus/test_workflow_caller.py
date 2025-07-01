@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass
 from enum import IntEnum
+from itertools import zip_longest
 from typing import Any, Callable, Literal, Union
 
 import nexusrpc
@@ -1164,11 +1165,33 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 #     io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='application error 1', type='APPLICATION_ERROR', nonRetryable=true)
 #         io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='Custom error 2', type='io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException', nonRetryable=false)
 
+ActionInSyncOp = Literal[
+    "application_error_non_retryable",
+    "custom_error",
+    "custom_error_from_custom_error",
+    "application_error_non_retryable_from_custom_error",
+    "nexus_handler_error_not_found",
+    "nexus_handler_error_not_found_from_custom_error",
+    "nexus_operation_error_from_application_error_non_retryable_from_custom_error",
+]
+
 
 @dataclass
 class ErrorConversionTestCase:
-    name: str
+    name: ActionInSyncOp
     java_behavior: list[tuple[type[Exception], dict[str, Any]]]
+
+    @staticmethod
+    def parse_exception(
+        exception: BaseException,
+    ) -> tuple[type[BaseException], dict[str, Any]]:
+        if isinstance(exception, NexusOperationError):
+            return NexusOperationError, {}
+        return type(exception), {
+            "message": getattr(exception, "message", None),
+            "type": getattr(exception, "type", None),
+            "non_retryable": getattr(exception, "non_retryable", None),
+        }
 
 
 error_conversion_test_cases = []
@@ -1247,6 +1270,13 @@ error_conversion_test_cases.append(
 _ = ["NexusOperationError", "HandlerError"]
 # Java
 # [Not possible]
+error_conversion_test_cases.append(
+    ErrorConversionTestCase(
+        name="custom_error_from_custom_error",
+        java_behavior=[],  # [Not possible]
+    )
+)
+
 
 # application_error_non_retryable_from_custom_error:
 _ = ["NexusOperationError", "HandlerError"]
@@ -1302,7 +1332,7 @@ _ = [
 
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
-        name="application_error_non_retryable_from_custom_error",
+        name="nexus_handler_error_not_found",
         java_behavior=[
             (NexusOperationError, {}),
             (
@@ -1331,7 +1361,7 @@ _ = ["NexusOperationError", "HandlerError"]
 # [Not possible]
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
-        name="nexus_handler_error_not_found",
+        name="nexus_handler_error_not_found_from_custom_error",
         java_behavior=[],  # [Not possible]
     )
 )
@@ -1369,17 +1399,6 @@ error_conversion_test_cases.append(
         ],
     )
 )
-
-
-ActionInSyncOp = Literal[
-    "application_error_non_retryable",
-    "custom_error",
-    "custom_error_from_custom_error",
-    "application_error_non_retryable_from_custom_error",
-    "nexus_handler_error_not_found",
-    "nexus_handler_error_not_found_from_custom_error",
-    "nexus_operation_error_from_application_error_non_retryable_from_custom_error",
-]
 
 
 class CustomError(Exception):
@@ -1453,9 +1472,10 @@ class ErrorTestCallerWorkflow:
             service=ErrorTestService,
             endpoint=make_nexus_endpoint_name(input.task_queue),
         )
+        self.test_cases = {t.name: t for t in error_conversion_test_cases}
 
     @workflow.run
-    async def run(self, input: ErrorTestInput) -> list[str]:
+    async def run(self, input: ErrorTestInput) -> None:
         try:
             await self.nexus_client.execute_operation(
                 # TODO(nexus-preview): why wasn't this a type error?
@@ -1470,7 +1490,26 @@ class ErrorTestCallerWorkflow:
             while err.__cause__:
                 errs.append(err.__cause__)
                 err = err.__cause__
-            return [type(err).__name__ for err in errs]
+            actual = [ErrorConversionTestCase.parse_exception(err) for err in errs]
+            results = list(
+                zip_longest(
+                    self.test_cases[input.action_in_sync_op].java_behavior,
+                    actual,
+                    fillvalue=None,
+                )
+            )
+            print(f"""
+
+{input.action_in_sync_op}
+{'-' * 80}
+""")
+            for java_behavior, actual in results:
+                print(f"Java:   {java_behavior}")
+                print(f"Python: {actual}")
+                print()
+            print("-" * 80)
+            return None
+
         assert False, "Unreachable"
 
 
@@ -1497,7 +1536,7 @@ async def test_errors_raised_by_nexus_operation(
         task_queue=task_queue,
     ):
         await create_nexus_endpoint(task_queue, client)
-        result = await client.execute_workflow(
+        await client.execute_workflow(
             ErrorTestCallerWorkflow.run,
             ErrorTestInput(
                 task_queue=task_queue,
@@ -1506,5 +1545,3 @@ async def test_errors_raised_by_nexus_operation(
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
-
-        print(f"\n\n\n{action_in_sync_op}: \n", result, "\n\n\n")
