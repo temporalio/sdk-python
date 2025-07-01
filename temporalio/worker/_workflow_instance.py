@@ -1626,7 +1626,9 @@ class _WorkflowInstanceImpl(
                             or _WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY
                             in self._current_internal_flags
                         ):
-                            self._current_completion.successful.used_internal_flags.append(_WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY)
+                            self._current_completion.successful.used_internal_flags.append(
+                                _WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY
+                            )
                             raise
                     # Send a cancel request to the activity
                     handle._apply_cancel_command(self._add_command())
@@ -3135,4 +3137,3 @@ class _WorkflowLogicFlag(IntEnum):
     """Flags that may be set on task/activation completion to differentiate new from old workflow behavior."""
 
     RAISE_ON_CANCELLING_COMPLETED_ACTIVITY = 1
-
