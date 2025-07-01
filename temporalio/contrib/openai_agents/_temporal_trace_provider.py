@@ -79,7 +79,6 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
     def __init__(
         self, impl: SynchronousMultiTracingProcessor, auto_close_in_workflows: bool
     ):
-        print("Auto close in workflow tracing:", auto_close_in_workflows)
         super().__init__()
         self._impl = impl
         self._auto_close_in_workflows = auto_close_in_workflows
