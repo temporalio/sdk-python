@@ -96,8 +96,6 @@ class MyService:
     log: nexusrpc.Operation[Input, Output]
     workflow_run_operation_happy_path: nexusrpc.Operation[Input, Output]
     sync_operation_with_non_async_def: nexusrpc.Operation[Input, Output]
-    # TODO(nexus-prerelease): fix tests of callable instances
-    # sync_operation_with_non_async_callable_instance: nexusrpc.Operation[Input, Output]
     operation_returning_unwrapped_result_at_runtime_error: nexusrpc.Operation[
         Input, Output
     ]
@@ -236,29 +234,6 @@ class MyServiceHandler:
     ) -> Output:
         return Output(
             value=f"from start method on {self.__class__.__name__}: {input.value}"
-        )
-
-    if False:
-        # TODO(nexus-prerelease): fix tests of callable instances
-        def sync_operation_with_non_async_callable_instance(
-            self,
-        ) -> OperationHandler[Input, Output]:
-            class start:
-                def __call__(
-                    self,
-                    ctx: StartOperationContext,
-                    input: Input,
-                ) -> Output:
-                    return Output(
-                        value=f"from start method on {self.__class__.__name__}: {input.value}"
-                    )
-
-            return sync_operation(start())
-
-        _sync_operation_with_non_async_callable_instance = operation_handler(
-            name="sync_operation_with_non_async_callable_instance",
-        )(
-            sync_operation_with_non_async_callable_instance,
         )
 
     @workflow_run_operation
@@ -472,16 +447,6 @@ class SyncHandlerHappyPathNonAsyncDef(_TestCase):
     )
 
 
-class SyncHandlerHappyPathWithNonAsyncCallableInstance(_TestCase):
-    operation = "sync_operation_with_non_async_callable_instance"
-    input = Input("hello")
-    expected = SuccessfulResponse(
-        status_code=200,
-        body_json={"value": "from start method on MyServiceHandler: hello"},
-    )
-    skip = "TODO(nexus-prerelease): fix tests of callable instances"
-
-
 class AsyncHandlerHappyPath(_TestCase):
     operation = "workflow_run_operation_happy_path"
     input = Input("hello")
@@ -671,8 +636,6 @@ class NonSerializableOutputFailure(_FailureTestCase):
         SyncHandlerHappyPath,
         SyncHandlerHappyPathRenamed,
         SyncHandlerHappyPathNonAsyncDef,
-        # TODO(nexus-prerelease): make callable instance work
-        # SyncHandlerHappyPathWithNonAsyncCallableInstance,
         AsyncHandlerHappyPath,
         WorkflowRunOpLinkTestHappyPath,
     ],
