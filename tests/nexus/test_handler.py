@@ -95,8 +95,6 @@ class MyService:
     hang: nexusrpc.Operation[Input, Output]
     log: nexusrpc.Operation[Input, Output]
     workflow_run_operation_happy_path: nexusrpc.Operation[Input, Output]
-    workflow_run_operation_without_type_annotations: nexusrpc.Operation[Input, Output]
-    sync_operation_without_type_annotations: nexusrpc.Operation[Input, Output]
     sync_operation_with_non_async_def: nexusrpc.Operation[Input, Output]
     # TODO(nexus-prerelease): fix tests of callable instances
     # sync_operation_with_non_async_callable_instance: nexusrpc.Operation[Input, Output]
@@ -261,22 +259,6 @@ class MyServiceHandler:
             name="sync_operation_with_non_async_callable_instance",
         )(
             sync_operation_with_non_async_callable_instance,
-        )
-
-    @sync_operation
-    async def sync_operation_without_type_annotations(self, ctx, input):
-        # Despite the lack of type annotations, the input type from the op definition in
-        # the service definition is used to deserialize the input.
-        return Output(
-            value=f"from start method on {self.__class__.__name__} without type annotations: {input}"
-        )
-
-    @workflow_run_operation
-    async def workflow_run_operation_without_type_annotations(self, ctx, input):
-        return await ctx.start_workflow(
-            WorkflowWithoutTypeAnnotations.run,
-            input,
-            id=str(uuid.uuid4()),
         )
 
     @workflow_run_operation
@@ -500,35 +482,10 @@ class SyncHandlerHappyPathWithNonAsyncCallableInstance(_TestCase):
     skip = "TODO(nexus-prerelease): fix tests of callable instances"
 
 
-class SyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
-    operation = "sync_operation_without_type_annotations"
-    input = Input("hello")
-    expected = SuccessfulResponse(
-        status_code=200,
-        body_json={
-            "value": "from start method on MyServiceHandler without type annotations: Input(value='hello')"
-        },
-    )
-    expected_without_service_definition = SuccessfulResponse(
-        status_code=200,
-        body_json={
-            "value": "from start method on MyServiceHandler without type annotations: {'value': 'hello'}"
-        },
-    )
-
-
 class AsyncHandlerHappyPath(_TestCase):
     operation = "workflow_run_operation_happy_path"
     input = Input("hello")
     headers = {"Operation-Timeout": "777s"}
-    expected = SuccessfulResponse(
-        status_code=201,
-    )
-
-
-class AsyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
-    operation = "workflow_run_operation_without_type_annotations"
-    input = Input("hello")
     expected = SuccessfulResponse(
         status_code=201,
     )
@@ -716,9 +673,7 @@ class NonSerializableOutputFailure(_FailureTestCase):
         SyncHandlerHappyPathNonAsyncDef,
         # TODO(nexus-prerelease): make callable instance work
         # SyncHandlerHappyPathWithNonAsyncCallableInstance,
-        SyncHandlerHappyPathWithoutTypeAnnotations,
         AsyncHandlerHappyPath,
-        AsyncHandlerHappyPathWithoutTypeAnnotations,
         WorkflowRunOpLinkTestHappyPath,
     ],
 )
@@ -805,6 +760,55 @@ async def _test_start_operation(
             test_case.check_response(response, with_service_definition)
 
     assert not any(warnings), [w.message for w in warnings]
+
+
+@nexusrpc.service
+class MyServiceWithOperationsWithoutTypeAnnotations(MyService):
+    workflow_run_operation_without_type_annotations: nexusrpc.Operation[Input, Output]
+    sync_operation_without_type_annotations: nexusrpc.Operation[Input, Output]
+
+
+class MyServiceHandlerWithOperationsWithoutTypeAnnotations(MyServiceHandler):
+    @sync_operation
+    async def sync_operation_without_type_annotations(self, ctx, input):
+        # Despite the lack of type annotations, the input type from the op definition in
+        # the service definition is used to deserialize the input.
+        return Output(
+            value=f"from start method on {self.__class__.__name__} without type annotations: {input}"
+        )
+
+    @workflow_run_operation
+    async def workflow_run_operation_without_type_annotations(self, ctx, input):
+        return await ctx.start_workflow(
+            WorkflowWithoutTypeAnnotations.run,
+            input,
+            id=str(uuid.uuid4()),
+        )
+
+
+class SyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
+    operation = "sync_operation_without_type_annotations"
+    input = Input("hello")
+    expected = SuccessfulResponse(
+        status_code=200,
+        body_json={
+            "value": "from start method on MyServiceHandler without type annotations: Input(value='hello')"
+        },
+    )
+    expected_without_service_definition = SuccessfulResponse(
+        status_code=200,
+        body_json={
+            "value": "from start method on MyServiceHandler without type annotations: {'value': 'hello'}"
+        },
+    )
+
+
+class AsyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
+    operation = "workflow_run_operation_without_type_annotations"
+    input = Input("hello")
+    expected = SuccessfulResponse(
+        status_code=201,
+    )
 
 
 async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: Any):
