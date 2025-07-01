@@ -2,7 +2,7 @@ import os
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, Union, no_type_check
+from typing import Any, Optional, Union, no_type_check, cast
 
 import pytest
 from pydantic import ConfigDict, Field
@@ -64,8 +64,8 @@ with workflow.unsafe.imports_passed_through():
         ResponseFunctionToolCall,
         ResponseFunctionWebSearch,
         ResponseOutputMessage,
-        ResponseOutputText,
-    )
+        ResponseOutputText, EasyInputMessageParam,
+)
     from openai.types.responses.response_function_web_search import ActionSearch
     from openai.types.responses.response_prompt_param import ResponsePromptParam
 
@@ -98,6 +98,7 @@ class TestModel(OpenAIResponsesModel):
     ) -> None:
         global response_index
         response_index = 0
+        self.inputs: list[Union[str, list[TResponseInputItem]]] = []
         super().__init__(model, openai_client)
 
     async def get_response(
@@ -115,6 +116,7 @@ class TestModel(OpenAIResponsesModel):
         global response_index
         response = self.responses[response_index]
         response_index += 1
+        self.inputs.append(input)
         return response
 
 
@@ -805,12 +807,11 @@ async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
 
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
     with set_open_ai_agent_temporal_overrides(model_params):
-        model_activity = ModelActivity(
-            TestProvider(
-                AgentAsToolsModel(  # type: ignore
+        model = AgentAsToolsModel(  # type: ignore
                     "", openai_client=AsyncOpenAI(api_key="Fake key")
                 )
-            )
+        model_activity = ModelActivity(
+            TestProvider(model)
             if use_local_model
             else None
         )
@@ -862,7 +863,7 @@ async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
                     .activity_task_completed_event_attributes.result.payloads[0]
                     .data.decode()
                 )
-
+                assert isinstance(cast(EasyInputMessageParam, model.inputs[3][3])["content"], list)
 
 class AirlineAgentContext(BaseModel):
     passenger_name: Optional[str] = None
