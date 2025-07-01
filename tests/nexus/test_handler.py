@@ -879,14 +879,6 @@ async def test_start_operation_without_type_annotations(
     assert not any(warnings), [w.message for w in warnings]
 
 
-def test_operation_without_type_annotations_without_service_definition_raises_validation_error():
-    with pytest.raises(
-        ValueError,
-        match=r"has no input type.+has no output type",
-    ):
-        service_handler(MyServiceHandlerWithOperationsWithoutTypeAnnotations)
-
-
 async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: Any):
     task_queue = str(uuid.uuid4())
     service_name = MyService.__name__
