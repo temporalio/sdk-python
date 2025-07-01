@@ -98,7 +98,7 @@ class TestModel(OpenAIResponsesModel):
     ) -> None:
         global response_index
         response_index = 0
-        self.inputs = []
+        self.inputs: list[Union[str, list[TResponseInputItem]]] = []
         super().__init__(model, openai_client)
 
     async def get_response(
