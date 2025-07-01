@@ -1,5 +1,5 @@
 """Support for using Temporal activities as OpenAI agents tools."""
-
+import inspect
 import json
 from datetime import timedelta
 from typing import Any, Callable, Optional
@@ -86,6 +86,11 @@ def activity_as_tool(
 
         # Activities don't support keyword only arguments, so we can ignore the kwargs_dict return
         args, _ = schema.to_call_args(schema.params_pydantic_model(**json_data))
+
+        # Add the context to the arguments if it takes that
+        if schema.takes_context:
+            args = [ctx] + args
+
         result = await workflow.execute_activity(
             fn,
             args=args,
