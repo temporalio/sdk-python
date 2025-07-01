@@ -683,7 +683,10 @@ async def test_start_operation_happy_path(
     with_service_definition: bool,
     env: WorkflowEnvironment,
 ):
-    await _test_start_operation(test_case, with_service_definition, env)
+    if with_service_definition:
+        await _test_start_operation_with_service_definition(test_case, env)
+    else:
+        await _test_start_operation_without_service_definition(test_case, env)
 
 
 @pytest.mark.parametrize(
@@ -702,7 +705,7 @@ async def test_start_operation_happy_path(
 async def test_start_operation_protocol_level_failures(
     test_case: Type[_TestCase], env: WorkflowEnvironment
 ):
-    await _test_start_operation(test_case, True, env)
+    await _test_start_operation_with_service_definition(test_case, env)
 
 
 @pytest.mark.parametrize(
@@ -716,12 +719,11 @@ async def test_start_operation_protocol_level_failures(
 async def test_start_operation_operation_failures(
     test_case: Type[_TestCase], env: WorkflowEnvironment
 ):
-    await _test_start_operation(test_case, True, env)
+    await _test_start_operation_with_service_definition(test_case, env)
 
 
-async def _test_start_operation(
+async def _test_start_operation_with_service_definition(
     test_case: Type[_TestCase],
-    with_service_definition: bool,
     env: WorkflowEnvironment,
 ):
     if test_case.skip:
@@ -731,19 +733,11 @@ async def _test_start_operation(
     service_client = ServiceClient(
         server_address=server_address(env),
         endpoint=endpoint,
-        service=(
-            test_case.service_defn
-            if with_service_definition
-            else MyServiceHandler.__name__
-        ),
+        service=(test_case.service_defn),
     )
 
     with pytest.WarningsRecorder() as warnings:
-        decorator = (
-            service_handler(service=MyService)
-            if with_service_definition
-            else service_handler
-        )
+        decorator = service_handler(service=MyService)
         user_service_handler = decorator(MyServiceHandler)()
 
         async with Worker(
@@ -757,7 +751,41 @@ async def _test_start_operation(
                 dataclass_as_dict(test_case.input),
                 test_case.headers,
             )
-            test_case.check_response(response, with_service_definition)
+            test_case.check_response(response, with_service_definition=True)
+
+    assert not any(warnings), [w.message for w in warnings]
+
+
+async def _test_start_operation_without_service_definition(
+    test_case: Type[_TestCase],
+    env: WorkflowEnvironment,
+):
+    if test_case.skip:
+        pytest.skip(test_case.skip)
+    task_queue = str(uuid.uuid4())
+    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    service_client = ServiceClient(
+        server_address=server_address(env),
+        endpoint=endpoint,
+        service=MyServiceHandler.__name__,
+    )
+
+    with pytest.WarningsRecorder() as warnings:
+        decorator = service_handler
+        user_service_handler = decorator(MyServiceHandler)()
+
+        async with Worker(
+            env.client,
+            task_queue=task_queue,
+            nexus_service_handlers=[user_service_handler],
+            nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+        ):
+            response = await service_client.start_operation(
+                test_case.operation,
+                dataclass_as_dict(test_case.input),
+                test_case.headers,
+            )
+            test_case.check_response(response, with_service_definition=False)
 
     assert not any(warnings), [w.message for w in warnings]
 
