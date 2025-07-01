@@ -1622,14 +1622,11 @@ class _WorkflowInstanceImpl(
                     if handle._result_fut.done():
                         # TODO in next release, check sdk flag when not replaying instead of global override, remove the override, and set flag use
                         if (
-                            (
-                                not self._is_replaying
-                                and _raise_on_cancelling_completed_activity_override
-                            )
+                            not self._is_replaying
                             or _WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY
                             in self._current_internal_flags
                         ):
-                            # self._current_completion.successful.used_internal_flags.append(WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY)
+                            self._current_completion.successful.used_internal_flags.append(_WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY)
                             raise
                     # Send a cancel request to the activity
                     handle._apply_cancel_command(self._add_command())
@@ -3139,6 +3136,3 @@ class _WorkflowLogicFlag(IntEnum):
 
     RAISE_ON_CANCELLING_COMPLETED_ACTIVITY = 1
 
-
-# Used by tests to validate behavior prior to SDK flag becoming default
-_raise_on_cancelling_completed_activity_override = False
