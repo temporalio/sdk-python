@@ -1,12 +1,14 @@
 """Support for using Temporal activities as OpenAI agents tools."""
 
 import json
+import typing
 from datetime import timedelta
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Type
 
 from temporalio import activity, workflow
 from temporalio.common import Priority, RetryPolicy
 from temporalio.exceptions import ApplicationError, TemporalError
+from temporalio.nexus._util import get_operation_factory
 from temporalio.workflow import ActivityCancellationType, VersioningIntent, unsafe
 
 with unsafe.imports_passed_through():
@@ -115,3 +117,102 @@ def activity_as_tool(
         on_invoke_tool=run_activity,
         strict_json_schema=True,
     )
+
+
+def nexus_operation_as_tool(
+    fn: Callable,
+    *,
+    service: Type[Any],
+    endpoint: str,
+    schedule_to_close_timeout: Optional[timedelta] = None,
+) -> Tool:
+    """Convert a Nexus operation into an OpenAI agent tool.
+
+    .. warning::
+        This API is experimental and may change in future versions.
+        Use with caution in production environments.
+
+    This function takes a Nexus operation and converts it into an
+    OpenAI agent tool that can be used by the agent to execute the operation
+    during workflow execution. The tool will automatically handle the conversion
+    of inputs and outputs between the agent and the operation.
+
+    Args:
+        fn: A Nexus operation to convert into a tool.
+        service: The Nexus service class that contains the operation.
+        endpoint: The Nexus endpoint to use for the operation.
+
+    Returns:
+        An OpenAI agent tool that wraps the provided operation.
+
+    Raises:
+        ApplicationError: If the operation is not properly decorated as a Nexus operation.
+
+    Example:
+        >>> @service_handler
+        >>> class WeatherServiceHandler:
+        ...     @sync_operation
+        ...     async def get_weather_object(self, ctx: StartOperationContext, input: WeatherInput) -> Weather:
+        ...         return Weather(
+        ...             city=input.city, temperature_range="14-20C", conditions="Sunny with wind."
+        ...         )
+        >>>
+        >>> # Create tool with custom activity options
+        >>> tool = nexus_operation_as_tool(
+        ...     WeatherServiceHandler.get_weather_object,
+        ...     service=WeatherServiceHandler,
+        ...     endpoint="weather-service",
+        ... )
+        >>> # Use tool with an OpenAI agent
+    """
+    if not get_operation_factory(fn):
+        raise ApplicationError(
+            "Function is not a Nexus operation",
+            "invalid_tool",
+        )
+
+    schema = function_schema(adapt_nexus_operation_function_schema(fn))
+
+    async def run_operation(ctx: RunContextWrapper[Any], input: str) -> Any:
+        try:
+            json_data = json.loads(input)
+        except Exception as e:
+            raise ApplicationError(
+                f"Invalid JSON input for tool {schema.name}: {input}"
+            ) from e
+
+        nexus_client = workflow.NexusClient(service=service, endpoint=endpoint)
+        args, _ = schema.to_call_args(schema.params_pydantic_model(**json_data))
+        assert len(args) == 1, "Nexus operations must have exactly one argument"
+        [arg] = args
+        result = await nexus_client.execute_operation(
+            fn,
+            arg,
+            schedule_to_close_timeout=schedule_to_close_timeout,
+        )
+        try:
+            return str(result)
+        except Exception as e:
+            raise ToolSerializationError(
+                "You must return a string representation of the tool output, or something we can call str() on"
+            ) from e
+
+    return FunctionTool(
+        name=schema.name,
+        description=schema.description or "",
+        params_json_schema=schema.params_json_schema,
+        on_invoke_tool=run_operation,
+        strict_json_schema=True,
+    )
+
+
+def adapt_nexus_operation_function_schema(fn: Callable[..., Any]) -> Callable[..., Any]:
+    # Nexus operation start methods look like
+    # async def operation(self, ctx: StartOperationContext, input: InputType) -> OutputType
+    _, inputT, retT = typing.get_type_hints(fn).values()
+
+    def adapted(input: inputT) -> retT:  # type: ignore
+        pass
+
+    adapted.__name__ = fn.__name__
+    return adapted
