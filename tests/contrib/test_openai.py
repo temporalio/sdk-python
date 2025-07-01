@@ -6,6 +6,48 @@ from datetime import timedelta
 from typing import Any, Optional, Union, no_type_check
 
 import pytest
+from agents import (
+    Agent,
+    AgentOutputSchemaBase,
+    GuardrailFunctionOutput,
+    Handoff,
+    InputGuardrailTripwireTriggered,
+    ItemHelpers,
+    MessageOutputItem,
+    Model,
+    ModelProvider,
+    ModelResponse,
+    ModelSettings,
+    ModelTracing,
+    OpenAIResponsesModel,
+    OutputGuardrailTripwireTriggered,
+    RunContextWrapper,
+    Runner,
+    Tool,
+    TResponseInputItem,
+    Usage,
+    function_tool,
+    handoff,
+    input_guardrail,
+    output_guardrail,
+    trace,
+)
+from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
+from agents.items import (
+    HandoffOutputItem,
+    ToolCallItem,
+    ToolCallOutputItem,
+)
+from agents.run import DEFAULT_AGENT_RUNNER, AgentRunner
+from openai import AsyncOpenAI, BaseModel
+from openai.types.responses import (
+    ResponseFunctionToolCall,
+    ResponseFunctionWebSearch,
+    ResponseOutputMessage,
+    ResponseOutputText,
+)
+from openai.types.responses.response_function_web_search import ActionSearch
+from openai.types.responses.response_prompt_param import ResponsePromptParam
 from pydantic import ConfigDict, Field
 
 from temporalio import activity, workflow
@@ -24,53 +66,8 @@ from temporalio.contrib.openai_agents.temporal_tools import activity_as_tool
 from temporalio.contrib.openai_agents.trace_interceptor import (
     OpenAIAgentsTracingInterceptor,
 )
+from tests.contrib.research_agents.research_manager import ResearchManager
 from tests.helpers import new_worker
-
-with workflow.unsafe.imports_passed_through():
-    from agents import (
-        Agent,
-        AgentOutputSchemaBase,
-        GuardrailFunctionOutput,
-        Handoff,
-        InputGuardrailTripwireTriggered,
-        ItemHelpers,
-        MessageOutputItem,
-        Model,
-        ModelProvider,
-        ModelResponse,
-        ModelSettings,
-        ModelTracing,
-        OpenAIResponsesModel,
-        OutputGuardrailTripwireTriggered,
-        RunContextWrapper,
-        Runner,
-        Tool,
-        TResponseInputItem,
-        Usage,
-        function_tool,
-        handoff,
-        input_guardrail,
-        output_guardrail,
-        trace,
-    )
-    from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
-    from agents.items import (
-        HandoffOutputItem,
-        ToolCallItem,
-        ToolCallOutputItem,
-    )
-    from agents.run import DEFAULT_AGENT_RUNNER, AgentRunner
-    from openai import AsyncOpenAI, BaseModel
-    from openai.types.responses import (
-        ResponseFunctionToolCall,
-        ResponseFunctionWebSearch,
-        ResponseOutputMessage,
-        ResponseOutputText,
-    )
-    from openai.types.responses.response_function_web_search import ActionSearch
-    from openai.types.responses.response_prompt_param import ResponsePromptParam
-
-    from tests.contrib.research_agents.research_manager import ResearchManager
 
 
 class TestProvider(ModelProvider):
