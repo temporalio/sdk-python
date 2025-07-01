@@ -97,6 +97,7 @@ class TestModel(OpenAIResponsesModel):
     ) -> None:
         global response_index
         response_index = 0
+        self.inputs = []
         super().__init__(model, openai_client)
 
     async def get_response(
@@ -114,6 +115,7 @@ class TestModel(OpenAIResponsesModel):
         global response_index
         response = self.responses[response_index]
         response_index += 1
+        self.inputs.append(input)
         return response
 
 
@@ -804,11 +806,12 @@ async def test_agents_as_tools_workflow(client: Client):
 
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=10))
     with set_open_ai_agent_temporal_overrides(model_params):
+        model = AgentAsToolsModel(  # type: ignore
+            "", openai_client=AsyncOpenAI(api_key="Fake key")
+        )
         model_activity = ModelActivity(
             TestProvider(
-                AgentAsToolsModel(  # type: ignore
-                    "", openai_client=AsyncOpenAI(api_key="Fake key")
-                )
+                model,
             )
         )
         async with new_worker(
@@ -857,6 +860,7 @@ async def test_agents_as_tools_workflow(client: Client):
                 .activity_task_completed_event_attributes.result.payloads[0]
                 .data.decode()
             )
+            assert isinstance(model.inputs[3][3]["content"], list)
 
 
 class AirlineAgentContext(BaseModel):

@@ -24,6 +24,7 @@ from agents import (
     WebSearchTool,
 )
 from agents.models.multi_provider import MultiProvider
+from pydantic_core import to_jsonable_python
 from typing_extensions import Required, TypedDict
 
 from temporalio import activity, workflow
@@ -139,7 +140,7 @@ class ModelActivity:
 
         # workaround for https://github.com/pydantic/pydantic/issues/9541
         # ValidatorIterator returned
-        input_json = json.dumps(input["input"], default=str)
+        input_json = json.dumps(to_jsonable_python(input["input"]))
         input_input = json.loads(input_json)
 
         def make_tool(tool: ToolInput) -> Tool:
