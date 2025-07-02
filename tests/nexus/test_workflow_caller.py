@@ -1483,7 +1483,6 @@ class ErrorTestCallerWorkflow:
     "action_in_sync_op",
     [
         "application_error_non_retryable",
-        "custom_error",
         "custom_error_from_custom_error",
         "application_error_non_retryable_from_custom_error",
         "nexus_handler_error_not_found",
