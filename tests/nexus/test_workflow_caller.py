@@ -51,9 +51,9 @@ from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
-# TODO(dan): test availability of Temporal client etc in async context set by worker
-# TODO(dan): test worker shutdown, wait_all_completed, drain etc
-# TODO(dan): test worker op handling failure
+# TODO(nexus-prerelease): test availability of Temporal client etc in async context set by worker
+# TODO(nexus-prerelease): test worker shutdown, wait_all_completed, drain etc
+# TODO(nexus-prerelease): test worker op handling failure
 
 # -----------------------------------------------------------------------------
 # Test definition
@@ -145,7 +145,7 @@ class HandlerWorkflow:
         )
 
 
-# TODO: make types pass pyright strict mode
+# TODO(nexus-prerelease): check type-checking passing in CI
 
 
 class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
@@ -156,7 +156,7 @@ class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
         StartOperationResultAsync,
     ]:
         if input.response_type.exception_in_operation_start:
-            # TODO(dan): don't think RPCError should be used here
+            # TODO(nexus-prerelease): don't think RPCError should be used here
             raise RPCError(
                 "RPCError INVALID_ARGUMENT in Nexus operation",
                 RPCStatusCode.INVALID_ARGUMENT,
@@ -381,7 +381,7 @@ class UntypedCallerWorkflow:
     def __init__(
         self, input: CallerWfInput, request_cancel: bool, task_queue: str
     ) -> None:
-        # TODO(dan): untyped caller cannot reference name of implementation. I think this is as it should be.
+        # TODO(nexus-prerelease): untyped caller cannot reference name of implementation. I think this is as it should be.
         service_name = "ServiceInterface"
         self.nexus_client = workflow.NexusClient(
             service=service_name,
@@ -427,9 +427,9 @@ class UntypedCallerWorkflow:
 #
 
 
-# TODO(dan): cross-namespace tests
-# TODO(dan): nexus endpoint pytest fixture?
-# TODO(dan): test headers
+# TODO(nexus-prerelease): cross-namespace tests
+# TODO(nexus-prerelease): nexus endpoint pytest fixture?
+# TODO(nexus-prerelease): test headers
 @pytest.mark.parametrize("exception_in_operation_start", [False, True])
 @pytest.mark.parametrize("request_cancel", [False, True])
 @pytest.mark.parametrize(
@@ -476,7 +476,7 @@ async def test_sync_response(
             task_queue=task_queue,
         )
 
-        # TODO(dan): check bidi links for sync operation
+        # TODO(nexus-prerelease): check bidi links for sync operation
 
         # The operation result is returned even when request_cancel=True, because the
         # response was synchronous and it could not be cancelled. See explanation below.
@@ -551,7 +551,7 @@ async def test_async_response(
             )
             return
 
-        # TODO(dan): race here? How do we know it hasn't been canceled already?
+        # TODO(nexus-prerelease): race here? How do we know it hasn't been canceled already?
         handler_wf_info = await handler_wf_handle.describe()
         assert handler_wf_info.status in [
             WorkflowExecutionStatus.RUNNING,
@@ -736,8 +736,8 @@ class ServiceClassNameOutput:
     name: str
 
 
-# TODO(dan): test interface op types not matching
-# TODO(dan): async and non-async cancel methods
+# TODO(nexus-prerelease): test interface op types not matching
+# TODO(nexus-prerelease): async and non-async cancel methods
 
 
 @nexusrpc.service
@@ -822,12 +822,12 @@ class ServiceInterfaceAndImplCallerWorkflow:
             endpoint=make_nexus_endpoint_name(task_queue),
         )
 
-        # TODO(dan): maybe not surprising that this doesn't type check given complexity of
+        # TODO(nexus-prerelease): maybe not surprising that this doesn't type check given complexity of
         # the union?
         return await nexus_client.execute_operation(service_cls.op, None)  # type: ignore
 
 
-# TODO(dan): check missing decorator behavior
+# TODO(nexus-prerelease): check missing decorator behavior
 
 
 async def test_service_interface_and_implementation_names(client: Client):
@@ -979,8 +979,8 @@ async def test_workflow_run_operation_can_execute_workflow_before_starting_backi
         assert result == "result-1-result-2"
 
 
-# TODO(dan): test invalid service interface implementations
-# TODO(dan): test caller passing output_type
+# TODO(nexus-prerelease): test invalid service interface implementations
+# TODO(nexus-prerelease): test caller passing output_type
 
 
 async def assert_caller_workflow_has_link_to_handler_workflow(
@@ -1444,10 +1444,10 @@ class ErrorTestCallerWorkflow:
     async def run(self, input: ErrorTestInput) -> None:
         try:
             await self.nexus_client.execute_operation(
-                # TODO(nexus-preview): why wasn't this a type error?
+                # TODO(nexus-prerelease): why wasn't this a type error?
                 #            ErrorTestService.op, ErrorTestCallerWfInput()
                 ErrorTestService.op,
-                # TODO(nexus-preview): why wasn't this a type error?
+                # TODO(nexus-prerelease): why wasn't this a type error?
                 # None
                 input,
             )
