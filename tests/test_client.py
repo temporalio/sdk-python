@@ -64,6 +64,7 @@ from temporalio.client import (
     SignalWorkflowInput,
     StartWorkflowInput,
     StartWorkflowUpdateInput,
+    TaskQueueType,
     TaskReachabilityType,
     TerminateWorkflowInput,
     WorkflowContinuedAsNewError,
@@ -1499,3 +1500,58 @@ async def test_cloud_client_simple():
         GetNamespaceRequest(namespace=os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"])
     )
     assert os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"] == result.namespace.namespace
+
+
+@workflow.defn
+class TaskQueueDescribeWorkflow:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        return f"Hello, {name}!"
+
+
+async def test_describe_task_queue(client: Client):
+    task_queue = f"tq-{uuid.uuid4()}"
+    # Simple describe when nothing present
+    desc = await client.describe_task_queue(
+        task_queue, report_pollers=True, report_stats=True
+    )
+    # Confirm activity and workflow have no pollers
+    assert not desc.types[TaskQueueType.ACTIVITY].pollers
+    assert not desc.types[TaskQueueType.WORKFLOW].pollers
+
+    # Confirm no add rate
+    stats = desc.types[TaskQueueType.ACTIVITY].stats
+    assert stats and stats.tasks_add_rate == 0.0
+    stats = desc.types[TaskQueueType.WORKFLOW].stats
+    assert stats and stats.tasks_add_rate == 0.0
+
+    # Run some workflows
+    async with new_worker(
+        client, TaskQueueDescribeWorkflow, task_queue=task_queue
+    ) as worker:
+        for i in range(10):
+            await client.execute_workflow(
+                TaskQueueDescribeWorkflow.run,
+                f"user{i}",
+                id=f"tq-{uuid.uuid4()}",
+                task_queue=task_queue,
+            )
+
+        # Describe again (while poller still running)
+        desc = await client.describe_task_queue(
+            task_queue, report_pollers=True, report_stats=True
+        )
+
+        # Confirm activity still has no pollers, but workflow has this one
+        assert not desc.types[TaskQueueType.ACTIVITY].pollers
+        assert len(desc.types[TaskQueueType.WORKFLOW].pollers) == 1
+        assert (
+            desc.types[TaskQueueType.WORKFLOW].pollers[0].identity
+            == client.service_client.config.identity
+        )
+
+        # Confirm activity still has no stats, but workflow does
+        stats = desc.types[TaskQueueType.ACTIVITY].stats
+        assert stats and stats.tasks_add_rate == 0.0
+        stats = desc.types[TaskQueueType.WORKFLOW].stats
+        assert stats and stats.tasks_add_rate != 0.0
