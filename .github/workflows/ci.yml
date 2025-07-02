@@ -10,6 +10,10 @@ env:
   COLUMNS: 120
 
 jobs:
+
+  nightly:
+    uses: ./.github/workflows/run-bench.yml
+
   # Build and test the project
   build-lint-test:
     timeout-minutes: 30
