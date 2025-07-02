@@ -1131,39 +1131,33 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 #   }
 
 # 🌈 RAISE_APPLICATION_ERROR:
-# io.temporal.failure.NexusOperationFailure(type=no-type-attr, message=Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=)
-#     io.nexusrpc.handler.HandlerException(type=no-type-attr, message=handler error: message='application error 1', type='APPLICATION_ERROR', nonRetryable=true)
-#         io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='application error 1', type='APPLICATION_ERROR', nonRetryable=true)
+# io.temporal.failure.NexusOperationFailure(message="Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=", scheduledEventId=scheduledEventId, operationToken="operationToken")
+#     io.nexusrpc.handler.HandlerException(message="handler error: message='application error 1', type='my-application-error-type', nonRetryable=true", type="INTERNAL", nonRetryable=true)
+#         io.temporal.failure.ApplicationFailure(message="application error 1", type="my-application-error-type", nonRetryable=true)
 
 
 # 🌈 RAISE_CUSTOM_ERROR:
-# io.temporal.failure.NexusOperationFailure(type=no-type-attr, message=Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=)
-#     io.nexusrpc.handler.HandlerException(type=no-type-attr, message=handler error: message='Custom error wrapped: custom error 1', type='CUSTOM_ERROR', nonRetryable=true)
-#         io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='Custom error wrapped: custom error 1', type='CUSTOM_ERROR', nonRetryable=true)
+# io.temporal.failure.NexusOperationFailure(message="Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=", scheduledEventId=scheduledEventId, operationToken="operationToken")
+#     io.temporal.failure.TimeoutFailure(message="message='operation timed out', timeoutType=TIMEOUT_TYPE_SCHEDULE_TO_CLOSE")
 
 
 # 🌈 RAISE_APPLICATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
-# io.temporal.failure.NexusOperationFailure(type=no-type-attr, message=Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=)
-#     io.nexusrpc.handler.HandlerException(type=no-type-attr, message=handler error: message='application error 1', type='APPLICATION_ERROR', nonRetryable=true)
-#         io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='application error 1', type='APPLICATION_ERROR', nonRetryable=true)
-#             io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='Custom error 2', type='io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException', nonRetryable=false)
+# io.temporal.failure.NexusOperationFailure(message="Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=", scheduledEventId=scheduledEventId, operationToken="operationToken")
+#     io.nexusrpc.handler.HandlerException(message="handler error: message='application error 1', type='my-application-error-type', nonRetryable=true", type="INTERNAL", nonRetryable=true)
+#         io.temporal.failure.ApplicationFailure(message="application error 1", type="my-application-error-type", nonRetryable=true)
+#             io.temporal.failure.ApplicationFailure(message="Custom error 2", type="io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException", nonRetryable=false)
 
 
 # 🌈 RAISE_NEXUS_HANDLER_ERROR:
-# io.temporal.failure.NexusOperationFailure(type=no-type-attr, message=Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=)
-#     io.nexusrpc.handler.HandlerException(type=no-type-attr, message=handler error: message='Handler error 1', type='java.lang.RuntimeException', nonRetryable=false)
-#         io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='Handler error 1', type='java.lang.RuntimeException', nonRetryable=false)
-
-
-# 🌈 RAISE_NEXUS_HANDLER_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
-# io.temporal.failure.NexusOperationFailure(type=no-type-attr, message=Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=)
-#     io.temporal.failure.TimeoutFailure(type=no-type-attr, message=message='operation timed out', timeoutType=TIMEOUT_TYPE_SCHEDULE_TO_CLOSE)
+# io.temporal.failure.NexusOperationFailure(message="Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=", scheduledEventId=scheduledEventId, operationToken="operationToken")
+#     io.nexusrpc.handler.HandlerException(message="handler error: message='Handler error 1', type='java.lang.RuntimeException', nonRetryable=false", type="NOT_FOUND", nonRetryable=true)
+#         io.temporal.failure.ApplicationFailure(message="Handler error 1", type="java.lang.RuntimeException", nonRetryable=false)
 
 
 # 🌈 RAISE_NEXUS_OPERATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
-# io.temporal.failure.NexusOperationFailure(type=no-type-attr, message=Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=)
-#     io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='application error 1', type='APPLICATION_ERROR', nonRetryable=true)
-#         io.temporal.failure.ApplicationFailure(type=no-type-attr, message=message='Custom error 2', type='io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException', nonRetryable=false)
+# io.temporal.failure.NexusOperationFailure(message="Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=", scheduledEventId=scheduledEventId, operationToken="operationToken")
+#     io.temporal.failure.ApplicationFailure(message="application error 1", type="my-application-error-type", nonRetryable=true)
+#         io.temporal.failure.ApplicationFailure(message="Custom error 2", type="io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException", nonRetryable=false)
 
 ActionInSyncOp = Literal[
     "application_error_non_retryable",
