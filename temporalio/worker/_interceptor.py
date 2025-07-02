@@ -304,7 +304,6 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
     _operation_name: str = field(init=False, repr=False)
     _input_type: Optional[Type[InputT]] = field(init=False, repr=False)
 
-    # TODO(nexus-prerelease): update this logic to handle service impl start methods
     def __post_init__(self) -> None:
         if isinstance(self.operation, nexusrpc.Operation):
             self._operation_name = self.operation.name

@@ -41,9 +41,6 @@ class EchoWorkflow:
         return input
 
 
-# TODO(nexus-prerelease): this test dates from a point at which we were encouraging
-# subclassing WorkflowRunOperationHandler as part of the public API. Leaving it in for
-# now.
 class MyOperation(WorkflowRunOperationHandler):
     def __init__(self):
         pass
