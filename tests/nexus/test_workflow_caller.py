@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from enum import IntEnum
 from itertools import zip_longest
-from typing import Any, Callable, Literal, Union
+from typing import Any, Awaitable, Callable, Literal, Union
 
 import nexusrpc
 import nexusrpc.handler
@@ -31,6 +31,7 @@ import temporalio.api.nexus.v1
 import temporalio.api.operatorservice
 import temporalio.api.operatorservice.v1
 import temporalio.exceptions
+import temporalio.nexus
 from temporalio import nexus, workflow
 from temporalio.client import (
     Client,
@@ -1554,3 +1555,149 @@ async def test_timeout_error_raised_by_nexus_operation(client: Client):
             assert isinstance(err, WorkflowFailureError)
             assert isinstance(err.__cause__, NexusOperationError)
             assert isinstance(err.__cause__.__cause__, TimeoutError)
+
+
+# Test overloads
+
+
+@workflow.defn
+class OverloadTestHandlerWorkflow:
+    @workflow.run
+    async def run(self, input: int) -> int:
+        return input * 2
+
+
+@workflow.defn
+class OverloadTestHandlerWorkflowNoParam:
+    @workflow.run
+    async def run(self) -> int:
+        return 0
+
+
+@nexusrpc.handler.service_handler
+class OverloadTestServiceHandler:
+    @workflow_run_operation
+    async def no_param(
+        self,
+        ctx: WorkflowRunOperationContext,
+        _: int,
+    ) -> nexus.WorkflowHandle[int]:
+        return await ctx.start_workflow(
+            OverloadTestHandlerWorkflowNoParam.run,
+            id=str(uuid.uuid4()),
+        )
+
+    @workflow_run_operation
+    async def single_param(
+        self, ctx: WorkflowRunOperationContext, input: int
+    ) -> nexus.WorkflowHandle[int]:
+        return await ctx.start_workflow(
+            OverloadTestHandlerWorkflow.run,
+            input,
+            id=str(uuid.uuid4()),
+        )
+
+    @workflow_run_operation
+    async def multi_param(
+        self, ctx: WorkflowRunOperationContext, input: int
+    ) -> nexus.WorkflowHandle[int]:
+        return await ctx.start_workflow(
+            OverloadTestHandlerWorkflow.run,
+            args=[input],
+            id=str(uuid.uuid4()),
+        )
+
+    @workflow_run_operation
+    async def by_name(
+        self, ctx: WorkflowRunOperationContext, input: int
+    ) -> nexus.WorkflowHandle[int]:
+        return await ctx.start_workflow(
+            "OverloadTestHandlerWorkflow",
+            input,
+            id=str(uuid.uuid4()),
+            result_type=OverloadTestValue,
+        )
+
+    @workflow_run_operation
+    async def by_name_multi_param(
+        self, ctx: WorkflowRunOperationContext, input: int
+    ) -> nexus.WorkflowHandle[int]:
+        return await ctx.start_workflow(
+            "OverloadTestHandlerWorkflow",
+            args=[input],
+            id=str(uuid.uuid4()),
+        )
+
+
+@dataclass
+class OverloadTestInput:
+    op: Callable[
+        [Any, WorkflowRunOperationContext, Any],
+        Awaitable[temporalio.nexus.WorkflowHandle[Any]],
+    ]
+    input: Any
+    output: Any
+
+
+@workflow.defn
+class OverloadTestCallerWorkflow:
+    @workflow.run
+    async def run(self, op: str, input: int) -> int:
+        nexus_client = workflow.NexusClient(
+            service=OverloadTestServiceHandler,
+            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+        )
+        if op == "no_param":
+            return await nexus_client.execute_operation(
+                OverloadTestServiceHandler.no_param, input
+            )
+        elif op == "single_param":
+            return await nexus_client.execute_operation(
+                OverloadTestServiceHandler.single_param, input
+            )
+        elif op == "multi_param":
+            return await nexus_client.execute_operation(
+                OverloadTestServiceHandler.multi_param, input
+            )
+        elif op == "by_name":
+            return await nexus_client.execute_operation(
+                OverloadTestServiceHandler.by_name, input
+            )
+        elif op == "by_name_multi_param":
+            return await nexus_client.execute_operation(
+                OverloadTestServiceHandler.by_name_multi_param, input
+            )
+        else:
+            raise ValueError(f"Unknown op: {op}")
+
+
+@pytest.mark.parametrize(
+    "op",
+    [
+        "no_param",
+        "single_param",
+        "multi_param",
+        "by_name",
+        "by_name_multi_param",
+    ],
+)
+async def test_workflow_run_operation_overloads(client: Client, op: str):
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[
+            OverloadTestCallerWorkflow,
+            OverloadTestHandlerWorkflow,
+            OverloadTestHandlerWorkflowNoParam,
+        ],
+        nexus_service_handlers=[OverloadTestServiceHandler()],
+    ):
+        await create_nexus_endpoint(task_queue, client)
+        res = await client.execute_workflow(
+            OverloadTestCallerWorkflow.run,
+            args=[op, 2],
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
+        )
+        assert res == (4 if op != "no_param" else 0)
