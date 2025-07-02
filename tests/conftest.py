@@ -123,13 +123,13 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
             ],
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )
+        # TODO(nexus-preview): expose this in a more principled way
         env._http_port = http_port  # type: ignore
     elif env_type == "time-skipping":
         env = await WorkflowEnvironment.start_time_skipping()
     else:
         env = WorkflowEnvironment.from_client(await Client.connect(env_type))
 
-    # TODO(nexus-prerelease): expose this in a principled way
     yield env
     await env.shutdown()
 

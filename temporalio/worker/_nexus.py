@@ -191,7 +191,7 @@ class _NexusWorker:
                 ),
             )
         else:
-            # TODO(nexus-prerelease): when do we use ack_cancel?
+            # TODO(nexus-preview): ack_cancel completions?
             completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
                 task_token=task_token,
                 completed=temporalio.api.nexus.v1.Response(
