@@ -1983,7 +1983,7 @@ if TYPE_CHECKING:
         pass
 
 else:
-    # TODO(dan): inherited classes should be other way around?
+    # TODO: inherited classes should be other way around?
     class _AsyncioTask(Generic[AnyType], asyncio.Task):
         pass
 
