@@ -1,6 +1,7 @@
 import asyncio
 import uuid
 from dataclasses import dataclass
+from datetime import timedelta
 from enum import IntEnum
 from itertools import zip_longest
 from typing import Any, Callable, Literal, Union
@@ -39,7 +40,12 @@ from temporalio.client import (
     WorkflowHandle,
 )
 from temporalio.common import WorkflowIDConflictPolicy
-from temporalio.exceptions import ApplicationError, CancelledError, NexusOperationError
+from temporalio.exceptions import (
+    ApplicationError,
+    CancelledError,
+    NexusOperationError,
+    TimeoutError,
+)
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import Worker
@@ -1505,3 +1511,52 @@ async def test_errors_raised_by_nexus_operation(
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
+
+
+# Timeout test
+@service_handler
+class TimeoutTestService:
+    @sync_operation
+    async def op_handler_that_never_returns(
+        self, ctx: StartOperationContext, input: None
+    ) -> None:
+        await asyncio.Future()
+
+
+@workflow.defn
+class TimeoutTestCallerWorkflow:
+    @workflow.init
+    def __init__(self):
+        self.nexus_client = workflow.NexusClient(
+            service=TimeoutTestService,
+            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+        )
+
+    @workflow.run
+    async def run(self) -> None:
+        await self.nexus_client.execute_operation(
+            TimeoutTestService.op_handler_that_never_returns,
+            None,
+            schedule_to_close_timeout=timedelta(seconds=0.1),
+        )
+
+
+async def test_timeout_error_raised_by_nexus_operation(client: Client):
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client,
+        nexus_service_handlers=[TimeoutTestService()],
+        workflows=[TimeoutTestCallerWorkflow],
+        task_queue=task_queue,
+    ):
+        await create_nexus_endpoint(task_queue, client)
+        try:
+            await client.execute_workflow(
+                TimeoutTestCallerWorkflow.run,
+                id=str(uuid.uuid4()),
+                task_queue=task_queue,
+            )
+        except Exception as err:
+            assert isinstance(err, WorkflowFailureError)
+            assert isinstance(err.__cause__, NexusOperationError)
+            assert isinstance(err.__cause__.__cause__, TimeoutError)
