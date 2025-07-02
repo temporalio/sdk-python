@@ -316,23 +316,6 @@ async def _decode_payload(
     """Decode a payload with the given codec."""
     return await _apply_to_payload(payload, codec.decode)
 
-async def _decode_headers(
-    headers: google.protobuf.internal.containers.MessageMap[str, temporalio.api.common.v1.Payload],
-    codec: temporalio.converter.PayloadCodec,
-) -> None:
-    """Decode payloads in a header map with the given codec."""
-    return await _apply_to_headers(headers, codec.decode)
-
-async def _apply_to_headers(
-    headers: google.protobuf.internal.containers.MessageMap[str, temporalio.api.common.v1.Payload],
-    cb: Callable[
-        [Sequence[temporalio.api.common.v1.Payload]],
-        Awaitable[List[temporalio.api.common.v1.Payload]],
-    ],) -> None:
-    """Decode payloads with the given codec."""
-    for payload in headers.values():
-        new_payload = (await cb([payload]))[0]
-        payload.CopyFrom(new_payload)
 
 async def _encode_payloads(
     payloads: PayloadContainer,
@@ -358,7 +341,6 @@ async def decode_activation(
     for job in act.jobs:
         if job.HasField("query_workflow"):
             await _decode_payloads(job.query_workflow.arguments, codec)
-            await _decode_headers(job.query_workflow.headers, codec)
         elif job.HasField("resolve_activity"):
             if job.resolve_activity.result.HasField("cancelled"):
                 await codec.decode_failure(
@@ -403,12 +385,8 @@ async def decode_activation(
                 await codec.decode_failure(job.resolve_signal_external_workflow.failure)
         elif job.HasField("signal_workflow"):
             await _decode_payloads(job.signal_workflow.input, codec)
-            await _decode_headers(job.signal_workflow.headers, codec)
-
         elif job.HasField("initialize_workflow"):
             await _decode_payloads(job.initialize_workflow.arguments, codec)
-            await _decode_headers(job.initialize_workflow.headers, codec)
-
             if job.initialize_workflow.HasField("continued_failure"):
                 await codec.decode_failure(job.initialize_workflow.continued_failure)
             for val in job.initialize_workflow.memo.fields.values():
@@ -422,7 +400,6 @@ async def decode_activation(
                 val.data = new_payload.data
         elif job.HasField("do_update"):
             await _decode_payloads(job.do_update.input, codec)
-            await _decode_headers(job.do_update.headers, codec)
 
 
 async def encode_completion(
