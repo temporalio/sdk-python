@@ -130,9 +130,6 @@ class MyLinkTestWorkflow:
         return Output(value=f"from link test workflow: {input.value}")
 
 
-# TODO: implement some of these ops as explicit OperationHandler classes to provide coverage for that?
-
-
 # The service_handler decorator is applied by the test
 class MyServiceHandler:
     @sync_operation
