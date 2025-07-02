@@ -152,7 +152,7 @@ class HelloWorldAgent:
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 async def test_hello_world_agent(client: Client, use_local_model: bool):
-    if not use_local_model and "OPENAI_API_KEY" not in os.environ:
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
@@ -312,7 +312,7 @@ class ToolsWorkflow:
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 async def test_tool_workflow(client: Client, use_local_model: bool):
-    if not use_local_model and "OPENAI_API_KEY" not in os.environ:
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
@@ -572,7 +572,7 @@ class ResearchWorkflow:
 @pytest.mark.parametrize("use_local_model", [True, False])
 @pytest.mark.timeout(120)
 async def test_research_workflow(client: Client, use_local_model: bool):
-    if not use_local_model and "OPENAI_API_KEY" not in os.environ:
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
@@ -795,7 +795,7 @@ class AgentAsToolsModel(TestModel):
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
-    if not use_local_model and "OPENAI_API_KEY" not in os.environ:
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
@@ -1158,7 +1158,7 @@ class CustomerServiceWorkflow:
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 async def test_customer_service_workflow(client: Client, use_local_model: bool):
-    if not use_local_model and "OPENAI_API_KEY" not in os.environ:
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
@@ -1452,7 +1452,7 @@ class InputGuardrailWorkflow:
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 async def test_input_guardrail(client: Client, use_local_model: bool):
-    if not use_local_model and "OPENAI_API_KEY" not in os.environ:
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
@@ -1569,7 +1569,7 @@ class OutputGuardrailWorkflow:
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 async def test_output_guardrail(client: Client, use_local_model: bool):
-    if not use_local_model and "OPENAI_API_KEY" not in os.environ:
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
