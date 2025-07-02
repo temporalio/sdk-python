@@ -59,24 +59,29 @@ dev = [
 [tool.poe.tasks]
 build-develop = "uv run maturin develop --uv"
 build-develop-with-release = { cmd = "uv run maturin develop --release --uv" }
-format = [{cmd = "uv run ruff check --select I --fix"}, {cmd = "uv run ruff format"}, ]
+format = [{cmd = "uv run ruff check --fix"}, {cmd = "uv run ruff format"}, ]
 gen-docs = "uv run python scripts/gen_docs.py"
 gen-protos = "uv run python scripts/gen_protos.py"
 lint = [
-  {cmd = "uv run ruff check --select I"},
+  {cmd = "uv run ruff check"},
   {cmd = "uv run ruff format --check"},
-  {ref = "lint-types"},
-  {cmd = "uv run pyright"},
+  {ref = "lint-types-mypy"},
+  {ref = "lint-types-pyright"},
   {ref = "lint-docs"},
 ]
 bridge-lint = { cmd = "cargo clippy -- -D warnings", cwd = "temporalio/bridge" }
 # TODO(cretz): Why does pydocstyle complain about @overload missing docs after
 # https://github.com/PyCQA/pydocstyle/pull/511?
 lint-docs = "uv run pydocstyle --ignore-decorators=overload"
-lint-types = "uv run mypy --namespace-packages --check-untyped-defs ."
+lint-types-mypy = "uv run mypy --namespace-packages --check-untyped-defs ."
+lint-types-pyright = "uv run pyright"
 run-bench = "uv run python scripts/run_bench.py"
 test = "uv run pytest"
 
+[tool.ruff]
+target-version = "py39"
+exclude = ["*_pb2.py", "*_pb2_grpc.py"]
+lint.ignore = ["E741"]  # we occasionally use e.g. O as a type var and l as a loop variable
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -188,9 +193,6 @@ exclude = [
   "temporalio/bridge/testing.py",
   "temporalio/envconfig.py",
 ]
-
-[tool.ruff]
-target-version = "py39"
 
 [build-system]
 requires = ["maturin>=1.0,<2.0"]

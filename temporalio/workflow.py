@@ -1808,7 +1808,7 @@ def _assert_dynamic_handler_args(
     if (
         not arg_types
         or len(arg_types) != 2
-        or arg_types[0] != str
+        or arg_types[0] is not str
         or arg_types[1] != Sequence[temporalio.common.RawValue]
     ):
         raise RuntimeError(
@@ -4486,7 +4486,7 @@ class ContinueAsNewError(BaseException):
 
     def __init__(self, *args: object) -> None:
         """Direct instantiation is disabled. Use :py:func:`continue_as_new`."""
-        if type(self) == ContinueAsNewError:
+        if type(self) is ContinueAsNewError:
             raise RuntimeError("Cannot instantiate ContinueAsNewError directly")
         super().__init__(*args)
 
