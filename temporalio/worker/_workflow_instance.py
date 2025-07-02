@@ -1620,7 +1620,6 @@ class _WorkflowInstanceImpl(
                     # If an activity future completes at the same time as a cancellation is being processed, the cancellation would be swallowed
                     # _WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY will correctly reraise the exception
                     if handle._result_fut.done():
-                        # TODO in next release, check sdk flag when not replaying instead of global override, remove the override, and set flag use
                         if (
                             not self._is_replaying
                             or _WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY
