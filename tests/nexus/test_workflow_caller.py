@@ -52,8 +52,7 @@ from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 # TODO(nexus-prerelease): test availability of Temporal client etc in async context set by worker
-# TODO(nexus-prerelease): test worker shutdown, wait_all_completed, drain etc
-# TODO(nexus-prerelease): test worker op handling failure
+# TODO(nexus-preview): test worker shutdown, wait_all_completed, drain etc
 
 # -----------------------------------------------------------------------------
 # Test definition
@@ -381,7 +380,7 @@ class UntypedCallerWorkflow:
     def __init__(
         self, input: CallerWfInput, request_cancel: bool, task_queue: str
     ) -> None:
-        # TODO(nexus-prerelease): untyped caller cannot reference name of implementation. I think this is as it should be.
+        # TODO(nexus-preview): untyped caller cannot reference name of implementation. I think this is as it should be.
         service_name = "ServiceInterface"
         self.nexus_client = workflow.NexusClient(
             service=service_name,
@@ -427,8 +426,8 @@ class UntypedCallerWorkflow:
 #
 
 
-# TODO(nexus-prerelease): cross-namespace tests
-# TODO(nexus-prerelease): nexus endpoint pytest fixture?
+# TODO(nexus-preview): cross-namespace tests
+# TODO(nexus-preview): nexus endpoint pytest fixture?
 # TODO(nexus-prerelease): test headers
 @pytest.mark.parametrize("exception_in_operation_start", [False, True])
 @pytest.mark.parametrize("request_cancel", [False, True])
@@ -736,7 +735,6 @@ class ServiceClassNameOutput:
     name: str
 
 
-# TODO(nexus-prerelease): test interface op types not matching
 # TODO(nexus-prerelease): async and non-async cancel methods
 
 
@@ -822,8 +820,6 @@ class ServiceInterfaceAndImplCallerWorkflow:
             endpoint=make_nexus_endpoint_name(task_queue),
         )
 
-        # TODO(nexus-prerelease): maybe not surprising that this doesn't type check given complexity of
-        # the union?
         return await nexus_client.execute_operation(service_cls.op, None)  # type: ignore
 
 
@@ -947,7 +943,6 @@ class WorkflowCallingNexusOperationThatExecutesWorkflowBeforeStartingBackingWork
             service=ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow,
             endpoint=make_nexus_endpoint_name(task_queue),
         )
-        # TODO(nexus-prerelease): update StartNexusOperationInput.__post_init__
         return await nexus_client.execute_operation(
             ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow.my_workflow_run_operation,
             None,

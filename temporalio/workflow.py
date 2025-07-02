@@ -4384,25 +4384,16 @@ async def execute_child_workflow(
     return await handle
 
 
-# TODO(nexus-prerelease): ABC / inherit from asyncio.Task?
 class NexusOperationHandle(Generic[OutputT]):
     def cancel(self) -> bool:
-        # TODO(nexus-prerelease): docstring
         """
-        Call task.cancel() on the asyncio task that is backing this handle.
-
-        From asyncio docs:
-
-        Cancel the future and schedule callbacks.
-
-        If the future is already done or cancelled, return False. Otherwise, change the future's state to cancelled, schedule the callbacks and return True.
+        Request cancellation of the operation.
         """
         raise NotImplementedError
 
     def __await__(self) -> Generator[Any, Any, OutputT]:
         raise NotImplementedError
 
-    # TODO(nexus-prerelease): check SDK-wide consistency for @property vs nullary accessor methods.
     @property
     def operation_token(self) -> Optional[str]:
         raise NotImplementedError

@@ -13,13 +13,6 @@ from tests.helpers.nexus import create_nexus_endpoint
 HTTP_PORT = 7243
 
 
-# TODO(nexus-prerelease): test programmatic creation from ServiceHandler
-def make_incrementer_service_from_service_handler(
-    op_names: list[str],
-) -> tuple[str, type]:
-    pass
-
-
 def make_incrementer_user_service_definition_and_service_handler_classes(
     op_names: list[str],
 ) -> tuple[type, type]:

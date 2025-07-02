@@ -869,7 +869,7 @@ class _WorkflowInstanceImpl(
             # Note that core will still send a `ResolveNexusOperation` job in the same
             # activation, so there does not need to be an exceptional case for this in
             # lang.
-            # TODO(nexus-prerelease): confirm appropriate to take no action here
+            # TODO(nexus-preview): confirm appropriate to take no action here
             pass
         else:
             raise ValueError(f"Unknown Nexus operation start status: {job}")
@@ -3008,7 +3008,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
 
     @property
     def operation_token(self) -> Optional[str]:
-        # TODO(nexus-prerelease): How should this behave?
+        # TODO(nexus-preview): How should this behave?
         # Java has a separate class that only exists if the operation token exists:
         # https://github.com/temporalio/sdk-java/blob/master/temporal-sdk/src/main/java/io/temporal/internal/sync/NexusOperationExecutionImpl.java#L26
         # And Go similar:

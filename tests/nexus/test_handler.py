@@ -80,15 +80,14 @@ class NonSerializableOutput:
 
 # TODO(nexus-prelease): Test attaching multiple callers to the same operation.
 # TODO(nexus-preview): type check nexus implementation under mypy
-# TODO(nexus-prerelease): test dynamic creation of a service from unsugared definition
-# TODO(nexus-prerelease): test malformed inbound_links and outbound_links
-# TODO(nexus-prerelease): test good error message on forgetting to add decorators etc
+# TODO(nexus-preview): test malformed inbound_links and outbound_links
+
+# TODO(nexus-prerelease): 2025-07-02T23:29:20.000489Z  WARN temporal_sdk_core::worker::nexus: Nexus task not found on completion. This may happen if the operation has already been cancelled but completed anyway. details=Status { code: NotFound, message: "Nexus task not found or already expired", details: b"\x08\x05\x12'Nexus task not found or already expired\x1aB\n@type.googleapis.com/temporal.api.errordetails.v1.NotFoundFailure", metadata: MetadataMap { headers: {"content-type": "application/grpc"} }, source: None }
 
 
 @nexusrpc.service
 class MyService:
     echo: nexusrpc.Operation[Input, Output]
-    # TODO(nexus-prerelease): support renamed operations!
     echo_renamed: nexusrpc.Operation[Input, Output] = nexusrpc.Operation(
         name="echo-renamed"
     )
@@ -140,13 +139,11 @@ class MyServiceHandler:
             value=f"from start method on {self.__class__.__name__}: {input.value}"
         )
 
-    # The name override is prsent in the service definition. But the test below submits
+    # The name override is present in the service definition. But the test below submits
     # the same operation name in the request whether using a service definition or now.
     # The name override here is necessary when the test is not using the service
     # definition. It should be permitted when the service definition is in effect, as
     # long as the name override is the same as that in the service definition.
-    # TODO(nexus-prerelease): implement in nexusrpc the check that operation handler
-    # name overrides must be consistent with service definition overrides.
     @sync_operation(name="echo-renamed")
     async def echo_renamed(self, ctx: StartOperationContext, input: Input) -> Output:
         return await self.echo(ctx, input)
@@ -163,7 +160,7 @@ class MyServiceHandler:
         raise ApplicationError(
             "non-retryable application error",
             "details arg",
-            # TODO(nexus-prerelease): what values of `type` should be tested?
+            # TODO(nexus-preview): what values of `type` should be tested?
             type="TestFailureType",
             non_retryable=True,
         )
@@ -329,7 +326,6 @@ class UnsuccessfulResponse:
     failure_details: bool = True
     # Expected value of inverse of non_retryable attribute of exception.
     retryable_exception: bool = True
-    # TODO(nexus-prerelease): the body of a successful response need not be JSON; test non-JSON-parseable string
     body_json: Optional[Callable[[dict[str, Any]], bool]] = None
     headers: Mapping[str, str] = UNSUCCESSFUL_RESPONSE_HEADERS
 
@@ -477,11 +473,6 @@ class WorkflowRunOpLinkTestHappyPath(_TestCase):
             "<temporal://"
         ), f"nexus-link header {nexus_link} does not start with <temporal://"
 
-
-# TODO(nexus-prerelease): Before fixing the upstream-timeout test by implementing the handler for the
-# timeout cancellation sent by core, I was seeing 2025-05-11T22:41:51.853243Z  WARN
-# temporal_sdk_core::worker::nexus: Failed to parse nexus timeout header value
-# '5.617792ms'
 
 # TODO(nexus-prerelease): test Nexus-Callback- headers
 # TODO(nexus-prerelease): make assertions about failure.exception.cause

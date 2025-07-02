@@ -311,7 +311,7 @@ class Worker:
             nexus_task_poller_behavior: Specify the behavior of Nexus task polling.
                 Defaults to a 5-poller maximum.
         """
-        # TODO(nexus-prerelease): max_concurrent_nexus_tasks / tuner support
+        # TODO(nexus-preview): max_concurrent_nexus_tasks / tuner support
         if not (activities or nexus_service_handlers or workflows):
             raise ValueError(
                 "At least one activity, Nexus service, or workflow must be specified"
