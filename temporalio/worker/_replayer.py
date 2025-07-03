@@ -47,6 +47,7 @@ class Replayer:
         debug_mode: bool = False,
         runtime: Optional[temporalio.runtime.Runtime] = None,
         disable_safe_workflow_eviction: bool = False,
+        encode_headers: bool = True,
     ) -> None:
         """Create a replayer to replay workflows from history.
 
@@ -78,6 +79,7 @@ class Replayer:
             debug_mode=debug_mode,
             runtime=runtime,
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
+            encode_headers=encode_headers,
         )
 
     def config(self) -> ReplayerConfig:
@@ -217,6 +219,7 @@ class Replayer:
                 disable_safe_eviction=self._config["disable_safe_workflow_eviction"],
                 should_enforce_versioning_behavior=False,
                 assert_local_activity_valid=lambda a: None,
+                encode_headers=self._config["encode_headers"],
             )
             # Create bridge worker
             bridge_worker, pusher = temporalio.bridge.worker.Worker.for_replay(
@@ -335,6 +338,7 @@ class ReplayerConfig(TypedDict, total=False):
     debug_mode: bool
     runtime: Optional[temporalio.runtime.Runtime]
     disable_safe_workflow_eviction: bool
+    encode_headers: bool
 
 
 @dataclass(frozen=True)

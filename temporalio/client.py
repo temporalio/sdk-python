@@ -27,6 +27,7 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
+    Text,
     Tuple,
     Type,
     Union,
@@ -37,6 +38,7 @@ from typing import (
 import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.timestamp_pb2
+from google.protobuf.internal.containers import MessageMap
 from typing_extensions import Concatenate, Required, TypedDict
 
 import temporalio.api.common.v1
@@ -191,6 +193,7 @@ class Client:
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
+        encode_headers: bool = True,
     ):
         """Create a Temporal client from a service client.
 
@@ -208,6 +211,7 @@ class Client:
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
+            encode_headers=encode_headers,
         )
 
     def config(self) -> ClientConfig:
@@ -1491,6 +1495,7 @@ class ClientConfig(TypedDict, total=False):
     default_workflow_query_reject_condition: Required[
         Optional[temporalio.common.QueryRejectCondition]
     ]
+    encode_headers: Required[bool]
 
 
 class WorkflowHistoryEventFilterType(IntEnum):
@@ -3849,6 +3854,10 @@ class ScheduleActionStartWorkflow(ScheduleAction):
     priority: temporalio.common.Priority
 
     headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
+    """
+    Headers may still be encoded by the payload codec if present.
+    """
+    _from_raw: bool
 
     @staticmethod
     def _from_proto(  # pyright: ignore
@@ -3975,6 +3984,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         """
         super().__init__()
         if raw_info:
+            self._from_raw = True
             # Ignore other fields
             self.workflow = raw_info.workflow_type.name
             self.args = raw_info.input.payloads if raw_info.input else []
@@ -4034,6 +4044,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                 else temporalio.common.Priority.default
             )
         else:
+            self._from_raw = False
             if not id:
                 raise ValueError("ID required")
             if not task_queue:
@@ -4057,7 +4068,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             self.memo = memo
             self.typed_search_attributes = typed_search_attributes
             self.untyped_search_attributes = untyped_search_attributes
-            self.headers = headers
+            self.headers = headers  # encode here
             self.static_summary = static_summary
             self.static_details = static_details
             self.priority = priority
@@ -4134,9 +4145,13 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             temporalio.converter.encode_search_attributes(
                 self.typed_search_attributes, action.start_workflow.search_attributes
             )
+        print("Schedule Headers:", self.headers)
         if self.headers:
-            temporalio.common._apply_headers(
-                self.headers, action.start_workflow.header.fields
+            await _apply_headers(
+                self.headers,
+                action.start_workflow.header.fields,
+                client.config()["encode_headers"] and not self._from_raw,
+                client.data_converter.payload_codec,
             )
         return action
 
@@ -5884,7 +5899,7 @@ class _ClientImpl(OutboundInterceptor):
         if input.start_delay is not None:
             req.workflow_start_delay.FromTimedelta(input.start_delay)
         if input.headers is not None:
-            temporalio.common._apply_headers(input.headers, req.header.fields)
+            await self._apply_headers(input.headers, req.header.fields)
         if input.priority is not None:
             req.priority.CopyFrom(input.priority._to_proto())
         if input.versioning_override is not None:
@@ -5970,7 +5985,7 @@ class _ClientImpl(OutboundInterceptor):
                 await self._client.data_converter.encode(input.args)
             )
         if input.headers is not None:
-            temporalio.common._apply_headers(input.headers, req.query.header.fields)
+            await self._apply_headers(input.headers, req.query.header.fields)
         try:
             resp = await self._client.workflow_service.query_workflow(
                 req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
@@ -6016,7 +6031,7 @@ class _ClientImpl(OutboundInterceptor):
                 await self._client.data_converter.encode(input.args)
             )
         if input.headers is not None:
-            temporalio.common._apply_headers(input.headers, req.header.fields)
+            await self._apply_headers(input.headers, req.header.fields)
         await self._client.workflow_service.signal_workflow_execution(
             req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
         )
@@ -6127,9 +6142,7 @@ class _ClientImpl(OutboundInterceptor):
                 await self._client.data_converter.encode(input.args)
             )
         if input.headers is not None:
-            temporalio.common._apply_headers(
-                input.headers, req.request.input.header.fields
-            )
+            await self._apply_headers(input.headers, req.request.input.header.fields)
         return req
 
     async def start_update_with_start_workflow(
@@ -6684,6 +6697,33 @@ class _ClientImpl(OutboundInterceptor):
             req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
         )
         return WorkerTaskReachability._from_proto(resp)
+
+    async def _apply_headers(
+        self,
+        source: Optional[Mapping[str, temporalio.api.common.v1.Payload]],
+        dest: MessageMap[Text, temporalio.api.common.v1.Payload],
+    ) -> None:
+        await _apply_headers(
+            source,
+            dest,
+            self._client.config()["encode_headers"],
+            self._client.data_converter.payload_codec,
+        )
+
+
+async def _apply_headers(
+    source: Optional[Mapping[str, temporalio.api.common.v1.Payload]],
+    dest: MessageMap[Text, temporalio.api.common.v1.Payload],
+    encode_headers: bool,
+    codec: Optional[temporalio.converter.PayloadCodec],
+) -> None:
+    if source is None:
+        return
+    if encode_headers and codec is not None:
+        for payload in source.values():
+            new_payload = (await codec.encode([payload]))[0]
+            payload.CopyFrom(new_payload)
+    temporalio.common._apply_headers(source, dest)
 
 
 def _history_from_json(
