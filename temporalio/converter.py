@@ -16,7 +16,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
 from itertools import zip_longest
-from logging import getLogger
 from typing import (
     Any,
     Awaitable,
@@ -41,7 +40,6 @@ import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.message
 import google.protobuf.symbol_database
-import nexusrpc
 import typing_extensions
 
 import temporalio.api.common.v1
@@ -61,8 +59,6 @@ if sys.version_info >= (3, 11):
 
 if sys.version_info >= (3, 10):
     from types import UnionType
-
-logger = getLogger(__name__)
 
 
 class PayloadConverter(ABC):
@@ -1018,16 +1014,9 @@ class DefaultFailureConverter(FailureConverter):
             )
         elif failure.HasField("nexus_handler_failure_info"):
             nexus_handler_failure_info = failure.nexus_handler_failure_info
-            try:
-                _type = nexusrpc.HandlerErrorType[nexus_handler_failure_info.type]
-            except KeyError:
-                logger.warning(
-                    f"Unknown Nexus HandlerErrorType: {nexus_handler_failure_info.type}"
-                )
-                _type = nexusrpc.HandlerErrorType.INTERNAL
-            return nexusrpc.HandlerError(
+            err = temporalio.exceptions.NexusHandlerError(
                 failure.message or "Nexus handler error",
-                type=_type,
+                type=nexus_handler_failure_info.type,
                 retryable={
                     temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE: True,
                     temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE: False,
