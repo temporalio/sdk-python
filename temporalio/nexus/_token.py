@@ -19,7 +19,6 @@ class WorkflowHandle(Generic[OutputT]):
 
     namespace: str
     workflow_id: str
-    _type: OperationTokenType = OPERATION_TOKEN_TYPE_WORKFLOW
     # Version of the token. Treated as v1 if missing. This field is not included in the
     # serialized token; it's only used to reject newer token versions on load.
     version: Optional[int] = None
@@ -56,7 +55,7 @@ class WorkflowHandle(Generic[OutputT]):
         return _base64url_encode_no_padding(
             json.dumps(
                 {
-                    "t": self._type,
+                    "t": OPERATION_TOKEN_TYPE_WORKFLOW,
                     "ns": self.namespace,
                     "wid": self.workflow_id,
                 },
@@ -83,10 +82,10 @@ class WorkflowHandle(Generic[OutputT]):
                 f"invalid workflow token: expected dict, got {type(workflow_operation_token)}"
             )
 
-        _type = workflow_operation_token.get("t")
-        if _type != OPERATION_TOKEN_TYPE_WORKFLOW:
+        token_type = workflow_operation_token.get("t")
+        if token_type != OPERATION_TOKEN_TYPE_WORKFLOW:
             raise TypeError(
-                f"invalid workflow token type: {_type}, expected: {OPERATION_TOKEN_TYPE_WORKFLOW}"
+                f"invalid workflow token type: {token_type}, expected: {OPERATION_TOKEN_TYPE_WORKFLOW}"
             )
 
         version = workflow_operation_token.get("v")
@@ -109,7 +108,6 @@ class WorkflowHandle(Generic[OutputT]):
             )
 
         return cls(
-            _type=_type,
             namespace=namespace,
             workflow_id=workflow_id,
             version=version,
