@@ -2639,7 +2639,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "futures",
- "log",
  "prost",
  "pyo3",
  "pyo3-async-runtimes",
