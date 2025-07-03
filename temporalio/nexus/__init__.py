@@ -1,5 +1,6 @@
 from ._decorators import workflow_run_operation as workflow_run_operation
 from ._operation_context import Info as Info
+from ._operation_context import LoggerAdapter as LoggerAdapter
 from ._operation_context import (
     WorkflowRunOperationContext as WorkflowRunOperationContext,
 )
