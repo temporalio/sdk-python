@@ -8045,7 +8045,7 @@ async def test_workflow_logging_trace_identifier(client: Client):
         ) as worker:
             await client.execute_workflow(
                 TaskFailOnceWorkflow.run,
-                id=f"workflow_failure_trace_identifier",
+                id="workflow_failure_trace_identifier",
                 task_queue=worker.task_queue,
             )
 
@@ -8085,7 +8085,7 @@ async def test_in_workflow_sync(client: Client):
     ) as worker:
         res = await client.execute_workflow(
             UseInWorkflow.run,
-            id=f"test_in_workflow_sync",
+            id="test_in_workflow_sync",
             task_queue=worker.task_queue,
             execution_timeout=timedelta(minutes=1),
         )

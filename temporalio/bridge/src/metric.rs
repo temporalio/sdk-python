@@ -25,32 +25,32 @@ pub struct MetricAttributesRef {
 
 #[pyclass]
 pub struct MetricCounterRef {
-    counter: Arc<metrics::Counter>,
+    counter: metrics::Counter,
 }
 
 #[pyclass]
 pub struct MetricHistogramRef {
-    histogram: Arc<metrics::Histogram>,
+    histogram: metrics::Histogram,
 }
 
 #[pyclass]
 pub struct MetricHistogramFloatRef {
-    histogram: Arc<metrics::HistogramF64>,
+    histogram: metrics::HistogramF64,
 }
 
 #[pyclass]
 pub struct MetricHistogramDurationRef {
-    histogram: Arc<metrics::HistogramDuration>,
+    histogram: metrics::HistogramDuration,
 }
 
 #[pyclass]
 pub struct MetricGaugeRef {
-    gauge: Arc<metrics::Gauge>,
+    gauge: metrics::Gauge,
 }
 
 #[pyclass]
 pub struct MetricGaugeFloatRef {
-    gauge: Arc<metrics::GaugeF64>,
+    gauge: metrics::GaugeF64,
 }
 
 pub fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<MetricMeterRef> {
