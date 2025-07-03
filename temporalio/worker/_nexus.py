@@ -102,9 +102,7 @@ class _NexusWorker:
                             )
                         )
                     elif task.request.HasField("cancel_operation"):
-                        # TODO(nexus-prerelease): do we need to track cancel operation
-                        # tasks as we do start operation tasks?
-                        asyncio.create_task(
+                        self._running_tasks[task.task_token] = asyncio.create_task(
                             self._handle_cancel_operation_task(
                                 task.task_token,
                                 task.request.cancel_operation,
