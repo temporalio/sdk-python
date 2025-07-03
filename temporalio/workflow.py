@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
-import dataclasses
 import inspect
 import logging
 import threading
@@ -23,6 +22,7 @@ from typing import (
     Awaitable,
     Callable,
     Dict,
+    Generator,
     Generic,
     Iterable,
     Iterator,
@@ -40,6 +40,9 @@ from typing import (
     overload,
 )
 
+import nexusrpc
+import nexusrpc.handler
+from nexusrpc import InputT, OutputT
 from typing_extensions import (
     Concatenate,
     Literal,
@@ -54,6 +57,7 @@ import temporalio.bridge.proto.workflow_commands
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.nexus
 import temporalio.workflow
 
 from .types import (
@@ -845,6 +849,18 @@ class _Runtime(ABC):
         cancellation_type: ActivityCancellationType,
         activity_id: Optional[str],
     ) -> ActivityHandle[Any]: ...
+
+    @abstractmethod
+    async def workflow_start_nexus_operation(
+        self,
+        endpoint: str,
+        service: str,
+        operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
+        input: Any,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> NexusOperationHandle[OutputT]: ...
 
     @abstractmethod
     def workflow_time_ns(self) -> int: ...
@@ -1967,7 +1983,7 @@ if TYPE_CHECKING:
         pass
 
 else:
-
+    # TODO: inherited classes should be other way around?
     class _AsyncioTask(Generic[AnyType], asyncio.Task):
         pass
 
@@ -4368,6 +4384,21 @@ async def execute_child_workflow(
     return await handle
 
 
+class NexusOperationHandle(Generic[OutputT]):
+    def cancel(self) -> bool:
+        """
+        Request cancellation of the operation.
+        """
+        raise NotImplementedError
+
+    def __await__(self) -> Generator[Any, Any, OutputT]:
+        raise NotImplementedError
+
+    @property
+    def operation_token(self) -> Optional[str]:
+        raise NotImplementedError
+
+
 class ExternalWorkflowHandle(Generic[SelfType]):
     """Handle for interacting with an external workflow.
 
@@ -5074,3 +5105,151 @@ class VersioningIntent(Enum):
         elif self == VersioningIntent.DEFAULT:
             return temporalio.bridge.proto.common.VersioningIntent.DEFAULT
         return temporalio.bridge.proto.common.VersioningIntent.UNSPECIFIED
+
+
+# Nexus
+
+ServiceT = TypeVar("ServiceT")
+
+
+class NexusClient(ABC, Generic[ServiceT]):
+    """
+    A client for invoking Nexus operations.
+
+    example:
+    ```python
+    nexus_client = workflow.create_nexus_client(
+        endpoint=my_nexus_endpoint,
+        service=MyService,
+    )
+    handle = await nexus_client.start_operation(
+        operation=MyService.my_operation,
+        input=MyOperationInput(value="hello"),
+        schedule_to_close_timeout=timedelta(seconds=10),
+    )
+    result = await handle.result()
+    ```
+    """
+
+    # TODO(nexus-prerelease): overloads: no-input, ret type
+    # TODO(nexus-prerelease): should it be an error to use a reference to a method on a class other than that supplied?
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> NexusOperationHandle[OutputT]:
+        """Start a Nexus operation and return its handle.
+
+        Args:
+            operation: The Nexus operation.
+            input: The Nexus operation input.
+            output_type: The Nexus operation output type.
+            schedule_to_close_timeout: Timeout for the entire operation attempt.
+            headers: Headers to send with the Nexus HTTP request.
+
+        Returns:
+            A handle to the Nexus operation. The result can be obtained as
+            ```python
+            await handle.result()
+            ```
+        """
+        ...
+
+    # TODO(nexus-prerelease): overloads: no-input, ret type
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> OutputT: ...
+
+
+class _NexusClient(NexusClient[ServiceT]):
+    def __init__(
+        self,
+        *,
+        endpoint: str,
+        service: Union[Type[ServiceT], str],
+    ) -> None:
+        """Create a Nexus client.
+
+        Args:
+            service: The Nexus service.
+            endpoint: The Nexus endpoint.
+        """
+        # If service is not a str, then it must be a service interface or implementation
+        # class.
+        if isinstance(service, str):
+            self.service_name = service
+        elif service_defn := nexusrpc.get_service_definition(service):
+            self.service_name = service_defn.name
+        else:
+            raise ValueError(
+                f"`service` may be a name (str), or a class decorated with either "
+                f"@nexusrpc.handler.service_handler or @nexusrpc.service. "
+                f"Invalid service type: {type(service)}"
+            )
+        self.endpoint = endpoint
+
+    # TODO(nexus-prerelease): overloads: no-input, ret type
+    # TODO(nexus-prerelease): should it be an error to use a reference to a method on a class other than that supplied?
+    async def start_operation(
+        self,
+        operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
+        return (
+            await temporalio.workflow._Runtime.current().workflow_start_nexus_operation(
+                endpoint=self.endpoint,
+                service=self.service_name,
+                operation=operation,
+                input=input,
+                output_type=output_type,
+                schedule_to_close_timeout=schedule_to_close_timeout,
+                headers=headers,
+            )
+        )
+
+    # TODO(nexus-prerelease): overloads: no-input, ret type
+    async def execute_operation(
+        self,
+        operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> OutputT:
+        handle = await self.start_operation(
+            operation,
+            input,
+            output_type=output_type,
+            schedule_to_close_timeout=schedule_to_close_timeout,
+            headers=headers,
+        )
+        return await handle
+
+
+def create_nexus_client(
+    endpoint: str, service: Union[Type[ServiceT], str]
+) -> NexusClient[ServiceT]:
+    """Create a Nexus client.
+
+    Args:
+        endpoint: The Nexus endpoint.
+        service: The Nexus service.
+    """
+    return _NexusClient(endpoint=endpoint, service=service)

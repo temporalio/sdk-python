@@ -362,6 +362,86 @@ class ChildWorkflowError(FailureError):
         return self._retry_state
 
 
+class NexusOperationError(FailureError):
+    """Error raised on Nexus operation failure."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        scheduled_event_id: int,
+        endpoint: str,
+        service: str,
+        operation: str,
+        operation_token: str,
+    ):
+        """
+        Args:
+            message: The error message.
+            scheduled_event_id: The NexusOperationScheduled event ID for the failed operation.
+            endpoint: The endpoint name for the failed operation.
+            service: The service name for the failed operation.
+            operation: The name of the failed operation.
+            operation_token: The operation token returned by the failed operation.
+        """
+        super().__init__(message)
+        self._scheduled_event_id = scheduled_event_id
+        self._endpoint = endpoint
+        self._service = service
+        self._operation = operation
+        self._operation_token = operation_token
+
+    @property
+    def scheduled_event_id(self) -> int:
+        """The NexusOperationScheduled event ID for the failed operation."""
+        return self._scheduled_event_id
+
+    @property
+    def endpoint(self) -> str:
+        """The endpoint name for the failed operation."""
+        return self._endpoint
+
+    @property
+    def service(self) -> str:
+        """The service name for the failed operation."""
+        return self._service
+
+    @property
+    def operation(self) -> str:
+        """The name of the failed operation."""
+        return self._operation
+
+    @property
+    def operation_token(self) -> str:
+        """The operation token returned by the failed operation."""
+        return self._operation_token
+
+
+class NexusHandlerError(FailureError):
+    """
+    Error raised on Nexus handler failure.
+
+    This is a Temporal serialized form of nexusrpc.HandlerError.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        type: str,
+        retryable: Optional[bool] = None,
+    ):
+        """
+        Args:
+            message: The error message.
+            type: String representation of the nexusrpc.HandlerErrorType.
+            retryable: Whether the error was marked as retryable by the code that raised it.
+        """
+        super().__init__(message)
+        self.type = type
+        self.retryable = retryable
+
+
 def is_cancelled_exception(exception: BaseException) -> bool:
     """Check whether the given exception is considered a cancellation exception
     according to Temporal.

@@ -261,6 +261,9 @@ class Replayer:
                     activity_task_poller_behavior=temporalio.bridge.worker.PollerBehaviorSimpleMaximum(
                         1
                     ),
+                    nexus_task_poller_behavior=temporalio.bridge.worker.PollerBehaviorSimpleMaximum(
+                        1
+                    ),
                 ),
             )
             # Start worker
