@@ -257,10 +257,10 @@ class MyServiceHandler:
             input: Input,
             # This return type is a type error, but VSCode doesn't flag it unless
             # "python.analysis.typeCheckingMode" is set to "strict"
-        ) -> StartOperationResultSync[Output]:
+        ) -> Output:
             # Invalid: start method must wrap result as StartOperationResultSync
             # or StartOperationResultAsync
-            return StartOperationResultSync(Output(value="unwrapped result error"))  # type: ignore
+            return Output(value="unwrapped result error")
 
         async def fetch_info(
             self, ctx: FetchOperationInfoContext, token: str
