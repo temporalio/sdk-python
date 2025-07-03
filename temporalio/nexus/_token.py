@@ -120,13 +120,15 @@ def _base64url_encode_no_padding(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode("utf-8").rstrip("=")
 
 
+_base64_url_alphabet = set(
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+)
+
+
 def _base64url_decode_no_padding(s: str) -> bytes:
-    if not all(
-        c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
-        for c in s
-    ):
+    if invalid_chars := set(s) - _base64_url_alphabet:
         raise ValueError(
-            "invalid base64URL encoded string: contains invalid characters"
+            f"invalid base64URL encoded string: contains invalid characters: {invalid_chars}"
         )
     padding = "=" * (-len(s) % 4)
     return base64.urlsafe_b64decode(s + padding)
