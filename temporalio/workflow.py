@@ -4399,44 +4399,6 @@ class NexusOperationHandle(Generic[OutputT]):
         raise NotImplementedError
 
 
-async def start_nexus_operation(
-    endpoint: str,
-    service: str,
-    operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
-    input: Any,
-    *,
-    output_type: Optional[Type[OutputT]] = None,
-    schedule_to_close_timeout: Optional[timedelta] = None,
-    headers: Optional[Mapping[str, str]] = None,
-) -> NexusOperationHandle[OutputT]:
-    """Start a Nexus operation and return its handle.
-
-    Args:
-        endpoint: The Nexus endpoint.
-        service: The Nexus service.
-        operation: The Nexus operation.
-        input: The Nexus operation input.
-        output_type: The Nexus operation output type.
-        schedule_to_close_timeout: Timeout for the entire operation attempt.
-        headers: Headers to send with the Nexus HTTP request.
-
-    Returns:
-        A handle to the Nexus operation. The result can be obtained as
-        ```python
-        await handle.result()
-        ```
-    """
-    return await _Runtime.current().workflow_start_nexus_operation(
-        endpoint=endpoint,
-        service=service,
-        operation=operation,
-        input=input,
-        output_type=output_type,
-        schedule_to_close_timeout=schedule_to_close_timeout,
-        headers=headers,
-    )
-
-
 class ExternalWorkflowHandle(Generic[SelfType]):
     """Handle for interacting with an external workflow.
 
@@ -5157,19 +5119,25 @@ class NexusClient(Generic[ServiceT]):
         *,
         endpoint: str,
     ) -> None:
+        """Create a Nexus client.
+
+        Args:
+            service: The Nexus service.
+            endpoint: The Nexus endpoint.
+        """
         # If service is not a str, then it must be a service interface or implementation
         # class.
         if isinstance(service, str):
-            self._service_name = service
+            self.service_name = service
         elif service_defn := nexusrpc.get_service_definition(service):
-            self._service_name = service_defn.name
+            self.service_name = service_defn.name
         else:
             raise ValueError(
                 f"`service` may be a name (str), or a class decorated with either "
                 f"@nexusrpc.handler.service_handler or @nexusrpc.service. "
                 f"Invalid service type: {type(service)}"
             )
-        self._endpoint = endpoint
+        self.endpoint = endpoint
 
     # TODO(nexus-prerelease): overloads: no-input, ret type
     # TODO(nexus-prerelease): should it be an error to use a reference to a method on a class other than that supplied?
@@ -5182,9 +5150,24 @@ class NexusClient(Generic[ServiceT]):
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]:
-        return await temporalio.workflow.start_nexus_operation(
-            endpoint=self._endpoint,
-            service=self._service_name,
+        """Start a Nexus operation and return its handle.
+
+        Args:
+            operation: The Nexus operation.
+            input: The Nexus operation input.
+            output_type: The Nexus operation output type.
+            schedule_to_close_timeout: Timeout for the entire operation attempt.
+            headers: Headers to send with the Nexus HTTP request.
+
+        Returns:
+            A handle to the Nexus operation. The result can be obtained as
+            ```python
+            await handle.result()
+            ```
+        """
+        return await _Runtime.current().workflow_start_nexus_operation(
+            endpoint=self.endpoint,
+            service=self.service_name,
             operation=operation,
             input=input,
             output_type=output_type,
