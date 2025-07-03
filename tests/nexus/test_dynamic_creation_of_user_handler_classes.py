@@ -21,7 +21,7 @@ def make_incrementer_user_service_definition_and_service_handler_classes(
     #
 
     ops = {name: nexusrpc.Operation[int, int] for name in op_names}
-    service_cls = nexusrpc.service(type("ServiceContract", (), ops))
+    service_cls: type = nexusrpc.service(type("ServiceContract", (), ops))
 
     #
     # service handler
@@ -40,7 +40,7 @@ def make_incrementer_user_service_definition_and_service_handler_classes(
         assert op_handler_factory
         op_handler_factories[name] = op_handler_factory
 
-    handler_cls = nexusrpc.handler.service_handler(service=service_cls)(
+    handler_cls: type = nexusrpc.handler.service_handler(service=service_cls)(
         type("ServiceImpl", (), op_handler_factories)
     )
 
@@ -72,7 +72,6 @@ async def test_dynamic_creation_of_user_handler_classes(client: Client):
             response = await http_client.post(
                 f"http://127.0.0.1:{HTTP_PORT}/nexus/endpoints/{endpoint}/services/{service_name}/increment",
                 json=1,
-                headers={},
             )
             assert response.status_code == 200
             assert response.json() == 2

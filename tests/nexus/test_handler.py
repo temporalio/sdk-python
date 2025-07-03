@@ -40,6 +40,7 @@ from nexusrpc.handler import (
     FetchOperationResultContext,
     OperationHandler,
     StartOperationContext,
+    StartOperationResultSync,
     service_handler,
     sync_operation,
 )
@@ -50,7 +51,10 @@ from temporalio import nexus, workflow
 from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import ApplicationError
-from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
+from temporalio.nexus import (
+    WorkflowRunOperationContext,
+    workflow_run_operation,
+)
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import (
@@ -256,10 +260,10 @@ class MyServiceHandler:
             input: Input,
             # This return type is a type error, but VSCode doesn't flag it unless
             # "python.analysis.typeCheckingMode" is set to "strict"
-        ) -> Output:
+        ) -> StartOperationResultSync[Output]:
             # Invalid: start method must wrap result as StartOperationResultSync
             # or StartOperationResultAsync
-            return Output(value="unwrapped result error")  # type: ignore
+            return StartOperationResultSync(Output(value="unwrapped result error"))  # type: ignore
 
         async def fetch_info(
             self, ctx: FetchOperationInfoContext, token: str
@@ -365,7 +369,7 @@ class _TestCase:
 
 
 class _FailureTestCase(_TestCase):
-    expected: UnsuccessfulResponse
+    expected: UnsuccessfulResponse  # type: ignore[assignment]
 
     @classmethod
     def check_response(
@@ -398,10 +402,9 @@ class _FailureTestCase(_TestCase):
                 exception_from_failure_details.type == "HandlerError"
                 and exception_from_failure_details.__cause__
             ):
-                exception_from_failure_details = (
-                    exception_from_failure_details.__cause__
-                )
-                assert isinstance(exception_from_failure_details, ApplicationError)
+                cause = exception_from_failure_details.__cause__
+                assert isinstance(cause, ApplicationError)
+                exception_from_failure_details = cause
 
             assert exception_from_failure_details.non_retryable == (
                 not cls.expected.retryable_exception
@@ -533,6 +536,8 @@ class BadRequest(_FailureTestCase):
 
 class _ApplicationErrorTestCase(_FailureTestCase):
     """Test cases in which the operation raises an ApplicationError."""
+
+    expected: UnsuccessfulResponse  # type: ignore[assignment]
 
     @classmethod
     def check_response(
@@ -919,18 +924,20 @@ class SyncCancelHandler:
             input: Input,
             # This return type is a type error, but VSCode doesn't flag it unless
             # "python.analysis.typeCheckingMode" is set to "strict"
-        ) -> Output:
+        ) -> StartOperationResultSync[Output]:
             # Invalid: start method must wrap result as StartOperationResultSync
             # or StartOperationResultAsync
-            return Output(value="Hello")  # type: ignore
+            return StartOperationResultSync(Output(value="Hello"))  # type: ignore
 
-        def cancel(self, ctx: CancelOperationContext, token: str) -> Output:
-            return Output(value="Hello")  # type: ignore
+        def cancel(self, ctx: CancelOperationContext, token: str) -> None:
+            return None  # type: ignore
 
-        def fetch_info(self, ctx: FetchOperationInfoContext) -> OperationInfo:
+        def fetch_info(
+            self, ctx: FetchOperationInfoContext, token: str
+        ) -> OperationInfo:
             raise NotImplementedError
 
-        def fetch_result(self, ctx: FetchOperationResultContext) -> Output:
+        def fetch_result(self, ctx: FetchOperationResultContext, token: str) -> Output:
             raise NotImplementedError
 
     @operation_handler
