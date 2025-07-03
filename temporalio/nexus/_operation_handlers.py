@@ -88,7 +88,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
         """Cancel the operation, by cancelling the workflow."""
-        await cancel_operation(token)
+        await _cancel_workflow(token)
 
     async def fetch_info(
         self, ctx: FetchOperationInfoContext, token: str
@@ -126,21 +126,26 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         # return await client_handle.result()
 
 
-async def cancel_operation(
+async def _cancel_workflow(
     token: str,
     **kwargs: Any,
 ) -> None:
-    """Cancel a Nexus operation.
+    """
+    Cancel a workflow that is backing a Nexus operation.
+
+    This function is used by the Nexus worker to cancel a workflow that is backing a
+    Nexus operation, i.e. started by a
+    :py:func:`temporalio.nexus.workflow_run_operation`-decorated method.
 
     Args:
-        token: The token of the operation to cancel.
-        client: The client to use to cancel the operation.
+        token: The token of the workflow to cancel. kwargs: Additional keyword arguments
+        to pass to the workflow cancel method.
     """
     try:
         nexus_workflow_handle = WorkflowHandle[Any].from_token(token)
     except Exception as err:
         raise HandlerError(
-            "Failed to decode operation token as workflow operation token. "
+            "Failed to decode operation token as a workflow operation token. "
             "Canceling non-workflow operations is not supported.",
             type=HandlerErrorType.NOT_FOUND,
         ) from err
