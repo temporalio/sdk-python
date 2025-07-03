@@ -5,12 +5,104 @@ import nexusrpc.handler
 import pytest
 from nexusrpc.handler import sync_operation
 
+from temporalio import nexus, workflow
 from temporalio.client import Client
 from temporalio.nexus._util import get_operation_factory
 from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint
 
 HTTP_PORT = 7243
+
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self, input: int) -> int:
+        return input + 1
+
+
+@nexusrpc.service
+class MyService:
+    increment: nexusrpc.Operation[int, int]
+
+
+class MyIncrementOperationHandler(nexusrpc.handler.OperationHandler[int, int]):
+    async def start(
+        self,
+        ctx: nexusrpc.handler.StartOperationContext,
+        input: int,
+    ) -> nexusrpc.handler.StartOperationResultAsync:
+        wrctx = nexus.WorkflowRunOperationContext.from_start_operation_context(ctx)
+        wf_handle = await wrctx.start_workflow(
+            MyWorkflow.run, input, id=str(uuid.uuid4())
+        )
+        return nexusrpc.handler.StartOperationResultAsync(token=wf_handle.to_token())
+
+    async def cancel(
+        self,
+        ctx: nexusrpc.handler.CancelOperationContext,
+        token: str,
+    ) -> None:
+        raise NotImplementedError
+
+    async def fetch_info(
+        self,
+        ctx: nexusrpc.handler.FetchOperationInfoContext,
+        token: str,
+    ) -> nexusrpc.OperationInfo:
+        raise NotImplementedError
+
+    async def fetch_result(
+        self,
+        ctx: nexusrpc.handler.FetchOperationResultContext,
+        token: str,
+    ) -> int:
+        raise NotImplementedError
+
+
+@nexusrpc.handler.service_handler
+class MyServiceHandlerWithWorkflowRunOperation:
+    @nexusrpc.handler._decorators.operation_handler
+    def increment(self) -> nexusrpc.handler.OperationHandler[int, int]:
+        return MyIncrementOperationHandler()
+
+
+async def test_run_nexus_service_from_programmatically_created_service_handler(
+    client: Client,
+):
+    task_queue = str(uuid.uuid4())
+
+    service_handler = nexusrpc.handler._core.ServiceHandler(
+        service=nexusrpc.ServiceDefinition(
+            name="MyService",
+            operations={
+                "increment": nexusrpc.Operation[int, int](
+                    name="increment",
+                    method_name="increment",
+                    input_type=int,
+                    output_type=int,
+                ),
+            },
+        ),
+        operation_handlers={
+            "increment": MyIncrementOperationHandler(),
+        },
+    )
+
+    service_name = service_handler.service.name
+
+    endpoint = (await create_nexus_endpoint(task_queue, client)).endpoint.id
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_service_handlers=[service_handler],
+    ):
+        async with httpx.AsyncClient() as http_client:
+            response = await http_client.post(
+                f"http://127.0.0.1:{HTTP_PORT}/nexus/endpoints/{endpoint}/services/{service_name}/increment",
+                json=1,
+            )
+            assert response.status_code == 201
 
 
 def make_incrementer_user_service_definition_and_service_handler_classes(
@@ -21,7 +113,7 @@ def make_incrementer_user_service_definition_and_service_handler_classes(
     #
 
     ops = {name: nexusrpc.Operation[int, int] for name in op_names}
-    service_cls = nexusrpc.service(type("ServiceContract", (), ops))
+    service_cls: type = nexusrpc.service(type("ServiceContract", (), ops))
 
     #
     # service handler
@@ -40,7 +132,7 @@ def make_incrementer_user_service_definition_and_service_handler_classes(
         assert op_handler_factory
         op_handler_factories[name] = op_handler_factory
 
-    handler_cls = nexusrpc.handler.service_handler(service=service_cls)(
+    handler_cls: type = nexusrpc.handler.service_handler(service=service_cls)(
         type("ServiceImpl", (), op_handler_factories)
     )
 
@@ -72,7 +164,6 @@ async def test_dynamic_creation_of_user_handler_classes(client: Client):
             response = await http_client.post(
                 f"http://127.0.0.1:{HTTP_PORT}/nexus/endpoints/{endpoint}/services/{service_name}/increment",
                 json=1,
-                headers={},
             )
             assert response.status_code == 200
             assert response.json() == 2

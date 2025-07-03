@@ -40,6 +40,7 @@ from nexusrpc.handler import (
     FetchOperationResultContext,
     OperationHandler,
     StartOperationContext,
+    StartOperationResultSync,
     service_handler,
     sync_operation,
 )
@@ -50,7 +51,10 @@ from temporalio import nexus, workflow
 from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import ApplicationError
-from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
+from temporalio.nexus import (
+    WorkflowRunOperationContext,
+    workflow_run_operation,
+)
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import (
@@ -135,6 +139,7 @@ class MyServiceHandler:
     async def echo(self, ctx: StartOperationContext, input: Input) -> Output:
         assert ctx.headers["test-header-key"] == "test-header-value"
         ctx.outbound_links.extend(ctx.inbound_links)
+        assert nexus.in_operation()
         return Output(
             value=f"from start method on {self.__class__.__name__}: {input.value}"
         )
@@ -215,6 +220,7 @@ class MyServiceHandler:
     async def workflow_run_operation_happy_path(
         self, ctx: WorkflowRunOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
+        assert nexus.in_operation()
         return await ctx.start_workflow(
             MyWorkflow.run,
             input,
@@ -235,13 +241,10 @@ class MyServiceHandler:
         self, ctx: WorkflowRunOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
         assert any(
-            link.url == "http://inbound-link/"
-            for link in ctx.nexus_context.inbound_links
+            link.url == "http://inbound-link/" for link in ctx.inbound_links
         ), "Inbound link not found"
-        assert (
-            ctx.nexus_context.request_id == "test-request-id-123"
-        ), "Request ID mismatch"
-        ctx.nexus_context.outbound_links.extend(ctx.nexus_context.inbound_links)
+        assert ctx.request_id == "test-request-id-123", "Request ID mismatch"
+        ctx.outbound_links.extend(ctx.inbound_links)
 
         return await ctx.start_workflow(
             MyLinkTestWorkflow.run,
@@ -259,7 +262,7 @@ class MyServiceHandler:
         ) -> Output:
             # Invalid: start method must wrap result as StartOperationResultSync
             # or StartOperationResultAsync
-            return Output(value="unwrapped result error")  # type: ignore
+            return Output(value="unwrapped result error")
 
         async def fetch_info(
             self, ctx: FetchOperationInfoContext, token: str
@@ -365,7 +368,7 @@ class _TestCase:
 
 
 class _FailureTestCase(_TestCase):
-    expected: UnsuccessfulResponse
+    expected: UnsuccessfulResponse  # type: ignore[assignment]
 
     @classmethod
     def check_response(
@@ -398,10 +401,9 @@ class _FailureTestCase(_TestCase):
                 exception_from_failure_details.type == "HandlerError"
                 and exception_from_failure_details.__cause__
             ):
-                exception_from_failure_details = (
-                    exception_from_failure_details.__cause__
-                )
-                assert isinstance(exception_from_failure_details, ApplicationError)
+                cause = exception_from_failure_details.__cause__
+                assert isinstance(cause, ApplicationError)
+                exception_from_failure_details = cause
 
             assert exception_from_failure_details.non_retryable == (
                 not cls.expected.retryable_exception
@@ -533,6 +535,8 @@ class BadRequest(_FailureTestCase):
 
 class _ApplicationErrorTestCase(_FailureTestCase):
     """Test cases in which the operation raises an ApplicationError."""
+
+    expected: UnsuccessfulResponse  # type: ignore[assignment]
 
     @classmethod
     def check_response(
@@ -830,6 +834,14 @@ async def test_start_operation_without_type_annotations(
     assert not any(warnings), [w.message for w in warnings]
 
 
+def test_operation_without_type_annotations_without_service_definition_raises_validation_error():
+    with pytest.raises(
+        ValueError,
+        match=r"has no input type.+has no output type",
+    ):
+        service_handler(MyServiceHandlerWithOperationsWithoutTypeAnnotations)
+
+
 async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: Any):
     task_queue = str(uuid.uuid4())
     service_name = MyService.__name__
@@ -919,18 +931,20 @@ class SyncCancelHandler:
             input: Input,
             # This return type is a type error, but VSCode doesn't flag it unless
             # "python.analysis.typeCheckingMode" is set to "strict"
-        ) -> Output:
+        ) -> StartOperationResultSync[Output]:
             # Invalid: start method must wrap result as StartOperationResultSync
             # or StartOperationResultAsync
-            return Output(value="Hello")  # type: ignore
+            return StartOperationResultSync(Output(value="Hello"))  # type: ignore
 
-        def cancel(self, ctx: CancelOperationContext, token: str) -> Output:
-            return Output(value="Hello")  # type: ignore
+        def cancel(self, ctx: CancelOperationContext, token: str) -> None:
+            return None  # type: ignore
 
-        def fetch_info(self, ctx: FetchOperationInfoContext) -> OperationInfo:
+        def fetch_info(
+            self, ctx: FetchOperationInfoContext, token: str
+        ) -> OperationInfo:
             raise NotImplementedError
 
-        def fetch_result(self, ctx: FetchOperationResultContext) -> Output:
+        def fetch_result(self, ctx: FetchOperationResultContext, token: str) -> Output:
             raise NotImplementedError
 
     @operation_handler

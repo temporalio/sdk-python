@@ -31,7 +31,7 @@ import temporalio.api.nexus.v1
 import temporalio.api.operatorservice
 import temporalio.api.operatorservice.v1
 import temporalio.exceptions
-import temporalio.nexus
+import temporalio.nexus._operation_handlers
 from temporalio import nexus, workflow
 from temporalio.client import (
     Client,
@@ -44,6 +44,7 @@ from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import (
     ApplicationError,
     CancelledError,
+    NexusHandlerError,
     NexusOperationError,
     TimeoutError,
 )
@@ -149,7 +150,7 @@ class HandlerWorkflow:
 
 
 class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
-    async def start(
+    async def start(  # type: ignore[override]
         self, ctx: StartOperationContext, input: OpInput
     ) -> Union[
         StartOperationResultSync[OpOutput],
@@ -179,7 +180,7 @@ class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
             raise TypeError
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
-        return await nexus.cancel_operation(token)
+        return await temporalio.nexus._operation_handlers._cancel_workflow(token)
 
     async def fetch_info(
         self, ctx: FetchOperationInfoContext, token: str
@@ -260,12 +261,12 @@ class CallerWorkflow:
         request_cancel: bool,
         task_queue: str,
     ) -> None:
-        self.nexus_client = workflow.NexusClient(
+        self.nexus_client = workflow.create_nexus_client(
+            endpoint=make_nexus_endpoint_name(task_queue),
             service={
                 CallerReference.IMPL_WITH_INTERFACE: ServiceImpl,
                 CallerReference.INTERFACE: ServiceInterface,
             }[input.op_input.caller_reference],
-            endpoint=make_nexus_endpoint_name(task_queue),
         )
         self._nexus_operation_started = False
         self._proceed = False
@@ -312,7 +313,7 @@ class CallerWorkflow:
         nexusrpc.Operation[OpInput, OpOutput],
         Callable[[Any], OperationHandler[OpInput, OpOutput]],
     ]:
-        return {
+        return {  # type: ignore[return-value]
             (
                 SyncResponse,
                 OpDefinitionType.SHORTHAND,
@@ -383,9 +384,9 @@ class UntypedCallerWorkflow:
     ) -> None:
         # TODO(nexus-preview): untyped caller cannot reference name of implementation. I think this is as it should be.
         service_name = "ServiceInterface"
-        self.nexus_client = workflow.NexusClient(
-            service=service_name,
+        self.nexus_client: workflow.NexusClient[Any] = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(task_queue),
+            service=service_name,
         )
 
     @workflow.run
@@ -486,7 +487,7 @@ async def test_sync_response(
             e = ei.value
             assert isinstance(e, WorkflowFailureError)
             assert isinstance(e.__cause__, NexusOperationError)
-            assert isinstance(e.__cause__.__cause__, nexusrpc.HandlerError)
+            assert isinstance(e.__cause__.__cause__, NexusHandlerError)
             # ID of first command
             assert e.__cause__.scheduled_event_id == 5
             assert e.__cause__.endpoint == make_nexus_endpoint_name(task_queue)
@@ -539,7 +540,7 @@ async def test_async_response(
             e = ei.value
             assert isinstance(e, WorkflowFailureError)
             assert isinstance(e.__cause__, NexusOperationError)
-            assert isinstance(e.__cause__.__cause__, nexusrpc.HandlerError)
+            assert isinstance(e.__cause__.__cause__, NexusHandlerError)
             # ID of first command after update accepted
             assert e.__cause__.scheduled_event_id == 6
             assert e.__cause__.endpoint == make_nexus_endpoint_name(task_queue)
@@ -716,7 +717,7 @@ async def test_untyped_caller(
             e = ei.value
             assert isinstance(e, WorkflowFailureError)
             assert isinstance(e.__cause__, NexusOperationError)
-            assert isinstance(e.__cause__.__cause__, nexusrpc.HandlerError)
+            assert isinstance(e.__cause__.__cause__, NexusHandlerError)
         else:
             result = await caller_wf_handle.result()
             assert result.op_output.value == (
@@ -800,6 +801,7 @@ class ServiceInterfaceAndImplCallerWorkflow:
         task_queue: str,
     ) -> ServiceClassNameOutput:
         C, N = CallerReference, NameOverride
+        service_cls: type
         if (caller_reference, name_override) == (C.INTERFACE, N.YES):
             service_cls = ServiceInterfaceWithNameOverride
         elif (caller_reference, name_override) == (C.INTERFACE, N.NO):
@@ -816,9 +818,9 @@ class ServiceInterfaceAndImplCallerWorkflow:
                 f"Invalid combination of caller_reference ({caller_reference}) and name_override ({name_override})"
             )
 
-        nexus_client = workflow.NexusClient(
-            service=service_cls,
+        nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(task_queue),
+            service=service_cls,
         )
 
         return await nexus_client.execute_operation(service_cls.op, None)  # type: ignore
@@ -940,9 +942,9 @@ class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
 class WorkflowCallingNexusOperationThatExecutesWorkflowBeforeStartingBackingWorkflow:
     @workflow.run
     async def run(self, input: str, task_queue: str) -> str:
-        nexus_client = workflow.NexusClient(
-            service=ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow,
+        nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(task_queue),
+            service=ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow,
         )
         return await nexus_client.execute_operation(
             ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow.my_workflow_run_operation,
@@ -1190,18 +1192,10 @@ class ErrorConversionTestCase:
         }
 
 
-error_conversion_test_cases = []
+error_conversion_test_cases: list[ErrorConversionTestCase] = []
 
 
 # application_error_non_retryable:
-_ = ["NexusOperationError", "HandlerError"]
-# Java
-_ = [
-    "NexusOperationError",
-    "HandlerError('handler error: message='application error 1', type='my-application-error-type', nonRetryable=true', type='INTERNAL', nonRetryable=true)",
-    "ApplicationError('application error 1', type='my-application-error-type', nonRetryable=true)",
-]
-
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
         name="application_error_non_retryable",
@@ -1227,11 +1221,16 @@ error_conversion_test_cases.append(
     )
 )
 
+# custom_error:
+error_conversion_test_cases.append(
+    ErrorConversionTestCase(
+        name="custom_error",
+        java_behavior=[],  # [Not possible]
+    )
+)
+
 
 # custom_error_from_custom_error:
-_ = ["NexusOperationError", "HandlerError"]
-# Java
-# [Not possible]
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
         name="custom_error_from_custom_error",
@@ -1241,15 +1240,6 @@ error_conversion_test_cases.append(
 
 
 # application_error_non_retryable_from_custom_error:
-_ = ["NexusOperationError", "HandlerError"]
-# Java
-_ = [
-    "NexusOperationError",
-    "HandlerError('handler error: message='application error 1', type='my-application-error-type', nonRetryable=true', type='INTERNAL', nonRetryable=true)",
-    "ApplicationError('application error 1', type='my-application-error-type', nonRetryable=true)",
-    "ApplicationError('Custom error 2', type='io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException', nonRetryable=false)",
-]
-
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
         name="application_error_non_retryable_from_custom_error",
@@ -1284,14 +1274,6 @@ error_conversion_test_cases.append(
 )
 
 # nexus_handler_error_not_found:
-_ = ["NexusOperationError", "HandlerError"]
-# Java
-_ = [
-    "NexusOperationError",
-    "HandlerError('handler error: message='Handler error 1', type='java.lang.RuntimeException', nonRetryable=false', type='NOT_FOUND', nonRetryable=true)",
-    "ApplicationError('Handler error 1', type='java.lang.RuntimeException', nonRetryable=false)",
-]
-
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
         name="nexus_handler_error_not_found",
@@ -1318,9 +1300,6 @@ error_conversion_test_cases.append(
 )
 
 # nexus_handler_error_not_found_from_custom_error:
-_ = ["NexusOperationError", "HandlerError"]
-# Java
-# [Not possible]
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
         name="nexus_handler_error_not_found_from_custom_error",
@@ -1330,13 +1309,6 @@ error_conversion_test_cases.append(
 
 
 # nexus_operation_error_from_application_error_non_retryable_from_custom_error:
-_ = ["NexusOperationError", "ApplicationError", "ApplicationError"]
-# Java
-_ = [
-    "NexusOperationError",
-    "ApplicationError('application error 1', type='my-application-error-type', nonRetryable=true)",
-    "ApplicationError('Custom error 2', type='io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException', nonRetryable=false)",
-]
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
         name="nexus_operation_error_from_application_error_non_retryable_from_custom_error",
@@ -1430,9 +1402,9 @@ class ErrorTestService:
 class ErrorTestCallerWorkflow:
     @workflow.init
     def __init__(self, input: ErrorTestInput):
-        self.nexus_client = workflow.NexusClient(
-            service=ErrorTestService,
+        self.nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(input.task_queue),
+            service=ErrorTestService,
         )
         self.test_cases = {t.name: t for t in error_conversion_test_cases}
 
@@ -1465,7 +1437,7 @@ class ErrorTestCallerWorkflow:
 {input.action_in_sync_op}
 {'-' * 80}
 """)
-            for java_behavior, actual in results:
+            for java_behavior, actual in results:  # type: ignore[assignment]
                 print(f"Java:   {java_behavior}")
                 print(f"Python: {actual}")
                 print()
@@ -1479,6 +1451,7 @@ class ErrorTestCallerWorkflow:
     "action_in_sync_op",
     [
         "application_error_non_retryable",
+        "custom_error",
         "custom_error_from_custom_error",
         "application_error_non_retryable_from_custom_error",
         "nexus_handler_error_not_found",
@@ -1508,9 +1481,9 @@ async def test_errors_raised_by_nexus_operation(
         )
 
 
-# Timeout test
+# Start timeout test
 @service_handler
-class TimeoutTestService:
+class StartTimeoutTestService:
     @sync_operation
     async def op_handler_that_never_returns(
         self, ctx: StartOperationContext, input: None
@@ -1519,35 +1492,35 @@ class TimeoutTestService:
 
 
 @workflow.defn
-class TimeoutTestCallerWorkflow:
+class StartTimeoutTestCallerWorkflow:
     @workflow.init
     def __init__(self):
-        self.nexus_client = workflow.NexusClient(
-            service=TimeoutTestService,
+        self.nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+            service=StartTimeoutTestService,
         )
 
     @workflow.run
     async def run(self) -> None:
         await self.nexus_client.execute_operation(
-            TimeoutTestService.op_handler_that_never_returns,
+            StartTimeoutTestService.op_handler_that_never_returns,
             None,
             schedule_to_close_timeout=timedelta(seconds=0.1),
         )
 
 
-async def test_timeout_error_raised_by_nexus_operation(client: Client):
+async def test_error_raised_by_timeout_of_nexus_start_operation(client: Client):
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
-        nexus_service_handlers=[TimeoutTestService()],
-        workflows=[TimeoutTestCallerWorkflow],
+        nexus_service_handlers=[StartTimeoutTestService()],
+        workflows=[StartTimeoutTestCallerWorkflow],
         task_queue=task_queue,
     ):
         await create_nexus_endpoint(task_queue, client)
         try:
             await client.execute_workflow(
-                TimeoutTestCallerWorkflow.run,
+                StartTimeoutTestCallerWorkflow.run,
                 id=str(uuid.uuid4()),
                 task_queue=task_queue,
             )
@@ -1555,6 +1528,82 @@ async def test_timeout_error_raised_by_nexus_operation(client: Client):
             assert isinstance(err, WorkflowFailureError)
             assert isinstance(err.__cause__, NexusOperationError)
             assert isinstance(err.__cause__.__cause__, TimeoutError)
+        else:
+            pytest.fail("Expected exception due to timeout of nexus start operation")
+
+
+# Cancellation timeout test
+
+
+class OperationWithCancelMethodThatNeverReturns(OperationHandler[None, None]):
+    async def start(
+        self, ctx: StartOperationContext, input: None
+    ) -> StartOperationResultAsync:
+        return StartOperationResultAsync("fake-token")
+
+    async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
+        await asyncio.Future()
+
+    async def fetch_info(
+        self, ctx: FetchOperationInfoContext, token: str
+    ) -> nexusrpc.OperationInfo:
+        raise NotImplementedError("Not implemented")
+
+    async def fetch_result(self, ctx: FetchOperationResultContext, token: str) -> None:
+        raise NotImplementedError("Not implemented")
+
+
+@service_handler
+class CancellationTimeoutTestService:
+    @nexusrpc.handler._decorators.operation_handler
+    def op_with_cancel_method_that_never_returns(
+        self,
+    ) -> OperationHandler[None, None]:
+        return OperationWithCancelMethodThatNeverReturns()
+
+
+@workflow.defn
+class CancellationTimeoutTestCallerWorkflow:
+    @workflow.init
+    def __init__(self):
+        self.nexus_client = workflow.create_nexus_client(
+            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+            service=CancellationTimeoutTestService,
+        )
+
+    @workflow.run
+    async def run(self) -> None:
+        op_handle = await self.nexus_client.start_operation(
+            CancellationTimeoutTestService.op_with_cancel_method_that_never_returns,
+            None,
+            schedule_to_close_timeout=timedelta(seconds=0.1),
+        )
+        op_handle.cancel()
+        await op_handle
+
+
+async def test_error_raised_by_timeout_of_nexus_cancel_operation(client: Client):
+    pytest.skip("TODO(nexus-prerelease): finish writing this test")
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client,
+        nexus_service_handlers=[CancellationTimeoutTestService()],
+        workflows=[CancellationTimeoutTestCallerWorkflow],
+        task_queue=task_queue,
+    ):
+        await create_nexus_endpoint(task_queue, client)
+        try:
+            await client.execute_workflow(
+                CancellationTimeoutTestCallerWorkflow.run,
+                id=str(uuid.uuid4()),
+                task_queue=task_queue,
+            )
+        except Exception as err:
+            assert isinstance(err, WorkflowFailureError)
+            assert isinstance(err.__cause__, NexusOperationError)
+            assert isinstance(err.__cause__.__cause__, TimeoutError)
+        else:
+            pytest.fail("Expected exception due to timeout of nexus cancel operation")
 
 
 # Test overloads
@@ -1648,9 +1697,9 @@ class OverloadTestInput:
 class OverloadTestCallerWorkflow:
     @workflow.run
     async def run(self, op: str, input: OverloadTestValue) -> OverloadTestValue:
-        nexus_client = workflow.NexusClient(
-            service=OverloadTestServiceHandler,
+        nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+            service=OverloadTestServiceHandler,
         )
         if op == "no_param":
             return await nexus_client.execute_operation(

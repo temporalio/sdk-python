@@ -62,6 +62,13 @@ class Info:
     """The task queue of the worker handling this Nexus operation."""
 
 
+def in_operation() -> bool:
+    """
+    Whether the current code is inside a Nexus operation.
+    """
+    return _try_temporal_context() is not None
+
+
 def info() -> Info:
     """
     Get the current Nexus operation information.
@@ -120,7 +127,7 @@ class _TemporalStartOperationContext:
     def set(self) -> None:
         _temporal_start_operation_context.set(self)
 
-    def get_completion_callbacks(
+    def _get_completion_callbacks(
         self,
     ) -> list[temporalio.client.NexusCompletionCallback]:
         ctx = self.nexus_context
@@ -140,7 +147,7 @@ class _TemporalStartOperationContext:
             else []
         )
 
-    def get_workflow_event_links(
+    def _get_workflow_event_links(
         self,
     ) -> list[temporalio.api.common.v1.Link.WorkflowEvent]:
         event_links = []
@@ -149,7 +156,7 @@ class _TemporalStartOperationContext:
                 event_links.append(link)
         return event_links
 
-    def add_outbound_links(
+    def _add_outbound_links(
         self, workflow_handle: temporalio.client.WorkflowHandle[Any, Any]
     ):
         try:
@@ -184,10 +191,6 @@ class WorkflowRunOperationContext(StartOperationContext):
         if not self._temporal_context:
             raise RuntimeError("Temporal context not set")
         return self._temporal_context
-
-    @property
-    def nexus_context(self) -> StartOperationContext:
-        return self.temporal_context.nexus_context
 
     @classmethod
     def from_start_operation_context(
@@ -438,12 +441,12 @@ class WorkflowRunOperationContext(StartOperationContext):
             request_eager_start=request_eager_start,
             priority=priority,
             versioning_override=versioning_override,
-            nexus_completion_callbacks=self.temporal_context.get_completion_callbacks(),
-            workflow_event_links=self.temporal_context.get_workflow_event_links(),
+            nexus_completion_callbacks=self.temporal_context._get_completion_callbacks(),
+            workflow_event_links=self.temporal_context._get_workflow_event_links(),
             request_id=self.temporal_context.nexus_context.request_id,
         )
 
-        self.temporal_context.add_outbound_links(wf_handle)
+        self.temporal_context._add_outbound_links(wf_handle)
 
         return WorkflowHandle[ReturnType]._unsafe_from_client_workflow_handle(wf_handle)
 
@@ -560,7 +563,7 @@ def _nexus_link_to_workflow_event(
     )
 
 
-class _LoggerAdapter(logging.LoggerAdapter):
+class LoggerAdapter(logging.LoggerAdapter):
     def __init__(self, logger: logging.Logger, extra: Optional[Mapping[str, Any]]):
         super().__init__(logger, extra or {})
 
@@ -576,5 +579,5 @@ class _LoggerAdapter(logging.LoggerAdapter):
         return msg, kwargs
 
 
-logger = _LoggerAdapter(logging.getLogger("temporalio.nexus"), None)
+logger = LoggerAdapter(logging.getLogger("temporalio.nexus"), None)
 """Logger that emits additional data describing the current Nexus operation."""
