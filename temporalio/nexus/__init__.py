@@ -12,5 +12,4 @@ from ._operation_context import (
 from ._operation_context import client as client
 from ._operation_context import info as info
 from ._operation_context import logger as logger
-from ._operation_handlers import cancel_operation as cancel_operation
 from ._token import WorkflowHandle as WorkflowHandle
