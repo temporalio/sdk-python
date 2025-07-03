@@ -285,21 +285,23 @@ class _NexusWorker:
         )
         try:
             result = await self._handler.start_operation(ctx, input)
+            links = [
+                temporalio.api.nexus.v1.Link(url=link.url, type=link.type)
+                for link in ctx.outbound_links
+            ]
             if isinstance(result, nexusrpc.handler.StartOperationResultAsync):
                 return temporalio.api.nexus.v1.StartOperationResponse(
                     async_success=temporalio.api.nexus.v1.StartOperationResponse.Async(
                         operation_token=result.token,
-                        links=[
-                            temporalio.api.nexus.v1.Link(url=link.url, type=link.type)
-                            for link in ctx.outbound_links
-                        ],
+                        links=links,
                     )
                 )
             elif isinstance(result, nexusrpc.handler.StartOperationResultSync):
                 [payload] = await self._data_converter.encode([result.value])
                 return temporalio.api.nexus.v1.StartOperationResponse(
                     sync_success=temporalio.api.nexus.v1.StartOperationResponse.Sync(
-                        payload=payload
+                        payload=payload,
+                        links=links,
                     )
                 )
             else:
