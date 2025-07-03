@@ -63,30 +63,6 @@ class ServiceClient:
                 headers=headers,
             )
 
-    async def fetch_operation_info(
-        self,
-        operation: str,
-        token: str,
-    ) -> httpx.Response:
-        async with httpx.AsyncClient() as http_client:
-            return await http_client.get(
-                f"{self.server_address}/nexus/endpoints/{self.endpoint}/services/{self.service}/{operation}",
-                # Token can also be sent as "Nexus-Operation-Token" header
-                params={"token": token},
-            )
-
-    async def fetch_operation_result(
-        self,
-        operation: str,
-        token: str,
-    ) -> httpx.Response:
-        async with httpx.AsyncClient() as http_client:
-            return await http_client.get(
-                f"{self.server_address}/nexus/endpoints/{self.endpoint}/services/{self.service}/{operation}/result",
-                # Token can also be sent as "Nexus-Operation-Token" header
-                params={"token": token},
-            )
-
     async def cancel_operation(
         self,
         operation: str,
