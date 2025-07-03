@@ -261,12 +261,12 @@ class CallerWorkflow:
         request_cancel: bool,
         task_queue: str,
     ) -> None:
-        self.nexus_client = workflow.NexusClient(
+        self.nexus_client = workflow.create_nexus_client(
+            endpoint=make_nexus_endpoint_name(task_queue),
             service={
                 CallerReference.IMPL_WITH_INTERFACE: ServiceImpl,
                 CallerReference.INTERFACE: ServiceInterface,
             }[input.op_input.caller_reference],
-            endpoint=make_nexus_endpoint_name(task_queue),
         )
         self._nexus_operation_started = False
         self._proceed = False
@@ -384,9 +384,9 @@ class UntypedCallerWorkflow:
     ) -> None:
         # TODO(nexus-preview): untyped caller cannot reference name of implementation. I think this is as it should be.
         service_name = "ServiceInterface"
-        self.nexus_client: workflow.NexusClient[Any] = workflow.NexusClient(
-            service=service_name,
+        self.nexus_client: workflow.NexusClient[Any] = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(task_queue),
+            service=service_name,
         )
 
     @workflow.run
@@ -818,9 +818,9 @@ class ServiceInterfaceAndImplCallerWorkflow:
                 f"Invalid combination of caller_reference ({caller_reference}) and name_override ({name_override})"
             )
 
-        nexus_client = workflow.NexusClient(
-            service=service_cls,
+        nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(task_queue),
+            service=service_cls,
         )
 
         return await nexus_client.execute_operation(service_cls.op, None)  # type: ignore
@@ -942,9 +942,9 @@ class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
 class WorkflowCallingNexusOperationThatExecutesWorkflowBeforeStartingBackingWorkflow:
     @workflow.run
     async def run(self, input: str, task_queue: str) -> str:
-        nexus_client = workflow.NexusClient(
-            service=ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow,
+        nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(task_queue),
+            service=ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow,
         )
         return await nexus_client.execute_operation(
             ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow.my_workflow_run_operation,
@@ -1402,9 +1402,9 @@ class ErrorTestService:
 class ErrorTestCallerWorkflow:
     @workflow.init
     def __init__(self, input: ErrorTestInput):
-        self.nexus_client = workflow.NexusClient(
-            service=ErrorTestService,
+        self.nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(input.task_queue),
+            service=ErrorTestService,
         )
         self.test_cases = {t.name: t for t in error_conversion_test_cases}
 
@@ -1495,9 +1495,9 @@ class TimeoutTestService:
 class TimeoutTestCallerWorkflow:
     @workflow.init
     def __init__(self):
-        self.nexus_client = workflow.NexusClient(
-            service=TimeoutTestService,
+        self.nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+            service=TimeoutTestService,
         )
 
     @workflow.run
@@ -1621,9 +1621,9 @@ class OverloadTestInput:
 class OverloadTestCallerWorkflow:
     @workflow.run
     async def run(self, op: str, input: OverloadTestValue) -> OverloadTestValue:
-        nexus_client = workflow.NexusClient(
-            service=OverloadTestServiceHandler,
+        nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+            service=OverloadTestServiceHandler,
         )
         if op == "no_param":
             return await nexus_client.execute_operation(
