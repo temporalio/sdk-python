@@ -312,7 +312,7 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
         elif isinstance(self.operation, str):
             self._operation_name = self.operation
             self._input_type = None
-        elif isinstance(self.operation, Callable):
+        elif callable(self.operation):
             _, op = temporalio.nexus._util.get_operation_factory(self.operation)
             if isinstance(op, nexusrpc.Operation):
                 self._operation_name = op.name

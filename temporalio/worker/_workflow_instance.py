@@ -1842,7 +1842,7 @@ class _WorkflowInstanceImpl(
         async def operation_handle_fn() -> OutputT:
             while True:
                 try:
-                    return await asyncio.shield(handle._result_fut)
+                    return cast(OutputT, await asyncio.shield(handle._result_fut))
                 except asyncio.CancelledError:
                     cancel_command = self._add_command()
                     handle._apply_cancel_command(cancel_command)
@@ -3038,7 +3038,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         # We intentionally let this error if already done
         self._start_fut.set_result(operation_token)
 
-    def _resolve_success(self, result: OutputT) -> None:
+    def _resolve_success(self, result: Any) -> None:
         # We intentionally let this error if already done
         self._result_fut.set_result(result)
 
