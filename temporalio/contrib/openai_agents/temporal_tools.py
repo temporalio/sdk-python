@@ -181,7 +181,7 @@ def nexus_operation_as_tool(
                 f"Invalid JSON input for tool {schema.name}: {input}"
             ) from e
 
-        nexus_client = workflow.NexusClient(service=service, endpoint=endpoint)
+        nexus_client = workflow.create_nexus_client(endpoint=endpoint, service=service)
         args, _ = schema.to_call_args(schema.params_pydantic_model(**json_data))
         assert len(args) == 1, "Nexus operations must have exactly one argument"
         [arg] = args
