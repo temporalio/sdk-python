@@ -149,7 +149,7 @@ class HandlerWorkflow:
 
 
 class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
-    async def start(
+    async def start(  # type: ignore[override]
         self, ctx: StartOperationContext, input: OpInput
     ) -> Union[
         StartOperationResultSync[OpOutput],
@@ -312,7 +312,7 @@ class CallerWorkflow:
         nexusrpc.Operation[OpInput, OpOutput],
         Callable[[Any], OperationHandler[OpInput, OpOutput]],
     ]:
-        return {
+        return {  # type: ignore[return-value]
             (
                 SyncResponse,
                 OpDefinitionType.SHORTHAND,
@@ -383,7 +383,7 @@ class UntypedCallerWorkflow:
     ) -> None:
         # TODO(nexus-preview): untyped caller cannot reference name of implementation. I think this is as it should be.
         service_name = "ServiceInterface"
-        self.nexus_client = workflow.NexusClient(
+        self.nexus_client: workflow.NexusClient[Any] = workflow.NexusClient(
             service=service_name,
             endpoint=make_nexus_endpoint_name(task_queue),
         )
@@ -800,6 +800,7 @@ class ServiceInterfaceAndImplCallerWorkflow:
         task_queue: str,
     ) -> ServiceClassNameOutput:
         C, N = CallerReference, NameOverride
+        service_cls: type
         if (caller_reference, name_override) == (C.INTERFACE, N.YES):
             service_cls = ServiceInterfaceWithNameOverride
         elif (caller_reference, name_override) == (C.INTERFACE, N.NO):
@@ -1190,7 +1191,7 @@ class ErrorConversionTestCase:
         }
 
 
-error_conversion_test_cases = []
+error_conversion_test_cases: list[ErrorConversionTestCase] = []
 
 
 # application_error_non_retryable:
@@ -1465,7 +1466,7 @@ class ErrorTestCallerWorkflow:
 {input.action_in_sync_op}
 {'-' * 80}
 """)
-            for java_behavior, actual in results:
+            for java_behavior, actual in results:  # type: ignore[assignment]
                 print(f"Java:   {java_behavior}")
                 print(f"Python: {actual}")
                 print()

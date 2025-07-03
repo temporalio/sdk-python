@@ -9,8 +9,8 @@ from nexusrpc import OutputT
 
 from temporalio import client
 
-OPERATION_TOKEN_TYPE_WORKFLOW = 1
 OperationTokenType = Literal[1]
+OPERATION_TOKEN_TYPE_WORKFLOW: OperationTokenType = 1
 
 
 @dataclass(frozen=True)
