@@ -5185,7 +5185,7 @@ class NexusClient(Generic[ServiceT]):
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT:
-        handle: NexusOperationHandle[OutputT] = await self.start_operation(
+        handle = await self.start_operation(
             operation,
             input,
             output_type=output_type,
