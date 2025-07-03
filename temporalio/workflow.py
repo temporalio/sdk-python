@@ -5112,12 +5112,73 @@ class VersioningIntent(Enum):
 ServiceT = TypeVar("ServiceT")
 
 
-class NexusClient(Generic[ServiceT]):
+class NexusClient(ABC, Generic[ServiceT]):
+    """
+    A client for invoking Nexus operations.
+
+    example:
+    ```python
+    nexus_client = workflow.create_nexus_client(
+        endpoint=my_nexus_endpoint,
+        service=MyService,
+    )
+    handle = await nexus_client.start_operation(
+        operation=MyService.my_operation,
+        input=MyOperationInput(value="hello"),
+        schedule_to_close_timeout=timedelta(seconds=10),
+    )
+    result = await handle.result()
+    ```
+    """
+
+    # TODO(nexus-prerelease): overloads: no-input, ret type
+    # TODO(nexus-prerelease): should it be an error to use a reference to a method on a class other than that supplied?
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> NexusOperationHandle[OutputT]:
+        """Start a Nexus operation and return its handle.
+
+        Args:
+            operation: The Nexus operation.
+            input: The Nexus operation input.
+            output_type: The Nexus operation output type.
+            schedule_to_close_timeout: Timeout for the entire operation attempt.
+            headers: Headers to send with the Nexus HTTP request.
+
+        Returns:
+            A handle to the Nexus operation. The result can be obtained as
+            ```python
+            await handle.result()
+            ```
+        """
+        ...
+
+    # TODO(nexus-prerelease): overloads: no-input, ret type
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> OutputT: ...
+
+
+class _NexusClient(NexusClient[ServiceT]):
     def __init__(
         self,
-        service: Union[Type[ServiceT], str],
         *,
         endpoint: str,
+        service: Union[Type[ServiceT], str],
     ) -> None:
         """Create a Nexus client.
 
@@ -5149,30 +5210,17 @@ class NexusClient(Generic[ServiceT]):
         output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
-    ) -> NexusOperationHandle[OutputT]:
-        """Start a Nexus operation and return its handle.
-
-        Args:
-            operation: The Nexus operation.
-            input: The Nexus operation input.
-            output_type: The Nexus operation output type.
-            schedule_to_close_timeout: Timeout for the entire operation attempt.
-            headers: Headers to send with the Nexus HTTP request.
-
-        Returns:
-            A handle to the Nexus operation. The result can be obtained as
-            ```python
-            await handle.result()
-            ```
-        """
-        return await _Runtime.current().workflow_start_nexus_operation(
-            endpoint=self.endpoint,
-            service=self.service_name,
-            operation=operation,
-            input=input,
-            output_type=output_type,
-            schedule_to_close_timeout=schedule_to_close_timeout,
-            headers=headers,
+    ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
+        return (
+            await temporalio.workflow._Runtime.current().workflow_start_nexus_operation(
+                endpoint=self.endpoint,
+                service=self.service_name,
+                operation=operation,
+                input=input,
+                output_type=output_type,
+                schedule_to_close_timeout=schedule_to_close_timeout,
+                headers=headers,
+            )
         )
 
     # TODO(nexus-prerelease): overloads: no-input, ret type
@@ -5193,3 +5241,15 @@ class NexusClient(Generic[ServiceT]):
             headers=headers,
         )
         return await handle
+
+
+def create_nexus_client(
+    endpoint: str, service: Union[Type[ServiceT], str]
+) -> NexusClient[ServiceT]:
+    """Create a Nexus client.
+
+    Args:
+        endpoint: The Nexus endpoint.
+        service: The Nexus service.
+    """
+    return _NexusClient(endpoint=endpoint, service=service)
