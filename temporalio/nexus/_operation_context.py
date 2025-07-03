@@ -563,7 +563,7 @@ def _nexus_link_to_workflow_event(
     )
 
 
-class _LoggerAdapter(logging.LoggerAdapter):
+class LoggerAdapter(logging.LoggerAdapter):
     def __init__(self, logger: logging.Logger, extra: Optional[Mapping[str, Any]]):
         super().__init__(logger, extra or {})
 
@@ -579,5 +579,5 @@ class _LoggerAdapter(logging.LoggerAdapter):
         return msg, kwargs
 
 
-logger = _LoggerAdapter(logging.getLogger("temporalio.nexus"), None)
+logger = LoggerAdapter(logging.getLogger("temporalio.nexus"), None)
 """Logger that emits additional data describing the current Nexus operation."""
