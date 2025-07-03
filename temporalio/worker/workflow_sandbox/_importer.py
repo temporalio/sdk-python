@@ -145,18 +145,30 @@ class Importer:
             while it is running and therefore should be locked against other
             code running at the same time.
         """
-        with _thread_local_sys_modules.applied(sys, "modules", self.new_modules):
-            with _thread_local_import.applied(builtins, "__import__", self.import_func):
-                with self._builtins_restricted():
-                    yield None
+        orig_importer = Importer.current_importer()
+        Importer._thread_local_current.importer = self
+        try:
+            with _thread_local_sys_modules.applied(sys, "modules", self.new_modules):
+                with _thread_local_import.applied(
+                    builtins, "__import__", self.import_func
+                ):
+                    with self._builtins_restricted():
+                        yield None
+        finally:
+            Importer._thread_local_current.importer = orig_importer
 
     @contextmanager
     def _unapplied(self) -> Iterator[None]:
+        orig_importer = Importer.current_importer()
+        Importer._thread_local_current.importer = None
         # Set orig modules, then unset on complete
-        with _thread_local_sys_modules.unapplied():
-            with _thread_local_import.unapplied():
-                with self._builtins_unrestricted():
-                    yield None
+        try:
+            with _thread_local_sys_modules.unapplied():
+                with _thread_local_import.unapplied():
+                    with self._builtins_unrestricted():
+                        yield None
+        finally:
+            Importer._thread_local_current.importer = orig_importer
 
     def _traced_import(
         self,
@@ -211,6 +223,8 @@ class Importer:
                 # Put it on the parent
                 if parent:
                     setattr(sys.modules[parent], child, sys.modules[full_name])
+                # All children of this module that are on the original sys
+                # modules but not here and are passthrough
 
             # If the module is __temporal_main__ and not already in sys.modules,
             # we load it from whatever file __main__ was originally in
@@ -251,21 +265,31 @@ class Importer:
         ):
             raise RestrictedWorkflowAccessError(name)
 
+    def module_configured_passthrough(self, name: str) -> bool:
+        """Whether the given module name is configured as passthrough."""
+        if (
+            self.restrictions.passthrough_all_modules
+            or name in self.restrictions.passthrough_modules
+        ):
+            return True
+        # Iterate backwards looking if configured passthrough
+        end_dot = -1
+        while True:
+            end_dot = name.find(".", end_dot + 1)
+            if end_dot == -1:
+                return False
+            elif name[:end_dot] in self.restrictions.passthrough_modules:
+                break
+        return True
+
     def _maybe_passthrough_module(self, name: str) -> Optional[types.ModuleType]:
         # If imports not passed through and all modules are not passed through
         # and name not in passthrough modules, check parents
         if (
             not temporalio.workflow.unsafe.is_imports_passed_through()
-            and not self.restrictions.passthrough_all_modules
-            and name not in self.restrictions.passthrough_modules
+            and not self.module_configured_passthrough(name)
         ):
-            end_dot = -1
-            while True:
-                end_dot = name.find(".", end_dot + 1)
-                if end_dot == -1:
-                    return None
-                elif name[:end_dot] in self.restrictions.passthrough_modules:
-                    break
+            return None
         # Do the pass through
         with self._unapplied():
             _trace("Passing module %s through from host", name)
@@ -310,6 +334,13 @@ class Importer:
             for _, thread_local, _ in self.restricted_builtins:
                 stack.enter_context(thread_local.unapplied())
             yield None
+
+    _thread_local_current = threading.local()
+
+    @staticmethod
+    def current_importer() -> Optional[Importer]:
+        """Get the current importer if any."""
+        return Importer._thread_local_current.__dict__.get("importer")
 
 
 _T = TypeVar("_T")
@@ -385,13 +416,23 @@ class _ThreadLocalSysModules(
     MutableMapping[str, types.ModuleType],
 ):
     def __contains__(self, key: object) -> bool:
-        return key in self.current
+        if key in self.current:
+            return True
+        return (
+            isinstance(key, str)
+            and self._lazily_passthrough_if_available(key) is not None
+        )
 
     def __delitem__(self, key: str) -> None:
         del self.current[key]
 
     def __getitem__(self, key: str) -> types.ModuleType:
-        return self.current[key]
+        try:
+            return self.current[key]
+        except KeyError:
+            if module := self._lazily_passthrough_if_available(key):
+                return module
+            raise
 
     def __len__(self) -> int:
         return len(self.current)
@@ -430,6 +471,20 @@ class _ThreadLocalSysModules(
     @classmethod
     def fromkeys(cls, *args, **kwargs) -> Any:
         return dict.fromkeys(*args, **kwargs)
+
+    def _lazily_passthrough_if_available(self, key: str) -> Optional[types.ModuleType]:
+        # We only lazily pass through if it's in orig, lazy not disabled, and
+        # module configured as pass through
+        if (
+            key in self.orig
+            and (importer := Importer.current_importer())
+            and not importer.restrictions.disable_lazy_sys_module_passthrough
+            and importer.module_configured_passthrough(key)
+        ):
+            orig = self.orig[key]
+            self.current[key] = orig
+            return orig
+        return None
 
 
 _thread_local_sys_modules = _ThreadLocalSysModules(sys.modules)
