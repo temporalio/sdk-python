@@ -239,13 +239,10 @@ class MyServiceHandler:
         self, ctx: WorkflowRunOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
         assert any(
-            link.url == "http://inbound-link/"
-            for link in ctx.nexus_context.inbound_links
+            link.url == "http://inbound-link/" for link in ctx.inbound_links
         ), "Inbound link not found"
-        assert (
-            ctx.nexus_context.request_id == "test-request-id-123"
-        ), "Request ID mismatch"
-        ctx.nexus_context.outbound_links.extend(ctx.nexus_context.inbound_links)
+        assert ctx.request_id == "test-request-id-123", "Request ID mismatch"
+        ctx.outbound_links.extend(ctx.inbound_links)
 
         return await ctx.start_workflow(
             MyLinkTestWorkflow.run,
