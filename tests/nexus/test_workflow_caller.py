@@ -1560,18 +1560,23 @@ async def test_timeout_error_raised_by_nexus_operation(client: Client):
 # Test overloads
 
 
+@dataclass
+class OverloadTestValue:
+    value: int
+
+
 @workflow.defn
 class OverloadTestHandlerWorkflow:
     @workflow.run
-    async def run(self, input: int) -> int:
-        return input * 2
+    async def run(self, input: OverloadTestValue) -> OverloadTestValue:
+        return OverloadTestValue(value=input.value * 2)
 
 
 @workflow.defn
 class OverloadTestHandlerWorkflowNoParam:
     @workflow.run
-    async def run(self) -> int:
-        return 0
+    async def run(self) -> OverloadTestValue:
+        return OverloadTestValue(value=0)
 
 
 @nexusrpc.handler.service_handler
@@ -1580,8 +1585,8 @@ class OverloadTestServiceHandler:
     async def no_param(
         self,
         ctx: WorkflowRunOperationContext,
-        _: int,
-    ) -> nexus.WorkflowHandle[int]:
+        _: OverloadTestValue,
+    ) -> nexus.WorkflowHandle[OverloadTestValue]:
         return await ctx.start_workflow(
             OverloadTestHandlerWorkflowNoParam.run,
             id=str(uuid.uuid4()),
@@ -1589,8 +1594,8 @@ class OverloadTestServiceHandler:
 
     @workflow_run_operation
     async def single_param(
-        self, ctx: WorkflowRunOperationContext, input: int
-    ) -> nexus.WorkflowHandle[int]:
+        self, ctx: WorkflowRunOperationContext, input: OverloadTestValue
+    ) -> nexus.WorkflowHandle[OverloadTestValue]:
         return await ctx.start_workflow(
             OverloadTestHandlerWorkflow.run,
             input,
@@ -1599,8 +1604,8 @@ class OverloadTestServiceHandler:
 
     @workflow_run_operation
     async def multi_param(
-        self, ctx: WorkflowRunOperationContext, input: int
-    ) -> nexus.WorkflowHandle[int]:
+        self, ctx: WorkflowRunOperationContext, input: OverloadTestValue
+    ) -> nexus.WorkflowHandle[OverloadTestValue]:
         return await ctx.start_workflow(
             OverloadTestHandlerWorkflow.run,
             args=[input],
@@ -1609,8 +1614,8 @@ class OverloadTestServiceHandler:
 
     @workflow_run_operation
     async def by_name(
-        self, ctx: WorkflowRunOperationContext, input: int
-    ) -> nexus.WorkflowHandle[int]:
+        self, ctx: WorkflowRunOperationContext, input: OverloadTestValue
+    ) -> nexus.WorkflowHandle[OverloadTestValue]:
         return await ctx.start_workflow(
             "OverloadTestHandlerWorkflow",
             input,
@@ -1620,8 +1625,8 @@ class OverloadTestServiceHandler:
 
     @workflow_run_operation
     async def by_name_multi_param(
-        self, ctx: WorkflowRunOperationContext, input: int
-    ) -> nexus.WorkflowHandle[int]:
+        self, ctx: WorkflowRunOperationContext, input: OverloadTestValue
+    ) -> nexus.WorkflowHandle[OverloadTestValue]:
         return await ctx.start_workflow(
             "OverloadTestHandlerWorkflow",
             args=[input],
@@ -1642,7 +1647,7 @@ class OverloadTestInput:
 @workflow.defn
 class OverloadTestCallerWorkflow:
     @workflow.run
-    async def run(self, op: str, input: int) -> int:
+    async def run(self, op: str, input: OverloadTestValue) -> OverloadTestValue:
         nexus_client = workflow.NexusClient(
             service=OverloadTestServiceHandler,
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
@@ -1696,8 +1701,12 @@ async def test_workflow_run_operation_overloads(client: Client, op: str):
         await create_nexus_endpoint(task_queue, client)
         res = await client.execute_workflow(
             OverloadTestCallerWorkflow.run,
-            args=[op, 2],
+            args=[op, OverloadTestValue(value=2)],
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
-        assert res == (4 if op != "no_param" else 0)
+        assert res == (
+            OverloadTestValue(value=4)
+            if op != "no_param"
+            else OverloadTestValue(value=0)
+        )
