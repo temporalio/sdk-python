@@ -21,15 +21,50 @@ class MyWorkflow:
         return input + 1
 
 
+@nexusrpc.service
+class MyService:
+    increment: nexusrpc.Operation[int, int]
+
+
+class MyIncrementOperationHandler(nexusrpc.handler.OperationHandler[int, int]):
+    async def start(
+        self,
+        ctx: nexusrpc.handler.StartOperationContext,
+        input: int,
+    ) -> nexusrpc.handler.StartOperationResultAsync:
+        wrctx = nexus.WorkflowRunOperationContext.from_start_operation_context(ctx)
+        wf_handle = await wrctx.start_workflow(
+            MyWorkflow.run, input, id=str(uuid.uuid4())
+        )
+        return nexusrpc.handler.StartOperationResultAsync(token=wf_handle.to_token())
+
+    async def cancel(
+        self,
+        ctx: nexusrpc.handler.CancelOperationContext,
+        token: str,
+    ) -> None:
+        raise NotImplementedError
+
+    async def fetch_info(
+        self,
+        ctx: nexusrpc.handler.FetchOperationInfoContext,
+        token: str,
+    ) -> nexusrpc.OperationInfo:
+        raise NotImplementedError
+
+    async def fetch_result(
+        self,
+        ctx: nexusrpc.handler.FetchOperationResultContext,
+        token: str,
+    ) -> int:
+        raise NotImplementedError
+
+
 @nexusrpc.handler.service_handler
 class MyServiceHandlerWithWorkflowRunOperation:
-    @nexus.workflow_run_operation
-    async def increment(
-        self,
-        ctx: nexus.WorkflowRunOperationContext,
-        input: int,
-    ) -> nexus.WorkflowHandle[int]:
-        return await ctx.start_workflow(MyWorkflow.run, input, id=str(uuid.uuid4()))
+    @nexusrpc.handler._decorators.operation_handler
+    def increment(self) -> nexusrpc.handler.OperationHandler[int, int]:
+        return MyIncrementOperationHandler()
 
 
 async def test_run_nexus_service_from_programmatically_created_service_handler(
@@ -37,17 +72,24 @@ async def test_run_nexus_service_from_programmatically_created_service_handler(
 ):
     task_queue = str(uuid.uuid4())
 
-    user_service_handler_instance = MyServiceHandlerWithWorkflowRunOperation()
-    service_handler = nexusrpc.handler._core.ServiceHandler.from_user_instance(
-        user_service_handler_instance
+    service_handler = nexusrpc.handler._core.ServiceHandler(
+        service=nexusrpc.ServiceDefinition(
+            name="MyService",
+            operations={
+                "increment": nexusrpc.Operation[int, int](
+                    name="increment",
+                    method_name="increment",
+                    input_type=int,
+                    output_type=int,
+                ),
+            },
+        ),
+        operation_handlers={
+            "increment": MyIncrementOperationHandler(),
+        },
     )
 
-    assert (
-        service_defn := nexusrpc.get_service_definition(
-            user_service_handler_instance.__class__
-        )
-    )
-    service_name = service_defn.name
+    service_name = service_handler.service.name
 
     endpoint = (await create_nexus_endpoint(task_queue, client)).endpoint.id
     async with Worker(
