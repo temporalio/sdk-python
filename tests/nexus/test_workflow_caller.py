@@ -1196,14 +1196,6 @@ error_conversion_test_cases: list[ErrorConversionTestCase] = []
 
 
 # application_error_non_retryable:
-_ = ["NexusOperationError", "HandlerError"]
-# Java
-_ = [
-    "NexusOperationError",
-    "HandlerError('handler error: message='application error 1', type='my-application-error-type', nonRetryable=true', type='INTERNAL', nonRetryable=true)",
-    "ApplicationError('application error 1', type='my-application-error-type', nonRetryable=true)",
-]
-
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
         name="application_error_non_retryable",
@@ -1229,11 +1221,16 @@ error_conversion_test_cases.append(
     )
 )
 
+# custom_error:
+error_conversion_test_cases.append(
+    ErrorConversionTestCase(
+        name="custom_error",
+        java_behavior=[],  # [Not possible]
+    )
+)
+
 
 # custom_error_from_custom_error:
-_ = ["NexusOperationError", "HandlerError"]
-# Java
-# [Not possible]
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
         name="custom_error_from_custom_error",
@@ -1243,15 +1240,6 @@ error_conversion_test_cases.append(
 
 
 # application_error_non_retryable_from_custom_error:
-_ = ["NexusOperationError", "HandlerError"]
-# Java
-_ = [
-    "NexusOperationError",
-    "HandlerError('handler error: message='application error 1', type='my-application-error-type', nonRetryable=true', type='INTERNAL', nonRetryable=true)",
-    "ApplicationError('application error 1', type='my-application-error-type', nonRetryable=true)",
-    "ApplicationError('Custom error 2', type='io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException', nonRetryable=false)",
-]
-
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
         name="application_error_non_retryable_from_custom_error",
@@ -1286,14 +1274,6 @@ error_conversion_test_cases.append(
 )
 
 # nexus_handler_error_not_found:
-_ = ["NexusOperationError", "HandlerError"]
-# Java
-_ = [
-    "NexusOperationError",
-    "HandlerError('handler error: message='Handler error 1', type='java.lang.RuntimeException', nonRetryable=false', type='NOT_FOUND', nonRetryable=true)",
-    "ApplicationError('Handler error 1', type='java.lang.RuntimeException', nonRetryable=false)",
-]
-
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
         name="nexus_handler_error_not_found",
@@ -1320,9 +1300,6 @@ error_conversion_test_cases.append(
 )
 
 # nexus_handler_error_not_found_from_custom_error:
-_ = ["NexusOperationError", "HandlerError"]
-# Java
-# [Not possible]
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
         name="nexus_handler_error_not_found_from_custom_error",
@@ -1332,13 +1309,6 @@ error_conversion_test_cases.append(
 
 
 # nexus_operation_error_from_application_error_non_retryable_from_custom_error:
-_ = ["NexusOperationError", "ApplicationError", "ApplicationError"]
-# Java
-_ = [
-    "NexusOperationError",
-    "ApplicationError('application error 1', type='my-application-error-type', nonRetryable=true)",
-    "ApplicationError('Custom error 2', type='io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException', nonRetryable=false)",
-]
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
         name="nexus_operation_error_from_application_error_non_retryable_from_custom_error",
@@ -1481,6 +1451,7 @@ class ErrorTestCallerWorkflow:
     "action_in_sync_op",
     [
         "application_error_non_retryable",
+        "custom_error",
         "custom_error_from_custom_error",
         "application_error_non_retryable_from_custom_error",
         "nexus_handler_error_not_found",
