@@ -1481,9 +1481,9 @@ async def test_errors_raised_by_nexus_operation(
         )
 
 
-# Timeout test
+# Start timeout test
 @service_handler
-class TimeoutTestService:
+class StartTimeoutTestService:
     @sync_operation
     async def op_handler_that_never_returns(
         self, ctx: StartOperationContext, input: None
@@ -1492,35 +1492,45 @@ class TimeoutTestService:
 
 
 @workflow.defn
-class TimeoutTestCallerWorkflow:
+class StartTimeoutTestCallerWorkflow:
     @workflow.init
     def __init__(self):
         self.nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
-            service=TimeoutTestService,
+            service=StartTimeoutTestService,
         )
 
     @workflow.run
     async def run(self) -> None:
         await self.nexus_client.execute_operation(
-            TimeoutTestService.op_handler_that_never_returns,
+            StartTimeoutTestService.op_handler_that_never_returns,
             None,
             schedule_to_close_timeout=timedelta(seconds=0.1),
         )
 
 
-async def test_timeout_error_raised_by_nexus_operation(client: Client):
+async def test_error_raised_by_timeout_of_nexus_start_operation(client: Client):
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
-        nexus_service_handlers=[TimeoutTestService()],
-        workflows=[TimeoutTestCallerWorkflow],
+        nexus_service_handlers=[StartTimeoutTestService()],
+        workflows=[StartTimeoutTestCallerWorkflow],
         task_queue=task_queue,
     ):
         await create_nexus_endpoint(task_queue, client)
         try:
             await client.execute_workflow(
-                TimeoutTestCallerWorkflow.run,
+                StartTimeoutTestCallerWorkflow.run,
+                id=str(uuid.uuid4()),
+                task_queue=task_queue,
+            )
+        except Exception as err:
+            assert isinstance(err, WorkflowFailureError)
+            assert isinstance(err.__cause__, NexusOperationError)
+            assert isinstance(err.__cause__.__cause__, TimeoutError)
+        else:
+            pytest.fail("Expected exception due to timeout of nexus start operation")
+
                 id=str(uuid.uuid4()),
                 task_queue=task_queue,
             )
