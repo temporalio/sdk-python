@@ -9,12 +9,15 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
     Any,
+    Awaitable,
     Callable,
     Mapping,
     MutableMapping,
     Optional,
     Sequence,
+    Type,
     Union,
+    overload,
 )
 
 import nexusrpc.handler
@@ -194,6 +197,7 @@ class WorkflowRunOperationContext(StartOperationContext):
 
     # Overload for single-param workflow
     # TODO(nexus-prerelease)*: bring over other overloads
+    @overload
     async def start_workflow(
         self,
         workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
@@ -201,6 +205,41 @@ class WorkflowRunOperationContext(StartOperationContext):
         *,
         id: str,
         task_queue: Optional[str] = None,
+        execution_timeout: Optional[timedelta] = None,
+        run_timeout: Optional[timedelta] = None,
+        task_timeout: Optional[timedelta] = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        cron_schedule: str = "",
+        memo: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[
+            Union[
+                temporalio.common.TypedSearchAttributes,
+                temporalio.common.SearchAttributes,
+            ]
+        ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
+        start_delay: Optional[timedelta] = None,
+        start_signal: Optional[str] = None,
+        start_signal_args: Sequence[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+        request_eager_start: bool = False,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+    ) -> WorkflowHandle[ReturnType]: ...
+
+    async def start_workflow(
+        self,
+        workflow: Union[str, Callable[..., Awaitable[ReturnType]]],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: Optional[str] = None,
+        result_type: Optional[Type] = None,
         execution_timeout: Optional[timedelta] = None,
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
@@ -266,8 +305,10 @@ class WorkflowRunOperationContext(StartOperationContext):
         wf_handle = await self.temporal_context.client.start_workflow(  # type: ignore
             workflow=workflow,
             arg=arg,
+            args=args,
             id=id,
             task_queue=task_queue or self.temporal_context.info().task_queue,
+            result_type=result_type,
             execution_timeout=execution_timeout,
             run_timeout=run_timeout,
             task_timeout=task_timeout,
