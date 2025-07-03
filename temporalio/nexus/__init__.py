@@ -10,6 +10,7 @@ from ._operation_context import (
     _TemporalStartOperationContext as _TemporalStartOperationContext,
 )
 from ._operation_context import client as client
+from ._operation_context import in_operation as in_operation
 from ._operation_context import info as info
 from ._operation_context import logger as logger
 from ._token import WorkflowHandle as WorkflowHandle

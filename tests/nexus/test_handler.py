@@ -139,6 +139,7 @@ class MyServiceHandler:
     async def echo(self, ctx: StartOperationContext, input: Input) -> Output:
         assert ctx.headers["test-header-key"] == "test-header-value"
         ctx.outbound_links.extend(ctx.inbound_links)
+        assert nexus.in_operation()
         return Output(
             value=f"from start method on {self.__class__.__name__}: {input.value}"
         )
@@ -219,6 +220,7 @@ class MyServiceHandler:
     async def workflow_run_operation_happy_path(
         self, ctx: WorkflowRunOperationContext, input: Input
     ) -> nexus.WorkflowHandle[Output]:
+        assert nexus.in_operation()
         return await ctx.start_workflow(
             MyWorkflow.run,
             input,

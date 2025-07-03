@@ -62,6 +62,13 @@ class Info:
     """The task queue of the worker handling this Nexus operation."""
 
 
+def in_operation() -> bool:
+    """
+    Whether the current code is inside a Nexus operation.
+    """
+    return _try_temporal_context() is not None
+
+
 def info() -> Info:
     """
     Get the current Nexus operation information.
