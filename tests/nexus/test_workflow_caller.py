@@ -44,7 +44,6 @@ from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import (
     ApplicationError,
     CancelledError,
-    NexusHandlerError,
     NexusOperationError,
     TimeoutError,
 )
@@ -487,7 +486,7 @@ async def test_sync_response(
             e = ei.value
             assert isinstance(e, WorkflowFailureError)
             assert isinstance(e.__cause__, NexusOperationError)
-            assert isinstance(e.__cause__.__cause__, NexusHandlerError)
+            assert isinstance(e.__cause__.__cause__, nexusrpc.HandlerError)
             # ID of first command
             assert e.__cause__.scheduled_event_id == 5
             assert e.__cause__.endpoint == make_nexus_endpoint_name(task_queue)
@@ -540,7 +539,7 @@ async def test_async_response(
             e = ei.value
             assert isinstance(e, WorkflowFailureError)
             assert isinstance(e.__cause__, NexusOperationError)
-            assert isinstance(e.__cause__.__cause__, NexusHandlerError)
+            assert isinstance(e.__cause__.__cause__, nexusrpc.HandlerError)
             # ID of first command after update accepted
             assert e.__cause__.scheduled_event_id == 6
             assert e.__cause__.endpoint == make_nexus_endpoint_name(task_queue)
@@ -717,7 +716,7 @@ async def test_untyped_caller(
             e = ei.value
             assert isinstance(e, WorkflowFailureError)
             assert isinstance(e.__cause__, NexusOperationError)
-            assert isinstance(e.__cause__.__cause__, NexusHandlerError)
+            assert isinstance(e.__cause__.__cause__, nexusrpc.HandlerError)
         else:
             result = await caller_wf_handle.result()
             assert result.op_output.value == (
