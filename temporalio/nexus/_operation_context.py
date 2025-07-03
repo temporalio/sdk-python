@@ -22,6 +22,7 @@ from typing import (
 
 import nexusrpc.handler
 from nexusrpc.handler import CancelOperationContext, StartOperationContext
+from typing_extensions import Concatenate
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -29,7 +30,9 @@ import temporalio.client
 import temporalio.common
 from temporalio.nexus._token import WorkflowHandle
 from temporalio.types import (
+    MethodAsyncNoParam,
     MethodAsyncSingleParam,
+    MultiParamSpec,
     ParamType,
     ReturnType,
     SelfType,
@@ -195,14 +198,84 @@ class WorkflowRunOperationContext(StartOperationContext):
             **{f.name: getattr(ctx, f.name) for f in dataclasses.fields(ctx)},
         )
 
+    # Overload for no-param workflow
+    @overload
+    async def start_workflow(
+        self,
+        workflow: MethodAsyncNoParam[SelfType, ReturnType],
+        *,
+        id: str,
+        task_queue: Optional[str] = None,
+        execution_timeout: Optional[timedelta] = None,
+        run_timeout: Optional[timedelta] = None,
+        task_timeout: Optional[timedelta] = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        cron_schedule: str = "",
+        memo: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[
+            Union[
+                temporalio.common.TypedSearchAttributes,
+                temporalio.common.SearchAttributes,
+            ]
+        ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
+        start_delay: Optional[timedelta] = None,
+        start_signal: Optional[str] = None,
+        start_signal_args: Sequence[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+        request_eager_start: bool = False,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+    ) -> WorkflowHandle[ReturnType]: ...
+
     # Overload for single-param workflow
-    # TODO(nexus-prerelease)*: bring over other overloads
     @overload
     async def start_workflow(
         self,
         workflow: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
         arg: ParamType,
         *,
+        id: str,
+        task_queue: Optional[str] = None,
+        execution_timeout: Optional[timedelta] = None,
+        run_timeout: Optional[timedelta] = None,
+        task_timeout: Optional[timedelta] = None,
+        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
+        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        cron_schedule: str = "",
+        memo: Optional[Mapping[str, Any]] = None,
+        search_attributes: Optional[
+            Union[
+                temporalio.common.TypedSearchAttributes,
+                temporalio.common.SearchAttributes,
+            ]
+        ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
+        start_delay: Optional[timedelta] = None,
+        start_signal: Optional[str] = None,
+        start_signal_args: Sequence[Any] = [],
+        rpc_metadata: Mapping[str, str] = {},
+        rpc_timeout: Optional[timedelta] = None,
+        request_eager_start: bool = False,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+    ) -> WorkflowHandle[ReturnType]: ...
+
+    # Overload for multi-param workflow
+    @overload
+    async def start_workflow(
+        self,
+        workflow: Callable[
+            Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]
+        ],
+        *,
+        args: Sequence[Any],
         id: str,
         task_queue: Optional[str] = None,
         execution_timeout: Optional[timedelta] = None,
@@ -241,7 +314,7 @@ class WorkflowRunOperationContext(StartOperationContext):
         args: Sequence[Any] = [],
         id: str,
         task_queue: Optional[str] = None,
-        result_type: Optional[Type] = None,
+        result_type: Optional[Type[ReturnType]] = None,
         execution_timeout: Optional[timedelta] = None,
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
@@ -266,7 +339,7 @@ class WorkflowRunOperationContext(StartOperationContext):
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
-    ) -> WorkflowHandle[Any]: ...
+    ) -> WorkflowHandle[ReturnType]: ...
 
     async def start_workflow(
         self,
