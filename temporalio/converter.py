@@ -1024,7 +1024,7 @@ class DefaultFailureConverter(FailureConverter):
                 logger.warning(
                     f"Unknown Nexus HandlerErrorType: {nexus_handler_failure_info.type}"
                 )
-                _type = nexusrpc.HandlerErrorType.INTERNAL
+                raise
             return nexusrpc.HandlerError(
                 failure.message or "Nexus handler error",
                 type=_type,
