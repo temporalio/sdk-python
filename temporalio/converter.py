@@ -918,6 +918,12 @@ class DefaultFailureConverter(FailureConverter):
         # TODO(nexus-prerelease): test coverage for this
         elif isinstance(error, temporalio.exceptions.NexusOperationError):
             failure.nexus_operation_execution_failure_info.SetInParent()
+            failure.nexus_operation_execution_failure_info.scheduled_event_id = (
+                error.scheduled_event_id
+            )
+            failure.nexus_operation_execution_failure_info.endpoint = error.endpoint
+            failure.nexus_operation_execution_failure_info.service = error.service
+            failure.nexus_operation_execution_failure_info.operation = error.operation
             failure.nexus_operation_execution_failure_info.operation_token = (
                 error.operation_token
             )
