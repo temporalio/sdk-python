@@ -140,7 +140,7 @@ class _TemporalStartOperationContext:
                 # https://github.com/temporalio/sdk-go/pull/1945
                 temporalio.client.NexusCompletionCallback(
                     url=ctx.callback_url,
-                    header=ctx.callback_headers,
+                    headers=ctx.callback_headers,
                 )
             ]
             if ctx.callback_url
