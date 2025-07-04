@@ -1190,101 +1190,11 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 # Python: None
 
 # --------------------------------------------------------------------------------
-# .
-
-# custom_error
-# --------------------------------------------------------------------------------
-
-# Java:   None
-# Python: (<class 'temporalio.exceptions.NexusOperationError'>, {})
-
-# Java:   None
-# Python: (<class 'nexusrpc._common.HandlerError'>, {'message': None, 'type': <HandlerErrorType.INTERNAL: 'INTERNAL'>, 'non_retryable': None})
-
-# --------------------------------------------------------------------------------
-# .
-
-# custom_error_from_custom_error
-# --------------------------------------------------------------------------------
-
-# Java:   None
-# Python: (<class 'temporalio.exceptions.NexusOperationError'>, {})
-
-# Java:   None
-# Python: (<class 'nexusrpc._common.HandlerError'>, {'message': None, 'type': <HandlerErrorType.INTERNAL: 'INTERNAL'>, 'non_retryable': None})
-
-# --------------------------------------------------------------------------------
-# .
-
-# application_error_non_retryable_from_custom_error
-# --------------------------------------------------------------------------------
-
-# Java:   (<class 'temporalio.exceptions.NexusOperationError'>, {})
-# Python: (<class 'temporalio.exceptions.NexusOperationError'>, {})
-
-# Java:   (<class 'nexusrpc._common.HandlerError'>, {'message': "handler error: message='application error 1', type='my-application-error-type', nonRetryable=true", 'type': 'INTERNAL', 'non_retryable': True})
-# Python: (<class 'nexusrpc._common.HandlerError'>, {'message': None, 'type': <HandlerErrorType.INTERNAL: 'INTERNAL'>, 'non_retryable': None})
-
-# Java:   (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'application error 1', 'type': 'my-application-error-type', 'non_retryable': True})
-# Python: None
-
-# Java:   (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'Custom error 2', 'type': 'io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException', 'non_retryable': False})
-# Python: None
-
-# --------------------------------------------------------------------------------
-# .
-
-# nexus_handler_error_not_found
-# --------------------------------------------------------------------------------
-
-# Java:   (<class 'temporalio.exceptions.NexusOperationError'>, {})
-# Python: (<class 'temporalio.exceptions.NexusOperationError'>, {})
-
-# Java:   (<class 'nexusrpc._common.HandlerError'>, {'message': "handler error: message='Handler error 1', type='java.lang.RuntimeException', nonRetryable=false", 'type': 'NOT_FOUND', 'non_retryable': True})
-# Python: (<class 'nexusrpc._common.HandlerError'>, {'message': None, 'type': <HandlerErrorType.NOT_FOUND: 'NOT_FOUND'>, 'non_retryable': None})
-
-# Java:   (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'Handler error 1', 'type': 'java.lang.RuntimeException', 'non_retryable': False})
-# Python: None
-
-# --------------------------------------------------------------------------------
-# .
-
-# nexus_handler_error_not_found_from_custom_error
-# --------------------------------------------------------------------------------
-
-# Java:   None
-# Python: (<class 'temporalio.exceptions.NexusOperationError'>, {})
-
-# Java:   None
-# Python: (<class 'nexusrpc._common.HandlerError'>, {'message': None, 'type': <HandlerErrorType.NOT_FOUND: 'NOT_FOUND'>, 'non_retryable': None})
-
-# --------------------------------------------------------------------------------
 # .CLI 1.3.1-persistence-fix.0 (Server 1.27.0, UI 2.36.0)
 
-# Server:  localhost:55762
+# Server:  localhost:63705
 # HTTP:    localhost:7243
-# Metrics: http://localhost:55764/metrics
-
-
-# nexus_operation_error_from_application_error_non_retryable_from_custom_error
-# --------------------------------------------------------------------------------
-
-# Java:   (<class 'temporalio.exceptions.NexusOperationError'>, {})
-# Python: (<class 'temporalio.exceptions.NexusOperationError'>, {})
-
-# Java:   (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'application error 1', 'type': 'my-application-error-type', 'non_retryable': True})
-# Python: (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'operation error in nexus op', 'type': 'OperationError', 'non_retryable': False})
-
-# Java:   (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'Custom error 2', 'type': 'io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException', 'non_retryable': False})
-# Python: (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'application error in nexus op', 'type': None, 'non_retryable': True})
-
-# Java:   None
-# Python: (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'custom error in nexus op', 'type': 'CustomError', 'non_retryable': False})
-
-# --------------------------------------------------------------------------------
-# .
-# Results (0.47s):
-#          7 passed
+# Metrics: http://localhost:63708/metrics
 
 
 ActionInSyncOp = Literal[
@@ -1474,43 +1384,71 @@ class ErrorTestService:
     @sync_operation
     async def op(self, ctx: StartOperationContext, input: ErrorTestInput) -> None:
         if input.action_in_sync_op == "application_error_non_retryable":
-            raise ApplicationError("application error in nexus op", non_retryable=True)
-        elif input.action_in_sync_op == "custom_error":
-            raise CustomError("custom error in nexus op")
-        elif input.action_in_sync_op == "custom_error_from_custom_error":
-            raise CustomError("custom error 1 in nexus op") from CustomError(
-                "custom error 2 in nexus op"
+            raise ApplicationError(
+                "application error 1",
+                type="my-application-error-type",
+                non_retryable=True,
             )
+        elif input.action_in_sync_op == "custom_error":
+            raise CustomError("Custom error 1")
+        elif input.action_in_sync_op == "custom_error_from_custom_error":
+            try:
+                raise CustomError("Custom error 2")
+            except CustomError as err:
+                raise CustomError("Custom error 1") from err
         elif (
             input.action_in_sync_op
             == "application_error_non_retryable_from_custom_error"
         ):
-            raise ApplicationError(
-                "application error in nexus op", non_retryable=True
-            ) from CustomError("custom error in nexus op")
+            try:
+                raise CustomError("Custom error 2")
+            except CustomError as err:
+                raise ApplicationError(
+                    "application error 1",
+                    type="my-application-error-type",
+                    non_retryable=True,
+                ) from err
         elif input.action_in_sync_op == "nexus_handler_error_not_found":
-            raise nexusrpc.HandlerError(
-                "test",
-                type=nexusrpc.HandlerErrorType.NOT_FOUND,
-            )
+            try:
+                raise RuntimeError("Handler error 1")
+            except RuntimeError as err:
+                raise nexusrpc.HandlerError(
+                    "handler-error-message",
+                    type=nexusrpc.HandlerErrorType.NOT_FOUND,
+                ) from err
         elif (
             input.action_in_sync_op == "nexus_handler_error_not_found_from_custom_error"
         ):
-            raise nexusrpc.HandlerError(
-                "test",
-                type=nexusrpc.HandlerErrorType.NOT_FOUND,
-            ) from CustomError("custom error in nexus op")
+            try:
+                raise CustomError("Custom error 2")
+            except CustomError as err:
+                raise nexusrpc.HandlerError(
+                    "handler-error-message",
+                    type=nexusrpc.HandlerErrorType.NOT_FOUND,
+                ) from err
         elif (
             input.action_in_sync_op
             == "nexus_operation_error_from_application_error_non_retryable_from_custom_error"
         ):
+            # case RAISE_NEXUS_OPERATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
+            #   throw OperationException.failure(
+            #       ApplicationFailure.newNonRetryableFailureWithCause(
+            #           "application error 1",
+            #           "my-application-error-type",
+            #           new MyCustomException("Custom error 2")));
+
             try:
-                raise ApplicationError(
-                    "application error in nexus op", non_retryable=True
-                ) from CustomError("custom error in nexus op")
+                try:
+                    raise CustomError("Custom error 2")
+                except CustomError as err:
+                    raise ApplicationError(
+                        "application error 1",
+                        type="my-application-error-type",
+                        non_retryable=True,
+                    ) from err
             except ApplicationError as err:
                 raise nexusrpc.OperationError(
-                    "operation error in nexus op",
+                    "operation-error-message",
                     state=nexusrpc.OperationErrorState.FAILED,
                 ) from err
         else:
