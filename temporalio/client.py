@@ -5832,7 +5832,7 @@ class _ClientImpl(OutboundInterceptor):
         req.completion_callbacks.extend(
             temporalio.api.common.v1.Callback(
                 nexus=temporalio.api.common.v1.Callback.Nexus(
-                    url=callback.url, header=callback.header
+                    url=callback.url, header=callback.headers
                 )
             )
             for callback in input.nexus_completion_callbacks
@@ -7274,7 +7274,7 @@ class NexusCompletionCallback:
     url: str
     """Callback URL."""
 
-    header: Mapping[str, str]
+    headers: Mapping[str, str]
     """Header to attach to callback request."""
 
 
