@@ -392,6 +392,7 @@ class Worker:
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
                 metric_meter=self._runtime.metric_meter,
+                encode_headers=client_config["encode_headers"],
             )
         self._workflow_worker: Optional[_WorkflowWorker] = None
         if workflows:
@@ -429,6 +430,7 @@ class Worker:
                 disable_safe_eviction=disable_safe_workflow_eviction,
                 should_enforce_versioning_behavior=should_enforce_versioning_behavior,
                 assert_local_activity_valid=check_activity,
+                encode_headers=client_config["encode_headers"],
             )
 
         if tuner is not None:
