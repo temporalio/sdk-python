@@ -194,7 +194,7 @@ class MultiParamWorkflow:
 
 async def test_workflow_multi_param(client: Client):
     # This test is mostly just here to confirm MyPy type checks the multi-param
-    # overload approach properly
+    # overload approach  properly, and infers result type from result_type.
     async with new_worker(
         client, MultiParamWorkflow, activities=[multi_param_activity]
     ) as worker:
@@ -205,6 +205,15 @@ async def test_workflow_multi_param(client: Client):
             task_queue=worker.task_queue,
         )
         assert result == "param1: 123, param2: val1"
+
+        result_via_name_overload = await client.execute_workflow(
+            "MultiParamWorkflow",
+            args=[123, "val1"],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            result_type=str,
+        )
+        assert result_via_name_overload == "param1: 123, param2: val1"
 
 
 @workflow.defn
@@ -8038,7 +8047,7 @@ async def test_workflow_logging_trace_identifier(client: Client):
         ) as worker:
             await client.execute_workflow(
                 TaskFailOnceWorkflow.run,
-                id=f"workflow_failure_trace_identifier",
+                id="workflow_failure_trace_identifier",
                 task_queue=worker.task_queue,
             )
 
@@ -8078,7 +8087,7 @@ async def test_in_workflow_sync(client: Client):
     ) as worker:
         res = await client.execute_workflow(
             UseInWorkflow.run,
-            id=f"test_in_workflow_sync",
+            id="test_in_workflow_sync",
             task_queue=worker.task_queue,
             execution_timeout=timedelta(minutes=1),
         )
