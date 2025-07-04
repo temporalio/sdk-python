@@ -1091,14 +1091,14 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 
 # Handler
 
-#   @OperationImpl
+# @OperationImpl
 #   public OperationHandler<NexusService.ErrorTestInput, NexusService.ErrorTestOutput> testError() {
 #     return OperationHandler.sync(
 #         (ctx, details, input) -> {
 #           switch (input.getAction()) {
 #             case RAISE_APPLICATION_ERROR:
 #               throw ApplicationFailure.newNonRetryableFailure(
-#                   "application error 1", "APPLICATION_ERROR");
+#                   "application error 1", "my-application-error-type");
 #             case RAISE_CUSTOM_ERROR:
 #               throw new MyCustomException("Custom error 1");
 #             case RAISE_CUSTOM_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
@@ -1109,7 +1109,7 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 #             case RAISE_APPLICATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
 #               throw ApplicationFailure.newNonRetryableFailureWithCause(
 #                   "application error 1",
-#                   "APPLICATION_ERROR",
+#                   "my-application-error-type",
 #                   new MyCustomException("Custom error 2"));
 #             case RAISE_NEXUS_HANDLER_ERROR:
 #               throw new HandlerException(HandlerException.ErrorType.NOT_FOUND, "Handler error 1");
@@ -1126,12 +1126,13 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 #               throw OperationException.failure(
 #                   ApplicationFailure.newNonRetryableFailureWithCause(
 #                       "application error 1",
-#                       "APPLICATION_ERROR",
+#                       "my-application-error-type",
 #                       new MyCustomException("Custom error 2")));
 #           }
 #           return new NexusService.ErrorTestOutput("Unreachable");
 #         });
 #   }
+# }
 
 # 🌈 RAISE_APPLICATION_ERROR:
 # io.temporal.failure.NexusOperationFailure(message="Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=", scheduledEventId=scheduledEventId, operationToken="operationToken")
@@ -1161,6 +1162,130 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 # io.temporal.failure.NexusOperationFailure(message="Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=", scheduledEventId=scheduledEventId, operationToken="operationToken")
 #     io.temporal.failure.ApplicationFailure(message="application error 1", type="my-application-error-type", nonRetryable=true)
 #         io.temporal.failure.ApplicationFailure(message="Custom error 2", type="io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException", nonRetryable=false)
+
+
+# ============================= test session starts ==============================
+# platform darwin -- Python 3.9.21, pytest-7.4.4, pluggy-1.6.0
+# rootdir: /Users/dan/src/temporalio/sdk-python
+# configfile: pyproject.toml
+# plugins: anyio-4.9.0, pretty-1.3.0, timeout-2.4.0, cov-6.2.1, asyncio-0.21.2
+# timeout: 60.0s
+# timeout method: signal
+# timeout func_only: True
+# asyncio: mode=auto
+# collected 7 items
+
+# tests/nexus/test_workflow_caller.py
+
+# application_error_non_retryable
+# --------------------------------------------------------------------------------
+
+# Java:   (<class 'temporalio.exceptions.NexusOperationError'>, {})
+# Python: (<class 'temporalio.exceptions.NexusOperationError'>, {})
+
+# Java:   (<class 'nexusrpc._common.HandlerError'>, {'message': "handler error: message='application error 1', type='my-application-error-type', nonRetryable=true", 'type': 'INTERNAL', 'non_retryable': True})
+# Python: (<class 'nexusrpc._common.HandlerError'>, {'message': None, 'type': <HandlerErrorType.INTERNAL: 'INTERNAL'>, 'non_retryable': None})
+
+# Java:   (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'application error 1', 'type': 'my-application-error-type', 'non_retryable': True})
+# Python: None
+
+# --------------------------------------------------------------------------------
+# .
+
+# custom_error
+# --------------------------------------------------------------------------------
+
+# Java:   None
+# Python: (<class 'temporalio.exceptions.NexusOperationError'>, {})
+
+# Java:   None
+# Python: (<class 'nexusrpc._common.HandlerError'>, {'message': None, 'type': <HandlerErrorType.INTERNAL: 'INTERNAL'>, 'non_retryable': None})
+
+# --------------------------------------------------------------------------------
+# .
+
+# custom_error_from_custom_error
+# --------------------------------------------------------------------------------
+
+# Java:   None
+# Python: (<class 'temporalio.exceptions.NexusOperationError'>, {})
+
+# Java:   None
+# Python: (<class 'nexusrpc._common.HandlerError'>, {'message': None, 'type': <HandlerErrorType.INTERNAL: 'INTERNAL'>, 'non_retryable': None})
+
+# --------------------------------------------------------------------------------
+# .
+
+# application_error_non_retryable_from_custom_error
+# --------------------------------------------------------------------------------
+
+# Java:   (<class 'temporalio.exceptions.NexusOperationError'>, {})
+# Python: (<class 'temporalio.exceptions.NexusOperationError'>, {})
+
+# Java:   (<class 'nexusrpc._common.HandlerError'>, {'message': "handler error: message='application error 1', type='my-application-error-type', nonRetryable=true", 'type': 'INTERNAL', 'non_retryable': True})
+# Python: (<class 'nexusrpc._common.HandlerError'>, {'message': None, 'type': <HandlerErrorType.INTERNAL: 'INTERNAL'>, 'non_retryable': None})
+
+# Java:   (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'application error 1', 'type': 'my-application-error-type', 'non_retryable': True})
+# Python: None
+
+# Java:   (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'Custom error 2', 'type': 'io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException', 'non_retryable': False})
+# Python: None
+
+# --------------------------------------------------------------------------------
+# .
+
+# nexus_handler_error_not_found
+# --------------------------------------------------------------------------------
+
+# Java:   (<class 'temporalio.exceptions.NexusOperationError'>, {})
+# Python: (<class 'temporalio.exceptions.NexusOperationError'>, {})
+
+# Java:   (<class 'nexusrpc._common.HandlerError'>, {'message': "handler error: message='Handler error 1', type='java.lang.RuntimeException', nonRetryable=false", 'type': 'NOT_FOUND', 'non_retryable': True})
+# Python: (<class 'nexusrpc._common.HandlerError'>, {'message': None, 'type': <HandlerErrorType.NOT_FOUND: 'NOT_FOUND'>, 'non_retryable': None})
+
+# Java:   (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'Handler error 1', 'type': 'java.lang.RuntimeException', 'non_retryable': False})
+# Python: None
+
+# --------------------------------------------------------------------------------
+# .
+
+# nexus_handler_error_not_found_from_custom_error
+# --------------------------------------------------------------------------------
+
+# Java:   None
+# Python: (<class 'temporalio.exceptions.NexusOperationError'>, {})
+
+# Java:   None
+# Python: (<class 'nexusrpc._common.HandlerError'>, {'message': None, 'type': <HandlerErrorType.NOT_FOUND: 'NOT_FOUND'>, 'non_retryable': None})
+
+# --------------------------------------------------------------------------------
+# .CLI 1.3.1-persistence-fix.0 (Server 1.27.0, UI 2.36.0)
+
+# Server:  localhost:55762
+# HTTP:    localhost:7243
+# Metrics: http://localhost:55764/metrics
+
+
+# nexus_operation_error_from_application_error_non_retryable_from_custom_error
+# --------------------------------------------------------------------------------
+
+# Java:   (<class 'temporalio.exceptions.NexusOperationError'>, {})
+# Python: (<class 'temporalio.exceptions.NexusOperationError'>, {})
+
+# Java:   (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'application error 1', 'type': 'my-application-error-type', 'non_retryable': True})
+# Python: (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'operation error in nexus op', 'type': 'OperationError', 'non_retryable': False})
+
+# Java:   (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'Custom error 2', 'type': 'io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException', 'non_retryable': False})
+# Python: (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'application error in nexus op', 'type': None, 'non_retryable': True})
+
+# Java:   None
+# Python: (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'custom error in nexus op', 'type': 'CustomError', 'non_retryable': False})
+
+# --------------------------------------------------------------------------------
+# .
+# Results (0.47s):
+#          7 passed
+
 
 ActionInSyncOp = Literal[
     "application_error_non_retryable",
