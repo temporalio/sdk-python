@@ -1031,13 +1031,23 @@ class DefaultFailureConverter(FailureConverter):
                     f"Unknown Nexus HandlerErrorType: {nexus_handler_failure_info.type}"
                 )
                 raise
+            retryable = (
+                True
+                if (
+                    nexus_handler_failure_info.retry_behavior
+                    == temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+                )
+                else False
+                if (
+                    nexus_handler_failure_info.retry_behavior
+                    == temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+                )
+                else None
+            )
             return nexusrpc.HandlerError(
                 failure.message or "Nexus handler error",
                 type=_type,
-                retryable={
-                    temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE: True,
-                    temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE: False,
-                }.get(nexus_handler_failure_info.retry_behavior),
+                retryable=retryable,
             )
         elif failure.HasField("nexus_operation_execution_failure_info"):
             nexus_op_failure_info = failure.nexus_operation_execution_failure_info
