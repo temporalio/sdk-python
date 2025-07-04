@@ -806,6 +806,8 @@ class DefaultFailureConverter(FailureConverter):
         # If already a failure error, use that
         if isinstance(exception, temporalio.exceptions.FailureError):
             self._error_to_failure(exception, payload_converter, failure)
+        elif isinstance(exception, nexusrpc.HandlerError):
+            self._nexus_handler_error_to_failure(exception, payload_converter, failure)
         else:
             # Convert to failure error
             failure_error = temporalio.exceptions.ApplicationError(
@@ -927,6 +929,28 @@ class DefaultFailureConverter(FailureConverter):
             failure.nexus_operation_execution_failure_info.operation_token = (
                 error.operation_token
             )
+
+    def _nexus_handler_error_to_failure(
+        self,
+        error: nexusrpc.HandlerError,
+        payload_converter: PayloadConverter,
+        failure: temporalio.api.failure.v1.Failure,
+    ) -> None:
+        # TODO(nexus-preview) add message field to nexusrpc.HandlerError
+        failure.message = getattr(error, "message", str(error))
+        if error.__traceback__:
+            failure.stack_trace = "\n".join(traceback.format_tb(error.__traceback__))
+        if error.__cause__:
+            self.to_failure(error.__cause__, payload_converter, failure.cause)
+        failure.nexus_handler_failure_info.SetInParent()
+        failure.nexus_handler_failure_info.type = error.type.name
+        failure.nexus_handler_failure_info.retry_behavior = temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.ValueType(
+            temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+            if error.retryable is True
+            else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+            if error.retryable is False
+            else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+        )
 
     def from_failure(
         self,
