@@ -341,31 +341,25 @@ class _NexusWorker:
         """
         Serialize ``handler_error`` as a Nexus Failure proto.
 
-        The Nexus Failure represents the top-level HandlerError. If there is a cause
-        chain attached to the HandlerError, then serialize it as the ``details``.
+        The Nexus Failure message is that of the top-level HandlerError. Additionally,
+        the top-level HandlerError is serialized as the first element of the cause chain
+        in ``details`` (its traceback is there, but its message is omitted since it is
+        present at the top level).
 
         See https://github.com/nexus-rpc/api/blob/main/SPEC.md#failure
         """
-        message = str(handler_error)
-        if cause := handler_error.__cause__:
-            try:
-                failure = temporalio.api.failure.v1.Failure()
-                await self._data_converter.encode_failure(cause, failure)
-                return temporalio.api.nexus.v1.Failure(
-                    message=message,
-                    metadata={"type": "temporal.api.failure.v1.Failure"},
-                    details=json.dumps(
-                        google.protobuf.json_format.MessageToDict(failure),
-                        separators=(",", ":"),
-                    ).encode("utf-8"),
-                )
-            except BaseException:
-                logger.exception("Failed to serialize cause chain of HandlerError")
-        return temporalio.api.nexus.v1.Failure(
-            message=message,
-            metadata={},
-            details=b"",
-        )
+        try:
+            failure = temporalio.api.failure.v1.Failure()
+            await self._data_converter.encode_failure(handler_error, failure)
+            failure_dict = google.protobuf.json_format.MessageToDict(failure)
+            return temporalio.api.nexus.v1.Failure(
+                message=failure_dict.pop("message", ""),
+                metadata={"type": "temporal.api.failure.v1.Failure"},
+                details=json.dumps(failure_dict, separators=(",", ":")).encode("utf-8"),
+            )
+        except BaseException:
+            logger.exception("Failed to serialize cause chain of HandlerError")
+            return temporalio.api.nexus.v1.Failure(message=str(handler_error))
 
     async def _operation_error_to_proto(
         self,
