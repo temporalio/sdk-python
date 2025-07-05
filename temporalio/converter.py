@@ -1005,7 +1005,7 @@ class DefaultFailureConverter(FailureConverter):
             except:
                 pass
 
-        err: temporalio.exceptions.FailureError
+        err: Union[temporalio.exceptions.FailureError, nexusrpc.HandlerError]
         if failure.HasField("application_failure_info"):
             app_info = failure.application_failure_info
             err = temporalio.exceptions.ApplicationError(
@@ -1094,7 +1094,7 @@ class DefaultFailureConverter(FailureConverter):
                 )
                 else None
             )
-            return nexusrpc.HandlerError(
+            err = nexusrpc.HandlerError(
                 failure.message or "Nexus handler error",
                 type=_type,
                 retryable=retryable,
@@ -1111,7 +1111,8 @@ class DefaultFailureConverter(FailureConverter):
             )
         else:
             err = temporalio.exceptions.FailureError(failure.message or "Failure error")
-        err._failure = failure
+        if isinstance(err, temporalio.exceptions.FailureError):
+            err._failure = failure
         if failure.HasField("cause"):
             err.__cause__ = self.from_failure(failure.cause, payload_converter)
         return err
