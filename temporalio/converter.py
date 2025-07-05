@@ -807,7 +807,13 @@ class DefaultFailureConverter(FailureConverter):
         if isinstance(exception, temporalio.exceptions.FailureError):
             self._error_to_failure(exception, payload_converter, failure)
         elif isinstance(exception, nexusrpc.HandlerError):
+            print("🌈 to_failure(nexusrpc.HandlerError)")
             self._nexus_handler_error_to_failure(exception, payload_converter, failure)
+        elif isinstance(exception, nexusrpc.OperationError):
+            print("🌈 to_failure(nexusrpc.OperationError)")
+            self._nexus_operation_error_to_failure(
+                exception, payload_converter, failure
+            )
         else:
             # Convert to failure error
             failure_error = temporalio.exceptions.ApplicationError(
@@ -930,6 +936,31 @@ class DefaultFailureConverter(FailureConverter):
                 error.operation_token
             )
 
+    # message NexusOperationFailureInfo {
+    #     // The NexusOperationScheduled event ID.
+    #     int64 scheduled_event_id = 1;
+    #     // Endpoint name.
+    #     string endpoint = 2;
+    #     // Service name.
+    #     string service = 3;
+    #     // Operation name.
+    #     string operation = 4;
+    #     // Operation ID - may be empty if the operation completed synchronously.
+    #     //
+    #     // Deprecated: Renamed to operation_token.
+    #     string operation_id = 5;
+    #     // Operation token - may be empty if the operation completed synchronously.
+    #     string operation_token = 6;
+    # }
+
+    # message NexusHandlerFailureInfo {
+    #     // The Nexus error type as defined in the spec:
+    #     // https://github.com/nexus-rpc/api/blob/main/SPEC.md#predefined-handler-errors.
+    #     string type = 1;
+    #     // Retry behavior, defaults to the retry behavior of the error type as defined in the spec.
+    #     temporal.api.enums.v1.NexusHandlerErrorRetryBehavior retry_behavior = 2;
+    # }
+
     def _nexus_handler_error_to_failure(
         self,
         error: nexusrpc.HandlerError,
@@ -950,6 +981,22 @@ class DefaultFailureConverter(FailureConverter):
             else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
             if error.retryable is False
             else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+        )
+
+    def _nexus_operation_error_to_failure(
+        self,
+        error: nexusrpc.OperationError,
+        payload_converter: PayloadConverter,
+        failure: temporalio.api.failure.v1.Failure,
+    ) -> None:
+        failure.message = getattr(error, "message", str(error))
+        if error.__traceback__:
+            failure.stack_trace = "\n".join(traceback.format_tb(error.__traceback__))
+        if error.__cause__:
+            self.to_failure(error.__cause__, payload_converter, failure.cause)
+        failure.nexus_operation_execution_failure_info.SetInParent()
+        failure.nexus_operation_execution_failure_info.scheduled_event_id = (
+            error.scheduled_event_id
         )
 
     def from_failure(
