@@ -127,9 +127,9 @@ class _TemporalStartOperationContext:
     def set(self) -> None:
         _temporal_start_operation_context.set(self)
 
-    def _get_completion_callbacks(
+    def _get_callbacks(
         self,
-    ) -> list[temporalio.client.NexusCompletionCallback]:
+    ) -> list[temporalio.client.Callback]:
         ctx = self.nexus_context
         return (
             [
@@ -138,7 +138,7 @@ class _TemporalStartOperationContext:
                 # StartWorkflowRequest.CompletionCallbacks and to StartWorkflowRequest.Links
                 # (for backwards compatibility). PR reference in Go SDK:
                 # https://github.com/temporalio/sdk-go/pull/1945
-                temporalio.client.NexusCompletionCallback(
+                temporalio.client.NexusCallback(
                     url=ctx.callback_url,
                     headers=ctx.callback_headers,
                 )
@@ -441,7 +441,7 @@ class WorkflowRunOperationContext(StartOperationContext):
             request_eager_start=request_eager_start,
             priority=priority,
             versioning_override=versioning_override,
-            nexus_completion_callbacks=self.temporal_context._get_completion_callbacks(),
+            callbacks=self.temporal_context._get_callbacks(),
             workflow_event_links=self.temporal_context._get_workflow_event_links(),
             request_id=self.temporal_context.nexus_context.request_id,
         )
