@@ -315,7 +315,7 @@ class _NexusWorker:
                 operation_error=await self._operation_error_to_proto(err),
             )
 
-    async def _exception_to_failure_proto(
+    async def _exception_to_nexus_failure_proto(
         self,
         err: BaseException,
     ) -> temporalio.api.nexus.v1.Failure:
@@ -340,7 +340,7 @@ class _NexusWorker:
     ) -> temporalio.api.nexus.v1.UnsuccessfulOperationError:
         return temporalio.api.nexus.v1.UnsuccessfulOperationError(
             operation_state=err.state.value,
-            failure=await self._exception_to_failure_proto(err),
+            failure=await self._exception_to_nexus_failure_proto(err),
         )
 
     async def _handler_error_to_proto(
@@ -348,7 +348,7 @@ class _NexusWorker:
     ) -> temporalio.api.nexus.v1.HandlerError:
         return temporalio.api.nexus.v1.HandlerError(
             error_type=err.type.value,
-            failure=await self._exception_to_failure_proto(err),
+            failure=await self._exception_to_nexus_failure_proto(err),
             retry_behavior=(
                 temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
                 if err.retryable
