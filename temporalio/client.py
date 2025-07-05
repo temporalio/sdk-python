@@ -469,7 +469,7 @@ class Client:
         # The following options should not be considered part of the public API. They
         # are deliberately not exposed in overloads, and are not subject to any
         # backwards compatibility guarantees.
-        nexus_completion_callbacks: Sequence[NexusCompletionCallback] = [],
+        callbacks: Sequence[Callback] = [],
         workflow_event_links: Sequence[
             temporalio.api.common.v1.Link.WorkflowEvent
         ] = [],
@@ -564,7 +564,7 @@ class Client:
                 rpc_timeout=rpc_timeout,
                 request_eager_start=request_eager_start,
                 priority=priority,
-                nexus_completion_callbacks=nexus_completion_callbacks,
+                callbacks=callbacks,
                 workflow_event_links=workflow_event_links,
                 request_id=request_id,
             )
@@ -5204,7 +5204,7 @@ class StartWorkflowInput:
     request_eager_start: bool
     priority: temporalio.common.Priority
     # The following options are experimental and unstable.
-    nexus_completion_callbacks: Sequence[NexusCompletionCallback]
+    callbacks: Sequence[Callback]
     workflow_event_links: Sequence[temporalio.api.common.v1.Link.WorkflowEvent]
     request_id: Optional[str]
     versioning_override: Optional[temporalio.common.VersioningOverride] = None
@@ -5835,7 +5835,7 @@ class _ClientImpl(OutboundInterceptor):
                     url=callback.url, header=callback.headers
                 )
             )
-            for callback in input.nexus_completion_callbacks
+            for callback in input.callbacks
         )
         req.links.extend(
             temporalio.api.common.v1.Link(workflow_event=link)
@@ -7264,7 +7264,7 @@ class CloudOperationsClient:
 
 
 @dataclass(frozen=True)
-class NexusCompletionCallback:
+class NexusCallback:
     """Nexus callback to attach to events such as workflow completion.
 
     .. warning::
@@ -7276,6 +7276,10 @@ class NexusCompletionCallback:
 
     headers: Mapping[str, str]
     """Header to attach to callback request."""
+
+
+# Intended to become a union of callback types
+Callback = NexusCallback
 
 
 async def _encode_user_metadata(
