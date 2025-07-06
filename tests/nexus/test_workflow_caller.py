@@ -1098,18 +1098,18 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 #           switch (input.getAction()) {
 #             case RAISE_APPLICATION_ERROR:
 #               throw ApplicationFailure.newNonRetryableFailure(
-#                   "application error 1", "my-application-error-type");
+#                   "application-error-message", "application-error-type");
 #             case RAISE_CUSTOM_ERROR:
-#               throw new MyCustomException("Custom error 1");
+#               throw new MyCustomException("custom-error-message");
 #             case RAISE_CUSTOM_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
 #               // ** THIS DOESN'T WORK **: CHAINED CUSTOM EXCEPTIONS DON'T SERIALIZE
-#               MyCustomException customError = new MyCustomException("Custom error 1");
+#               MyCustomException customError = new MyCustomException("custom-error-message");
 #               customError.initCause(new MyCustomException("Custom error 2"));
 #               throw customError;
 #             case RAISE_APPLICATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
 #               throw ApplicationFailure.newNonRetryableFailureWithCause(
-#                   "application error 1",
-#                   "my-application-error-type",
+#                   "application-error-message",
+#                   "application-error-type",
 #                   new MyCustomException("Custom error 2"));
 #             case RAISE_NEXUS_HANDLER_ERROR:
 #               throw new HandlerException(HandlerException.ErrorType.NOT_FOUND, "Handler error 1");
@@ -1125,8 +1125,8 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 #             case RAISE_NEXUS_OPERATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
 #               throw OperationException.failure(
 #                   ApplicationFailure.newNonRetryableFailureWithCause(
-#                       "application error 1",
-#                       "my-application-error-type",
+#                       "application-error-message",
+#                       "application-error-type",
 #                       new MyCustomException("Custom error 2")));
 #           }
 #           return new NexusService.ErrorTestOutput("Unreachable");
@@ -1136,8 +1136,8 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 
 # 🌈 RAISE_APPLICATION_ERROR:
 # io.temporal.failure.NexusOperationFailure(message="Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=", scheduledEventId=scheduledEventId, operationToken="operationToken")
-#     io.nexusrpc.handler.HandlerException(message="handler error: message='application error 1', type='my-application-error-type', nonRetryable=true", type="INTERNAL", nonRetryable=true)
-#         io.temporal.failure.ApplicationFailure(message="application error 1", type="my-application-error-type", nonRetryable=true)
+#     io.nexusrpc.handler.HandlerException(message="handler error: message='application-error-message', type='application-error-type', nonRetryable=true", type="INTERNAL", nonRetryable=true)
+#         io.temporal.failure.ApplicationFailure(message="application-error-message", type="application-error-type", nonRetryable=true)
 
 
 # 🌈 RAISE_CUSTOM_ERROR:
@@ -1147,8 +1147,8 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 
 # 🌈 RAISE_APPLICATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
 # io.temporal.failure.NexusOperationFailure(message="Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=", scheduledEventId=scheduledEventId, operationToken="operationToken")
-#     io.nexusrpc.handler.HandlerException(message="handler error: message='application error 1', type='my-application-error-type', nonRetryable=true", type="INTERNAL", nonRetryable=true)
-#         io.temporal.failure.ApplicationFailure(message="application error 1", type="my-application-error-type", nonRetryable=true)
+#     io.nexusrpc.handler.HandlerException(message="handler error: message='application-error-message', type='application-error-type', nonRetryable=true", type="INTERNAL", nonRetryable=true)
+#         io.temporal.failure.ApplicationFailure(message="application-error-message", type="application-error-type", nonRetryable=true)
 #             io.temporal.failure.ApplicationFailure(message="Custom error 2", type="io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException", nonRetryable=false)
 
 
@@ -1160,7 +1160,7 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 
 # 🌈 RAISE_NEXUS_OPERATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
 # io.temporal.failure.NexusOperationFailure(message="Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=", scheduledEventId=scheduledEventId, operationToken="operationToken")
-#     io.temporal.failure.ApplicationFailure(message="application error 1", type="my-application-error-type", nonRetryable=true)
+#     io.temporal.failure.ApplicationFailure(message="application-error-message", type="application-error-type", nonRetryable=true)
 #         io.temporal.failure.ApplicationFailure(message="Custom error 2", type="io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException", nonRetryable=false)
 
 
@@ -1183,10 +1183,10 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 # Java:   (<class 'temporalio.exceptions.NexusOperationError'>, {})
 # Python: (<class 'temporalio.exceptions.NexusOperationError'>, {})
 
-# Java:   (<class 'nexusrpc._common.HandlerError'>, {'message': "handler error: message='application error 1', type='my-application-error-type', nonRetryable=true", 'type': 'INTERNAL', 'non_retryable': True})
+# Java:   (<class 'nexusrpc._common.HandlerError'>, {'message': "handler error: message='application-error-message', type='application-error-type', nonRetryable=true", 'type': 'INTERNAL', 'non_retryable': True})
 # Python: (<class 'nexusrpc._common.HandlerError'>, {'message': None, 'type': <HandlerErrorType.INTERNAL: 'INTERNAL'>, 'non_retryable': None})
 
-# Java:   (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'application error 1', 'type': 'my-application-error-type', 'non_retryable': True})
+# Java:   (<class 'temporalio.exceptions.ApplicationError'>, {'message': 'application-error-message', 'type': 'application-error-type', 'non_retryable': True})
 # Python: None
 
 # --------------------------------------------------------------------------------
@@ -1219,11 +1219,22 @@ class ErrorConversionTestCase:
     ) -> tuple[type[BaseException], dict[str, Any]]:
         if isinstance(exception, NexusOperationError):
             return NexusOperationError, {}
-        return type(exception), {
-            "message": getattr(exception, "message", None),
-            "type": getattr(exception, "type", None),
-            "non_retryable": getattr(exception, "non_retryable", None),
-        }
+        elif isinstance(exception, ApplicationError):
+            return ApplicationError, {
+                "message": exception.message,
+                "type": exception.type,
+                "non_retryable": exception.non_retryable,
+            }
+        elif isinstance(exception, nexusrpc.HandlerError):
+            return type(exception), {
+                "message": exception.message,
+                "type": exception.type,
+                "non_retryable": {True: False, False: True, None: None}[
+                    exception.retryable
+                ],
+            }
+        else:
+            raise TypeError(f"Unexpected exception type: {type(exception)}")
 
 
 error_conversion_test_cases: list[ErrorConversionTestCase] = []
@@ -1248,8 +1259,8 @@ error_conversion_test_cases: list[ErrorConversionTestCase] = []
 #         ApplicationFailure: represents the first (and only) item in the failure details chain.
 #
 # io.temporal.failure.NexusOperationFailure(message="Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=", scheduledEventId=scheduledEventId, operationToken="operationToken")
-#     io.nexusrpc.handler.HandlerException(message="handler error: message='application error 1', type='my-application-error-type', nonRetryable=true", type="INTERNAL", nonRetryable=true)
-#         io.temporal.failure.ApplicationFailure(message="application error 1", type="my-application-error-type", nonRetryable=true)
+#     io.nexusrpc.handler.HandlerException(message="handler error: message='application-error-message', type='application-error-type', nonRetryable=true", type="INTERNAL", nonRetryable=true)
+#         io.temporal.failure.ApplicationFailure(message="application-error-message", type="application-error-type", nonRetryable=true)
 #
 # The Python handler sends NexusTaskFailed containing
 #
@@ -1257,7 +1268,7 @@ error_conversion_test_cases: list[ErrorConversionTestCase] = []
 #     message: "application-error-message",
 #     details: [
 #         HandlerFailureInfo(INTERNAL, non_retryable_behavior)
-#         ApplicationErrorInfo("application-error-type", non_retryable, "my-application-error-message")
+#         ApplicationErrorInfo("application-error-type", non_retryable, "application-error-message")
 #     ]
 #   }
 # )
@@ -1269,7 +1280,7 @@ error_conversion_test_cases.append(
             (
                 nexusrpc.HandlerError,
                 {
-                    "message": "handler error: message='application error 1', type='my-application-error-type', nonRetryable=true",
+                    "message": "handler error: message='application-error-message', type='application-error-type', nonRetryable=true",
                     "type": "INTERNAL",
                     "non_retryable": True,
                 },
@@ -1277,10 +1288,10 @@ error_conversion_test_cases.append(
             (
                 ApplicationError,
                 {
-                    "message": "application error 1",
-                    "type": "my-application-error-type",
+                    "message": "application-error-message",
+                    "type": "application-error-type",
                     "non_retryable": True,
-                },  # TODO: message should be "my-application-error-message"
+                },  # TODO: message should be "application-error-message"
             ),
         ],
     )
@@ -1313,7 +1324,7 @@ error_conversion_test_cases.append(
             (
                 nexusrpc.HandlerError,
                 {
-                    "message": "handler error: message='application error 1', type='my-application-error-type', nonRetryable=true",
+                    "message": "handler error: message='application-error-message', type='application-error-type', nonRetryable=true",
                     "type": "INTERNAL",
                     "non_retryable": True,
                 },
@@ -1321,8 +1332,8 @@ error_conversion_test_cases.append(
             (
                 ApplicationError,
                 {
-                    "message": "application error 1",
-                    "type": "my-application-error-type",
+                    "message": "application-error-message",
+                    "type": "application-error-type",
                     "non_retryable": True,
                 },
             ),
@@ -1393,7 +1404,7 @@ error_conversion_test_cases.append(
 #         ApplicationError: corresponds to the 2nd ApplicationError in the details chain
 #
 # io.temporal.failure.NexusOperationFailure(message="Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=", scheduledEventId=scheduledEventId, operationToken="operationToken")
-#     io.temporal.failure.ApplicationFailure(message="application error 1", type="my-application-error-type", nonRetryable=true)
+#     io.temporal.failure.ApplicationFailure(message="application-error-message", type="application-error-type", nonRetryable=true)
 #         io.temporal.failure.ApplicationFailure(message="Custom error 2", type="io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException", nonRetryable=false)
 #
 # The Python handler sends NexusTaskCompleted containing
@@ -1401,7 +1412,7 @@ error_conversion_test_cases.append(
 #     message: "operation-error-message",
 #     details: [
 #         ApplicationErrorInfo("OperationError", retryable,  <no message>),
-#         ApplicationErrorInfo("my-application-error-type", non_retryable, "my-application-error-message"),
+#         ApplicationErrorInfo("application-error-type", non_retryable, "application-error-message"),
 #         ApplicationErrorInfo("CustomError", retryable, "custom-error-message"),
 #     ]
 #   }
@@ -1415,8 +1426,8 @@ error_conversion_test_cases.append(
             (
                 ApplicationError,
                 {
-                    "message": "application error 1",
-                    "type": "my-application-error-type",
+                    "message": "application-error-message",
+                    "type": "application-error-type",
                     "non_retryable": True,
                 },
             ),
@@ -1449,17 +1460,17 @@ class ErrorTestService:
     async def op(self, ctx: StartOperationContext, input: ErrorTestInput) -> None:
         if input.action_in_sync_op == "application_error_non_retryable":
             raise ApplicationError(
-                "my-application-error-message",
-                type="my-application-error-type",
+                "application-error-message",
+                type="application-error-type",
                 non_retryable=True,
             )
         elif input.action_in_sync_op == "custom_error":
-            raise CustomError("Custom error 1")
+            raise CustomError("custom-error-message")
         elif input.action_in_sync_op == "custom_error_from_custom_error":
             try:
                 raise CustomError("Custom error 2")
             except CustomError as err:
-                raise CustomError("Custom error 1") from err
+                raise CustomError("custom-error-message") from err
         elif (
             input.action_in_sync_op
             == "application_error_non_retryable_from_custom_error"
@@ -1468,8 +1479,8 @@ class ErrorTestService:
                 raise CustomError("Custom error 2")
             except CustomError as err:
                 raise ApplicationError(
-                    "application error 1",
-                    type="my-application-error-type",
+                    "application-error-message",
+                    type="application-error-type",
                     non_retryable=True,
                 ) from err
         elif input.action_in_sync_op == "nexus_handler_error_not_found":
@@ -1497,8 +1508,8 @@ class ErrorTestService:
             # case RAISE_NEXUS_OPERATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
             #   throw OperationException.failure(
             #       ApplicationFailure.newNonRetryableFailureWithCause(
-            #           "application error 1",
-            #           "my-application-error-type",
+            #           "application-error-message",
+            #           "application-error-type",
             #           new MyCustomException("Custom error 2")));
 
             try:
@@ -1506,8 +1517,8 @@ class ErrorTestService:
                     raise CustomError("Custom error 2")
                 except CustomError as err:
                     raise ApplicationError(
-                        "application error 1",
-                        type="my-application-error-type",
+                        "application-error-message",
+                        type="application-error-type",
                         non_retryable=True,
                     ) from err
             except ApplicationError as err:
