@@ -37,6 +37,8 @@ from temporalio.service import RPCError, RPCStatusCode
 
 from ._interceptor import Interceptor
 
+_TEMPORAL_FAILURE_PROTO_TYPE = "temporal.api.failure.v1.Failure"
+
 
 class _NexusWorker:
     def __init__(
@@ -325,13 +327,13 @@ class _NexusWorker:
             _api_failure = google.protobuf.json_format.MessageToDict(api_failure)
             return temporalio.api.nexus.v1.Failure(
                 message=_api_failure.pop("message", ""),
-                metadata={"type": "temporal.api.failure.v1.Failure"},
+                metadata={"type": _TEMPORAL_FAILURE_PROTO_TYPE},
                 details=json.dumps(_api_failure, separators=(",", ":")).encode("utf-8"),
             )
         except BaseException as err:
             return temporalio.api.nexus.v1.Failure(
                 message=f"{err.__class__.__name__}: {err}",
-                metadata={"type": "temporal.api.failure.v1.Failure"},
+                metadata={"type": _TEMPORAL_FAILURE_PROTO_TYPE},
             )
 
     async def _handler_error_to_nexus_failure_proto(
@@ -353,7 +355,7 @@ class _NexusWorker:
                 await self._data_converter.encode_failure(cause, failure)
                 return temporalio.api.nexus.v1.Failure(
                     message=message,
-                    metadata={"type": "temporal.api.failure.v1.Failure"},
+                    metadata={"type": _TEMPORAL_FAILURE_PROTO_TYPE},
                     details=json.dumps(
                         google.protobuf.json_format.MessageToDict(failure),
                         separators=(",", ":"),
@@ -433,7 +435,7 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
         return err
     elif isinstance(err, ApplicationError):
         handler_err = nexusrpc.HandlerError(
-            # TODO(nexus-prerelease): what should message be?
+            # TODO(nexus-preview): confirm what we want as message here
             err.message,
             type=nexusrpc.HandlerErrorType.INTERNAL,
             retryable=not err.non_retryable,
