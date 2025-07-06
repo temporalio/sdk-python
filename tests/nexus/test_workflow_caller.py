@@ -1433,7 +1433,7 @@ class RaiseNexusOperationErrorFromApplicationErrorNonRetryableFromCustomError(
 
         try:
             try:
-                raise CustomError("Custom error 2")
+                raise CustomError("custom-error-message")
             except CustomError as err:
                 raise ApplicationError(
                     "application-error-message",
@@ -1447,7 +1447,13 @@ class RaiseNexusOperationErrorFromApplicationErrorNonRetryableFromCustomError(
             ) from err
 
     expected_exception_chain_in_workflow = [
-        (NexusOperationError, {}),
+        (
+            NexusOperationError,
+            {
+                "message": "nexus operation completed unsuccessfully",
+                "service": "ErrorTestService",
+            },
+        ),
         (
             ApplicationError,
             {
@@ -1459,8 +1465,8 @@ class RaiseNexusOperationErrorFromApplicationErrorNonRetryableFromCustomError(
         (
             ApplicationError,
             {
-                "message": "Custom error 2",
-                "type": "io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException",
+                "message": "custom-error-message",
+                "type": "CustomError",
                 "non_retryable": False,
             },
         ),
