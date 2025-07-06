@@ -18,6 +18,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import IntEnum
+from pprint import pprint
 from typing import (
     Any,
     Awaitable,
@@ -887,12 +888,16 @@ class _WorkflowInstanceImpl(
         # Handle the four oneof variants of NexusOperationResult
         result = job.result
         if result.HasField("completed"):
+            print("🟢 workflow received NexusOperationResult.completed")
+            pprint(result.completed)
             [output] = self._convert_payloads(
                 [result.completed],
                 [handle._input.output_type] if handle._input.output_type else None,
             )
             handle._resolve_success(output)
         elif result.HasField("failed"):
+            print("🔴 workflow received NexusOperationResult.failed")
+            pprint(result.failed)
             handle._resolve_failure(
                 self._failure_converter.from_failure(
                     result.failed, self._payload_converter
