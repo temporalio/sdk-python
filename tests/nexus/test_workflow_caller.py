@@ -1229,7 +1229,38 @@ class ErrorConversionTestCase:
 error_conversion_test_cases: list[ErrorConversionTestCase] = []
 
 
-# application_error_non_retryable:
+# If a nexus handler raises a non-retryable ApplicationError, the calling workflow
+# should see a non-retryable exception.
+#
+# The Java handler sends NexusTaskFailed containing
+#
+# temporalio.api.nexus.v1.HandlerError(INTERNAL, RETRY_BEHAVIOR_NON_RETRYABLE, failure={
+#     message: "application-error-message",
+#     details: [
+#         ApplicationErrorInfo(non_retryable, "application-error-type", <no message>)
+#     ]
+#   }
+# )
+#
+# The Java workflow caller rehydrates this as below. Essentially, the error chain is
+# NexusOperationError: corresponds to the NexusTaskFailed request perhaps
+#     nexusrpc.HandlerError: represents the top-level HandlerError proto (non_retryable=True from the HandlerError proto retry_behavior)
+#         ApplicationFailure: represents the first (and only) item in the failure details chain.
+#
+# io.temporal.failure.NexusOperationFailure(message="Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=", scheduledEventId=scheduledEventId, operationToken="operationToken")
+#     io.nexusrpc.handler.HandlerException(message="handler error: message='application error 1', type='my-application-error-type', nonRetryable=true", type="INTERNAL", nonRetryable=true)
+#         io.temporal.failure.ApplicationFailure(message="application error 1", type="my-application-error-type", nonRetryable=true)
+#
+# The Python handler sends NexusTaskFailed containing
+#
+# temporalio.api.nexus.v1.HandlerError(INTERNAL, RETRY_BEHAVIOR_NON_RETRYABLE, failure={
+#     message: "application-error-message",
+#     details: [
+#         HandlerFailureInfo(INTERNAL, non_retryable_behavior)
+#         ApplicationErrorInfo("application-error-type", non_retryable, "my-application-error-message")
+#     ]
+#   }
+# )
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
         name="application_error_non_retryable",
@@ -1249,7 +1280,7 @@ error_conversion_test_cases.append(
                     "message": "application error 1",
                     "type": "my-application-error-type",
                     "non_retryable": True,
-                },
+                },  # TODO: message should be "my-application-error-message"
             ),
         ],
     )
@@ -1342,7 +1373,40 @@ error_conversion_test_cases.append(
 )
 
 
-# nexus_operation_error_from_application_error_non_retryable_from_custom_error:
+# If a nexus handler raises an OperationError, the calling workflow
+# should see a non-retryable exception.
+#
+# The Java handler sends NexusTaskCompleted containing
+#
+# temporalio.api.nexus.v1.UnsuccessfulOperationError(FAILED, failure={
+#     message: "application-error-message",
+#     details: [
+#         ApplicationErrorInfo(non_retryable, "application-error-type", <no message>),
+#         ApplicationErrorInfo(retryable, "MyCustomException", "custom-error-message"),
+#     ]
+#   }
+# )
+#
+# The Java workflow caller rehydrates this as below. Essentially, the error chain is
+# NexusOperationError: corresponds to the top-level UnsuccessfulOperationError
+#     ApplicationError: corresponds to the 1st ApplicationError in the details chain
+#         ApplicationError: corresponds to the 2nd ApplicationError in the details chain
+#
+# io.temporal.failure.NexusOperationFailure(message="Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=", scheduledEventId=scheduledEventId, operationToken="operationToken")
+#     io.temporal.failure.ApplicationFailure(message="application error 1", type="my-application-error-type", nonRetryable=true)
+#         io.temporal.failure.ApplicationFailure(message="Custom error 2", type="io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException", nonRetryable=false)
+#
+# The Python handler sends NexusTaskCompleted containing
+# temporalio.api.nexus.v1.UnsuccessfulOperationError(FAILED, failure={
+#     message: "operation-error-message",
+#     details: [
+#         ApplicationErrorInfo("OperationError", retryable,  <no message>),
+#         ApplicationErrorInfo("my-application-error-type", non_retryable, "my-application-error-message"),
+#         ApplicationErrorInfo("CustomError", retryable, "custom-error-message"),
+#     ]
+#   }
+# )
+#
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
         name="nexus_operation_error_from_application_error_non_retryable_from_custom_error",
@@ -1385,7 +1449,7 @@ class ErrorTestService:
     async def op(self, ctx: StartOperationContext, input: ErrorTestInput) -> None:
         if input.action_in_sync_op == "application_error_non_retryable":
             raise ApplicationError(
-                "application error 1",
+                "my-application-error-message",
                 type="my-application-error-type",
                 non_retryable=True,
             )
