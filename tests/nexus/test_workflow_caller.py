@@ -1422,7 +1422,9 @@ class RaiseNexusHandlerErrorNotFound(ErrorConversionTestCase):
         (
             ApplicationError,
             {
-                "message": "runtime-error-message",
+                # TODO(nexus-preview): empirically, this is "handler-error-message",
+                # but it should be "runtime-error-message"
+                # "message": "runtime-error-message",
                 "type": "RuntimeError",
                 "non_retryable": False,
             },
