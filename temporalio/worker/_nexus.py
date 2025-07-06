@@ -353,6 +353,10 @@ class _NexusWorker:
             try:
                 failure = temporalio.api.failure.v1.Failure()
                 await self._data_converter.encode_failure(cause, failure)
+                # Note that Java removes the message from the first item in the details
+                # chain, since in Java's case HandlerException does not have its own
+                # message. In the case of Python however, the top-level message belongs
+                # to the HandlerError itself and so is distinct.
                 return temporalio.api.nexus.v1.Failure(
                     message=message,
                     metadata={"type": _TEMPORAL_FAILURE_PROTO_TYPE},
