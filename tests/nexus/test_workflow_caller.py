@@ -1208,36 +1208,17 @@ ActionInSyncOp = Literal[
 ]
 
 
-@dataclass
 class ErrorConversionTestCase:
     name: ActionInSyncOp
-    java_behavior: list[tuple[type[Exception], dict[str, Any]]]
+    expectation: list[tuple[type[Exception], dict[str, Any]]]
 
-    @staticmethod
-    def parse_exception(
-        exception: BaseException,
-    ) -> tuple[type[BaseException], dict[str, Any]]:
-        if isinstance(exception, NexusOperationError):
-            return NexusOperationError, {}
-        elif isinstance(exception, ApplicationError):
-            return ApplicationError, {
-                "message": exception.message,
-                "type": exception.type,
-                "non_retryable": exception.non_retryable,
-            }
-        elif isinstance(exception, nexusrpc.HandlerError):
-            return type(exception), {
-                "message": exception.message,
-                "type": exception.type,
-                "non_retryable": {True: False, False: True, None: None}[
-                    exception.retryable
-                ],
-            }
-        else:
-            raise TypeError(f"Unexpected exception type: {type(exception)}")
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if hasattr(cls, "name") and hasattr(cls, "expectation"):
+            error_conversion_test_cases.append(cls)
 
 
-error_conversion_test_cases: list[ErrorConversionTestCase] = []
+error_conversion_test_cases: list[type[ErrorConversionTestCase]] = []
 
 
 # If a nexus handler raises a non-retryable ApplicationError, the calling workflow
@@ -1271,144 +1252,104 @@ error_conversion_test_cases: list[ErrorConversionTestCase] = []
 #     ]
 #   }
 # )
-#
-# The Python workflow receives a WFT containing a chain of length 3:
-# NexusOperationFailureInfo
-#     NexusHandlerFailureInfo
-#         ApplicationFailureInfo
-#
-# cause {
-#   message: "handler error (INTERNAL): application-error-message"
-#   cause {
-#     message: "application-error-message"
-#     stack_trace: "  File \"/Users/dan/src/temporalio/sdk-python/temporalio/worker/_nexus.py\", line 216, in _handle_start_operation_task\n    start_response = await self._start_operation(start_request, headers)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/dan/src/temporalio/sdk-python/temporalio/worker/_nexus.py\", line 282, in _start_operation\n    result = await self._handler.start_operation(ctx, input)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/dan/src/temporalio/nexus-sdk-python/src/nexusrpc/handler/_core.py\", line 302, in start_operation\n    return await op_handler.start(ctx, deserialized_input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/dan/src/temporalio/nexus-sdk-python/src/nexusrpc/handler/_operation_handler.py\", line 126, in start\n    return StartOperationResultSync(await self._start(ctx, input))\n                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/dan/src/temporalio/nexus-sdk-python/src/nexusrpc/handler/_decorators.py\", line 322, in asyncio_start\n    return await start_async(self, ctx, input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/dan/src/temporalio/sdk-python/tests/nexus/test_workflow_caller.py\", line 1451, in op\n    raise ApplicationError(\n    ...<3 lines>...\n    )\n"
-#     application_failure_info {
-#       type: "application-error-type"
-#       non_retryable: true
-#     }
-#   }
-#   nexus_handler_failure_info {
-#     type: "INTERNAL"
-#     retry_behavior: NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
-#   }
-# }
-# nexus_operation_execution_failure_info {
-#   scheduled_event_id: 5
-#   endpoint: "nexus-endpoint-b6b08d6f-cbc9-4cc5-9629-abcd7298584c"
-#   service: "ErrorTestService"
-#   operation: "op"
-# }
 
-error_conversion_test_cases.append(
-    ErrorConversionTestCase(
-        name="application_error_non_retryable",
-        java_behavior=[
-            (NexusOperationError, {}),
-            (
-                nexusrpc.HandlerError,
-                {
-                    "message": "handler error: message='application-error-message', type='application-error-type', nonRetryable=true",
-                    "type": "INTERNAL",
-                    "non_retryable": True,
-                },
-            ),
-            (
-                ApplicationError,
-                {
-                    "message": "application-error-message",
-                    "type": "application-error-type",
-                    "non_retryable": True,
-                },  # TODO: message should be "application-error-message"
-            ),
-        ],
-    )
-)
+
+class RaiseApplicationErrorNonRetryable(ErrorConversionTestCase):
+    name = "application_error_non_retryable"
+    expectation = [
+        (NexusOperationError, {}),
+        (
+            nexusrpc.HandlerError,
+            {
+                # In this test case the user code raised ApplicationError directly,
+                # and a wrapping HandlerError was synthesized with the same error
+                # message as that of the ApplicationError. I believe the server
+                # prepends 'handler error (INTERNAL):'
+                "message": "handler error (INTERNAL): application-error-message",
+                "type": nexusrpc.HandlerErrorType.INTERNAL,
+                "retryable": False,
+            },
+        ),
+        (
+            ApplicationError,
+            {
+                "message": "application-error-message",
+                "type": "application-error-type",
+                "non_retryable": True,
+            },
+        ),
+    ]
+
 
 # custom_error:
-error_conversion_test_cases.append(
-    ErrorConversionTestCase(
-        name="custom_error",
-        java_behavior=[],  # [Not possible]
-    )
-)
+class RaiseCustomError(ErrorConversionTestCase):
+    name = "custom_error"
+    expectation = []  # [Not possible]
 
 
 # custom_error_from_custom_error:
-error_conversion_test_cases.append(
-    ErrorConversionTestCase(
-        name="custom_error_from_custom_error",
-        java_behavior=[],  # [Not possible]
-    )
-)
+class RaiseCustomErrorFromCustomError(ErrorConversionTestCase):
+    name = "custom_error_from_custom_error"
+    expectation = []  # [Not possible]
 
 
-# application_error_non_retryable_from_custom_error:
-error_conversion_test_cases.append(
-    ErrorConversionTestCase(
-        name="application_error_non_retryable_from_custom_error",
-        java_behavior=[
-            (NexusOperationError, {}),
-            (
-                nexusrpc.HandlerError,
-                {
-                    "message": "handler error: message='application-error-message', type='application-error-type', nonRetryable=true",
-                    "type": "INTERNAL",
-                    "non_retryable": True,
-                },
-            ),
-            (
-                ApplicationError,
-                {
-                    "message": "application-error-message",
-                    "type": "application-error-type",
-                    "non_retryable": True,
-                },
-            ),
-            (
-                ApplicationError,
-                {
-                    "message": "Custom error 2",
-                    "type": "io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException",
-                    "non_retryable": False,
-                },
-            ),
-        ],
-    )
-)
+class RaiseApplicationErrorNonRetryableFromCustomError(ErrorConversionTestCase):
+    name = "application_error_non_retryable_from_custom_error"
+    expectation = [
+        (NexusOperationError, {}),
+        (
+            nexusrpc.HandlerError,
+            {
+                "message": "handler error: message='application-error-message', type='application-error-type', nonRetryable=true",
+                "type": "INTERNAL",
+                "non_retryable": True,
+            },
+        ),
+        (
+            ApplicationError,
+            {
+                "message": "application-error-message",
+                "type": "application-error-type",
+                "non_retryable": True,
+            },
+        ),
+        (
+            ApplicationError,
+            {
+                "message": "Custom error 2",
+                "type": "io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException",
+                "non_retryable": False,
+            },
+        ),
+    ]
 
-# nexus_handler_error_not_found:
-error_conversion_test_cases.append(
-    ErrorConversionTestCase(
-        name="nexus_handler_error_not_found",
-        java_behavior=[
-            (NexusOperationError, {}),
-            (
-                nexusrpc.HandlerError,
-                {
-                    "message": "handler error: message='Handler error 1', type='java.lang.RuntimeException', nonRetryable=false",
-                    "type": "NOT_FOUND",
-                    "non_retryable": True,
-                },
-            ),
-            (
-                ApplicationError,
-                {
-                    "message": "Handler error 1",
-                    "type": "java.lang.RuntimeException",
-                    "non_retryable": False,
-                },
-            ),
-        ],
-    )
-)
 
-# nexus_handler_error_not_found_from_custom_error:
-error_conversion_test_cases.append(
-    ErrorConversionTestCase(
-        name="nexus_handler_error_not_found_from_custom_error",
-        java_behavior=[],  # [Not possible]
-    )
-)
+class RaiseNexusHandlerErrorNotFound(ErrorConversionTestCase):
+    name = "nexus_handler_error_not_found"
+    expectation = [
+        (NexusOperationError, {}),
+        (
+            nexusrpc.HandlerError,
+            {
+                "message": "handler error: message='Handler error 1', type='java.lang.RuntimeException', nonRetryable=false",
+                "type": "NOT_FOUND",
+                "non_retryable": True,
+            },
+        ),
+        (
+            ApplicationError,
+            {
+                "message": "Handler error 1",
+                "type": "java.lang.RuntimeException",
+                "non_retryable": False,
+            },
+        ),
+    ]
+
+
+class RaiseNexusHandlerErrorNotFoundFromCustomError(ErrorConversionTestCase):
+    name = "nexus_handler_error_not_found_from_custom_error"
+    expectation = []  # [Not possible]
 
 
 # If a nexus handler raises an OperationError, the calling workflow
@@ -1445,30 +1386,31 @@ error_conversion_test_cases.append(
 #   }
 # )
 #
-error_conversion_test_cases.append(
-    ErrorConversionTestCase(
-        name="nexus_operation_error_from_application_error_non_retryable_from_custom_error",
-        java_behavior=[
-            (NexusOperationError, {}),
-            (
-                ApplicationError,
-                {
-                    "message": "application-error-message",
-                    "type": "application-error-type",
-                    "non_retryable": True,
-                },
-            ),
-            (
-                ApplicationError,
-                {
-                    "message": "Custom error 2",
-                    "type": "io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException",
-                    "non_retryable": False,
-                },
-            ),
-        ],
+class RaiseNexusOperationErrorFromApplicationErrorNonRetryableFromCustomError(
+    ErrorConversionTestCase
+):
+    name = (
+        "nexus_operation_error_from_application_error_non_retryable_from_custom_error"
     )
-)
+    expectation = [
+        (NexusOperationError, {}),
+        (
+            ApplicationError,
+            {
+                "message": "application-error-message",
+                "type": "application-error-type",
+                "non_retryable": True,
+            },
+        ),
+        (
+            ApplicationError,
+            {
+                "message": "Custom error 2",
+                "type": "io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException",
+                "non_retryable": False,
+            },
+        ),
+    ]
 
 
 class CustomError(Exception):
@@ -1581,43 +1523,29 @@ class ErrorTestCallerWorkflow:
             while err.__cause__:
                 errs.append(err.__cause__)
                 err = err.__cause__
-            actual = [ErrorConversionTestCase.parse_exception(err) for err in errs]
-            results = list(
-                zip_longest(
-                    self.test_cases[input.action_in_sync_op].java_behavior,
-                    actual,
-                    fillvalue=None,
-                )
+
+            test_case = self.test_cases[input.action_in_sync_op]
+            _print_comparison(
+                test_case.name,
+                errs,
+                test_case.expectation,
             )
-            print(f"""
 
-{input.action_in_sync_op}
-{'-' * 80}
-""")
-            for java_behavior, actual in results:  # type: ignore[assignment]
-                print(f"Java:   {java_behavior}")
-                print(f"Python: {actual}")
-                print()
-            print("-" * 80)
-            return None
+            assert len(errs) == len(test_case.expectation)
+            for err, (expected_cls, expected_fields) in zip(
+                errs, test_case.expectation
+            ):
+                assert isinstance(err, expected_cls)
+                for k, v in expected_fields.items():
+                    assert getattr(err, k) == v
 
-        assert False, "Unreachable"
+        else:
+            assert False, "Unreachable"
 
 
-@pytest.mark.parametrize(
-    "action_in_sync_op",
-    [
-        "application_error_non_retryable",
-        "custom_error",
-        "custom_error_from_custom_error",
-        "application_error_non_retryable_from_custom_error",
-        "nexus_handler_error_not_found",
-        "nexus_handler_error_not_found_from_custom_error",
-        "nexus_operation_error_from_application_error_non_retryable_from_custom_error",
-    ],
-)
+@pytest.mark.parametrize("test_case", error_conversion_test_cases)
 async def test_errors_raised_by_nexus_operation(
-    client: Client, action_in_sync_op: ActionInSyncOp
+    client: Client, test_case: type[ErrorConversionTestCase]
 ):
     task_queue = str(uuid.uuid4())
     async with Worker(
@@ -1631,11 +1559,54 @@ async def test_errors_raised_by_nexus_operation(
             ErrorTestCallerWorkflow.run,
             ErrorTestInput(
                 task_queue=task_queue,
-                action_in_sync_op=action_in_sync_op,
+                action_in_sync_op=test_case.name,
             ),
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
+
+
+def _print_comparison(
+    action_in_sync_op: ActionInSyncOp,
+    errs: list[BaseException],
+    expectation: list[tuple[type[Exception], dict[str, Any]]],
+):
+    def parse_exception(
+        exception: BaseException,
+    ) -> tuple[type[BaseException], dict[str, Any]]:
+        if isinstance(exception, NexusOperationError):
+            return NexusOperationError, {}
+        elif isinstance(exception, ApplicationError):
+            return ApplicationError, {
+                "message": exception.message,
+                "type": exception.type,
+                "non_retryable": exception.non_retryable,
+            }
+        elif isinstance(exception, nexusrpc.HandlerError):
+            return type(exception), {
+                "message": exception.message,
+                "type": exception.type,
+                "non_retryable": {True: False, False: True, None: None}[
+                    exception.retryable
+                ],
+            }
+        else:
+            raise TypeError(f"Unexpected exception type: {type(exception)}")
+
+    print(f"""
+
+{action_in_sync_op}
+{'-' * 80}
+""")
+    for e, o in zip_longest(
+        expectation,
+        [parse_exception(err) for err in errs],
+        fillvalue=None,
+    ):  # type: ignore[assignment]
+        print(f"Expected:  {e}")
+        print(f"Observed:  {o}")
+        print()
+    print("-" * 80)
 
 
 # Start timeout test
