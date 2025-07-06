@@ -1457,7 +1457,10 @@ class RaiseNexusOperationErrorFromApplicationErrorNonRetryableFromCustomError(
         (
             ApplicationError,
             {
-                "message": "application-error-message",
+                # TODO(nexus-preview) I expected this to be application-error-message,
+                # but the server replaces it with the top-level
+                # UnsuccessfulOperationError message.
+                "message": "operation-error-message",
                 "type": "application-error-type",
                 "non_retryable": True,
             },
