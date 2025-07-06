@@ -5837,6 +5837,7 @@ class _ClientImpl(OutboundInterceptor):
             )
             for callback in input.callbacks
         )
+        # TODO(nexus-prerelease) add links to callback
         req.links.extend(
             temporalio.api.common.v1.Link(workflow_event=link)
             for link in input.workflow_event_links

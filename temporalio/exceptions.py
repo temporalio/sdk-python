@@ -432,6 +432,8 @@ def is_cancelled_exception(exception: BaseException) -> bool:
             (
                 isinstance(exception, ActivityError)
                 or isinstance(exception, ChildWorkflowError)
+                # TODO(nexus-preview) test coverage
+                or isinstance(exception, NexusOperationError)
             )
             and isinstance(exception.cause, CancelledError)
         )
