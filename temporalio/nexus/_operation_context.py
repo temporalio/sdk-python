@@ -193,7 +193,7 @@ class WorkflowRunOperationContext(StartOperationContext):
         return self._temporal_context
 
     @classmethod
-    def from_start_operation_context(
+    def _from_start_operation_context(
         cls, ctx: StartOperationContext
     ) -> WorkflowRunOperationContext:
         return cls(

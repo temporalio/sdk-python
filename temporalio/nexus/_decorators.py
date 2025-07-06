@@ -117,7 +117,7 @@ def workflow_run_operation(
             ) -> WorkflowHandle[OutputT]:
                 return await start(
                     self,
-                    WorkflowRunOperationContext.from_start_operation_context(ctx),
+                    WorkflowRunOperationContext._from_start_operation_context(ctx),
                     input,
                 )
 

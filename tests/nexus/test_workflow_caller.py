@@ -168,7 +168,7 @@ class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
             # TODO(nexus-preview): what do we want the DX to be for a user who is
             # starting a Nexus backing workflow from a custom start method? (They may
             # need to do this in order to customize the cancel method).
-            tctx = WorkflowRunOperationContext.from_start_operation_context(ctx)
+            tctx = WorkflowRunOperationContext._from_start_operation_context(ctx)
             handle = await tctx.start_workflow(
                 HandlerWorkflow.run,
                 HandlerWfInput(op_input=input),
