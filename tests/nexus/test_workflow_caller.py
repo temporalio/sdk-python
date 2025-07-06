@@ -1267,11 +1267,38 @@ error_conversion_test_cases: list[ErrorConversionTestCase] = []
 # temporalio.api.nexus.v1.HandlerError(INTERNAL, RETRY_BEHAVIOR_NON_RETRYABLE, failure={
 #     message: "application-error-message",
 #     details: [
-#         HandlerFailureInfo(INTERNAL, non_retryable_behavior)
 #         ApplicationErrorInfo("application-error-type", non_retryable, "application-error-message")
 #     ]
 #   }
 # )
+#
+# The Python workflow receives a WFT containing a chain of length 3:
+# NexusOperationFailureInfo
+#     NexusHandlerFailureInfo
+#         ApplicationFailureInfo
+#
+# cause {
+#   message: "handler error (INTERNAL): application-error-message"
+#   cause {
+#     message: "application-error-message"
+#     stack_trace: "  File \"/Users/dan/src/temporalio/sdk-python/temporalio/worker/_nexus.py\", line 216, in _handle_start_operation_task\n    start_response = await self._start_operation(start_request, headers)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/dan/src/temporalio/sdk-python/temporalio/worker/_nexus.py\", line 282, in _start_operation\n    result = await self._handler.start_operation(ctx, input)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/dan/src/temporalio/nexus-sdk-python/src/nexusrpc/handler/_core.py\", line 302, in start_operation\n    return await op_handler.start(ctx, deserialized_input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/dan/src/temporalio/nexus-sdk-python/src/nexusrpc/handler/_operation_handler.py\", line 126, in start\n    return StartOperationResultSync(await self._start(ctx, input))\n                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/dan/src/temporalio/nexus-sdk-python/src/nexusrpc/handler/_decorators.py\", line 322, in asyncio_start\n    return await start_async(self, ctx, input)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n  File \"/Users/dan/src/temporalio/sdk-python/tests/nexus/test_workflow_caller.py\", line 1451, in op\n    raise ApplicationError(\n    ...<3 lines>...\n    )\n"
+#     application_failure_info {
+#       type: "application-error-type"
+#       non_retryable: true
+#     }
+#   }
+#   nexus_handler_failure_info {
+#     type: "INTERNAL"
+#     retry_behavior: NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+#   }
+# }
+# nexus_operation_execution_failure_info {
+#   scheduled_event_id: 5
+#   endpoint: "nexus-endpoint-b6b08d6f-cbc9-4cc5-9629-abcd7298584c"
+#   service: "ErrorTestService"
+#   operation: "op"
+# }
+
 error_conversion_test_cases.append(
     ErrorConversionTestCase(
         name="application_error_non_retryable",
