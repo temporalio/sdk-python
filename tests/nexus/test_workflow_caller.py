@@ -1410,14 +1410,7 @@ class ErrorTestCallerWorkflow:
     @workflow.run
     async def run(self, input: ErrorTestInput) -> None:
         try:
-            await self.nexus_client.execute_operation(
-                # TODO(nexus-prerelease): why wasn't this a type error?
-                #            ErrorTestService.op, ErrorTestCallerWfInput()
-                ErrorTestService.op,
-                # TODO(nexus-prerelease): why wasn't this a type error?
-                # None
-                input,
-            )
+            await self.nexus_client.execute_operation(ErrorTestService.op, input)
         except BaseException as err:
             errs = [err]
             while err.__cause__:
