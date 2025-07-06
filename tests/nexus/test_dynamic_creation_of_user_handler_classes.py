@@ -32,7 +32,7 @@ class MyIncrementOperationHandler(nexusrpc.handler.OperationHandler[int, int]):
         ctx: nexusrpc.handler.StartOperationContext,
         input: int,
     ) -> nexusrpc.handler.StartOperationResultAsync:
-        wrctx = nexus.WorkflowRunOperationContext.from_start_operation_context(ctx)
+        wrctx = nexus.WorkflowRunOperationContext._from_start_operation_context(ctx)
         wf_handle = await wrctx.start_workflow(
             MyWorkflow.run, input, id=str(uuid.uuid4())
         )
