@@ -1584,7 +1584,10 @@ class ErrorTestCallerWorkflow:
             ):
                 assert isinstance(err, expected_cls)
                 for k, v in expected_fields.items():
-                    assert getattr(err, k) == v
+                    if k == "message" and isinstance(err, nexusrpc.HandlerError):
+                        assert str(err) == v
+                    else:
+                        assert getattr(err, k) == v
 
         else:
             assert False, "Unreachable"
@@ -1637,7 +1640,7 @@ def _print_comparison(
             }
         elif isinstance(exception, nexusrpc.HandlerError):
             return type(exception), {
-                "message": exception.message,
+                "message": str(exception),
                 "type": exception.type,
                 "retryable": exception.retryable,
             }
@@ -1752,6 +1755,7 @@ class CancellationTimeoutTestCallerWorkflow:
 
     @workflow.run
     async def run(self) -> None:
+        # TODO(nexus-prerelease)
         op_handle = await self.nexus_client.start_operation(
             CancellationTimeoutTestService.op_with_cancel_method_that_never_returns,
             None,

@@ -386,9 +386,15 @@ class _NexusWorker:
         """
         retry_behavior = (
             temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
-            if handler_error.retryable is True
+            if (
+                handler_error.retry_behavior
+                == nexusrpc.HandlerErrorRetryBehavior.RETRYABLE
+            )
             else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
-            if handler_error.retryable is False
+            if (
+                handler_error.retry_behavior
+                == nexusrpc.HandlerErrorRetryBehavior.NON_RETRYABLE
+            )
             else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
         )
         return temporalio.api.nexus.v1.HandlerError(
@@ -423,7 +429,7 @@ class _DummyPayloadSerializer:
             raise nexusrpc.HandlerError(
                 "Data converter failed to decode Nexus operation input",
                 type=nexusrpc.HandlerErrorType.BAD_REQUEST,
-                retryable=False,
+                retry_behavior=nexusrpc.HandlerErrorRetryBehavior.NON_RETRYABLE,
             ) from err
 
 
@@ -438,7 +444,11 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
             # TODO(nexus-preview): confirm what we want as message here
             err.message,
             type=nexusrpc.HandlerErrorType.INTERNAL,
-            retryable=not err.non_retryable,
+            retry_behavior=(
+                nexusrpc.HandlerErrorRetryBehavior.NON_RETRYABLE
+                if err.non_retryable
+                else nexusrpc.HandlerErrorRetryBehavior.RETRYABLE
+            ),
         )
     elif isinstance(err, RPCError):
         if err.status == RPCStatusCode.INVALID_ARGUMENT:
@@ -454,7 +464,7 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
             handler_err = nexusrpc.HandlerError(
                 err.message,
                 type=nexusrpc.HandlerErrorType.INTERNAL,
-                retryable=False,
+                retry_behavior=nexusrpc.HandlerErrorRetryBehavior.NON_RETRYABLE,
             )
         elif err.status in [RPCStatusCode.ABORTED, RPCStatusCode.UNAVAILABLE]:
             handler_err = nexusrpc.HandlerError(
