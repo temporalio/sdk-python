@@ -119,51 +119,6 @@ class RaiseApplicationErrorNonRetryable(ErrorConversionTestCase):
     ]
 
 
-# TODO: this is retried; how should this scenario be tested?
-#
-# class RaiseCustomError(ErrorConversionTestCase):
-#     @staticmethod
-#     def action_in_nexus_operation():
-#         raise CustomError("custom-error-message")
-#
-#     expected_exception_chain_in_workflow = [
-#         (
-#             NexusOperationError,
-#             {
-#                 "service": "ErrorTestService",
-#                 "message": "nexus operation completed unsuccessfully",
-#             },
-#         ),
-#         (
-#             nexusrpc.HandlerError,
-#             {
-#                 "message": "handler error (INTERNAL): custom-error-mesage",
-#                 "type": nexusrpc.HandlerErrorType.INTERNAL,
-#                 "retryable": True,
-#             },
-#         ),
-#         (
-#             ApplicationError,
-#             {
-#                 "message": "custom-error-message",
-#                 "type": "CustomError",
-#                 "retryable": True,
-#             },
-#         ),
-#     ]
-
-
-# class RaiseCustomErrorFromCustomError(ErrorConversionTestCase):
-#     @staticmethod
-#     def action_in_nexus_operation():
-#         try:
-#             raise CustomError("custom-error-message-2")
-#         except CustomError as err:
-#             raise CustomError("custom-error-message") from err
-
-#     expected_exception_chain_in_workflow = []
-
-
 class RaiseApplicationErrorNonRetryableFromCustomError(ErrorConversionTestCase):
     @staticmethod
     def action_in_nexus_operation():
