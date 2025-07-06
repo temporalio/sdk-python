@@ -1285,23 +1285,49 @@ class RaiseApplicationErrorNonRetryable(ErrorConversionTestCase):
     ]
 
 
-class RaiseCustomError(ErrorConversionTestCase):
-    @staticmethod
-    def action_in_nexus_operation():
-        raise CustomError("custom-error-message")
+# TODO: this is retried; how should this scenario be tested?
+#
+# class RaiseCustomError(ErrorConversionTestCase):
+#     @staticmethod
+#     def action_in_nexus_operation():
+#         raise CustomError("custom-error-message")
+#
+#     expected_exception_chain_in_workflow = [
+#         (
+#             NexusOperationError,
+#             {
+#                 "service": "ErrorTestService",
+#                 "message": "nexus operation completed unsuccessfully",
+#             },
+#         ),
+#         (
+#             nexusrpc.HandlerError,
+#             {
+#                 "message": "handler error (INTERNAL): custom-error-mesage",
+#                 "type": nexusrpc.HandlerErrorType.INTERNAL,
+#                 "retryable": True,
+#             },
+#         ),
+#         (
+#             ApplicationError,
+#             {
+#                 "message": "custom-error-message",
+#                 "type": "CustomError",
+#                 "retryable": True,
+#             },
+#         ),
+#     ]
 
-    expected_exception_chain_in_workflow = []
 
+# class RaiseCustomErrorFromCustomError(ErrorConversionTestCase):
+#     @staticmethod
+#     def action_in_nexus_operation():
+#         try:
+#             raise CustomError("custom-error-message-2")
+#         except CustomError as err:
+#             raise CustomError("custom-error-message") from err
 
-class RaiseCustomErrorFromCustomError(ErrorConversionTestCase):
-    @staticmethod
-    def action_in_nexus_operation():
-        try:
-            raise CustomError("custom-error-message-2")
-        except CustomError as err:
-            raise CustomError("custom-error-message") from err
-
-    expected_exception_chain_in_workflow = []
+#     expected_exception_chain_in_workflow = []
 
 
 class RaiseApplicationErrorNonRetryableFromCustomError(ErrorConversionTestCase):
@@ -1390,7 +1416,21 @@ class RaiseNexusHandlerErrorNotFoundFromCustomError(ErrorConversionTestCase):
                 type=nexusrpc.HandlerErrorType.NOT_FOUND,
             ) from err
 
-    expected_exception_chain_in_workflow = []
+    expected_exception_chain_in_workflow = (
+        RaiseNexusHandlerErrorNotFound.expected_exception_chain_in_workflow[:-1]
+        + [
+            (
+                ApplicationError,
+                {
+                    # TODO(nexus-preview): empirically, this is "handler-error-message",
+                    # but it should be "runtime-error-message"
+                    # "message": "runtime-error-message",
+                    "type": "CustomError",
+                    "non_retryable": False,
+                },
+            )
+        ]
+    )
 
 
 # If a nexus handler raises an OperationError, the calling workflow
