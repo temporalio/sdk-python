@@ -1334,6 +1334,13 @@ class RaiseApplicationErrorNonRetryableFromCustomError(ErrorConversionTestCase):
 class RaiseNexusHandlerErrorNotFound(ErrorConversionTestCase):
     @staticmethod
     def action_in_nexus_operation():
+        # Java equivalent:
+        # throw new HandlerException(HandlerException.ErrorType.NOT_FOUND, "handler-error-message")
+        # which uses the following constructor:
+        #   public HandlerException(ErrorType errorType, String message) {
+        #     this(errorType, new RuntimeException(message), RetryBehavior.UNSPECIFIED);
+        #   }
+
         try:
             raise RuntimeError("runtime-error-message")
         except RuntimeError as err:
@@ -1342,21 +1349,81 @@ class RaiseNexusHandlerErrorNotFound(ErrorConversionTestCase):
                 type=nexusrpc.HandlerErrorType.NOT_FOUND,
             ) from err
 
+    # Java sends NexusTaskFailed:
+    #
+    #   "error": {
+    #     "errorType": "NOT_FOUND",
+    #     "failure": {
+    #       "details": "...",
+    #       "message": "handler-error-message",
+    #       "metadata": {
+    #         "type": "temporal.api.failure.v1.Failure"
+    #       },
+    #       "details__xrayUnmarshaled": {
+    #         "source": "JavaSDK",
+    #         "stackTrace": "io.nexusrpc.handler.HandlerException.<init>(HandlerException.java:38)\nio.temporal.samples.nexus.handler.NexusServiceImpl.lambda$testError$2(NexusServiceImpl.java:84)\nio.nexusrpc.handler.SynchronousOperationHandler.start(SynchronousOperationHandler.java:19)\nio.temporal.internal.nexus.RootNexusOperationInboundCallsInterceptor.startOperation(RootNexusOperationInboundCallsInterceptor.java:25)\nio.temporal.internal.nexus.TemporalInterceptorMiddleware$OperationInterceptorConverter.start(TemporalInterceptorMiddleware.java:45)\nio.nexusrpc.handler.ServiceHandler.startOperation(ServiceHandler.java:87)\nio.temporal.internal.nexus.NexusTaskHandlerImpl.startOperation(NexusTaskHandlerImpl.java:227)\nio.temporal.internal.nexus.NexusTaskHandlerImpl.handleStartOperation(NexusTaskHandlerImpl.java:270)\nio.temporal.internal.nexus.NexusTaskHandlerImpl.handle(NexusTaskHandlerImpl.java:118)\nio.temporal.internal.worker.NexusWorker$TaskHandlerImpl.handleNexusTask(NexusWorker.java:283)\nio.temporal.internal.worker.NexusWorker$TaskHandlerImpl.handle(NexusWorker.java:260)\nio.temporal.internal.worker.NexusWorker$TaskHandlerImpl.handle(NexusWorker.java:209)\nio.temporal.internal.worker.PollTaskExecutor.lambda$process$1(PollTaskExecutor.java:76)\njava.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)\njava.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)\njava.base/java.lang.Thread.run(Thread.java:840)\n",
+    #         "applicationFailureInfo": {
+    #           "type": "java.lang.RuntimeException"
+    #         }
+    #       }
+    #     }
+    #   },
+    #
+    # Which results in this hydrated exception chain:
+    # io.temporal.failure.NexusOperationFailure(message="Nexus Operation with operation='testErrorservice='NexusService' endpoint='my-nexus-endpoint-name' failed: 'nexus operation completed unsuccessfully'. scheduledEventId=5, operationToken=", scheduledEventId=scheduledEventId, operationToken="operationToken")
+    #     io.nexusrpc.handler.HandlerException(message="handler error: message='handler-error-message', type='java.lang.RuntimeException', nonRetryable=false", type="NOT_FOUND", nonRetryable=true)
+    #         io.temporal.failure.ApplicationFailure(message="handler-error-message", type="java.lang.RuntimeException", nonRetryable=false)
+
+    # Empricially, Python (core) is sending the exact same thing:
+    # RespondNexusTaskFailedRequest
+    # {
+    #   "error": {
+    #     "errorType": "NOT_FOUND",
+    #     "failure": {
+    #       "details": "...",
+    #       "message": "handler-error-message",
+    #       "metadata": {
+    #         "type": "temporal.api.failure.v1.Failure"
+    #       },
+    #       "details__xrayUnmarshaled": {
+    #         "message": "runtime-error-message",
+    #         "stackTrace": "  File \"/Users/dan/src/temporalio/sdk-python/tests/nexus/test_workflow_caller.py\", line 1338, in action_in_nexus_operation\n    raise RuntimeError(\"runtime-error-message\")\n",
+    #         "applicationFailureInfo": {
+    #           "type": "RuntimeError"
+    #         }
+    #       }
+    #     }
+    #   },
+
     expected_exception_chain_in_workflow = [
-        (NexusOperationError, {}),
+        (
+            NexusOperationError,
+            {
+                "service": "ErrorTestService",
+                "message": "nexus operation completed unsuccessfully",
+            },
+        ),
         (
             nexusrpc.HandlerError,
             {
-                "message": "handler error: message='Handler error 1', type='java.lang.RuntimeException', nonRetryable=false",
-                "type": "NOT_FOUND",
-                "non_retryable": True,
+                # In this test case the user code raised HandlerError directly, so there
+                # was no need to synthesize a wrapping HandlerError The server prepends
+                # 'handler error (INTERNAL):'
+                "message": "handler error (NOT_FOUND): handler-error-message",
+                "type": nexusrpc.HandlerErrorType.NOT_FOUND,
+                # The following HandlerError types should be considered non-retryable:
+                # BAD_REQUEST, UNAUTHENTICATED, UNAUTHORIZED, NOT_FOUND, and
+                # RESOURCE_EXHAUSTED In this test case, the handler does not set the
+                # retryable flag in the HandlerError sent to the server. This value is
+                # computed by the retryable property on HandlerError.
+                "retryable": False,
             },
         ),
         (
             ApplicationError,
             {
-                "message": "Handler error 1",
-                "type": "java.lang.RuntimeException",
+                "message": "runtime-error-message",
+                "type": "RuntimeError",
                 "non_retryable": False,
             },
         ),
