@@ -5,7 +5,6 @@ import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import IntEnum
-from itertools import zip_longest
 from typing import Any, Awaitable, Callable, Union
 
 import nexusrpc
@@ -158,7 +157,6 @@ class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
         StartOperationResultAsync,
     ]:
         if input.response_type.exception_in_operation_start:
-            # TODO(nexus-prerelease): don't think RPCError should be used here
             raise RPCError(
                 "RPCError INVALID_ARGUMENT in Nexus operation",
                 RPCStatusCode.INVALID_ARGUMENT,
@@ -1561,12 +1559,6 @@ class ErrorTestCallerWorkflow:
                 err = err.__cause__
 
             test_case = error_conversion_test_cases[input.name]
-            _print_comparison(
-                test_case.__name__,
-                errs,
-                test_case.expected_exception_chain_in_workflow,
-            )
-
             assert len(errs) == len(test_case.expected_exception_chain_in_workflow)
             for err, (expected_cls, expected_fields) in zip(
                 errs, test_case.expected_exception_chain_in_workflow
@@ -1603,53 +1595,6 @@ async def test_errors_raised_by_nexus_operation(
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
-
-
-def _print_comparison(
-    test_case_name: str,
-    errs: list[BaseException],
-    expectation: list[tuple[type[Exception], dict[str, Any]]],
-):
-    def parse_exception(
-        exception: BaseException,
-    ) -> tuple[type[BaseException], dict[str, Any]]:
-        if isinstance(exception, NexusOperationError):
-            return NexusOperationError, {
-                "message": exception.message,
-                "service": exception.service,
-                "operation": exception.operation,
-                "operation_token": exception.operation_token,
-                "scheduled_event_id": exception.scheduled_event_id,
-            }
-        elif isinstance(exception, ApplicationError):
-            return ApplicationError, {
-                "message": exception.message,
-                "type": exception.type,
-                "non_retryable": exception.non_retryable,
-            }
-        elif isinstance(exception, nexusrpc.HandlerError):
-            return type(exception), {
-                "message": str(exception),
-                "type": exception.type,
-                "retryable": exception.retryable,
-            }
-        else:
-            raise TypeError(f"Unexpected exception type: {type(exception)}")
-
-    print(f"""
-
-{test_case_name}
-{'-' * 80}
-""")
-    for e, o in zip_longest(
-        expectation,
-        [parse_exception(err) for err in errs],
-        fillvalue=None,
-    ):  # type: ignore[assignment]
-        print(f"Expected:  {e}")
-        print(f"Observed:  {o}")
-        print()
-    print("-" * 80)
 
 
 # Start timeout test
