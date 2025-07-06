@@ -451,7 +451,7 @@ class WorkflowRunOperationContext(StartOperationContext):
         return WorkflowHandle[ReturnType]._unsafe_from_client_workflow_handle(wf_handle)
 
 
-@dataclass
+@dataclass(frozen=True)
 class _TemporalCancelOperationContext:
     """
     Context for a Nexus cancel operation being handled by a Temporal Nexus Worker.
@@ -490,9 +490,8 @@ def _workflow_handle_to_workflow_execution_started_event_link(
         workflow_id=handle.id,
         run_id=handle.first_execution_run_id,
         event_ref=temporalio.api.common.v1.Link.WorkflowEvent.EventReference(
-            # TODO(nexus-prerelease): confirm that it is correct not to use event_id.
-            # Should the proto say explicitly that it's optional or how it behaves when it's missing?
-            event_type=temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+            event_id=1,
+            event_type=temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED,
         ),
         # TODO(nexus-prerelease): RequestIdReference?
     )
