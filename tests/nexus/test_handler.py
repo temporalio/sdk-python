@@ -45,7 +45,6 @@ from nexusrpc.handler import (
     sync_operation,
 )
 from nexusrpc.handler._decorators import operation_handler
-from nexusrpc.syncio.handler import sync_operation as syncio_sync_operation
 
 from temporalio import nexus, workflow
 from temporalio.client import Client
@@ -904,7 +903,7 @@ class EchoService:
 
 @service_handler(service=EchoService)
 class SyncStartHandler:
-    @syncio_sync_operation
+    @sync_operation
     def echo(self, ctx: StartOperationContext, input: Input) -> Output:
         assert ctx.headers["test-header-key"] == "test-header-value"
         ctx.outbound_links.extend(ctx.inbound_links)
@@ -956,7 +955,7 @@ class SyncHandlerNoExecutor(_InstantiationCase):
     handler = SyncStartHandler
     executor = False
     exception = RuntimeError
-    match = "Use nexusrpc.syncio.handler.Handler instead"
+    match = "Use nexusrpc._syncio.handler.Handler instead"
 
 
 class DefaultCancel(_InstantiationCase):
@@ -969,7 +968,7 @@ class SyncCancel(_InstantiationCase):
     handler = SyncCancelHandler
     executor = False
     exception = RuntimeError
-    match = "Use nexusrpc.syncio.handler.Handler instead"
+    match = "Use nexusrpc._syncio.handler.Handler instead"
 
 
 @pytest.mark.parametrize(
