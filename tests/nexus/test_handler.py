@@ -187,7 +187,7 @@ class MyServiceHandler:
         raise HandlerError(
             message="deliberate internal handler error",
             type=HandlerErrorType.INTERNAL,
-            retryable=False,
+            retry_behavior=nexusrpc.HandlerErrorRetryBehavior.NON_RETRYABLE,
         ) from RuntimeError("cause message")
 
     @sync_operation
@@ -321,11 +321,11 @@ class SuccessfulResponse:
 @dataclass
 class UnsuccessfulResponse:
     status_code: int
-    # Expected value of Nexus-Request-Retryable header
-    retryable_header: Optional[bool]
     failure_message: Union[str, Callable[[str], bool]]
     # Is the Nexus Failure expected to have the details field populated?
     failure_details: bool = True
+    # Expected value of Nexus-Request-Retryable header
+    retryable_header: Optional[bool] = None
     # Expected value of inverse of non_retryable attribute of exception.
     retryable_exception: bool = True
     body_json: Optional[Callable[[dict[str, Any]], bool]] = None
@@ -382,12 +382,11 @@ class _FailureTestCase(_TestCase):
             assert cls.expected.failure_message(failure.message)
 
         # retryability assertions
-        if (
-            retryable_header := response.headers.get("nexus-request-retryable")
-        ) is not None:
+        if cls.expected.retryable_header is not None:
+            assert (
+                retryable_header := response.headers.get("nexus-request-retryable")
+            ) is not None
             assert json.loads(retryable_header) == cls.expected.retryable_header
-        else:
-            assert cls.expected.retryable_header is None
 
         if cls.expected.failure_details:
             assert (
@@ -483,7 +482,6 @@ class OperationHandlerReturningUnwrappedResultError(_FailureTestCase):
     operation = "operation_returning_unwrapped_result_at_runtime_error"
     expected = UnsuccessfulResponse(
         status_code=500,
-        retryable_header=False,
         failure_message=(
             "Operation start method must return either "
             "nexusrpc.handler.StartOperationResultSync or "
