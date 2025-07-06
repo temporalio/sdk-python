@@ -14,6 +14,7 @@ from typing import (
     Optional,
     Sequence,
     Type,
+    Union,
 )
 
 import google.protobuf.json_format
@@ -312,51 +313,30 @@ class _NexusWorker:
                 operation_error=await self._operation_error_to_proto(err),
             )
 
-    async def _exception_to_nexus_failure_proto(
+    async def _nexus_error_to_nexus_failure_proto(
         self,
-        err: BaseException,
+        error: Union[nexusrpc.HandlerError, nexusrpc.OperationError],
     ) -> temporalio.api.nexus.v1.Failure:
         """
-        Serialize ``err`` as a Nexus Failure proto.
+        Serialize ``error`` as a Nexus Failure proto.
+
+        The Nexus Failure represents the top-level error. If there is a cause chain
+        attached to the exception, then serialize it as the ``details``.
+
+        Notice that any stack trace attached to ``error`` itself is not included in the
+        result.
 
         See https://github.com/nexus-rpc/api/blob/main/SPEC.md#failure
         """
-        try:
-            api_failure = temporalio.api.failure.v1.Failure()
-            await self._data_converter.encode_failure(err, api_failure)
-            _api_failure = google.protobuf.json_format.MessageToDict(api_failure)
-            return temporalio.api.nexus.v1.Failure(
-                message=_api_failure.pop("message", ""),
-                metadata={"type": _TEMPORAL_FAILURE_PROTO_TYPE},
-                details=json.dumps(_api_failure, separators=(",", ":")).encode("utf-8"),
-            )
-        except BaseException as err:
-            return temporalio.api.nexus.v1.Failure(
-                message=f"{err.__class__.__name__}: {err}",
-                metadata={"type": _TEMPORAL_FAILURE_PROTO_TYPE},
-            )
-
-    async def _handler_error_to_nexus_failure_proto(
-        self,
-        handler_error: nexusrpc.HandlerError,
-    ) -> temporalio.api.nexus.v1.Failure:
-        """
-        Serialize ``handler_error`` as a Nexus Failure proto.
-
-        The Nexus Failure represents the top-level HandlerError. If there is a cause
-        chain attached to the HandlerError, then serialize it as the ``details``.
-
-        See https://github.com/nexus-rpc/api/blob/main/SPEC.md#failure
-        """
-        message = str(handler_error)
-        if cause := handler_error.__cause__:
+        message = str(error)
+        if cause := error.__cause__:
             try:
                 failure = temporalio.api.failure.v1.Failure()
                 await self._data_converter.encode_failure(cause, failure)
                 # Note that Java removes the message from the first item in the details
-                # chain, since in Java's case HandlerException does not have its own
+                # chain, since in Java's case the nexus exception does not have its own
                 # message. In the case of Python however, the top-level message belongs
-                # to the HandlerError itself and so is distinct.
+                # to the nexus exception itself and so is distinct.
                 return temporalio.api.nexus.v1.Failure(
                     message=message,
                     metadata={"type": _TEMPORAL_FAILURE_PROTO_TYPE},
@@ -366,7 +346,7 @@ class _NexusWorker:
                     ).encode("utf-8"),
                 )
             except BaseException:
-                logger.exception("Failed to serialize cause chain of HandlerError")
+                logger.exception("Failed to serialize cause chain of nexus exception")
         return temporalio.api.nexus.v1.Failure(
             message=message,
             metadata={},
@@ -379,7 +359,7 @@ class _NexusWorker:
     ) -> temporalio.api.nexus.v1.UnsuccessfulOperationError:
         return temporalio.api.nexus.v1.UnsuccessfulOperationError(
             operation_state=err.state.value,
-            failure=await self._exception_to_nexus_failure_proto(err),
+            failure=await self._nexus_error_to_nexus_failure_proto(err),
         )
 
     async def _handler_error_to_proto(
@@ -397,7 +377,7 @@ class _NexusWorker:
         )
         return temporalio.api.nexus.v1.HandlerError(
             error_type=handler_error.type.value,
-            failure=await self._handler_error_to_nexus_failure_proto(handler_error),
+            failure=await self._nexus_error_to_nexus_failure_proto(handler_error),
             retry_behavior=retry_behavior,
         )
 
