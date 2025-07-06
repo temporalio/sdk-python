@@ -1255,14 +1255,20 @@ class RaiseApplicationErrorNonRetryable(ErrorConversionTestCase):
         )
 
     expected_exception_chain_in_workflow = [
-        (NexusOperationError, {}),
+        (
+            NexusOperationError,
+            {
+                "service": "ErrorTestService",
+                "message": "nexus operation completed unsuccessfully",
+            },
+        ),
         (
             nexusrpc.HandlerError,
             {
-                # In this test case the user code raised ApplicationError directly,
-                # and a wrapping HandlerError was synthesized with the same error
-                # message as that of the ApplicationError. I believe the server
-                # prepends 'handler error (INTERNAL):'
+                # In this test case the user code raised ApplicationError directly, and
+                # a wrapping HandlerError was synthesized with the same error message as
+                # that of the ApplicationError. The server prepends 'handler error
+                # (INTERNAL):'
                 "message": "handler error (INTERNAL): application-error-message",
                 "type": nexusrpc.HandlerErrorType.INTERNAL,
                 "retryable": False,
@@ -1310,33 +1316,19 @@ class RaiseApplicationErrorNonRetryableFromCustomError(ErrorConversionTestCase):
                 non_retryable=True,
             ) from err
 
-    expected_exception_chain_in_workflow = [
-        (NexusOperationError, {}),
-        (
-            nexusrpc.HandlerError,
-            {
-                "message": "handler error: message='application-error-message', type='application-error-type', nonRetryable=true",
-                "type": "INTERNAL",
-                "non_retryable": True,
-            },
-        ),
-        (
-            ApplicationError,
-            {
-                "message": "application-error-message",
-                "type": "application-error-type",
-                "non_retryable": True,
-            },
-        ),
-        (
-            ApplicationError,
-            {
-                "message": "Custom error 2",
-                "type": "io.temporal.samples.nexus.handler.NexusServiceImpl$MyCustomException",
-                "non_retryable": False,
-            },
-        ),
-    ]
+    expected_exception_chain_in_workflow = (
+        RaiseApplicationErrorNonRetryable.expected_exception_chain_in_workflow
+        + [
+            (
+                ApplicationError,
+                {
+                    "message": "custom-error-message",
+                    "type": "CustomError",
+                    "non_retryable": False,
+                },
+            ),
+        ]
+    )
 
 
 class RaiseNexusHandlerErrorNotFound(ErrorConversionTestCase):
