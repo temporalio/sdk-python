@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import uuid
 from dataclasses import dataclass
-from datetime import timedelta
 from enum import IntEnum
 from typing import Any, Awaitable, Callable, Union
 
@@ -43,10 +42,8 @@ from temporalio.client import (
 )
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.exceptions import (
-    ApplicationError,
     CancelledError,
     NexusOperationError,
-    TimeoutError,
 )
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.service import RPCError, RPCStatusCode
@@ -945,6 +942,7 @@ class WorkflowCallingNexusOperationThatExecutesWorkflowBeforeStartingBackingWork
             endpoint=make_nexus_endpoint_name(task_queue),
             service=ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow,
         )
+
         return await nexus_client.execute_operation(
             ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow.my_workflow_run_operation,
             None,
@@ -1184,6 +1182,7 @@ class OverloadTestCallerWorkflow:
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
             service=OverloadTestServiceHandler,
         )
+
         if op == "no_param":
             return await nexus_client.execute_operation(
                 OverloadTestServiceHandler.no_param, input
