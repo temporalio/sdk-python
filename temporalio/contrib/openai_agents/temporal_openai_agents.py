@@ -1,6 +1,7 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
 from contextlib import contextmanager
+from typing import Optional
 
 from agents import set_trace_provider
 from agents.run import get_default_agent_runner, set_default_agent_runner
@@ -16,7 +17,7 @@ from temporalio.contrib.openai_agents.model_parameters import ModelActivityParam
 
 @contextmanager
 def set_open_ai_agent_temporal_overrides(
-    model_params: ModelActivityParameters,
+    model_params: Optional[ModelActivityParameters] = None,
     auto_close_tracing_in_workflows: bool = False,
 ):
     """Configure Temporal-specific overrides for OpenAI agents.
@@ -43,6 +44,9 @@ def set_open_ai_agent_temporal_overrides(
         A context manager that yields the configured TemporalTraceProvider.
 
     """
+    if model_params is None:
+        model_params = ModelActivityParameters()
+
     if (
         not model_params.start_to_close_timeout
         and not model_params.schedule_to_close_timeout
