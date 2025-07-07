@@ -945,9 +945,9 @@ class DefaultFailureConverter(FailureConverter):
         failure.nexus_handler_failure_info.type = error.type.name
         failure.nexus_handler_failure_info.retry_behavior = temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.ValueType(
             temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
-            if error.retryable is True
+            if error.retry_behavior == nexusrpc.HandlerErrorRetryBehavior.RETRYABLE
             else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
-            if error.retryable is False
+            if error.retry_behavior == nexusrpc.HandlerErrorRetryBehavior.NON_RETRYABLE
             else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
         )
 
