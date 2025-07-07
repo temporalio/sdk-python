@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import concurrent.futures
 from collections.abc import Callable, Mapping, MutableMapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
     Any,
@@ -301,38 +301,38 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
     headers: Optional[Mapping[str, str]]
     output_type: Optional[Type[OutputT]] = None
 
-    _operation_name: str = field(init=False, repr=False)
-    _input_type: Optional[Type[InputT]] = field(init=False, repr=False)
-
     def __post_init__(self) -> None:
         if isinstance(self.operation, nexusrpc.Operation):
-            self._operation_name = self.operation.name
-            self._input_type = self.operation.input_type
             self.output_type = self.operation.output_type
-        elif isinstance(self.operation, str):
-            self._operation_name = self.operation
-            self._input_type = None
         elif callable(self.operation):
             _, op = temporalio.nexus._util.get_operation_factory(self.operation)
             if isinstance(op, nexusrpc.Operation):
-                self._operation_name = op.name
-                self._input_type = op.input_type
                 self.output_type = op.output_type
+            else:
+                raise ValueError(
+                    f"Operation callable is not a Nexus operation: {self.operation}"
+                )
+        elif isinstance(self.operation, str):
+            pass
+        else:
+            raise ValueError(f"Operation is not a Nexus operation: {self.operation}")
+
+    @property
+    def operation_name(self) -> str:
+        if isinstance(self.operation, nexusrpc.Operation):
+            return self.operation.name
+        elif isinstance(self.operation, str):
+            return self.operation
+        elif callable(self.operation):
+            _, op = temporalio.nexus._util.get_operation_factory(self.operation)
+            if isinstance(op, nexusrpc.Operation):
+                return op.name
             else:
                 raise ValueError(
                     f"Operation callable is not a Nexus operation: {self.operation}"
                 )
         else:
             raise ValueError(f"Operation is not a Nexus operation: {self.operation}")
-
-    @property
-    def operation_name(self) -> str:
-        return self._operation_name
-
-    # TODO(nexus-preview) contravariant type in output
-    @property
-    def input_type(self) -> Optional[Type[InputT]]:
-        return self._input_type
 
 
 @dataclass
