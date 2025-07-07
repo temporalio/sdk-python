@@ -865,11 +865,14 @@ class _WorkflowInstanceImpl(
             # `ResolveNexusOperation` job will be in the same activation.
             handle._resolve_start_success(None)
         elif job.HasField("cancelled_before_start"):
-            # The operation was cancelled before it was ever sent to server (same WFT).
-            # Note that core will still send a `ResolveNexusOperation` job in the same
-            # activation, so there does not need to be an exceptional case for this in
-            # lang.
-            # TODO(nexus-preview): confirm appropriate to take no action here
+            # From proto docs: the operation was cancelled before it was ever
+            # sent to server (same WFT). Note that core will still send a
+            # `ResolveNexusOperation` job in the same activation, so there does
+            # not need to be an exceptional case for this in lang.
+            #
+            # We do not resolve start here because it will be resolved in the by
+            # handle._resolve_failure when handling the follow-up
+            # ResolveNexusOperation from core.
             pass
         else:
             raise ValueError(f"Unknown Nexus operation start status: {job}")
