@@ -1,21 +1,17 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
 from contextlib import contextmanager
-from datetime import timedelta
-from typing import Optional
 
 from agents import set_trace_provider
 from agents.run import get_default_agent_runner, set_default_agent_runner
 from agents.tracing import get_trace_provider
 from agents.tracing.provider import DefaultTraceProvider
 
-from temporalio.common import Priority, RetryPolicy
 from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
     TemporalTraceProvider,
 )
 from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
-from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 
 @contextmanager
@@ -41,6 +37,7 @@ def set_open_ai_agent_temporal_overrides(
 
     Args:
         model_params: Configuration parameters for Temporal activity execution of model calls.
+        auto_close_tracing_in_workflows: If set to true, close tracing spans immediately.
 
     Returns:
         A context manager that yields the configured TemporalTraceProvider.
