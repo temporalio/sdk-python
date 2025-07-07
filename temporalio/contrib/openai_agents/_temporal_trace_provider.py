@@ -7,7 +7,10 @@ from agents import SpanData, Trace, TracingProcessor
 from agents.tracing import (
     get_trace_provider,
 )
-from agents.tracing.provider import DefaultTraceProvider
+from agents.tracing.provider import (
+    DefaultTraceProvider,
+    SynchronousMultiTracingProcessor,
+)
 from agents.tracing.spans import Span
 
 from temporalio import workflow
@@ -72,10 +75,19 @@ def activity_span(
     )
 
 
-class _TemporalTracingProcessor(TracingProcessor):
-    def __init__(self, impl: TracingProcessor):
+class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
+    def __init__(
+        self, impl: SynchronousMultiTracingProcessor, auto_close_in_workflows: bool
+    ):
         super().__init__()
         self._impl = impl
+        self._auto_close_in_workflows = auto_close_in_workflows
+
+    def add_tracing_processor(self, tracing_processor: TracingProcessor):
+        self._impl.add_tracing_processor(tracing_processor)
+
+    def set_processors(self, processors: list[TracingProcessor]):
+        self._impl.set_processors(processors)
 
     def on_trace_start(self, trace: Trace) -> None:
         if workflow.in_workflow() and workflow.unsafe.is_replaying():
@@ -83,10 +95,14 @@ class _TemporalTracingProcessor(TracingProcessor):
             return
 
         self._impl.on_trace_start(trace)
+        if self._auto_close_in_workflows and workflow.in_workflow():
+            self._impl.on_trace_end(trace)
 
     def on_trace_end(self, trace: Trace) -> None:
         if workflow.in_workflow() and workflow.unsafe.is_replaying():
             # In replay mode, don't report
+            return
+        if self._auto_close_in_workflows and workflow.in_workflow():
             return
 
         self._impl.on_trace_end(trace)
@@ -97,11 +113,16 @@ class _TemporalTracingProcessor(TracingProcessor):
             return
 
         self._impl.on_span_start(span)
+        if self._auto_close_in_workflows and workflow.in_workflow():
+            self._impl.on_span_end(span)
 
     def on_span_end(self, span: Span[Any]) -> None:
         if workflow.in_workflow() and workflow.unsafe.is_replaying():
             # In replay mode, don't report
             return
+        if self._auto_close_in_workflows and workflow.in_workflow():
+            return
+
         self._impl.on_span_end(span)
 
     def shutdown(self) -> None:
@@ -114,12 +135,13 @@ class _TemporalTracingProcessor(TracingProcessor):
 class TemporalTraceProvider(DefaultTraceProvider):
     """A trace provider that integrates with Temporal workflows."""
 
-    def __init__(self):
+    def __init__(self, auto_close_in_workflows: bool = False):
         """Initialize the TemporalTraceProvider."""
         super().__init__()
         self._original_provider = cast(DefaultTraceProvider, get_trace_provider())
-        self._multi_processor = _TemporalTracingProcessor(  # type: ignore[assignment]
-            self._original_provider._multi_processor
+        self._multi_processor = _TemporalTracingProcessor(
+            self._original_provider._multi_processor,
+            auto_close_in_workflows,
         )
 
     def time_iso(self) -> str:
