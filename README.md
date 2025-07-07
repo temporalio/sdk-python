@@ -1310,6 +1310,18 @@ affect calls activity code might make to functions on the `temporalio.activity` 
 * `worker_shutdown()` can be invoked to simulate a worker shutdown during execution of the activity
 
 
+### Nexus
+
+⚠️  **Nexus support is currently at an experimental release stage. Backwards-incompatible changes are anticipated until a stable release of Nexus support is announced.** ⚠️
+
+#### What is Nexus?
+
+[Nexus](https://github.com/nexus-rpc/) itself is a synchronous RPC protocol. Arbitrary duration operations that can
+respond asynchronously are modeled on top of a set of pre-defined synchronous RPCs. The Temporal Python SDK supports
+defining Nexus operations that can be called from a workflow.
+
+TODO
+
 ### Workflow Replay
 
 Given a workflow's history, it can be replayed locally to check for things like non-determinism errors. For example,
