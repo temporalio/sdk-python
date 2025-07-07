@@ -8011,8 +8011,6 @@ async def test_quick_activity_swallows_cancellation(client: Client):
         activities=[short_activity_async],
         activity_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1),
     ) as worker:
-        temporalio.worker._workflow_instance._raise_on_cancelling_completed_activity_override = True
-
         for i in range(10):
             wf_duration = random.uniform(5.0, 15.0)
             wf_handle = await client.start_workflow(
@@ -8033,8 +8031,6 @@ async def test_quick_activity_swallows_cancellation(client: Client):
 
             assert isinstance(cause, CancelledError)
             assert cause.message == "Workflow cancelled"
-
-        temporalio.worker._workflow_instance._raise_on_cancelling_completed_activity_override = False
 
 
 async def test_workflow_logging_trace_identifier(client: Client):
