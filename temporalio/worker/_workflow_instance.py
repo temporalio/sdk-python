@@ -3049,15 +3049,14 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
             self._result_fut.set_result(None)
 
     def _apply_schedule_command(self) -> None:
+        payload = self._instance._payload_converter.to_payload(self._input.input)
         command = self._instance._add_command()
         v = command.schedule_nexus_operation
         v.seq = self._seq
         v.endpoint = self._input.endpoint
         v.service = self._input.service
         v.operation = self._input.operation_name
-        v.input.CopyFrom(
-            self._instance._payload_converter.to_payload(self._input.input)
-        )
+        v.input.CopyFrom(payload)
         if self._input.schedule_to_close_timeout is not None:
             v.schedule_to_close_timeout.FromTimedelta(
                 self._input.schedule_to_close_timeout
