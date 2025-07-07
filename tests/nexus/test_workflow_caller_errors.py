@@ -40,6 +40,7 @@ operation_invocation_counts = Counter()
 
 @dataclass
 class ErrorTestInput:
+    service_name: str
     operation_name: str
     task_queue: str
     id: str
@@ -92,7 +93,7 @@ class CallerWorkflow:
     async def run(self, input: ErrorTestInput) -> None:
         nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(input.task_queue),
-            service=ErrorTestService,
+            service=input.service_name,
         )
         await nexus_client.execute_operation(input.operation_name, input)
 
@@ -108,6 +109,7 @@ class CallerWorkflow:
 )
 async def test_nexus_operation_is_retried(client: Client, operation_name: str):
     input = ErrorTestInput(
+        service_name="ErrorTestService",
         operation_name=operation_name,
         task_queue=str(uuid.uuid4()),
         id=str(uuid.uuid4()),
@@ -133,6 +135,64 @@ async def test_nexus_operation_is_retried(client: Client, operation_name: str):
             return operation_invocation_counts[input.id]
 
         await assert_eq_eventually(2, times_called)
+
+
+@pytest.mark.parametrize(
+    ["operation_name", "handler_error_type", "handler_error_message"],
+    [
+        (
+            "fails_due_to_nonexistent_operation",
+            nexusrpc.HandlerErrorType.NOT_FOUND,
+            "has no operation",
+        ),
+        (
+            "fails_due_to_nonexistent_service",
+            nexusrpc.HandlerErrorType.NOT_FOUND,
+            "No handler for service",
+        ),
+    ],
+)
+async def test_nexus_operation_fails_without_retry_as_handler_error(
+    client: Client,
+    operation_name: str,
+    handler_error_type: nexusrpc.HandlerErrorType,
+    handler_error_message: str,
+):
+    input = ErrorTestInput(
+        service_name=(
+            "ErrorTestService"
+            if operation_name != "fails_due_to_nonexistent_service"
+            else "NonExistentService"
+        ),
+        operation_name=operation_name,
+        task_queue=str(uuid.uuid4()),
+        id=str(uuid.uuid4()),
+    )
+    async with Worker(
+        client,
+        nexus_service_handlers=[ErrorTestService()],
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1),
+        workflows=[CallerWorkflow],
+        task_queue=input.task_queue,
+    ):
+        await create_nexus_endpoint(input.task_queue, client)
+        try:
+            await client.execute_workflow(
+                CallerWorkflow.run,
+                input,
+                id=str(uuid.uuid4()),
+                task_queue=input.task_queue,
+            )
+        except Exception as err:
+            assert isinstance(err, WorkflowFailureError)
+            assert isinstance(err.__cause__, NexusOperationError)
+            handler_error = err.__cause__.__cause__
+            assert isinstance(handler_error, nexusrpc.HandlerError)
+            assert not handler_error.retryable
+            assert handler_error.type == handler_error_type
+            assert handler_error_message in str(handler_error)
+        else:
+            pytest.fail("Unreachable")
 
 
 # Start timeout test
