@@ -1044,7 +1044,7 @@ wheels = [
 [[package]]
 name = "nexus-rpc"
 version = "1.1.0"
-source = { git = "https://github.com/nexus-rpc/sdk-python?branch=final-changes-for-1.1.0#d337e3032409d669a8db0283847950f0b1fee7fa" }
+source = { git = "https://github.com/nexus-rpc/sdk-python#6efc0caa541dc304cc52d70c4adc79c5ed5748e9" }
 dependencies = [
     { name = "typing-extensions" },
 ]
@@ -1757,7 +1757,7 @@ dev = [
 requires-dist = [
     { name = "eval-type-backport", marker = "python_full_version < '3.10' and extra == 'openai-agents'", specifier = ">=0.2.2" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.48.2,<2" },
-    { name = "nexus-rpc", git = "https://github.com/nexus-rpc/sdk-python?branch=final-changes-for-1.1.0" },
+    { name = "nexus-rpc", git = "https://github.com/nexus-rpc/sdk-python" },
     { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.1,<0.2" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
