@@ -289,7 +289,11 @@ class CancellationTimeoutTestCallerWorkflow:
     async def run(self) -> None:
         # TODO(nexus-prerelease)
         op_handle = await self.nexus_client.start_operation(
-            CancellationTimeoutTestService.op_with_cancel_method_that_never_returns,
+            # Although the tests are making use of it, we are not exposing operation
+            # factory methods to users as a way to write nexus operations, and so the
+            # types on NexusClient start_operation/execute_operation do not currently
+            # permit it.
+            CancellationTimeoutTestService.op_with_cancel_method_that_never_returns,  # type: ignore
             None,
             schedule_to_close_timeout=timedelta(seconds=0.1),
         )
