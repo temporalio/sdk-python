@@ -878,7 +878,7 @@ class _WorkflowInstanceImpl(
         self,
         job: temporalio.bridge.proto.workflow_activation.ResolveNexusOperation,
     ) -> None:
-        handle = self._pending_nexus_operations.get(job.seq)
+        handle = self._pending_nexus_operations.pop(job.seq, None)
         if not handle:
             raise RuntimeError(
                 f"Failed to find nexus operation handle for job sequence number {job.seq}"
