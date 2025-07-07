@@ -37,7 +37,11 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.runtime
 import temporalio.service
-from temporalio.common import VersioningBehavior, WorkerDeploymentVersion, HeaderCodecBehavior
+from temporalio.common import (
+    HeaderCodecBehavior,
+    VersioningBehavior,
+    WorkerDeploymentVersion,
+)
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
@@ -392,7 +396,8 @@ class Worker:
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
                 metric_meter=self._runtime.metric_meter,
-                encode_headers=client_config["header_codec_behavior"] == HeaderCodecBehavior.CODEC,
+                encode_headers=client_config["header_codec_behavior"]
+                == HeaderCodecBehavior.CODEC,
             )
         self._workflow_worker: Optional[_WorkflowWorker] = None
         if workflows:
@@ -430,7 +435,8 @@ class Worker:
                 disable_safe_eviction=disable_safe_workflow_eviction,
                 should_enforce_versioning_behavior=should_enforce_versioning_behavior,
                 assert_local_activity_valid=check_activity,
-                encode_headers=client_config["header_codec_behavior"] != HeaderCodecBehavior.NO_CODEC,
+                encode_headers=client_config["header_codec_behavior"]
+                != HeaderCodecBehavior.NO_CODEC,
             )
 
         if tuner is not None:

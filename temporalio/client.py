@@ -67,8 +67,8 @@ from temporalio.service import (
     RPCStatusCode,
     TLSConfig,
 )
-from .common import HeaderCodecBehavior
 
+from .common import HeaderCodecBehavior
 from .types import (
     AnyType,
     LocalReturnType,
@@ -4150,7 +4150,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             await _apply_headers(
                 self.headers,
                 action.start_workflow.header.fields,
-                client.config()["header_codec_behavior"] == HeaderCodecBehavior.CODEC and not self._from_raw,
+                client.config()["header_codec_behavior"] == HeaderCodecBehavior.CODEC
+                and not self._from_raw,
                 client.data_converter.payload_codec,
             )
         return action

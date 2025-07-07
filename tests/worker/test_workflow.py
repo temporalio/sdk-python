@@ -74,6 +74,7 @@ from temporalio.client import (
     WorkflowUpdateStage,
 )
 from temporalio.common import (
+    HeaderCodecBehavior,
     Priority,
     RawValue,
     RetryPolicy,
@@ -82,7 +83,7 @@ from temporalio.common import (
     SearchAttributes,
     SearchAttributeValues,
     TypedSearchAttributes,
-    WorkflowIDConflictPolicy, HeaderCodecBehavior,
+    WorkflowIDConflictPolicy,
 )
 from temporalio.converter import (
     DataConverter,
@@ -8132,7 +8133,9 @@ class HeaderWorkerInterceptor(temporalio.worker.Interceptor):
     ) -> Optional[Type[temporalio.worker.WorkflowInboundInterceptor]]:
         return HeaderWorkflowInboundInterceptor
 
+
 global_header_codec_behavior: HeaderCodecBehavior
+
 
 class HeaderActivityInboundInterceptor(temporalio.worker.ActivityInboundInterceptor):
     async def execute_activity(
@@ -8176,11 +8179,15 @@ class HeaderClientInterceptor(temporalio.client.Interceptor):
     def intercept_client(
         self, next: temporalio.client.OutboundInterceptor
     ) -> temporalio.client.OutboundInterceptor:
-        return HeaderClientOutboundInterceptor(super().intercept_client(next), self.header)
+        return HeaderClientOutboundInterceptor(
+            super().intercept_client(next), self.header
+        )
 
 
 class HeaderClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
-    def __init__(self, next: temporalio.client.OutboundInterceptor, header: Payload) -> None:
+    def __init__(
+        self, next: temporalio.client.OutboundInterceptor, header: Payload
+    ) -> None:
         self.header = header
         super().__init__(next)
 
@@ -8201,8 +8208,17 @@ class HeaderClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
         return await super().create_schedule(input)
 
 
-@pytest.mark.parametrize("header_codec_behavior", [HeaderCodecBehavior.NO_CODEC, HeaderCodecBehavior.CODEC, HeaderCodecBehavior.WORKFLOW_ONLY_CODEC])
-async def test_workflow_headers_with_codec(client: Client, header_codec_behavior: HeaderCodecBehavior):
+@pytest.mark.parametrize(
+    "header_codec_behavior",
+    [
+        HeaderCodecBehavior.NO_CODEC,
+        HeaderCodecBehavior.CODEC,
+        HeaderCodecBehavior.WORKFLOW_ONLY_CODEC,
+    ],
+)
+async def test_workflow_headers_with_codec(
+    client: Client, header_codec_behavior: HeaderCodecBehavior
+):
     header_payload = Payload(data=b"bar")
     if header_codec_behavior == HeaderCodecBehavior.WORKFLOW_ONLY_CODEC:
         header_payload = (await SimpleCodec().encode([header_payload]))[0]
