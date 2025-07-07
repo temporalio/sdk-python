@@ -41,7 +41,8 @@ def activity_as_tool(
     This function takes a Temporal activity function and converts it into an
     OpenAI agent tool that can be used by the agent to execute the activity
     during workflow execution. The tool will automatically handle the conversion
-    of inputs and outputs between the agent and the activity.
+    of inputs and outputs between the agent and the activity. Note that if you take a context,
+    mutation will not be persisted, as the activity may not be running in the same location.
 
     Args:
         fn: A Temporal activity function to convert to a tool.
@@ -85,6 +86,11 @@ def activity_as_tool(
 
         # Activities don't support keyword only arguments, so we can ignore the kwargs_dict return
         args, _ = schema.to_call_args(schema.params_pydantic_model(**json_data))
+
+        # Add the context to the arguments if it takes that
+        if schema.takes_context:
+            args = [ctx] + args
+
         result = await workflow.execute_activity(
             fn,
             args=args,
