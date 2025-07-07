@@ -178,23 +178,24 @@ class _NexusWorker:
             client=self._client,
         ).set()
         try:
-            await self._handler.cancel_operation(ctx, request.operation_token)
-        except BaseException as err:
-            logger.warning("Failed to execute Nexus cancel operation method")
-            completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
-                task_token=task_token,
-                error=await self._handler_error_to_proto(
-                    _exception_to_handler_error(err)
-                ),
-            )
-        else:
-            completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
-                task_token=task_token,
-                completed=temporalio.api.nexus.v1.Response(
-                    cancel_operation=temporalio.api.nexus.v1.CancelOperationResponse()
-                ),
-            )
-        try:
+            try:
+                await self._handler.cancel_operation(ctx, request.operation_token)
+            except BaseException as err:
+                logger.warning("Failed to execute Nexus cancel operation method")
+                completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                    task_token=task_token,
+                    error=await self._handler_error_to_proto(
+                        _exception_to_handler_error(err)
+                    ),
+                )
+            else:
+                completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                    task_token=task_token,
+                    completed=temporalio.api.nexus.v1.Response(
+                        cancel_operation=temporalio.api.nexus.v1.CancelOperationResponse()
+                    ),
+                )
+
             await self._bridge_worker().complete_nexus_task(completion)
         except Exception:
             logger.exception("Failed to send Nexus task completion")
@@ -220,25 +221,24 @@ class _NexusWorker:
         """
 
         try:
-            start_response = await self._start_operation(start_request, headers)
-        except BaseException as err:
-            logger.warning("Failed to execute Nexus start operation method")
-            handler_err = _exception_to_handler_error(err)
-            completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
-                task_token=task_token,
-                error=await self._handler_error_to_proto(handler_err),
-            )
-            if isinstance(err, concurrent.futures.BrokenExecutor):
-                self._fail_worker_exception_queue.put_nowait(err)
-        else:
-            completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
-                task_token=task_token,
-                completed=temporalio.api.nexus.v1.Response(
-                    start_operation=start_response
-                ),
-            )
-
-        try:
+            try:
+                start_response = await self._start_operation(start_request, headers)
+            except BaseException as err:
+                logger.warning("Failed to execute Nexus start operation method")
+                handler_err = _exception_to_handler_error(err)
+                completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                    task_token=task_token,
+                    error=await self._handler_error_to_proto(handler_err),
+                )
+                if isinstance(err, concurrent.futures.BrokenExecutor):
+                    self._fail_worker_exception_queue.put_nowait(err)
+            else:
+                completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                    task_token=task_token,
+                    completed=temporalio.api.nexus.v1.Response(
+                        start_operation=start_response
+                    ),
+                )
             await self._bridge_worker().complete_nexus_task(completion)
         except Exception:
             logger.exception("Failed to send Nexus task completion")
