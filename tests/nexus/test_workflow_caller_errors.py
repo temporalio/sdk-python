@@ -92,8 +92,8 @@ class CallerWorkflow:
     @workflow.run
     async def run(self, input: ErrorTestInput) -> None:
         nexus_client = workflow.create_nexus_client(
-            endpoint=make_nexus_endpoint_name(input.task_queue),
             service=input.service_name,
+            endpoint=make_nexus_endpoint_name(input.task_queue),
         )
         await nexus_client.execute_operation(input.operation_name, input)
 
@@ -210,8 +210,8 @@ class StartTimeoutTestCallerWorkflow:
     @workflow.init
     def __init__(self):
         self.nexus_client = workflow.create_nexus_client(
-            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
             service=StartTimeoutTestService,
+            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
         )
 
     @workflow.run
@@ -281,8 +281,8 @@ class CancellationTimeoutTestCallerWorkflow:
     @workflow.init
     def __init__(self):
         self.nexus_client = workflow.create_nexus_client(
-            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
             service=CancellationTimeoutTestService,
+            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
         )
 
     @workflow.run

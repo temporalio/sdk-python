@@ -356,8 +356,8 @@ class ErrorTestCallerWorkflow:
     @workflow.init
     def __init__(self, input: ErrorTestInput):
         self.nexus_client = workflow.create_nexus_client(
-            endpoint=make_nexus_endpoint_name(input.task_queue),
             service=ErrorTestService,
+            endpoint=make_nexus_endpoint_name(input.task_queue),
         )
 
     @workflow.run

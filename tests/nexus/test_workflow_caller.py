@@ -258,11 +258,11 @@ class CallerWorkflow:
         task_queue: str,
     ) -> None:
         self.nexus_client = workflow.create_nexus_client(
-            endpoint=make_nexus_endpoint_name(task_queue),
             service={
                 CallerReference.IMPL_WITH_INTERFACE: ServiceImpl,
                 CallerReference.INTERFACE: ServiceInterface,
             }[input.op_input.caller_reference],
+            endpoint=make_nexus_endpoint_name(task_queue),
         )
         self._nexus_operation_started = False
         self._proceed = False
@@ -381,8 +381,8 @@ class UntypedCallerWorkflow:
         # TODO(nexus-preview): untyped caller cannot reference name of implementation. I think this is as it should be.
         service_name = "ServiceInterface"
         self.nexus_client: workflow.NexusClient[Any] = workflow.create_nexus_client(
-            endpoint=make_nexus_endpoint_name(task_queue),
             service=service_name,
+            endpoint=make_nexus_endpoint_name(task_queue),
         )
 
     @workflow.run
@@ -815,8 +815,8 @@ class ServiceInterfaceAndImplCallerWorkflow:
             )
 
         nexus_client = workflow.create_nexus_client(
-            endpoint=make_nexus_endpoint_name(task_queue),
             service=service_cls,
+            endpoint=make_nexus_endpoint_name(task_queue),
         )
 
         return await nexus_client.execute_operation(service_cls.op, None)  # type: ignore
@@ -939,8 +939,8 @@ class WorkflowCallingNexusOperationThatExecutesWorkflowBeforeStartingBackingWork
     @workflow.run
     async def run(self, input: str, task_queue: str) -> str:
         nexus_client = workflow.create_nexus_client(
-            endpoint=make_nexus_endpoint_name(task_queue),
             service=ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow,
+            endpoint=make_nexus_endpoint_name(task_queue),
         )
 
         return await nexus_client.execute_operation(
@@ -1179,8 +1179,8 @@ class OverloadTestCallerWorkflow:
     @workflow.run
     async def run(self, op: str, input: OverloadTestValue) -> OverloadTestValue:
         nexus_client = workflow.create_nexus_client(
-            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
             service=OverloadTestServiceHandler,
+            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
         )
 
         if op == "no_param":

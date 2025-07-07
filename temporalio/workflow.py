@@ -5353,12 +5353,14 @@ class _NexusClient(NexusClient[ServiceT]):
 
 
 def create_nexus_client(
-    endpoint: str, service: Union[Type[ServiceT], str]
+    *,
+    service: Union[Type[ServiceT], str],
+    endpoint: str,
 ) -> NexusClient[ServiceT]:
     """Create a Nexus client.
 
     Args:
-        endpoint: The Nexus endpoint.
         service: The Nexus service.
+        endpoint: The Nexus endpoint.
     """
     return _NexusClient(endpoint=endpoint, service=service)
