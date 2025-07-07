@@ -45,7 +45,7 @@ dev = [
     "psutil>=5.9.3,<6",
     "pydocstyle>=6.3.0,<7",
     "pydoctor>=24.11.1,<25",
-    "pyright==1.1.400",
+    "pyright==1.1.402",
     "pytest~=7.4",
     "pytest-asyncio>=0.21,<0.22",
     "pytest-timeout~=2.2",
