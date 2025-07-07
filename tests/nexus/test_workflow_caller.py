@@ -307,7 +307,12 @@ class CallerWorkflow:
         op_input: OpInput,
     ) -> Union[
         nexusrpc.Operation[OpInput, OpOutput],
-        Callable[[Any], OperationHandler[OpInput, OpOutput]],
+        Callable[..., Awaitable[OpOutput]],
+        # We are not exposing operation factory methods to users as a way to write nexus
+        # operations, and accordingly the types on NexusClient
+        # start_operation/execute_operation to not permit it. We fake the type by
+        # pretending that this function doesn't return such operations.
+        # Callable[[Any], OperationHandler[OpInput, OpOutput]],
     ]:
         return {  # type: ignore[return-value]
             (
