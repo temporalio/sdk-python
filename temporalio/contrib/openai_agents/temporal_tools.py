@@ -1,6 +1,5 @@
 """Support for using Temporal activities as OpenAI agents tools."""
 
-import inspect
 import json
 from datetime import timedelta
 from typing import Any, Callable, Optional
