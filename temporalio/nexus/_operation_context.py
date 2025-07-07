@@ -182,22 +182,16 @@ class _TemporalStartOperationContext:
         return workflow_handle
 
 
-@dataclass(frozen=True)
 class WorkflowRunOperationContext(StartOperationContext):
-    _temporal_context: Optional[_TemporalStartOperationContext] = None
-
-    @property
-    def temporal_context(self) -> _TemporalStartOperationContext:
-        if not self._temporal_context:
-            raise RuntimeError("Temporal context not set")
-        return self._temporal_context
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.temporal_context = _TemporalStartOperationContext.get()
 
     @classmethod
     def _from_start_operation_context(
         cls, ctx: StartOperationContext
     ) -> WorkflowRunOperationContext:
         return cls(
-            _temporal_context=_TemporalStartOperationContext.get(),
             **{f.name: getattr(ctx, f.name) for f in dataclasses.fields(ctx)},
         )
 
