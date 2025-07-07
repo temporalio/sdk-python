@@ -89,7 +89,7 @@ jobs:
           TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
           TEMPORAL_CLIENT_CLOUD_NAMESPACE: sdk-ci.a2dd6
       - if: ${{ matrix.openaiTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
-        run: poe test tests/contrib/openai_agents/test_openai.py ${{matrix.pytestExtraArgs}} -s -k  --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--openai.xml
+        run: poe test tests/contrib/openai_agents/test_openai.py ${{matrix.pytestExtraArgs}} -s  --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--openai.xml
         timeout-minutes: 10
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
