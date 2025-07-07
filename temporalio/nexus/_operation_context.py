@@ -185,7 +185,7 @@ class _TemporalStartOperationContext:
 class WorkflowRunOperationContext(StartOperationContext):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.temporal_context = _TemporalStartOperationContext.get()
+        self._temporal_context = _TemporalStartOperationContext.get()
 
     @classmethod
     def _from_start_operation_context(
@@ -409,12 +409,12 @@ class WorkflowRunOperationContext(StartOperationContext):
         # We must pass nexus_completion_callbacks, workflow_event_links, and request_id,
         # but these are deliberately not exposed in overloads, hence the type-check
         # violation.
-        wf_handle = await self.temporal_context.client.start_workflow(  # type: ignore
+        wf_handle = await self._temporal_context.client.start_workflow(  # type: ignore
             workflow=workflow,
             arg=arg,
             args=args,
             id=id,
-            task_queue=task_queue or self.temporal_context.info().task_queue,
+            task_queue=task_queue or self._temporal_context.info().task_queue,
             result_type=result_type,
             execution_timeout=execution_timeout,
             run_timeout=run_timeout,
@@ -435,12 +435,12 @@ class WorkflowRunOperationContext(StartOperationContext):
             request_eager_start=request_eager_start,
             priority=priority,
             versioning_override=versioning_override,
-            callbacks=self.temporal_context._get_callbacks(),
-            workflow_event_links=self.temporal_context._get_workflow_event_links(),
-            request_id=self.temporal_context.nexus_context.request_id,
+            callbacks=self._temporal_context._get_callbacks(),
+            workflow_event_links=self._temporal_context._get_workflow_event_links(),
+            request_id=self._temporal_context.nexus_context.request_id,
         )
 
-        self.temporal_context._add_outbound_links(wf_handle)
+        self._temporal_context._add_outbound_links(wf_handle)
 
         return WorkflowHandle[ReturnType]._unsafe_from_client_workflow_handle(wf_handle)
 
