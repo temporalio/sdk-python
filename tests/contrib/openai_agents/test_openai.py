@@ -223,6 +223,14 @@ async def get_weather_object(input: WeatherInput) -> Weather:
     )
 
 
+@activity.defn
+async def get_weather_context(ctx: RunContextWrapper[str], city: str) -> Weather:
+    """
+    Get the weather for a given city.
+    """
+    return Weather(city=city, temperature_range="14-20C", conditions=ctx.context)
+
+
 class TestWeatherModel(TestModel):
     responses = [
         ModelResponse(
@@ -259,6 +267,20 @@ class TestWeatherModel(TestModel):
                     arguments='{"city":"Tokyo","country":"Japan"}',
                     call_id="call",
                     name="get_weather_country",
+                    type="function_call",
+                    id="id",
+                    status="completed",
+                )
+            ],
+            usage=Usage(),
+            response_id=None,
+        ),
+        ModelResponse(
+            output=[
+                ResponseFunctionToolCall(
+                    arguments='{"city":"Tokyo"}',
+                    call_id="call",
+                    name="get_weather_context",
                     type="function_call",
                     id="id",
                     status="completed",
@@ -306,9 +328,14 @@ class ToolsWorkflow:
                 activity_as_tool(
                     get_weather_country, start_to_close_timeout=timedelta(seconds=10)
                 ),
+                activity_as_tool(
+                    get_weather_context, start_to_close_timeout=timedelta(seconds=10)
+                ),
             ],
         )  # type: Agent
-        result = await Runner.run(starting_agent=agent, input=question)
+        result = await Runner.run(
+            starting_agent=agent, input=question, context="Stormy"
+        )
         return result.final_output
 
 
@@ -339,6 +366,7 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
                 get_weather,
                 get_weather_object,
                 get_weather_country,
+                get_weather_context,
             ],
             interceptors=[OpenAIAgentsTracingInterceptor()],
         ) as worker:
@@ -359,7 +387,7 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
                     if e.HasField("activity_task_completed_event_attributes"):
                         events.append(e)
 
-                assert len(events) == 7
+                assert len(events) == 9
                 assert (
                     "function_call"
                     in events[0]
@@ -397,8 +425,20 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
                     .data.decode()
                 )
                 assert (
-                    "Test weather result"
+                    "function_call"
                     in events[6]
+                    .activity_task_completed_event_attributes.result.payloads[0]
+                    .data.decode()
+                )
+                assert (
+                    "Stormy"
+                    in events[7]
+                    .activity_task_completed_event_attributes.result.payloads[0]
+                    .data.decode()
+                )
+                assert (
+                    "Test weather result"
+                    in events[8]
                     .activity_task_completed_event_attributes.result.payloads[0]
                     .data.decode()
                 )
