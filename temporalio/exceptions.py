@@ -375,7 +375,15 @@ class NexusOperationError(FailureError):
         operation: str,
         operation_token: str,
     ):
-        """Initialize a Nexus operation error."""
+        """
+        Args:
+            message: The error message.
+            scheduled_event_id: The NexusOperationScheduled event ID for the failed operation.
+            endpoint: The endpoint name for the failed operation.
+            service: The service name for the failed operation.
+            operation: The name of the failed operation.
+            operation_token: The operation token returned by the failed operation.
+        """
         super().__init__(message)
         self._scheduled_event_id = scheduled_event_id
         self._endpoint = endpoint
@@ -432,7 +440,6 @@ def is_cancelled_exception(exception: BaseException) -> bool:
             (
                 isinstance(exception, ActivityError)
                 or isinstance(exception, ChildWorkflowError)
-                # TODO(nexus-preview) test coverage
                 or isinstance(exception, NexusOperationError)
             )
             and isinstance(exception.cause, CancelledError)

@@ -341,21 +341,26 @@ class _NexusWorker:
             try:
                 failure = temporalio.api.failure.v1.Failure()
                 await self._data_converter.encode_failure(cause, failure)
-                # TODO(nexus-preview) Note that Java removes the message from the first
-                # item in the details chain, since in Java's case the nexus exception
-                # does not have its own message. In the case of Python however, the
-                # top-level message belongs to the nexus exception itself and so is
-                # distinct, and it would be reasonable to expect it to be propagated to
-                # the caller.
+                # nexusrpc.HandlerError and nexusrpc.OperationError have their
+                # own error messages and stack traces, independent of any cause
+                # exception they may have, and it would be reasonable to expect
+                # these to be propagated to the caller.
                 #
-                # In the case of OperationError (UnsuccessfulOperationError proto), the
-                # server appears to take the message from the top-level
-                # UnsuccessfulOperationError and replace the message of the first entry
-                # in the details chain with it. Presumably the server is anticipating
-                # that we've hoisted the message to that position and is undoing the
-                # hoist. Therefore in that case, we put the message from the first entry
-                # of the details chain at the top level and accept that the message of
-                # the OperationError itself will be lost.
+                # In the case of OperationError (UnsuccessfulOperationError
+                # proto), the server takes the message from the top-level
+                # UnsuccessfulOperationError and replace the message of the
+                # first entry in the details chain with it. Presumably the
+                # server is anticipating that we've hoisted the message to that
+                # position and is undoing the hoist. Therefore in that case, we
+                # put the message from the first entry of the details chain at
+                # the top level and accept that the message of the
+                # OperationError itself will be lost.
+                #
+                # Note that other SDKs (e.g. Java) remove the message from the
+                # first item in the details chain, since constructors are
+                # controlled such that the nexus exception itself does not have
+                # its own message.
+                #
                 failure_dict = google.protobuf.json_format.MessageToDict(failure)
                 if isinstance(error, nexusrpc.OperationError):
                     message = failure_dict.pop("message", str(error))

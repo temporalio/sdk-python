@@ -1053,7 +1053,7 @@ class DefaultFailureConverter(FailureConverter):
                 logger.warning(
                     f"Unknown Nexus HandlerErrorType: {nexus_handler_failure_info.type}"
                 )
-                raise
+                _type = nexusrpc.HandlerErrorType.INTERNAL
             retry_behavior = (
                 nexusrpc.HandlerErrorRetryBehavior.RETRYABLE
                 if (
