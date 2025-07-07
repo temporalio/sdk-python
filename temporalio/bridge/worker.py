@@ -11,6 +11,7 @@ from typing import (
     Awaitable,
     Callable,
     List,
+    Mapping,
     Optional,
     Sequence,
     Set,
@@ -272,9 +273,7 @@ else:
 
 
 async def _apply_to_headers(
-    headers: google.protobuf.internal.containers.MessageMap[
-        str, temporalio.api.common.v1.Payload
-    ],
+    headers: Mapping[str, temporalio.api.common.v1.Payload],
     cb: Callable[
         [Sequence[temporalio.api.common.v1.Payload]],
         Awaitable[List[temporalio.api.common.v1.Payload]],
@@ -287,9 +286,7 @@ async def _apply_to_headers(
 
 
 async def _decode_headers(
-    headers: google.protobuf.internal.containers.MessageMap[
-        str, temporalio.api.common.v1.Payload
-    ],
+    headers: Mapping[str, temporalio.api.common.v1.Payload],
     codec: temporalio.converter.PayloadCodec,
 ) -> None:
     """Decode headers with the given codec."""
@@ -297,9 +294,7 @@ async def _decode_headers(
 
 
 async def _encode_headers(
-    headers: google.protobuf.internal.containers.MessageMap[
-        str, temporalio.api.common.v1.Payload
-    ],
+    headers: Mapping[str, temporalio.api.common.v1.Payload],
     codec: temporalio.converter.PayloadCodec,
 ) -> None:
     """Encode headers with the given codec."""

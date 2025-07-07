@@ -546,7 +546,6 @@ class _ActivityWorker:
         )
 
         if self._encode_headers and self._data_converter.payload_codec is not None:
-            logger.info("headers: %s", start.header_fields)
             for payload in start.header_fields.values():
                 new_payload = (
                     await self._data_converter.payload_codec.decode([payload])

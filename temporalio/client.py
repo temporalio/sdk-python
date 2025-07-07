@@ -119,6 +119,7 @@ class Client:
         lazy: bool = False,
         runtime: Optional[temporalio.runtime.Runtime] = None,
         http_connect_proxy_config: Optional[HttpConnectProxyConfig] = None,
+        header_codec_behavior: Optional[HeaderCodecBehavior] = None,
     ) -> Client:
         """Connect to a Temporal server.
 
@@ -163,6 +164,7 @@ class Client:
                 used for workers.
             runtime: The runtime for this client, or the default if unset.
             http_connect_proxy_config: Configuration for HTTP CONNECT proxy.
+            header_codec_behavior: Encoding behavior for headers sent by the client.
         """
         connect_config = temporalio.service.ConnectConfig(
             target_host=target_host,
@@ -182,6 +184,9 @@ class Client:
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
+            header_codec_behavior=HeaderCodecBehavior.NO_CODEC
+            if header_codec_behavior is None
+            else header_codec_behavior,
         )
 
     def __init__(

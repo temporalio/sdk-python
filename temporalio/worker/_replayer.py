@@ -19,6 +19,7 @@ import temporalio.converter
 import temporalio.runtime
 import temporalio.workflow
 
+from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor
 from ._worker import load_default_build_id
 from ._workflow import _WorkflowWorker
@@ -47,7 +48,7 @@ class Replayer:
         debug_mode: bool = False,
         runtime: Optional[temporalio.runtime.Runtime] = None,
         disable_safe_workflow_eviction: bool = False,
-        encode_headers: bool = True,
+        header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
     ) -> None:
         """Create a replayer to replay workflows from history.
 
@@ -79,7 +80,7 @@ class Replayer:
             debug_mode=debug_mode,
             runtime=runtime,
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
-            encode_headers=encode_headers,
+            header_codec_behavior=header_codec_behavior,
         )
 
     def config(self) -> ReplayerConfig:
@@ -219,7 +220,8 @@ class Replayer:
                 disable_safe_eviction=self._config["disable_safe_workflow_eviction"],
                 should_enforce_versioning_behavior=False,
                 assert_local_activity_valid=lambda a: None,
-                encode_headers=self._config["encode_headers"],
+                encode_headers=self._config["header_codec_behavior"]
+                != HeaderCodecBehavior.NO_CODEC,
             )
             # Create bridge worker
             bridge_worker, pusher = temporalio.bridge.worker.Worker.for_replay(
@@ -338,7 +340,7 @@ class ReplayerConfig(TypedDict, total=False):
     debug_mode: bool
     runtime: Optional[temporalio.runtime.Runtime]
     disable_safe_workflow_eviction: bool
-    encode_headers: bool
+    header_codec_behavior: HeaderCodecBehavior
 
 
 @dataclass(frozen=True)
