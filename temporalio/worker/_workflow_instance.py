@@ -3018,9 +3018,6 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         except BaseException:
             return None
 
-    async def result(self) -> OutputT:
-        return await self._task
-
     def __await__(self) -> Generator[Any, Any, OutputT]:
         return self._task.__await__()
 
