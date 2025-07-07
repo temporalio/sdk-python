@@ -246,7 +246,15 @@ class RaiseNexusHandlerErrorNotFoundFromHandlerErrorUnavailable(
 # If a nexus handler raises an OperationError, the calling workflow
 # should see a non-retryable exception.
 #
-# The Java handler sends NexusTaskCompleted containing
+# Given Java operation code
+#
+#   throw OperationException.failure(
+#       ApplicationFailure.newNonRetryableFailureWithCause(
+#           "application-error-message",
+#           "application-error-type",
+#           new MyCustomException("Custom error 2")));
+#
+# the Java handler sends NexusTaskCompleted containing
 #
 # temporalio.api.nexus.v1.UnsuccessfulOperationError(FAILED, failure={
 #     message: "application-error-message",
@@ -282,13 +290,6 @@ class RaiseNexusOperationErrorFromApplicationErrorNonRetryableFromCustomError(
 ):
     @staticmethod
     def action_in_nexus_operation():
-        # case RAISE_NEXUS_OPERATION_ERROR_WITH_CAUSE_OF_CUSTOM_ERROR:
-        #   throw OperationException.failure(
-        #       ApplicationFailure.newNonRetryableFailureWithCause(
-        #           "application-error-message",
-        #           "application-error-type",
-        #           new MyCustomException("Custom error 2")));
-
         try:
             try:
                 raise CustomError("custom-error-message")
