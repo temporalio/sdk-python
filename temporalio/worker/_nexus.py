@@ -444,7 +444,6 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
         err = ApplicationError(
             message=str(handler_err),
             non_retryable=not handler_err.retryable,
-            type=f"{handler_err.__class__.__module__}.{handler_err.__class__.__qualname__}",
         )
         err.__traceback__ = handler_err.__traceback__
         err.__cause__ = handler_err.__cause__

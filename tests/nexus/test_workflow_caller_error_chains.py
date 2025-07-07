@@ -175,7 +175,6 @@ class RaiseNexusHandlerErrorNotFound(ErrorConversionTestCase):
             ApplicationError,
             {
                 "message": "handler-error-message",
-                "type": "nexusrpc._common.HandlerError",
                 "non_retryable": True,
             },
         ),
