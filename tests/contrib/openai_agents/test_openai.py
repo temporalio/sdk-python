@@ -228,9 +228,8 @@ async def get_weather_context(ctx: RunContextWrapper[str], city: str) -> Weather
     """
     Get the weather for a given city.
     """
-    return Weather(
-        city=city, temperature_range="14-20C", conditions=ctx.context
-    )
+    return Weather(city=city, temperature_range="14-20C", conditions=ctx.context)
+
 
 class TestWeatherModel(TestModel):
     responses = [
@@ -331,10 +330,12 @@ class ToolsWorkflow:
                 ),
                 activity_as_tool(
                     get_weather_context, start_to_close_timeout=timedelta(seconds=10)
-                )
+                ),
             ],
         )  # type: Agent
-        result = await Runner.run(starting_agent=agent, input=question, context="Stormy")
+        result = await Runner.run(
+            starting_agent=agent, input=question, context="Stormy"
+        )
         return result.final_output
 
 

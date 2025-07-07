@@ -1,4 +1,5 @@
 """Support for using Temporal activities as OpenAI agents tools."""
+
 import inspect
 import json
 from datetime import timedelta
@@ -42,7 +43,8 @@ def activity_as_tool(
     This function takes a Temporal activity function and converts it into an
     OpenAI agent tool that can be used by the agent to execute the activity
     during workflow execution. The tool will automatically handle the conversion
-    of inputs and outputs between the agent and the activity.
+    of inputs and outputs between the agent and the activity. Note that if you take a context,
+    mutation will not be persisted, as the activity may not be running in the same location.
 
     Args:
         fn: A Temporal activity function to convert to a tool.
