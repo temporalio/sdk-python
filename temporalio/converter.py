@@ -945,9 +945,9 @@ class DefaultFailureConverter(FailureConverter):
         failure.nexus_handler_failure_info.type = error.type.name
         failure.nexus_handler_failure_info.retry_behavior = temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.ValueType(
             temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
-            if error.retry_behavior == nexusrpc.HandlerErrorRetryBehavior.RETRYABLE
+            if error.retryable_override is True
             else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
-            if error.retry_behavior == nexusrpc.HandlerErrorRetryBehavior.NON_RETRYABLE
+            if error.retryable_override is False
             else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
         )
 
@@ -1054,13 +1054,13 @@ class DefaultFailureConverter(FailureConverter):
                     f"Unknown Nexus HandlerErrorType: {nexus_handler_failure_info.type}"
                 )
                 _type = nexusrpc.HandlerErrorType.INTERNAL
-            retry_behavior = (
-                nexusrpc.HandlerErrorRetryBehavior.RETRYABLE
+            retryable_override = (
+                True
                 if (
                     nexus_handler_failure_info.retry_behavior
                     == temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
                 )
-                else nexusrpc.HandlerErrorRetryBehavior.NON_RETRYABLE
+                else False
                 if (
                     nexus_handler_failure_info.retry_behavior
                     == temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
@@ -1070,7 +1070,7 @@ class DefaultFailureConverter(FailureConverter):
             err = nexusrpc.HandlerError(
                 failure.message or "Nexus handler error",
                 type=_type,
-                retry_behavior=retry_behavior,
+                retryable_override=retryable_override,
             )
         elif failure.HasField("nexus_operation_execution_failure_info"):
             nexus_op_failure_info = failure.nexus_operation_execution_failure_info

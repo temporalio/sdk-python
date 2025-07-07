@@ -186,7 +186,7 @@ class MyServiceHandler:
         raise HandlerError(
             message="deliberate internal handler error",
             type=HandlerErrorType.INTERNAL,
-            retry_behavior=nexusrpc.HandlerErrorRetryBehavior.NON_RETRYABLE,
+            retryable_override=False,
         ) from RuntimeError("cause message")
 
     @sync_operation
