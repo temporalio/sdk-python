@@ -10,7 +10,13 @@ from pydantic import ConfigDict, Field
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
 from temporalio.contrib import openai_agents
-from temporalio.contrib.openai_agents import open_ai_data_converter, OpenAIAgentsTracingInterceptor, ModelActivity, ModelActivityParameters, set_open_ai_agent_temporal_overrides
+from temporalio.contrib.openai_agents import (
+    ModelActivity,
+    ModelActivityParameters,
+    OpenAIAgentsTracingInterceptor,
+    open_ai_data_converter,
+    set_open_ai_agent_temporal_overrides,
+)
 from tests.helpers import new_worker
 
 with workflow.unsafe.imports_passed_through():
