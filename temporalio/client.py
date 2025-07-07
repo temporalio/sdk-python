@@ -5829,19 +5829,22 @@ class _ClientImpl(OutboundInterceptor):
         if input.request_id:
             req.request_id = input.request_id
 
+        links = [
+            temporalio.api.common.v1.Link(workflow_event=link)
+            for link in input.workflow_event_links
+        ]
         req.completion_callbacks.extend(
             temporalio.api.common.v1.Callback(
                 nexus=temporalio.api.common.v1.Callback.Nexus(
-                    url=callback.url, header=callback.headers
-                )
+                    url=callback.url,
+                    header=callback.headers,
+                ),
+                links=links,
             )
             for callback in input.callbacks
         )
-        # TODO(nexus-prerelease) add links to callback
-        req.links.extend(
-            temporalio.api.common.v1.Link(workflow_event=link)
-            for link in input.workflow_event_links
-        )
+        # Links are duplicated on request for compatibility with older server versions.
+        req.links.extend(links)
         return req
 
     async def _build_signal_with_start_workflow_execution_request(
