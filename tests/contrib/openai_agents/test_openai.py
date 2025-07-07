@@ -5,6 +5,48 @@ from datetime import timedelta
 from typing import Any, Optional, Union, cast, no_type_check
 
 import pytest
+from agents import (
+    Agent,
+    AgentOutputSchemaBase,
+    GuardrailFunctionOutput,
+    Handoff,
+    InputGuardrailTripwireTriggered,
+    ItemHelpers,
+    MessageOutputItem,
+    Model,
+    ModelProvider,
+    ModelResponse,
+    ModelSettings,
+    ModelTracing,
+    OpenAIResponsesModel,
+    OutputGuardrailTripwireTriggered,
+    RunContextWrapper,
+    Runner,
+    Tool,
+    TResponseInputItem,
+    Usage,
+    function_tool,
+    handoff,
+    input_guardrail,
+    output_guardrail,
+    trace,
+)
+from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
+from agents.items import (
+    HandoffOutputItem,
+    ToolCallItem,
+    ToolCallOutputItem,
+)
+from agents.run import DEFAULT_AGENT_RUNNER, AgentRunner
+from openai import AsyncOpenAI, BaseModel
+from openai.types.responses import (
+    ResponseFunctionToolCall,
+    ResponseFunctionWebSearch,
+    ResponseOutputMessage,
+    ResponseOutputText,
+)
+from openai.types.responses.response_function_web_search import ActionSearch
+from openai.types.responses.response_prompt_param import ResponsePromptParam
 from pydantic import ConfigDict, Field
 
 from temporalio import activity, workflow
@@ -24,54 +66,10 @@ from temporalio.contrib.openai_agents.trace_interceptor import (
     OpenAIAgentsTracingInterceptor,
 )
 from temporalio.exceptions import CancelledError
+from tests.contrib.openai_agents.research_agents.research_manager import (
+    ResearchManager,
+)
 from tests.helpers import new_worker
-
-with workflow.unsafe.imports_passed_through():
-    from agents import (
-        Agent,
-        AgentOutputSchemaBase,
-        GuardrailFunctionOutput,
-        Handoff,
-        InputGuardrailTripwireTriggered,
-        ItemHelpers,
-        MessageOutputItem,
-        Model,
-        ModelProvider,
-        ModelResponse,
-        ModelSettings,
-        ModelTracing,
-        OpenAIResponsesModel,
-        OutputGuardrailTripwireTriggered,
-        RunContextWrapper,
-        Runner,
-        Tool,
-        TResponseInputItem,
-        Usage,
-        function_tool,
-        handoff,
-        input_guardrail,
-        output_guardrail,
-        trace,
-    )
-    from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
-    from agents.items import (
-        HandoffOutputItem,
-        ToolCallItem,
-        ToolCallOutputItem,
-    )
-    from openai import AsyncOpenAI, BaseModel
-    from openai.types.responses import (
-        ResponseFunctionToolCall,
-        ResponseFunctionWebSearch,
-        ResponseOutputMessage,
-        ResponseOutputText,
-    )
-    from openai.types.responses.response_function_web_search import ActionSearch
-    from openai.types.responses.response_prompt_param import ResponsePromptParam
-
-    from tests.contrib.openai_agents.research_agents.research_manager import (
-        ResearchManager,
-    )
 
 
 class TestProvider(ModelProvider):
@@ -156,7 +154,7 @@ class HelloWorldAgent:
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 async def test_hello_world_agent(client: Client, use_local_model: bool):
-    if not use_local_model and "OPENAI_API_KEY" not in os.environ:
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
@@ -316,7 +314,7 @@ class ToolsWorkflow:
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 async def test_tool_workflow(client: Client, use_local_model: bool):
-    if not use_local_model and "OPENAI_API_KEY" not in os.environ:
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
@@ -576,7 +574,7 @@ class ResearchWorkflow:
 @pytest.mark.parametrize("use_local_model", [True, False])
 @pytest.mark.timeout(120)
 async def test_research_workflow(client: Client, use_local_model: bool):
-    if not use_local_model and "OPENAI_API_KEY" not in os.environ:
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
@@ -799,7 +797,7 @@ class AgentAsToolsModel(TestModel):
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
-    if not use_local_model and "OPENAI_API_KEY" not in os.environ:
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
@@ -1164,7 +1162,7 @@ class CustomerServiceWorkflow:
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 async def test_customer_service_workflow(client: Client, use_local_model: bool):
-    if not use_local_model and "OPENAI_API_KEY" not in os.environ:
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
@@ -1458,7 +1456,7 @@ class InputGuardrailWorkflow:
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 async def test_input_guardrail(client: Client, use_local_model: bool):
-    if not use_local_model and "OPENAI_API_KEY" not in os.environ:
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
@@ -1575,7 +1573,7 @@ class OutputGuardrailWorkflow:
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 async def test_output_guardrail(client: Client, use_local_model: bool):
-    if not use_local_model and "OPENAI_API_KEY" not in os.environ:
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["data_converter"] = open_ai_data_converter
