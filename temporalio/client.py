@@ -67,6 +67,7 @@ from temporalio.service import (
     RPCStatusCode,
     TLSConfig,
 )
+from .common import HeaderCodecBehavior
 
 from .types import (
     AnyType,
@@ -193,7 +194,7 @@ class Client:
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
-        encode_headers: bool = True,
+        header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
     ):
         """Create a Temporal client from a service client.
 
@@ -211,7 +212,7 @@ class Client:
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
-            encode_headers=encode_headers,
+            header_codec_behavior=header_codec_behavior,
         )
 
     def config(self) -> ClientConfig:
@@ -1495,7 +1496,7 @@ class ClientConfig(TypedDict, total=False):
     default_workflow_query_reject_condition: Required[
         Optional[temporalio.common.QueryRejectCondition]
     ]
-    encode_headers: Required[bool]
+    header_codec_behavior: Required[HeaderCodecBehavior]
 
 
 class WorkflowHistoryEventFilterType(IntEnum):
@@ -4145,12 +4146,11 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             temporalio.converter.encode_search_attributes(
                 self.typed_search_attributes, action.start_workflow.search_attributes
             )
-        print("Schedule Headers:", self.headers)
         if self.headers:
             await _apply_headers(
                 self.headers,
                 action.start_workflow.header.fields,
-                client.config()["encode_headers"] and not self._from_raw,
+                client.config()["header_codec_behavior"] == HeaderCodecBehavior.CODEC and not self._from_raw,
                 client.data_converter.payload_codec,
             )
         return action
@@ -6706,7 +6706,7 @@ class _ClientImpl(OutboundInterceptor):
         await _apply_headers(
             source,
             dest,
-            self._client.config()["encode_headers"],
+            self._client.config()["header_codec_behavior"] == HeaderCodecBehavior.CODEC,
             self._client.data_converter.payload_codec,
         )
 

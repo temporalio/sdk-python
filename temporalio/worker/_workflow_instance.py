@@ -2595,7 +2595,6 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         v.seq = self._seq
         v.activity_id = self._input.activity_id or str(self._seq)
         v.activity_type = self._input.activity
-        logger.info("Headers in workflow %s:", self._input.headers)
         if self._input.headers:
             temporalio.common._apply_headers(self._input.headers, v.headers)
         if payloads:

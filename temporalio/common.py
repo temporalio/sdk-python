@@ -1230,3 +1230,9 @@ def _type_hints_from_func(
         # necessarily
         args.append(arg_hint)  # type: ignore
     return args, ret
+
+
+class HeaderCodecBehavior(IntEnum):
+    NO_CODEC = 1
+    CODEC = 2
+    WORKFLOW_ONLY_CODEC = 3
