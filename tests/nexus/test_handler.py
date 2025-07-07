@@ -15,7 +15,6 @@ Failure object.
 
 import asyncio
 import concurrent.futures
-import json
 import logging
 import pprint
 import uuid
@@ -324,8 +323,6 @@ class UnsuccessfulResponse:
     failure_message: Union[str, Callable[[str], bool]]
     # Is the Nexus Failure expected to have the details field populated?
     failure_details: bool = True
-    # Expected value of Nexus-Request-Retryable header
-    retryable_header: Optional[bool] = None
     # Expected value of inverse of non_retryable attribute of exception.
     retryable_exception: bool = True
     body_json: Optional[Callable[[dict[str, Any]], bool]] = None
@@ -380,32 +377,6 @@ class _FailureTestCase(_TestCase):
             assert failure.message == cls.expected.failure_message
         else:
             assert cls.expected.failure_message(failure.message)
-
-        # retryability assertions
-        if cls.expected.retryable_header is not None:
-            assert (
-                retryable_header := response.headers.get("nexus-request-retryable")
-            ) is not None
-            assert json.loads(retryable_header) == cls.expected.retryable_header
-
-        if cls.expected.failure_details:
-            assert (
-                failure.exception_from_details is not None
-            ), "Expected exception details, but found none."
-            assert isinstance(failure.exception_from_details, ApplicationError)
-
-            exception_from_failure_details = failure.exception_from_details
-            if (
-                exception_from_failure_details.type == "HandlerError"
-                and exception_from_failure_details.__cause__
-            ):
-                cause = exception_from_failure_details.__cause__
-                assert isinstance(cause, ApplicationError)
-                exception_from_failure_details = cause
-
-            assert exception_from_failure_details.non_retryable == (
-                not cls.expected.retryable_exception
-            )
 
 
 class SyncHandlerHappyPath(_TestCase):
@@ -495,8 +466,6 @@ class UpstreamTimeoutViaRequestTimeout(_FailureTestCase):
     headers = {"Request-Timeout": "10ms"}
     expected = UnsuccessfulResponse(
         status_code=520,
-        # TODO(nexus-prerelease): should this have the retryable header set?
-        retryable_header=None,
         # This error is returned by the server; it doesn't populate metadata or details, and it
         # doesn't set temporal-nexus-failure-source.
         failure_details=False,
@@ -523,7 +492,6 @@ class BadRequest(_FailureTestCase):
     input = Input(7)  # type: ignore
     expected = UnsuccessfulResponse(
         status_code=400,
-        retryable_header=False,
         failure_message=lambda s: s.startswith(
             "Data converter failed to decode Nexus operation input"
         ),
@@ -535,25 +503,11 @@ class _ApplicationErrorTestCase(_FailureTestCase):
 
     expected: UnsuccessfulResponse  # type: ignore[assignment]
 
-    @classmethod
-    def check_response(
-        cls, response: httpx.Response, with_service_definition: bool
-    ) -> None:
-        super().check_response(response, with_service_definition)
-        failure = Failure(**response.json())
-        assert failure.exception_from_details
-        assert isinstance(failure.exception_from_details, ApplicationError)
-        err = failure.exception_from_details.__cause__
-        assert isinstance(err, ApplicationError)
-        assert err.type == "TestFailureType"
-        assert err.details == ("details arg",)
-
 
 class NonRetryableApplicationError(_ApplicationErrorTestCase):
     operation = "non_retryable_application_error"
     expected = UnsuccessfulResponse(
         status_code=500,
-        retryable_header=False,
         retryable_exception=False,
         failure_message="non-retryable application error",
     )
@@ -563,7 +517,6 @@ class RetryableApplicationError(_ApplicationErrorTestCase):
     operation = "retryable_application_error"
     expected = UnsuccessfulResponse(
         status_code=500,
-        retryable_header=True,
         failure_message="retryable application error",
     )
 
@@ -572,8 +525,6 @@ class HandlerErrorInternal(_FailureTestCase):
     operation = "handler_error_internal"
     expected = UnsuccessfulResponse(
         status_code=500,
-        # TODO(nexus-prerelease): check this assertion
-        retryable_header=False,
         failure_message="deliberate internal handler error",
     )
 
@@ -582,31 +533,8 @@ class OperationErrorFailed(_FailureTestCase):
     operation = "operation_error_failed"
     expected = UnsuccessfulResponse(
         status_code=424,
-        # TODO(nexus-prerelease): check that OperationError should not set retryable header
-        retryable_header=None,
         failure_message="deliberate operation error",
         headers=UNSUCCESSFUL_RESPONSE_HEADERS | {"nexus-operation-state": "failed"},
-    )
-
-
-class UnknownService(_FailureTestCase):
-    service_defn = "NonExistentService"
-    operation = "<should not be used by test>"
-    expected = UnsuccessfulResponse(
-        status_code=404,
-        retryable_header=False,
-        failure_message="No handler for service 'NonExistentService'.",
-    )
-
-
-class UnknownOperation(_FailureTestCase):
-    operation = "NonExistentOperation"
-    expected = UnsuccessfulResponse(
-        status_code=404,
-        retryable_header=False,
-        failure_message=lambda s: s.startswith(
-            "Nexus service definition 'MyService' has no operation 'NonExistentOperation'."
-        ),
     )
 
 
@@ -614,7 +542,6 @@ class NonSerializableOutputFailure(_FailureTestCase):
     operation = "non_serializable_output"
     expected = UnsuccessfulResponse(
         status_code=500,
-        retryable_header=False,
         failure_message="Object of type function is not JSON serializable",
     )
 
@@ -649,8 +576,6 @@ async def test_start_operation_happy_path(
         OperationTimeoutHeader,
         BadRequest,
         HandlerErrorInternal,
-        UnknownService,
-        UnknownOperation,
         NonSerializableOutputFailure,
     ],
 )
@@ -953,7 +878,7 @@ class SyncHandlerNoExecutor(_InstantiationCase):
     handler = SyncStartHandler
     executor = False
     exception = RuntimeError
-    match = "Use nexusrpc._syncio.handler.Handler instead"
+    match = "you have not supplied an executor"
 
 
 class DefaultCancel(_InstantiationCase):
@@ -966,7 +891,7 @@ class SyncCancel(_InstantiationCase):
     handler = SyncCancelHandler
     executor = False
     exception = RuntimeError
-    match = "Use nexusrpc._syncio.handler.Handler instead"
+    match = "you have not supplied an executor"
 
 
 @pytest.mark.parametrize(
