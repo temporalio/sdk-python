@@ -337,38 +337,24 @@ class _NexusWorker:
 
         See https://github.com/nexus-rpc/api/blob/main/SPEC.md#failure
         """
-        message = str(error)
         if cause := error.__cause__:
             try:
                 failure = temporalio.api.failure.v1.Failure()
                 await self._data_converter.encode_failure(cause, failure)
-                # nexusrpc.HandlerError and nexusrpc.OperationError have their
-                # own error messages and stack traces, independent of any cause
-                # exception they may have, and it would be reasonable to expect
-                # these to be propagated to the caller.
-                #
-                # In the case of OperationError (UnsuccessfulOperationError
-                # proto), the server takes the message from the top-level
-                # UnsuccessfulOperationError and replace the message of the
-                # first entry in the details chain with it. Presumably the
-                # server is anticipating that we've hoisted the message to that
-                # position and is undoing the hoist. Therefore in that case, we
-                # put the message from the first entry of the details chain at
-                # the top level and accept that the message of the
-                # OperationError itself will be lost.
-                #
-                # Note that other SDKs (e.g. Java) remove the message from the
-                # first item in the details chain, since constructors are
-                # controlled such that the nexus exception itself does not have
-                # its own message.
-                #
+                # Following other SDKs, we move the message from the first item
+                # in the details chain to the top level nexus.v1.Failure
+                # message. In Go and Java this particularly makes sense since
+                # their constructors are controlled such that the nexus
+                # exception itself does not have its own message. However, in
+                # Python, nexusrpc.HandlerError and nexusrpc.OperationError have
+                # their own error messages and stack traces, independent of any
+                # cause exception they may have, and this must be propagated to
+                # the caller. See _exception_to_handler_error for how we address
+                # this by injecting an additional error into the cause chain
+                # before the current function is called.
                 failure_dict = google.protobuf.json_format.MessageToDict(failure)
-                if isinstance(error, nexusrpc.OperationError):
-                    message = failure_dict.pop("message", str(error))
-                else:
-                    message = str(error)
                 return temporalio.api.nexus.v1.Failure(
-                    message=message,
+                    message=failure_dict.pop("message", str(error)),
                     metadata={"type": _TEMPORAL_FAILURE_PROTO_TYPE},
                     details=json.dumps(
                         failure_dict,
@@ -446,7 +432,21 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
     # Based on sdk-typescript's convertKnownErrors:
     # https://github.com/temporalio/sdk-typescript/blob/nexus/packages/worker/src/nexus.ts
     if isinstance(err, nexusrpc.HandlerError):
-        return err
+        # Insert an ApplicationError at the head of the cause chain to hold the
+        # HandlerError's message and traceback. We do this because
+        # _nexus_error_to_nexus_failure_proto moves the message at the head of
+        # the cause chain to be the top-level nexus.Failure message. Therefore,
+        # if we did not do this, then the HandlerError's own message and
+        # traceback would be lost. (This hoisting behavior makes sense for Go
+        # and Java since they control construction of HandlerError such that it
+        # does not have its own message or stack trace.)
+        handler_err = err
+        err = ApplicationError(
+            message=str(handler_err),
+            non_retryable=not handler_err.retryable,
+        )
+        err.__traceback__ = handler_err.__traceback__
+        err.__cause__ = handler_err.__cause__
     elif isinstance(err, ApplicationError):
         handler_err = nexusrpc.HandlerError(
             # TODO(nexus-preview): confirm what we want as message here
