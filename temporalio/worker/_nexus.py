@@ -432,7 +432,22 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
     # Based on sdk-typescript's convertKnownErrors:
     # https://github.com/temporalio/sdk-typescript/blob/nexus/packages/worker/src/nexus.ts
     if isinstance(err, nexusrpc.HandlerError):
-        return err
+        # Insert an ApplicationError at the head of the cause chain to hold the
+        # HandlerError's message and traceback. We do this because
+        # _nexus_error_to_nexus_failure_proto moves the message at the head of
+        # the cause chain to be the top-level nexus.Failure message. Therefore,
+        # if we did not do this, then the HandlerError's own message and
+        # traceback would be lost. (This hoisting behavior makes sense for Go
+        # and Java since they control construction of HandlerError such that it
+        # does not have its own message or stack trace.)
+        handler_err = err
+        err = ApplicationError(
+            message=str(handler_err),
+            non_retryable=not handler_err.retryable,
+            type=f"{handler_err.__class__.__module__}.{handler_err.__class__.__qualname__}",
+        )
+        err.__traceback__ = handler_err.__traceback__
+        err.__cause__ = handler_err.__cause__
     elif isinstance(err, ApplicationError):
         handler_err = nexusrpc.HandlerError(
             # TODO(nexus-preview): confirm what we want as message here
