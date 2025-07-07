@@ -799,13 +799,6 @@ async def update_seat(
     confirmation_number: str,
     new_seat: str,
 ) -> str:
-    """
-    Update the seat for a given confirmation number.
-
-    Args:
-        confirmation_number: The confirmation number for the flight.
-        new_seat: The new seat to update to.
-    """
     # Update the context based on the customer's input
     context.context.confirmation_number = confirmation_number
     context.context.seat_number = new_seat

@@ -2,13 +2,13 @@
 
 from contextlib import contextmanager
 from datetime import timedelta
-from typing import Any, AsyncIterator, Callable, Optional, Union
+from typing import Any, AsyncIterator, Callable, Optional, Union, overload
 
 from agents.items import TResponseStreamEvent
 from openai.types.responses import ResponsePromptParam
 
-import temporalio
 from temporalio import activity
+from temporalio import workflow as temporal_workflow
 from temporalio.common import Priority, RetryPolicy
 from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
@@ -97,15 +97,22 @@ def set_open_ai_agent_temporal_overrides(
 
 
 class TestModelProvider(ModelProvider):
+    """Test model provider which simply returns the given module."""
+
     def __init__(self, model: Model):
+        """Initialize a test model provider with a model."""
         self._model = model
 
     def get_model(self, model_name: Union[str, None]) -> Model:
+        """Get a model from the model provider."""
         return self._model
 
 
 class TestModel(Model):
+    """Test model for use mocking model responses."""
+
     def __init__(self, fn: Callable[[], ModelResponse]) -> None:
+        """Initialize a test model with a callable."""
         self.fn = fn
 
     async def get_response(
@@ -117,9 +124,11 @@ class TestModel(Model):
         output_schema: Union[AgentOutputSchemaBase, None],
         handoffs: list[Handoff],
         tracing: ModelTracing,
+        *,
         previous_response_id: Union[str, None],
         prompt: Union[ResponsePromptParam, None] = None,
     ) -> ModelResponse:
+        """Get a response from the model."""
         return self.fn()
 
     def stream_response(
@@ -135,10 +144,13 @@ class TestModel(Model):
         previous_response_id: str | None,
         prompt: ResponsePromptParam | None,
     ) -> AsyncIterator[TResponseStreamEvent]:
+        """Get a streamed response from the model. Unimplemented."""
         raise NotImplementedError()
 
 
 class workflow:
+    """Encapsulates workflow specific primitives for working with the OpenAI Agents SDK in a workflow context"""
+
     @classmethod
     def activity_as_tool(
         cls,
@@ -201,7 +213,7 @@ class workflow:
         async def run_activity(ctx: RunContextWrapper[Any], input: str) -> Any:
             try:
                 return str(
-                    await temporalio.workflow.execute_activity(
+                    await temporal_workflow.execute_activity(
                         fn,
                         input,
                         task_queue=task_queue,
@@ -230,6 +242,43 @@ class workflow:
             on_invoke_tool=run_activity,
             strict_json_schema=True,
         )
+
+    @classmethod
+    @overload
+    def tool(
+        cls,
+        *,
+        name_override: Union[str, None] = None,
+        description_override: Union[str, None] = None,
+        docstring_style: Union[DocstringStyle, None] = None,
+        use_docstring_info: bool = True,
+        failure_error_function: Union[
+            ToolErrorFunction, None
+        ] = default_tool_error_function,
+        strict_mode: bool = True,
+        is_enabled: Union[
+            bool, Callable[[RunContextWrapper[Any], Agent[Any]], MaybeAwaitable[bool]]
+        ] = True,
+    ) -> Callable[[ToolFunction[...]], FunctionTool]: ...
+
+    @classmethod
+    @overload
+    def tool(
+        cls,
+        func: ToolFunction[...],
+        *,
+        name_override: Union[str, None] = None,
+        description_override: Union[str, None] = None,
+        docstring_style: Union[DocstringStyle, None] = None,
+        use_docstring_info: bool = True,
+        failure_error_function: Union[
+            ToolErrorFunction, None
+        ] = default_tool_error_function,
+        strict_mode: bool = True,
+        is_enabled: Union[
+            bool, Callable[[RunContextWrapper[Any], Agent[Any]], MaybeAwaitable[bool]]
+        ] = True,
+    ) -> FunctionTool: ...
 
     @classmethod
     def tool(
