@@ -172,7 +172,7 @@ class _NexusWorker:
             operation=request.operation,
             headers=headers,
         )
-        temporalio.nexus._TemporalCancelOperationContext(
+        temporalio.nexus._operation_context._TemporalCancelOperationContext(
             info=lambda: Info(task_queue=self._task_queue),
             nexus_context=ctx,
             client=self._client,
@@ -274,7 +274,7 @@ class _NexusWorker:
             ],
             callback_headers=dict(start_request.callback_header),
         )
-        temporalio.nexus._TemporalStartOperationContext(
+        temporalio.nexus._operation_context._TemporalStartOperationContext(
             nexus_context=ctx,
             client=self._client,
             info=lambda: Info(task_queue=self._task_queue),
