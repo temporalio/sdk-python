@@ -251,7 +251,7 @@ class MyServiceHandler:
         )
 
     class OperationHandlerReturningUnwrappedResult(OperationHandler[Input, Output]):
-        async def start(
+        async def start(  # type: ignore[override] # intentional test error
             self,
             ctx: StartOperationContext,
             input: Input,
@@ -814,7 +814,7 @@ async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: A
 
 class _InstantiationCase:
     executor: bool
-    handler: Callable[[], Any]
+    handler: Callable[..., Any]
     exception: Optional[Type[Exception]]
     match: Optional[str]
 

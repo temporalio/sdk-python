@@ -27,7 +27,7 @@ error_conversion_test_cases: dict[str, type[ErrorConversionTestCase]] = {}
 
 
 class ErrorConversionTestCase:
-    action_in_nexus_operation: Callable[[], None]
+    action_in_nexus_operation: Callable[..., Any]
     expected_exception_chain_in_workflow: list[tuple[type[Exception], dict[str, Any]]]
 
     def __init_subclass__(cls, **kwargs):
@@ -369,7 +369,11 @@ class ErrorTestCallerWorkflow:
     @workflow.run
     async def invoke_nexus_op_and_assert_error(self, input: ErrorTestInput) -> None:
         try:
-            await self.nexus_client.execute_operation(ErrorTestService.op, input)
+            await self.nexus_client.execute_operation(
+                ErrorTestService.op,  # type: ignore[arg-type] # mypy can't infer OutputT=None in Union type
+                input,
+                output_type=None,
+            )
         except BaseException as err:
             errs = [err]
             while err.__cause__:

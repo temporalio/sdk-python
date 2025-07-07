@@ -36,7 +36,8 @@ class NotCalled(_TestCase):
         @workflow_run_operation
         async def my_workflow_run_operation_handler(
             self, ctx: WorkflowRunOperationContext, input: Input
-        ) -> nexus.WorkflowHandle[Output]: ...
+        ) -> nexus.WorkflowHandle[Output]:
+            raise NotImplementedError
 
     expected_operations = {
         "my_workflow_run_operation_handler": nexusrpc.Operation(
@@ -54,7 +55,8 @@ class CalledWithoutArgs(_TestCase):
         @workflow_run_operation
         async def my_workflow_run_operation_handler(
             self, ctx: WorkflowRunOperationContext, input: Input
-        ) -> nexus.WorkflowHandle[Output]: ...
+        ) -> nexus.WorkflowHandle[Output]:
+            raise NotImplementedError
 
     expected_operations = NotCalled.expected_operations
 
@@ -65,7 +67,8 @@ class CalledWithNameOverride(_TestCase):
         @workflow_run_operation(name="operation-name")
         async def workflow_run_operation_with_name_override(
             self, ctx: WorkflowRunOperationContext, input: Input
-        ) -> nexus.WorkflowHandle[Output]: ...
+        ) -> nexus.WorkflowHandle[Output]:
+            raise NotImplementedError
 
     expected_operations = {
         "workflow_run_operation_with_name_override": nexusrpc.Operation(

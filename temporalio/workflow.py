@@ -5172,14 +5172,30 @@ class NexusClient(ABC, Generic[ServiceT]):
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
-    # Overload for sync_operation methods
+    # Overload for sync_operation methods (async def)
     @overload
     @abstractmethod
     async def start_operation(
         self,
         operation: Callable[
             [ServiceHandlerT, nexusrpc.handler.StartOperationContext, InputT],
-            Union[Awaitable[OutputT], OutputT],
+            Awaitable[OutputT],
+        ],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
+    # Overload for sync_operation methods (def)
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: Callable[
+            [ServiceHandlerT, nexusrpc.handler.StartOperationContext, InputT],
+            OutputT,
         ],
         input: InputT,
         *,
@@ -5257,14 +5273,30 @@ class NexusClient(ABC, Generic[ServiceT]):
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
 
-    # Overload for sync_operation methods
+    # Overload for sync_operation methods (async def)
     @overload
     @abstractmethod
     async def execute_operation(
         self,
         operation: Callable[
             [ServiceHandlerT, nexusrpc.handler.StartOperationContext, InputT],
-            Union[Awaitable[OutputT], OutputT],
+            Awaitable[OutputT],
+        ],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> OutputT: ...
+
+    # Overload for sync_operation methods (def)
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: Callable[
+            [ServiceHandlerT, nexusrpc.handler.StartOperationContext, InputT],
+            OutputT,
         ],
         input: InputT,
         *,
@@ -5350,6 +5382,22 @@ class _NexusClient(NexusClient[ServiceT]):
             headers=headers,
         )
         return await handle
+
+
+@overload
+def create_nexus_client(
+    *,
+    service: Type[ServiceT],
+    endpoint: str,
+) -> NexusClient[ServiceT]: ...
+
+
+@overload
+def create_nexus_client(
+    *,
+    service: str,
+    endpoint: str,
+) -> NexusClient[Any]: ...
 
 
 def create_nexus_client(

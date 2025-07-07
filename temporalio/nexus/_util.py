@@ -11,7 +11,6 @@ from typing import (
     Optional,
     Type,
     TypeVar,
-    Union,
 )
 
 import nexusrpc
@@ -72,16 +71,12 @@ def get_workflow_run_start_method_input_and_output_type_annotations(
 def _get_start_method_input_and_output_type_annotations(
     start: Callable[
         [ServiceHandlerT, WorkflowRunOperationContext, InputT],
-        Union[OutputT, Awaitable[OutputT]],
+        Awaitable[WorkflowHandle[OutputT]],
     ],
 ) -> tuple[
     Optional[Type[InputT]],
     Optional[Type[OutputT]],
 ]:
-    """Return operation input and output types.
-
-    `start` must be a type-annotated start method that returns a synchronous result.
-    """
     try:
         type_annotations = typing.get_type_hints(start)
     except TypeError:

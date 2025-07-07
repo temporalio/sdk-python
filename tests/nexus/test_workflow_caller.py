@@ -276,7 +276,7 @@ class CallerWorkflow:
     ) -> CallerWfOutput:
         op_input = input.op_input
         op_handle = await self.nexus_client.start_operation(
-            self._get_operation(op_input),
+            self._get_operation(op_input),  # type: ignore[arg-type] # test uses non-public operation types
             op_input,
             headers=op_input.headers,
         )

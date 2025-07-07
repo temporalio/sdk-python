@@ -2,7 +2,7 @@ import dataclasses
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
-import temporalio.api
+import temporalio.api.failure.v1
 import temporalio.api.nexus.v1
 import temporalio.api.operatorservice.v1
 import temporalio.workflow

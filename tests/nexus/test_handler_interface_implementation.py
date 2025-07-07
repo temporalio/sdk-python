@@ -38,7 +38,8 @@ class ValidWorkflowRunImpl(_InterfaceImplementationTestCase):
         @workflow_run_operation
         async def op(
             self, ctx: WorkflowRunOperationContext, input: str
-        ) -> nexus.WorkflowHandle[int]: ...
+        ) -> nexus.WorkflowHandle[int]:
+            raise NotImplementedError
 
     error_message = None
 

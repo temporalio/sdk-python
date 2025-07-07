@@ -62,7 +62,8 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
             )
         self._start = start
         if start.__doc__:
-            self.start.__func__.__doc__ = start.__doc__
+            if start_func := getattr(self.start, "__func__", None):
+                start_func.__doc__ = start.__doc__
         self._input_type = input_type
         self._output_type = output_type
 

@@ -35,7 +35,7 @@ from temporalio.worker import Worker
 from tests.helpers import assert_eq_eventually
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
-operation_invocation_counts = Counter()
+operation_invocation_counts = Counter[str]()
 
 
 @dataclass
@@ -217,8 +217,9 @@ class StartTimeoutTestCallerWorkflow:
     @workflow.run
     async def run(self) -> None:
         await self.nexus_client.execute_operation(
-            StartTimeoutTestService.op_handler_that_never_returns,
+            StartTimeoutTestService.op_handler_that_never_returns,  # type: ignore[arg-type] # mypy can't infer OutputT=None in Union type
             None,
+            output_type=None,
             schedule_to_close_timeout=timedelta(seconds=0.1),
         )
 
