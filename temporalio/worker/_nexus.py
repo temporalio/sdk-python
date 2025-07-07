@@ -188,7 +188,6 @@ class _NexusWorker:
                 ),
             )
         else:
-            # TODO(nexus-preview): ack_cancel completions?
             completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
                 task_token=task_token,
                 completed=temporalio.api.nexus.v1.Response(
@@ -199,6 +198,13 @@ class _NexusWorker:
             await self._bridge_worker().complete_nexus_task(completion)
         except Exception:
             logger.exception("Failed to send Nexus task completion")
+        finally:
+            try:
+                del self._running_tasks[task_token]
+            except KeyError:
+                logger.exception(
+                    "Failed to remove task for completed Nexus cancel operation"
+                )
 
     async def _handle_start_operation_task(
         self,
@@ -240,7 +246,9 @@ class _NexusWorker:
             try:
                 del self._running_tasks[task_token]
             except KeyError:
-                logger.exception("Failed to remove completed Nexus operation")
+                logger.exception(
+                    "Failed to remove task for completed Nexus start operation"
+                )
 
     async def _start_operation(
         self,

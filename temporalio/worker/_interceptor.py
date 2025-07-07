@@ -329,7 +329,7 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
     def operation_name(self) -> str:
         return self._operation_name
 
-    # TODO(nexus-prerelease) contravariant type in output
+    # TODO(nexus-preview) contravariant type in output
     @property
     def input_type(self) -> Optional[Type[InputT]]:
         return self._input_type
