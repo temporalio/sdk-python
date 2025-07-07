@@ -212,6 +212,37 @@ class RaiseNexusHandlerErrorNotFoundFromCustomError(ErrorConversionTestCase):
     )
 
 
+class RaiseNexusHandlerErrorNotFoundFromHandlerErrorUnavailable(
+    ErrorConversionTestCase
+):
+    @staticmethod
+    def action_in_nexus_operation():
+        try:
+            raise nexusrpc.HandlerError(
+                "handler-error-message-2",
+                type=nexusrpc.HandlerErrorType.UNAVAILABLE,
+            )
+        except nexusrpc.HandlerError as err:
+            raise nexusrpc.HandlerError(
+                "handler-error-message",
+                type=nexusrpc.HandlerErrorType.NOT_FOUND,
+            ) from err
+
+    expected_exception_chain_in_workflow = (
+        RaiseNexusHandlerErrorNotFound.expected_exception_chain_in_workflow[:-1]
+        + [
+            (
+                nexusrpc.HandlerError,
+                {
+                    "message": "handler-error-message",
+                    "type": nexusrpc.HandlerErrorType.UNAVAILABLE,
+                    "retryable": True,
+                },
+            )
+        ]
+    )
+
+
 # If a nexus handler raises an OperationError, the calling workflow
 # should see a non-retryable exception.
 #

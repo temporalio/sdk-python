@@ -363,7 +363,7 @@ class ChildWorkflowError(FailureError):
 
 
 class NexusOperationError(FailureError):
-    """Error raised on Nexus operation failure."""
+    """Error raised on Nexus operation failure inside a Workflow."""
 
     def __init__(
         self,

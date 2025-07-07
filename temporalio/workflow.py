@@ -5108,8 +5108,6 @@ class VersioningIntent(Enum):
         return temporalio.bridge.proto.common.VersioningIntent.UNSPECIFIED
 
 
-# Nexus
-
 ServiceT = TypeVar("ServiceT")
 
 
@@ -5190,8 +5188,6 @@ class NexusClient(ABC, Generic[ServiceT]):
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
-    # TODO(nexus-prerelease): overloads: no-input, ret type
-    # TODO(nexus-prerelease): should it be an error to use a reference to a method on a class other than that supplied?
     @abstractmethod
     async def start_operation(
         self,
@@ -5277,7 +5273,6 @@ class NexusClient(ABC, Generic[ServiceT]):
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
 
-    # TODO(nexus-prerelease): overloads: no-input, ret type
     @abstractmethod
     async def execute_operation(
         self,
@@ -5317,8 +5312,6 @@ class _NexusClient(NexusClient[ServiceT]):
             )
         self.endpoint = endpoint
 
-    # TODO(nexus-prerelease): overloads: no-input, ret type
-    # TODO(nexus-prerelease): should it be an error to use a reference to a method on a class other than that supplied?
     async def start_operation(
         self,
         operation: Any,
@@ -5340,7 +5333,6 @@ class _NexusClient(NexusClient[ServiceT]):
             )
         )
 
-    # TODO(nexus-prerelease): overloads: no-input, ret type
     async def execute_operation(
         self,
         operation: Any,
