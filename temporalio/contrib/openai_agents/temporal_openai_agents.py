@@ -235,13 +235,15 @@ class workflow:
                 )
 
         schema = function_schema(fn)
-        return FunctionTool(
+        tool = FunctionTool(
             name=schema.name,
             description=schema.description or "",
             params_json_schema=schema.params_json_schema,
             on_invoke_tool=run_activity,
             strict_json_schema=True,
         )
+        setattr(tool, "__temporal_tool_definition", True)
+        return tool
 
     @classmethod
     @overload

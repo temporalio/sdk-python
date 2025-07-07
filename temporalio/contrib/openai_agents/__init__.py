@@ -29,10 +29,3 @@ __all__ = [
     "set_open_ai_agent_temporal_overrides",
     "OpenAIAgentsTracingInterceptor",
 ]
-
-# pretend if plugin
-# __all__ = [
-#     "plugin",
-#     "ModelActivityParameters",
-#     "workflow",
-# ]
