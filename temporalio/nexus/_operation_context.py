@@ -405,6 +405,14 @@ class WorkflowRunOperationContext(StartOperationContext):
         #     attachRequestId: true,
         #     };
         # }
+        if (
+            id_conflict_policy
+            == temporalio.common.WorkflowIDConflictPolicy.USE_EXISTING
+        ):
+            raise RuntimeError(
+                "WorkflowIDConflictPolicy.USE_EXISTING is not yet supported when starting a workflow "
+                "that backs a Nexus operation (Python SDK Nexus support is at Pre-release stage)."
+            )
 
         # We must pass nexus_completion_callbacks, workflow_event_links, and request_id,
         # but these are deliberately not exposed in overloads, hence the type-check
