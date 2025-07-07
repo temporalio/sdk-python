@@ -218,4 +218,4 @@ exclude = [
 package = false
 
 [tool.uv.sources]
-nexus-rpc = { git = "https://github.com/nexus-rpc/sdk-python" }
+nexus-rpc = { path = "../nexus-sdk-python", editable = true }
