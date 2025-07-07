@@ -174,9 +174,15 @@ class RaiseNexusHandlerErrorNotFound(ErrorConversionTestCase):
         (
             ApplicationError,
             {
-                # TODO(nexus-preview): empirically, this is "handler-error-message",
-                # but it should be "runtime-error-message"
-                # "message": "runtime-error-message",
+                "message": "handler-error-message",
+                "type": "nexusrpc._common.HandlerError",
+                "non_retryable": True,
+            },
+        ),
+        (
+            ApplicationError,
+            {
+                "message": "runtime-error-message",
                 "type": "RuntimeError",
                 "non_retryable": False,
             },
@@ -234,7 +240,7 @@ class RaiseNexusHandlerErrorNotFoundFromHandlerErrorUnavailable(
             (
                 nexusrpc.HandlerError,
                 {
-                    "message": "handler-error-message",
+                    "message": "handler-error-message-2",
                     "type": nexusrpc.HandlerErrorType.UNAVAILABLE,
                     "retryable": True,
                 },
