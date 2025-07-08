@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import inspect
 import json
 from datetime import timedelta
-from typing import Any, Callable, Optional, Type, get_args, get_origin, get_type_hints
+from typing import Any, Callable, Optional, Type
 
 import nexusrpc
-from pydantic import BaseModel, Field, create_model
 
 from temporalio import activity, workflow
 from temporalio.common import Priority, RetryPolicy
@@ -17,12 +15,7 @@ from temporalio.workflow import ActivityCancellationType, VersioningIntent, unsa
 
 with unsafe.imports_passed_through():
     from agents import FunctionTool, RunContextWrapper, Tool
-    from agents.function_schema import (
-        FuncSchema,
-        ToolContext,
-        ensure_strict_json_schema,
-        generate_func_documentation,
-    )
+    from agents.function_schema import function_schema
 
 
 class ToolSerializationError(TemporalError):
@@ -171,10 +164,7 @@ def nexus_operation_as_tool(
         ... )
         >>> # Use tool with an OpenAI agent
     """
-    schema = function_schema(
-        adapt_nexus_operation_function_schema(operation),
-        globalns=function_schema_globalns,
-    )
+    schema = function_schema(adapt_nexus_operation_function_schema(operation))
 
     async def run_operation(ctx: RunContextWrapper[Any], input: str) -> Any:
         try:
@@ -221,166 +211,3 @@ def adapt_nexus_operation_function_schema(
     }
     adapted.__name__ = operation.name
     return adapted
-
-
-def function_schema(
-    func: Callable[..., Any],
-    docstring_style: DocstringStyle | None = None,
-    name_override: str | None = None,
-    description_override: str | None = None,
-    use_docstring_info: bool = True,
-    strict_json_schema: bool = True,
-    globalns: Optional[dict[str, Any]] = None,
-) -> FuncSchema:
-    """
-    Given a python function, extracts a `FuncSchema` from it, capturing the name, description,
-    parameter descriptions, and other metadata.
-
-    Args:
-        func: The function to extract the schema from.
-        docstring_style: The style of the docstring to use for parsing. If not provided, we will
-            attempt to auto-detect the style.
-        name_override: If provided, use this name instead of the function's `__name__`.
-        description_override: If provided, use this description instead of the one derived from the
-            docstring.
-        use_docstring_info: If True, uses the docstring to generate the description and parameter
-            descriptions.
-        strict_json_schema: Whether the JSON schema is in strict mode. If True, we'll ensure that
-            the schema adheres to the "strict" standard the OpenAI API expects. We **strongly**
-            recommend setting this to True, as it increases the likelihood of the LLM providing
-            correct JSON input.
-
-    Returns:
-        A `FuncSchema` object containing the function's name, description, parameter descriptions,
-        and other metadata.
-    """
-
-    # 1. Grab docstring info
-    if use_docstring_info:
-        doc_info = generate_func_documentation(func, docstring_style)
-        param_descs = doc_info.param_descriptions or {}
-    else:
-        doc_info = None
-        param_descs = {}
-
-    # Ensure name_override takes precedence even if docstring info is disabled.
-    func_name = name_override or (doc_info.name if doc_info else func.__name__)
-
-    # 2. Inspect function signature and get type hints
-    sig = inspect.signature(func)
-    type_hints = get_type_hints(func, globalns=globalns)
-    params = list(sig.parameters.items())
-    takes_context = False
-    filtered_params = []
-
-    if params:
-        first_name, first_param = params[0]
-        # Prefer the evaluated type hint if available
-        ann = type_hints.get(first_name, first_param.annotation)
-        if ann != inspect._empty:
-            origin = get_origin(ann) or ann
-            if origin is RunContextWrapper or origin is ToolContext:
-                takes_context = True  # Mark that the function takes context
-            else:
-                filtered_params.append((first_name, first_param))
-        else:
-            filtered_params.append((first_name, first_param))
-
-    # For parameters other than the first, raise error if any use RunContextWrapper or ToolContext.
-    for name, param in params[1:]:
-        ann = type_hints.get(name, param.annotation)
-        if ann != inspect._empty:
-            origin = get_origin(ann) or ann
-            if origin is RunContextWrapper or origin is ToolContext:
-                raise UserError(
-                    f"RunContextWrapper/ToolContext param found at non-first position in function"
-                    f" {func.__name__}"
-                )
-        filtered_params.append((name, param))
-
-    # We will collect field definitions for create_model as a dict:
-    #   field_name -> (type_annotation, default_value_or_Field(...))
-    fields: dict[str, Any] = {}
-
-    for name, param in filtered_params:
-        ann = type_hints.get(name, param.annotation)
-        default = param.default
-
-        # If there's no type hint, assume `Any`
-        if ann == inspect._empty:
-            ann = Any
-
-        # If a docstring param description exists, use it
-        field_description = param_descs.get(name, None)
-
-        # Handle different parameter kinds
-        if param.kind == param.VAR_POSITIONAL:
-            # e.g. *args: extend positional args
-            if get_origin(ann) is tuple:
-                # e.g. def foo(*args: tuple[int, ...]) -> treat as List[int]
-                args_of_tuple = get_args(ann)
-                if len(args_of_tuple) == 2 and args_of_tuple[1] is Ellipsis:
-                    ann = list[args_of_tuple[0]]  # type: ignore
-                else:
-                    ann = list[Any]
-            else:
-                # If user wrote *args: int, treat as List[int]
-                ann = list[ann]  # type: ignore
-
-            # Default factory to empty list
-            fields[name] = (
-                ann,
-                Field(default_factory=list, description=field_description),  # type: ignore
-            )
-
-        elif param.kind == param.VAR_KEYWORD:
-            # **kwargs handling
-            if get_origin(ann) is dict:
-                # e.g. def foo(**kwargs: dict[str, int])
-                dict_args = get_args(ann)
-                if len(dict_args) == 2:
-                    ann = dict[dict_args[0], dict_args[1]]  # type: ignore
-                else:
-                    ann = dict[str, Any]
-            else:
-                # e.g. def foo(**kwargs: int) -> Dict[str, int]
-                ann = dict[str, ann]  # type: ignore
-
-            fields[name] = (
-                ann,
-                Field(default_factory=dict, description=field_description),  # type: ignore
-            )
-
-        else:
-            # Normal parameter
-            if default == inspect._empty:
-                # Required field
-                fields[name] = (
-                    ann,
-                    Field(..., description=field_description),
-                )
-            else:
-                # Parameter with a default value
-                fields[name] = (
-                    ann,
-                    Field(default=default, description=field_description),
-                )
-
-    # 3. Dynamically build a Pydantic model
-    dynamic_model = create_model(f"{func_name}_args", __base__=BaseModel, **fields)
-
-    # 4. Build JSON schema from that model
-    json_schema = dynamic_model.model_json_schema()
-    if strict_json_schema:
-        json_schema = ensure_strict_json_schema(json_schema)
-
-    # 5. Return as a FuncSchema dataclass
-    return FuncSchema(
-        name=func_name,
-        description=description_override or doc_info.description if doc_info else None,
-        params_pydantic_model=dynamic_model,
-        params_json_schema=json_schema,
-        signature=sig,
-        takes_context=takes_context,
-        strict_json_schema=strict_json_schema,
-    )
