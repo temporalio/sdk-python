@@ -5,47 +5,45 @@ from contextlib import contextmanager
 from datetime import timedelta
 from typing import Any, AsyncIterator, Callable, Optional, Union, overload
 
+from agents import (
+    Agent,
+    AgentOutputSchemaBase,
+    Handoff,
+    Model,
+    ModelProvider,
+    ModelResponse,
+    ModelSettings,
+    ModelTracing,
+    RunContextWrapper,
+    Tool,
+    TResponseInputItem,
+    set_trace_provider,
+)
+from agents.function_schema import DocstringStyle, function_schema
 from agents.items import TResponseStreamEvent
+from agents.run import get_default_agent_runner, set_default_agent_runner
+from agents.tool import (
+    FunctionTool,
+    ToolErrorFunction,
+    ToolFunction,
+    default_tool_error_function,
+    function_tool,
+)
+from agents.tracing import get_trace_provider
+from agents.tracing.provider import DefaultTraceProvider
+from agents.util._types import MaybeAwaitable
 from openai.types.responses import ResponsePromptParam
 
 from temporalio import activity
 from temporalio import workflow as temporal_workflow
 from temporalio.common import Priority, RetryPolicy
+from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
     TemporalTraceProvider,
 )
-from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
 from temporalio.exceptions import ApplicationError, TemporalError
-from temporalio.workflow import ActivityCancellationType, VersioningIntent, unsafe
-
-with unsafe.imports_passed_through():
-    from agents import (
-        Agent,
-        AgentOutputSchemaBase,
-        Handoff,
-        Model,
-        ModelProvider,
-        ModelResponse,
-        ModelSettings,
-        ModelTracing,
-        RunContextWrapper,
-        Tool,
-        TResponseInputItem,
-        set_trace_provider,
-    )
-    from agents.function_schema import DocstringStyle, function_schema
-    from agents.run import get_default_agent_runner, set_default_agent_runner
-    from agents.tool import (
-        FunctionTool,
-        ToolErrorFunction,
-        ToolFunction,
-        default_tool_error_function,
-        function_tool,
-    )
-    from agents.tracing import get_trace_provider
-    from agents.tracing.provider import DefaultTraceProvider
-    from agents.util._types import MaybeAwaitable
+from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 
 @contextmanager

@@ -95,13 +95,14 @@ import asyncio
 from datetime import timedelta
 
 from temporalio.client import Client
-from temporalio.contrib.openai_agents.invoke_model_activity import ModelActivity
-from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
+from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
+from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents.open_ai_data_converter import open_ai_data_converter
 from temporalio.contrib.openai_agents.temporal_openai_agents import set_open_ai_agent_temporal_overrides
 from temporalio.worker import Worker
 
 from hello_world_workflow import HelloWorldAgent
+
 
 async def worker_main():
     # Configure the OpenAI Agents SDK to use Temporal activities for LLM API calls
@@ -118,13 +119,14 @@ async def worker_main():
         )
 
         model_activity = ModelActivity(model_provider=None)
-            worker = Worker(
-                client,
-                task_queue="my-task-queue",
-                workflows=[HelloWorldAgent],
-                activities=[model_activity.invoke_model_activity],
-            )
-            await worker.run()
+        worker = Worker(
+            client,
+            task_queue="my-task-queue",
+            workflows=[HelloWorldAgent],
+            activities=[model_activity.invoke_model_activity],
+        )
+        await worker.run()
+
 
 if __name__ == "__main__":
     asyncio.run(worker_main())

@@ -6,7 +6,7 @@ from typing import Optional
 
 from temporalio import workflow
 from temporalio.common import Priority, RetryPolicy
-from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
+from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ from agents import (
 from agents.items import TResponseStreamEvent
 from openai.types.responses.response_prompt_param import ResponsePromptParam
 
-from temporalio.contrib.openai_agents.invoke_model_activity import (
+from temporalio.contrib.openai_agents._invoke_model_activity import (
     ActivityModelInput,
     AgentOutputSchemaInput,
     FunctionToolInput,

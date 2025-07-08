@@ -36,7 +36,6 @@ from agents.items import (
     ToolCallItem,
     ToolCallOutputItem,
 )
-from agents.run import DEFAULT_AGENT_RUNNER, AgentRunner
 from openai import AsyncOpenAI, BaseModel
 from openai.types.responses import (
     ResponseFunctionToolCall,
@@ -55,26 +54,16 @@ from temporalio.contrib.openai_agents import (
     ModelActivity,
     ModelActivityParameters,
     OpenAIAgentsTracingInterceptor,
-    open_ai_data_converter,
+    TestModel,
+    TestModelProvider,
     set_open_ai_agent_temporal_overrides,
 )
-from temporalio.contrib.openai_agents.temporal_openai_agents import TestModel
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import CancelledError
 from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
 )
 from tests.helpers import new_worker
-
-
-class TestProvider(ModelProvider):
-    __test__ = False
-
-    def __init__(self, model: Model):
-        self._model = model
-
-    def get_model(self, model_name: Union[str, None]) -> Model:
-        return self._model
-
 
 response_index: int = 0
 
@@ -136,13 +125,13 @@ async def test_hello_world_agent(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = open_ai_data_converter
+    new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
 
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(TestHelloModel()) if use_local_model else None
+            TestModelProvider(TestHelloModel()) if use_local_model else None
         )
         async with new_worker(
             client, HelloWorldAgent, activities=[model_activity.invoke_model_activity]
@@ -317,13 +306,13 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = open_ai_data_converter
+    new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
 
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(
+            TestModelProvider(
                 TestWeatherModel(  # type: ignore
                 )
             )
@@ -503,7 +492,7 @@ async def test_research_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = open_ai_data_converter
+    new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
 
     global response_index
@@ -514,7 +503,7 @@ async def test_research_workflow(client: Client, use_local_model: bool):
     )
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(TestResearchModel()) if use_local_model else None
+            TestModelProvider(TestResearchModel()) if use_local_model else None
         )
         async with new_worker(
             client,
@@ -720,13 +709,13 @@ async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = open_ai_data_converter
+    new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
 
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(
+            TestModelProvider(
                 AgentAsToolsModel(  # type: ignore
                 )
             )
@@ -1075,7 +1064,7 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = open_ai_data_converter
+    new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
 
     questions = ["Hello", "Book me a flight to PDX", "11111", "Any window seat"]
@@ -1083,7 +1072,7 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(
+            TestModelProvider(
                 CustomerServiceModel(  # type: ignore
                 )
             )
@@ -1368,13 +1357,13 @@ async def test_input_guardrail(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = open_ai_data_converter
+    new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
 
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(
+            TestModelProvider(
                 InputGuardrailModel(  # type: ignore
                     "", openai_client=AsyncOpenAI(api_key="Fake key")
                 )
@@ -1485,13 +1474,13 @@ async def test_output_guardrail(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = open_ai_data_converter
+    new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
 
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(
+            TestModelProvider(
                 OutputGuardrailModel(  # type: ignore
                 )
             )

@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from temporalio.client import WorkflowHistory
-from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
+from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents.open_ai_data_converter import (
     open_ai_data_converter,
 )
