@@ -20,7 +20,7 @@ class ModelActivityParameters:
     task_queue: Optional[str] = None
     """Specific task queue to use for model activities."""
 
-    schedule_to_close_timeout: Optional[timedelta] = None
+    schedule_to_close_timeout: Optional[timedelta] = timedelta(seconds=60)
     """Maximum time from scheduling to completion."""
 
     schedule_to_start_timeout: Optional[timedelta] = None

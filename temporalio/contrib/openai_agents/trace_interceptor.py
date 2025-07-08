@@ -60,16 +60,6 @@ def context_from_header(
     if span_info is None:
         yield
     else:
-        span = SpanImpl(
-            trace_id=str(span_info["traceId"]),
-            span_id=span_info["spanId"],
-            parent_id=None,
-            span_data=CustomSpanData(
-                name="Parent Temporal Span",
-                data={},
-            ),
-            processor=cast(DefaultTraceProvider, get_trace_provider())._multi_processor,
-        )
         workflow_type = (
             activity.info().workflow_type
             if activity.in_activity()
@@ -94,11 +84,11 @@ def context_from_header(
                 span_info["traceName"],
                 trace_id=span_info["traceId"],
                 metadata=metadata,
-            ):
-                with custom_span(name=span_name, parent=span, data=data):
+            ) as t:
+                with custom_span(name=span_name, parent=t, data=data):
                     yield
         else:
-            with custom_span(name=span_name, parent=span, data=data):
+            with custom_span(name=span_name, parent=None, data=data):
                 yield
 
 

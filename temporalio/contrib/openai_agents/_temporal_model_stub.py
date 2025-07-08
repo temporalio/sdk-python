@@ -11,36 +11,35 @@ from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 logger = logging.getLogger(__name__)
 
-with workflow.unsafe.imports_passed_through():
-    from typing import Any, AsyncIterator, Optional, Sequence, Union, cast
+from typing import Any, AsyncIterator, Optional, Sequence, Union, cast
 
-    from agents import (
-        AgentOutputSchema,
-        AgentOutputSchemaBase,
-        ComputerTool,
-        FileSearchTool,
-        FunctionTool,
-        Handoff,
-        Model,
-        ModelResponse,
-        ModelSettings,
-        ModelTracing,
-        Tool,
-        TResponseInputItem,
-        WebSearchTool,
-    )
-    from agents.items import TResponseStreamEvent
-    from openai.types.responses.response_prompt_param import ResponsePromptParam
+from agents import (
+    AgentOutputSchema,
+    AgentOutputSchemaBase,
+    ComputerTool,
+    FileSearchTool,
+    FunctionTool,
+    Handoff,
+    Model,
+    ModelResponse,
+    ModelSettings,
+    ModelTracing,
+    Tool,
+    TResponseInputItem,
+    WebSearchTool,
+)
+from agents.items import TResponseStreamEvent
+from openai.types.responses.response_prompt_param import ResponsePromptParam
 
-    from temporalio.contrib.openai_agents.invoke_model_activity import (
-        ActivityModelInput,
-        AgentOutputSchemaInput,
-        FunctionToolInput,
-        HandoffInput,
-        ModelActivity,
-        ModelTracingInput,
-        ToolInput,
-    )
+from temporalio.contrib.openai_agents.invoke_model_activity import (
+    ActivityModelInput,
+    AgentOutputSchemaInput,
+    FunctionToolInput,
+    HandoffInput,
+    ModelActivity,
+    ModelTracingInput,
+    ToolInput,
+)
 
 
 class _TemporalModelStub(Model):
