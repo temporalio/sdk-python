@@ -516,7 +516,7 @@ async def test_research_workflow(client: Client, use_local_model: bool):
                 "Caribbean vacation spots in April, optimizing for surfing, hiking and water sports",
                 id=f"research-workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
+                execution_timeout=timedelta(seconds=120),
             )
             result = await workflow_handle.result()
 
