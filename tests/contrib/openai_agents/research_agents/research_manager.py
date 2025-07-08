@@ -61,7 +61,7 @@ class ResearchManager:
             )
             return str(result.final_output)
         except Exception:
-            return None
+            raise
 
     async def _write_report(self, query: str, search_results: list[str]) -> ReportData:
         input = f"Original query: {query}\nSummarized search results: {search_results}"

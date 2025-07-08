@@ -58,6 +58,7 @@ from temporalio.contrib.openai_agents import (
     open_ai_data_converter,
     set_open_ai_agent_temporal_overrides,
 )
+from temporalio.contrib.openai_agents.temporal_openai_agents import TestModel
 from temporalio.exceptions import CancelledError
 from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
@@ -78,38 +79,25 @@ class TestProvider(ModelProvider):
 response_index: int = 0
 
 
-class TestModel(OpenAIResponsesModel):
+class StaticTestModel(TestModel):
     __test__ = False
     responses: list[ModelResponse] = []
 
-    def __init__(
-        self,
-        model: str,
-        openai_client: AsyncOpenAI,
-    ) -> None:
-        global response_index
-        response_index = 0
-        super().__init__(model, openai_client)
-
-    async def get_response(
-        self,
-        system_instructions: Union[str, None],
-        input: Union[str, list[TResponseInputItem]],
-        model_settings: ModelSettings,
-        tools: list[Tool],
-        output_schema: Union[AgentOutputSchemaBase, None],
-        handoffs: list[Handoff],
-        tracing: ModelTracing,
-        previous_response_id: Union[str, None],
-        prompt: Union[ResponsePromptParam, None] = None,
-    ) -> ModelResponse:
+    def response(self):
         global response_index
         response = self.responses[response_index]
         response_index += 1
         return response
 
+    def __init__(
+        self,
+    ) -> None:
+        global response_index
+        response_index = 0
+        super().__init__(self.response)
 
-class TestHelloModel(TestModel):
+
+class TestHelloModel(StaticTestModel):
     responses = [
         ModelResponse(
             output=[
@@ -155,9 +143,7 @@ async def test_hello_world_agent(client: Client, use_local_model: bool):
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
             TestProvider(
-                TestHelloModel(  # type: ignore
-                    "", openai_client=AsyncOpenAI(api_key="Fake key")
-                )
+                TestHelloModel()
             )
             if use_local_model
             else None
@@ -222,7 +208,7 @@ async def get_weather_context(ctx: RunContextWrapper[str], city: str) -> Weather
     return Weather(city=city, temperature_range="14-20C", conditions=ctx.context)
 
 
-class TestWeatherModel(TestModel):
+class TestWeatherModel(StaticTestModel):
     responses = [
         ModelResponse(
             output=[
@@ -343,7 +329,6 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
         model_activity = ModelActivity(
             TestProvider(
                 TestWeatherModel(  # type: ignore
-                    "", openai_client=AsyncOpenAI(api_key="Fake key")
                 )
             )
             if use_local_model
@@ -435,94 +420,8 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
                 )
 
 
-class TestPlannerModel(OpenAIResponsesModel):
-    __test__ = False
-
-    def __init__(
-        self,
-        model: str,
-        openai_client: AsyncOpenAI,
-    ) -> None:
-        super().__init__(model, openai_client)
-
-    async def get_response(
-        self,
-        system_instructions: Union[str, None],
-        input: Union[str, list[TResponseInputItem]],
-        model_settings: ModelSettings,
-        tools: list[Tool],
-        output_schema: Union[AgentOutputSchemaBase, None],
-        handoffs: list[Handoff],
-        tracing: ModelTracing,
-        previous_response_id: Union[str, None],
-        prompt: Union[ResponsePromptParam, None] = None,
-    ) -> ModelResponse:
-        return ModelResponse(
-            output=[
-                ResponseOutputMessage(
-                    id="",
-                    content=[
-                        ResponseOutputText(
-                            text='{"searches":[{"query":"best Caribbean surfing spots April","reason":"Identify locations with optimal surfing conditions in the Caribbean during April."},{"query":"top Caribbean islands for hiking April","reason":"Find Caribbean islands with excellent hiking opportunities that are ideal in April."},{"query":"Caribbean water sports destinations April","reason":"Locate Caribbean destinations offering a variety of water sports activities in April."},{"query":"surfing conditions Caribbean April","reason":"Understand the surfing conditions and which islands are suitable for surfing in April."},{"query":"Caribbean adventure travel hiking surfing","reason":"Explore adventure travel options that combine hiking and surfing in the Caribbean."},{"query":"best beaches for surfing Caribbean April","reason":"Identify which Caribbean beaches are renowned for surfing in April."},{"query":"Caribbean islands with national parks hiking","reason":"Find islands with national parks or reserves that offer hiking trails."},{"query":"Caribbean weather April surfing conditions","reason":"Research the weather conditions in April affecting surfing in the Caribbean."},{"query":"Caribbean water sports rentals April","reason":"Look for places where water sports equipment can be rented in the Caribbean during April."},{"query":"Caribbean multi-activity vacation packages","reason":"Look for vacation packages that offer a combination of surfing, hiking, and water sports."}]}',
-                            annotations=[],
-                            type="output_text",
-                        )
-                    ],
-                    role="assistant",
-                    status="completed",
-                    type="message",
-                )
-            ],
-            usage=Usage(),
-            response_id=None,
-        )
-
-
-class TestReportModel(OpenAIResponsesModel):
-    __test__ = False
-
-    def __init__(
-        self,
-        model: str,
-        openai_client: AsyncOpenAI,
-    ) -> None:
-        super().__init__(model, openai_client)
-
-    async def get_response(
-        self,
-        system_instructions: Union[str, None],
-        input: Union[str, list[TResponseInputItem]],
-        model_settings: ModelSettings,
-        tools: list[Tool],
-        output_schema: Union[AgentOutputSchemaBase, None],
-        handoffs: list[Handoff],
-        tracing: ModelTracing,
-        previous_response_id: Union[str, None],
-        prompt: Union[ResponsePromptParam, None] = None,
-    ) -> ModelResponse:
-        return ModelResponse(
-            output=[
-                ResponseOutputMessage(
-                    id="",
-                    content=[
-                        ResponseOutputText(
-                            text="report",
-                            annotations=[],
-                            type="output_text",
-                        )
-                    ],
-                    role="assistant",
-                    status="completed",
-                    type="message",
-                )
-            ],
-            usage=Usage(),
-            response_id=None,
-        )
-
-
 @no_type_check
-class TestResearchModel(TestModel):
+class TestResearchModel(StaticTestModel):
     responses = [
         ModelResponse(
             output=[
@@ -620,9 +519,7 @@ async def test_research_workflow(client: Client, use_local_model: bool):
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
             TestProvider(
-                TestResearchModel(  # type: ignore
-                    "", openai_client=AsyncOpenAI(api_key="Fake key")
-                )
+                TestResearchModel()
             )
             if use_local_model
             else None
@@ -638,7 +535,7 @@ async def test_research_workflow(client: Client, use_local_model: bool):
                 "Caribbean vacation spots in April, optimizing for surfing, hiking and water sports",
                 id=f"research-workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=120),
+                execution_timeout=timedelta(seconds=10),
             )
             result = await workflow_handle.result()
 
@@ -750,7 +647,7 @@ class AgentsAsToolsWorkflow:
         return synthesizer_result.final_output
 
 
-class AgentAsToolsModel(TestModel):
+class AgentAsToolsModel(StaticTestModel):
     responses = [
         ModelResponse(
             output=[
@@ -839,7 +736,6 @@ async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
         model_activity = ModelActivity(
             TestProvider(
                 AgentAsToolsModel(  # type: ignore
-                    "", openai_client=AsyncOpenAI(api_key="Fake key")
                 )
             )
             if use_local_model
@@ -1006,7 +902,7 @@ class ProcessUserMessageInput(BaseModel):
     chat_length: int
 
 
-class CustomerServiceModel(TestModel):
+class CustomerServiceModel(StaticTestModel):
     responses = [
         ModelResponse(
             output=[
@@ -1197,7 +1093,6 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
         model_activity = ModelActivity(
             TestProvider(
                 CustomerServiceModel(  # type: ignore
-                    "", openai_client=AsyncOpenAI(api_key="Fake key")
                 )
             )
             if use_local_model
@@ -1519,7 +1414,7 @@ async def test_input_guardrail(client: Client, use_local_model: bool):
                 assert result[1] == "Sorry, I can't help you with your math homework."
 
 
-class OutputGuardrailModel(TestModel):
+class OutputGuardrailModel(StaticTestModel):
     responses = [
         ModelResponse(
             output=[
@@ -1606,7 +1501,6 @@ async def test_output_guardrail(client: Client, use_local_model: bool):
         model_activity = ModelActivity(
             TestProvider(
                 OutputGuardrailModel(  # type: ignore
-                    "", openai_client=AsyncOpenAI(api_key="Fake key")
                 )
             )
             if use_local_model

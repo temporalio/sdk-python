@@ -268,15 +268,13 @@ class workflow:
                     "You must return a string representation of the tool output, or something we can call str() on"
                 ) from e
 
-        tool = FunctionTool(
+        return FunctionTool(
             name=schema.name,
             description=schema.description or "",
             params_json_schema=schema.params_json_schema,
             on_invoke_tool=run_activity,
             strict_json_schema=True,
         )
-        setattr(tool, "__temporal_tool_definition", True)
-        return tool
 
     @classmethod
     @overload
@@ -333,7 +331,7 @@ class workflow:
         ] = True,
     ) -> Union[FunctionTool, Callable[[ToolFunction[...]], FunctionTool]]:
         """A temporal specific wrapper for OpenAI's @function_tool. This exists to ensure the user is aware that the function tool is workflow level code and must be deterministic."""
-        tool = function_tool(
+        return function_tool(
             func,  # type: ignore
             name_override=name_override,
             description_override=description_override,
@@ -343,5 +341,3 @@ class workflow:
             strict_mode=strict_mode,
             is_enabled=is_enabled,
         )
-        setattr(tool, "__temporal_tool_definition", True)
-        return tool
