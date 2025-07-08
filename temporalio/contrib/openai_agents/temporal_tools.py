@@ -228,6 +228,7 @@ def adapt_nexus_operation_function_schema(fn: Callable[..., Any]) -> Callable[..
         pass
 
     adapted.__annotations__ = {"input": input_type, "return": ret_type}
+    adapted.__name__ = fn.__name__
     return adapted
 
 
