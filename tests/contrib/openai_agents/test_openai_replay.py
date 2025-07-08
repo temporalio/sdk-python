@@ -1,16 +1,12 @@
-from datetime import timedelta
 from pathlib import Path
 
 import pytest
 
 from temporalio.client import WorkflowHistory
-from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
-from temporalio.contrib.openai_agents.open_ai_data_converter import (
-    open_ai_data_converter,
-)
 from temporalio.contrib.openai_agents.temporal_openai_agents import (
     set_open_ai_agent_temporal_overrides,
 )
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Replayer
 from tests.contrib.openai_agents.test_openai import (
     AgentsAsToolsWorkflow,
@@ -39,10 +35,7 @@ async def test_replay(file_name: str) -> None:
     with (Path(__file__).with_name("histories") / file_name).open("r") as f:
         history_json = f.read()
 
-        model_params = ModelActivityParameters(
-            start_to_close_timeout=timedelta(seconds=120)
-        )
-        with set_open_ai_agent_temporal_overrides(model_params):
+        with set_open_ai_agent_temporal_overrides():
             await Replayer(
                 workflows=[
                     ResearchWorkflow,
@@ -53,5 +46,5 @@ async def test_replay(file_name: str) -> None:
                     InputGuardrailWorkflow,
                     OutputGuardrailWorkflow,
                 ],
-                data_converter=open_ai_data_converter,
+                data_converter=pydantic_data_converter,
             ).replay_workflow(WorkflowHistory.from_json("fake", history_json))
