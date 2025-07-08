@@ -13,8 +13,6 @@ from agents import (
     InputGuardrailTripwireTriggered,
     ItemHelpers,
     MessageOutputItem,
-    Model,
-    ModelProvider,
     ModelResponse,
     ModelSettings,
     ModelTracing,
@@ -28,7 +26,7 @@ from agents import (
     handoff,
     input_guardrail,
     output_guardrail,
-    trace,
+    trace, function_tool,
 )
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
 from agents.items import (
@@ -779,7 +777,7 @@ class AirlineAgentContext(BaseModel):
     flight_number: Optional[str] = None
 
 
-@openai_agents.workflow.tool(
+@function_tool(
     name_override="faq_lookup_tool",
     description_override="Lookup frequently asked questions.",
 )
@@ -801,7 +799,7 @@ async def faq_lookup_tool(question: str) -> str:
     return "I'm sorry, I don't know the answer to that question."
 
 
-@openai_agents.workflow.tool
+@function_tool
 async def update_seat(
     context: RunContextWrapper[AirlineAgentContext],
     confirmation_number: str,
@@ -1503,3 +1501,86 @@ async def test_output_guardrail(client: Client, use_local_model: bool):
 
             if use_local_model:
                 assert not result
+
+class WorkflowToolModel(StaticTestModel):
+    responses = [
+        ModelResponse(
+            output=[
+                ResponseFunctionToolCall(
+                    arguments='{}',
+                    call_id="call",
+                    name="run_tool",
+                    type="function_call",
+                    id="id",
+                    status="completed",
+                )
+            ],
+            usage=Usage(),
+            response_id=None,
+        ),
+        ModelResponse(
+            output=[
+                ResponseOutputMessage(
+                    id="",
+                    content=[
+                        ResponseOutputText(
+                            text='',
+                            annotations=[],
+                            type="output_text",
+                        )
+                    ],
+                    role="assistant",
+                    status="completed",
+                    type="message",
+                )
+            ],
+            usage=Usage(),
+            response_id=None,
+        )
+    ]
+
+
+@workflow.defn
+class WorkflowToolWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        agent = Agent(
+            name="Assistant",
+            instructions="You are a helpful assistant.",
+            tools=[function_tool(self.run_tool)]
+        )
+        await Runner.run(
+            agent,
+            "My phone number is 650-123-4567. Where do you think I live?",
+        )
+
+    async def run_tool(self):
+        print("Tool ran with self:", self)
+        workflow.logger.info("Tool ran with self: %s", self)
+        return None
+
+async def test_workflow_method_tools(client: Client):
+    new_config = client.config()
+    new_config["data_converter"] = pydantic_data_converter
+    client = Client(**new_config)
+
+    with set_open_ai_agent_temporal_overrides():
+        model_activity = ModelActivity(
+            TestModelProvider(
+                WorkflowToolModel()
+            )
+        )
+        async with new_worker(
+                client,
+                WorkflowToolWorkflow,
+                activities=[model_activity.invoke_model_activity],
+                interceptors=[OpenAIAgentsTracingInterceptor()],
+        ) as worker:
+            workflow_handle = await client.start_workflow(
+                WorkflowToolWorkflow.run,
+                id=f"workflow-tool-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=10),
+            )
+            result = await workflow_handle.result()
+            assert result is None
