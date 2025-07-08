@@ -69,6 +69,7 @@ class _ActivityWorker:
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         metric_meter: temporalio.common.MetricMeter,
+        encode_headers: bool,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._task_queue = task_queue
@@ -78,6 +79,7 @@ class _ActivityWorker:
         self._data_converter = data_converter
         self._interceptors = interceptors
         self._metric_meter = metric_meter
+        self._encode_headers = encode_headers
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
         # Lazily created on first activity
         self._worker_shutdown_event: Optional[temporalio.activity._CompositeEvent] = (
@@ -543,6 +545,14 @@ class _ActivityWorker:
             workflow_type=start.workflow_type,
             priority=temporalio.common.Priority._from_proto(start.priority),
         )
+
+        if self._encode_headers and self._data_converter.payload_codec is not None:
+            for payload in start.header_fields.values():
+                new_payload = (
+                    await self._data_converter.payload_codec.decode([payload])
+                )[0]
+                payload.CopyFrom(new_payload)
+
         running_activity.info = info
         input = ExecuteActivityInput(
             fn=activity_def.fn,

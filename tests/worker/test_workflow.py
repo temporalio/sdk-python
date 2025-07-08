@@ -58,8 +58,12 @@ from temporalio.bridge.proto.workflow_completion import WorkflowActivationComple
 from temporalio.client import (
     AsyncActivityCancelledError,
     Client,
+    CreateScheduleInput,
     RPCError,
     RPCStatusCode,
+    ScheduleActionStartWorkflow,
+    ScheduleHandle,
+    SignalWorkflowInput,
     WorkflowExecutionStatus,
     WorkflowFailureError,
     WorkflowHandle,
@@ -70,6 +74,7 @@ from temporalio.client import (
     WorkflowUpdateStage,
 )
 from temporalio.common import (
+    HeaderCodecBehavior,
     Priority,
     RawValue,
     RetryPolicy,
@@ -110,6 +115,8 @@ from temporalio.runtime import (
 from temporalio.service import __version__
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
+    ExecuteWorkflowInput,
+    HandleSignalInput,
     UnsandboxedWorkflowRunner,
     Worker,
     WorkflowInstance,
@@ -8113,3 +8120,183 @@ async def test_signal_handler_in_interceptor(client: Client):
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+
+
+class HeaderWorkerInterceptor(temporalio.worker.Interceptor):
+    def intercept_activity(
+        self, next: temporalio.worker.ActivityInboundInterceptor
+    ) -> temporalio.worker.ActivityInboundInterceptor:
+        return HeaderActivityInboundInterceptor(super().intercept_activity(next))
+
+    def workflow_interceptor_class(
+        self, input: temporalio.worker.WorkflowInterceptorClassInput
+    ) -> Optional[Type[temporalio.worker.WorkflowInboundInterceptor]]:
+        return HeaderWorkflowInboundInterceptor
+
+
+global_header_codec_behavior: HeaderCodecBehavior
+
+
+class HeaderActivityInboundInterceptor(temporalio.worker.ActivityInboundInterceptor):
+    async def execute_activity(
+        self, input: temporalio.worker.ExecuteActivityInput
+    ) -> Any:
+        if global_header_codec_behavior == HeaderCodecBehavior.WORKFLOW_ONLY_CODEC:
+            assert input.headers["foo"].data == b"\n\x05\x12\x03bar"
+        else:
+            assert input.headers["foo"].data == b"bar"
+
+        return await super().execute_activity(input)
+
+
+class HeaderWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterceptor):
+    def init(self, outbound: temporalio.worker.WorkflowOutboundInterceptor) -> None:
+        super().init(HeaderWorkflowOutboundInterceptor(outbound))
+
+    async def handle_signal(self, input: HandleSignalInput) -> None:
+        assert input.headers["foo"].data == b"bar"
+        await super().handle_signal(input)
+
+    async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
+        assert input.headers["foo"].data == b"bar"
+        return await super().execute_workflow(input)
+
+
+class HeaderWorkflowOutboundInterceptor(temporalio.worker.WorkflowOutboundInterceptor):
+    def start_activity(
+        self, input: temporalio.worker.StartActivityInput
+    ) -> workflow.ActivityHandle:
+        # Add a header to the outbound activity call
+        input.headers = {"foo": Payload(data=b"bar")}
+        return super().start_activity(input)
+
+
+class HeaderClientInterceptor(temporalio.client.Interceptor):
+    def __init__(self, header: Payload):
+        self.header = header
+        super().__init__()
+
+    def intercept_client(
+        self, next: temporalio.client.OutboundInterceptor
+    ) -> temporalio.client.OutboundInterceptor:
+        return HeaderClientOutboundInterceptor(
+            super().intercept_client(next), self.header
+        )
+
+
+class HeaderClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
+    def __init__(
+        self, next: temporalio.client.OutboundInterceptor, header: Payload
+    ) -> None:
+        self.header = header
+        super().__init__(next)
+
+    async def start_workflow(
+        self, input: temporalio.client.StartWorkflowInput
+    ) -> WorkflowHandle[Any, Any]:
+        input.headers = {"foo": self.header.__deepcopy__()}
+        return await super().start_workflow(input)
+
+    async def signal_workflow(self, input: SignalWorkflowInput) -> None:
+        input.headers = {"foo": self.header.__deepcopy__()}
+        return await super().signal_workflow(input)
+
+    async def create_schedule(self, input: CreateScheduleInput) -> ScheduleHandle:
+        cast(ScheduleActionStartWorkflow, input.schedule.action).headers = {
+            "foo": self.header.__deepcopy__()
+        }
+        return await super().create_schedule(input)
+
+
+@pytest.mark.parametrize(
+    "header_codec_behavior",
+    [
+        HeaderCodecBehavior.NO_CODEC,
+        HeaderCodecBehavior.CODEC,
+        HeaderCodecBehavior.WORKFLOW_ONLY_CODEC,
+    ],
+)
+async def test_workflow_headers_with_codec(
+    client: Client, env: WorkflowEnvironment, header_codec_behavior: HeaderCodecBehavior
+):
+    if env.supports_time_skipping:
+        pytest.skip("Time skipping server doesn't persist headers.")
+
+    header_payload = Payload(data=b"bar")
+    if header_codec_behavior == HeaderCodecBehavior.WORKFLOW_ONLY_CODEC:
+        header_payload = (await SimpleCodec().encode([header_payload]))[0]
+
+    # Make client with this codec and run a couple of existing tests
+    config = client.config()
+    config["data_converter"] = DataConverter(payload_codec=SimpleCodec())
+    config["interceptors"] = [HeaderClientInterceptor(header_payload)]
+    config["header_codec_behavior"] = header_codec_behavior
+    client = Client(**config)
+
+    global global_header_codec_behavior
+    global_header_codec_behavior = header_codec_behavior
+
+    async with new_worker(
+        client,
+        SimpleActivityWorkflow,
+        SignalAndQueryWorkflow,
+        activities=[say_hello],
+        interceptors=[HeaderWorkerInterceptor()],
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            SimpleActivityWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert await workflow_handle.result() == "Hello, Temporal!"
+
+        async for e in workflow_handle.fetch_history_events():
+            if e.HasField("activity_task_scheduled_event_attributes"):
+                header = e.activity_task_scheduled_event_attributes.header.fields["foo"]
+                if header_codec_behavior == HeaderCodecBehavior.CODEC:
+                    assert "simple-codec" in header.metadata
+
+        handle = await client.start_workflow(
+            SignalAndQueryWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Simple signals and queries
+        await handle.signal(SignalAndQueryWorkflow.signal1, "some arg")
+        assert "signal1: some arg" == await handle.query(
+            SignalAndQueryWorkflow.last_event
+        )
+
+        async for e in handle.fetch_history_events():
+            if e.HasField("workflow_execution_signaled_event_attributes"):
+                header = e.workflow_execution_signaled_event_attributes.header.fields[
+                    "foo"
+                ]
+                if header_codec_behavior == HeaderCodecBehavior.CODEC:
+                    assert "simple-codec" in header.metadata
+
+        schedule_handle = await client.create_schedule(
+            f"schedule-{uuid.uuid4()}",
+            temporalio.client.Schedule(
+                action=temporalio.client.ScheduleActionStartWorkflow(
+                    "SimpleActivityWorkflow",
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                ),
+                spec=temporalio.client.ScheduleSpec(
+                    calendars=[temporalio.client.ScheduleCalendarSpec()]
+                ),
+                state=temporalio.client.ScheduleState(paused=True),
+            ),
+        )
+        description = await schedule_handle.describe()
+
+        # Header payload is still encoded due to limitations
+        headers = cast(ScheduleActionStartWorkflow, description.schedule.action).headers
+        assert headers is not None
+        if header_codec_behavior == HeaderCodecBehavior.NO_CODEC:
+            assert headers["foo"].data == b"bar"
+        else:
+            assert headers["foo"].data != b"bar"
