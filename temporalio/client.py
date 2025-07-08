@@ -3871,7 +3871,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
     """
     Headers may still be encoded by the payload codec if present.
     """
-    _from_raw: bool = dataclasses.field(compare=False)
+    _from_raw: bool = dataclasses.field(compare=False, init=False)
 
     @staticmethod
     def _from_proto(  # pyright: ignore
