@@ -104,27 +104,6 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         raise NotImplementedError(
             "Temporal Nexus operation handlers do not support fetching the operation result."
         )
-        # An implementation is provided for future reference:
-        # TODO: honor `wait` param and Request-Timeout header
-        # try:
-        #     nexus_handle = WorkflowHandle[OutputT].from_token(token)
-        # except Exception as err:
-        #     raise HandlerError(
-        #         "Failed to decode operation token as workflow operation token. "
-        #         "Fetching result for non-workflow operations is not supported.",
-        #         type=HandlerErrorType.NOT_FOUND,
-        #     ) from err
-        # ctx = _temporal_fetch_operation_context.get()
-        # try:
-        #     client_handle = nexus_handle.to_workflow_handle(
-        #         ctx.client, result_type=self._output_type
-        #     )
-        # except Exception as err:
-        #     raise HandlerError(
-        #         "Failed to construct workflow handle from workflow operation token",
-        #         type=HandlerErrorType.NOT_FOUND,
-        #     ) from err
-        # return await client_handle.result()
 
 
 async def _cancel_workflow(
