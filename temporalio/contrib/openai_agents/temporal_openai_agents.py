@@ -140,16 +140,16 @@ class TestModel(Model):
 
     def stream_response(
         self,
-        system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        system_instructions: Optional[str],
+        input: Union[str, list[TResponseInputItem]],
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: AgentOutputSchemaBase | None,
+        output_schema: Optional[AgentOutputSchemaBase],
         handoffs: list[Handoff],
         tracing: ModelTracing,
         *,
-        previous_response_id: str | None,
-        prompt: ResponsePromptParam | None,
+        previous_response_id: Optional[str],
+        prompt: Optional[ResponsePromptParam],
     ) -> AsyncIterator[TResponseStreamEvent]:
         """Get a streamed response from the model. Unimplemented."""
         raise NotImplementedError()
