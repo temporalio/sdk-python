@@ -8154,6 +8154,7 @@ class HeaderWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundIntercep
         super().init(HeaderWorkflowOutboundInterceptor(outbound))
 
     async def handle_signal(self, input: HandleSignalInput) -> None:
+        print("Signal header inbound:", input.headers)
         assert input.headers["foo"].data == b"bar"
         await super().handle_signal(input)
 
@@ -8198,6 +8199,7 @@ class HeaderClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
         return await super().start_workflow(input)
 
     async def signal_workflow(self, input: SignalWorkflowInput) -> None:
+        print("Signal header:", self.header)
         input.headers = {"foo": self.header.__deepcopy__()}
         return await super().signal_workflow(input)
 
