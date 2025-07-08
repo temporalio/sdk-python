@@ -464,9 +464,17 @@ class Client:
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
-        stack_level: int = 2,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        # The following options should not be considered part of the public API. They
+        # are deliberately not exposed in overloads, and are not subject to any
+        # backwards compatibility guarantees.
+        callbacks: Sequence[Callback] = [],
+        workflow_event_links: Sequence[
+            temporalio.api.common.v1.Link.WorkflowEvent
+        ] = [],
+        request_id: Optional[str] = None,
+        stack_level: int = 2,
     ) -> WorkflowHandle[Any, Any]:
         """Start a workflow and return its handle.
 
@@ -529,7 +537,6 @@ class Client:
         name, result_type_from_type_hint = (
             temporalio.workflow._Definition.get_name_and_result_type(workflow)
         )
-
         return await self._impl.start_workflow(
             StartWorkflowInput(
                 workflow=name,
@@ -557,6 +564,9 @@ class Client:
                 rpc_timeout=rpc_timeout,
                 request_eager_start=request_eager_start,
                 priority=priority,
+                callbacks=callbacks,
+                workflow_event_links=workflow_event_links,
+                request_id=request_id,
             )
         )
 
@@ -5193,6 +5203,10 @@ class StartWorkflowInput:
     rpc_timeout: Optional[timedelta]
     request_eager_start: bool
     priority: temporalio.common.Priority
+    # The following options are experimental and unstable.
+    callbacks: Sequence[Callback]
+    workflow_event_links: Sequence[temporalio.api.common.v1.Link.WorkflowEvent]
+    request_id: Optional[str]
     versioning_override: Optional[temporalio.common.VersioningOverride] = None
 
 
@@ -5807,8 +5821,30 @@ class _ClientImpl(OutboundInterceptor):
         self, input: StartWorkflowInput
     ) -> temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest:
         req = temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest()
-        req.request_eager_execution = input.request_eager_start
         await self._populate_start_workflow_execution_request(req, input)
+        # _populate_start_workflow_execution_request is used for both StartWorkflowInput
+        # and UpdateWithStartStartWorkflowInput. UpdateWithStartStartWorkflowInput does
+        # not have the following two fields so they are handled here.
+        req.request_eager_execution = input.request_eager_start
+        if input.request_id:
+            req.request_id = input.request_id
+
+        links = [
+            temporalio.api.common.v1.Link(workflow_event=link)
+            for link in input.workflow_event_links
+        ]
+        req.completion_callbacks.extend(
+            temporalio.api.common.v1.Callback(
+                nexus=temporalio.api.common.v1.Callback.Nexus(
+                    url=callback.url,
+                    header=callback.headers,
+                ),
+                links=links,
+            )
+            for callback in input.callbacks
+        )
+        # Links are duplicated on request for compatibility with older server versions.
+        req.links.extend(links)
         return req
 
     async def _build_signal_with_start_workflow_execution_request(
@@ -7229,6 +7265,25 @@ class CloudOperationsClient:
         # Update config and perform update
         self.service_client.config.api_key = value
         self.service_client.update_api_key(value)
+
+
+@dataclass(frozen=True)
+class NexusCallback:
+    """Nexus callback to attach to events such as workflow completion.
+
+    .. warning::
+        This API is experimental and unstable.
+    """
+
+    url: str
+    """Callback URL."""
+
+    headers: Mapping[str, str]
+    """Header to attach to callback request."""
+
+
+# Intended to become a union of callback types
+Callback = NexusCallback
 
 
 async def _encode_user_metadata(
