@@ -572,7 +572,7 @@ impl WorkerRef {
             let bytes = match worker.poll_nexus_task().await {
                 Ok(task) => task.encode_to_vec(),
                 Err(PollError::ShutDown) => return Err(PollShutdownError::new_err(())),
-                Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {}", err))),
+                Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {err}"))),
             };
             Ok(bytes)
         })
@@ -618,7 +618,7 @@ impl WorkerRef {
 ) -> PyResult<Bound<'p, PyAny>> {
         let worker = self.worker.as_ref().unwrap().clone();
         let completion = NexusTaskCompletion::decode(proto.as_bytes())
-            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
+            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
         self.runtime.future_into_py(py, async move {
             worker
                 .complete_nexus_task(completion)
