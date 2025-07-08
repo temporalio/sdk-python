@@ -480,6 +480,7 @@ SandboxRestrictions.passthrough_modules_with_temporal = (
         # https://wrapt.readthedocs.io/en/latest/issues.html#using-issubclass-on-abstract-classes
         "asyncio",
         "abc",
+        "nexusrpc",
         "temporalio",
         # Due to pkg_resources use of base classes caused by the ABC issue
         # above, and Otel's use of pkg_resources, we pass it through
