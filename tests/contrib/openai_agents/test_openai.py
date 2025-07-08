@@ -23,10 +23,11 @@ from agents import (
     Tool,
     TResponseInputItem,
     Usage,
+    function_tool,
     handoff,
     input_guardrail,
     output_guardrail,
-    trace, function_tool,
+    trace,
 )
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
 from agents.items import (
@@ -1502,12 +1503,13 @@ async def test_output_guardrail(client: Client, use_local_model: bool):
             if use_local_model:
                 assert not result
 
+
 class WorkflowToolModel(StaticTestModel):
     responses = [
         ModelResponse(
             output=[
                 ResponseFunctionToolCall(
-                    arguments='{}',
+                    arguments="{}",
                     call_id="call",
                     name="run_tool",
                     type="function_call",
@@ -1524,7 +1526,7 @@ class WorkflowToolModel(StaticTestModel):
                     id="",
                     content=[
                         ResponseOutputText(
-                            text='',
+                            text="",
                             annotations=[],
                             type="output_text",
                         )
@@ -1536,7 +1538,7 @@ class WorkflowToolModel(StaticTestModel):
             ],
             usage=Usage(),
             response_id=None,
-        )
+        ),
     ]
 
 
@@ -1544,10 +1546,10 @@ class WorkflowToolModel(StaticTestModel):
 class WorkflowToolWorkflow:
     @workflow.run
     async def run(self) -> None:
-        agent = Agent(
+        agent: Agent = Agent(
             name="Assistant",
             instructions="You are a helpful assistant.",
-            tools=[function_tool(self.run_tool)]
+            tools=[function_tool(self.run_tool)],
         )
         await Runner.run(
             agent,
@@ -1559,22 +1561,19 @@ class WorkflowToolWorkflow:
         workflow.logger.info("Tool ran with self: %s", self)
         return None
 
+
 async def test_workflow_method_tools(client: Client):
     new_config = client.config()
     new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
 
     with set_open_ai_agent_temporal_overrides():
-        model_activity = ModelActivity(
-            TestModelProvider(
-                WorkflowToolModel()
-            )
-        )
+        model_activity = ModelActivity(TestModelProvider(WorkflowToolModel()))
         async with new_worker(
-                client,
-                WorkflowToolWorkflow,
-                activities=[model_activity.invoke_model_activity],
-                interceptors=[OpenAIAgentsTracingInterceptor()],
+            client,
+            WorkflowToolWorkflow,
+            activities=[model_activity.invoke_model_activity],
+            interceptors=[OpenAIAgentsTracingInterceptor()],
         ) as worker:
             workflow_handle = await client.start_workflow(
                 WorkflowToolWorkflow.run,
@@ -1582,5 +1581,4 @@ async def test_workflow_method_tools(client: Client):
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=10),
             )
-            result = await workflow_handle.result()
-            assert result is None
+            await workflow_handle.result()
