@@ -144,6 +144,9 @@ async def test_async_operation_lifecycle(
         Type[MyServiceHandlerWithNonAsyncDefs],
     ],
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     task_executor = await TaskExecutor.connect()
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id

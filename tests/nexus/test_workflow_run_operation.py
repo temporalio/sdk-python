@@ -90,6 +90,9 @@ async def test_workflow_run_operation(
     env: WorkflowEnvironment,
     service_handler_cls: Type[Any],
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
     assert (service_defn := nexusrpc.get_service_definition(service_handler_cls))

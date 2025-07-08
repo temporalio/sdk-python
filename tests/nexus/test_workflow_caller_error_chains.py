@@ -20,6 +20,7 @@ from temporalio.exceptions import (
     ApplicationError,
     NexusOperationError,
 )
+from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
@@ -398,8 +399,11 @@ class ErrorTestCallerWorkflow:
 
 @pytest.mark.parametrize("test_case", list(error_conversion_test_cases.values()))
 async def test_errors_raised_by_nexus_operation(
-    client: Client, test_case: type[ErrorConversionTestCase]
+    client: Client, env: WorkflowEnvironment, test_case: type[ErrorConversionTestCase]
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,

@@ -8,6 +8,7 @@ from nexusrpc.handler import sync_operation
 from temporalio import nexus, workflow
 from temporalio.client import Client
 from temporalio.nexus._util import get_operation_factory
+from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint
 
@@ -69,7 +70,11 @@ class MyServiceHandlerWithWorkflowRunOperation:
 
 async def test_run_nexus_service_from_programmatically_created_service_handler(
     client: Client,
+    env: WorkflowEnvironment,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     task_queue = str(uuid.uuid4())
 
     service_handler = nexusrpc.handler._core.ServiceHandler(

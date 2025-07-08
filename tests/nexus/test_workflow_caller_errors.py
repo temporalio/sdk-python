@@ -31,6 +31,7 @@ from temporalio.exceptions import (
     NexusOperationError,
     TimeoutError,
 )
+from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import assert_eq_eventually
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
@@ -107,7 +108,12 @@ class CallerWorkflow:
         "retried_due_to_internal_handler_error",
     ],
 )
-async def test_nexus_operation_is_retried(client: Client, operation_name: str):
+async def test_nexus_operation_is_retried(
+    client: Client, env: WorkflowEnvironment, operation_name: str
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     input = ErrorTestInput(
         service_name="ErrorTestService",
         operation_name=operation_name,
@@ -154,10 +160,14 @@ async def test_nexus_operation_is_retried(client: Client, operation_name: str):
 )
 async def test_nexus_operation_fails_without_retry_as_handler_error(
     client: Client,
+    env: WorkflowEnvironment,
     operation_name: str,
     handler_error_type: nexusrpc.HandlerErrorType,
     handler_error_message: str,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     input = ErrorTestInput(
         service_name=(
             "ErrorTestService"
@@ -224,7 +234,12 @@ class StartTimeoutTestCallerWorkflow:
         )
 
 
-async def test_error_raised_by_timeout_of_nexus_start_operation(client: Client):
+async def test_error_raised_by_timeout_of_nexus_start_operation(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
@@ -302,7 +317,12 @@ class CancellationTimeoutTestCallerWorkflow:
         await op_handle
 
 
-async def test_error_raised_by_timeout_of_nexus_cancel_operation(client: Client):
+async def test_error_raised_by_timeout_of_nexus_cancel_operation(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     pytest.skip("TODO(nexus-prerelease): finish writing this test")
     task_queue = str(uuid.uuid4())
     async with Worker(

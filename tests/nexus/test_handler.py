@@ -562,6 +562,9 @@ async def test_start_operation_happy_path(
     with_service_definition: bool,
     env: WorkflowEnvironment,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     if with_service_definition:
         await _test_start_operation_with_service_definition(test_case, env)
     else:
@@ -582,6 +585,9 @@ async def test_start_operation_happy_path(
 async def test_start_operation_protocol_level_failures(
     test_case: Type[_TestCase], env: WorkflowEnvironment
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     await _test_start_operation_with_service_definition(test_case, env)
 
 
@@ -596,6 +602,9 @@ async def test_start_operation_protocol_level_failures(
 async def test_start_operation_operation_failures(
     test_case: Type[_TestCase], env: WorkflowEnvironment
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     await _test_start_operation_with_service_definition(test_case, env)
 
 
@@ -722,6 +731,9 @@ class AsyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
 async def test_start_operation_without_type_annotations(
     test_case: Type[_TestCase], env: WorkflowEnvironment
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     if test_case.skip:
         pytest.skip(test_case.skip)
     task_queue = str(uuid.uuid4())
@@ -765,6 +777,9 @@ def test_operation_without_type_annotations_without_service_definition_raises_va
 
 
 async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: Any):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     task_queue = str(uuid.uuid4())
     service_name = MyService.__name__
     operation_name = "log"
@@ -923,6 +938,9 @@ async def test_handler_instantiation(
 
 
 async def test_cancel_operation_with_invalid_token(env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     """Verify that canceling an operation with an invalid token fails correctly."""
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
@@ -953,6 +971,9 @@ async def test_cancel_operation_with_invalid_token(env: WorkflowEnvironment):
 async def test_request_id_is_received_by_sync_operation(
     env: WorkflowEnvironment,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
     service_client = ServiceClient(
@@ -1019,6 +1040,9 @@ class ServiceHandlerForRequestIdTest:
 
 
 async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     # We send two Nexus requests that would start a workflow with the same workflow ID,
     # using reuse_policy=REJECT_DUPLICATE. This would fail if they used different
     # request IDs. However, when we use the same request ID, it does not fail,

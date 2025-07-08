@@ -47,6 +47,7 @@ from temporalio.exceptions import (
 )
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.service import RPCError, RPCStatusCode
+from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
@@ -443,11 +444,15 @@ class UntypedCallerWorkflow:
 )
 async def test_sync_response(
     client: Client,
+    env: WorkflowEnvironment,
     exception_in_operation_start: bool,
     request_cancel: bool,
     op_definition_type: OpDefinitionType,
     caller_reference: CallerReference,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
@@ -514,11 +519,15 @@ async def test_sync_response(
 )
 async def test_async_response(
     client: Client,
+    env: WorkflowEnvironment,
     exception_in_operation_start: bool,
     request_cancel: bool,
     op_definition_type: OpDefinitionType,
     caller_reference: CallerReference,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
@@ -669,11 +678,15 @@ async def _start_wf_and_nexus_op(
 @pytest.mark.parametrize("response_type", [SyncResponse, AsyncResponse])
 async def test_untyped_caller(
     client: Client,
+    env: WorkflowEnvironment,
     exception_in_operation_start: bool,
     op_definition_type: OpDefinitionType,
     caller_reference: CallerReference,
     response_type: ResponseType,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
@@ -830,7 +843,12 @@ class ServiceInterfaceAndImplCallerWorkflow:
 # TODO(nexus-prerelease): check missing decorator behavior
 
 
-async def test_service_interface_and_implementation_names(client: Client):
+async def test_service_interface_and_implementation_names(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     # Note that:
     # - The caller can specify the service & operation via a reference to either the
     #   interface or implementation class.
@@ -956,7 +974,11 @@ class WorkflowCallingNexusOperationThatExecutesWorkflowBeforeStartingBackingWork
 
 async def test_workflow_run_operation_can_execute_workflow_before_starting_backing_workflow(
     client: Client,
+    env: WorkflowEnvironment,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
@@ -1222,7 +1244,12 @@ class OverloadTestCallerWorkflow:
         "by_name_multi_param",
     ],
 )
-async def test_workflow_run_operation_overloads(client: Client, op: str):
+async def test_workflow_run_operation_overloads(
+    client: Client, env: WorkflowEnvironment, op: str
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
