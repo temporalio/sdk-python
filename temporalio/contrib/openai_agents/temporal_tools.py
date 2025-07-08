@@ -7,12 +7,12 @@ import json
 from datetime import timedelta
 from typing import Any, Callable, Optional, Type, get_args, get_origin, get_type_hints
 
+import nexusrpc
 from pydantic import BaseModel, Field, create_model
 
 from temporalio import activity, workflow
 from temporalio.common import Priority, RetryPolicy
 from temporalio.exceptions import ApplicationError, TemporalError
-from temporalio.nexus._util import get_operation_factory
 from temporalio.workflow import ActivityCancellationType, VersioningIntent, unsafe
 
 with unsafe.imports_passed_through():
@@ -129,7 +129,7 @@ def activity_as_tool(
 
 
 def nexus_operation_as_tool(
-    fn: Callable[..., Any],
+    operation: nexusrpc.Operation[nexusrpc.InputT, nexusrpc.OutputT],
     *,
     service: Type[Any],
     endpoint: str,
@@ -159,30 +159,20 @@ def nexus_operation_as_tool(
         ApplicationError: If the operation is not properly decorated as a Nexus operation.
 
     Example:
-        >>> @service_handler
-        >>> class WeatherServiceHandler:
-        ...     @sync_operation
-        ...     async def get_weather_object(self, ctx: StartOperationContext, input: WeatherInput) -> Weather:
-        ...         return Weather(
-        ...             city=input.city, temperature_range="14-20C", conditions="Sunny with wind."
-        ...         )
+        >>> @nexusrpc.service
+        ... class WeatherService:
+        ...     get_weather_object_nexus_operation: nexusrpc.Operation[WeatherInput, Weather]
         >>>
         >>> # Create tool with custom activity options
         >>> tool = nexus_operation_as_tool(
-        ...     WeatherServiceHandler.get_weather_object,
-        ...     service=WeatherServiceHandler,
+        ...     WeatherService.get_weather_object_nexus_operation,
+        ...     service=WeatherService,
         ...     endpoint="weather-service",
         ... )
         >>> # Use tool with an OpenAI agent
     """
-    if not get_operation_factory(fn):
-        raise ApplicationError(
-            "Function is not a Nexus operation",
-            "invalid_tool",
-        )
-
     schema = function_schema(
-        adapt_nexus_operation_function_schema(fn),
+        adapt_nexus_operation_function_schema(operation),
         globalns=function_schema_globalns,
     )
 
@@ -199,7 +189,7 @@ def nexus_operation_as_tool(
         assert len(args) == 1, "Nexus operations must have exactly one argument"
         [arg] = args
         result = await nexus_client.execute_operation(
-            fn,
+            operation,
             arg,
             schedule_to_close_timeout=schedule_to_close_timeout,
         )
@@ -219,16 +209,17 @@ def nexus_operation_as_tool(
     )
 
 
-def adapt_nexus_operation_function_schema(fn: Callable[..., Any]) -> Callable[..., Any]:
-    # Nexus operation start methods look like
-    # async def operation(self, ctx: StartOperationContext, input: InputType) -> OutputType
-    _, input_type, ret_type = fn.__annotations__.values()
+def adapt_nexus_operation_function_schema(
+    operation: nexusrpc.Operation[nexusrpc.InputT, nexusrpc.OutputT],
+) -> Callable[[nexusrpc.InputT], nexusrpc.OutputT]:
+    def adapted(input: nexusrpc.InputT) -> nexusrpc.OutputT:
+        raise NotImplementedError("This function definition is used as a type only")
 
-    def adapted(input):
-        pass
-
-    adapted.__annotations__ = {"input": input_type, "return": ret_type}
-    adapted.__name__ = fn.__name__
+    adapted.__annotations__ = {
+        "input": operation.input_type,
+        "return": operation.output_type,
+    }
+    adapted.__name__ = operation.name
     return adapted
 
 

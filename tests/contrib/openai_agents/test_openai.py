@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Optional, Union, no_type_check
 
+import nexusrpc
 import pytest
-from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
 from pydantic import ConfigDict, Field
 
 from temporalio import activity, workflow
@@ -228,11 +228,16 @@ async def get_weather_object(input: WeatherInput) -> Weather:
     )
 
 
-@service_handler
+@nexusrpc.service
+class WeatherService:
+    get_weather_object_nexus_operation: nexusrpc.Operation[WeatherInput, Weather]
+
+
+@nexusrpc.handler.service_handler(service=WeatherService)
 class WeatherServiceHandler:
-    @sync_operation
+    @nexusrpc.handler.sync_operation
     async def get_weather_object_nexus_operation(
-        self, ctx: StartOperationContext, input: WeatherInput
+        self, ctx: nexusrpc.handler.StartOperationContext, input: WeatherInput
     ) -> Weather:
         return Weather(
             city=input.city, temperature_range="14-20C", conditions="Sunny with wind."
@@ -337,8 +342,8 @@ class ToolsWorkflow:
                     get_weather_country, start_to_close_timeout=timedelta(seconds=10)
                 ),
                 nexus_operation_as_tool(
-                    WeatherServiceHandler.get_weather_object_nexus_operation,
-                    service=WeatherServiceHandler,
+                    WeatherService.get_weather_object_nexus_operation,
+                    service=WeatherService,
                     endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
                     schedule_to_close_timeout=timedelta(seconds=10),
                 ),
