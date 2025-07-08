@@ -15,8 +15,8 @@ from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
 
 from temporalio import workflow
 from temporalio.common import Priority, RetryPolicy
+from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
-from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
 from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 
