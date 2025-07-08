@@ -56,11 +56,7 @@ The first file, `hello_world_workflow.py`, defines an OpenAI agent within a Temp
 ```python
 # File: hello_world_workflow.py
 from temporalio import workflow
-
-# Trusted imports bypass the Temporal sandbox, which otherwise
-# prevents imports which may result in non-deterministic execution.
-with workflow.unsafe.imports_passed_through():
-    from agents import Agent, Runner
+from agents import Agent, Runner
 
 @workflow.defn
 class HelloWorldAgent:
@@ -80,11 +76,6 @@ We annotate the `HelloWorldAgent` class with `@workflow.defn` to define a workfl
 We use the `Agent` class to define a simple agent, one which always responds with haikus.
 Within the workflow, we start the agent using the `Runner`, as is typical, passing through `prompt` as an argument.
 
-Perhaps the most interesting thing about this code is the `workflow.unsafe.imports_passed_through()` context manager that precedes the OpenAI Agents SDK imports.
-This statement tells Temporal to skip sandboxing for these trusted libraries.
-This is important because Python's dynamic nature forces Temporal's Python's sandbox to re-validate imports every time a workflow runs, which comes at a performance cost.
-The OpenAI Agents SDK also contains certain code that Temporal is not able to validate automatically for determinism.
-
 The second file, `run_worker.py`, launches a Temporal worker.
 This is a program that connects to the Temporal server and receives work to run, in this case `HelloWorldAgent` invocations.
 
@@ -95,10 +86,8 @@ import asyncio
 from datetime import timedelta
 
 from temporalio.client import Client
-from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
-from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
-from temporalio.contrib.openai_agents.open_ai_data_converter import open_ai_data_converter
-from temporalio.contrib.openai_agents.temporal_openai_agents import set_open_ai_agent_temporal_overrides
+from temporalio.contrib.openai_agents import ModelActivity, ModelActivityParameters, set_open_ai_agent_temporal_overrides
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
 from hello_world_workflow import HelloWorldAgent
@@ -115,15 +104,14 @@ async def worker_main():
         # Use the OpenAI data converter to ensure proper serialization/deserialization
         client = await Client.connect(
             "localhost:7233",
-            data_converter=open_ai_data_converter,
+            data_converter=pydantic_data_converter,
         )
 
-        model_activity = ModelActivity(model_provider=None)
         worker = Worker(
             client,
             task_queue="my-task-queue",
             workflows=[HelloWorldAgent],
-            activities=[model_activity.invoke_model_activity],
+            activities=[ModelActivity().invoke_model_activity],
         )
         await worker.run()
 
@@ -134,8 +122,8 @@ if __name__ == "__main__":
 
 We wrap the entire `worker_main` function body in the `set_open_ai_agent_temporal_overrides()` context manager.
 This causes a Temporal activity to be invoked whenever the OpenAI Agents SDK invokes an LLM or calls a tool.
-We also pass the `open_ai_data_converter` to the Temporal Client, which ensures proper serialization of OpenAI Agents SDK data.
-We create a `ModelActivity` which serves as a generic wrapper for LLM calls, and we register this wrapper's invocation point, `model_activity.invoke_model_activity`, with the worker.
+We also pass the `pydantic_data_converter` to the Temporal Client, which ensures proper serialization of pydantic models in OpenAI Agents SDK data.
+We create a `ModelActivity` which serves as a generic wrapper for LLM calls, and we register this wrapper's invocation point, `ModelActivity().invoke_model_activity`, with the worker.
 
 In order to launch the agent, use the standard Temporal workflow invocation:
 
@@ -146,7 +134,7 @@ import asyncio
 
 from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
-from temporalio.contrib.openai_agents.open_ai_data_converter import open_ai_data_converter
+from temporalio.contrib.pydantic import pydantic_data_converter
 
 from hello_world_workflow import HelloWorldAgent
 
@@ -154,7 +142,7 @@ async def main():
     # Create client connected to server at the given address
     client = await Client.connect(
         "localhost:7233",
-        data_converter=open_ai_data_converter,
+        data_converter=pydantic_data_converter,
     )
 
     # Execute a workflow
@@ -173,7 +161,7 @@ if __name__ == "__main__":
 
 This launcher script executes the Temporal workflow to start the agent.
 
-Note that this basic example works without providing the `open_ai_data_converter` to the Temporal client that executes the workflow, but we include it because more complex uses will generally need it.
+Note that this basic example works without providing the `pydantic_data_converter` to the Temporal client that executes the workflow, but we include it because more complex uses will generally need it.
 
 
 ## Using Temporal Activities as OpenAI Agents Tools
@@ -188,10 +176,8 @@ We then pass this through the `activity_as_tool` helper function to create an Op
 from dataclasses import dataclass
 from datetime import timedelta
 from temporalio import activity, workflow
-from temporalio.contrib.openai_agents.temporal_tools import activity_as_tool
-
-with workflow.unsafe.imports_passed_through():
-    from agents import Agent, Runner
+from temporalio.contrib import openai_agents
+from agents import Agent, Runner
 
 @dataclass
 class Weather:
@@ -212,7 +198,7 @@ class WeatherAgent:
             name="Weather Assistant",
             instructions="You are a helpful weather agent.",
             tools=[
-                activity_as_tool(
+                openai_agents.workflow.activity_as_tool(
                     get_weather, 
                     start_to_close_timeout=timedelta(seconds=10)
                 )
