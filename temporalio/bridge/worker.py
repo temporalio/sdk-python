@@ -27,6 +27,7 @@ import temporalio.api.history.v1
 import temporalio.bridge.client
 import temporalio.bridge.proto
 import temporalio.bridge.proto.activity_task
+import temporalio.bridge.proto.nexus
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.runtime
@@ -36,7 +37,7 @@ import temporalio.exceptions
 from temporalio.bridge.temporal_sdk_bridge import (
     CustomSlotSupplier as BridgeCustomSlotSupplier,
 )
-from temporalio.bridge.temporal_sdk_bridge import PollShutdownError
+from temporalio.bridge.temporal_sdk_bridge import PollShutdownError  # type: ignore
 
 
 @dataclass
@@ -61,6 +62,7 @@ class WorkerConfig:
     graceful_shutdown_period_millis: int
     nondeterminism_as_workflow_fail: bool
     nondeterminism_as_workflow_fail_for_types: Set[str]
+    nexus_task_poller_behavior: PollerBehavior
 
 
 @dataclass
@@ -217,6 +219,14 @@ class Worker:
             await self._ref.poll_activity_task()
         )
 
+    async def poll_nexus_task(
+        self,
+    ) -> temporalio.bridge.proto.nexus.NexusTask:
+        """Poll for a nexus task."""
+        return temporalio.bridge.proto.nexus.NexusTask.FromString(
+            await self._ref.poll_nexus_task()
+        )
+
     async def complete_workflow_activation(
         self,
         comp: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
@@ -229,6 +239,12 @@ class Worker:
     ) -> None:
         """Complete an activity task."""
         await self._ref.complete_activity_task(comp.SerializeToString())
+
+    async def complete_nexus_task(
+        self, comp: temporalio.bridge.proto.nexus.NexusTaskCompletion
+    ) -> None:
+        """Complete a nexus task."""
+        await self._ref.complete_nexus_task(comp.SerializeToString())
 
     def record_activity_heartbeat(
         self, comp: temporalio.bridge.proto.ActivityHeartbeat

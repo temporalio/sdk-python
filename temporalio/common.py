@@ -8,7 +8,7 @@ import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import Enum, IntEnum
+from enum import IntEnum
 from typing import (
     Any,
     Callable,
