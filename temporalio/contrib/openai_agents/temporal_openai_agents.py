@@ -1,18 +1,23 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
+import json
 from contextlib import contextmanager
-from typing import AsyncIterator, Callable, Optional, Union, overload
+from datetime import timedelta
+from typing import Any, AsyncIterator, Callable, Optional, Union, overload
 
 from agents.items import TResponseStreamEvent
 from openai.types.responses import ResponsePromptParam
 
+from temporalio import activity
 from temporalio import workflow as temporal_workflow
+from temporalio.common import Priority, RetryPolicy
 from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
     TemporalTraceProvider,
 )
 from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
-from temporalio.workflow import unsafe
+from temporalio.exceptions import ApplicationError, TemporalError
+from temporalio.workflow import ActivityCancellationType, VersioningIntent, unsafe
 
 with unsafe.imports_passed_through():
     from agents import (
@@ -24,13 +29,15 @@ with unsafe.imports_passed_through():
         ModelResponse,
         ModelSettings,
         ModelTracing,
+        RunContextWrapper,
         Tool,
         TResponseInputItem,
         set_trace_provider,
     )
-    from agents.function_schema import DocstringStyle
+    from agents.function_schema import DocstringStyle, function_schema
     from agents.run import get_default_agent_runner, set_default_agent_runner
     from agents.tool import (
+        FunctionTool,
         ToolErrorFunction,
         ToolFunction,
         default_tool_error_function,
@@ -146,21 +153,6 @@ class TestModel(Model):
     ) -> AsyncIterator[TResponseStreamEvent]:
         """Get a streamed response from the model. Unimplemented."""
         raise NotImplementedError()
-
-
-"""Support for using Temporal activities as OpenAI agents tools."""
-
-import json
-from datetime import timedelta
-from typing import Any, Callable, Optional
-
-from agents import FunctionTool, RunContextWrapper, Tool
-from agents.function_schema import function_schema
-
-from temporalio import activity
-from temporalio.common import Priority, RetryPolicy
-from temporalio.exceptions import ApplicationError, TemporalError
-from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 
 class ToolSerializationError(TemporalError):

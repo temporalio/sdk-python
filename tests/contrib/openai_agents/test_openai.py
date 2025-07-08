@@ -142,11 +142,7 @@ async def test_hello_world_agent(client: Client, use_local_model: bool):
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(
-                TestHelloModel()
-            )
-            if use_local_model
-            else None
+            TestProvider(TestHelloModel()) if use_local_model else None
         )
         async with new_worker(
             client, HelloWorldAgent, activities=[model_activity.invoke_model_activity]
@@ -518,11 +514,7 @@ async def test_research_workflow(client: Client, use_local_model: bool):
     )
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(
-                TestResearchModel()
-            )
-            if use_local_model
-            else None
+            TestProvider(TestResearchModel()) if use_local_model else None
         )
         async with new_worker(
             client,
