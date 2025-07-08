@@ -25,7 +25,6 @@ from agents import (
     Tool,
     TResponseInputItem,
     Usage,
-    function_tool,
     handoff,
     input_guardrail,
     output_guardrail,
@@ -37,7 +36,6 @@ from agents.items import (
     ToolCallItem,
     ToolCallOutputItem,
 )
-from agents.run import DEFAULT_AGENT_RUNNER, AgentRunner
 from openai import AsyncOpenAI, BaseModel
 from openai.types.responses import (
     ResponseFunctionToolCall,
@@ -51,72 +49,44 @@ from pydantic import ConfigDict, Field
 
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
-from temporalio.contrib.openai_agents.invoke_model_activity import (
+from temporalio.contrib import openai_agents
+from temporalio.contrib.openai_agents import (
     ModelActivity,
-)
-from temporalio.contrib.openai_agents.model_parameters import ModelActivityParameters
-from temporalio.contrib.openai_agents.open_ai_data_converter import (
-    open_ai_data_converter,
-)
-from temporalio.contrib.openai_agents.temporal_openai_agents import (
+    ModelActivityParameters,
+    OpenAIAgentsTracingInterceptor,
+    TestModel,
+    TestModelProvider,
     set_open_ai_agent_temporal_overrides,
 )
-from temporalio.contrib.openai_agents.temporal_tools import activity_as_tool
-from temporalio.contrib.openai_agents.trace_interceptor import (
-    OpenAIAgentsTracingInterceptor,
-)
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import CancelledError
 from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
 )
 from tests.helpers import new_worker
 
-
-class TestProvider(ModelProvider):
-    __test__ = False
-
-    def __init__(self, model: Model):
-        self._model = model
-
-    def get_model(self, model_name: Union[str, None]) -> Model:
-        return self._model
-
-
 response_index: int = 0
 
 
-class TestModel(OpenAIResponsesModel):
+class StaticTestModel(TestModel):
     __test__ = False
     responses: list[ModelResponse] = []
 
-    def __init__(
-        self,
-        model: str,
-        openai_client: AsyncOpenAI,
-    ) -> None:
-        global response_index
-        response_index = 0
-        super().__init__(model, openai_client)
-
-    async def get_response(
-        self,
-        system_instructions: Union[str, None],
-        input: Union[str, list[TResponseInputItem]],
-        model_settings: ModelSettings,
-        tools: list[Tool],
-        output_schema: Union[AgentOutputSchemaBase, None],
-        handoffs: list[Handoff],
-        tracing: ModelTracing,
-        previous_response_id: Union[str, None],
-        prompt: Union[ResponsePromptParam, None] = None,
-    ) -> ModelResponse:
+    def response(self):
         global response_index
         response = self.responses[response_index]
         response_index += 1
         return response
 
+    def __init__(
+        self,
+    ) -> None:
+        global response_index
+        response_index = 0
+        super().__init__(self.response)
 
-class TestHelloModel(TestModel):
+
+class TestHelloModel(StaticTestModel):
     responses = [
         ModelResponse(
             output=[
@@ -155,19 +125,13 @@ async def test_hello_world_agent(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = open_ai_data_converter
+    new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
 
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(
-                TestHelloModel(  # type: ignore
-                    "", openai_client=AsyncOpenAI(api_key="Fake key")
-                )
-            )
-            if use_local_model
-            else None
+            TestModelProvider(TestHelloModel()) if use_local_model else None
         )
         async with new_worker(
             client, HelloWorldAgent, activities=[model_activity.invoke_model_activity]
@@ -229,7 +193,7 @@ async def get_weather_context(ctx: RunContextWrapper[str], city: str) -> Weather
     return Weather(city=city, temperature_range="14-20C", conditions=ctx.context)
 
 
-class TestWeatherModel(TestModel):
+class TestWeatherModel(StaticTestModel):
     responses = [
         ModelResponse(
             output=[
@@ -317,16 +281,16 @@ class ToolsWorkflow:
             name="Tools Workflow",
             instructions="You are a helpful agent.",
             tools=[
-                activity_as_tool(
+                openai_agents.workflow.activity_as_tool(
                     get_weather, start_to_close_timeout=timedelta(seconds=10)
                 ),
-                activity_as_tool(
+                openai_agents.workflow.activity_as_tool(
                     get_weather_object, start_to_close_timeout=timedelta(seconds=10)
                 ),
-                activity_as_tool(
+                openai_agents.workflow.activity_as_tool(
                     get_weather_country, start_to_close_timeout=timedelta(seconds=10)
                 ),
-                activity_as_tool(
+                openai_agents.workflow.activity_as_tool(
                     get_weather_context, start_to_close_timeout=timedelta(seconds=10)
                 ),
             ],
@@ -342,15 +306,14 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = open_ai_data_converter
+    new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
 
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(
+            TestModelProvider(
                 TestWeatherModel(  # type: ignore
-                    "", openai_client=AsyncOpenAI(api_key="Fake key")
                 )
             )
             if use_local_model
@@ -442,94 +405,8 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
                 )
 
 
-class TestPlannerModel(OpenAIResponsesModel):
-    __test__ = False
-
-    def __init__(
-        self,
-        model: str,
-        openai_client: AsyncOpenAI,
-    ) -> None:
-        super().__init__(model, openai_client)
-
-    async def get_response(
-        self,
-        system_instructions: Union[str, None],
-        input: Union[str, list[TResponseInputItem]],
-        model_settings: ModelSettings,
-        tools: list[Tool],
-        output_schema: Union[AgentOutputSchemaBase, None],
-        handoffs: list[Handoff],
-        tracing: ModelTracing,
-        previous_response_id: Union[str, None],
-        prompt: Union[ResponsePromptParam, None] = None,
-    ) -> ModelResponse:
-        return ModelResponse(
-            output=[
-                ResponseOutputMessage(
-                    id="",
-                    content=[
-                        ResponseOutputText(
-                            text='{"searches":[{"query":"best Caribbean surfing spots April","reason":"Identify locations with optimal surfing conditions in the Caribbean during April."},{"query":"top Caribbean islands for hiking April","reason":"Find Caribbean islands with excellent hiking opportunities that are ideal in April."},{"query":"Caribbean water sports destinations April","reason":"Locate Caribbean destinations offering a variety of water sports activities in April."},{"query":"surfing conditions Caribbean April","reason":"Understand the surfing conditions and which islands are suitable for surfing in April."},{"query":"Caribbean adventure travel hiking surfing","reason":"Explore adventure travel options that combine hiking and surfing in the Caribbean."},{"query":"best beaches for surfing Caribbean April","reason":"Identify which Caribbean beaches are renowned for surfing in April."},{"query":"Caribbean islands with national parks hiking","reason":"Find islands with national parks or reserves that offer hiking trails."},{"query":"Caribbean weather April surfing conditions","reason":"Research the weather conditions in April affecting surfing in the Caribbean."},{"query":"Caribbean water sports rentals April","reason":"Look for places where water sports equipment can be rented in the Caribbean during April."},{"query":"Caribbean multi-activity vacation packages","reason":"Look for vacation packages that offer a combination of surfing, hiking, and water sports."}]}',
-                            annotations=[],
-                            type="output_text",
-                        )
-                    ],
-                    role="assistant",
-                    status="completed",
-                    type="message",
-                )
-            ],
-            usage=Usage(),
-            response_id=None,
-        )
-
-
-class TestReportModel(OpenAIResponsesModel):
-    __test__ = False
-
-    def __init__(
-        self,
-        model: str,
-        openai_client: AsyncOpenAI,
-    ) -> None:
-        super().__init__(model, openai_client)
-
-    async def get_response(
-        self,
-        system_instructions: Union[str, None],
-        input: Union[str, list[TResponseInputItem]],
-        model_settings: ModelSettings,
-        tools: list[Tool],
-        output_schema: Union[AgentOutputSchemaBase, None],
-        handoffs: list[Handoff],
-        tracing: ModelTracing,
-        previous_response_id: Union[str, None],
-        prompt: Union[ResponsePromptParam, None] = None,
-    ) -> ModelResponse:
-        return ModelResponse(
-            output=[
-                ResponseOutputMessage(
-                    id="",
-                    content=[
-                        ResponseOutputText(
-                            text="report",
-                            annotations=[],
-                            type="output_text",
-                        )
-                    ],
-                    role="assistant",
-                    status="completed",
-                    type="message",
-                )
-            ],
-            usage=Usage(),
-            response_id=None,
-        )
-
-
 @no_type_check
-class TestResearchModel(TestModel):
+class TestResearchModel(StaticTestModel):
     responses = [
         ModelResponse(
             output=[
@@ -615,7 +492,7 @@ async def test_research_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = open_ai_data_converter
+    new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
 
     global response_index
@@ -626,13 +503,7 @@ async def test_research_workflow(client: Client, use_local_model: bool):
     )
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(
-                TestResearchModel(  # type: ignore
-                    "", openai_client=AsyncOpenAI(api_key="Fake key")
-                )
-            )
-            if use_local_model
-            else None
+            TestModelProvider(TestResearchModel()) if use_local_model else None
         )
         async with new_worker(
             client,
@@ -757,7 +628,7 @@ class AgentsAsToolsWorkflow:
         return synthesizer_result.final_output
 
 
-class AgentAsToolsModel(TestModel):
+class AgentAsToolsModel(StaticTestModel):
     responses = [
         ModelResponse(
             output=[
@@ -838,15 +709,14 @@ async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = open_ai_data_converter
+    new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
 
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(
+            TestModelProvider(
                 AgentAsToolsModel(  # type: ignore
-                    "", openai_client=AsyncOpenAI(api_key="Fake key")
                 )
             )
             if use_local_model
@@ -909,7 +779,7 @@ class AirlineAgentContext(BaseModel):
     flight_number: Optional[str] = None
 
 
-@function_tool(
+@openai_agents.workflow.tool(
     name_override="faq_lookup_tool",
     description_override="Lookup frequently asked questions.",
 )
@@ -931,19 +801,12 @@ async def faq_lookup_tool(question: str) -> str:
     return "I'm sorry, I don't know the answer to that question."
 
 
-@function_tool
+@openai_agents.workflow.tool
 async def update_seat(
     context: RunContextWrapper[AirlineAgentContext],
     confirmation_number: str,
     new_seat: str,
 ) -> str:
-    """
-    Update the seat for a given confirmation number.
-
-    Args:
-        confirmation_number: The confirmation number for the flight.
-        new_seat: The new seat to update to.
-    """
     # Update the context based on the customer's input
     context.context.confirmation_number = confirmation_number
     context.context.seat_number = new_seat
@@ -1020,7 +883,7 @@ class ProcessUserMessageInput(BaseModel):
     chat_length: int
 
 
-class CustomerServiceModel(TestModel):
+class CustomerServiceModel(StaticTestModel):
     responses = [
         ModelResponse(
             output=[
@@ -1201,7 +1064,7 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = open_ai_data_converter
+    new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
 
     questions = ["Hello", "Book me a flight to PDX", "11111", "Any window seat"]
@@ -1209,9 +1072,8 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(
+            TestModelProvider(
                 CustomerServiceModel(  # type: ignore
-                    "", openai_client=AsyncOpenAI(api_key="Fake key")
                 )
             )
             if use_local_model
@@ -1495,13 +1357,13 @@ async def test_input_guardrail(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = open_ai_data_converter
+    new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
 
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(
+            TestModelProvider(
                 InputGuardrailModel(  # type: ignore
                     "", openai_client=AsyncOpenAI(api_key="Fake key")
                 )
@@ -1533,7 +1395,7 @@ async def test_input_guardrail(client: Client, use_local_model: bool):
                 assert result[1] == "Sorry, I can't help you with your math homework."
 
 
-class OutputGuardrailModel(TestModel):
+class OutputGuardrailModel(StaticTestModel):
     responses = [
         ModelResponse(
             output=[
@@ -1612,15 +1474,14 @@ async def test_output_guardrail(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = open_ai_data_converter
+    new_config["data_converter"] = pydantic_data_converter
     client = Client(**new_config)
 
     model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
-            TestProvider(
+            TestModelProvider(
                 OutputGuardrailModel(  # type: ignore
-                    "", openai_client=AsyncOpenAI(api_key="Fake key")
                 )
             )
             if use_local_model
