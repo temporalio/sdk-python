@@ -4386,17 +4386,19 @@ async def execute_child_workflow(
 
 
 class NexusOperationHandle(Generic[OutputT]):
+    """Handle for interacting with a Nexus operation."""
+
     def cancel(self) -> bool:
-        """
-        Request cancellation of the operation.
-        """
+        """Request cancellation of the operation."""
         raise NotImplementedError
 
     def __await__(self) -> Generator[Any, Any, OutputT]:
+        """Support await."""
         raise NotImplementedError
 
     @property
     def operation_token(self) -> Optional[str]:
+        """The operation token for this handle."""
         raise NotImplementedError
 
 
@@ -5112,10 +5114,9 @@ ServiceT = TypeVar("ServiceT")
 
 
 class NexusClient(ABC, Generic[ServiceT]):
-    """
-    A client for invoking Nexus operations.
+    """A client for invoking Nexus operations.
 
-    example:
+    Example:
     ```python
     nexus_client = workflow.create_nexus_client(
         endpoint=my_nexus_endpoint,
@@ -5314,7 +5315,20 @@ class NexusClient(ABC, Generic[ServiceT]):
         output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
-    ) -> Any: ...
+    ) -> Any:
+        """Execute a Nexus operation and return its result.
+
+        Args:
+            operation: The Nexus operation.
+            input: The Nexus operation input.
+            output_type: The Nexus operation output type.
+            schedule_to_close_timeout: Timeout for the entire operation attempt.
+            headers: Headers to send with the Nexus HTTP request.
+
+        Returns:
+            The operation result.
+        """
+        ...
 
 
 class _NexusClient(NexusClient[ServiceT]):

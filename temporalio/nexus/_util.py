@@ -42,7 +42,6 @@ def get_workflow_run_start_method_input_and_output_type_annotations(
     `start` must be a type-annotated start method that returns a
     :py:class:`temporalio.nexus.WorkflowHandle`.
     """
-
     input_type, output_type = _get_start_method_input_and_output_type_annotations(start)
     origin_type = typing.get_origin(output_type)
     if not origin_type:
@@ -107,6 +106,7 @@ def _get_start_method_input_and_output_type_annotations(
 
 
 def get_callable_name(fn: Callable[..., Any]) -> str:
+    """Return the name of a callable object."""
     method_name = getattr(fn, "__name__", None)
     if not method_name and callable(fn) and hasattr(fn, "__call__"):
         method_name = fn.__class__.__name__
@@ -158,8 +158,7 @@ def set_operation_factory(
 #
 # This file is licensed under the MIT License.
 def is_async_callable(obj: Any) -> bool:
-    """
-    Return True if `obj` is an async callable.
+    """Return True if `obj` is an async callable.
 
     Supports partials of async callable class instances.
     """

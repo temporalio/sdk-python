@@ -302,6 +302,7 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
     output_type: Optional[Type[OutputT]] = None
 
     def __post_init__(self) -> None:
+        """Initialize operation-specific attributes after dataclass creation."""
         if isinstance(self.operation, nexusrpc.Operation):
             self.output_type = self.operation.output_type
         elif callable(self.operation):
@@ -319,6 +320,7 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
 
     @property
     def operation_name(self) -> str:
+        """Get the name of the Nexus operation."""
         if isinstance(self.operation, nexusrpc.Operation):
             return self.operation.name
         elif isinstance(self.operation, str):

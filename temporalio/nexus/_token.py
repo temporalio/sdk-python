@@ -15,9 +15,7 @@ OPERATION_TOKEN_TYPE_WORKFLOW: OperationTokenType = 1
 
 @dataclass(frozen=True)
 class WorkflowHandle(Generic[OutputT]):
-    """
-    A handle to a workflow that is backing a Nexus operation.
-
+    """A handle to a workflow that is backing a Nexus operation.
 
     Do not instantiate this directly. Use
     :py:func:`temporalio.nexus.WorkflowRunOperationContext.start_workflow` to create a
@@ -59,6 +57,7 @@ class WorkflowHandle(Generic[OutputT]):
         )
 
     def to_token(self) -> str:
+        """Convert handle to a base64url-encoded token string."""
         return _base64url_encode_no_padding(
             json.dumps(
                 {

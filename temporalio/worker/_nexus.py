@@ -69,9 +69,7 @@ class _NexusWorker:
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
 
     async def run(self) -> None:
-        """
-        Continually poll for Nexus tasks and dispatch to handlers.
-        """
+        """Continually poll for Nexus tasks and dispatch to handlers."""
 
         async def raise_from_exception_queue() -> NoReturn:
             raise await self._fail_worker_exception_queue.get()
@@ -160,8 +158,7 @@ class _NexusWorker:
         request: temporalio.api.nexus.v1.CancelOperationRequest,
         headers: Mapping[str, str],
     ) -> None:
-        """
-        Handle a cancel operation task.
+        """Handle a cancel operation task.
 
         Attempt to execute the user cancel_operation method. Handle errors and send the
         task completion.
@@ -213,13 +210,11 @@ class _NexusWorker:
         start_request: temporalio.api.nexus.v1.StartOperationRequest,
         headers: Mapping[str, str],
     ) -> None:
-        """
-        Handle a start operation task.
+        """Handle a start operation task.
 
         Attempt to execute the user start_operation method and invoke the data converter
         on the result. Handle errors and send the task completion.
         """
-
         try:
             try:
                 start_response = await self._start_operation(start_request, headers)
@@ -256,8 +251,7 @@ class _NexusWorker:
         start_request: temporalio.api.nexus.v1.StartOperationRequest,
         headers: Mapping[str, str],
     ) -> temporalio.api.nexus.v1.StartOperationResponse:
-        """
-        Invoke the Nexus handler's start_operation method and construct the StartOperationResponse.
+        """Invoke the Nexus handler's start_operation method and construct the StartOperationResponse.
 
         OperationError is handled by this function, since it results in a StartOperationResponse.
 
@@ -326,8 +320,7 @@ class _NexusWorker:
         self,
         error: Union[nexusrpc.HandlerError, nexusrpc.OperationError],
     ) -> temporalio.api.nexus.v1.Failure:
-        """
-        Serialize ``error`` as a Nexus Failure proto.
+        """Serialize ``error`` as a Nexus Failure proto.
 
         The Nexus Failure represents the top-level error. If there is a cause chain
         attached to the exception, then serialize it as the ``details``.
@@ -381,9 +374,7 @@ class _NexusWorker:
     async def _handler_error_to_proto(
         self, handler_error: nexusrpc.HandlerError
     ) -> temporalio.api.nexus.v1.HandlerError:
-        """
-        Serialize ``handler_error`` as a Nexus HandlerError proto.
-        """
+        """Serialize ``handler_error`` as a Nexus HandlerError proto."""
         retry_behavior = (
             temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
             if handler_error.retryable_override is True

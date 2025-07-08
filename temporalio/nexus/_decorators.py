@@ -91,9 +91,7 @@ def workflow_run_operation(
         ],
     ],
 ]:
-    """
-    Decorator marking a method as the start method for a workflow-backed operation.
-    """
+    """Decorator marking a method as the start method for a workflow-backed operation."""
 
     def decorator(
         start: Callable[

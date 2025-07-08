@@ -183,7 +183,7 @@ class Worker:
                 otherwise. The default one will be properly shutdown, but if one
                 is provided, the caller is responsible for shutting it down after
                 the worker is shut down.
-            nexus_operation_executor: Executor to use for non-async
+            nexus_task_executor: Executor to use for non-async
                 Nexus operations. This is required if any operation start methods
                 are non-`async def`. :py:class:`concurrent.futures.ThreadPoolExecutor`
                 is recommended.

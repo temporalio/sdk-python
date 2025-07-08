@@ -36,8 +36,7 @@ from ._util import (
 
 
 class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
-    """
-    Operation handler for Nexus operations that start a workflow.
+    """Operation handler for Nexus operations that start a workflow.
 
     Use this class to create an operation handler that starts a workflow by passing your
     ``start`` method to the constructor. Your ``start`` method must use
@@ -54,6 +53,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         input_type: Optional[Type[InputT]],
         output_type: Optional[Type[OutputT]],
     ) -> None:
+        """Initialize the workflow run operation handler."""
         if not is_async_callable(start):
             raise RuntimeError(
                 f"{start} is not an `async def` method. "
@@ -70,9 +70,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
     async def start(
         self, ctx: StartOperationContext, input: InputT
     ) -> StartOperationResultAsync:
-        """
-        Start the operation, by starting a workflow and completing asynchronously.
-        """
+        """Start the operation, by starting a workflow and completing asynchronously."""
         handle = await self._start(ctx, input)
         if not isinstance(handle, WorkflowHandle):
             if isinstance(handle, client.WorkflowHandle):
@@ -94,6 +92,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
     async def fetch_info(
         self, ctx: FetchOperationInfoContext, token: str
     ) -> OperationInfo:
+        """Fetch operation info (not supported for Temporal Nexus operations)."""
         raise NotImplementedError(
             "Temporal Nexus operation handlers do not support fetching operation info."
         )
@@ -101,6 +100,7 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
     async def fetch_result(
         self, ctx: FetchOperationResultContext, token: str
     ) -> OutputT:
+        """Fetch operation result (not supported for Temporal Nexus operations)."""
         raise NotImplementedError(
             "Temporal Nexus operation handlers do not support fetching the operation result."
         )
@@ -131,8 +131,7 @@ async def _cancel_workflow(
     token: str,
     **kwargs: Any,
 ) -> None:
-    """
-    Cancel a workflow that is backing a Nexus operation.
+    """Cancel a workflow that is backing a Nexus operation.
 
     This function is used by the Nexus worker to cancel a workflow that is backing a
     Nexus operation, i.e. started by a

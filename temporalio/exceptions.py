@@ -375,7 +375,8 @@ class NexusOperationError(FailureError):
         operation: str,
         operation_token: str,
     ):
-        """
+        """Initialize a Nexus operation error.
+
         Args:
             message: The error message.
             scheduled_event_id: The NexusOperationScheduled event ID for the failed operation.

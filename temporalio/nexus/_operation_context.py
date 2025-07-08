@@ -63,23 +63,17 @@ class Info:
 
 
 def in_operation() -> bool:
-    """
-    Whether the current code is inside a Nexus operation.
-    """
+    """Whether the current code is inside a Nexus operation."""
     return _try_temporal_context() is not None
 
 
 def info() -> Info:
-    """
-    Get the current Nexus operation information.
-    """
+    """Get the current Nexus operation information."""
     return _temporal_context().info()
 
 
 def client() -> temporalio.client.Client:
-    """
-    Get the Temporal client used by the worker handling the current Nexus operation.
-    """
+    """Get the Temporal client used by the worker handling the current Nexus operation."""
     return _temporal_context().client
 
 
@@ -104,9 +98,7 @@ def _try_temporal_context() -> (
 
 @dataclass
 class _TemporalStartOperationContext:
-    """
-    Context for a Nexus start operation being handled by a Temporal Nexus Worker.
-    """
+    """Context for a Nexus start operation being handled by a Temporal Nexus Worker."""
 
     nexus_context: StartOperationContext
     """Nexus-specific start operation context."""
@@ -183,7 +175,10 @@ class _TemporalStartOperationContext:
 
 
 class WorkflowRunOperationContext(StartOperationContext):
+    """Context received by a workflow run operation."""
+
     def __init__(self, *args, **kwargs):
+        """Initialize the workflow run operation context."""
         super().__init__(*args, **kwargs)
         self._temporal_context = _TemporalStartOperationContext.get()
 
@@ -455,9 +450,7 @@ class WorkflowRunOperationContext(StartOperationContext):
 
 @dataclass(frozen=True)
 class _TemporalCancelOperationContext:
-    """
-    Context for a Nexus cancel operation being handled by a Temporal Nexus Worker.
-    """
+    """Context for a Nexus cancel operation being handled by a Temporal Nexus Worker."""
 
     nexus_context: CancelOperationContext
     """Nexus-specific cancel operation context."""
@@ -565,12 +558,16 @@ def _nexus_link_to_workflow_event(
 
 
 class LoggerAdapter(logging.LoggerAdapter):
+    """Logger adapter that adds Nexus operation context information."""
+
     def __init__(self, logger: logging.Logger, extra: Optional[Mapping[str, Any]]):
+        """Initialize the logger adapter."""
         super().__init__(logger, extra or {})
 
     def process(
         self, msg: Any, kwargs: MutableMapping[str, Any]
     ) -> tuple[Any, MutableMapping[str, Any]]:
+        """Process log records to add Nexus operation context."""
         extra = dict(self.extra or {})
         if tctx := _try_temporal_context():
             extra["service"] = tctx.nexus_context.service
