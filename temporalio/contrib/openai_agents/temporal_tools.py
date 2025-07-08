@@ -127,7 +127,6 @@ def nexus_operation_as_tool(
     service: Type[Any],
     endpoint: str,
     schedule_to_close_timeout: Optional[timedelta] = None,
-    function_schema_globalns: Optional[dict[str, Any]] = None,
 ) -> Tool:
     """Convert a Nexus operation into an OpenAI agent tool.
 
