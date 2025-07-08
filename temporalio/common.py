@@ -1230,3 +1230,14 @@ def _type_hints_from_func(
         # necessarily
         args.append(arg_hint)  # type: ignore
     return args, ret
+
+
+class HeaderCodecBehavior(IntEnum):
+    """Different ways to handle header encoding"""
+
+    NO_CODEC = 1
+    """Don't encode or decode any headers automatically"""
+    CODEC = 2
+    """Encode and decode all headers automatically"""
+    WORKFLOW_ONLY_CODEC = 3
+    """Only automatically encode and decode headers in workflow activation encoding and decoding."""
