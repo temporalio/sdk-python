@@ -1321,7 +1321,7 @@ Temporal supports calling Nexus operations **from a workflow**. See https://docs
 currently for calling a Nexus operation from non-workflow code.
 
 To get started quickly using Nexus with Temporal, see the Python Nexus sample:
-https://github.com/temporalio/samples-python/tree/main/hello_nexus.
+https://github.com/temporalio/samples-python/tree/nexus/hello_nexus.
 
 
 Two types of Nexus operation are supported, each using a decorator:
@@ -1334,7 +1334,7 @@ Two types of Nexus operation are supported, each using a decorator:
 may do network I/O, but it must respond within 10 seconds.
 
 The following steps are an overview of the [Python Nexus sample](
-https://github.com/temporalio/samples-python/tree/main/hello_nexus).
+https://github.com/temporalio/samples-python/tree/nexus/hello_nexus).
 
 1. Create the caller and handler namespaces, and the Nexus endpoint. For example,
     ```
