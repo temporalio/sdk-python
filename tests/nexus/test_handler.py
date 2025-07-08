@@ -17,6 +17,7 @@ import asyncio
 import concurrent.futures
 import logging
 import pprint
+import sys
 import uuid
 from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -585,6 +586,11 @@ async def test_start_operation_happy_path(
 async def test_start_operation_protocol_level_failures(
     test_case: Type[_TestCase], env: WorkflowEnvironment
 ):
+    if test_case == UpstreamTimeoutViaRequestTimeout and sys.platform == "win32":
+        pytest.skip(
+            "TODO(nexus-preview): skipping UpstreamTimeoutViaRequestTimeout test on Windows"
+        )
+
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
