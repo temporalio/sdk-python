@@ -105,7 +105,7 @@ class _WorkflowWorker:
             if interceptor_class:
                 self._interceptor_classes.append(interceptor_class)
         self._extern_functions.update(
-            **_WorkflowExternFunctions(
+            **_WorkflowExternFunctions(  # type: ignore
                 __temporal_get_metric_meter=lambda: metric_meter,
                 __temporal_assert_local_activity_valid=assert_local_activity_valid,
             )

@@ -16,6 +16,7 @@ from ._interceptor import (
     StartActivityInput,
     StartChildWorkflowInput,
     StartLocalActivityInput,
+    StartNexusOperationInput,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
@@ -89,6 +90,7 @@ __all__ = [
     "StartActivityInput",
     "StartChildWorkflowInput",
     "StartLocalActivityInput",
+    "StartNexusOperationInput",
     "WorkflowInterceptorClassInput",
     # Advanced activity classes
     "SharedStateManager",
