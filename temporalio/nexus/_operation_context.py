@@ -55,6 +55,9 @@ _temporal_cancel_operation_context: ContextVar[_TemporalCancelOperationContext] 
 class Info:
     """Information about the running Nexus operation.
 
+    .. warning::
+        This API is experimental and unstable.
+
     Retrieved inside a Nexus operation handler via :py:func:`info`.
     """
 
@@ -175,7 +178,11 @@ class _TemporalStartOperationContext:
 
 
 class WorkflowRunOperationContext(StartOperationContext):
-    """Context received by a workflow run operation."""
+    """Context received by a workflow run operation.
+
+    .. warning::
+        This API is experimental and unstable.
+    """
 
     def __init__(self, *args, **kwargs):
         """Initialize the workflow run operation context."""

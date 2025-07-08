@@ -7272,7 +7272,7 @@ class NexusCallback:
     """Nexus callback to attach to events such as workflow completion.
 
     .. warning::
-        This option is experimental and unstable.
+        This API is experimental and unstable.
     """
 
     url: str
