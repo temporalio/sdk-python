@@ -26,9 +26,9 @@ from agents.tool import (
     FunctionTool,
     ToolErrorFunction,
     ToolFunction,
+    ToolParams,
     default_tool_error_function,
     function_tool,
-    ToolParams,
 )
 from agents.tracing import get_trace_provider
 from agents.tracing.provider import DefaultTraceProvider
@@ -323,7 +323,7 @@ class workflow:
     ) -> Union[FunctionTool, Callable[[ToolFunction[ToolParams]], FunctionTool]]:
         """A temporal specific wrapper for OpenAI's @function_tool. This exists to ensure the user is aware that the function tool is workflow level code and must be deterministic."""
         return function_tool(
-            func,
+            func,  # type: ignore
             name_override=name_override,
             description_override=description_override,
             docstring_style=docstring_style,
