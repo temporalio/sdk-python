@@ -5116,19 +5116,18 @@ ServiceT = TypeVar("ServiceT")
 class NexusClient(ABC, Generic[ServiceT]):
     """A client for invoking Nexus operations.
 
-    Example:
-    ```python
-    nexus_client = workflow.create_nexus_client(
-        endpoint=my_nexus_endpoint,
-        service=MyService,
-    )
-    handle = await nexus_client.start_operation(
-        operation=MyService.my_operation,
-        input=MyOperationInput(value="hello"),
-        schedule_to_close_timeout=timedelta(seconds=10),
-    )
-    result = await handle.result()
-    ```
+    Example::
+
+        nexus_client = workflow.create_nexus_client(
+            endpoint=my_nexus_endpoint,
+            service=MyService,
+        )
+        handle = await nexus_client.start_operation(
+            operation=MyService.my_operation,
+            input=MyOperationInput(value="hello"),
+            schedule_to_close_timeout=timedelta(seconds=10),
+        )
+        result = await handle.result()
     """
 
     # Overload for nexusrpc.Operation
