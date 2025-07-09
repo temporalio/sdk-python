@@ -544,7 +544,7 @@ def _nexus_link_to_workflow_event(
         logger.warning(
             f"Failed to parse event reference from Nexus link URL query parameters: {link} ({err})"
         )
-        event_ref = None
+        return None
 
     groups = match.groupdict()
     return temporalio.api.common.v1.Link.WorkflowEvent(
