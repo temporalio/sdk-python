@@ -2512,6 +2512,30 @@ class _WorkflowInstanceImpl(
     def get_debug(self) -> bool:
         return False
 
+    def run_in_executor(
+        self,
+        executor: Optional[Any],
+        func: Callable[..., Any],
+        *args: Any,
+    ) -> asyncio.Future[Any]:
+        """Run a function in an executor (thread pool).
+        
+        For Temporal workflows, this implementation runs the function
+        synchronously in the current workflow thread to maintain
+        determinism. The executor parameter is ignored.
+        """
+        # Create a future that will be resolved immediately
+        future = self.create_future()
+        
+        try:
+            # Run the function synchronously in the workflow thread
+            result = func(*args)
+            future.set_result(result)
+        except Exception as e:
+            future.set_exception(e)
+        
+        return future
+
 
 class _WorkflowInboundImpl(WorkflowInboundInterceptor):
     def __init__(
