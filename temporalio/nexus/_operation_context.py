@@ -524,6 +524,8 @@ def _workflow_event_to_nexus_link(
 _LINK_URL_PATH_REGEX = re.compile(
     r"^/namespaces/(?P<namespace>[^/]+)/workflows/(?P<workflow_id>[^/]+)/(?P<run_id>[^/]+)/history$"
 )
+LINK_EVENT_ID_PARAM_NAME = "eventID"
+LINK_EVENT_TYPE_PARAM_NAME = "eventType"
 
 
 def _nexus_link_to_workflow_event(
@@ -537,21 +539,10 @@ def _nexus_link_to_workflow_event(
         )
         return None
     try:
-        query_params = urllib.parse.parse_qs(url.query)
-        [reference_type] = query_params.get("referenceType", [])
-        if reference_type != "EventReference":
-            raise ValueError(
-                f"Expected Nexus link URL query parameter referenceType to be EventReference but got: {reference_type}"
-            )
-        [event_type_name] = query_params.get("eventType", [])
-        event_ref = temporalio.api.common.v1.Link.WorkflowEvent.EventReference(
-            # TODO(nexus-prerelease): confirm that it is correct not to use event_id.
-            # Should the proto say explicitly that it's optional or how it behaves when it's missing?
-            event_type=temporalio.api.enums.v1.EventType.Value(event_type_name)
-        )
+        event_ref = _event_reference_from_query_params(urllib.parse.parse_qs(url.query))
     except ValueError as err:
         logger.warning(
-            f"Failed to parse event type from Nexus link URL query parameters: {link} ({err})"
+            f"Failed to parse event reference from Nexus link URL query parameters: {link} ({err})"
         )
         event_ref = None
 
@@ -562,6 +553,55 @@ def _nexus_link_to_workflow_event(
         run_id=urllib.parse.unquote(groups["run_id"]),
         event_ref=event_ref,
     )
+
+
+def _event_reference_from_query_params(
+    query_params: Mapping[str, list[str]],
+) -> temporalio.api.common.v1.Link.WorkflowEvent.EventReference:
+    """
+    Return an EventReference from the query params or raise ValueError.
+    """
+    [reference_type] = query_params.get("referenceType", [])
+    if reference_type != "EventReference":
+        raise ValueError(
+            f"Expected Nexus link URL query parameter referenceType to be EventReference but got: {reference_type}"
+        )
+    # event type
+    [raw_event_type_name] = query_params.get(LINK_EVENT_TYPE_PARAM_NAME, [None])
+    if not raw_event_type_name:
+        raise ValueError(f"query params do not contain event type: {query_params}")
+    if raw_event_type_name.startswith("EVENT_TYPE_"):
+        event_type_name = raw_event_type_name
+    elif re.match("[A-Z][a-z]", raw_event_type_name):
+        event_type_name = "EVENT_TYPE_" + _pascal_case_to_constant_case(
+            raw_event_type_name
+        )
+    else:
+        raise ValueError(f"Invalid event type name: {raw_event_type_name}")
+
+    # event id
+    event_id = 0
+    [raw_event_id] = query_params.get(LINK_EVENT_ID_PARAM_NAME, [None])
+    if raw_event_id:
+        try:
+            event_id = int(raw_event_id)
+        except ValueError:
+            raise ValueError(f"Query params contain invalid event id: {raw_event_id}")
+
+    return temporalio.api.common.v1.Link.WorkflowEvent.EventReference(
+        event_type=temporalio.api.enums.v1.EventType.Value(event_type_name),
+        event_id=event_id,
+    )
+
+
+def _pascal_case_to_constant_case(s: str) -> str:
+    """
+    Convert a PascalCase string to CONSTANT_CASE.
+
+    >>> _pascal_case_to_constant_case("NexusOperationScheduled")
+    "NEXUS_OPERATION_SCHEDULED"
+    """
+    return re.sub(r"([^\b])([A-Z])", lambda m: "_".join(m.groups()), s).upper()
 
 
 class LoggerAdapter(logging.LoggerAdapter):

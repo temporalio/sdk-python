@@ -31,6 +31,7 @@ import temporalio.api.nexus.v1
 import temporalio.api.operatorservice
 import temporalio.api.operatorservice.v1
 import temporalio.exceptions
+import temporalio.nexus._operation_context
 import temporalio.nexus._operation_handlers
 from temporalio import nexus, workflow
 from temporalio.client import (
@@ -1273,3 +1274,12 @@ async def test_workflow_run_operation_overloads(
             if op != "no_param"
             else OverloadTestValue(value=0)
         )
+
+
+def test_link_conversion_utilities():
+    pc2cc = temporalio.nexus._operation_context._pascal_case_to_constant_case
+    assert pc2cc("") == ""
+    assert pc2cc("A") == "A"
+    assert pc2cc("a") == "A"
+    assert pc2cc("AbCd") == "AB_CD"
+    assert pc2cc("NexusOperationScheduled") == "NEXUS_OPERATION_SCHEDULED"
