@@ -580,7 +580,7 @@ def _event_reference_from_query_params(
         raise ValueError(f"Invalid event type name: {raw_event_type_name}")
 
     # event id
-    event_id = 1
+    event_id = 0
     [raw_event_id] = query_params.get(LINK_EVENT_ID_PARAM_NAME) or [None]
     if raw_event_id:
         try:
