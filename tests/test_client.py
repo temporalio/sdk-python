@@ -41,9 +41,11 @@ from temporalio.client import (
     BuildIdOpPromoteSetByBuildId,
     CancelWorkflowInput,
     Client,
+    ClientConfig,
     CloudOperationsClient,
     Interceptor,
     OutboundInterceptor,
+    Plugin,
     QueryWorkflowInput,
     RPCError,
     RPCStatusCode,
@@ -1499,3 +1501,30 @@ async def test_cloud_client_simple():
         GetNamespaceRequest(namespace=os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"])
     )
     assert os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"] == result.namespace.namespace
+
+
+class MyPlugin(Plugin):
+    def on_create_client(self, config: ClientConfig) -> ClientConfig:
+        config["namespace"] = "replaced_namespace"
+        return super().on_create_client(config)
+
+    async def connect_service_client(
+        self, config: temporalio.service.ConnectConfig
+    ) -> temporalio.service.ServiceClient:
+        config.api_key = "replaced key"
+        return await super().connect_service_client(config)
+
+
+async def test_client_plugin(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Client connect is only designed for local")
+
+    config = client.config()
+    config["plugins"] = [MyPlugin()]
+    new_client = Client(**config)
+    assert new_client.namespace == "replaced_namespace"
+
+    new_client = await Client.connect(
+        client.service_client.config.target_host, plugins=[MyPlugin()]
+    )
+    assert new_client.service_client.config.api_key == "replaced key"

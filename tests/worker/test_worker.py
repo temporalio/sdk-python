@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import sys
 import uuid
 from datetime import timedelta
 from typing import Any, Awaitable, Callable, Optional, Sequence
 from urllib.request import urlopen
 
 import temporalio.api.enums.v1
+import temporalio.client
 import temporalio.worker._worker
 from temporalio import activity, workflow
 from temporalio.api.workflowservice.v1 import (
@@ -19,7 +19,11 @@ from temporalio.api.workflowservice.v1 import (
     SetWorkerDeploymentRampingVersionRequest,
     SetWorkerDeploymentRampingVersionResponse,
 )
-from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
+from temporalio.client import (
+    BuildIdOpAddNewDefault,
+    Client,
+    TaskReachabilityType,
+)
 from temporalio.common import PinnedVersioningOverride, RawValue, VersioningBehavior
 from temporalio.runtime import PrometheusConfig, Runtime, TelemetryConfig
 from temporalio.service import RPCError
@@ -38,6 +42,7 @@ from temporalio.worker import (
     SlotReleaseContext,
     SlotReserveContext,
     Worker,
+    WorkerConfig,
     WorkerDeploymentConfig,
     WorkerDeploymentVersion,
     WorkerTuner,
@@ -1184,3 +1189,46 @@ class PollFailureInjector:
         if self.next_exception_task:
             self.next_exception_task.cancel()
         setattr(self.worker._bridge_worker, self.attr, self.orig_poll_call)
+
+
+class MyCombinedPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
+    def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
+        print("Create worker combined plugin")
+        config["task_queue"] = "combined"
+        return super().on_create_worker(config)
+
+
+class MyWorkerPlugin(temporalio.worker.Plugin):
+    def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
+        print("Create worker worker plugin")
+        config["task_queue"] = "replaced_queue"
+        return super().on_create_worker(config)
+
+    async def run_worker(self, worker: Worker) -> None:
+        await super().run_worker(worker)
+
+
+async def test_worker_plugin(client: Client) -> None:
+    worker = Worker(
+        client,
+        task_queue="queue",
+        activities=[never_run_activity],
+        plugins=[MyWorkerPlugin()],
+    )
+    assert worker.config().get("task_queue") == "replaced_queue"
+
+    # Test client plugin propagation to worker plugins
+    new_config = client.config()
+    new_config["plugins"] = [MyCombinedPlugin()]
+    client = Client(**new_config)
+    worker = Worker(client, task_queue="queue", activities=[never_run_activity])
+    assert worker.config().get("task_queue") == "combined"
+
+    # Test both. Client propagated plugins are called first, so the worker plugin overrides in this case
+    worker = Worker(
+        client,
+        task_queue="queue",
+        activities=[never_run_activity],
+        plugins=[MyWorkerPlugin()],
+    )
+    assert worker.config().get("task_queue") == "replaced_queue"

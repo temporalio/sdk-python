@@ -96,6 +96,26 @@ PollerBehavior: TypeAlias = Union[
 ]
 
 
+class Plugin:
+    def init_worker_plugin(self, next: Plugin) -> Plugin:
+        self.next_worker_plugin = next
+        return self
+
+    def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
+        return self.next_worker_plugin.on_create_worker(config)
+
+    async def run_worker(self, worker: Worker) -> None:
+        await self.next_worker_plugin.run_worker(worker)
+
+
+class _RootPlugin(Plugin):
+    def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
+        return config
+
+    async def run_worker(self, worker: Worker) -> None:
+        await worker._run()
+
+
 class Worker:
     """Worker to process workflows and/or activities.
 
@@ -153,6 +173,7 @@ class Worker:
         nexus_task_poller_behavior: PollerBehavior = PollerBehaviorSimpleMaximum(
             maximum=5
         ),
+        plugins: Sequence[Plugin] = [],
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -343,11 +364,17 @@ class Worker:
         )
         interceptors = interceptors_from_client + list(interceptors)
 
+        plugins_from_client = cast(
+            List[Plugin], [p for p in client_config["plugins"] if isinstance(p, Plugin)]
+        )
+        plugins = plugins_from_client + list(plugins)
+        print(plugins)
+
         # Extract the bridge service client
         bridge_client = _extract_bridge_client_for_worker(client)
 
         # Store the config for tracking
-        self._config = WorkerConfig(
+        config = WorkerConfig(
             client=client,
             task_queue=task_queue,
             activities=activities,
@@ -382,6 +409,13 @@ class Worker:
             use_worker_versioning=use_worker_versioning,
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
         )
+
+        root_plugin: Plugin = _RootPlugin()
+        for plugin in reversed(list(plugins)):
+            root_plugin = plugin.init_worker_plugin(root_plugin)
+        self._config = root_plugin.on_create_worker(config)
+        self._plugin = root_plugin
+
         self._started = False
         self._shutdown_event = asyncio.Event()
         self._shutdown_complete_event = asyncio.Event()
@@ -646,6 +680,9 @@ class Worker:
         also cancel the shutdown process. Therefore users are encouraged to use
         explicit shutdown instead.
         """
+        await self._plugin.run_worker(self)
+
+    async def _run(self):
         # Eagerly validate which will do a namespace check in Core
         await self._bridge_worker.validate()
 

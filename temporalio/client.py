@@ -120,6 +120,7 @@ class Client:
         runtime: Optional[temporalio.runtime.Runtime] = None,
         http_connect_proxy_config: Optional[HttpConnectProxyConfig] = None,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
+        plugins: Sequence[Plugin] = [],
     ) -> Client:
         """Connect to a Temporal server.
 
@@ -178,13 +179,21 @@ class Client:
             runtime=runtime,
             http_connect_proxy_config=http_connect_proxy_config,
         )
+
+        root_plugin: Plugin = _RootPlugin()
+        for plugin in reversed(list(plugins)):
+            root_plugin = plugin.init_client_plugin(root_plugin)
+
+        service_client = await root_plugin.connect_service_client(connect_config)
+
         return Client(
-            await temporalio.service.ServiceClient.connect(connect_config),
+            service_client,
             namespace=namespace,
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
             header_codec_behavior=header_codec_behavior,
+            plugins=plugins,
         )
 
     def __init__(
@@ -198,6 +207,7 @@ class Client:
             temporalio.common.QueryRejectCondition
         ] = None,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
+        plugins: Sequence[Plugin] = [],
     ):
         """Create a Temporal client from a service client.
 
@@ -209,14 +219,21 @@ class Client:
             self._impl = interceptor.intercept_client(self._impl)
 
         # Store the config for tracking
-        self._config = ClientConfig(
+        config = ClientConfig(
             service_client=service_client,
             namespace=namespace,
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
             header_codec_behavior=header_codec_behavior,
+            plugins=plugins,
         )
+
+        root_plugin: Plugin = _RootPlugin()
+        for plugin in reversed(list(plugins)):
+            root_plugin = plugin.init_client_plugin(root_plugin)
+
+        self._config = root_plugin.on_create_client(config)
 
     def config(self) -> ClientConfig:
         """Config, as a dictionary, used to create this client.
@@ -1510,6 +1527,7 @@ class ClientConfig(TypedDict, total=False):
         Optional[temporalio.common.QueryRejectCondition]
     ]
     header_codec_behavior: Required[HeaderCodecBehavior]
+    plugins: Required[Sequence[Plugin]]
 
 
 class WorkflowHistoryEventFilterType(IntEnum):
@@ -7367,3 +7385,27 @@ async def _decode_user_metadata(
         if not metadata.HasField("details")
         else (await converter.decode([metadata.details]))[0],
     )
+
+
+class Plugin:
+    def init_client_plugin(self, next: Plugin) -> Plugin:
+        self.next_client_plugin = next
+        return self
+
+    def on_create_client(self, config: ClientConfig) -> ClientConfig:
+        return self.next_client_plugin.on_create_client(config)
+
+    async def connect_service_client(
+        self, config: temporalio.service.ConnectConfig
+    ) -> temporalio.service.ServiceClient:
+        return await self.next_client_plugin.connect_service_client(config)
+
+
+class _RootPlugin(Plugin):
+    def on_create_client(self, config: ClientConfig) -> ClientConfig:
+        return config
+
+    async def connect_service_client(
+        self, config: temporalio.service.ConnectConfig
+    ) -> temporalio.service.ServiceClient:
+        return await temporalio.service.ServiceClient.connect(config)
