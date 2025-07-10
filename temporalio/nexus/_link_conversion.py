@@ -90,7 +90,7 @@ def _query_params_from_event_reference(
 ) -> str:
     event_type_name = temporalio.api.enums.v1.EventType.Name(event_ref.event_type)
     if event_type_name.startswith("EVENT_TYPE_"):
-        event_type_name = _constant_case_to_pascal_case(
+        event_type_name = _event_type_constant_case_to_pascal_case(
             event_type_name.removeprefix("EVENT_TYPE_")
         )
     return urllib.parse.urlencode(
@@ -116,7 +116,7 @@ def _event_reference_from_query_params(
     if raw_event_type_name.startswith("EVENT_TYPE_"):
         event_type_name = raw_event_type_name
     elif re.match("[A-Z][a-z]", raw_event_type_name):
-        event_type_name = "EVENT_TYPE_" + _pascal_case_to_constant_case(
+        event_type_name = "EVENT_TYPE_" + _event_type_pascal_case_to_constant_case(
             raw_event_type_name
         )
     else:
@@ -137,19 +137,19 @@ def _event_reference_from_query_params(
     )
 
 
-def _constant_case_to_pascal_case(s: str) -> str:
+def _event_type_constant_case_to_pascal_case(s: str) -> str:
     """Convert a CONSTANT_CASE string to PascalCase.
 
-    >>> _constant_case_to_pascal_case("NEXUS_OPERATION_SCHEDULED")
+    >>> _event_type_constant_case_to_pascal_case("NEXUS_OPERATION_SCHEDULED")
     "NexusOperationScheduled"
     """
     return re.sub(r"(\b|_)([a-z])", lambda m: m.groups()[1].upper(), s.lower())
 
 
-def _pascal_case_to_constant_case(s: str) -> str:
+def _event_type_pascal_case_to_constant_case(s: str) -> str:
     """Convert a PascalCase string to CONSTANT_CASE.
 
-    >>> _pascal_case_to_constant_case("NexusOperationScheduled")
+    >>> _event_type_pascal_case_to_constant_case("NexusOperationScheduled")
     "NEXUS_OPERATION_SCHEDULED"
     """
     return re.sub(r"([^\b])([A-Z])", lambda m: "_".join(m.groups()), s).upper()

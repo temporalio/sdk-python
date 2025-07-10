@@ -1277,8 +1277,8 @@ async def test_workflow_run_operation_overloads(
 
 
 def test_link_conversion_utilities():
-    p2c = temporalio.nexus._link_conversion._pascal_case_to_constant_case
-    c2p = temporalio.nexus._link_conversion._constant_case_to_pascal_case
+    p2c = temporalio.nexus._link_conversion._event_type_pascal_case_to_constant_case
+    c2p = temporalio.nexus._link_conversion._event_type_constant_case_to_pascal_case
 
     for p, c in [
         ("", ""),
