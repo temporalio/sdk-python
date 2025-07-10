@@ -1,7 +1,6 @@
 #![allow(non_local_definitions)] // pymethods annotations causing issues with this lint
 
 use anyhow::Context;
-use log::error;
 use prost::Message;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -24,6 +23,7 @@ use temporal_sdk_core_protos::coresdk::{ActivityHeartbeat, ActivityTaskCompletio
 use temporal_sdk_core_protos::temporal::api::history::v1::History;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
+use tracing::error;
 
 use crate::client;
 use crate::runtime;
@@ -366,9 +366,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
             }) {
                 Ok(f) => f,
                 Err(e) => {
-                    error!(
-                        "Unexpected error in custom slot supplier `reserve_slot`: {e}"
-                    );
+                    error!("Unexpected error in custom slot supplier `reserve_slot`: {e}");
                     continue;
                 }
             }
@@ -401,9 +399,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
             )))
         })
         .unwrap_or_else(|e| {
-            error!(
-                "Uncaught error in custom slot supplier `try_reserve_slot`: {e}"
-            );
+            error!("Uncaught error in custom slot supplier `try_reserve_slot`: {e}");
             None
         })
     }
@@ -425,9 +421,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
             )?;
             PyResult::Ok(())
         }) {
-            error!(
-                "Uncaught error in custom slot supplier `mark_slot_used`: {e}"
-            );
+            error!("Uncaught error in custom slot supplier `mark_slot_used`: {e}");
         }
     }
 
@@ -447,9 +441,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
             py_obj.call_method1("release_slot", (SlotReleaseCtx { slot_info, permit },))?;
             PyResult::Ok(())
         }) {
-            error!(
-                "Uncaught error in custom slot supplier `release_slot`: {e}"
-            );
+            error!("Uncaught error in custom slot supplier `release_slot`: {e}");
         }
     }
 
