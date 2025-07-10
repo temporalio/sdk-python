@@ -23,7 +23,9 @@ from nexusrpc.handler import (
 from nexusrpc.handler._decorators import operation_handler
 
 import temporalio.api
+import temporalio.api.common.v1
 import temporalio.api.enums.v1
+import temporalio.api.history.v1
 import temporalio.nexus._operation_handlers
 from temporalio import nexus, workflow
 from temporalio.client import (
@@ -1113,11 +1115,12 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
             == temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
         )
     )
-    if not len(wf_started_event.links) == 1:
+    links = _get_links_from_workflow_execution_started_event(wf_started_event)
+    if not len(links) == 1:
         pytest.fail(
-            f"Expected 1 link on WorkflowExecutionStarted event, got {len(wf_started_event.links)}"
+            f"Expected 1 link on WorkflowExecutionStarted event, got {len(links)}"
         )
-    [link] = wf_started_event.links
+    [link] = links
     assert link.workflow_event.namespace == caller_wf_handle._client.namespace
     assert link.workflow_event.workflow_id == caller_wf_handle.id
     assert link.workflow_event.run_id
@@ -1126,6 +1129,17 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
         link.workflow_event.event_ref.event_type
         == temporalio.api.enums.v1.EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED
     )
+
+
+def _get_links_from_workflow_execution_started_event(
+    event: temporalio.api.history.v1.HistoryEvent,
+) -> list[temporalio.api.common.v1.Link]:
+    [callback] = event.workflow_execution_started_event_attributes.completion_callbacks
+    if links := callback.links:
+        assert not event.links, "Did not expect both callback.links and event.links"
+        return list(links)
+    else:
+        return list(event.links)
 
 
 # When request_cancel is True, the NexusOperationHandle in the workflow evolves
