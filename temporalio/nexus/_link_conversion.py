@@ -94,7 +94,11 @@ def _event_reference_to_query_params(
             event_type_name.removeprefix("EVENT_TYPE_")
         )
     return urllib.parse.urlencode(
-        {"eventType": event_type_name, "referenceType": "EventReference"}
+        {
+            "referenceType": "EventReference",
+            "eventType": event_type_name,
+            "eventID": event_ref.event_id,
+        }
     )
 
 
