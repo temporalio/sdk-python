@@ -8,8 +8,6 @@ from nexusrpc.handler import StartOperationContext, sync_operation
 from temporalio import nexus
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 
-HTTP_PORT = 7243
-
 
 class _InterfaceImplementationTestCase:
     Interface: Type[Any]

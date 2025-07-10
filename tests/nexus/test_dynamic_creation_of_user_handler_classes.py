@@ -10,9 +10,7 @@ from temporalio.client import Client
 from temporalio.nexus._util import get_operation_factory
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers.nexus import create_nexus_endpoint
-
-HTTP_PORT = 7243
+from tests.helpers.nexus import ServiceClient, create_nexus_endpoint
 
 
 @workflow.defn
@@ -102,9 +100,10 @@ async def test_run_nexus_service_from_programmatically_created_service_handler(
         task_queue=task_queue,
         nexus_service_handlers=[service_handler],
     ):
+        server_address = ServiceClient.default_server_address(env)
         async with httpx.AsyncClient() as http_client:
             response = await http_client.post(
-                f"http://127.0.0.1:{HTTP_PORT}/nexus/endpoints/{endpoint}/services/{service_name}/increment",
+                f"http://{server_address}/nexus/endpoints/{endpoint}/services/{service_name}/increment",
                 json=1,
             )
             assert response.status_code == 201
@@ -147,7 +146,9 @@ def make_incrementer_user_service_definition_and_service_handler_classes(
 @pytest.mark.skip(
     reason="Dynamic creation of service contract using type() is not supported"
 )
-async def test_dynamic_creation_of_user_handler_classes(client: Client):
+async def test_dynamic_creation_of_user_handler_classes(
+    client: Client, env: WorkflowEnvironment
+):
     task_queue = str(uuid.uuid4())
 
     service_cls, handler_cls = (
@@ -165,9 +166,10 @@ async def test_dynamic_creation_of_user_handler_classes(client: Client):
         task_queue=task_queue,
         nexus_service_handlers=[handler_cls()],
     ):
+        server_address = ServiceClient.default_server_address(env)
         async with httpx.AsyncClient() as http_client:
             response = await http_client.post(
-                f"http://127.0.0.1:{HTTP_PORT}/nexus/endpoints/{endpoint}/services/{service_name}/increment",
+                f"http://{server_address}/nexus/endpoints/{endpoint}/services/{service_name}/increment",
                 json=1,
             )
             assert response.status_code == 200
