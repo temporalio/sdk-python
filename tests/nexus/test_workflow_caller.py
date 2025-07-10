@@ -1286,6 +1286,7 @@ def test_link_conversion_utilities():
         ("Ab", "AB"),
         ("AbCd", "AB_CD"),
         ("AbCddE", "AB_CDD_E"),
+        ("ContainsAOneLetterWord", "CONTAINS_A_ONE_LETTER_WORD"),
         ("NexusOperationScheduled", "NEXUS_OPERATION_SCHEDULED"),
     ]:
         assert p2c(p) == c

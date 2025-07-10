@@ -152,4 +152,4 @@ def _event_type_pascal_case_to_constant_case(s: str) -> str:
     >>> _event_type_pascal_case_to_constant_case("NexusOperationScheduled")
     "NEXUS_OPERATION_SCHEDULED"
     """
-    return re.sub(r"([^\b])([A-Z])", lambda m: "_".join(m.groups()), s).upper()
+    return re.sub(r"([A-Z])", r"_\1", s).lstrip("_").upper()
