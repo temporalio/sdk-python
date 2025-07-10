@@ -31,7 +31,7 @@ import temporalio.api.nexus.v1
 import temporalio.api.operatorservice
 import temporalio.api.operatorservice.v1
 import temporalio.exceptions
-import temporalio.nexus._operation_context
+import temporalio.nexus._link_conversion
 import temporalio.nexus._operation_handlers
 from temporalio import nexus, workflow
 from temporalio.client import (
@@ -1277,8 +1277,8 @@ async def test_workflow_run_operation_overloads(
 
 
 def test_link_conversion_utilities():
-    p2c = temporalio.nexus._operation_context._pascal_case_to_constant_case
-    c2p = temporalio.nexus._operation_context._constant_case_to_pascal_case
+    p2c = temporalio.nexus._link_conversion._pascal_case_to_constant_case
+    c2p = temporalio.nexus._link_conversion._constant_case_to_pascal_case
 
     for p, c in [
         ("", ""),
