@@ -8,6 +8,7 @@ import temporalio.api.operatorservice.v1
 import temporalio.workflow
 from temporalio.client import Client
 from temporalio.converter import FailureConverter, PayloadConverter
+from temporalio.testing import WorkflowEnvironment
 
 with temporalio.workflow.unsafe.imports_passed_through():
     import httpx
@@ -74,6 +75,13 @@ class ServiceClient:
                 # Token can also be sent as "Nexus-Operation-Token" header
                 params={"token": token},
             )
+
+    @staticmethod
+    def default_server_address(env: WorkflowEnvironment) -> str:
+        # TODO(nexus-preview): nexus tests are making http requests directly but this is
+        # not officially supported.
+        http_port = getattr(env, "_http_port", 7243)
+        return f"http://127.0.0.1:{http_port}"
 
 
 def dataclass_as_dict(dataclass: Any) -> dict[str, Any]:
