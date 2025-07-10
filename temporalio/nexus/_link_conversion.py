@@ -26,6 +26,7 @@ LINK_EVENT_TYPE_PARAM_NAME = "eventType"
 def workflow_handle_to_workflow_execution_started_event_link(
     handle: temporalio.client.WorkflowHandle[Any, Any],
 ) -> temporalio.api.common.v1.Link.WorkflowEvent:
+    """Create a WorkflowEvent link corresponding to a started workflow"""
     if handle.first_execution_run_id is None:
         raise ValueError(
             f"Workflow handle {handle} has no first execution run ID. "
@@ -39,13 +40,18 @@ def workflow_handle_to_workflow_execution_started_event_link(
             event_id=1,
             event_type=temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED,
         ),
-        # TODO(nexus-preview): RequestIdReference?
+        # TODO(nexus-preview): RequestIdReference
     )
 
 
 def workflow_event_to_nexus_link(
     workflow_event: temporalio.api.common.v1.Link.WorkflowEvent,
 ) -> nexusrpc.Link:
+    """Convert a WorkflowEvent link into a nexusrpc link
+
+    Used when propagating links from a StartWorkflow response to a Nexus start operation
+    response.
+    """
     scheme = "temporal"
     namespace = urllib.parse.quote(workflow_event.namespace)
     workflow_id = urllib.parse.quote(workflow_event.workflow_id)
@@ -61,6 +67,11 @@ def workflow_event_to_nexus_link(
 def nexus_link_to_workflow_event(
     link: nexusrpc.Link,
 ) -> Optional[temporalio.api.common.v1.Link.WorkflowEvent]:
+    """Convert a nexus link into a WorkflowEvent link
+
+    This is used when propagating links from a Nexus start operation request to a
+    StartWorklow request.
+    """
     url = urllib.parse.urlparse(link.url)
     match = _LINK_URL_PATH_REGEX.match(url.path)
     if not match:
