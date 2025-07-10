@@ -1277,9 +1277,19 @@ async def test_workflow_run_operation_overloads(
 
 
 def test_link_conversion_utilities():
-    pc2cc = temporalio.nexus._operation_context._pascal_case_to_constant_case
-    assert pc2cc("") == ""
-    assert pc2cc("A") == "A"
-    assert pc2cc("a") == "A"
-    assert pc2cc("AbCd") == "AB_CD"
-    assert pc2cc("NexusOperationScheduled") == "NEXUS_OPERATION_SCHEDULED"
+    p2c = temporalio.nexus._operation_context._pascal_case_to_constant_case
+    c2p = temporalio.nexus._operation_context._constant_case_to_pascal_case
+
+    for p, c in [
+        ("", ""),
+        ("A", "A"),
+        ("Ab", "AB"),
+        ("AbCd", "AB_CD"),
+        ("AbCddE", "AB_CDD_E"),
+        ("NexusOperationScheduled", "NEXUS_OPERATION_SCHEDULED"),
+    ]:
+        assert p2c(p) == c
+        assert c2p(c) == p
+
+    assert p2c("a") == "A"
+    assert c2p("A") == "A"

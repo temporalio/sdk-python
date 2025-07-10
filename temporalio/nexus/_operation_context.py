@@ -514,14 +514,7 @@ def _workflow_event_to_nexus_link(
     workflow_id = urllib.parse.quote(workflow_event.workflow_id)
     run_id = urllib.parse.quote(workflow_event.run_id)
     path = f"/namespaces/{namespace}/workflows/{workflow_id}/{run_id}/history"
-    query_params = urllib.parse.urlencode(
-        {
-            "eventType": temporalio.api.enums.v1.EventType.Name(
-                workflow_event.event_ref.event_type
-            ),
-            "referenceType": "EventReference",
-        }
-    )
+    query_params = _query_params_from_event_reference(workflow_event.event_ref)
     return nexusrpc.Link(
         url=urllib.parse.urlunparse((scheme, "", path, "", query_params, "")),
         type=workflow_event.DESCRIPTOR.full_name,
@@ -552,6 +545,19 @@ def _nexus_link_to_workflow_event(
         workflow_id=urllib.parse.unquote(groups["workflow_id"]),
         run_id=urllib.parse.unquote(groups["run_id"]),
         event_ref=event_ref,
+    )
+
+
+def _query_params_from_event_reference(
+    event_ref: temporalio.api.common.v1.Link.WorkflowEvent.EventReference,
+) -> str:
+    event_type_name = temporalio.api.enums.v1.EventType.Name(event_ref.event_type)
+    if event_type_name.startswith("EVENT_TYPE_"):
+        event_type_name = _constant_case_to_pascal_case(
+            event_type_name.removeprefix("EVENT_TYPE_")
+        )
+    return urllib.parse.urlencode(
+        {"eventType": event_type_name, "referenceType": "EventReference"}
     )
 
 
@@ -594,6 +600,16 @@ def _event_reference_from_query_params(
         event_type=temporalio.api.enums.v1.EventType.Value(event_type_name),
         event_id=event_id,
     )
+
+
+def _constant_case_to_pascal_case(s: str) -> str:
+    """
+    Convert a CONSTANT_CASE string to PascalCase.
+
+    >>> _constant_case_to_pascal_case("NEXUS_OPERATION_SCHEDULED")
+    "NexusOperationScheduled"
+    """
+    return re.sub(r"(\b|_)([a-z])", lambda m: m.groups()[1].upper(), s.lower())
 
 
 def _pascal_case_to_constant_case(s: str) -> str:
