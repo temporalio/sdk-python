@@ -23,15 +23,7 @@ from nexusrpc.handler import (
 from nexusrpc.handler._decorators import operation_handler
 
 import temporalio.api
-import temporalio.api.common
-import temporalio.api.common.v1
 import temporalio.api.enums.v1
-import temporalio.api.nexus
-import temporalio.api.nexus.v1
-import temporalio.api.operatorservice
-import temporalio.api.operatorservice.v1
-import temporalio.exceptions
-import temporalio.nexus._link_conversion
 import temporalio.nexus._operation_handlers
 from temporalio import nexus, workflow
 from temporalio.client import (
@@ -1347,23 +1339,3 @@ async def test_workflow_run_operation_overloads(
             if op != "no_param"
             else OverloadTestValue(value=0)
         )
-
-
-def test_link_conversion_utilities():
-    p2c = temporalio.nexus._link_conversion._event_type_pascal_case_to_constant_case
-    c2p = temporalio.nexus._link_conversion._event_type_constant_case_to_pascal_case
-
-    for p, c in [
-        ("", ""),
-        ("A", "A"),
-        ("Ab", "AB"),
-        ("AbCd", "AB_CD"),
-        ("AbCddE", "AB_CDD_E"),
-        ("ContainsAOneLetterWord", "CONTAINS_A_ONE_LETTER_WORD"),
-        ("NexusOperationScheduled", "NEXUS_OPERATION_SCHEDULED"),
-    ]:
-        assert p2c(p) == c
-        assert c2p(c) == p
-
-    assert p2c("a") == "A"
-    assert c2p("A") == "A"
