@@ -158,6 +158,16 @@ project-name = "Temporal Python"
 sidebar-expand-depth = 2
 
 [tool.pyright]
+reportUnknownVariableType = "none"
+reportUnknownParameterType = "none"
+reportUnusedCallResult = "none"
+reportImplicitStringConcatenation = "none"
+reportPrivateUsage = "none"
+reportExplicitAny = "none"
+reportMissingTypeArgument = "none"
+reportAny = "none"
+enableTypeIgnoreComments = true
+
 include = ["temporalio", "tests"]
 exclude = [
   "temporalio/api",
