@@ -125,11 +125,6 @@ class _TemporalStartOperationContext:
         ctx = self.nexus_context
         return (
             [
-                # TODO(nexus-prerelease): For WorkflowRunOperation, when it handles the Nexus
-                # request, it needs to copy the links to the callback in
-                # StartWorkflowRequest.CompletionCallbacks and to StartWorkflowRequest.Links
-                # (for backwards compatibility). PR reference in Go SDK:
-                # https://github.com/temporalio/sdk-go/pull/1945
                 temporalio.client.NexusCallback(
                     url=ctx.callback_url,
                     headers=ctx.callback_headers,
