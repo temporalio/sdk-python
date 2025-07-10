@@ -564,9 +564,7 @@ def _query_params_from_event_reference(
 def _event_reference_from_query_params(
     raw_query_params: str,
 ) -> temporalio.api.common.v1.Link.WorkflowEvent.EventReference:
-    """
-    Return an EventReference from the query params or raise ValueError.
-    """
+    """Return an EventReference from the query params or raise ValueError."""
     query_params = urllib.parse.parse_qs(raw_query_params)
 
     [reference_type] = query_params.get("referenceType") or [""]
@@ -603,8 +601,7 @@ def _event_reference_from_query_params(
 
 
 def _constant_case_to_pascal_case(s: str) -> str:
-    """
-    Convert a CONSTANT_CASE string to PascalCase.
+    """Convert a CONSTANT_CASE string to PascalCase.
 
     >>> _constant_case_to_pascal_case("NEXUS_OPERATION_SCHEDULED")
     "NexusOperationScheduled"
@@ -613,8 +610,7 @@ def _constant_case_to_pascal_case(s: str) -> str:
 
 
 def _pascal_case_to_constant_case(s: str) -> str:
-    """
-    Convert a PascalCase string to CONSTANT_CASE.
+    """Convert a PascalCase string to CONSTANT_CASE.
 
     >>> _pascal_case_to_constant_case("NexusOperationScheduled")
     "NEXUS_OPERATION_SCHEDULED"
