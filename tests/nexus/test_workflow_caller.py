@@ -1136,7 +1136,6 @@ def _get_links_from_workflow_execution_started_event(
 ) -> list[temporalio.api.common.v1.Link]:
     [callback] = event.workflow_execution_started_event_attributes.completion_callbacks
     if links := callback.links:
-        assert not event.links, "Did not expect both callback.links and event.links"
         return list(links)
     else:
         return list(event.links)
