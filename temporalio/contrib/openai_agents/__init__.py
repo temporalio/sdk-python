@@ -14,6 +14,7 @@ from temporalio.contrib.openai_agents._trace_interceptor import (
     OpenAIAgentsTracingInterceptor,
 )
 from temporalio.contrib.openai_agents.temporal_openai_agents import (
+    Plugin,
     TestModel,
     TestModelProvider,
     set_open_ai_agent_temporal_overrides,
@@ -21,6 +22,7 @@ from temporalio.contrib.openai_agents.temporal_openai_agents import (
 )
 
 __all__ = [
+    "Plugin",
     "ModelActivity",
     "ModelActivityParameters",
     "workflow",

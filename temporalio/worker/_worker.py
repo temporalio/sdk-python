@@ -385,7 +385,8 @@ class Worker:
         )
 
         plugins_from_client = cast(
-            List[Plugin], [p for p in client.config()["plugins"] if isinstance(p, Plugin)]
+            List[Plugin],
+            [p for p in client.config()["plugins"] if isinstance(p, Plugin)],
         )
         plugins = plugins_from_client + list(plugins)
 
@@ -402,7 +403,11 @@ class Worker:
         self._config = config
 
         # TODO(nexus-preview): max_concurrent_nexus_tasks / tuner support
-        if not (config["activities"] or config["nexus_service_handlers"] or config["workflows"]):
+        if not (
+            config["activities"]
+            or config["nexus_service_handlers"]
+            or config["workflows"]
+        ):
             raise ValueError(
                 "At least one activity, Nexus service, or workflow must be specified"
             )
@@ -410,7 +415,9 @@ class Worker:
             raise ValueError(
                 "build_id must be specified when use_worker_versioning is True"
             )
-        if config["deployment_config"] and (config["build_id"] or config["use_worker_versioning"]):
+        if config["deployment_config"] and (
+            config["build_id"] or config["use_worker_versioning"]
+        ):
             raise ValueError(
                 "deployment_config cannot be used with build_id or use_worker_versioning"
             )
@@ -506,9 +513,13 @@ class Worker:
                 unsandboxed_workflow_runner=config["unsandboxed_workflow_runner"],
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
-                workflow_failure_exception_types=config["workflow_failure_exception_types"],
+                workflow_failure_exception_types=config[
+                    "workflow_failure_exception_types"
+                ],
                 debug_mode=config["debug_mode"],
-                disable_eager_activity_execution=config["disable_eager_activity_execution"],
+                disable_eager_activity_execution=config[
+                    "disable_eager_activity_execution"
+                ],
                 metric_meter=self._runtime.metric_meter,
                 on_eviction_hook=None,
                 disable_safe_eviction=config["disable_safe_workflow_eviction"],
@@ -519,7 +530,7 @@ class Worker:
             )
 
         tuner = config["tuner"]
-        if config["tuner"] is not None:
+        if tuner is not None:
             if (
                 config["max_concurrent_workflow_tasks"]
                 or config["max_concurrent_activities"]
@@ -540,9 +551,9 @@ class Worker:
 
         versioning_strategy: temporalio.bridge.worker.WorkerVersioningStrategy
         if config["deployment_config"]:
-            versioning_strategy = (
-                config["deployment_config"]._to_bridge_worker_deployment_options()
-            )
+            versioning_strategy = config[
+                "deployment_config"
+            ]._to_bridge_worker_deployment_options()
         elif config["use_worker_versioning"]:
             build_id = config["build_id"] or load_default_build_id()
             versioning_strategy = (
@@ -586,9 +597,11 @@ class Worker:
                 # We have to disable remote activities if a user asks _or_ if we
                 # are not running an activity worker at all. Otherwise shutdown
                 # will not proceed properly.
-                no_remote_activities=config["no_remote_activities"] or not config["activities"],
+                no_remote_activities=config["no_remote_activities"]
+                or not config["activities"],
                 sticky_queue_schedule_to_start_timeout_millis=int(
-                    1000 * config["sticky_queue_schedule_to_start_timeout"].total_seconds()
+                    1000
+                    * config["sticky_queue_schedule_to_start_timeout"].total_seconds()
                 ),
                 max_heartbeat_throttle_interval_millis=int(
                     1000 * config["max_heartbeat_throttle_interval"].total_seconds()
@@ -597,7 +610,9 @@ class Worker:
                     1000 * config["default_heartbeat_throttle_interval"].total_seconds()
                 ),
                 max_activities_per_second=config["max_activities_per_second"],
-                max_task_queue_activities_per_second=config["max_task_queue_activities_per_second"],
+                max_task_queue_activities_per_second=config[
+                    "max_task_queue_activities_per_second"
+                ],
                 graceful_shutdown_period_millis=int(
                     1000 * config["graceful_shutdown_timeout"].total_seconds()
                 ),
@@ -614,7 +629,9 @@ class Worker:
                 versioning_strategy=versioning_strategy,
                 workflow_task_poller_behavior=workflow_task_poller_behavior._to_bridge(),
                 activity_task_poller_behavior=activity_task_poller_behavior._to_bridge(),
-                nexus_task_poller_behavior=config["nexus_task_poller_behavior"]._to_bridge(),
+                nexus_task_poller_behavior=config[
+                    "nexus_task_poller_behavior"
+                ]._to_bridge(),
             ),
         )
 
@@ -901,6 +918,7 @@ class WorkerConfig(TypedDict, total=False):
     workflow_task_poller_behavior: PollerBehavior
     activity_task_poller_behavior: PollerBehavior
     nexus_task_poller_behavior: PollerBehavior
+
 
 @dataclass
 class WorkerDeploymentConfig:

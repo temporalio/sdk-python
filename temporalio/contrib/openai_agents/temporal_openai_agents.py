@@ -3,10 +3,9 @@
 import json
 from contextlib import contextmanager
 from datetime import timedelta
-from typing import Any, AsyncIterator, Callable, Optional, Union, overload
+from typing import Any, AsyncIterator, Callable, Optional, Union
 
 from agents import (
-    Agent,
     AgentOutputSchemaBase,
     Handoff,
     Model,
@@ -19,31 +18,34 @@ from agents import (
     TResponseInputItem,
     set_trace_provider,
 )
-from agents.function_schema import DocstringStyle, function_schema
+from agents.function_schema import function_schema
 from agents.items import TResponseStreamEvent
 from agents.run import get_default_agent_runner, set_default_agent_runner
 from agents.tool import (
     FunctionTool,
-    ToolErrorFunction,
-    ToolFunction,
-    ToolParams,
-    default_tool_error_function,
-    function_tool,
 )
 from agents.tracing import get_trace_provider
 from agents.tracing.provider import DefaultTraceProvider
-from agents.util._types import MaybeAwaitable
 from openai.types.responses import ResponsePromptParam
 
+import temporalio.client
+import temporalio.worker
 from temporalio import activity
 from temporalio import workflow as temporal_workflow
+from temporalio.client import ClientConfig
 from temporalio.common import Priority, RetryPolicy
+from temporalio.contrib.openai_agents import (
+    ModelActivity,
+    OpenAIAgentsTracingInterceptor,
+)
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
     TemporalTraceProvider,
 )
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import ApplicationError, TemporalError
+from temporalio.worker import Worker, WorkerConfig
 from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 
@@ -152,6 +154,33 @@ class TestModel(Model):
     ) -> AsyncIterator[TResponseStreamEvent]:
         """Get a streamed response from the model. Unimplemented."""
         raise NotImplementedError()
+
+
+class Plugin(temporalio.client.Plugin, temporalio.worker.Plugin):
+    def __init__(
+        self,
+        model_params: Optional[ModelActivityParameters] = None,
+        model_provider: Optional[ModelProvider] = None,
+    ) -> None:
+        self._model_params = model_params
+        self._model_provider = model_provider
+
+    def on_create_client(self, config: ClientConfig) -> ClientConfig:
+        config["data_converter"] = pydantic_data_converter
+        return super().on_create_client(config)
+
+    def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
+        config["interceptors"] = list(config.get("interceptors") or []) + [
+            OpenAIAgentsTracingInterceptor()
+        ]
+        config["activities"] = list(config.get("activities") or []) + [
+            ModelActivity(self._model_provider).invoke_model_activity
+        ]
+        return super().on_create_worker(config)
+
+    async def run_worker(self, worker: Worker) -> None:
+        with set_open_ai_agent_temporal_overrides(self._model_params):
+            await super().run_worker(worker)
 
 
 class ToolSerializationError(TemporalError):
