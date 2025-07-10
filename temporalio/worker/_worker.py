@@ -530,7 +530,7 @@ class Worker:
             )
 
         tuner = config["tuner"]
-        if config["tuner"] is not None:
+        if tuner is not None:
             if (
                 config["max_concurrent_workflow_tasks"]
                 or config["max_concurrent_activities"]
