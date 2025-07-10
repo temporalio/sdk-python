@@ -3,10 +3,10 @@
 import json
 from contextlib import contextmanager
 from datetime import timedelta
-from typing import Any, AsyncIterator, Callable, Optional, Union, overload
+from typing import Any, AsyncIterator, Callable, Optional, Type, Union
 
+import nexusrpc
 from agents import (
-    Agent,
     AgentOutputSchemaBase,
     Handoff,
     Model,
@@ -19,20 +19,14 @@ from agents import (
     TResponseInputItem,
     set_trace_provider,
 )
-from agents.function_schema import DocstringStyle, function_schema
+from agents.function_schema import function_schema
 from agents.items import TResponseStreamEvent
 from agents.run import get_default_agent_runner, set_default_agent_runner
 from agents.tool import (
     FunctionTool,
-    ToolErrorFunction,
-    ToolFunction,
-    ToolParams,
-    default_tool_error_function,
-    function_tool,
 )
 from agents.tracing import get_trace_provider
 from agents.tracing.provider import DefaultTraceProvider
-from agents.util._types import MaybeAwaitable
 from openai.types.responses import ResponsePromptParam
 
 from temporalio import activity
@@ -264,5 +258,92 @@ class workflow:
             description=schema.description or "",
             params_json_schema=schema.params_json_schema,
             on_invoke_tool=run_activity,
+            strict_json_schema=True,
+        )
+
+    @classmethod
+    def nexus_operation_as_tool(
+        cls,
+        operation: nexusrpc.Operation[Any, Any],
+        *,
+        service: Type[Any],
+        endpoint: str,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+    ) -> Tool:
+        """Convert a Nexus operation into an OpenAI agent tool.
+
+        .. warning::
+            This API is experimental and may change in future versions.
+            Use with caution in production environments.
+
+        This function takes a Nexus operation and converts it into an
+        OpenAI agent tool that can be used by the agent to execute the operation
+        during workflow execution. The tool will automatically handle the conversion
+        of inputs and outputs between the agent and the operation.
+
+        Args:
+            fn: A Nexus operation to convert into a tool.
+            service: The Nexus service class that contains the operation.
+            endpoint: The Nexus endpoint to use for the operation.
+
+        Returns:
+            An OpenAI agent tool that wraps the provided operation.
+
+        Example:
+            >>> @nexusrpc.service
+            ... class WeatherService:
+            ...     get_weather_object_nexus_operation: nexusrpc.Operation[WeatherInput, Weather]
+            >>>
+            >>> # Create tool with custom activity options
+            >>> tool = nexus_operation_as_tool(
+            ...     WeatherService.get_weather_object_nexus_operation,
+            ...     service=WeatherService,
+            ...     endpoint="weather-service",
+            ... )
+            >>> # Use tool with an OpenAI agent
+        """
+
+        def operation_callable(input):
+            raise NotImplementedError("This function definition is used as a type only")
+
+        operation_callable.__annotations__ = {
+            "input": operation.input_type,
+            "return": operation.output_type,
+        }
+        operation_callable.__name__ = operation.name
+
+        schema = function_schema(operation_callable)
+
+        async def run_operation(ctx: RunContextWrapper[Any], input: str) -> Any:
+            try:
+                json_data = json.loads(input)
+            except Exception as e:
+                raise ApplicationError(
+                    f"Invalid JSON input for tool {schema.name}: {input}"
+                ) from e
+
+            nexus_client = temporal_workflow.create_nexus_client(
+                service=service, endpoint=endpoint
+            )
+            args, _ = schema.to_call_args(schema.params_pydantic_model(**json_data))
+            assert len(args) == 1, "Nexus operations must have exactly one argument"
+            [arg] = args
+            result = await nexus_client.execute_operation(
+                operation,
+                arg,
+                schedule_to_close_timeout=schedule_to_close_timeout,
+            )
+            try:
+                return str(result)
+            except Exception as e:
+                raise ToolSerializationError(
+                    "You must return a string representation of the tool output, or something we can call str() on"
+                ) from e
+
+        return FunctionTool(
+            name=schema.name,
+            description=schema.description or "",
+            params_json_schema=schema.params_json_schema,
+            on_invoke_tool=run_operation,
             strict_json_schema=True,
         )
