@@ -431,6 +431,79 @@ class UntypedCallerWorkflow:
 #
 
 
+async def test_sync_operation_happy_path(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client,
+        nexus_service_handlers=[ServiceImpl()],
+        workflows=[CallerWorkflow, HandlerWorkflow],
+        task_queue=task_queue,
+        workflow_failure_exception_types=[Exception],
+    ):
+        await create_nexus_endpoint(task_queue, client)
+        wf_output = await client.execute_workflow(
+            CallerWorkflow.run,
+            args=[
+                CallerWfInput(
+                    op_input=OpInput(
+                        response_type=SyncResponse(
+                            op_definition_type=OpDefinitionType.SHORTHAND,
+                            use_async_def=True,
+                            exception_in_operation_start=False,
+                        ),
+                        headers={},
+                        caller_reference=CallerReference.IMPL_WITH_INTERFACE,
+                    ),
+                ),
+                False,
+                task_queue,
+            ],
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
+        )
+        assert wf_output.op_output.value == "sync response"
+
+
+async def test_workflow_run_operation_happy_path(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client,
+        nexus_service_handlers=[ServiceImpl()],
+        workflows=[CallerWorkflow, HandlerWorkflow],
+        task_queue=task_queue,
+        workflow_failure_exception_types=[Exception],
+    ):
+        await create_nexus_endpoint(task_queue, client)
+        wf_output = await client.execute_workflow(
+            CallerWorkflow.run,
+            args=[
+                CallerWfInput(
+                    op_input=OpInput(
+                        response_type=AsyncResponse(
+                            operation_workflow_id=str(uuid.uuid4()),
+                            block_forever_waiting_for_cancellation=False,
+                            op_definition_type=OpDefinitionType.SHORTHAND,
+                            exception_in_operation_start=False,
+                        ),
+                        headers={},
+                        caller_reference=CallerReference.IMPL_WITH_INTERFACE,
+                    ),
+                ),
+                False,
+                task_queue,
+            ],
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
+        )
+        assert wf_output.op_output.value == "workflow result"
+
+
 # TODO(nexus-preview): cross-namespace tests
 # TODO(nexus-preview): nexus endpoint pytest fixture?
 # TODO(nexus-prerelease): test headers
