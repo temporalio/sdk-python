@@ -569,13 +569,13 @@ def _event_reference_from_query_params(
     """
     query_params = urllib.parse.parse_qs(raw_query_params)
 
-    [reference_type] = query_params.get("referenceType") or [None]
+    [reference_type] = query_params.get("referenceType") or [""]
     if reference_type != "EventReference":
         raise ValueError(
             f"Expected Nexus link URL query parameter referenceType to be EventReference but got: {reference_type}"
         )
     # event type
-    [raw_event_type_name] = query_params.get(LINK_EVENT_TYPE_PARAM_NAME) or [None]
+    [raw_event_type_name] = query_params.get(LINK_EVENT_TYPE_PARAM_NAME) or [""]
     if not raw_event_type_name:
         raise ValueError(f"query params do not contain event type: {query_params}")
     if raw_event_type_name.startswith("EVENT_TYPE_"):
@@ -589,7 +589,7 @@ def _event_reference_from_query_params(
 
     # event id
     event_id = 0
-    [raw_event_id] = query_params.get(LINK_EVENT_ID_PARAM_NAME) or [None]
+    [raw_event_id] = query_params.get(LINK_EVENT_ID_PARAM_NAME) or [""]
     if raw_event_id:
         try:
             event_id = int(raw_event_id)
