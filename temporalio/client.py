@@ -107,6 +107,7 @@ class Client:
         namespace: str = "default",
         api_key: Optional[str] = None,
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
+        plugins: Sequence[Plugin] = [],
         interceptors: Sequence[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
@@ -120,7 +121,6 @@ class Client:
         runtime: Optional[temporalio.runtime.Runtime] = None,
         http_connect_proxy_config: Optional[HttpConnectProxyConfig] = None,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
-        plugins: Sequence[Plugin] = [],
     ) -> Client:
         """Connect to a Temporal server.
 
@@ -202,22 +202,17 @@ class Client:
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
+        plugins: Sequence[Plugin] = [],
         interceptors: Sequence[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
-        plugins: Sequence[Plugin] = [],
     ):
         """Create a Temporal client from a service client.
 
         See :py:meth:`connect` for details on the parameters.
         """
-        # Iterate over interceptors in reverse building the impl
-        self._impl: OutboundInterceptor = _ClientImpl(self)
-        for interceptor in reversed(list(interceptors)):
-            self._impl = interceptor.intercept_client(self._impl)
-
         # Store the config for tracking
         config = ClientConfig(
             service_client=service_client,
@@ -234,6 +229,11 @@ class Client:
             root_plugin = plugin.init_client_plugin(root_plugin)
 
         self._config = root_plugin.on_create_client(config)
+
+        # Iterate over interceptors in reverse building the impl
+        self._impl: OutboundInterceptor = _ClientImpl(self)
+        for interceptor in reversed(list(interceptors)):
+            self._impl = interceptor.intercept_client(self._impl)
 
     def config(self) -> ClientConfig:
         """Config, as a dictionary, used to create this client.
