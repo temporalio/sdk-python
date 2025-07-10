@@ -62,8 +62,6 @@ from tests.helpers.nexus import (
     dataclass_as_dict,
 )
 
-HTTP_PORT = 7243
-
 
 @dataclass
 class Input:
@@ -622,7 +620,7 @@ async def _test_start_operation_with_service_definition(
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
     service_client = ServiceClient(
-        server_address=server_address(env),
+        server_address=ServiceClient.default_server_address(env),
         endpoint=endpoint,
         service=(test_case.service_defn),
     )
@@ -656,7 +654,7 @@ async def _test_start_operation_without_service_definition(
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
     service_client = ServiceClient(
-        server_address=server_address(env),
+        server_address=ServiceClient.default_server_address(env),
         endpoint=endpoint,
         service=MyServiceHandler.__name__,
     )
@@ -744,7 +742,7 @@ async def test_start_operation_without_type_annotations(
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
     service_client = ServiceClient(
-        server_address=server_address(env),
+        server_address=ServiceClient.default_server_address(env),
         endpoint=endpoint,
         service=MyServiceWithOperationsWithoutTypeAnnotations.__name__,
     )
@@ -791,7 +789,7 @@ async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: A
     resp = await create_nexus_endpoint(task_queue, env.client)
     endpoint = resp.endpoint.id
     service_client = ServiceClient(
-        server_address=server_address(env),
+        server_address=ServiceClient.default_server_address(env),
         endpoint=endpoint,
         service=service_name,
     )
@@ -950,7 +948,7 @@ async def test_cancel_operation_with_invalid_token(env: WorkflowEnvironment):
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
     service_client = ServiceClient(
-        server_address=server_address(env),
+        server_address=ServiceClient.default_server_address(env),
         endpoint=endpoint,
         service=MyService.__name__,
     )
@@ -982,7 +980,7 @@ async def test_request_id_is_received_by_sync_operation(
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
     service_client = ServiceClient(
-        server_address=server_address(env),
+        server_address=ServiceClient.default_server_address(env),
         endpoint=endpoint,
         service=MyService.__name__,
     )
@@ -1056,7 +1054,7 @@ async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnviron
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
     service_client = ServiceClient(
-        server_address=server_address(env),
+        server_address=ServiceClient.default_server_address(env),
         endpoint=endpoint,
         service=ServiceHandlerForRequestIdTest.__name__,
     )
@@ -1124,8 +1122,3 @@ async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnviron
         await start_two_workflows_in_a_single_operation(
             request_id_1, 500, "Workflow execution already started"
         )
-
-
-def server_address(env: WorkflowEnvironment) -> str:
-    http_port = getattr(env, "_http_port", 7243)
-    return f"http://127.0.0.1:{http_port}"

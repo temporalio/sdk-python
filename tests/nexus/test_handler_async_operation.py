@@ -151,7 +151,7 @@ async def test_async_operation_lifecycle(
     task_queue = str(uuid.uuid4())
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
     service_client = ServiceClient(
-        f"http://127.0.0.1:{env._http_port}",  # type: ignore
+        ServiceClient.default_server_address(env),
         endpoint,
         service_handler_cls.__name__,
     )

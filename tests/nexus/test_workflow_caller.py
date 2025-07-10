@@ -23,14 +23,9 @@ from nexusrpc.handler import (
 from nexusrpc.handler._decorators import operation_handler
 
 import temporalio.api
-import temporalio.api.common
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
-import temporalio.api.nexus
-import temporalio.api.nexus.v1
-import temporalio.api.operatorservice
-import temporalio.api.operatorservice.v1
-import temporalio.exceptions
+import temporalio.api.history.v1
 import temporalio.nexus._operation_handlers
 from temporalio import nexus, workflow
 from temporalio.client import (
@@ -430,6 +425,79 @@ class UntypedCallerWorkflow:
 #
 
 
+async def test_sync_operation_happy_path(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client,
+        nexus_service_handlers=[ServiceImpl()],
+        workflows=[CallerWorkflow, HandlerWorkflow],
+        task_queue=task_queue,
+        workflow_failure_exception_types=[Exception],
+    ):
+        await create_nexus_endpoint(task_queue, client)
+        wf_output = await client.execute_workflow(
+            CallerWorkflow.run,
+            args=[
+                CallerWfInput(
+                    op_input=OpInput(
+                        response_type=SyncResponse(
+                            op_definition_type=OpDefinitionType.SHORTHAND,
+                            use_async_def=True,
+                            exception_in_operation_start=False,
+                        ),
+                        headers={},
+                        caller_reference=CallerReference.IMPL_WITH_INTERFACE,
+                    ),
+                ),
+                False,
+                task_queue,
+            ],
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
+        )
+        assert wf_output.op_output.value == "sync response"
+
+
+async def test_workflow_run_operation_happy_path(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client,
+        nexus_service_handlers=[ServiceImpl()],
+        workflows=[CallerWorkflow, HandlerWorkflow],
+        task_queue=task_queue,
+        workflow_failure_exception_types=[Exception],
+    ):
+        await create_nexus_endpoint(task_queue, client)
+        wf_output = await client.execute_workflow(
+            CallerWorkflow.run,
+            args=[
+                CallerWfInput(
+                    op_input=OpInput(
+                        response_type=AsyncResponse(
+                            operation_workflow_id=str(uuid.uuid4()),
+                            block_forever_waiting_for_cancellation=False,
+                            op_definition_type=OpDefinitionType.SHORTHAND,
+                            exception_in_operation_start=False,
+                        ),
+                        headers={},
+                        caller_reference=CallerReference.IMPL_WITH_INTERFACE,
+                    ),
+                ),
+                False,
+                task_queue,
+            ],
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
+        )
+        assert wf_output.op_output.value == "workflow result"
+
+
 # TODO(nexus-preview): cross-namespace tests
 # TODO(nexus-preview): nexus endpoint pytest fixture?
 # TODO(nexus-prerelease): test headers
@@ -568,11 +636,11 @@ async def test_async_response(
             WorkflowExecutionStatus.RUNNING,
             WorkflowExecutionStatus.COMPLETED,
         ]
-        await assert_caller_workflow_has_link_to_handler_workflow(
-            caller_wf_handle, handler_wf_handle, handler_wf_info.run_id
-        )
         await assert_handler_workflow_has_link_to_caller_workflow(
             caller_wf_handle, handler_wf_handle
+        )
+        await assert_caller_workflow_has_link_to_handler_workflow(
+            caller_wf_handle, handler_wf_handle, handler_wf_info.run_id
         )
 
         if request_cancel:
@@ -1047,11 +1115,12 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
             == temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
         )
     )
-    if not len(wf_started_event.links) == 1:
+    links = _get_links_from_workflow_execution_started_event(wf_started_event)
+    if not len(links) == 1:
         pytest.fail(
-            f"Expected 1 link on WorkflowExecutionStarted event, got {len(wf_started_event.links)}"
+            f"Expected 1 link on WorkflowExecutionStarted event, got {len(links)}"
         )
-    [link] = wf_started_event.links
+    [link] = links
     assert link.workflow_event.namespace == caller_wf_handle._client.namespace
     assert link.workflow_event.workflow_id == caller_wf_handle.id
     assert link.workflow_event.run_id
@@ -1060,6 +1129,16 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
         link.workflow_event.event_ref.event_type
         == temporalio.api.enums.v1.EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED
     )
+
+
+def _get_links_from_workflow_execution_started_event(
+    event: temporalio.api.history.v1.HistoryEvent,
+) -> list[temporalio.api.common.v1.Link]:
+    [callback] = event.workflow_execution_started_event_attributes.completion_callbacks
+    if links := callback.links:
+        return list(links)
+    else:
+        return list(event.links)
 
 
 # When request_cancel is True, the NexusOperationHandle in the workflow evolves

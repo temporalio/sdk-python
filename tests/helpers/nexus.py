@@ -1,6 +1,7 @@
 import dataclasses
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional
+from urllib.parse import urlparse
 
 import temporalio.api.failure.v1
 import temporalio.api.nexus.v1
@@ -8,6 +9,7 @@ import temporalio.api.operatorservice.v1
 import temporalio.workflow
 from temporalio.client import Client
 from temporalio.converter import FailureConverter, PayloadConverter
+from temporalio.testing import WorkflowEnvironment
 
 with temporalio.workflow.unsafe.imports_passed_through():
     import httpx
@@ -58,7 +60,7 @@ class ServiceClient:
         # TODO(nexus-preview): Support callback URL as query param
         async with httpx.AsyncClient() as http_client:
             return await http_client.post(
-                f"{self.server_address}/nexus/endpoints/{self.endpoint}/services/{self.service}/{operation}",
+                f"http://{self.server_address}/nexus/endpoints/{self.endpoint}/services/{self.service}/{operation}",
                 json=body,
                 headers=headers,
             )
@@ -70,10 +72,19 @@ class ServiceClient:
     ) -> httpx.Response:
         async with httpx.AsyncClient() as http_client:
             return await http_client.post(
-                f"{self.server_address}/nexus/endpoints/{self.endpoint}/services/{self.service}/{operation}/cancel",
+                f"http://{self.server_address}/nexus/endpoints/{self.endpoint}/services/{self.service}/{operation}/cancel",
                 # Token can also be sent as "Nexus-Operation-Token" header
                 params={"token": token},
             )
+
+    @staticmethod
+    def default_server_address(env: WorkflowEnvironment) -> str:
+        # TODO(nexus-preview): nexus tests are making http requests directly but this is
+        # not officially supported.
+        parsed = urlparse(env.client.service_client.config.target_host)
+        host = parsed.hostname or "127.0.0.1"
+        http_port = getattr(env, "_http_port", 7243)
+        return f"{host}:{http_port}"
 
 
 def dataclass_as_dict(dataclass: Any) -> dict[str, Any]:
