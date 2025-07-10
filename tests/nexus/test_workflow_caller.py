@@ -634,11 +634,11 @@ async def test_async_response(
             WorkflowExecutionStatus.RUNNING,
             WorkflowExecutionStatus.COMPLETED,
         ]
-        await assert_caller_workflow_has_link_to_handler_workflow(
-            caller_wf_handle, handler_wf_handle, handler_wf_info.run_id
-        )
         await assert_handler_workflow_has_link_to_caller_workflow(
             caller_wf_handle, handler_wf_handle
+        )
+        await assert_caller_workflow_has_link_to_handler_workflow(
+            caller_wf_handle, handler_wf_handle, handler_wf_info.run_id
         )
 
         if request_cancel:
