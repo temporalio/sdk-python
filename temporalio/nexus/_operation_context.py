@@ -499,6 +499,13 @@ def _workflow_handle_to_workflow_execution_started_event_link(
     )
 
 
+_LINK_URL_PATH_REGEX = re.compile(
+    r"^/namespaces/(?P<namespace>[^/]+)/workflows/(?P<workflow_id>[^/]+)/(?P<run_id>[^/]+)/history$"
+)
+LINK_EVENT_ID_PARAM_NAME = "eventID"
+LINK_EVENT_TYPE_PARAM_NAME = "eventType"
+
+
 def _workflow_event_to_nexus_link(
     workflow_event: temporalio.api.common.v1.Link.WorkflowEvent,
 ) -> nexusrpc.Link:
@@ -521,13 +528,6 @@ def _workflow_event_to_nexus_link(
     )
 
 
-_LINK_URL_PATH_REGEX = re.compile(
-    r"^/namespaces/(?P<namespace>[^/]+)/workflows/(?P<workflow_id>[^/]+)/(?P<run_id>[^/]+)/history$"
-)
-LINK_EVENT_ID_PARAM_NAME = "eventID"
-LINK_EVENT_TYPE_PARAM_NAME = "eventType"
-
-
 def _nexus_link_to_workflow_event(
     link: nexusrpc.Link,
 ) -> Optional[temporalio.api.common.v1.Link.WorkflowEvent]:
@@ -539,7 +539,7 @@ def _nexus_link_to_workflow_event(
         )
         return None
     try:
-        event_ref = _event_reference_from_query_params(urllib.parse.parse_qs(url.query))
+        event_ref = _event_reference_from_query_params(url.query)
     except ValueError as err:
         logger.warning(
             f"Failed to parse event reference from Nexus link URL query parameters: {link} ({err})"
@@ -556,11 +556,13 @@ def _nexus_link_to_workflow_event(
 
 
 def _event_reference_from_query_params(
-    query_params: Mapping[str, list[str]],
+    raw_query_params: str,
 ) -> temporalio.api.common.v1.Link.WorkflowEvent.EventReference:
     """
     Return an EventReference from the query params or raise ValueError.
     """
+    query_params = urllib.parse.parse_qs(raw_query_params)
+
     [reference_type] = query_params.get("referenceType") or [None]
     if reference_type != "EventReference":
         raise ValueError(
