@@ -34,14 +34,14 @@ from temporalio import activity
 from temporalio import workflow as temporal_workflow
 from temporalio.client import ClientConfig
 from temporalio.common import Priority, RetryPolicy
-from temporalio.contrib.openai_agents import (
-    ModelActivity,
-    OpenAIAgentsTracingInterceptor,
-)
+from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
     TemporalTraceProvider,
+)
+from temporalio.contrib.openai_agents._trace_interceptor import (
+    OpenAIAgentsTracingInterceptor,
 )
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import ApplicationError, TemporalError

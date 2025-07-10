@@ -50,14 +50,10 @@ from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
 from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents import (
-    ModelActivity,
     ModelActivityParameters,
-    OpenAIAgentsTracingInterceptor,
     TestModel,
     TestModelProvider,
-    set_open_ai_agent_temporal_overrides,
 )
-from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import CancelledError
 from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
