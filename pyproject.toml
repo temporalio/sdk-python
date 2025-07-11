@@ -3,7 +3,7 @@ name = "temporalio"
 version = "1.14.1"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
-requires-python = "~=3.9"
+requires-python = ">=3.9"
 readme = "README.md"
 license = { file = "LICENSE" }
 keywords = [
