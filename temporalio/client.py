@@ -228,11 +228,14 @@ class Client:
         for plugin in reversed(list(plugins)):
             root_plugin = plugin.init_client_plugin(root_plugin)
 
-        self._config = root_plugin.on_create_client(config)
+        self._init_from_config(root_plugin.on_create_client(config))
+
+    def _init_from_config(self, config: ClientConfig):
+        self._config = config
 
         # Iterate over interceptors in reverse building the impl
         self._impl: OutboundInterceptor = _ClientImpl(self)
-        for interceptor in reversed(list(interceptors)):
+        for interceptor in reversed(list(self._config["interceptors"])):
             self._impl = interceptor.intercept_client(self._impl)
 
     def config(self) -> ClientConfig:
@@ -7388,6 +7391,9 @@ async def _decode_user_metadata(
 
 
 class Plugin:
+    def name(self) -> str:
+        return type(self).__module__ + "." + type(self).__qualname__
+
     def init_client_plugin(self, next: Plugin) -> Plugin:
         self.next_client_plugin = next
         return self

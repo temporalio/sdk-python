@@ -97,6 +97,9 @@ PollerBehavior: TypeAlias = Union[
 
 
 class Plugin:
+    def name(self) -> str:
+        return type(self).__module__ + "." + type(self).__qualname__
+
     def init_worker_plugin(self, next: Plugin) -> Plugin:
         self.next_worker_plugin = next
         return self
@@ -388,6 +391,11 @@ class Worker:
             List[Plugin],
             [p for p in client.config()["plugins"] if isinstance(p, Plugin)],
         )
+        for client_plugin in plugins_from_client:
+            if type(client_plugin) in [type(p) for p in plugins]:
+                warnings.warn(
+                    f"The same plugin type {type(client_plugin)} is present from both client and worker. It may run twice and may not be the intended behavior."
+                )
         plugins = plugins_from_client + list(plugins)
 
         root_plugin: Plugin = _RootPlugin()
