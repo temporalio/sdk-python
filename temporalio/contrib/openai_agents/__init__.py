@@ -17,8 +17,9 @@ from temporalio.contrib.openai_agents.temporal_openai_agents import (
     TestModel,
     TestModelProvider,
     set_open_ai_agent_temporal_overrides,
-    workflow,
 )
+
+from . import workflow
 
 __all__ = [
     "ModelActivity",
