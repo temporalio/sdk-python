@@ -133,6 +133,14 @@ class Client:
                 metadata doesn't already have an "authorization" key.
             data_converter: Data converter to use for all data conversions
                 to/from payloads.
+            plugins: Set of plugins that are chained together to allow
+                intercepting and modifying client creation and service connection.
+                The earlier plugins wrap the later ones.
+
+                Any plugins that also implement
+                :py:class:`temporalio.worker.Plugin` will be used as worker
+                plugins too so they should not be given when creating a
+                worker.
             interceptors: Set of interceptors that are chained together to allow
                 intercepting of client calls. The earlier interceptors wrap the
                 later ones.
@@ -7391,19 +7399,70 @@ async def _decode_user_metadata(
 
 
 class Plugin:
+    """Base class for client plugins that can intercept and modify client behavior.
+
+    Plugins allow customization of client creation and service connection processes
+    through a chain of responsibility pattern. Each plugin can modify the client
+    configuration or intercept service client connections.
+
+    If the plugin is also a temporalio.worker.Plugin, it will additionally be propagated as a worker plugin.
+    You should likley not also provide it to the worker as that will result in the plugin being applied twice.
+    """
+
     def name(self) -> str:
+        """Get the name of this plugin. Can be overridden if desired to provide a more appropriate name.
+
+        Returns:
+            The fully qualified name of the plugin class (module.classname).
+        """
         return type(self).__module__ + "." + type(self).__qualname__
 
     def init_client_plugin(self, next: Plugin) -> Plugin:
+        """Initialize this plugin in the plugin chain.
+
+        This method sets up the chain of responsibility pattern by storing a reference
+        to the next plugin in the chain. It is called during client creation to build
+        the plugin chain.
+
+        Args:
+            next: The next plugin in the chain to delegate to.
+
+        Returns:
+            This plugin instance for method chaining.
+        """
         self.next_client_plugin = next
         return self
 
     def on_create_client(self, config: ClientConfig) -> ClientConfig:
+        """Hook called when creating a client to allow modification of configuration.
+
+        This method is called during client creation and allows plugins to modify
+        the client configuration before the client is fully initialized. Plugins
+        can add interceptors, modify connection parameters, or change other settings.
+
+        Args:
+            config: The client configuration dictionary to potentially modify.
+
+        Returns:
+            The modified client configuration.
+        """
         return self.next_client_plugin.on_create_client(config)
 
     async def connect_service_client(
         self, config: temporalio.service.ConnectConfig
     ) -> temporalio.service.ServiceClient:
+        """Hook called when connecting to the Temporal service.
+
+        This method is called during service client connection and allows plugins
+        to intercept or modify the connection process. Plugins can modify connection
+        parameters, add authentication, or provide custom connection logic.
+
+        Args:
+            config: The service connection configuration.
+
+        Returns:
+            The connected service client.
+        """
         return await self.next_client_plugin.connect_service_client(config)
 
 

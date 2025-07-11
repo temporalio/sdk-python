@@ -97,17 +97,63 @@ PollerBehavior: TypeAlias = Union[
 
 
 class Plugin:
+    """Base class for worker plugins that can intercept and modify worker behavior.
+
+    Plugins allow customization of worker creation and execution processes
+    through a chain of responsibility pattern. Each plugin can modify the worker
+    configuration or intercept worker execution.
+    """
+
     def name(self) -> str:
+        """Get the qualified name of this plugin. Can be overridden if desired to provide a more appropriate name.
+
+        Returns:
+            The fully qualified name of the plugin class (module.classname).
+        """
         return type(self).__module__ + "." + type(self).__qualname__
 
     def init_worker_plugin(self, next: Plugin) -> Plugin:
+        """Initialize this plugin in the plugin chain.
+
+        This method sets up the chain of responsibility pattern by storing a reference
+        to the next plugin in the chain. It is called during worker creation to build
+        the plugin chain.
+
+        Args:
+            next: The next plugin in the chain to delegate to.
+
+        Returns:
+            This plugin instance for method chaining.
+        """
         self.next_worker_plugin = next
         return self
 
     def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
+        """Hook called when creating a worker to allow modification of configuration.
+
+        This method is called during worker creation and allows plugins to modify
+        the worker configuration before the worker is fully initialized. Plugins
+        can modify task queue names, adjust concurrency settings, add interceptors,
+        or change other worker settings.
+
+        Args:
+            config: The worker configuration dictionary to potentially modify.
+
+        Returns:
+            The modified worker configuration.
+        """
         return self.next_worker_plugin.on_create_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
+        """Hook called when running a worker to allow interception of execution.
+
+        This method is called when the worker is started and allows plugins to
+        intercept or wrap the worker execution. Plugins can add monitoring,
+        custom lifecycle management, or other execution-time behavior.
+
+        Args:
+            worker: The worker instance to run.
+        """
         await self.next_worker_plugin.run_worker(worker)
 
 
@@ -224,6 +270,10 @@ class Worker:
             workflow_runner: Runner for workflows.
             unsandboxed_workflow_runner: Runner for workflows that opt-out of
                 sandboxing.
+            plugins: Collection of plugins for this worker. Any plugins already
+                on the client that also implement :py:class:`temporalio.worker.Plugin` are
+                prepended to this list and should not be explicitly given here
+                to avoid running the plugin twice.
             interceptors: Collection of interceptors for this worker. Any
                 interceptors already on the client that also implement
                 :py:class:`Interceptor` are prepended to this list and should
