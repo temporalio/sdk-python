@@ -2514,7 +2514,7 @@ class _WorkflowInstanceImpl(
 
 
 class _WorkflowInboundImpl(WorkflowInboundInterceptor):
-    def __init__(
+    def __init__(  # type: ignore
         self,
         instance: _WorkflowInstanceImpl,
     ) -> None:
@@ -2522,7 +2522,7 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
         self._instance = instance
 
     def init(self, outbound: WorkflowOutboundInterceptor) -> None:
-        self._outbound = outbound
+        self._outbound = outbound  # type: ignore
 
     async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
         args = [self._instance._object] + list(input.args)
@@ -2572,7 +2572,7 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
 
 
 class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
-    def __init__(self, instance: _WorkflowInstanceImpl) -> None:
+    def __init__(self, instance: _WorkflowInstanceImpl) -> None:  # type: ignore
         # We are intentionally not calling the base class's __init__ here
         self._instance = instance
 

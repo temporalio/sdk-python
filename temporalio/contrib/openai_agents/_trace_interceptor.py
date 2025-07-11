@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Any, Mapping, Protocol, Type, cast
+from typing import Any, Mapping, Protocol, Type
 
-from agents import CustomSpanData, custom_span, get_current_span, trace
+from agents import custom_span, get_current_span, trace
 from agents.tracing import (
     get_trace_provider,
 )
-from agents.tracing.provider import DefaultTraceProvider
-from agents.tracing.spans import NoOpSpan, SpanImpl
+from agents.tracing.spans import NoOpSpan
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -116,7 +115,7 @@ class OpenAIAgentsTracingInterceptor(
         worker = Worker(client, task_queue="my-task-queue", interceptors=[interceptor])
     """
 
-    def __init__(
+    def __init__(  # type: ignore[reportMissingSuperCall]
         self,
         payload_converter: temporalio.converter.PayloadConverter = temporalio.converter.default().payload_converter,
     ) -> None:
@@ -189,7 +188,7 @@ class _ContextPropagationClientOutboundInterceptor(
             **({"temporal:workflowId": input.id} if input.id else {}),
         }
         data = {"workflowId": input.id} if input.id else None
-        span_name = f"temporal:startWorkflow"
+        span_name = "temporal:startWorkflow"
         if get_trace_provider().get_current_trace() is None:
             with trace(
                 span_name + ":" + input.workflow, metadata=metadata, group_id=input.id
@@ -208,7 +207,7 @@ class _ContextPropagationClientOutboundInterceptor(
             **({"temporal:workflowId": input.id} if input.id else {}),
         }
         data = {"workflowId": input.id, "query": input.query}
-        span_name = f"temporal:queryWorkflow"
+        span_name = "temporal:queryWorkflow"
         if get_trace_provider().get_current_trace() is None:
             with trace(span_name, metadata=metadata, group_id=input.id):
                 with custom_span(name=span_name, data=data):
@@ -227,7 +226,7 @@ class _ContextPropagationClientOutboundInterceptor(
             **({"temporal:workflowId": input.id} if input.id else {}),
         }
         data = {"workflowId": input.id, "signal": input.signal}
-        span_name = f"temporal:signalWorkflow"
+        span_name = "temporal:signalWorkflow"
         if get_trace_provider().get_current_trace() is None:
             with trace(span_name, metadata=metadata, group_id=input.id):
                 with custom_span(name=span_name, data=data):

@@ -26,7 +26,7 @@ from agents import (
 from agents.models.multi_provider import MultiProvider
 from typing_extensions import Required, TypedDict
 
-from temporalio import activity, workflow
+from temporalio import activity
 from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbeater
 
 
@@ -106,7 +106,7 @@ class ActivityModelInput(TypedDict, total=False):
 
     model_name: Optional[str]
     system_instructions: Optional[str]
-    input: Required[Union[str, list[TResponseInputItem]]]  # type: ignore
+    input: Required[Union[str, list[TResponseInputItem]]]
     model_settings: Required[ModelSettings]
     tools: list[ToolInput]
     output_schema: Optional[AgentOutputSchemaInput]
