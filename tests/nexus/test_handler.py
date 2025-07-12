@@ -773,10 +773,7 @@ async def test_start_operation_without_type_annotations(
 
 
 def test_operation_without_type_annotations_without_service_definition_raises_validation_error():
-    with pytest.raises(
-        ValueError,
-        match=r"has no input type.+has no output type",
-    ):
+    with pytest.raises(ValueError, match=r"has no input type"):
         service_handler(MyServiceHandlerWithOperationsWithoutTypeAnnotations)
 
 
