@@ -45,6 +45,7 @@ from nexusrpc.handler import (
     sync_operation,
 )
 from nexusrpc.handler._decorators import operation_handler
+from typing_extensions import dataclass_transform
 
 from temporalio import nexus, workflow
 from temporalio.client import Client
@@ -328,12 +329,17 @@ class UnsuccessfulResponse:
     headers: Mapping[str, str] = UNSUCCESSFUL_RESPONSE_HEADERS
 
 
-class _TestCase:
+@dataclass_transform()
+class _BaseTestCase:
+    pass
+
+
+class _TestCase(_BaseTestCase):
     operation: str
+    expected: SuccessfulResponse
     service_defn: str = "MyService"
     input: Input = Input("")
     headers: dict[str, str] = {}
-    expected: SuccessfulResponse
     expected_without_service_definition: Optional[SuccessfulResponse] = None
     skip = ""
 
