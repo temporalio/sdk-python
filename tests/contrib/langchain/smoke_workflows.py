@@ -64,7 +64,7 @@ class ActivityAsToolOpenAIWorkflow:
         ]
 
         agent = create_tool_calling_agent(model, tools, prompt)
-        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
 
         return await agent_executor.ainvoke({"input": user_prompt})
 
@@ -99,6 +99,6 @@ class ToolAsActivityOpenAIWorkflow:
         ]
 
         agent = create_tool_calling_agent(model, tools, prompt)
-        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
 
         return await agent_executor.ainvoke({"input": user_prompt})

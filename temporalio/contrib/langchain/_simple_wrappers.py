@@ -24,84 +24,98 @@ from temporalio import activity, workflow
 from typing import Any as ModelData, Any as ToolData
 
 
-# Monkey-patch for LangChain's run_in_executor to work in Temporal workflows
-_original_run_in_executor = None
-
-
-async def _temporal_run_in_executor(executor_or_config, func, *args, **kwargs):
-    """
-    Replacement for LangChain's run_in_executor that works in Temporal workflows.
-
-    In Temporal workflows, we can't use real thread executors because they break
-    determinism. Instead, we run the function synchronously.
-    """
+def _patch_workflow_event_loop():
+    """Monkey-patch the workflow event loop to add run_in_executor support."""
     try:
-        # Try to detect if we're in a workflow context by checking for workflow module
-        # If we can access workflow.info(), we're in a workflow
-        try:
-            workflow.info()
-            # We're in a workflow context - run synchronously
-            # Handle the context wrapper that LangChain uses
-            if (
-                hasattr(func, "func")
-                and hasattr(func, "args")
-                and hasattr(func, "keywords")
-            ):
-                # This is a partial function from LangChain's context wrapper
-                actual_func = func.func
-                actual_args = func.args + args
-                actual_kwargs = {**func.keywords, **kwargs}
-                result = actual_func(*actual_args, **actual_kwargs)
-            else:
-                # Regular function call
-                result = func(*args, **kwargs)
+        # Try to access workflow module to see if we're in Temporal context
+        import temporalio.workflow
 
-            return result
-        except Exception:
-            # Not in workflow context - use original implementation
-            pass
+        # Get the current event loop implementation used in workflows
+        # This might be in the workflow instance or event loop
+        from temporalio.worker._workflow_instance import _WorkflowInstanceImpl
+
+        # Store the original get_event_loop function for fallback
+        import asyncio
+
+        original_get_event_loop = asyncio.get_event_loop
+
+        def patched_get_event_loop():
+            """Patched get_event_loop that returns workflow event loop with run_in_executor."""
+            loop = original_get_event_loop()
+
+            # Check if we're in a workflow context
+            try:
+                temporalio.workflow.info()
+                # We're in a workflow - patch the loop's run_in_executor if it doesn't exist
+                if not hasattr(loop, "_temporal_run_in_executor_patched"):
+                    original_run_in_executor = getattr(loop, "run_in_executor", None)
+
+                    def workflow_run_in_executor(executor, func, *args):
+                        """Run function synchronously in workflow context for determinism."""
+                        # Create a future that will be resolved immediately
+                        future = loop.create_future()
+
+                        try:
+                            # Run the function synchronously in the workflow thread
+                            result = func(*args)
+                            future.set_result(result)
+                        except Exception as e:
+                            future.set_exception(e)
+
+                        return future
+
+                    # Replace the method
+                    loop.run_in_executor = workflow_run_in_executor
+                    loop._temporal_run_in_executor_patched = True
+
+            except Exception:
+                # Not in workflow context, return unmodified loop
+                pass
+
+            return loop
+
+        # Replace the global get_event_loop function
+        asyncio.get_event_loop = patched_get_event_loop
+
+        # Always patch _WorkflowInstanceImpl to restore the run_in_executor method
+        # that was removed from the core Temporal implementation
+        def run_in_executor(
+            self,
+            executor: Optional[Any],
+            func: Callable[..., Any],
+            *args: Any,
+        ) -> Any:  # asyncio.Future[Any] but keeping Any for compatibility
+            """Run a function in an executor (thread pool).
+
+            For Temporal workflows, this implementation runs the function
+            synchronously in the current workflow thread to maintain
+            determinism. The executor parameter is ignored.
+            """
+            import asyncio
+            from typing import Optional, Callable, Any
+
+            # Create a future that will be resolved immediately
+            future = self.create_future()
+
+            try:
+                # Run the function synchronously in the workflow thread
+                result = func(*args)
+                future.set_result(result)
+            except Exception as e:
+                future.set_exception(e)
+
+            return future
+
+        # Add the method to the workflow instance class
+        _WorkflowInstanceImpl.run_in_executor = run_in_executor
+
     except (ImportError, AttributeError):
-        # Not in Temporal context at all
+        # Not in Temporal context or method already exists
         pass
 
-    # Fall back to original implementation
-    if _original_run_in_executor:
-        return await _original_run_in_executor(
-            executor_or_config, func, *args, **kwargs
-        )
-    else:
-        # Last resort - run synchronously
-        # Handle the context wrapper that LangChain uses
-        if (
-            hasattr(func, "func")
-            and hasattr(func, "args")
-            and hasattr(func, "keywords")
-        ):
-            # This is a partial function from LangChain's context wrapper
-            actual_func = func.func
-            actual_args = func.args + args
-            actual_kwargs = {**func.keywords, **kwargs}
-            result = actual_func(*actual_args, **actual_kwargs)
-        else:
-            # Regular function call
-            result = func(*args, **kwargs)
 
-        return result
-
-
-def _patch_langchain_executor():
-    """Apply monkey-patch to LangChain's run_in_executor function."""
-    global _original_run_in_executor
-
-    from langchain_core.runnables import config as lc_config
-
-    if not _original_run_in_executor:
-        _original_run_in_executor = lc_config.run_in_executor
-        lc_config.run_in_executor = _temporal_run_in_executor
-
-
-# Apply the patch when this module is imported
-_patch_langchain_executor()
+# Apply the patches when this module is imported
+_patch_workflow_event_loop()
 
 
 # Input/Output types for static activities
@@ -1239,6 +1253,16 @@ class TemporalModelProxy(BaseLanguageModel):
                             args = [event.get("error")]
                         elif event_name == "on_text":
                             args = [event.get("text")]
+                        elif event_name == "on_chain_start":
+                            args = [event.get("serialized"), event.get("inputs")]
+                        elif event_name == "on_chain_end":
+                            args = [event.get("outputs")]
+                        elif event_name == "on_chain_error":
+                            args = [event.get("error")]
+                        elif event_name == "on_agent_action":
+                            args = [event.get("action")]
+                        elif event_name == "on_agent_finish":
+                            args = [event.get("finish")]
                         else:
                             # Unknown event, just use kwargs
                             args = []
