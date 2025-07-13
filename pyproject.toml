@@ -236,3 +236,6 @@ exclude = [
 [tool.uv]
 # Prevent uv commands from building the package by default
 package = false
+
+[tool.uv.sources]
+nexus-rpc = { path = "../nexus-sdk-python", editable = true }
