@@ -227,7 +227,7 @@ class LogForwardingConfig:
                 # We can't access logging module's start time and it's not worth
                 # doing difference math to get relative time right here, so
                 # we'll make time relative to _our_ module's start time
-                self.relativeCreated = (record.created - _module_start_time) * 1000
+                self.relativeCreated = (record.created - _module_start_time) * 1000  # type: ignore[reportUninitializedInstanceVariable]
             # Log the record
             self.logger.handle(record)
 

@@ -18,10 +18,11 @@ import concurrent.futures
 import logging
 import pprint
 import uuid
+from collections.abc import Mapping
 from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Callable, Mapping, Optional, Type, Union
+from typing import Any, Callable, Optional, Union
 
 import httpx
 import nexusrpc
@@ -556,7 +557,7 @@ class NonSerializableOutputFailure(_FailureTestCase):
 )
 @pytest.mark.parametrize("with_service_definition", [True, False])
 async def test_start_operation_happy_path(
-    test_case: Type[_TestCase],
+    test_case: type[_TestCase],
     with_service_definition: bool,
     env: WorkflowEnvironment,
 ):
@@ -581,7 +582,7 @@ async def test_start_operation_happy_path(
     ],
 )
 async def test_start_operation_protocol_level_failures(
-    test_case: Type[_TestCase], env: WorkflowEnvironment
+    test_case: type[_TestCase], env: WorkflowEnvironment
 ):
     if test_case == UpstreamTimeoutViaRequestTimeout:
         pytest.skip(
@@ -603,7 +604,7 @@ async def test_start_operation_protocol_level_failures(
     ],
 )
 async def test_start_operation_operation_failures(
-    test_case: Type[_TestCase], env: WorkflowEnvironment
+    test_case: type[_TestCase], env: WorkflowEnvironment
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -612,7 +613,7 @@ async def test_start_operation_operation_failures(
 
 
 async def _test_start_operation_with_service_definition(
-    test_case: Type[_TestCase],
+    test_case: type[_TestCase],
     env: WorkflowEnvironment,
 ):
     if test_case.skip:
@@ -646,7 +647,7 @@ async def _test_start_operation_with_service_definition(
 
 
 async def _test_start_operation_without_service_definition(
-    test_case: Type[_TestCase],
+    test_case: type[_TestCase],
     env: WorkflowEnvironment,
 ):
     if test_case.skip:
@@ -732,7 +733,7 @@ class AsyncHandlerHappyPathWithoutTypeAnnotations(_TestCase):
     ],
 )
 async def test_start_operation_without_type_annotations(
-    test_case: Type[_TestCase], env: WorkflowEnvironment
+    test_case: type[_TestCase], env: WorkflowEnvironment
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -830,10 +831,11 @@ async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: A
     assert getattr(record, "operation", None) == operation_name
 
 
+@dataclass
 class _InstantiationCase:
     executor: bool
     handler: Callable[..., Any]
-    exception: Optional[Type[Exception]]
+    exception: Optional[type[Exception]]
     match: Optional[str]
 
 
@@ -917,7 +919,7 @@ class SyncCancel(_InstantiationCase):
     [SyncHandlerNoExecutor, DefaultCancel, SyncCancel],
 )
 async def test_handler_instantiation(
-    test_case: Type[_InstantiationCase], client: Client
+    test_case: type[_InstantiationCase], client: Client
 ):
     task_queue = str(uuid.uuid4())
 
