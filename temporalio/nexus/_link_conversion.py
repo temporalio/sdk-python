@@ -4,6 +4,7 @@ import logging
 import re
 import urllib.parse
 from typing import (
+    TYPE_CHECKING,
     Any,
     Optional,
 )
@@ -12,7 +13,9 @@ import nexusrpc
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
-import temporalio.client
+
+if TYPE_CHECKING:
+    import temporalio.client
 
 logger = logging.getLogger(__name__)
 
