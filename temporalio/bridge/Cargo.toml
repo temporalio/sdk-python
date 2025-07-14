@@ -30,7 +30,7 @@ temporal-sdk-core-api = { version = "0.1.0", path = "./sdk-core/core-api", featu
 temporal-sdk-core-protos = { version = "0.1.0", path = "./sdk-core/sdk-core-protos" }
 tokio = "1.26"
 tokio-stream = "0.1"
-tonic = "0.12"
+tonic = "0.13"
 tracing = "0.1"
 url = "2.2"
 
