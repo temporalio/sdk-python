@@ -251,7 +251,7 @@ class ClientConfigProfile:
         disable_file: bool = False,
         disable_env: bool = False,
         config_file_strict: bool = False,
-        env_vars: Optional[Mapping[str, str]] = None,
+        override_env_vars: Optional[Mapping[str, str]] = None,
     ) -> ClientConfigProfile:
         """Load a single client profile from given sources, applying env
         overrides.
@@ -267,13 +267,14 @@ class ClientConfigProfile:
             disable_file: If true, file loading is disabled. This is only used
                 when ``config_source`` is not present.
             disable_env: If true, environment variable loading and overriding
-                is disabled. This takes precedence over the ``env_vars``
+                is disabled. This takes precedence over the ``override_env_vars``
                 parameter.
             config_file_strict: If true, will error on unrecognized keys.
-            env_vars: The environment to use for loading and overrides. If not
-                provided, environment variables are not used for overrides. To
-                use the current process's environment, :py:attr:`os.environ` can be
-                passed explicitly.
+            override_env_vars: The environment to use for loading and overrides.
+                If not provided, the current process's environment is used. To
+                use a specific set of environment variables, provide them here.
+                To disable environment variable loading, set ``disable_env`` to
+                true.
 
         Returns:
             The client configuration profile.
@@ -287,7 +288,7 @@ class ClientConfigProfile:
             disable_file=disable_file,
             disable_env=disable_env,
             config_file_strict=config_file_strict,
-            env_vars=env_vars,
+            env_vars=override_env_vars,
         )
         return ClientConfigProfile.from_dict(raw_profile)
 
@@ -331,7 +332,7 @@ class ClientConfig:
         config_source: Optional[DataSource] = None,
         disable_file: bool = False,
         config_file_strict: bool = False,
-        env_vars: Optional[Mapping[str, str]] = None,
+        override_env_vars: Optional[Mapping[str, str]] = None,
     ) -> ClientConfig:
         """Load all client profiles from given sources.
 
@@ -348,11 +349,12 @@ class ClientConfig:
                 when ``config_source`` is not present.
             config_file_strict: If true, will TOML file parsing will error on
                 unrecognized keys.
-            env_vars: The environment variables to use for locating the default config
-                file. If not provided, ``TEMPORAL_CONFIG_FILE`` is not checked
-                and only the default path is used (e.g. ``~/.config/temporalio/temporal.toml``).
-                To use the current process's environment, :py:attr:`os.environ` can be passed
-                explicitly.
+            override_env_vars: The environment variables to use for locating the
+                default config file. If not provided, the current process's
+                environment is used to check for ``TEMPORAL_CONFIG_FILE``. To
+                use a specific set of environment variables, provide them here.
+                To disable environment variable loading, set ``disable_file`` to
+                true or pass an empty dictionary for this parameter.
         """
         path, data = _source_to_path_and_data(config_source)
 
@@ -361,7 +363,7 @@ class ClientConfig:
             data=data,
             disable_file=disable_file,
             config_file_strict=config_file_strict,
-            env_vars=env_vars,
+            env_vars=override_env_vars,
         )
         return ClientConfig.from_dict(loaded_profiles)
 
@@ -392,7 +394,10 @@ class ClientConfig:
             config_file_strict: If true, will error on unrecognized keys in the
                 TOML file.
             override_env_vars: A dictionary of environment variables to use for
-                loading and overrides.
+                loading and overrides. If not provided, the current process's
+                environment is used. To use a specific set of environment
+                variables, provide them here. To disable environment variable
+                loading, set ``disable_env`` to true.
 
         Returns:
             TypedDict of keyword arguments for
@@ -408,6 +413,6 @@ class ClientConfig:
             disable_file=disable_file,
             disable_env=disable_env,
             config_file_strict=config_file_strict,
-            env_vars=override_env_vars,
+            override_env_vars=override_env_vars,
         )
         return prof.to_client_connect_config()

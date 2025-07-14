@@ -25,32 +25,32 @@ pub struct MetricAttributesRef {
 
 #[pyclass]
 pub struct MetricCounterRef {
-    counter: Arc<dyn metrics::Counter>,
+    counter: Arc<metrics::Counter>,
 }
 
 #[pyclass]
 pub struct MetricHistogramRef {
-    histogram: Arc<dyn metrics::Histogram>,
+    histogram: Arc<metrics::Histogram>,
 }
 
 #[pyclass]
 pub struct MetricHistogramFloatRef {
-    histogram: Arc<dyn metrics::HistogramF64>,
+    histogram: Arc<metrics::HistogramF64>,
 }
 
 #[pyclass]
 pub struct MetricHistogramDurationRef {
-    histogram: Arc<dyn metrics::HistogramDuration>,
+    histogram: Arc<metrics::HistogramDuration>,
 }
 
 #[pyclass]
 pub struct MetricGaugeRef {
-    gauge: Arc<dyn metrics::Gauge>,
+    gauge: Arc<metrics::Gauge>,
 }
 
 #[pyclass]
 pub struct MetricGaugeFloatRef {
-    gauge: Arc<dyn metrics::GaugeF64>,
+    gauge: Arc<metrics::GaugeF64>,
 }
 
 pub fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<MetricMeterRef> {
@@ -82,7 +82,8 @@ impl MetricMeterRef {
             counter: self
                 .meter
                 .inner
-                .counter(build_metric_parameters(name, description, unit)),
+                .counter(build_metric_parameters(name, description, unit))
+                .into(),
         }
     }
 
@@ -96,7 +97,8 @@ impl MetricMeterRef {
             histogram: self
                 .meter
                 .inner
-                .histogram(build_metric_parameters(name, description, unit)),
+                .histogram(build_metric_parameters(name, description, unit))
+                .into(),
         }
     }
 
@@ -107,11 +109,15 @@ impl MetricMeterRef {
         unit: Option<String>,
     ) -> MetricHistogramFloatRef {
         MetricHistogramFloatRef {
-            histogram: self.meter.inner.histogram_f64(build_metric_parameters(
-                name,
-                description,
-                unit,
-            )),
+            histogram: self
+                .meter
+                .inner
+                .histogram_f64(build_metric_parameters(
+                    name,
+                    description,
+                    unit,
+                ))
+                .into(),
         }
     }
 
@@ -122,11 +128,15 @@ impl MetricMeterRef {
         unit: Option<String>,
     ) -> MetricHistogramDurationRef {
         MetricHistogramDurationRef {
-            histogram: self.meter.inner.histogram_duration(build_metric_parameters(
-                name,
-                description,
-                unit,
-            )),
+            histogram: self
+                .meter
+                .inner
+                .histogram_duration(build_metric_parameters(
+                    name,
+                    description,
+                    unit,
+                ))
+                .into(),
         }
     }
 
@@ -140,7 +150,8 @@ impl MetricMeterRef {
             gauge: self
                 .meter
                 .inner
-                .gauge(build_metric_parameters(name, description, unit)),
+                .gauge(build_metric_parameters(name, description, unit))
+                .into(),
         }
     }
 
@@ -154,7 +165,8 @@ impl MetricMeterRef {
             gauge: self
                 .meter
                 .inner
-                .gauge_f64(build_metric_parameters(name, description, unit)),
+                .gauge_f64(build_metric_parameters(name, description, unit))
+                .into(),
         }
     }
 }

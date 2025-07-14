@@ -8,11 +8,13 @@ from .common_pb2 import (
     NexusOperationCancellationState,
     PendingNexusOperationState,
     Severity,
+    WorkerStatus,
     WorkflowRuleActionScope,
 )
 from .deployment_pb2 import (
     DeploymentReachability,
     VersionDrainageStatus,
+    WorkerDeploymentVersionStatus,
     WorkerVersioningMode,
 )
 from .event_type_pb2 import EventType
@@ -95,6 +97,8 @@ __all__ = [
     "UpdateWorkflowExecutionLifecycleStage",
     "VersionDrainageStatus",
     "VersioningBehavior",
+    "WorkerDeploymentVersionStatus",
+    "WorkerStatus",
     "WorkerVersioningMode",
     "WorkflowExecutionStatus",
     "WorkflowIdConflictPolicy",

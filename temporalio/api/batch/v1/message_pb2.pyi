@@ -219,9 +219,9 @@ class BatchOperationReset(google.protobuf.message.Message):
     def options(self) -> temporalio.api.common.v1.message_pb2.ResetOptions:
         """Describes what to reset to and how. If set, `reset_type` and `reset_reapply_type` are ignored."""
     reset_type: temporalio.api.enums.v1.reset_pb2.ResetType.ValueType
-    """Reset type (deprecated, use `options`)."""
+    """Deprecated. Use `options`."""
     reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType
-    """History event reapply options (deprecated, use `options`)."""
+    """Deprecated. Use `options`."""
     @property
     def post_reset_operations(
         self,
