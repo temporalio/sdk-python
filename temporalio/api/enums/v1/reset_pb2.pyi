@@ -74,9 +74,9 @@ class _ResetReapplyTypeEnumTypeWrapper(
     """All eligible events are reapplied when workflow is reset."""
 
 class ResetReapplyType(_ResetReapplyType, metaclass=_ResetReapplyTypeEnumTypeWrapper):
-    """Event types to include when reapplying events. Deprecated: applications
-    should use ResetReapplyExcludeType to specify exclusions from this set, and
-    new event types should be added to ResetReapplyExcludeType instead of here.
+    """Deprecated: applications should use ResetReapplyExcludeType to specify
+    exclusions from this set, and new event types should be added to ResetReapplyExcludeType
+    instead of here.
     """
 
 RESET_REAPPLY_TYPE_UNSPECIFIED: ResetReapplyType.ValueType  # 0
@@ -104,7 +104,7 @@ class _ResetTypeEnumTypeWrapper(
     """Resets to event of the last workflow task completed, or if it does not exist, the event after task scheduled."""
 
 class ResetType(_ResetType, metaclass=_ResetTypeEnumTypeWrapper):
-    """Reset type options. Deprecated, see temporalio.api.common.v1.ResetOptions."""
+    """Deprecated, see temporalio.api.common.v1.ResetOptions."""
 
 RESET_TYPE_UNSPECIFIED: ResetType.ValueType  # 0
 RESET_TYPE_FIRST_WORKFLOW_TASK: ResetType.ValueType  # 1
