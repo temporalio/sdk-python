@@ -632,6 +632,7 @@ class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Me
     inherit_build_id: builtins.bool
     """If this is set, the new execution inherits the Build ID of the current execution. Otherwise,
     the assignment rules will be used to independently assign a Build ID to the new execution.
+    Deprecated. Only considered for versioning v0.2.
     """
     def __init__(
         self,
@@ -785,6 +786,7 @@ class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Messa
     inherit_build_id: builtins.bool
     """If this is set, the child workflow inherits the Build ID of the parent. Otherwise, the assignment
     rules of the child's Task Queue will be used to independently assign a Build ID to it.
+    Deprecated. Only considered for versioning v0.2.
     """
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:

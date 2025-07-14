@@ -186,3 +186,89 @@ or may not need to use Patching to keep the new code compatible with prior versi
 VersioningBehavior enum.)
 """
 global___WorkerVersioningMode = WorkerVersioningMode
+
+class _WorkerDeploymentVersionStatus:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _WorkerDeploymentVersionStatusEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _WorkerDeploymentVersionStatus.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    WORKER_DEPLOYMENT_VERSION_STATUS_UNSPECIFIED: (
+        _WorkerDeploymentVersionStatus.ValueType
+    )  # 0
+    WORKER_DEPLOYMENT_VERSION_STATUS_INACTIVE: (
+        _WorkerDeploymentVersionStatus.ValueType
+    )  # 1
+    """The Worker Deployment Version has been created inside the Worker Deployment but is not used by any
+    workflow executions. These Versions can still have workflows if they have an explicit Versioning Override targeting
+    this Version. Such Versioning Override could be set at workflow start time, or at a later time via `UpdateWorkflowExecutionOptions`.
+    """
+    WORKER_DEPLOYMENT_VERSION_STATUS_CURRENT: (
+        _WorkerDeploymentVersionStatus.ValueType
+    )  # 2
+    """The Worker Deployment Version is the current version of the Worker Deployment. All new workflow executions 
+    and tasks of existing unversioned or AutoUpgrade workflows are routed to this version.
+    """
+    WORKER_DEPLOYMENT_VERSION_STATUS_RAMPING: (
+        _WorkerDeploymentVersionStatus.ValueType
+    )  # 3
+    """The Worker Deployment Version is the ramping version of the Worker Deployment. A subset of new Pinned workflow executions are 
+    routed to this version. Moreover, a portion of existing unversioned or AutoUpgrade workflow executions are also routed to this version.
+    """
+    WORKER_DEPLOYMENT_VERSION_STATUS_DRAINING: (
+        _WorkerDeploymentVersionStatus.ValueType
+    )  # 4
+    """The Worker Deployment Version is not used by new workflows but is still used by
+    open pinned workflows. The version cannot be decommissioned safely.
+    """
+    WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED: (
+        _WorkerDeploymentVersionStatus.ValueType
+    )  # 5
+    """The Worker Deployment Version is not used by new or open workflows, but might be still needed by
+    Queries sent to closed workflows. The version can be decommissioned safely if user does
+    not query closed workflows. If the user does query closed workflows for some time x after
+    workflows are closed, they should decommission the version after it has been drained for that duration.
+    """
+
+class WorkerDeploymentVersionStatus(
+    _WorkerDeploymentVersionStatus,
+    metaclass=_WorkerDeploymentVersionStatusEnumTypeWrapper,
+):
+    """(-- api-linter: core::0216::synonyms=disabled
+        aip.dev/not-precedent: Call this status because it is . --)
+    Specify the status of a Worker Deployment Version.
+    Experimental. Worker Deployments are experimental and might significantly change in the future.
+    """
+
+WORKER_DEPLOYMENT_VERSION_STATUS_UNSPECIFIED: (
+    WorkerDeploymentVersionStatus.ValueType
+)  # 0
+WORKER_DEPLOYMENT_VERSION_STATUS_INACTIVE: WorkerDeploymentVersionStatus.ValueType  # 1
+"""The Worker Deployment Version has been created inside the Worker Deployment but is not used by any
+workflow executions. These Versions can still have workflows if they have an explicit Versioning Override targeting
+this Version. Such Versioning Override could be set at workflow start time, or at a later time via `UpdateWorkflowExecutionOptions`.
+"""
+WORKER_DEPLOYMENT_VERSION_STATUS_CURRENT: WorkerDeploymentVersionStatus.ValueType  # 2
+"""The Worker Deployment Version is the current version of the Worker Deployment. All new workflow executions 
+and tasks of existing unversioned or AutoUpgrade workflows are routed to this version.
+"""
+WORKER_DEPLOYMENT_VERSION_STATUS_RAMPING: WorkerDeploymentVersionStatus.ValueType  # 3
+"""The Worker Deployment Version is the ramping version of the Worker Deployment. A subset of new Pinned workflow executions are 
+routed to this version. Moreover, a portion of existing unversioned or AutoUpgrade workflow executions are also routed to this version.
+"""
+WORKER_DEPLOYMENT_VERSION_STATUS_DRAINING: WorkerDeploymentVersionStatus.ValueType  # 4
+"""The Worker Deployment Version is not used by new workflows but is still used by
+open pinned workflows. The version cannot be decommissioned safely.
+"""
+WORKER_DEPLOYMENT_VERSION_STATUS_DRAINED: WorkerDeploymentVersionStatus.ValueType  # 5
+"""The Worker Deployment Version is not used by new or open workflows, but might be still needed by
+Queries sent to closed workflows. The version can be decommissioned safely if user does
+not query closed workflows. If the user does query closed workflows for some time x after
+workflows are closed, they should decommission the version after it has been drained for that duration.
+"""
+global___WorkerDeploymentVersionStatus = WorkerDeploymentVersionStatus

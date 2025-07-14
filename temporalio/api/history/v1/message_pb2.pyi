@@ -72,8 +72,8 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     INHERITED_BUILD_ID_FIELD_NUMBER: builtins.int
     VERSIONING_OVERRIDE_FIELD_NUMBER: builtins.int
     PARENT_PINNED_WORKER_DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
-    PARENT_PINNED_DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    INHERITED_PINNED_VERSION_FIELD_NUMBER: builtins.int
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
     parent_workflow_namespace: builtins.str
@@ -105,7 +105,7 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     def workflow_task_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """Timeout of a single workflow task."""
     continued_execution_run_id: builtins.str
-    """Run id of the previous workflow which continued-as-new or retired or cron executed into this
+    """Run id of the previous workflow which continued-as-new or retried or cron executed into this
     workflow.
     """
     initiator: temporalio.api.enums.v1.workflow_pb2.ContinueAsNewInitiator.ValueType
@@ -216,28 +216,40 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     def versioning_override(
         self,
     ) -> temporalio.api.workflow.v1.message_pb2.VersioningOverride:
-        """Versioning override applied to this workflow when it was started."""
+        """Versioning override applied to this workflow when it was started.
+        Children, crons, retries, and continue-as-new will inherit source run's override if pinned
+        and if the new workflow's Task Queue belongs to the override version.
+        """
     parent_pinned_worker_deployment_version: builtins.str
     """When present, it means this is a child workflow of a parent that is Pinned to this Worker
     Deployment Version. In this case, child workflow will start as Pinned to this Version instead
     of starting on the Current Version of its Task Queue.
     This is set only if the child workflow is starting on a Task Queue belonging to the same
     Worker Deployment Version.
-    Deprecated. Use `parent_pinned_deployment_version`.
+    Deprecated. Use `parent_versioning_info`.
     """
-    @property
-    def parent_pinned_deployment_version(
-        self,
-    ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion:
-        """When present, it means this is a child workflow of a parent that is Pinned to this Worker
-        Deployment Version. In this case, child workflow will start as Pinned to this Version instead
-        of starting on the Current Version of its Task Queue.
-        This is set only if the child workflow is starting on a Task Queue belonging to the same
-        Worker Deployment Version.
-        """
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """Priority metadata"""
+    @property
+    def inherited_pinned_version(
+        self,
+    ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion:
+        """If present, the new workflow should start on this version with pinned base behavior.
+        Child of pinned parent will inherit the parent's version if the Child's Task Queue belongs to that version.
+
+        New run initiated by workflow ContinueAsNew of pinned run, will inherit the previous run's version if the
+        new run's Task Queue belongs to that version.
+
+        New run initiated by workflow Cron will never inherit.
+
+        New run initiated by workflow Retry will only inherit if the retried run is effectively pinned at the time
+        of retry, and the retried run inherited a pinned version when it started (ie. it is a child of a pinned
+        parent, or a CaN of a pinned run, and is running on a Task Queue in the inherited version).
+
+        Pinned override is inherited if Task Queue of new run is compatible with the override version.
+        Override is inherited separately and takes precedence over inherited base version.
+        """
     def __init__(
         self,
         *,
@@ -286,9 +298,9 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
         versioning_override: temporalio.api.workflow.v1.message_pb2.VersioningOverride
         | None = ...,
         parent_pinned_worker_deployment_version: builtins.str = ...,
-        parent_pinned_deployment_version: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion
-        | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        inherited_pinned_version: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -299,14 +311,14 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             b"first_workflow_task_backoff",
             "header",
             b"header",
+            "inherited_pinned_version",
+            b"inherited_pinned_version",
             "input",
             b"input",
             "last_completion_result",
             b"last_completion_result",
             "memo",
             b"memo",
-            "parent_pinned_deployment_version",
-            b"parent_pinned_deployment_version",
             "parent_workflow_execution",
             b"parent_workflow_execution",
             "prev_auto_reset_points",
@@ -360,6 +372,8 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             b"identity",
             "inherited_build_id",
             b"inherited_build_id",
+            "inherited_pinned_version",
+            b"inherited_pinned_version",
             "initiator",
             b"initiator",
             "input",
@@ -374,8 +388,6 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             b"parent_initiated_event_id",
             "parent_initiated_event_version",
             b"parent_initiated_event_version",
-            "parent_pinned_deployment_version",
-            b"parent_pinned_deployment_version",
             "parent_pinned_worker_deployment_version",
             b"parent_pinned_worker_deployment_version",
             "parent_workflow_execution",
@@ -587,6 +599,7 @@ class WorkflowExecutionContinuedAsNewEventAttributes(google.protobuf.message.Mes
     inherit_build_id: builtins.bool
     """If this is set, the new execution inherits the Build ID of the current execution. Otherwise,
     the assignment rules will be used to independently assign a Build ID to the new execution.
+    Deprecated. Only considered for versioning v0.2.
     """
     def __init__(
         self,
@@ -1002,7 +1015,7 @@ class WorkflowTaskFailedEventAttributes(google.protobuf.message.Message):
     fork_event_version: builtins.int
     """TODO: ?"""
     binary_checksum: builtins.str
-    """DEPRECATED since 1.21 - This field should be cleaned up when versioning-2 API is removed. [cleanup-experimental-wv]
+    """Deprecated. This field should be cleaned up when versioning-2 API is removed. [cleanup-experimental-wv]
     If a worker explicitly failed this task, its binary id
     """
     @property
@@ -1833,7 +1846,7 @@ class WorkflowExecutionSignaledEventAttributes(google.protobuf.message.Message):
         server into the workflow task.
         """
     skip_generate_workflow_task: builtins.bool
-    """This field is deprecated and never respected. It should always be set to false."""
+    """Deprecated. This field is never respected and should always be set to false."""
     @property
     def external_workflow_execution(
         self,
@@ -1940,7 +1953,7 @@ class RequestCancelExternalWorkflowExecutionInitiatedEventAttributes(
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     control: builtins.str
-    """Deprecated"""
+    """Deprecated."""
     child_workflow_only: builtins.bool
     """Workers are expected to set this to true if the workflow they are requesting to cancel is
     a child of the workflow which issued the request
@@ -2018,7 +2031,7 @@ class RequestCancelExternalWorkflowExecutionFailedEventAttributes(
     corresponds to
     """
     control: builtins.str
-    """Deprecated"""
+    """Deprecated."""
     def __init__(
         self,
         *,
@@ -2147,7 +2160,7 @@ class SignalExternalWorkflowExecutionInitiatedEventAttributes(
     def input(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Serialized arguments to provide to the signal handler"""
     control: builtins.str
-    """Deprecated"""
+    """Deprecated."""
     child_workflow_only: builtins.bool
     """Workers are expected to set this to true if the workflow they are requesting to cancel is
     a child of the workflow which issued the request
@@ -2233,7 +2246,7 @@ class SignalExternalWorkflowExecutionFailedEventAttributes(
     ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     initiated_event_id: builtins.int
     control: builtins.str
-    """Deprecated"""
+    """Deprecated."""
     def __init__(
         self,
         *,
@@ -2296,7 +2309,7 @@ class ExternalWorkflowExecutionSignaledEventAttributes(google.protobuf.message.M
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     control: builtins.str
-    """Deprecated"""
+    """Deprecated."""
     def __init__(
         self,
         *,
@@ -2458,7 +2471,7 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
     )
     """Default: PARENT_CLOSE_POLICY_TERMINATE."""
     control: builtins.str
-    """Deprecated"""
+    """Deprecated."""
     workflow_task_completed_event_id: builtins.int
     """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
     workflow_id_reuse_policy: (
@@ -2480,6 +2493,7 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
     inherit_build_id: builtins.bool
     """If this is set, the child workflow inherits the Build ID of the parent. Otherwise, the assignment
     rules of the child's Task Queue will be used to independently assign a Build ID to it.
+    Deprecated. Only considered for versioning v0.2.
     """
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
@@ -2607,7 +2621,7 @@ class StartChildWorkflowExecutionFailedEventAttributes(google.protobuf.message.M
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
     cause: temporalio.api.enums.v1.failed_cause_pb2.StartChildWorkflowExecutionFailedCause.ValueType
     control: builtins.str
-    """Deprecated"""
+    """Deprecated."""
     initiated_event_id: builtins.int
     """Id of the `START_CHILD_WORKFLOW_EXECUTION_INITIATED` event which this event corresponds to"""
     workflow_task_completed_event_id: builtins.int
