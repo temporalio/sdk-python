@@ -195,6 +195,17 @@ async def get_weather_context(ctx: RunContextWrapper[str], city: str) -> Weather
     return Weather(city=city, temperature_range="14-20C", conditions=ctx.context)
 
 
+class ActivityWeatherService:
+    @activity.defn
+    async def get_weather_method(self, city: str) -> Weather:
+        """
+        Get the weather for a given city.
+        """
+        return Weather(
+            city=city, temperature_range="14-20C", conditions="Sunny with wind."
+        )
+
+
 @nexusrpc.service
 class WeatherService:
     get_weather_nexus_operation: nexusrpc.Operation[WeatherInput, Weather]
@@ -271,6 +282,20 @@ class TestWeatherModel(StaticTestModel):
         ),
         ModelResponse(
             output=[
+                ResponseFunctionToolCall(
+                    arguments='{"city":"Tokyo"}',
+                    call_id="call",
+                    name="get_weather_method",
+                    type="function_call",
+                    id="id",
+                    status="completed",
+                )
+            ],
+            usage=Usage(),
+            response_id=None,
+        ),
+        ModelResponse(
+            output=[
                 ResponseOutputMessage(
                     id="",
                     content=[
@@ -333,7 +358,7 @@ class TestNexusWeatherModel(StaticTestModel):
 class ToolsWorkflow:
     @workflow.run
     async def run(self, question: str) -> str:
-        agent = Agent(
+        agent: Agent = Agent(
             name="Tools Workflow",
             instructions="You are a helpful agent.",
             tools=[
@@ -349,8 +374,12 @@ class ToolsWorkflow:
                 openai_agents.workflow.activity_as_tool(
                     get_weather_context, start_to_close_timeout=timedelta(seconds=10)
                 ),
+                openai_agents.workflow.activity_as_tool(
+                    ActivityWeatherService.get_weather_method,
+                    start_to_close_timeout=timedelta(seconds=10),
+                ),
             ],
-        )  # type: Agent
+        )
         result = await Runner.run(
             starting_agent=agent, input=question, context="Stormy"
         )
@@ -406,6 +435,7 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
                 get_weather_object,
                 get_weather_country,
                 get_weather_context,
+                ActivityWeatherService().get_weather_method,
             ],
             interceptors=[OpenAIAgentsTracingInterceptor()],
         ) as worker:
@@ -426,7 +456,7 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
                     if e.HasField("activity_task_completed_event_attributes"):
                         events.append(e)
 
-                assert len(events) == 9
+                assert len(events) == 11
                 assert (
                     "function_call"
                     in events[0]
@@ -476,8 +506,20 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
                     .data.decode()
                 )
                 assert (
-                    "Test weather result"
+                    "function_call"
                     in events[8]
+                    .activity_task_completed_event_attributes.result.payloads[0]
+                    .data.decode()
+                )
+                assert (
+                    "Sunny with wind"
+                    in events[9]
+                    .activity_task_completed_event_attributes.result.payloads[0]
+                    .data.decode()
+                )
+                assert (
+                    "Test weather result"
+                    in events[11]
                     .activity_task_completed_event_attributes.result.payloads[0]
                     .data.decode()
                 )
