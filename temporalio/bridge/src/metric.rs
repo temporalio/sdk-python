@@ -82,8 +82,7 @@ impl MetricMeterRef {
             counter: self
                 .meter
                 .inner
-                .counter(build_metric_parameters(name, description, unit))
-                .into(),
+                .counter(build_metric_parameters(name, description, unit)),
         }
     }
 
@@ -97,8 +96,7 @@ impl MetricMeterRef {
             histogram: self
                 .meter
                 .inner
-                .histogram(build_metric_parameters(name, description, unit))
-                .into(),
+                .histogram(build_metric_parameters(name, description, unit)),
         }
     }
 
@@ -116,8 +114,7 @@ impl MetricMeterRef {
                     name,
                     description,
                     unit,
-                ))
-                .into(),
+                )),
         }
     }
 
@@ -135,8 +132,7 @@ impl MetricMeterRef {
                     name,
                     description,
                     unit,
-                ))
-                .into(),
+                )),
         }
     }
 
@@ -150,8 +146,7 @@ impl MetricMeterRef {
             gauge: self
                 .meter
                 .inner
-                .gauge(build_metric_parameters(name, description, unit))
-                .into(),
+                .gauge(build_metric_parameters(name, description, unit)),
         }
     }
 
@@ -165,8 +160,7 @@ impl MetricMeterRef {
             gauge: self
                 .meter
                 .inner
-                .gauge_f64(build_metric_parameters(name, description, unit))
-                .into(),
+                .gauge_f64(build_metric_parameters(name, description, unit)),
         }
     }
 }
