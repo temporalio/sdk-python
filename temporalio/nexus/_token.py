@@ -3,14 +3,15 @@ from __future__ import annotations
 import base64
 import json
 from dataclasses import dataclass
-from typing import Any, Generic, Literal, Optional, Type
+from typing import TYPE_CHECKING, Any, Generic, Literal, Optional
 
 from nexusrpc import OutputT
 
-from temporalio import client
-
 OperationTokenType = Literal[1]
 OPERATION_TOKEN_TYPE_WORKFLOW: OperationTokenType = 1
+
+if TYPE_CHECKING:
+    import temporalio.client
 
 
 @dataclass(frozen=True)
@@ -32,8 +33,10 @@ class WorkflowHandle(Generic[OutputT]):
     version: Optional[int] = None
 
     def _to_client_workflow_handle(
-        self, client: client.Client, result_type: Optional[Type[OutputT]] = None
-    ) -> client.WorkflowHandle[Any, OutputT]:
+        self,
+        client: temporalio.client.Client,
+        result_type: Optional[type[OutputT]] = None,
+    ) -> temporalio.client.WorkflowHandle[Any, OutputT]:
         """Create a :py:class:`temporalio.client.WorkflowHandle` from the token."""
         if client.namespace != self.namespace:
             raise ValueError(
@@ -46,7 +49,7 @@ class WorkflowHandle(Generic[OutputT]):
     # handle type.
     @classmethod
     def _unsafe_from_client_workflow_handle(
-        cls, workflow_handle: client.WorkflowHandle[Any, OutputT]
+        cls, workflow_handle: temporalio.client.WorkflowHandle[Any, OutputT]
     ) -> WorkflowHandle[OutputT]:
         """Create a :py:class:`WorkflowHandle` from a :py:class:`temporalio.client.WorkflowHandle`.
 
