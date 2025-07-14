@@ -13,7 +13,6 @@ from typing import (
     TypeVar,
 )
 
-import nexusrpc
 from nexusrpc import (
     InputT,
     OutputT,
@@ -116,28 +115,6 @@ def get_callable_name(fn: Callable[..., Any]) -> str:
             f"expected {fn} to be a function or callable instance."
         )
     return method_name
-
-
-# TODO(nexus-preview) Copied from nexusrpc
-def get_operation_factory(
-    obj: Any,
-) -> tuple[
-    Optional[Callable[[Any], Any]],
-    Optional[nexusrpc.Operation[Any, Any]],
-]:
-    """Return the :py:class:`Operation` for the object along with the factory function.
-
-    ``obj`` should be a decorated operation start method.
-    """
-    op = nexusrpc.get_operation(obj)
-    if op:
-        factory = obj
-    else:
-        if factory := getattr(obj, "__nexus_operation_factory__", None):
-            op = nexusrpc.get_operation(factory)
-    if not isinstance(op, nexusrpc.Operation):
-        return None, None
-    return factory, op
 
 
 # TODO(nexus-preview) Copied from nexusrpc
