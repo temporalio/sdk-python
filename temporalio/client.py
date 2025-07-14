@@ -55,6 +55,7 @@ import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.nexus
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
@@ -7319,23 +7320,8 @@ class CloudOperationsClient:
         self.service_client.update_api_key(value)
 
 
-@dataclass(frozen=True)
-class NexusCallback:
-    """Nexus callback to attach to events such as workflow completion.
-
-    .. warning::
-        This API is experimental and unstable.
-    """
-
-    url: str
-    """Callback URL."""
-
-    headers: Mapping[str, str]
-    """Header to attach to callback request."""
-
-
 # Intended to become a union of callback types
-Callback = NexusCallback
+Callback = temporalio.nexus.NexusCallback
 
 
 async def _encode_user_metadata(
