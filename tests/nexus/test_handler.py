@@ -45,6 +45,7 @@ from nexusrpc.handler import (
     sync_operation,
 )
 from nexusrpc.handler._decorators import operation_handler
+from typing_extensions import dataclass_transform
 
 from temporalio import nexus, workflow
 from temporalio.client import Client
@@ -328,12 +329,17 @@ class UnsuccessfulResponse:
     headers: Mapping[str, str] = UNSUCCESSFUL_RESPONSE_HEADERS
 
 
-class _TestCase:
+@dataclass_transform()
+class _BaseTestCase:
+    pass
+
+
+class _TestCase(_BaseTestCase):
     operation: str
+    expected: SuccessfulResponse
     service_defn: str = "MyService"
     input: Input = Input("")
     headers: dict[str, str] = {}
-    expected: SuccessfulResponse
     expected_without_service_definition: Optional[SuccessfulResponse] = None
     skip = ""
 
@@ -773,10 +779,7 @@ async def test_start_operation_without_type_annotations(
 
 
 def test_operation_without_type_annotations_without_service_definition_raises_validation_error():
-    with pytest.raises(
-        ValueError,
-        match=r"has no input type.+has no output type",
-    ):
+    with pytest.raises(ValueError, match=r"has no input type"):
         service_handler(MyServiceHandlerWithOperationsWithoutTypeAnnotations)
 
 

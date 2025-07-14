@@ -13,7 +13,6 @@ from typing import (
     TypeVar,
 )
 
-import nexusrpc
 from nexusrpc import (
     InputT,
     OutputT,
@@ -79,19 +78,10 @@ def _get_start_method_input_and_output_type_annotations(
     try:
         type_annotations = typing.get_type_hints(start)
     except TypeError:
-        warnings.warn(
-            f"Expected decorated start method {start} to have type annotations"
-        )
         return None, None
     output_type = type_annotations.pop("return", None)
 
     if len(type_annotations) != 2:
-        suffix = f": {type_annotations}" if type_annotations else ""
-        warnings.warn(
-            f"Expected decorated start method {start} to have exactly 2 "
-            f"type-annotated parameters (ctx and input), but it has {len(type_annotations)}"
-            f"{suffix}."
-        )
         input_type = None
     else:
         ctx_type, input_type = type_annotations.values()
@@ -116,28 +106,6 @@ def get_callable_name(fn: Callable[..., Any]) -> str:
             f"expected {fn} to be a function or callable instance."
         )
     return method_name
-
-
-# TODO(nexus-preview) Copied from nexusrpc
-def get_operation_factory(
-    obj: Any,
-) -> tuple[
-    Optional[Callable[[Any], Any]],
-    Optional[nexusrpc.Operation[Any, Any]],
-]:
-    """Return the :py:class:`Operation` for the object along with the factory function.
-
-    ``obj`` should be a decorated operation start method.
-    """
-    op_defn = nexusrpc.get_operation_definition(obj)
-    if op_defn:
-        factory = obj
-    else:
-        if factory := getattr(obj, "__nexus_operation_factory__", None):
-            op_defn = nexusrpc.get_operation_definition(factory)
-    if not isinstance(op_defn, nexusrpc.Operation):
-        return None, None
-    return factory, op_defn
 
 
 # TODO(nexus-preview) Copied from nexusrpc

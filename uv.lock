@@ -1044,13 +1044,9 @@ wheels = [
 [[package]]
 name = "nexus-rpc"
 version = "1.1.0"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/nexus-rpc/sdk-python.git?rev=35f574c711193a6e2560d3e6665732a5bb7ae92c#35f574c711193a6e2560d3e6665732a5bb7ae92c" }
 dependencies = [
     { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ef/66/540687556bd28cf1ec370cc6881456203dfddb9dab047b8979c6865b5984/nexus_rpc-1.1.0.tar.gz", hash = "sha256:d65ad6a2f54f14e53ebe39ee30555eaeb894102437125733fb13034a04a44553", size = 77383, upload-time = "2025-07-07T19:03:58.368Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/bf/2f/9e9d0dcaa4c6ffa22b7aa31069a8a264c753ff8027b36af602cce038c92f/nexus_rpc-1.1.0-py3-none-any.whl", hash = "sha256:d1b007af2aba186a27e736f8eaae39c03aed05b488084ff6c3d1785c9ba2ad38", size = 27743, upload-time = "2025-07-07T19:03:57.556Z" },
 ]
 
 [[package]]
@@ -1761,7 +1757,7 @@ dev = [
 requires-dist = [
     { name = "eval-type-backport", marker = "python_full_version < '3.10' and extra == 'openai-agents'", specifier = ">=0.2.2" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.48.2,<2" },
-    { name = "nexus-rpc", specifier = ">=1.1.0" },
+    { name = "nexus-rpc", git = "https://github.com/nexus-rpc/sdk-python.git?rev=35f574c711193a6e2560d3e6665732a5bb7ae92c" },
     { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.1,<0.2" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
