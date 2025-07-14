@@ -18,6 +18,7 @@ from nexusrpc.handler import CancelOperationContext, StartOperationContext
 from typing_extensions import Concatenate
 
 import temporalio.api.common.v1
+import temporalio.api.workflowservice.v1
 import temporalio.client
 import temporalio.common
 from temporalio.nexus import _link_conversion
@@ -142,25 +143,30 @@ class _TemporalStartOperationContext:
     def _add_outbound_links(
         self, workflow_handle: temporalio.client.WorkflowHandle[Any, Any]
     ):
+        # If links were not sent in StartWorkflowExecutionResponse then construct them.
+        wf_event_links: list[temporalio.api.common.v1.Link.WorkflowEvent] = []
         try:
-            link = _link_conversion.workflow_event_to_nexus_link(
-                _link_conversion.workflow_handle_to_workflow_execution_started_event_link(
-                    workflow_handle
-                )
+            if isinstance(
+                workflow_handle._start_workflow_response,
+                temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
+            ):
+                if workflow_handle._start_workflow_response.HasField("link"):
+                    if link := workflow_handle._start_workflow_response.link:
+                        if link.HasField("workflow_event"):
+                            wf_event_links.append(link.workflow_event)
+            if not wf_event_links:
+                wf_event_links = [
+                    _link_conversion.workflow_execution_started_event_link_from_workflow_handle(
+                        workflow_handle
+                    )
+                ]
+            self.nexus_context.outbound_links.extend(
+                _link_conversion.workflow_event_to_nexus_link(link)
+                for link in wf_event_links
             )
         except Exception as e:
             logger.warning(
-                f"Failed to create WorkflowExecutionStarted event link for workflow {id}: {e}"
-            )
-        else:
-            self.nexus_context.outbound_links.append(
-                # TODO(nexus-prerelease): Before, WorkflowRunOperation was generating an EventReference
-                # link to send back to the caller. Now, it checks if the server returned
-                # the link in the StartWorkflowExecutionResponse, and if so, send the link
-                # from the response to the caller. Fallback to generating the link for
-                # backwards compatibility. PR reference in Go SDK:
-                # https://github.com/temporalio/sdk-go/pull/1934
-                link
+                f"Failed to create WorkflowExecutionStarted event links for workflow {workflow_handle}: {e}"
             )
         return workflow_handle
 
