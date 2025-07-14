@@ -1,14 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
-
-from temporalio import workflow
-from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
-
-logger = logging.getLogger(__name__)
-
-from typing import Any, AsyncIterator, Sequence, Union, cast
+from typing import Any, AsyncIterator, Optional, Sequence, Union, cast
 
 from agents import (
     AgentOutputSchema,
@@ -28,6 +21,7 @@ from agents import (
 from agents.items import TResponseStreamEvent
 from openai.types.responses.response_prompt_param import ResponsePromptParam
 
+from temporalio import workflow
 from temporalio.contrib.openai_agents._invoke_model_activity import (
     ActivityModelInput,
     AgentOutputSchemaInput,
@@ -37,6 +31,9 @@ from temporalio.contrib.openai_agents._invoke_model_activity import (
     ModelTracingInput,
     ToolInput,
 )
+from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
+
+logger = logging.getLogger(__name__)
 
 
 class _TemporalModelStub(Model):
