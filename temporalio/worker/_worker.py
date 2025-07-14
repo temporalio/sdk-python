@@ -24,17 +24,9 @@ from typing import (
 
 from typing_extensions import TypeAlias, TypedDict
 
-import temporalio.activity
-import temporalio.api.common.v1
-import temporalio.bridge.client
-import temporalio.bridge.proto
-import temporalio.bridge.proto.activity_result
-import temporalio.bridge.proto.activity_task
-import temporalio.bridge.proto.common
 import temporalio.bridge.worker
 import temporalio.client
-import temporalio.converter
-import temporalio.exceptions
+import temporalio.common
 import temporalio.runtime
 import temporalio.service
 from temporalio.common import (
@@ -578,8 +570,8 @@ class Worker:
             Configuration, shallow-copied.
         """
         config = self._config.copy()
-        config["activities"] = list(config["activities"])
-        config["workflows"] = list(config["workflows"])
+        config["activities"] = list(config.get("activities", []))
+        config["workflows"] = list(config.get("workflows", []))
         return config
 
     @property

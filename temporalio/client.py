@@ -5772,7 +5772,7 @@ class OutboundInterceptor:
 
 
 class _ClientImpl(OutboundInterceptor):
-    def __init__(self, client: Client) -> None:
+    def __init__(self, client: Client) -> None:  # type: ignore
         # We are intentionally not calling the base class's __init__ here
         self._client = client
 
