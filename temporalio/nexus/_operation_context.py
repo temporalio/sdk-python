@@ -2,18 +2,14 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from collections.abc import Awaitable, Mapping, MutableMapping, Sequence
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
     Any,
-    Awaitable,
     Callable,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
-    Type,
     Union,
     overload,
 )
@@ -305,7 +301,7 @@ class WorkflowRunOperationContext(StartOperationContext):
         args: Sequence[Any] = [],
         id: str,
         task_queue: Optional[str] = None,
-        result_type: Optional[Type[ReturnType]] = None,
+        result_type: Optional[type[ReturnType]] = None,
         execution_timeout: Optional[timedelta] = None,
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
@@ -340,7 +336,7 @@ class WorkflowRunOperationContext(StartOperationContext):
         args: Sequence[Any] = [],
         id: str,
         task_queue: Optional[str] = None,
-        result_type: Optional[Type] = None,
+        result_type: Optional[type] = None,
         execution_timeout: Optional[timedelta] = None,
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,

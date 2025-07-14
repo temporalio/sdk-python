@@ -1,4 +1,5 @@
-from typing import Any, Optional, Type
+from dataclasses import dataclass
+from typing import Any, Optional
 
 import nexusrpc
 import nexusrpc.handler
@@ -9,9 +10,10 @@ from temporalio import nexus
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 
 
+@dataclass
 class _InterfaceImplementationTestCase:
-    Interface: Type[Any]
-    Impl: Type[Any]
+    Interface: type[Any]
+    Impl: type[Any]
     error_message: Optional[str]
 
 
@@ -22,7 +24,7 @@ class ValidImpl(_InterfaceImplementationTestCase):
 
     class Impl:
         @sync_operation
-        async def op(self, ctx: StartOperationContext, input: None) -> None: ...
+        async def op(self, _ctx: StartOperationContext, _input: None) -> None: ...
 
     error_message = None
 
@@ -35,7 +37,7 @@ class ValidWorkflowRunImpl(_InterfaceImplementationTestCase):
     class Impl:
         @workflow_run_operation
         async def op(
-            self, ctx: WorkflowRunOperationContext, input: str
+            self, _ctx: WorkflowRunOperationContext, _input: str
         ) -> nexus.WorkflowHandle[int]:
             raise NotImplementedError
 
@@ -50,7 +52,7 @@ class ValidWorkflowRunImpl(_InterfaceImplementationTestCase):
     ],
 )
 def test_service_decorator_enforces_interface_conformance(
-    test_case: Type[_InterfaceImplementationTestCase],
+    test_case: type[_InterfaceImplementationTestCase],
 ):
     if test_case.error_message:
         with pytest.raises(Exception) as ei:

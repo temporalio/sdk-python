@@ -23,11 +23,9 @@ def _():
     class MyWorkflow:
         @workflow.run
         async def invoke_nexus_op_and_assert_error(self) -> None:
-            self.nexus_client = workflow.create_nexus_client(
+            nexus_client = workflow.create_nexus_client(
                 service=MyService,
                 endpoint="fake-endpoint",
             )
-            await self.nexus_client.execute_operation(MyService.my_sync_operation, 1)
-            await self.nexus_client.execute_operation(
-                MyService.my_workflow_run_operation, 1
-            )
+            await nexus_client.execute_operation(MyService.my_sync_operation, 1)
+            await nexus_client.execute_operation(MyService.my_workflow_run_operation, 1)

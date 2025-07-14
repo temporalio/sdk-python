@@ -3,7 +3,7 @@ import json
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Mapping, Optional, Tuple, cast
+from typing import Any, List, Mapping, Optional, cast
 from unittest import mock
 
 import google.protobuf.any_pb2
@@ -312,7 +312,7 @@ async def test_rpc_already_exists_error_is_raised(client: Client):
             ],
         )
 
-        def __init__(self) -> None:
+        def __init__(self) -> None:  # type: ignore[reportMissingSuperCall]
             pass
 
         async def __call__(
@@ -481,7 +481,7 @@ async def test_single_client_config_change(client: Client, worker: ExternalWorke
 
 class TracingClientInterceptor(Interceptor):
     def intercept_client(self, next: OutboundInterceptor) -> OutboundInterceptor:
-        self.traces: List[Tuple[str, Any]] = []
+        self.traces: list[tuple[str, Any]] = []  # type: ignore[reportUninitializedInstanceVariable]
         return TracingClientOutboundInterceptor(self, next)
 
 
