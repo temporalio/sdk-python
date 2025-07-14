@@ -74,3 +74,8 @@ jobs:
         with:
           name: packages-${{ matrix.package-suffix }}
           path: dist
+
+      - name: Deliberately fail to prevent releasing nexus-rpc w/ GitHub link in pyproject.toml
+        run: |
+          echo "This is a deliberate failure to prevent releasing nexus-rpc with a GitHub link in pyproject.toml"
+          exit 1

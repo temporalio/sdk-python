@@ -299,15 +299,14 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
     input: InputT
     schedule_to_close_timeout: Optional[timedelta]
     headers: Optional[Mapping[str, str]]
-    output_type: Optional[Type[OutputT]] = None
+    output_type: Optional[type[OutputT]] = None
 
     def __post_init__(self) -> None:
         """Initialize operation-specific attributes after dataclass creation."""
         if isinstance(self.operation, nexusrpc.Operation):
             self.output_type = self.operation.output_type
         elif callable(self.operation):
-            _, op = temporalio.nexus._util.get_operation_factory(self.operation)
-            if isinstance(op, nexusrpc.Operation):
+            if op := nexusrpc.get_operation(self.operation):
                 self.output_type = op.output_type
             else:
                 raise ValueError(
@@ -326,8 +325,7 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
         elif isinstance(self.operation, str):
             return self.operation
         elif callable(self.operation):
-            _, op = temporalio.nexus._util.get_operation_factory(self.operation)
-            if isinstance(op, nexusrpc.Operation):
+            if op := nexusrpc.get_operation(self.operation):
                 return op.name
             else:
                 raise ValueError(
