@@ -519,7 +519,7 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
                 )
                 assert (
                     "Test weather result"
-                    in events[11]
+                    in events[10]
                     .activity_task_completed_event_attributes.result.payloads[0]
                     .data.decode()
                 )
