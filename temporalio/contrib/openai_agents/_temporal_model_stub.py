@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
 from typing import Optional
 
 from temporalio import workflow
-from temporalio.common import Priority, RetryPolicy
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
-from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 logger = logging.getLogger(__name__)
 
-from typing import Any, AsyncIterator, Optional, Sequence, Union, cast
+from typing import Any, AsyncIterator, Sequence, Union, cast
 
 from agents import (
     AgentOutputSchema,
@@ -57,7 +54,7 @@ class _TemporalModelStub(Model):
     async def get_response(
         self,
         system_instructions: Optional[str],
-        input: Union[str, list[TResponseInputItem]],
+        input: Union[str, list[TResponseInputItem], dict[str, str]],
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: Optional[AgentOutputSchemaBase],
@@ -67,7 +64,9 @@ class _TemporalModelStub(Model):
         previous_response_id: Optional[str],
         prompt: Optional[ResponsePromptParam],
     ) -> ModelResponse:
-        def get_summary(input: Union[str, list[TResponseInputItem]]) -> str:
+        def get_summary(
+            input: Union[str, list[TResponseInputItem], dict[str, str]],
+        ) -> str:
             ### Activity summary shown in the UI
             try:
                 max_size = 100
@@ -88,21 +87,18 @@ class _TemporalModelStub(Model):
             return ""
 
         def make_tool_info(tool: Tool) -> ToolInput:
-            if isinstance(tool, FileSearchTool):
-                return cast(FileSearchTool, tool)
-            elif isinstance(tool, WebSearchTool):
-                return cast(WebSearchTool, tool)
+            if isinstance(tool, (FileSearchTool, WebSearchTool)):
+                return tool
             elif isinstance(tool, ComputerTool):
                 raise NotImplementedError(
                     "Computer search preview is not supported in Temporal model"
                 )
             elif isinstance(tool, FunctionTool):
-                t = cast(FunctionToolInput, tool)
                 return FunctionToolInput(
-                    name=t.name,
-                    description=t.description,
-                    params_json_schema=t.params_json_schema,
-                    strict_json_schema=t.strict_json_schema,
+                    name=tool.name,
+                    description=tool.description,
+                    params_json_schema=tool.params_json_schema,
+                    strict_json_schema=tool.strict_json_schema,
                 )
             else:
                 raise ValueError(f"Unknown tool type: {tool.name}")
@@ -141,7 +137,7 @@ class _TemporalModelStub(Model):
         activity_input = ActivityModelInput(
             model_name=self.model_name,
             system_instructions=system_instructions,
-            input=input,
+            input=cast(Union[str, list[TResponseInputItem]], input),
             model_settings=model_settings,
             tools=tool_infos,
             output_schema=output_schema_input,
@@ -169,7 +165,7 @@ class _TemporalModelStub(Model):
     def stream_response(
         self,
         system_instructions: Optional[str],
-        input: Union[str, list][TResponseInputItem],  # type: ignore
+        input: Union[str, list[TResponseInputItem]],
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: Optional[AgentOutputSchemaBase],

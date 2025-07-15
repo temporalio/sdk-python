@@ -166,6 +166,10 @@ class _WorkflowTaskFailedCauseEnumTypeWrapper(
     for the workflow's namespace).
     Check the workflow task failure message for more information.
     """
+    WORKFLOW_TASK_FAILED_CAUSE_GRPC_MESSAGE_TOO_LARGE: (
+        _WorkflowTaskFailedCause.ValueType
+    )  # 36
+    """A workflow task failed because a grpc message was too large."""
 
 class WorkflowTaskFailedCause(
     _WorkflowTaskFailedCause, metaclass=_WorkflowTaskFailedCauseEnumTypeWrapper
@@ -306,6 +310,10 @@ WORKFLOW_TASK_FAILED_CAUSE_FEATURE_DISABLED: WorkflowTaskFailedCause.ValueType  
 for the workflow's namespace).
 Check the workflow task failure message for more information.
 """
+WORKFLOW_TASK_FAILED_CAUSE_GRPC_MESSAGE_TOO_LARGE: (
+    WorkflowTaskFailedCause.ValueType
+)  # 36
+"""A workflow task failed because a grpc message was too large."""
 global___WorkflowTaskFailedCause = WorkflowTaskFailedCause
 
 class _StartChildWorkflowExecutionFailedCause:

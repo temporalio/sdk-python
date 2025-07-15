@@ -1542,6 +1542,12 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         result_run_id: Optional[str] = None,
         first_execution_run_id: Optional[str] = None,
         result_type: Optional[Type] = None,
+        start_workflow_response: Optional[
+            Union[
+                temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
+                temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse,
+            ]
+        ] = None,
     ) -> None:
         """Create workflow handle."""
         self._client = client
@@ -1550,6 +1556,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self._result_run_id = result_run_id
         self._first_execution_run_id = first_execution_run_id
         self._result_type = result_type
+        self._start_workflow_response = start_workflow_response
         self.__temporal_eagerly_started = False
 
     @property
@@ -5772,7 +5779,7 @@ class OutboundInterceptor:
 
 
 class _ClientImpl(OutboundInterceptor):
-    def __init__(self, client: Client) -> None:
+    def __init__(self, client: Client) -> None:  # type: ignore
         # We are intentionally not calling the base class's __init__ here
         self._client = client
 
@@ -5832,6 +5839,7 @@ class _ClientImpl(OutboundInterceptor):
             result_run_id=resp.run_id,
             first_execution_run_id=first_execution_run_id,
             result_type=input.ret_type,
+            start_workflow_response=resp,
         )
         setattr(handle, "__temporal_eagerly_started", eagerly_started)
         return handle

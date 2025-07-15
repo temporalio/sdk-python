@@ -412,7 +412,7 @@ class WorkflowExecutionVersioningInfo(google.protobuf.message.Message):
     behaviors.
     This field is first set after an execution completes its first workflow task on a versioned
     worker, and set again on completion of every subsequent workflow task.
-    For child workflows of Pinned parents, this will be set to Pinned (along with `version`) when
+    For child workflows of Pinned parents, this will be set to Pinned (along with `deployment_version`) when
     the the child starts so that child's first workflow task goes to the same Version as the
     parent. After the first workflow task, it depends on the child workflow itself if it wants
     to stay pinned or become unpinned (according to Versioning Behavior set in the worker).
@@ -450,7 +450,8 @@ class WorkflowExecutionVersioningInfo(google.protobuf.message.Message):
         precedence over SDK-sent `behavior` (and `version` when override is PINNED). An
         override can be set when starting a new execution, as well as afterwards by calling the
         `UpdateWorkflowExecutionOptions` API.
-        Pinned overrides are automatically inherited by child workflows.
+        Pinned overrides are automatically inherited by child workflows, continue-as-new workflows,
+        workflow retries, and cron workflows.
         """
     @property
     def deployment_transition(self) -> global___DeploymentTransition:
@@ -489,7 +490,7 @@ class WorkflowExecutionVersioningInfo(google.protobuf.message.Message):
         start a transition to that version and continue execution there.
         A version transition can only exist while there is a pending or started workflow task.
         Once the pending workflow task completes on the transition's target version, the
-        transition completes and the workflow's `behavior`, and `version` fields are updated per the
+        transition completes and the workflow's `behavior`, and `deployment_version` fields are updated per the
         worker's task completion response.
         Pending activities will not start new attempts during a transition. Once the transition is
         completed, pending activities will start their next attempt on the new version.
@@ -825,9 +826,9 @@ class PendingActivityInfo(google.protobuf.message.Message):
     last_worker_identity: builtins.str
     @property
     def use_workflow_build_id(self) -> google.protobuf.empty_pb2.Empty:
-        """When present, it means this activity is assigned to the build ID of its workflow."""
+        """Deprecated. When present, it means this activity is assigned to the build ID of its workflow."""
     last_independently_assigned_build_id: builtins.str
-    """This means the activity is independently versioned and not bound to the build ID of its workflow.
+    """Deprecated. This means the activity is independently versioned and not bound to the build ID of its workflow.
     The activity will use the build id in this field instead.
     If the task fails and is scheduled again, the assigned build ID may change according to the latest versioning
     rules.
@@ -836,8 +837,8 @@ class PendingActivityInfo(google.protobuf.message.Message):
     def last_worker_version_stamp(
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkerVersionStamp:
-        """The version stamp of the worker to whom this activity was most recently dispatched
-        Deprecated. This field should be cleaned up when versioning-2 API is removed. [cleanup-experimental-wv]
+        """Deprecated. The version stamp of the worker to whom this activity was most recently dispatched
+        This field should be cleaned up when versioning-2 API is removed. [cleanup-experimental-wv]
         """
     @property
     def current_retry_interval(self) -> google.protobuf.duration_pb2.Duration:
@@ -1173,7 +1174,7 @@ class ResetPointInfo(google.protobuf.message.Message):
     build_id: builtins.str
     """Worker build id."""
     binary_checksum: builtins.str
-    """A worker binary version identifier (deprecated)."""
+    """Deprecated. A worker binary version identifier."""
     run_id: builtins.str
     """The first run ID in the execution chain that was touched by this worker build."""
     first_workflow_task_completed_id: builtins.int
@@ -1556,7 +1557,7 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
     operation_id: builtins.str
     """Operation ID. Only set for asynchronous operations after a successful StartOperation call.
 
-    Deprecated: Renamed to operation_token.
+    Deprecated. Renamed to operation_token.
     """
     @property
     def schedule_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
@@ -1782,6 +1783,8 @@ class VersioningOverride(google.protobuf.message.Message):
     `WorkflowExecutionInfo.VersioningInfo` for more information. To remove the override, call
     `UpdateWorkflowExecutionOptions` with a null `VersioningOverride`, and use the `update_mask`
     to indicate that it should be mutated.
+    Pinned overrides are automatically inherited by child workflows, continue-as-new workflows,
+    workflow retries, and cron workflows.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

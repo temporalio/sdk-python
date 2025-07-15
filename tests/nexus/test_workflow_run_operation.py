@@ -40,7 +40,9 @@ class EchoWorkflow:
 
 
 class MyOperation(WorkflowRunOperationHandler):
-    def __init__(self):
+    # TODO(nexus-preview) WorkflowRunOperationHandler is not currently implemented to
+    # support subclassing as this test does.
+    def __init__(self):  # type: ignore[reportMissingSuperCall]
         pass
 
     async def start(

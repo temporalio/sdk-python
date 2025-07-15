@@ -312,7 +312,7 @@ class NexusOperationFailureInfo(google.protobuf.message.Message):
     operation_id: builtins.str
     """Operation ID - may be empty if the operation completed synchronously.
 
-    Deprecated: Renamed to operation_token.
+    Deprecated. Renamed to operation_token.
     """
     operation_token: builtins.str
     """Operation token - may be empty if the operation completed synchronously."""

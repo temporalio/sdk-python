@@ -500,6 +500,11 @@ class WorkflowService:
             wsv1.ListWorkflowExecutionsRequest,
             wsv1.ListWorkflowExecutionsResponse,
         )
+        self.list_workers = client._new_call(
+            "list_workers",
+            wsv1.ListWorkersRequest,
+            wsv1.ListWorkersResponse,
+        )
         self.list_workflow_rules = client._new_call(
             "list_workflow_rules",
             wsv1.ListWorkflowRulesRequest,
@@ -549,6 +554,11 @@ class WorkflowService:
             "record_activity_task_heartbeat_by_id",
             wsv1.RecordActivityTaskHeartbeatByIdRequest,
             wsv1.RecordActivityTaskHeartbeatByIdResponse,
+        )
+        self.record_worker_heartbeat = client._new_call(
+            "record_worker_heartbeat",
+            wsv1.RecordWorkerHeartbeatRequest,
+            wsv1.RecordWorkerHeartbeatResponse,
         )
         self.register_namespace = client._new_call(
             "register_namespace",

@@ -463,6 +463,16 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TriggerWorkflowRuleRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TriggerWorkflowRuleResponse.FromString,
         )
+        self.RecordWorkerHeartbeat = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/RecordWorkerHeartbeat",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RecordWorkerHeartbeatRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RecordWorkerHeartbeatResponse.FromString,
+        )
+        self.ListWorkers = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/ListWorkers",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersResponse.FromString,
+        )
 
 
 class WorkflowServiceServicer(object):
@@ -1397,6 +1407,18 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def RecordWorkerHeartbeat(self, request, context):
+        """WorkerHeartbeat receive heartbeat request from the worker."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ListWorkers(self, request, context):
+        """ListWorkers is a visibility API to list worker status information in a specific namespace."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
 
 def add_WorkflowServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1834,6 +1856,16 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             servicer.TriggerWorkflowRule,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TriggerWorkflowRuleRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TriggerWorkflowRuleResponse.SerializeToString,
+        ),
+        "RecordWorkerHeartbeat": grpc.unary_unary_rpc_method_handler(
+            servicer.RecordWorkerHeartbeat,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RecordWorkerHeartbeatRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RecordWorkerHeartbeatResponse.SerializeToString,
+        ),
+        "ListWorkers": grpc.unary_unary_rpc_method_handler(
+            servicer.ListWorkers,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -4370,6 +4402,64 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/TriggerWorkflowRule",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TriggerWorkflowRuleRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.TriggerWorkflowRuleResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def RecordWorkerHeartbeat(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/RecordWorkerHeartbeat",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RecordWorkerHeartbeatRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.RecordWorkerHeartbeatResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def ListWorkers(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/ListWorkers",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersResponse.FromString,
             options,
             channel_credentials,
             insecure,
