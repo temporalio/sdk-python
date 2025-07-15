@@ -12,12 +12,14 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import dataclasses
+import enum
 import inspect
 import logging
 import threading
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+import types
 from typing import (
     Any,
     Callable,
@@ -518,6 +520,8 @@ logger = LoggerAdapter(logging.getLogger(__name__), None)
 """Logger that will have contextual activity details embedded."""
 
 
+temporal_activity_def_key =  "__temporal_activity_definition"
+
 @dataclass(frozen=True)
 class _Definition:
     name: Optional[str]
@@ -530,7 +534,7 @@ class _Definition:
 
     @staticmethod
     def from_callable(fn: Callable) -> Optional[_Definition]:
-        defn = getattr(fn, "__temporal_activity_definition", None)
+        defn = getattr(fn, temporal_activity_def_key, None)
         if isinstance(defn, _Definition):
             # We have to replace the function with the given callable here
             # because the one passed in may be a method or some other partial
@@ -557,7 +561,7 @@ class _Definition:
         no_thread_cancel_exception: bool = False,
     ) -> None:
         # Validate the activity
-        if hasattr(fn, "__temporal_activity_definition"):
+        if hasattr(fn, temporal_activity_def_key):
             raise ValueError("Function already contains activity definition")
         elif not callable(fn):
             raise TypeError("Activity is not callable")
@@ -568,7 +572,7 @@ class _Definition:
                 raise TypeError("Activity cannot have keyword-only arguments")
         setattr(
             fn,
-            "__temporal_activity_definition",
+            temporal_activity_def_key,
             _Definition(
                 name=activity_name,
                 fn=fn,
@@ -595,3 +599,50 @@ class _Definition:
                 )
             object.__setattr__(self, "arg_types", arg_types)
             object.__setattr__(self, "ret_type", ret_type)
+
+
+def get_activities(module: types.ModuleType) -> list[Callable]:
+    activities = []
+    for name, member in inspect.getmembers(module):
+        if inspect.isfunction(member) and hasattr(member, temporal_activity_def_key):
+            activities.append(getattr(module, name))
+    return activities
+
+
+class ActivitiesProvider:
+    class __MethodType(enum.Enum):
+        CLASS_METHOD = (True, False)
+        STATIC_METHOD = (False, True)
+        INSTANCE_METHOD = (False, False)
+
+    @classmethod
+    def __get_activities(
+        cls,
+        instance: Union[
+            type["ActivitiesProvider"], "ActivitiesProvider"
+        ],
+    ) -> list[Callable]:
+        throw_exception_for_instance_method = isinstance(instance, type)
+        activities = []
+        for name, member in inspect.getmembers(cls):
+            is_method_or_fn = inspect.isfunction(member) or inspect.ismethod(member)
+            is_activity = hasattr(member, temporal_activity_def_key)
+            if not (is_method_or_fn and is_activity):
+                continue
+            is_classmethod = isinstance(inspect.getattr_static(cls, name), classmethod)
+            is_staticmethod = isinstance(inspect.getattr_static(cls, name), staticmethod)
+            method_type = cls.__MethodType((is_classmethod, is_staticmethod))
+            if method_type is cls.__MethodType.INSTANCE_METHOD and throw_exception_for_instance_method:
+                raise ValueError(
+                    f"Class {cls.__name__} method {name} is an activity, but it is an instance method. "
+                    "Because of that, you cannot gather activities from the class, you must get them from "
+                    "an instance using instance.get_activities_from_instance()")
+            activities.append(getattr(instance, name))
+        return activities
+
+    def get_activities_from_instance(self) -> list[Callable]:
+        return self.__get_activities(self)
+
+    @classmethod
+    def get_activities_from_cls(cls) -> list[Callable]:
+        return cls.__get_activities(cls)
