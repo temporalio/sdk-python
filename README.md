@@ -1326,7 +1326,7 @@ There are five categories of inbound and outbound calls that you can modify in t
 
 4. Inbound call to execute an activity: `execute_activity()`
 
-5. Outbound activity calls: `info()` and `hearbeat()`
+5. Outbound activity calls: `info()` and `heartbeat()`
 
 
 To modify outbound client calls, define a class inheriting from
@@ -1355,7 +1355,7 @@ class to define the
 that you wish to use to effect your modifications. Then, pass a list containing an instance of your `worker.Interceptor`
 class as the `interceptors` argument of `Client.connect()`.
 
-You can also pass worker interceptors as the `interceptor` argument to the
+You can also pass worker interceptors as the `interceptors` argument to the
 [`Worker()`](https://python.temporal.io/temporalio.worker.Worker.html) constructor but, if you do, do not pass the same
 ones to `Client.connect()`. Finally, for convenience, it's common to define a class inheriting from _both_
 `client.Interceptor` and `worker.Interceptor` (their method sets do not overlap), and define all your interceptor
