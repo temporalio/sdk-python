@@ -5,7 +5,7 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 
 import enum
 import json
-from dataclasses import dataclass
+from pydantic.dataclasses import dataclass
 from typing import Any, Optional, Union, cast
 
 from agents import (

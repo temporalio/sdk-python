@@ -1747,4 +1747,11 @@ async def test_response_serialization():
         b'{"id": "msg_68757ec43348819d86709f0fcb70316301a1194a3e05b38c","type": "image_generation_call","status": "completed"}'
     )
     call = TypeAdapter(ImageGenerationCall).validate_python(data)
-    encoded = await pydantic_data_converter.encode([call])
+    model_response = ModelResponse(
+        output=[
+            call,
+        ],
+        usage=Usage(),
+        response_id="",
+    )
+    encoded = await pydantic_data_converter.encode([model_response])
