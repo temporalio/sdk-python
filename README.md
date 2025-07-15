@@ -1353,13 +1353,15 @@ class to define the
 [`WorkflowInboundInterceptor`](https://python.temporal.io/temporalio.worker.WorkflowInboundInterceptor.html), and
 [`WorkflowOutboundInterceptor`](https://python.temporal.io/temporalio.worker.WorkflowOutboundInterceptor.html) classes
 that you wish to use to effect your modifications. Then, pass a list containing an instance of your `worker.Interceptor`
-class as the `interceptors` argument of `Client.connect()`.
+class as the `interceptors` argument of the [`Worker()`](https://python.temporal.io/temporalio.worker.Worker.html)
+constructor.
 
-You can also pass worker interceptors as the `interceptors` argument to the
-[`Worker()`](https://python.temporal.io/temporalio.worker.Worker.html) constructor but, if you do, do not pass the same
-ones to `Client.connect()`. Finally, for convenience, it's common to define a class inheriting from _both_
-`client.Interceptor` and `worker.Interceptor` (their method sets do not overlap), and define all your interceptor
-customizations in the methods of that class.
+It often happens that your worker and client interceptors will share code because they implement closely related logic.
+For convenience, you can create an interceptor class that inherits from _both_ `client.Interceptor` and
+`worker.Interceptor` (their method sets do not overlap). You can then pass this in the `interceptors` argument of
+`Client.connect()` when starting your worker _as well as_ in your client/starter code. If you do this, your worker will
+automatically pick up the interceptors from its underlying client (and you should not pass them directly to the
+`Worker()` constructor).
 
 This is best explained by example. The [Context Propagation Interceptor
 Sample](https://github.com/temporalio/samples-python/tree/main/context_propagation) is a good starting point. In
@@ -1367,7 +1369,7 @@ Sample](https://github.com/temporalio/samples-python/tree/main/context_propagati
 a class is defined that inherits from both `client.Interceptor` and `worker.Interceptor`. It implements the various
 methods such that the outbound client and workflow calls set a certain key in the outbound `headers` field, and the
 inbound workflow and activity calls retrieve the header value from the inbound workflow/activity input data. An instance
-of this interceptor class is passed to `Client.connect` when [starting the
+of this interceptor class is passed to `Client.connect()` when [starting the
 worker](https://github.com/temporalio/samples-python/blob/main/context_propagation/worker.py) and when connecting the
 client in the [workflow starter
 code](https://github.com/temporalio/samples-python/blob/main/context_propagation/starter.py).
