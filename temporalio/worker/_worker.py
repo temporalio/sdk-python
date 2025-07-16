@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import abc
 import asyncio
 import concurrent.futures
 import hashlib
@@ -88,7 +89,7 @@ PollerBehavior: TypeAlias = Union[
 ]
 
 
-class Plugin:
+class Plugin(abc.ABC):
     """Base class for worker plugins that can intercept and modify worker behavior.
 
     Plugins allow customization of worker creation and execution processes

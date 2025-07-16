@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import abc
 import asyncio
 import copy
 import dataclasses
@@ -7387,7 +7388,7 @@ async def _decode_user_metadata(
     )
 
 
-class Plugin:
+class Plugin(abc.ABC):
     """Base class for client plugins that can intercept and modify client behavior.
 
     Plugins allow customization of client creation and service connection processes
@@ -7411,7 +7412,7 @@ class Plugin:
 
         This method sets up the chain of responsibility pattern by storing a reference
         to the next plugin in the chain. It is called during client creation to build
-        the plugin chain.
+        the plugin chain. Note, this may be called twice in the case of :py:meth:`connect`.
 
         Args:
             next: The next plugin in the chain to delegate to.
