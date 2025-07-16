@@ -5,11 +5,13 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Any, Mapping, Protocol, Type
 
-from agents import custom_span, get_current_span, trace
+from agents import CustomSpanData, custom_span, get_current_span, trace
 from agents.tracing import (
     get_trace_provider,
 )
-from agents.tracing.spans import NoOpSpan
+from agents.tracing.provider import DefaultTraceProvider
+from agents.tracing.scope import Scope
+from agents.tracing.spans import NoOpSpan, SpanImpl
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -69,7 +71,8 @@ def context_from_header(
             if activity.in_activity()
             else None
         )
-        if get_trace_provider().get_current_trace() is None:
+        current_trace = get_trace_provider().get_current_trace()
+        if current_trace is None:
             metadata = {
                 "temporal:workflowId": activity.info().workflow_id
                 if activity.in_activity()
@@ -79,16 +82,21 @@ def context_from_header(
                 else workflow.info().run_id,
                 "temporal:workflowType": workflow_type,
             }
-            with trace(
+            current_trace = trace(
                 span_info["traceName"],
                 trace_id=span_info["traceId"],
                 metadata=metadata,
-            ) as t:
-                with custom_span(name=span_name, parent=t, data=data):
-                    yield
-        else:
-            with custom_span(name=span_name, parent=None, data=data):
-                yield
+            )
+            Scope.set_current_trace(current_trace)
+        current_span = get_trace_provider().get_current_span()
+        if current_span is None:
+            current_span = get_trace_provider().create_span(
+                span_data=CustomSpanData(name="", data={}), span_id=span_info["spanId"]
+            )
+            Scope.set_current_span(current_span)
+
+        with custom_span(name=span_name, parent=current_span, data=data):
+            yield
 
 
 class OpenAIAgentsTracingInterceptor(
@@ -115,7 +123,7 @@ class OpenAIAgentsTracingInterceptor(
         worker = Worker(client, task_queue="my-task-queue", interceptors=[interceptor])
     """
 
-    def __init__(  # type: ignore[reportMissingSuperCall]
+    def __init__(
         self,
         payload_converter: temporalio.converter.PayloadConverter = temporalio.converter.default().payload_converter,
     ) -> None:
@@ -188,7 +196,7 @@ class _ContextPropagationClientOutboundInterceptor(
             **({"temporal:workflowId": input.id} if input.id else {}),
         }
         data = {"workflowId": input.id} if input.id else None
-        span_name = "temporal:startWorkflow"
+        span_name = f"temporal:startWorkflow"
         if get_trace_provider().get_current_trace() is None:
             with trace(
                 span_name + ":" + input.workflow, metadata=metadata, group_id=input.id
@@ -207,7 +215,7 @@ class _ContextPropagationClientOutboundInterceptor(
             **({"temporal:workflowId": input.id} if input.id else {}),
         }
         data = {"workflowId": input.id, "query": input.query}
-        span_name = "temporal:queryWorkflow"
+        span_name = f"temporal:queryWorkflow"
         if get_trace_provider().get_current_trace() is None:
             with trace(span_name, metadata=metadata, group_id=input.id):
                 with custom_span(name=span_name, data=data):
@@ -226,7 +234,7 @@ class _ContextPropagationClientOutboundInterceptor(
             **({"temporal:workflowId": input.id} if input.id else {}),
         }
         data = {"workflowId": input.id, "signal": input.signal}
-        span_name = "temporal:signalWorkflow"
+        span_name = f"temporal:signalWorkflow"
         if get_trace_provider().get_current_trace() is None:
             with trace(span_name, metadata=metadata, group_id=input.id):
                 with custom_span(name=span_name, data=data):
@@ -337,11 +345,8 @@ class _ContextPropagationWorkflowOutboundInterceptor(
     def start_activity(
         self, input: temporalio.worker.StartActivityInput
     ) -> temporalio.workflow.ActivityHandle:
-        with custom_span(
-            name=f"temporal:startActivity:{input.activity}",
-        ):
-            set_header_from_context(input, temporalio.workflow.payload_converter())
-            return self.next.start_activity(input)
+        set_header_from_context(input, temporalio.workflow.payload_converter())
+        return self.next.start_activity(input)
 
     async def start_child_workflow(
         self, input: temporalio.worker.StartChildWorkflowInput

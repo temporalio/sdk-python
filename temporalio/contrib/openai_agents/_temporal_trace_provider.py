@@ -1,5 +1,6 @@
 """Provides support for integration with OpenAI Agents SDK tracing across workflows"""
 
+import traceback
 import uuid
 from typing import Any, Optional, Union, cast
 
