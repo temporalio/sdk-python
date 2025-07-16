@@ -94,6 +94,50 @@ async def test_activity_custom_name(client: Client, worker: ExternalWorker):
     assert result.result == "Name: my custom activity name!"
 
 
+async def test_client_available_in_async_activities(
+    client: Client, worker: ExternalWorker
+):
+    with pytest.raises(RuntimeError) as err:
+        activity.client()
+    assert str(err.value) == "Not in activity context"
+
+    captured_client: Optional[Client] = None
+
+    @activity.defn
+    async def capture_client() -> None:
+        nonlocal captured_client
+        captured_client = activity.client()
+
+    await _execute_workflow_with_activity(client, worker, capture_client)
+    assert captured_client is client
+
+
+async def test_client_not_available_in_sync_activities(
+    client: Client, worker: ExternalWorker
+):
+    saw_error = False
+
+    @activity.defn
+    def some_activity() -> None:
+        with pytest.raises(
+            RuntimeError, match="The client is only available in async"
+        ) as err:
+            activity.client()
+        nonlocal saw_error
+        saw_error = True
+
+    await _execute_workflow_with_activity(
+        client,
+        worker,
+        some_activity,
+        worker_config={
+            "activity_executor": concurrent.futures.ThreadPoolExecutor(1),
+            "max_concurrent_activities": 1,
+        },
+    )
+    assert saw_error
+
+
 async def test_activity_info(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):

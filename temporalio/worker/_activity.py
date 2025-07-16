@@ -69,6 +69,7 @@ class _ActivityWorker:
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         metric_meter: temporalio.common.MetricMeter,
+        client: temporalio.client.Client,
         encode_headers: bool,
     ) -> None:
         self._bridge_worker = bridge_worker
@@ -86,6 +87,7 @@ class _ActivityWorker:
             None
         )
         self._seen_sync_activity = False
+        self._client = client
 
         # Validate and build activity dict
         self._activities: Dict[str, temporalio.activity._Definition] = {}
@@ -569,11 +571,14 @@ class _ActivityWorker:
                 heartbeat=None,
                 cancelled_event=running_activity.cancelled_event,
                 worker_shutdown_event=self._worker_shutdown_event,
-                shield_thread_cancel_exception=None
-                if not running_activity.cancel_thread_raiser
-                else running_activity.cancel_thread_raiser.shielded,
+                shield_thread_cancel_exception=(
+                    None
+                    if not running_activity.cancel_thread_raiser
+                    else running_activity.cancel_thread_raiser.shielded
+                ),
                 payload_converter_class_or_instance=self._data_converter.payload_converter,
                 runtime_metric_meter=None if sync_non_threaded else self._metric_meter,
+                client=self._client if not running_activity.sync else None,
                 cancellation_details=running_activity.cancellation_details,
             )
         )
@@ -838,11 +843,12 @@ def _execute_sync_activity(
             worker_shutdown_event=temporalio.activity._CompositeEvent(
                 thread_event=worker_shutdown_event, async_event=None
             ),
-            shield_thread_cancel_exception=None
-            if not cancel_thread_raiser
-            else cancel_thread_raiser.shielded,
+            shield_thread_cancel_exception=(
+                None if not cancel_thread_raiser else cancel_thread_raiser.shielded
+            ),
             payload_converter_class_or_instance=payload_converter_class_or_instance,
             runtime_metric_meter=runtime_metric_meter,
+            client=None,
             cancellation_details=cancellation_details,
         )
     )

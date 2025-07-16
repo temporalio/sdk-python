@@ -411,8 +411,10 @@ class Worker:
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
                 metric_meter=self._runtime.metric_meter,
-                encode_headers=client_config["header_codec_behavior"]
-                == HeaderCodecBehavior.CODEC,
+                client=client,
+                encode_headers=(
+                    client_config["header_codec_behavior"] == HeaderCodecBehavior.CODEC
+                ),
             )
         self._nexus_worker: Optional[_NexusWorker] = None
         if nexus_service_handlers:

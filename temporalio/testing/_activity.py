@@ -16,6 +16,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.worker._activity
+from temporalio.client import Client
 
 _Params = ParamSpec("_Params")
 _Return = TypeVar("_Return")
@@ -63,7 +64,7 @@ class ActivityEnvironment:
             take effect. Default is noop.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, client: Optional[Client] = None) -> None:
         """Create an ActivityEnvironment for running activity code."""
         self.info = _default_info
         self.on_heartbeat: Callable[..., None] = lambda *args: None
@@ -74,6 +75,7 @@ class ActivityEnvironment:
         self._cancelled = False
         self._worker_shutdown = False
         self._activities: Set[_Activity] = set()
+        self._client = client
         self._cancellation_details = (
             temporalio.activity._ActivityCancellationDetailsHolder()
         )
@@ -128,7 +130,7 @@ class ActivityEnvironment:
             The callable's result.
         """
         # Create an activity and run it
-        return _Activity(self, fn).run(*args, **kwargs)
+        return _Activity(self, fn, self._client).run(*args, **kwargs)
 
 
 class _Activity:
@@ -136,10 +138,13 @@ class _Activity:
         self,
         env: ActivityEnvironment,
         fn: Callable,
+        client: Optional[Client],
     ) -> None:
         self.env = env
         self.fn = fn
-        self.is_async = inspect.iscoroutinefunction(fn)
+        self.is_async = inspect.iscoroutinefunction(fn) or inspect.iscoroutinefunction(
+            fn.__call__  # type: ignore
+        )
         self.cancel_thread_raiser: Optional[
             temporalio.worker._activity._ThreadExceptionRaiser
         ] = None
@@ -163,11 +168,14 @@ class _Activity:
                 thread_event=threading.Event(),
                 async_event=asyncio.Event() if self.is_async else None,
             ),
-            shield_thread_cancel_exception=None
-            if not self.cancel_thread_raiser
-            else self.cancel_thread_raiser.shielded,
+            shield_thread_cancel_exception=(
+                None
+                if not self.cancel_thread_raiser
+                else self.cancel_thread_raiser.shielded
+            ),
             payload_converter_class_or_instance=env.payload_converter,
             runtime_metric_meter=env.metric_meter,
+            client=client if self.is_async else None,
             cancellation_details=env._cancellation_details,
         )
         self.task: Optional[asyncio.Task] = None
