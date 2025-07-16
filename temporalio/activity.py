@@ -279,18 +279,23 @@ class _CompositeEvent:
 def client() -> Client:
     """Return a Temporal Client for use in the current activity.
 
+    The client is only available in `async def` activities.
+
+    In tests it is not available automatically, but you can pass a client when creating a
+    :py:class:`temporalio.testing.ActivityEnvironment`.
+
     Returns:
         :py:class:`temporalio.client.Client` for use in the current activity.
 
     Raises:
-        RuntimeError: When not in an activity.
+        RuntimeError: When the client is not available.
     """
     client = _Context.current().client
     if not client:
         raise RuntimeError(
-            "No client available. The client is only available in async "
-            "(i.e. `async def`) activities; not in sync (i.e. `def`) activities. "
-            "In tests you can pass a client when creating ActivityEnvironment."
+            "No client available. The client is only available in `async def` "
+            "activities; not in `def` activities. In tests you can pass a "
+            "client when creating ActivityEnvironment."
         )
     return client
 

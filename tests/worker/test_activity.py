@@ -97,9 +97,8 @@ async def test_activity_custom_name(client: Client, worker: ExternalWorker):
 async def test_client_available_in_async_activities(
     client: Client, worker: ExternalWorker
 ):
-    with pytest.raises(RuntimeError) as err:
+    with pytest.raises(RuntimeError, match="Not in activity context"):
         activity.client()
-    assert str(err.value) == "Not in activity context"
 
     captured_client: Optional[Client] = None
 
@@ -120,8 +119,8 @@ async def test_client_not_available_in_sync_activities(
     @activity.defn
     def some_activity() -> None:
         with pytest.raises(
-            RuntimeError, match="The client is only available in async"
-        ) as err:
+            RuntimeError, match="The client is only available in `async def`"
+        ):
             activity.client()
         nonlocal saw_error
         saw_error = True
