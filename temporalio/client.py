@@ -964,9 +964,6 @@ class Client:
         the call will not return successfully until the update has been delivered to a
         worker.
 
-        .. warning::
-           This API is experimental
-
         Args:
             update: Update function or name on the workflow. arg: Single argument to the
                 update.
@@ -5383,11 +5380,7 @@ class StartWorkflowUpdateInput:
 
 @dataclass
 class UpdateWithStartUpdateWorkflowInput:
-    """Update input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`.
-
-    .. warning::
-       This API is experimental
-    """
+    """Update input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`."""
 
     update_id: Optional[str]
     update: str
@@ -5401,11 +5394,7 @@ class UpdateWithStartUpdateWorkflowInput:
 
 @dataclass
 class UpdateWithStartStartWorkflowInput:
-    """StartWorkflow input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`.
-
-    .. warning::
-       This API is experimental
-    """
+    """StartWorkflow input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`."""
 
     # Similar to StartWorkflowInput but without e.g. run_id, start_signal,
     # start_signal_args, request_eager_start.
@@ -5441,11 +5430,7 @@ class UpdateWithStartStartWorkflowInput:
 
 @dataclass
 class StartWorkflowUpdateWithStartInput:
-    """Input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`.
-
-    .. warning::
-       This API is experimental
-    """
+    """Input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`."""
 
     start_workflow_input: UpdateWithStartStartWorkflowInput
     update_workflow_input: UpdateWithStartUpdateWorkflowInput
@@ -5719,11 +5704,7 @@ class OutboundInterceptor:
     async def start_update_with_start_workflow(
         self, input: StartWorkflowUpdateWithStartInput
     ) -> WorkflowUpdateHandle[Any]:
-        """Called for every :py:meth:`Client.start_update_with_start_workflow` and :py:meth:`Client.execute_update_with_start_workflow` call.
-
-        .. warning::
-            This API is experimental
-        """
+        """Called for every :py:meth:`Client.start_update_with_start_workflow` and :py:meth:`Client.execute_update_with_start_workflow` call."""
         return await self.next.start_update_with_start_workflow(input)
 
     ### Async activity calls
