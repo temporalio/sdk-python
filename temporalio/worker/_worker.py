@@ -446,10 +446,12 @@ class Worker:
         config = root_plugin.configure_worker(config)
         self._plugin = root_plugin
 
-        self._init_from_config(config)
+        self._init_from_config(client, config)
 
-    def _init_from_config(self, config: WorkerConfig):
-        """Handles post plugin initialization to ensure original arguments are not used"""
+    def _init_from_config(self, client: temporalio.client.Client, config: WorkerConfig):
+        """Handles post plugin initialization to ensure original arguments are not used.
+        Client is safe to take separately since it can't be modified by worker plugins.
+        """
         self._config = config
 
         # TODO(nexus-preview): max_concurrent_nexus_tasks / tuner support
