@@ -612,7 +612,7 @@ async def test_activity_type_hints(client: Client, worker: ExternalWorker):
         result.result
         == "param1: <class 'tests.worker.test_activity.SomeClass2'>, param2: <class 'str'>"
     )
-    assert activity_param1 == SomeClass2(foo="str1", bar=SomeClass1(foo=123))
+    assert activity_param1 == SomeClass2(foo="str1", bar=SomeClass1(foo=123))  # type: ignore[reportUnboundVariable] # noqa
 
 
 async def test_activity_heartbeat_details(

@@ -679,7 +679,7 @@ class _ThreadExceptionRaiser:
 
 
 class _ActivityInboundImpl(ActivityInboundInterceptor):
-    def __init__(
+    def __init__(  # type: ignore[reportMissingSuperCall]
         self, worker: _ActivityWorker, running_activity: _RunningActivity
     ) -> None:
         # We are intentionally not calling the base class's __init__ here
@@ -786,7 +786,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
 
 
 class _ActivityOutboundImpl(ActivityOutboundInterceptor):
-    def __init__(self, worker: _ActivityWorker, info: temporalio.activity.Info) -> None:
+    def __init__(self, worker: _ActivityWorker, info: temporalio.activity.Info) -> None:  # type: ignore[reportMissingSuperCall]
         # We are intentionally not calling the base class's __init__ here
         self._worker = worker
         self._info = info
