@@ -189,7 +189,7 @@ class Client:
         )
 
         root_plugin: Plugin = _RootPlugin()
-        for plugin in reversed(list(plugins)):
+        for plugin in reversed(plugins):
             root_plugin = plugin.init_client_plugin(root_plugin)
 
         service_client = await root_plugin.connect_service_client(connect_config)
@@ -233,10 +233,10 @@ class Client:
         )
 
         root_plugin: Plugin = _RootPlugin()
-        for plugin in reversed(list(plugins)):
+        for plugin in reversed(plugins):
             root_plugin = plugin.init_client_plugin(root_plugin)
 
-        self._init_from_config(root_plugin.on_create_client(config))
+        self._init_from_config(root_plugin.configure_client(config))
 
     def _init_from_config(self, config: ClientConfig):
         self._config = config
@@ -7433,7 +7433,7 @@ class Plugin:
         self.next_client_plugin = next
         return self
 
-    def on_create_client(self, config: ClientConfig) -> ClientConfig:
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
         """Hook called when creating a client to allow modification of configuration.
 
         This method is called during client creation and allows plugins to modify
@@ -7446,7 +7446,7 @@ class Plugin:
         Returns:
             The modified client configuration.
         """
-        return self.next_client_plugin.on_create_client(config)
+        return self.next_client_plugin.configure_client(config)
 
     async def connect_service_client(
         self, config: temporalio.service.ConnectConfig
@@ -7467,7 +7467,7 @@ class Plugin:
 
 
 class _RootPlugin(Plugin):
-    def on_create_client(self, config: ClientConfig) -> ClientConfig:
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
         return config
 
     async def connect_service_client(

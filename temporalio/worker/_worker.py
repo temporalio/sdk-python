@@ -128,7 +128,7 @@ class Plugin:
         self.next_worker_plugin = next
         return self
 
-    def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         """Hook called when creating a worker to allow modification of configuration.
 
         This method is called during worker creation and allows plugins to modify
@@ -142,7 +142,7 @@ class Plugin:
         Returns:
             The modified worker configuration.
         """
-        return self.next_worker_plugin.on_create_worker(config)
+        return self.next_worker_plugin.configure_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
         """Hook called when running a worker to allow interception of execution.
@@ -158,7 +158,7 @@ class Plugin:
 
 
 class _RootPlugin(Plugin):
-    def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         return config
 
     async def run_worker(self, worker: Worker) -> None:
@@ -449,9 +449,9 @@ class Worker:
         plugins = plugins_from_client + list(plugins)
 
         root_plugin: Plugin = _RootPlugin()
-        for plugin in reversed(list(plugins)):
+        for plugin in reversed(plugins):
             root_plugin = plugin.init_worker_plugin(root_plugin)
-        config = root_plugin.on_create_worker(config)
+        config = root_plugin.configure_worker(config)
         self._plugin = root_plugin
 
         self._init_from_config(config)

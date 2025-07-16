@@ -4,13 +4,14 @@ import pytest
 
 import temporalio.client
 import temporalio.worker
-from temporalio.client import Client, ClientConfig, OutboundInterceptor, Plugin
+from temporalio.client import Client, ClientConfig, OutboundInterceptor
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker, WorkerConfig
 from tests.worker.test_worker import never_run_activity
 
 
 class TestClientInterceptor(temporalio.client.Interceptor):
+    __test__ = False
     intercepted = False
 
     def intercept_client(self, next: OutboundInterceptor) -> OutboundInterceptor:
@@ -18,16 +19,16 @@ class TestClientInterceptor(temporalio.client.Interceptor):
         return super().intercept_client(next)
 
 
-class MyClientPlugin(Plugin):
+class MyClientPlugin(temporalio.client.Plugin):
     def __init__(self):
         self.interceptor = TestClientInterceptor()
 
-    def on_create_client(self, config: ClientConfig) -> ClientConfig:
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
         config["namespace"] = "replaced_namespace"
         config["interceptors"] = list(config.get("interceptors") or []) + [
             self.interceptor
         ]
-        return super().on_create_client(config)
+        return super().configure_client(config)
 
     async def connect_service_client(
         self, config: temporalio.service.ConnectConfig
@@ -55,15 +56,15 @@ async def test_client_plugin(client: Client, env: WorkflowEnvironment):
 
 
 class MyCombinedPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
-    def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         config["task_queue"] = "combined"
-        return super().on_create_worker(config)
+        return super().configure_worker(config)
 
 
 class MyWorkerPlugin(temporalio.worker.Plugin):
-    def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         config["task_queue"] = "replaced_queue"
-        return super().on_create_worker(config)
+        return super().configure_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
         await super().run_worker(worker)
