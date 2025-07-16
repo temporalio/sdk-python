@@ -1514,10 +1514,10 @@ class AuthenticationPlugin(Plugin):
     def __init__(self, api_key: str):
         self.api_key = api_key
 
-    def on_create_client(self, config: ClientConfig) -> ClientConfig:
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
         # Modify client configuration
         config["namespace"] = "my-secure-namespace"
-        return super().on_create_client(config)
+        return super().configure_client(config)
 
     async def connect_service_client(
         self, config: temporalio.service.ConnectConfig
@@ -1548,12 +1548,12 @@ class MonitoringPlugin(Plugin):
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         # Modify worker configuration
         original_task_queue = config["task_queue"]
         config["task_queue"] = f"monitored-{original_task_queue}"
         self.logger.info(f"Worker created for task queue: {config['task_queue']}")
-        return super().on_create_worker(config)
+        return super().configure_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
         self.logger.info("Starting worker execution")
@@ -1575,36 +1575,38 @@ worker = Worker(
 For plugins that need to work with both clients and workers, you can implement both interfaces in a single class:
 
 ```python
-from temporalio.client import Plugin as ClientPlugin
-from temporalio.worker import Plugin as WorkerPlugin
+from temporalio.client import Plugin as ClientPlugin, ClientConfig
+from temporalio.worker import Plugin as WorkerPlugin, WorkerConfig
+
 
 class UnifiedPlugin(ClientPlugin, WorkerPlugin):
-    def on_create_client(self, config: ClientConfig) -> ClientConfig:
-        # Client-side customization
-        config["namespace"] = "unified-namespace"
-        return super().on_create_client(config)
+  def configure_client(self, config: ClientConfig) -> ClientConfig:
+    # Client-side customization
+    config["namespace"] = "unified-namespace"
+    return super().configure_client(config)
 
-    def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
-        # Worker-side customization
-        config["max_cached_workflows"] = 500
-        return super().on_create_worker(config)
+  def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+    # Worker-side customization
+    config["max_cached_workflows"] = 500
+    return super().configure_worker(config)
 
-    async def run_worker(self, worker: Worker) -> None:
-        print("Starting unified worker")
-        await super().run_worker(worker)
+  async def run_worker(self, worker: Worker) -> None:
+    print("Starting unified worker")
+    await super().run_worker(worker)
+
 
 # Create client with the unified plugin
 client = await Client.connect(
-    "localhost:7233",
-    plugins=[UnifiedPlugin()]
+  "localhost:7233",
+  plugins=[UnifiedPlugin()]
 )
 
 # Worker will automatically inherit the plugin from the client
 worker = Worker(
-    client,
-    task_queue="my-task-queue",
-    workflows=[MyWorkflow],
-    activities=[my_activity]
+  client,
+  task_queue="my-task-queue",
+  workflows=[MyWorkflow],
+  activities=[my_activity]
 )
 ```
 
