@@ -1257,6 +1257,7 @@ calls in the `temporalio.activity` package make use of it. Specifically:
 
 * `in_activity()` - Whether an activity context is present
 * `info()` - Returns the immutable info of the currently running activity
+* `client()` - Returns the Temporal client used by this worker. Only available in `async def` activities.
 * `heartbeat(*details)` - Record a heartbeat
 * `is_cancelled()` - Whether a cancellation has been requested on this activity
 * `wait_for_cancelled()` - `async` call to wait for cancellation request

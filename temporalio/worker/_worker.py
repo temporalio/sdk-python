@@ -411,8 +411,10 @@ class Worker:
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
                 metric_meter=self._runtime.metric_meter,
-                encode_headers=client_config["header_codec_behavior"]
-                == HeaderCodecBehavior.CODEC,
+                client=client,
+                encode_headers=(
+                    client_config["header_codec_behavior"] == HeaderCodecBehavior.CODEC
+                ),
             )
         self._nexus_worker: Optional[_NexusWorker] = None
         if nexus_service_handlers:
@@ -577,12 +579,12 @@ class Worker:
     @property
     def task_queue(self) -> str:
         """Task queue this worker is on."""
-        return self._config["task_queue"]
+        return self._config["task_queue"]  # type: ignore[reportTypedDictNotRequiredAccess]
 
     @property
     def client(self) -> temporalio.client.Client:
         """Client currently set on the worker."""
-        return self._config["client"]
+        return self._config["client"]  # type: ignore[reportTypedDictNotRequiredAccess]
 
     @client.setter
     def client(self, value: temporalio.client.Client) -> None:
@@ -679,9 +681,9 @@ class Worker:
             )
             if exception:
                 logger.error("Worker failed, shutting down", exc_info=exception)
-                if self._config["on_fatal_error"]:
+                if self._config["on_fatal_error"]:  # type: ignore[reportTypedDictNotRequiredAccess]
                     try:
-                        await self._config["on_fatal_error"](exception)
+                        await self._config["on_fatal_error"](exception)  # type: ignore[reportTypedDictNotRequiredAccess]
                     except:
                         logger.warning("Fatal error handler failed")
 
@@ -692,7 +694,7 @@ class Worker:
 
         # Cancel the shutdown task (safe if already done)
         tasks[None].cancel()
-        graceful_timeout = self._config["graceful_shutdown_timeout"]
+        graceful_timeout = self._config["graceful_shutdown_timeout"]  # type: ignore[reportTypedDictNotRequiredAccess]
         logger.info(
             f"Beginning worker shutdown, will wait {graceful_timeout} before cancelling activities"
         )
