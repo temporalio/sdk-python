@@ -529,7 +529,7 @@ class ResetOptions(google.protobuf.message.Message):
     continue-as-new.
     """
     reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType
-    """Event types to be reapplied (deprecated)
+    """Deprecated. Use `options`.
     Default: RESET_REAPPLY_TYPE_SIGNAL
     """
     current_run_only: builtins.bool

@@ -391,7 +391,7 @@ class ScheduleSpec(google.protobuf.message.Message):
         global___CalendarSpec
     ]:
         """Any timestamps matching any of exclude_* will be skipped.
-        use exclude_structured_calendar
+        Deprecated. Use exclude_structured_calendar.
         """
     @property
     def exclude_structured_calendar(
@@ -699,15 +699,28 @@ class TriggerImmediatelyRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     OVERLAP_POLICY_FIELD_NUMBER: builtins.int
+    SCHEDULED_TIME_FIELD_NUMBER: builtins.int
     overlap_policy: temporalio.api.enums.v1.schedule_pb2.ScheduleOverlapPolicy.ValueType
     """If set, override overlap policy for this one request."""
+    @property
+    def scheduled_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Timestamp used for the identity of the target workflow.
+        If not set the default value is the current time.
+        """
     def __init__(
         self,
         *,
         overlap_policy: temporalio.api.enums.v1.schedule_pb2.ScheduleOverlapPolicy.ValueType = ...,
+        scheduled_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["scheduled_time", b"scheduled_time"]
+    ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["overlap_policy", b"overlap_policy"]
+        self,
+        field_name: typing_extensions.Literal[
+            "overlap_policy", b"overlap_policy", "scheduled_time", b"scheduled_time"
+        ],
     ) -> None: ...
 
 global___TriggerImmediatelyRequest = TriggerImmediatelyRequest
@@ -873,6 +886,7 @@ class ScheduleInfo(google.protobuf.message.Message):
     @property
     def update_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     invalid_schedule_error: builtins.str
+    """Deprecated."""
     def __init__(
         self,
         *,

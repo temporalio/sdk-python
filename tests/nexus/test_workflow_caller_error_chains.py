@@ -27,6 +27,7 @@ from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 error_conversion_test_cases: dict[str, type[ErrorConversionTestCase]] = {}
 
 
+@dataclass
 class ErrorConversionTestCase:
     action_in_nexus_operation: Callable[..., Any]
     expected_exception_chain_in_workflow: list[tuple[type[Exception], dict[str, Any]]]

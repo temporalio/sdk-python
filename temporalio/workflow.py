@@ -5145,7 +5145,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         operation: nexusrpc.Operation[InputT, OutputT],
         input: InputT,
         *,
-        output_type: Optional[Type[OutputT]] = None,
+        output_type: Optional[type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -5158,7 +5158,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         operation: str,
         input: Any,
         *,
-        output_type: Optional[Type[OutputT]] = None,
+        output_type: Optional[type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -5174,7 +5174,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         ],
         input: InputT,
         *,
-        output_type: Optional[Type[OutputT]] = None,
+        output_type: Optional[type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -5190,7 +5190,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         ],
         input: InputT,
         *,
-        output_type: Optional[Type[OutputT]] = None,
+        output_type: Optional[type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -5206,7 +5206,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         ],
         input: InputT,
         *,
-        output_type: Optional[Type[OutputT]] = None,
+        output_type: Optional[type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -5217,7 +5217,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         operation: Any,
         input: Any,
         *,
-        output_type: Optional[Type[OutputT]] = None,
+        output_type: Optional[type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> Any:
@@ -5246,7 +5246,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         operation: nexusrpc.Operation[InputT, OutputT],
         input: InputT,
         *,
-        output_type: Optional[Type[OutputT]] = None,
+        output_type: Optional[type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
@@ -5259,7 +5259,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         operation: str,
         input: Any,
         *,
-        output_type: Optional[Type[OutputT]] = None,
+        output_type: Optional[type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
@@ -5275,7 +5275,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         ],
         input: InputT,
         *,
-        output_type: Optional[Type[OutputT]] = None,
+        output_type: Optional[type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
@@ -5291,7 +5291,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         ],
         input: InputT,
         *,
-        output_type: Optional[Type[OutputT]] = None,
+        output_type: Optional[type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
@@ -5307,7 +5307,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         ],
         input: InputT,
         *,
-        output_type: Optional[Type[OutputT]] = None,
+        output_type: Optional[type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
@@ -5318,7 +5318,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         operation: Any,
         input: Any,
         *,
-        output_type: Optional[Type[OutputT]] = None,
+        output_type: Optional[type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> Any:
@@ -5342,7 +5342,7 @@ class _NexusClient(NexusClient[ServiceT]):
         self,
         *,
         endpoint: str,
-        service: Union[Type[ServiceT], str],
+        service: Union[type[ServiceT], str],
     ) -> None:
         """Create a Nexus client.
 
@@ -5369,7 +5369,7 @@ class _NexusClient(NexusClient[ServiceT]):
         operation: Any,
         input: Any,
         *,
-        output_type: Optional[Type] = None,
+        output_type: Optional[type] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> Any:
@@ -5390,7 +5390,7 @@ class _NexusClient(NexusClient[ServiceT]):
         operation: Any,
         input: Any,
         *,
-        output_type: Optional[Type] = None,
+        output_type: Optional[type] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> Any:
@@ -5407,7 +5407,7 @@ class _NexusClient(NexusClient[ServiceT]):
 @overload
 def create_nexus_client(
     *,
-    service: Type[ServiceT],
+    service: type[ServiceT],
     endpoint: str,
 ) -> NexusClient[ServiceT]: ...
 
@@ -5422,9 +5422,9 @@ def create_nexus_client(
 
 def create_nexus_client(
     *,
-    service: Union[Type[ServiceT], str],
+    service: Union[type[ServiceT], str],
     endpoint: str,
-) -> NexusClient[ServiceT]:
+) -> NexusClient[Any]:
     """Create a Nexus client.
 
     .. warning::

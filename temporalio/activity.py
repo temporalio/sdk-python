@@ -19,6 +19,7 @@ from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Iterator,
@@ -41,6 +42,9 @@ import temporalio.common
 import temporalio.converter
 
 from .types import CallableType
+
+if TYPE_CHECKING:
+    from temporalio.client import Client
 
 
 @overload
@@ -179,6 +183,7 @@ class _Context:
         temporalio.converter.PayloadConverter,
     ]
     runtime_metric_meter: Optional[temporalio.common.MetricMeter]
+    client: Optional[Client]
     cancellation_details: _ActivityCancellationDetailsHolder
     _logger_details: Optional[Mapping[str, Any]] = None
     _payload_converter: Optional[temporalio.converter.PayloadConverter] = None
@@ -271,13 +276,37 @@ class _CompositeEvent:
         self.thread_event.wait(timeout)
 
 
+def client() -> Client:
+    """Return a Temporal Client for use in the current activity.
+
+    The client is only available in `async def` activities.
+
+    In tests it is not available automatically, but you can pass a client when creating a
+    :py:class:`temporalio.testing.ActivityEnvironment`.
+
+    Returns:
+        :py:class:`temporalio.client.Client` for use in the current activity.
+
+    Raises:
+        RuntimeError: When the client is not available.
+    """
+    client = _Context.current().client
+    if not client:
+        raise RuntimeError(
+            "No client available. The client is only available in `async def` "
+            "activities; not in `def` activities. In tests you can pass a "
+            "client when creating ActivityEnvironment."
+        )
+    return client
+
+
 def in_activity() -> bool:
     """Whether the current code is inside an activity.
 
     Returns:
         True if in an activity, False otherwise.
     """
-    return not _current_context.get(None) is None
+    return _current_context.get(None) is not None
 
 
 def info() -> Info:
@@ -574,8 +603,10 @@ class _Definition:
                 fn=fn,
                 # iscoroutinefunction does not return true for async __call__
                 # TODO(cretz): Why can't MyPy handle this?
-                is_async=inspect.iscoroutinefunction(fn)
-                or inspect.iscoroutinefunction(fn.__call__),  # type: ignore
+                is_async=(
+                    inspect.iscoroutinefunction(fn)
+                    or inspect.iscoroutinefunction(fn.__call__)  # type: ignore
+                ),
                 no_thread_cancel_exception=no_thread_cancel_exception,
             ),
         )

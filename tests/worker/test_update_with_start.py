@@ -109,9 +109,9 @@ class UpdateHandlerType(Enum):
 
 
 class TestUpdateWithStart:
-    client: Client
-    workflow_id: str
-    task_queue: str
+    client: Client  # type: ignore[reportUninitializedInstanceVariable]
+    workflow_id: str  # type: ignore[reportUninitializedInstanceVariable]
+    task_queue: str  # type: ignore[reportUninitializedInstanceVariable]
     update_id = "test-uws-up-id"
 
     @pytest.mark.parametrize(
@@ -825,7 +825,7 @@ async def test_start_update_with_start_empty_details(client: Client):
         # Set grpc_status with empty details
         empty_details_err._grpc_status = temporalio.api.common.v1.GrpcStatus(details=[])
 
-        def __init__(self) -> None:
+        def __init__(self) -> None:  # type: ignore[reportMissingSuperCall]
             pass
 
         async def __call__(

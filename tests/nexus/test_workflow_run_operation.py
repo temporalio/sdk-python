@@ -26,8 +26,6 @@ from tests.helpers.nexus import (
     dataclass_as_dict,
 )
 
-HTTP_PORT = 7243
-
 
 @dataclass
 class Input:
@@ -42,7 +40,9 @@ class EchoWorkflow:
 
 
 class MyOperation(WorkflowRunOperationHandler):
-    def __init__(self):
+    # TODO(nexus-preview) WorkflowRunOperationHandler is not currently implemented to
+    # support subclassing as this test does.
+    def __init__(self):  # type: ignore[reportMissingSuperCall]
         pass
 
     async def start(
@@ -97,7 +97,7 @@ async def test_workflow_run_operation(
     endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
     assert (service_defn := nexusrpc.get_service_definition(service_handler_cls))
     service_client = ServiceClient(
-        server_address=server_address(env),
+        server_address=ServiceClient.default_server_address(env),
         endpoint=endpoint,
         service=service_defn.name,
     )
@@ -117,8 +117,3 @@ async def test_workflow_run_operation(
             assert re.search(message, failure.message)
         else:
             assert resp.status_code == 201
-
-
-def server_address(env: WorkflowEnvironment) -> str:
-    http_port = getattr(env, "_http_port", 7243)
-    return f"http://127.0.0.1:{http_port}"

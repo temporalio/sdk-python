@@ -44,6 +44,7 @@ import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 import temporalio.api.update.v1.message_pb2
 import temporalio.api.version.v1.message_pb2
+import temporalio.api.worker.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
 
 if sys.version_info >= (3, 8):
@@ -1057,13 +1058,14 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
+    WORKER_HEARTBEAT_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
     identity: builtins.str
     """The identity of the worker/client who is polling this task queue"""
     binary_checksum: builtins.str
-    """DEPRECATED since 1.21 - use `deployment_options` instead.
+    """Deprecated. Use deployment_options instead.
     Each worker process should provide an ID unique to the specific set of code it is running
     "checksum" in this field name isn't very accurate, it should be though of as an id.
     """
@@ -1071,9 +1073,9 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     def worker_version_capabilities(
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkerVersionCapabilities:
-        """Information about this worker's build identifier and if it is choosing to use the versioning
+        """Deprecated. Use deployment_options instead.
+        Information about this worker's build identifier and if it is choosing to use the versioning
         feature. See the `WorkerVersionCapabilities` docstring for more.
-        Deprecated. Replaced by deployment_options.
         """
     @property
     def deployment_options(
@@ -1082,6 +1084,9 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
         """Worker deployment options that user has set in the worker.
         Experimental. Worker Deployments are experimental and might significantly change in the future.
         """
+    @property
+    def worker_heartbeat(self) -> temporalio.api.worker.v1.message_pb2.WorkerHeartbeat:
+        """Worker info to be sent to the server."""
     def __init__(
         self,
         *,
@@ -1093,6 +1098,8 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
         | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
+        worker_heartbeat: temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1101,6 +1108,8 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
             b"deployment_options",
             "task_queue",
             b"task_queue",
+            "worker_heartbeat",
+            b"worker_heartbeat",
             "worker_version_capabilities",
             b"worker_version_capabilities",
         ],
@@ -1118,6 +1127,8 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "task_queue",
             b"task_queue",
+            "worker_heartbeat",
+            b"worker_heartbeat",
             "worker_version_capabilities",
             b"worker_version_capabilities",
         ],
@@ -1437,7 +1448,7 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
     which run for longer than the task timeout being the prime example.
     """
     binary_checksum: builtins.str
-    """DEPRECATED since 1.21 - use `deployment_options` instead.
+    """Deprecated. Use `deployment_options` instead.
     Worker process' unique binary id
     """
     @property
@@ -1664,7 +1675,7 @@ class RespondWorkflowTaskFailedRequest(google.protobuf.message.Message):
     identity: builtins.str
     """The identity of the worker/client"""
     binary_checksum: builtins.str
-    """DEPRECATED since 1.21 - use `deployment_options` instead.
+    """Deprecated. Use `deployment_options` instead.
     Worker process' unique binary id
     """
     namespace: builtins.str
@@ -1771,6 +1782,7 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
     TASK_QUEUE_METADATA_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
+    WORKER_HEARTBEAT_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
@@ -1793,6 +1805,9 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that user has set in the worker."""
+    @property
+    def worker_heartbeat(self) -> temporalio.api.worker.v1.message_pb2.WorkerHeartbeat:
+        """Worker info to be sent to the server."""
     def __init__(
         self,
         *,
@@ -1805,6 +1820,8 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
         | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
+        worker_heartbeat: temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1815,6 +1832,8 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
             b"task_queue",
             "task_queue_metadata",
             b"task_queue_metadata",
+            "worker_heartbeat",
+            b"worker_heartbeat",
             "worker_version_capabilities",
             b"worker_version_capabilities",
         ],
@@ -1832,6 +1851,8 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
             b"task_queue",
             "task_queue_metadata",
             b"task_queue_metadata",
+            "worker_heartbeat",
+            b"worker_heartbeat",
             "worker_version_capabilities",
             b"worker_version_capabilities",
         ],
@@ -2877,7 +2898,7 @@ class SignalWorkflowExecutionRequest(google.protobuf.message.Message):
     request_id: builtins.str
     """Used to de-dupe sent signals"""
     control: builtins.str
-    """Deprecated"""
+    """Deprecated."""
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header:
         """Headers that are passed with the signal to the processing workflow.
@@ -3025,7 +3046,7 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
     def signal_input(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """Serialized value(s) to provide with the signal"""
     control: builtins.str
-    """Deprecated"""
+    """Deprecated."""
     @property
     def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy:
         """Retry policy for the workflow"""
@@ -3235,6 +3256,7 @@ class ResetWorkflowExecutionRequest(google.protobuf.message.Message):
     RESET_REAPPLY_TYPE_FIELD_NUMBER: builtins.int
     RESET_REAPPLY_EXCLUDE_TYPES_FIELD_NUMBER: builtins.int
     POST_RESET_OPERATIONS_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def workflow_execution(
@@ -3252,7 +3274,7 @@ class ResetWorkflowExecutionRequest(google.protobuf.message.Message):
     request_id: builtins.str
     """Used to de-dupe reset requests"""
     reset_reapply_type: temporalio.api.enums.v1.reset_pb2.ResetReapplyType.ValueType
-    """Event types to be reapplied (deprecated)
+    """Deprecated. Use `options`.
     Default: RESET_REAPPLY_TYPE_SIGNAL
     """
     @property
@@ -3272,6 +3294,8 @@ class ResetWorkflowExecutionRequest(google.protobuf.message.Message):
         to the *new* run of the workflow execution in the order they are provided.
         All operations are applied to the workflow before the first new workflow task is generated
         """
+    identity: builtins.str
+    """The identity of the worker/client"""
     def __init__(
         self,
         *,
@@ -3290,6 +3314,7 @@ class ResetWorkflowExecutionRequest(google.protobuf.message.Message):
             temporalio.api.workflow.v1.message_pb2.PostResetOperation
         ]
         | None = ...,
+        identity: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -3300,6 +3325,8 @@ class ResetWorkflowExecutionRequest(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
             "namespace",
             b"namespace",
             "post_reset_operations",
@@ -4029,6 +4056,7 @@ class RespondQueryTaskCompletedRequest(google.protobuf.message.Message):
     ERROR_MESSAGE_FIELD_NUMBER: builtins.int
     NAMESPACE_FIELD_NUMBER: builtins.int
     FAILURE_FIELD_NUMBER: builtins.int
+    CAUSE_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     completed_type: temporalio.api.enums.v1.query_pb2.QueryResultType.ValueType
     @property
@@ -4053,6 +4081,10 @@ class RespondQueryTaskCompletedRequest(google.protobuf.message.Message):
         traces.
         Mutually exclusive with `query_result`. Set when the query fails.
         """
+    cause: temporalio.api.enums.v1.failed_cause_pb2.WorkflowTaskFailedCause.ValueType
+    """Why did the task fail? It's important to note that many of the variants in this enum cannot
+    apply to worker responses. See the type's doc for more.
+    """
     def __init__(
         self,
         *,
@@ -4062,6 +4094,7 @@ class RespondQueryTaskCompletedRequest(google.protobuf.message.Message):
         error_message: builtins.str = ...,
         namespace: builtins.str = ...,
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
+        cause: temporalio.api.enums.v1.failed_cause_pb2.WorkflowTaskFailedCause.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -4072,6 +4105,8 @@ class RespondQueryTaskCompletedRequest(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "cause",
+            b"cause",
             "completed_type",
             b"completed_type",
             "error_message",
@@ -4140,10 +4175,15 @@ class ShutdownWorkerRequest(google.protobuf.message.Message):
     STICKY_TASK_QUEUE_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     REASON_FIELD_NUMBER: builtins.int
+    WORKER_HEARTBEAT_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     sticky_task_queue: builtins.str
     identity: builtins.str
     reason: builtins.str
+    @property
+    def worker_heartbeat(
+        self,
+    ) -> temporalio.api.worker.v1.message_pb2.WorkerHeartbeat: ...
     def __init__(
         self,
         *,
@@ -4151,7 +4191,13 @@ class ShutdownWorkerRequest(google.protobuf.message.Message):
         sticky_task_queue: builtins.str = ...,
         identity: builtins.str = ...,
         reason: builtins.str = ...,
+        worker_heartbeat: temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
+        | None = ...,
     ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["worker_heartbeat", b"worker_heartbeat"],
+    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
@@ -4163,6 +4209,8 @@ class ShutdownWorkerRequest(google.protobuf.message.Message):
             b"reason",
             "sticky_task_queue",
             b"sticky_task_queue",
+            "worker_heartbeat",
+            b"worker_heartbeat",
         ],
     ) -> None: ...
 
@@ -4407,30 +4455,38 @@ class DescribeTaskQueueRequest(google.protobuf.message.Message):
     NAMESPACE_FIELD_NUMBER: builtins.int
     TASK_QUEUE_FIELD_NUMBER: builtins.int
     TASK_QUEUE_TYPE_FIELD_NUMBER: builtins.int
+    REPORT_STATS_FIELD_NUMBER: builtins.int
     INCLUDE_TASK_QUEUE_STATUS_FIELD_NUMBER: builtins.int
     API_MODE_FIELD_NUMBER: builtins.int
     VERSIONS_FIELD_NUMBER: builtins.int
     TASK_QUEUE_TYPES_FIELD_NUMBER: builtins.int
-    REPORT_STATS_FIELD_NUMBER: builtins.int
     REPORT_POLLERS_FIELD_NUMBER: builtins.int
     REPORT_TASK_REACHABILITY_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue:
-        """Sticky queues are not supported in `ENHANCED` mode."""
+        """Sticky queues are not supported in deprecated ENHANCED mode."""
     task_queue_type: temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType
-    """Deprecated. Use `ENHANCED` mode with `task_queue_types`. Ignored in `ENHANCED` mode.
-    If unspecified (TASK_QUEUE_TYPE_UNSPECIFIED), then default value (TASK_QUEUE_TYPE_WORKFLOW) will be used.
+    """If unspecified (TASK_QUEUE_TYPE_UNSPECIFIED), then default value (TASK_QUEUE_TYPE_WORKFLOW) will be used.
+    Only supported in default mode (use `task_queue_types` in ENHANCED mode instead).
     """
+    report_stats: builtins.bool
+    """Report stats for the requested task queue type(s)."""
     include_task_queue_status: builtins.bool
-    """Deprecated. Ignored in `ENHANCED` mode."""
+    """Deprecated, use `report_stats` instead.
+    If true, the task queue status will be included in the response.
+    """
     api_mode: temporalio.api.enums.v1.task_queue_pb2.DescribeTaskQueueMode.ValueType
-    """All options except `task_queue_type` and `include_task_queue_status` are only available in the `ENHANCED` mode."""
+    """Deprecated. ENHANCED mode is also being deprecated.
+    Select the API mode to use for this request: DEFAULT mode (if unset) or ENHANCED mode.
+    Consult the documentation for each field to understand which mode it is supported in.
+    """
     @property
     def versions(
         self,
     ) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueueVersionSelection:
-        """Optional. If not provided, the result for the default Build ID will be returned. The default Build ID is the one
+        """Deprecated (as part of the ENHANCED mode deprecation).
+        Optional. If not provided, the result for the default Build ID will be returned. The default Build ID is the one
         mentioned in the first unconditional Assignment Rule. If there is no default Build ID, the result for the
         unversioned queue will be returned.
         (-- api-linter: core::0140::prepositions --)
@@ -4441,13 +4497,16 @@ class DescribeTaskQueueRequest(google.protobuf.message.Message):
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
         temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType
     ]:
-        """Task queue types to report info about. If not specified, all types are considered."""
-    report_stats: builtins.bool
-    """Report stats for the requested task queue types and versions"""
+        """Deprecated (as part of the ENHANCED mode deprecation).
+        Task queue types to report info about. If not specified, all types are considered.
+        """
     report_pollers: builtins.bool
-    """Report list of pollers for requested task queue types and versions"""
+    """Deprecated (as part of the ENHANCED mode deprecation).
+    Report list of pollers for requested task queue types and versions.
+    """
     report_task_reachability: builtins.bool
-    """Report task reachability for the requested versions and all task types (task reachability is not reported
+    """Deprecated (as part of the ENHANCED mode deprecation).
+    Report task reachability for the requested versions and all task types (task reachability is not reported
     per task type).
     """
     def __init__(
@@ -4456,6 +4515,7 @@ class DescribeTaskQueueRequest(google.protobuf.message.Message):
         namespace: builtins.str = ...,
         task_queue: temporalio.api.taskqueue.v1.message_pb2.TaskQueue | None = ...,
         task_queue_type: temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType = ...,
+        report_stats: builtins.bool = ...,
         include_task_queue_status: builtins.bool = ...,
         api_mode: temporalio.api.enums.v1.task_queue_pb2.DescribeTaskQueueMode.ValueType = ...,
         versions: temporalio.api.taskqueue.v1.message_pb2.TaskQueueVersionSelection
@@ -4464,7 +4524,6 @@ class DescribeTaskQueueRequest(google.protobuf.message.Message):
             temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType
         ]
         | None = ...,
-        report_stats: builtins.bool = ...,
         report_pollers: builtins.bool = ...,
         report_task_reachability: builtins.bool = ...,
     ) -> None: ...
@@ -4531,32 +4590,19 @@ class DescribeTaskQueueResponse(google.protobuf.message.Message):
         ) -> None: ...
 
     POLLERS_FIELD_NUMBER: builtins.int
+    STATS_FIELD_NUMBER: builtins.int
+    VERSIONING_INFO_FIELD_NUMBER: builtins.int
     TASK_QUEUE_STATUS_FIELD_NUMBER: builtins.int
     VERSIONS_INFO_FIELD_NUMBER: builtins.int
-    VERSIONING_INFO_FIELD_NUMBER: builtins.int
     @property
     def pollers(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         temporalio.api.taskqueue.v1.message_pb2.PollerInfo
-    ]:
-        """Deprecated. Use `versions_info.types_info.pollers` with `ENHANCED` mode instead.
-        Not set in `ENHANCED` mode.
-        """
+    ]: ...
     @property
-    def task_queue_status(
-        self,
-    ) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueueStatus:
-        """Deprecated. Not set in `ENHANCED` mode."""
-    @property
-    def versions_info(
-        self,
-    ) -> google.protobuf.internal.containers.MessageMap[
-        builtins.str, temporalio.api.taskqueue.v1.message_pb2.TaskQueueVersionInfo
-    ]:
-        """This map contains Task Queue information for each Build ID. Empty string as key value means unversioned.
-        Only set in `ENHANCED` mode.
-        """
+    def stats(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats:
+        """Statistics for the task queue. Only populated when `report_stats` is set to true in the request."""
     @property
     def versioning_info(
         self,
@@ -4571,6 +4617,23 @@ class DescribeTaskQueueResponse(google.protobuf.message.Message):
         are typically not Pinned until they complete their first task (unless they are started with
         a Pinned VersioningOverride or are Child Workflows of a Pinned parent).
         """
+    @property
+    def task_queue_status(
+        self,
+    ) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueueStatus:
+        """Deprecated.
+        Status of the task queue. Only populated when `include_task_queue_status` is set to true in the request.
+        """
+    @property
+    def versions_info(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, temporalio.api.taskqueue.v1.message_pb2.TaskQueueVersionInfo
+    ]:
+        """Deprecated.
+        Only returned in ENHANCED mode.
+        This map contains Task Queue information for each Build ID. Empty string as key value means unversioned.
+        """
     def __init__(
         self,
         *,
@@ -4578,18 +4641,21 @@ class DescribeTaskQueueResponse(google.protobuf.message.Message):
             temporalio.api.taskqueue.v1.message_pb2.PollerInfo
         ]
         | None = ...,
+        stats: temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats | None = ...,
+        versioning_info: temporalio.api.taskqueue.v1.message_pb2.TaskQueueVersioningInfo
+        | None = ...,
         task_queue_status: temporalio.api.taskqueue.v1.message_pb2.TaskQueueStatus
         | None = ...,
         versions_info: collections.abc.Mapping[
             builtins.str, temporalio.api.taskqueue.v1.message_pb2.TaskQueueVersionInfo
         ]
         | None = ...,
-        versioning_info: temporalio.api.taskqueue.v1.message_pb2.TaskQueueVersioningInfo
-        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "stats",
+            b"stats",
             "task_queue_status",
             b"task_queue_status",
             "versioning_info",
@@ -4601,6 +4667,8 @@ class DescribeTaskQueueResponse(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "pollers",
             b"pollers",
+            "stats",
+            b"stats",
             "task_queue_status",
             b"task_queue_status",
             "versioning_info",
@@ -6918,6 +6986,7 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
     TASK_QUEUE_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
+    WORKER_HEARTBEAT_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     identity: builtins.str
     """The identity of the client who initiated this request."""
@@ -6936,6 +7005,9 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that user has set in the worker."""
+    @property
+    def worker_heartbeat(self) -> temporalio.api.worker.v1.message_pb2.WorkerHeartbeat:
+        """Worker info to be sent to the server."""
     def __init__(
         self,
         *,
@@ -6946,6 +7018,8 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
         | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
+        worker_heartbeat: temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -6954,6 +7028,8 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
             b"deployment_options",
             "task_queue",
             b"task_queue",
+            "worker_heartbeat",
+            b"worker_heartbeat",
             "worker_version_capabilities",
             b"worker_version_capabilities",
         ],
@@ -6969,6 +7045,8 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "task_queue",
             b"task_queue",
+            "worker_heartbeat",
+            b"worker_heartbeat",
             "worker_version_capabilities",
             b"worker_version_capabilities",
         ],
@@ -7294,6 +7372,7 @@ class UpdateActivityOptionsRequest(google.protobuf.message.Message):
     UPDATE_MASK_FIELD_NUMBER: builtins.int
     ID_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int
+    RESTORE_ORIGINAL_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the workflow which scheduled this activity"""
     @property
@@ -7313,6 +7392,13 @@ class UpdateActivityOptionsRequest(google.protobuf.message.Message):
     """Only activity with this ID will be updated."""
     type: builtins.str
     """Update all running activities of this type."""
+    restore_original: builtins.bool
+    """If set, the activity options will be restored to the default.
+    Default options are then options activity was created with.
+    They are part of the first SCHEDULE event.
+    This flag cannot be combined with any other option; if you supply
+    restore_original together with other options, the request will be rejected.
+    """
     def __init__(
         self,
         *,
@@ -7324,6 +7410,7 @@ class UpdateActivityOptionsRequest(google.protobuf.message.Message):
         update_mask: google.protobuf.field_mask_pb2.FieldMask | None = ...,
         id: builtins.str = ...,
         type: builtins.str = ...,
+        restore_original: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -7357,6 +7444,8 @@ class UpdateActivityOptionsRequest(google.protobuf.message.Message):
             b"identity",
             "namespace",
             b"namespace",
+            "restore_original",
+            b"restore_original",
             "type",
             b"type",
             "update_mask",
@@ -7587,6 +7676,7 @@ class ResetActivityRequest(google.protobuf.message.Message):
     RESET_HEARTBEAT_FIELD_NUMBER: builtins.int
     KEEP_PAUSED_FIELD_NUMBER: builtins.int
     JITTER_FIELD_NUMBER: builtins.int
+    RESTORE_ORIGINAL_OPTIONS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the workflow which scheduled this activity."""
     @property
@@ -7609,6 +7699,11 @@ class ResetActivityRequest(google.protobuf.message.Message):
         """If set, and activity is in backoff, the activity will start at a random time within the specified jitter duration.
         (unless it is paused and keep_paused is set)
         """
+    restore_original_options: builtins.bool
+    """If set, the activity options will be restored to the defaults.
+    Default options are then options activity was created with.
+    They are part of the first SCHEDULE event.
+    """
     def __init__(
         self,
         *,
@@ -7620,6 +7715,7 @@ class ResetActivityRequest(google.protobuf.message.Message):
         reset_heartbeat: builtins.bool = ...,
         keep_paused: builtins.bool = ...,
         jitter: google.protobuf.duration_pb2.Duration | None = ...,
+        restore_original_options: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -7655,6 +7751,8 @@ class ResetActivityRequest(google.protobuf.message.Message):
             b"namespace",
             "reset_heartbeat",
             b"reset_heartbeat",
+            "restore_original_options",
+            b"restore_original_options",
             "type",
             b"type",
         ],
@@ -7834,6 +7932,7 @@ class DescribeWorkerDeploymentVersionRequest(google.protobuf.message.Message):
     NAMESPACE_FIELD_NUMBER: builtins.int
     VERSION_FIELD_NUMBER: builtins.int
     DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
+    REPORT_TASK_QUEUE_STATS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     version: builtins.str
     """Deprecated. Use `deployment_version`."""
@@ -7842,6 +7941,8 @@ class DescribeWorkerDeploymentVersionRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion:
         """Required."""
+    report_task_queue_stats: builtins.bool
+    """Report stats for task queues which have been polled by this version."""
     def __init__(
         self,
         *,
@@ -7849,6 +7950,7 @@ class DescribeWorkerDeploymentVersionRequest(google.protobuf.message.Message):
         version: builtins.str = ...,
         deployment_version: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion
         | None = ...,
+        report_task_queue_stats: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -7863,6 +7965,8 @@ class DescribeWorkerDeploymentVersionRequest(google.protobuf.message.Message):
             b"deployment_version",
             "namespace",
             b"namespace",
+            "report_task_queue_stats",
+            b"report_task_queue_stats",
             "version",
             b"version",
         ],
@@ -7873,15 +7977,57 @@ global___DescribeWorkerDeploymentVersionRequest = DescribeWorkerDeploymentVersio
 class DescribeWorkerDeploymentVersionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class VersionTaskQueue(google.protobuf.message.Message):
+        """(-- api-linter: core::0123::resource-annotation=disabled --)"""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        NAME_FIELD_NUMBER: builtins.int
+        TYPE_FIELD_NUMBER: builtins.int
+        STATS_FIELD_NUMBER: builtins.int
+        name: builtins.str
+        type: temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType
+        @property
+        def stats(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats:
+            """Only set if `report_task_queue_stats` is set on the request."""
+        def __init__(
+            self,
+            *,
+            name: builtins.str = ...,
+            type: temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType = ...,
+            stats: temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats | None = ...,
+        ) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["stats", b"stats"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "name", b"name", "stats", b"stats", "type", b"type"
+            ],
+        ) -> None: ...
+
     WORKER_DEPLOYMENT_VERSION_INFO_FIELD_NUMBER: builtins.int
+    VERSION_TASK_QUEUES_FIELD_NUMBER: builtins.int
     @property
     def worker_deployment_version_info(
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersionInfo: ...
+    @property
+    def version_task_queues(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___DescribeWorkerDeploymentVersionResponse.VersionTaskQueue
+    ]:
+        """All the Task Queues that have ever polled from this Deployment version."""
     def __init__(
         self,
         *,
         worker_deployment_version_info: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersionInfo
+        | None = ...,
+        version_task_queues: collections.abc.Iterable[
+            global___DescribeWorkerDeploymentVersionResponse.VersionTaskQueue
+        ]
         | None = ...,
     ) -> None: ...
     def HasField(
@@ -7893,7 +8039,10 @@ class DescribeWorkerDeploymentVersionResponse(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "worker_deployment_version_info", b"worker_deployment_version_info"
+            "version_task_queues",
+            b"version_task_queues",
+            "worker_deployment_version_info",
+            b"worker_deployment_version_info",
         ],
     ) -> None: ...
 
@@ -8442,6 +8591,9 @@ class ListWorkerDeploymentsResponse(google.protobuf.message.Message):
         NAME_FIELD_NUMBER: builtins.int
         CREATE_TIME_FIELD_NUMBER: builtins.int
         ROUTING_CONFIG_FIELD_NUMBER: builtins.int
+        LATEST_VERSION_SUMMARY_FIELD_NUMBER: builtins.int
+        CURRENT_VERSION_SUMMARY_FIELD_NUMBER: builtins.int
+        RAMPING_VERSION_SUMMARY_FIELD_NUMBER: builtins.int
         name: builtins.str
         @property
         def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
@@ -8449,6 +8601,21 @@ class ListWorkerDeploymentsResponse(google.protobuf.message.Message):
         def routing_config(
             self,
         ) -> temporalio.api.deployment.v1.message_pb2.RoutingConfig: ...
+        @property
+        def latest_version_summary(
+            self,
+        ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentInfo.WorkerDeploymentVersionSummary:
+            """Summary of the version that was added most recently in the Worker Deployment."""
+        @property
+        def current_version_summary(
+            self,
+        ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentInfo.WorkerDeploymentVersionSummary:
+            """Summary of the current version of the Worker Deployment."""
+        @property
+        def ramping_version_summary(
+            self,
+        ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentInfo.WorkerDeploymentVersionSummary:
+            """Summary of the ramping version of the Worker Deployment."""
         def __init__(
             self,
             *,
@@ -8456,11 +8623,26 @@ class ListWorkerDeploymentsResponse(google.protobuf.message.Message):
             create_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
             routing_config: temporalio.api.deployment.v1.message_pb2.RoutingConfig
             | None = ...,
+            latest_version_summary: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentInfo.WorkerDeploymentVersionSummary
+            | None = ...,
+            current_version_summary: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentInfo.WorkerDeploymentVersionSummary
+            | None = ...,
+            ramping_version_summary: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentInfo.WorkerDeploymentVersionSummary
+            | None = ...,
         ) -> None: ...
         def HasField(
             self,
             field_name: typing_extensions.Literal[
-                "create_time", b"create_time", "routing_config", b"routing_config"
+                "create_time",
+                b"create_time",
+                "current_version_summary",
+                b"current_version_summary",
+                "latest_version_summary",
+                b"latest_version_summary",
+                "ramping_version_summary",
+                b"ramping_version_summary",
+                "routing_config",
+                b"routing_config",
             ],
         ) -> builtins.bool: ...
         def ClearField(
@@ -8468,8 +8650,14 @@ class ListWorkerDeploymentsResponse(google.protobuf.message.Message):
             field_name: typing_extensions.Literal[
                 "create_time",
                 b"create_time",
+                "current_version_summary",
+                b"current_version_summary",
+                "latest_version_summary",
+                b"latest_version_summary",
                 "name",
                 b"name",
+                "ramping_version_summary",
+                b"ramping_version_summary",
                 "routing_config",
                 b"routing_config",
             ],
@@ -8655,6 +8843,7 @@ class UpdateWorkerDeploymentVersionMetadataRequest(google.protobuf.message.Messa
     DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
     UPSERT_ENTRIES_FIELD_NUMBER: builtins.int
     REMOVE_ENTRIES_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     version: builtins.str
     """Deprecated. Use `deployment_version`."""
@@ -8674,6 +8863,8 @@ class UpdateWorkerDeploymentVersionMetadataRequest(google.protobuf.message.Messa
         self,
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """List of keys to remove from the metadata."""
+    identity: builtins.str
+    """Optional. The identity of the client who initiated this request."""
     def __init__(
         self,
         *,
@@ -8686,6 +8877,7 @@ class UpdateWorkerDeploymentVersionMetadataRequest(google.protobuf.message.Messa
         ]
         | None = ...,
         remove_entries: collections.abc.Iterable[builtins.str] | None = ...,
+        identity: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -8698,6 +8890,8 @@ class UpdateWorkerDeploymentVersionMetadataRequest(google.protobuf.message.Messa
         field_name: typing_extensions.Literal[
             "deployment_version",
             b"deployment_version",
+            "identity",
+            b"identity",
             "namespace",
             b"namespace",
             "remove_entries",
@@ -9155,3 +9349,133 @@ class TriggerWorkflowRuleResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___TriggerWorkflowRuleResponse = TriggerWorkflowRuleResponse
+
+class RecordWorkerHeartbeatRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    WORKER_HEARTBEAT_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Namespace this worker belongs to."""
+    identity: builtins.str
+    """The identity of the client who initiated this request."""
+    @property
+    def worker_heartbeat(
+        self,
+    ) -> temporalio.api.worker.v1.message_pb2.WorkerHeartbeat: ...
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        identity: builtins.str = ...,
+        worker_heartbeat: temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["worker_heartbeat", b"worker_heartbeat"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "worker_heartbeat",
+            b"worker_heartbeat",
+        ],
+    ) -> None: ...
+
+global___RecordWorkerHeartbeatRequest = RecordWorkerHeartbeatRequest
+
+class RecordWorkerHeartbeatResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___RecordWorkerHeartbeatResponse = RecordWorkerHeartbeatResponse
+
+class ListWorkersRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    PAGE_SIZE_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    QUERY_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    page_size: builtins.int
+    next_page_token: builtins.bytes
+    query: builtins.str
+    """`query` in ListWorkers is used to filter workers based on worker status info.
+    The following worker status attributes are expected are supported as part of the query:
+    * WorkerInstanceKey
+    * WorkerIdentity
+    * HostName
+    * TaskQueue
+    * DeploymentName
+    * BuildId
+    * SdkName
+    * SdkVersion
+    * StartTime
+    * LastHeartbeatTime
+    * Status
+    Currently metrics are not supported as a part of ListWorkers query.
+    """
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        page_size: builtins.int = ...,
+        next_page_token: builtins.bytes = ...,
+        query: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "namespace",
+            b"namespace",
+            "next_page_token",
+            b"next_page_token",
+            "page_size",
+            b"page_size",
+            "query",
+            b"query",
+        ],
+    ) -> None: ...
+
+global___ListWorkersRequest = ListWorkersRequest
+
+class ListWorkersResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    WORKERS_INFO_FIELD_NUMBER: builtins.int
+    NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
+    @property
+    def workers_info(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.worker.v1.message_pb2.WorkerInfo
+    ]: ...
+    next_page_token: builtins.bytes
+    """Next page token"""
+    def __init__(
+        self,
+        *,
+        workers_info: collections.abc.Iterable[
+            temporalio.api.worker.v1.message_pb2.WorkerInfo
+        ]
+        | None = ...,
+        next_page_token: builtins.bytes = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "next_page_token", b"next_page_token", "workers_info", b"workers_info"
+        ],
+    ) -> None: ...
+
+global___ListWorkersResponse = ListWorkersResponse
