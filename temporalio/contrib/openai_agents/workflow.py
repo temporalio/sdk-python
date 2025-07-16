@@ -1,18 +1,27 @@
 """Workflow-specific primitives for working with the OpenAI Agents SDK in a workflow context"""
 
+import functools
+import inspect
 import json
 from datetime import timedelta
-from typing import Any, Callable, Optional, Type
+from typing import Any, Callable, Optional, Type, Union, overload
 
 import nexusrpc
 from agents import (
+    Agent,
     RunContextWrapper,
     Tool,
 )
-from agents.function_schema import function_schema
+from agents.function_schema import DocstringStyle, function_schema
 from agents.tool import (
     FunctionTool,
+    ToolErrorFunction,
+    ToolFunction,
+    ToolParams,
+    default_tool_error_function,
+    function_tool,
 )
+from agents.util._types import MaybeAwaitable
 
 from temporalio import activity
 from temporalio import workflow as temporal_workflow
@@ -78,6 +87,25 @@ def activity_as_tool(
             "Bare function without tool and activity decorators is not supported",
             "invalid_tool",
         )
+    if ret.name is None:
+        raise ApplicationError(
+            "Input activity must have a name to be made into a tool",
+            "invalid_tool",
+        )
+    # If the provided callable has a first argument of `self`, partially apply it with the same metadata
+    # The actual instance will be picked up by the activity execution, the partially applied function will never actually be executed
+    params = list(inspect.signature(fn).parameters.keys())
+    if len(params) > 0 and params[0] == "self":
+        partial = functools.partial(fn, None)
+        setattr(partial, "__name__", fn.__name__)
+        partial.__annotations__ = getattr(fn, "__annotations__")
+        setattr(
+            partial,
+            "__temporal_activity_definition",
+            getattr(fn, "__temporal_activity_definition"),
+        )
+        partial.__doc__ = fn.__doc__
+        fn = partial
     schema = function_schema(fn)
 
     async def run_activity(ctx: RunContextWrapper[Any], input: str) -> Any:
@@ -94,9 +122,8 @@ def activity_as_tool(
         # Add the context to the arguments if it takes that
         if schema.takes_context:
             args = [ctx] + args
-
         result = await temporal_workflow.execute_activity(
-            fn,
+            ret.name,  # type: ignore
             args=args,
             task_queue=task_queue,
             schedule_to_close_timeout=schedule_to_close_timeout,
