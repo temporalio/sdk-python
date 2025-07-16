@@ -197,7 +197,7 @@ _Context: TypeAlias = Dict[str, Any]
 _ExceptionHandler: TypeAlias = Callable[[asyncio.AbstractEventLoop, _Context], Any]
 
 
-class _WorkflowInstanceImpl(
+class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     WorkflowInstance, temporalio.workflow._Runtime, asyncio.AbstractEventLoop
 ):
     def __init__(self, det: WorkflowInstanceDetails) -> None:

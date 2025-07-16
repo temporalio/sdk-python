@@ -1,11 +1,9 @@
 from dataclasses import replace
-from datetime import timedelta
-from typing import Optional, Union
+from typing import Any, Union
 
 from agents import (
     Agent,
     RunConfig,
-    RunHooks,
     RunResult,
     RunResultStreaming,
     TContext,
@@ -14,10 +12,8 @@ from agents import (
 from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
 
 from temporalio import workflow
-from temporalio.common import Priority, RetryPolicy
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
-from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 
 class TemporalOpenAIRunner(AgentRunner):
@@ -36,7 +32,7 @@ class TemporalOpenAIRunner(AgentRunner):
         self,
         starting_agent: Agent[TContext],
         input: Union[str, list[TResponseInputItem]],
-        **kwargs,
+        **kwargs: Any,
     ) -> RunResult:
         """Run the agent in a Temporal workflow."""
         if not workflow.in_workflow():
@@ -82,7 +78,7 @@ class TemporalOpenAIRunner(AgentRunner):
         self,
         starting_agent: Agent[TContext],
         input: Union[str, list[TResponseInputItem]],
-        **kwargs,
+        **kwargs: Any,
     ) -> RunResult:
         """Run the agent synchronously (not supported in Temporal workflows)."""
         if not workflow.in_workflow():
@@ -97,7 +93,7 @@ class TemporalOpenAIRunner(AgentRunner):
         self,
         starting_agent: Agent[TContext],
         input: Union[str, list[TResponseInputItem]],
-        **kwargs,
+        **kwargs: Any,
     ) -> RunResultStreaming:
         """Run the agent with streaming responses (not supported in Temporal workflows)."""
         if not workflow.in_workflow():

@@ -534,7 +534,7 @@ class _AssertionErrorWorkflowInboundInterceptor(
 
 
 class _TimeSkippingClientInterceptor(temporalio.client.Interceptor):
-    def __init__(self, env: _EphemeralServerWorkflowEnvironment) -> None:
+    def __init__(self, env: _EphemeralServerWorkflowEnvironment) -> None:  # type: ignore[reportMissingSuperCall]
         self.env = env
 
     def intercept_client(
@@ -563,7 +563,7 @@ class _TimeSkippingClientOutboundInterceptor(temporalio.client.OutboundIntercept
 
 
 class _TimeSkippingWorkflowHandle(temporalio.client.WorkflowHandle):
-    env: _EphemeralServerWorkflowEnvironment
+    env: _EphemeralServerWorkflowEnvironment  # type: ignore[reportUninitializedInstanceAttribute]
 
     async def result(
         self,

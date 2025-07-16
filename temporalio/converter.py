@@ -508,7 +508,7 @@ class AdvancedJSONEncoder(json.JSONEncoder):
         if isinstance(o, datetime):
             return o.isoformat()
         # Dataclass support
-        if dataclasses.is_dataclass(o):
+        if dataclasses.is_dataclass(o) and not isinstance(o, type):
             return dataclasses.asdict(o)
         # Support for Pydantic v1's dict method
         dict_fn = getattr(o, "dict", None)
@@ -1701,7 +1701,7 @@ def value_to_type(
                     arg_type = type_args[i]
                 elif type_args[-1] is Ellipsis:
                     # Ellipsis means use the second to last one
-                    arg_type = type_args[-2]
+                    arg_type = type_args[-2]  # type: ignore
                 else:
                     raise TypeError(
                         f"Type {hint} only expecting {len(type_args)} values, got at least {i + 1}"

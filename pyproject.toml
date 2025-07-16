@@ -165,6 +165,7 @@ reportAny = "none"
 reportCallInDefaultInitializer = "none"
 reportExplicitAny = "none"
 reportIgnoreCommentWithoutRule = "none"
+reportImplicitAbstractClass = "none"
 reportImplicitOverride = "none"
 reportImplicitStringConcatenation = "none"
 reportImportCycles = "none"
@@ -184,11 +185,6 @@ exclude = [
   "temporalio/bridge/proto",
   "tests/worker/workflow_sandbox/testmodules/proto",
   "temporalio/bridge/worker.py",
-  "temporalio/contrib/opentelemetry.py",
-  "temporalio/contrib/pydantic.py",
-  "temporalio/converter.py",
-  "temporalio/testing/_workflow.py",
-  "temporalio/worker/_activity.py",
   "temporalio/worker/_replayer.py",
   "temporalio/worker/_worker.py",
   "temporalio/worker/workflow_sandbox/_importer.py",
@@ -203,9 +199,7 @@ exclude = [
   "tests/contrib/pydantic/workflows.py",
   "tests/test_converter.py",
   "tests/test_service.py",
-  "tests/test_workflow.py",
   "tests/worker/test_activity.py",
-  "tests/worker/test_workflow.py",
   "tests/worker/workflow_sandbox/test_importer.py",
   "tests/worker/workflow_sandbox/test_restrictions.py",
   # TODO: these pass locally but fail in CI with

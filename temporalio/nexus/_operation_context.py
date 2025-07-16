@@ -178,7 +178,7 @@ class WorkflowRunOperationContext(StartOperationContext):
         This API is experimental and unstable.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the workflow run operation context."""
         super().__init__(*args, **kwargs)
         self._temporal_context = _TemporalStartOperationContext.get()
