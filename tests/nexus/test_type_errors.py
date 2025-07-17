@@ -178,7 +178,7 @@ class MyWorkflow4:
         )
         # assert-type-error-pyright: 'No overloads for "execute_operation" match'
         await nexus_client.execute_operation(  # type: ignore
-            MyServiceHandler.my_sync_operation,
+            MyServiceHandler.my_sync_operation,  # type: ignore[arg-type]
             # assert-type-error-pyright: 'Argument of type .+ cannot be assigned to parameter "input"'
             "wrong-input-type",  # type: ignore
         )
