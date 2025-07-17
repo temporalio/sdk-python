@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Any, Mapping, Protocol, Type
+from typing import Any, Mapping, Protocol, Type, cast
 
 from agents import CustomSpanData, custom_span, get_current_span, trace
 from agents.tracing import (
@@ -67,7 +67,10 @@ def context_from_header(
             else workflow.info().workflow_type
         )
         data = (
-            {"activityId": activity.info().activity_id}
+            {
+                "activityId": activity.info().activity_id,
+                "activity": activity.info().activity_type,
+            }
             if activity.in_activity()
             else None
         )
@@ -333,29 +336,55 @@ class _ContextPropagationWorkflowOutboundInterceptor(
     async def signal_child_workflow(
         self, input: temporalio.worker.SignalChildWorkflowInput
     ) -> None:
-        set_header_from_context(input, temporalio.workflow.payload_converter())
-        return await self.next.signal_child_workflow(input)
+        with custom_span(
+            name=f"temporal:signalChildWorkflow",
+            data={"workflowId": input.child_workflow_id},
+        ):
+            set_header_from_context(input, temporalio.workflow.payload_converter())
+            await self.next.signal_child_workflow(input)
 
     async def signal_external_workflow(
         self, input: temporalio.worker.SignalExternalWorkflowInput
     ) -> None:
-        set_header_from_context(input, temporalio.workflow.payload_converter())
-        return await self.next.signal_external_workflow(input)
+        with custom_span(
+            name=f"temporal:signalExternalWorkflow",
+            data={"workflowId": input.workflow_id},
+        ):
+            set_header_from_context(input, temporalio.workflow.payload_converter())
+            await self.next.signal_external_workflow(input)
 
     def start_activity(
         self, input: temporalio.worker.StartActivityInput
     ) -> temporalio.workflow.ActivityHandle:
+        span = custom_span(
+            name=f"temporal:startActivity", data={"activity": input.activity}
+        )
+        span.start(mark_as_current=True)
         set_header_from_context(input, temporalio.workflow.payload_converter())
-        return self.next.start_activity(input)
+        handle = self.next.start_activity(input)
+        handle.add_done_callback(lambda _: span.finish())
+        return handle
 
     async def start_child_workflow(
         self, input: temporalio.worker.StartChildWorkflowInput
     ) -> temporalio.workflow.ChildWorkflowHandle:
+        span = custom_span(
+            name=f"temporal:startChildWorkflow", data={"workflow": input.workflow}
+        )
+        span.start(mark_as_current=True)
         set_header_from_context(input, temporalio.workflow.payload_converter())
-        return await self.next.start_child_workflow(input)
+        handle = await self.next.start_child_workflow(input)
+        handle.add_done_callback(lambda _: span.finish())
+        return handle
 
     def start_local_activity(
         self, input: temporalio.worker.StartLocalActivityInput
     ) -> temporalio.workflow.ActivityHandle:
+        span = custom_span(
+            name=f"temporal:startLocalActivity", data={"activity": input.activity}
+        )
+        span.start(mark_as_current=True)
         set_header_from_context(input, temporalio.workflow.payload_converter())
-        return self.next.start_local_activity(input)
+        handle = self.next.start_local_activity(input)
+        handle.add_done_callback(lambda _: span.finish())
+        return handle
