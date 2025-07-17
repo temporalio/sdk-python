@@ -79,7 +79,7 @@ class TestWorkflow2(TestWorkflow):
         return WorkflowOutput()
 
 
-async def _test_start_and_execute_workflow_type_errors():
+async def _start_and_execute_workflow_code_for_type_checking_test():
     client = Client(service_client=Mock(spec=ServiceClient))
 
     # Good
@@ -117,7 +117,7 @@ async def _test_start_and_execute_workflow_type_errors():
     )
 
 
-async def _test_signal_type_errors():
+async def _signal_workflow_code_for_type_checking_test():
     client = Client(service_client=Mock(spec=ServiceClient))
     handle: WorkflowHandle[TestWorkflow, WorkflowOutput] = await client.start_workflow(
         TestWorkflow.run, WorkflowInput(), id="wid", task_queue="tq"
@@ -134,7 +134,7 @@ async def _test_signal_type_errors():
     await handle.signal(TestWorkflow2.signal, SignalInput())  # type: ignore
 
 
-async def _test_query_type_errors():
+async def _query_workflow_code_for_type_checking_test():
     client = Client(service_client=Mock(spec=ServiceClient))
     handle: WorkflowHandle[TestWorkflow, WorkflowOutput] = await client.start_workflow(
         TestWorkflow.run, WorkflowInput(), id="wid", task_queue="tq"
@@ -152,7 +152,7 @@ async def _test_query_type_errors():
     await handle.query(TestWorkflow2.query, QueryInput())  # type: ignore
 
 
-async def _test_start_and_execute_update_type_errors():
+async def _update_workflow_code_for_type_checking_test():
     client = Client(service_client=Mock(spec=ServiceClient))
     handle: WorkflowHandle[TestWorkflow, WorkflowOutput] = await client.start_workflow(
         TestWorkflow.run, WorkflowInput(), id="wid", task_queue="tq"
@@ -186,7 +186,7 @@ async def _test_start_and_execute_update_type_errors():
     await handle.execute_update(TestWorkflow2.update, UpdateInput())  # type: ignore
 
 
-async def _test_start_and_execute_update_with_start_type_errors():
+async def _update_with_start_workflow_code_for_type_checking_test():
     client = Client(service_client=Mock(spec=ServiceClient))
 
     # Good
