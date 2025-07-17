@@ -1,7 +1,7 @@
 import datetime
 import uuid
 from datetime import timedelta
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 from agents import Span, Trace, TracingProcessor
 from agents.tracing import get_trace_provider
@@ -12,9 +12,6 @@ from temporalio.contrib.openai_agents import (
     OpenAIAgentsTracingInterceptor,
     TestModelProvider,
     set_open_ai_agent_temporal_overrides,
-)
-from temporalio.contrib.openai_agents._temporal_trace_provider import (
-    TemporalTraceProvider,
 )
 from temporalio.contrib.pydantic import pydantic_data_converter
 from tests.contrib.openai_agents.test_openai import ResearchWorkflow, TestResearchModel
@@ -51,7 +48,7 @@ async def test_tracing(client: Client):
     client = Client(**new_config)
 
     with set_open_ai_agent_temporal_overrides():
-        provider = cast(TemporalTraceProvider, get_trace_provider())
+        provider = get_trace_provider()
 
         processor = MemoryTracingProcessor()
         provider.set_processors([processor])
