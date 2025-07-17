@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Sequence, Type
 
@@ -52,8 +53,11 @@ _fake_info = temporalio.workflow.Info(
 )
 
 
+@dataclass
 class SandboxedWorkflowRunner(WorkflowRunner):
     """Runner for workflows in a sandbox."""
+
+    restrictions: SandboxRestrictions = SandboxRestrictions.default
 
     def __init__(
         self,
@@ -70,8 +74,8 @@ class SandboxedWorkflowRunner(WorkflowRunner):
                 re-imported and instantiated for *each* workflow run.
         """
         super().__init__()
+        self.restrictions = restrictions
         self._runner_class = runner_class
-        self._restrictions = restrictions
         self._worker_level_failure_exception_types: Sequence[type[BaseException]] = []
 
     def prepare_workflow(self, defn: temporalio.workflow._Definition) -> None:
@@ -94,7 +98,7 @@ class SandboxedWorkflowRunner(WorkflowRunner):
 
     def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
         """Implements :py:meth:`WorkflowRunner.create_instance`."""
-        return _Instance(det, self._runner_class, self._restrictions)
+        return _Instance(det, self._runner_class, self.restrictions)
 
     def set_worker_level_failure_exception_types(
         self, types: Sequence[type[BaseException]]

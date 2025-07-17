@@ -1,4 +1,5 @@
 import warnings
+from typing import cast
 
 import pytest
 
@@ -7,6 +8,7 @@ import temporalio.worker
 from temporalio.client import Client, ClientConfig, OutboundInterceptor
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker, WorkerConfig
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 from tests.worker.test_worker import never_run_activity
 
 
@@ -64,6 +66,9 @@ class MyCombinedPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
 class MyWorkerPlugin(temporalio.worker.Plugin):
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         config["task_queue"] = "replaced_queue"
+        runner = config.get("workflow_runner")
+        if isinstance(runner, SandboxedWorkflowRunner):
+            runner.restrictions.passthrough_modules.add("my_module")
         return super().configure_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
@@ -111,3 +116,19 @@ async def test_worker_duplicated_plugin(client: Client) -> None:
 
     assert len(warning_list) == 1
     assert "The same plugin type" in str(warning_list[0].message)
+
+
+async def test_worker_sandbox_restrictions(client: Client) -> None:
+    with warnings.catch_warnings(record=True) as warning_list:
+        worker = Worker(
+            client,
+            task_queue="queue",
+            activities=[never_run_activity],
+            plugins=[MyWorkerPlugin()],
+        )
+    assert (
+        "my_module"
+        in cast(
+            SandboxedWorkflowRunner, worker.config().get("workflow_runner")
+        ).restrictions.passthrough_modules
+    )
