@@ -15,7 +15,6 @@ Pydantic v1 is not supported.
 
 from typing import Any, Optional, Type
 
-import pydantic.dataclasses
 from pydantic import TypeAdapter
 from pydantic_core import to_json
 
