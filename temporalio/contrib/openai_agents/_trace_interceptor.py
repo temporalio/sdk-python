@@ -199,7 +199,7 @@ class _ContextPropagationClientOutboundInterceptor(
             **({"temporal:workflowId": input.id} if input.id else {}),
         }
         data = {"workflowId": input.id} if input.id else None
-        span_name = f"temporal:startWorkflow"
+        span_name = "temporal:startWorkflow"
         if get_trace_provider().get_current_trace() is None:
             with trace(
                 span_name + ":" + input.workflow, metadata=metadata, group_id=input.id
@@ -218,7 +218,7 @@ class _ContextPropagationClientOutboundInterceptor(
             **({"temporal:workflowId": input.id} if input.id else {}),
         }
         data = {"workflowId": input.id, "query": input.query}
-        span_name = f"temporal:queryWorkflow"
+        span_name = "temporal:queryWorkflow"
         if get_trace_provider().get_current_trace() is None:
             with trace(span_name, metadata=metadata, group_id=input.id):
                 with custom_span(name=span_name, data=data):
@@ -237,7 +237,7 @@ class _ContextPropagationClientOutboundInterceptor(
             **({"temporal:workflowId": input.id} if input.id else {}),
         }
         data = {"workflowId": input.id, "signal": input.signal}
-        span_name = f"temporal:signalWorkflow"
+        span_name = "temporal:signalWorkflow"
         if get_trace_provider().get_current_trace() is None:
             with trace(span_name, metadata=metadata, group_id=input.id):
                 with custom_span(name=span_name, data=data):
@@ -337,7 +337,7 @@ class _ContextPropagationWorkflowOutboundInterceptor(
         self, input: temporalio.worker.SignalChildWorkflowInput
     ) -> None:
         with custom_span(
-            name=f"temporal:signalChildWorkflow",
+            name="temporal:signalChildWorkflow",
             data={"workflowId": input.child_workflow_id},
         ):
             set_header_from_context(input, temporalio.workflow.payload_converter())
@@ -347,7 +347,7 @@ class _ContextPropagationWorkflowOutboundInterceptor(
         self, input: temporalio.worker.SignalExternalWorkflowInput
     ) -> None:
         with custom_span(
-            name=f"temporal:signalExternalWorkflow",
+            name="temporal:signalExternalWorkflow",
             data={"workflowId": input.workflow_id},
         ):
             set_header_from_context(input, temporalio.workflow.payload_converter())
@@ -357,7 +357,7 @@ class _ContextPropagationWorkflowOutboundInterceptor(
         self, input: temporalio.worker.StartActivityInput
     ) -> temporalio.workflow.ActivityHandle:
         span = custom_span(
-            name=f"temporal:startActivity", data={"activity": input.activity}
+            name="temporal:startActivity", data={"activity": input.activity}
         )
         span.start(mark_as_current=True)
         set_header_from_context(input, temporalio.workflow.payload_converter())
@@ -369,7 +369,7 @@ class _ContextPropagationWorkflowOutboundInterceptor(
         self, input: temporalio.worker.StartChildWorkflowInput
     ) -> temporalio.workflow.ChildWorkflowHandle:
         span = custom_span(
-            name=f"temporal:startChildWorkflow", data={"workflow": input.workflow}
+            name="temporal:startChildWorkflow", data={"workflow": input.workflow}
         )
         span.start(mark_as_current=True)
         set_header_from_context(input, temporalio.workflow.payload_converter())
@@ -381,7 +381,7 @@ class _ContextPropagationWorkflowOutboundInterceptor(
         self, input: temporalio.worker.StartLocalActivityInput
     ) -> temporalio.workflow.ActivityHandle:
         span = custom_span(
-            name=f"temporal:startLocalActivity", data={"activity": input.activity}
+            name="temporal:startLocalActivity", data={"activity": input.activity}
         )
         span.start(mark_as_current=True)
         set_header_from_context(input, temporalio.workflow.payload_converter())
