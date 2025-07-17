@@ -147,28 +147,6 @@ class MyWorkflow2:
 @workflow.defn
 class MyWorkflow3:
     @workflow.run
-    async def test_invoke_by_operation_name_happy_path(self) -> None:
-        """
-        When a nexus client calls an operation by referencing an operation name, the
-        output type is inferred as Unknown.
-        """
-        nexus_client = workflow.create_nexus_client(
-            service=MyServiceHandler,
-            endpoint="fake-endpoint",
-        )
-        input = MyInput()
-        # TODO: mypy fails these since no type is inferred, so we're forced to add a
-        # `type: ignore`. As a result this function doesn't currently prove anything, but
-        # one can confirm the inferred type is Unknown in an IDE.
-        _output_1 = await nexus_client.execute_operation("my_sync_operation", input)  # type: ignore[var-annotated]
-        _output_2 = await nexus_client.execute_operation(  # type: ignore[var-annotated]
-            "my_workflow_run_operation", input
-        )
-
-
-@workflow.defn
-class MyWorkflow4:
-    @workflow.run
     async def test_invoke_by_operation_definition_wrong_input_type(self) -> None:
         """
         When a nexus client calls an operation by referencing an operation definition on
@@ -187,7 +165,7 @@ class MyWorkflow4:
 
 
 @workflow.defn
-class MyWorkflow5:
+class MyWorkflow4:
     @workflow.run
     async def test_invoke_by_operation_handler_wrong_input_type(self) -> None:
         """
@@ -207,7 +185,7 @@ class MyWorkflow5:
 
 
 @workflow.defn
-class MyWorkflow6:
+class MyWorkflow5:
     @workflow.run
     async def test_invoke_by_operation_handler_method_on_wrong_service(self) -> None:
         """
