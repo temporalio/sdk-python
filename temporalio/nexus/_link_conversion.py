@@ -23,7 +23,7 @@ LINK_EVENT_ID_PARAM_NAME = "eventID"
 LINK_EVENT_TYPE_PARAM_NAME = "eventType"
 
 
-def workflow_handle_to_workflow_execution_started_event_link(
+def workflow_execution_started_event_link_from_workflow_handle(
     handle: temporalio.client.WorkflowHandle[Any, Any],
 ) -> temporalio.api.common.v1.Link.WorkflowEvent:
     """Create a WorkflowEvent link corresponding to a started workflow"""
