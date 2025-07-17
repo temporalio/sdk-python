@@ -5,7 +5,6 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 
 import enum
 import json
-from pydantic.dataclasses import dataclass
 from typing import Any, Optional, Union, cast
 
 from agents import (
@@ -24,6 +23,7 @@ from agents import (
     WebSearchTool,
 )
 from agents.models.multi_provider import MultiProvider
+from pydantic.dataclasses import dataclass
 from typing_extensions import Required, TypedDict
 
 from temporalio import activity
