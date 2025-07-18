@@ -96,6 +96,9 @@ informal introduction to the features and their implementation.
       - [Testing](#testing-1)
     - [Interceptors](#interceptors)
     - [Nexus](#nexus)
+    - [Plugins](#plugins)
+      - [Client Plugins](#client-plugins)
+      - [Worker Plugins](#worker-plugins)
     - [Workflow Replay](#workflow-replay)
     - [Observability](#observability)
       - [Metrics](#metrics)
@@ -1480,6 +1483,140 @@ https://github.com/temporalio/samples-python/tree/nexus/hello_nexus).
             sync_result = await sync_operation_handle
             return sync_result, wf_result
     ```
+
+
+### Plugins
+
+Plugins provide a way to extend and customize the behavior of Temporal clients and workers through a chain of 
+responsibility pattern. They allow you to intercept and modify client creation, service connections, worker 
+configuration, and worker execution. Common customizations may include but are not limited to:
+
+1. DataConverter
+2. Activities
+3. Workflows
+4. Interceptors
+
+A single plugin class can implement both client and worker plugin interfaces to share common logic between both 
+contexts. When used with a client, it will automatically be propagated to any workers created with that client.
+
+#### Client Plugins
+
+Client plugins can intercept and modify client configuration and service connections. They are useful for adding 
+authentication, modifying connection parameters, or adding custom behavior during client creation.
+
+Here's an example of a client plugin that adds custom authentication:
+
+```python
+from temporalio.client import Plugin, ClientConfig
+import temporalio.service
+
+class AuthenticationPlugin(Plugin):
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
+        # Modify client configuration
+        config["namespace"] = "my-secure-namespace"
+        return super().configure_client(config)
+
+    async def connect_service_client(
+        self, config: temporalio.service.ConnectConfig
+    ) -> temporalio.service.ServiceClient:
+        # Add authentication to the connection
+        config.api_key = self.api_key
+        return await super().connect_service_client(config)
+
+# Use the plugin when connecting
+client = await Client.connect(
+    "my-server.com:7233",
+    plugins=[AuthenticationPlugin("my-api-key")]
+)
+```
+
+#### Worker Plugins
+
+Worker plugins can modify worker configuration and intercept worker execution. They are useful for adding monitoring, 
+custom lifecycle management, or modifying worker settings.
+
+Here's an example of a worker plugin that adds custom monitoring:
+
+```python
+from temporalio.worker import Plugin, WorkerConfig, Worker
+import logging
+
+class MonitoringPlugin(Plugin):
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+        # Modify worker configuration
+        original_task_queue = config["task_queue"]
+        config["task_queue"] = f"monitored-{original_task_queue}"
+        self.logger.info(f"Worker created for task queue: {config['task_queue']}")
+        return super().configure_worker(config)
+
+    async def run_worker(self, worker: Worker) -> None:
+        self.logger.info("Starting worker execution")
+        try:
+            await super().run_worker(worker)
+        finally:
+            self.logger.info("Worker execution completed")
+
+# Use the plugin when creating a worker
+worker = Worker(
+    client,
+    task_queue="my-task-queue",
+    workflows=[MyWorkflow],
+    activities=[my_activity],
+    plugins=[MonitoringPlugin()]
+)
+```
+
+For plugins that need to work with both clients and workers, you can implement both interfaces in a single class:
+
+```python
+from temporalio.client import Plugin as ClientPlugin, ClientConfig
+from temporalio.worker import Plugin as WorkerPlugin, WorkerConfig
+
+
+class UnifiedPlugin(ClientPlugin, WorkerPlugin):
+  def configure_client(self, config: ClientConfig) -> ClientConfig:
+    # Client-side customization
+    config["namespace"] = "unified-namespace"
+    return super().configure_client(config)
+
+  def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+    # Worker-side customization
+    config["max_cached_workflows"] = 500
+    return super().configure_worker(config)
+
+  async def run_worker(self, worker: Worker) -> None:
+    print("Starting unified worker")
+    await super().run_worker(worker)
+
+
+# Create client with the unified plugin
+client = await Client.connect(
+  "localhost:7233",
+  plugins=[UnifiedPlugin()]
+)
+
+# Worker will automatically inherit the plugin from the client
+worker = Worker(
+  client,
+  task_queue="my-task-queue",
+  workflows=[MyWorkflow],
+  activities=[my_activity]
+)
+```
+
+**Important Notes:**
+
+- Plugins are executed in reverse order (last plugin wraps the first), forming a chain of responsibility
+- Client plugins that also implement worker plugin interfaces are automatically propagated to workers
+- Avoid providing the same plugin to both client and worker to prevent double execution
+- Plugin methods should call `super()` to maintain the plugin chain
+- Each plugin's `name()` method returns a unique identifier for debugging purposes
 
 
 ### Workflow Replay

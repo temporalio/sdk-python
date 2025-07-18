@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Sequence, Type
 
@@ -52,27 +53,20 @@ _fake_info = temporalio.workflow.Info(
 )
 
 
+@dataclass(frozen=True)
 class SandboxedWorkflowRunner(WorkflowRunner):
     """Runner for workflows in a sandbox."""
 
-    def __init__(
-        self,
-        *,
-        restrictions: SandboxRestrictions = SandboxRestrictions.default,
-        runner_class: Type[WorkflowRunner] = UnsandboxedWorkflowRunner,
-    ) -> None:
-        """Create the sandboxed workflow runner.
+    restrictions: SandboxRestrictions = SandboxRestrictions.default
+    """Set of restrictions to apply to this sandbox"""
 
-        Args:
-            restrictions: Set of restrictions to apply to this sandbox.
-            runner_class: The class for underlying runner the sandbox will
-                instantiate and  use to run workflows. Note, this class is
-                re-imported and instantiated for *each* workflow run.
-        """
-        super().__init__()
-        self._runner_class = runner_class
-        self._restrictions = restrictions
-        self._worker_level_failure_exception_types: Sequence[type[BaseException]] = []
+    runner_class: Type[WorkflowRunner] = UnsandboxedWorkflowRunner
+    """The class for underlying runner the sandbox will instantiate and  use to run workflows. Note, this class is
+    re-imported and instantiated for *each* workflow run."""
+
+    _worker_level_failure_exception_types: Sequence[type[BaseException]] = field(
+        default_factory=list, init=False
+    )
 
     def prepare_workflow(self, defn: temporalio.workflow._Definition) -> None:
         """Implements :py:meth:`WorkflowRunner.prepare_workflow`."""
@@ -94,13 +88,13 @@ class SandboxedWorkflowRunner(WorkflowRunner):
 
     def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
         """Implements :py:meth:`WorkflowRunner.create_instance`."""
-        return _Instance(det, self._runner_class, self._restrictions)
+        return _Instance(det, self.runner_class, self.restrictions)
 
     def set_worker_level_failure_exception_types(
         self, types: Sequence[type[BaseException]]
     ) -> None:
         """Implements :py:meth:`WorkflowRunner.set_worker_level_failure_exception_types`."""
-        self._worker_level_failure_exception_types = types
+        object.__setattr__(self, "_worker_level_failure_exception_types", types)
 
 
 # Implements in_sandbox._ExternEnvironment. Some of these calls are called from
