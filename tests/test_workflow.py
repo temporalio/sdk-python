@@ -225,7 +225,8 @@ class BadDefn(BadDefnBase):
         pass
 
     # Intentionally missing decorator
-    def base_update(self):
+    # assert-type-error-pyright: "overrides symbol of same name"
+    def base_update(self):  # type: ignore
         pass
 
 
@@ -288,7 +289,8 @@ class NonAsyncRun:
 
 def test_workflow_defn_non_async_run():
     with pytest.raises(ValueError) as err:
-        workflow.run(NonAsyncRun.run)
+        # assert-type-error-pyright: "Argument .+ cannot be assigned to parameter"
+        workflow.run(NonAsyncRun.run)  # type: ignore
     assert "must be an async function" in str(err.value)
 
 
@@ -451,6 +453,7 @@ class BadUpdateValidator:
     def my_update(self, a: str):
         pass
 
+    # assert-type-error-pyright: "Argument of type .+ cannot be assigned to parameter"
     @my_update.validator  # type: ignore
     def my_validator(self, a: int):
         pass

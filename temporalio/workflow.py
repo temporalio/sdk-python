@@ -5280,13 +5280,16 @@ class NexusClient(ABC, Generic[ServiceT]):
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
 
+    # TODO(nexus-preview): in practice, both these overloads match an async def sync
+    # operation (i.e. either can be deleted without causing a type error).
+
     # Overload for sync_operation methods (async def)
     @overload
     @abstractmethod
     async def execute_operation(
         self,
         operation: Callable[
-            [ServiceHandlerT, nexusrpc.handler.StartOperationContext, InputT],
+            [ServiceT, nexusrpc.handler.StartOperationContext, InputT],
             Awaitable[OutputT],
         ],
         input: InputT,
@@ -5302,7 +5305,7 @@ class NexusClient(ABC, Generic[ServiceT]):
     async def execute_operation(
         self,
         operation: Callable[
-            [ServiceHandlerT, nexusrpc.handler.StartOperationContext, InputT],
+            [ServiceT, nexusrpc.handler.StartOperationContext, InputT],
             OutputT,
         ],
         input: InputT,
