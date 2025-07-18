@@ -53,7 +53,7 @@ _fake_info = temporalio.workflow.Info(
 )
 
 
-@dataclass
+@dataclass(frozen=True)
 class SandboxedWorkflowRunner(WorkflowRunner):
     """Runner for workflows in a sandbox."""
 
