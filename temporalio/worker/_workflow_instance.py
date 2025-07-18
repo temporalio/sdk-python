@@ -44,6 +44,8 @@ from typing import (
 )
 
 import nexusrpc.handler
+import xray
+from google.protobuf.json_format import MessageToJson
 from nexusrpc import InputT, OutputT
 from typing_extensions import Self, TypeAlias, TypedDict
 
@@ -355,10 +357,30 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     # "_make_workflow_input", all other calls are "_apply_" + the job field
     # name.
 
+    # The commented code below had line numbers, which are now removed.
+
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
-        print("activate -------------------------------------------------------------")
+        with xray.start_as_current_span(
+            actor=xray.Actor.WORKFLOW_USER,
+            workflow_id=self._info.workflow_id,
+            name="handle_activation",
+            request_payload=MessageToJson(act),
+        ) as span:
+            print(
+                f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> WFT {self._info.workflow_id}\n"
+            )
+
+            completion = self._activate(act)
+            print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+            if span:
+                span.set_attribute("sdk.response.payload", MessageToJson(completion))
+        return completion
+
+    def _activate(
+        self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
+    ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
         # Reset current completion, time, and whether replaying
         self._current_completion = (
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()

@@ -14,6 +14,7 @@ dependencies = [
     "nexus-rpc>=1.1.0",
     "protobuf>=3.20,<6",
     "python-dateutil>=2.8.2,<3 ; python_version < '3.11'",
+    "temporalio-xray",
     "types-protobuf>=3.20",
     "typing-extensions>=4.2.0,<5",
 ]
@@ -233,3 +234,4 @@ package = false
 
 [tool.uv.sources]
 nexus-rpc = { git = "https://github.com/nexus-rpc/sdk-python.git", rev = "35f574c711193a6e2560d3e6665732a5bb7ae92c" }
+temporalio-xray = { path = "../xray/sdks/python" }
