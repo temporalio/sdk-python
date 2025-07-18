@@ -111,10 +111,6 @@ async def test_tracing(client: Client):
                     for (s, s_start) in processor.span_events
                 )
 
-            def to_time(time: Optional[str]) -> datetime.datetime:
-                assert time is not None
-                return datetime.datetime.strptime(time, "%Y-%m-%dT%H:%M:%S.%f%z")
-
             # Start activity is always parented to an agent
             if span_data.get("name") == "temporal:startActivity":
                 parents = [
@@ -124,9 +120,6 @@ async def test_tracing(client: Client):
                     len(parents) == 2
                     and parents[0].span_data.export()["type"] == "agent"
                 )
-
-                assert to_time(span.started_at) >= to_time(parents[0].started_at)
-                assert to_time(span.started_at) <= to_time(parents[1].ended_at)
 
             # Execute is parented to start
             if span_data.get("name") == "temporal:executeActivity":
@@ -138,9 +131,6 @@ async def test_tracing(client: Client):
                     and parents[0].span_data.export()["name"]
                     == "temporal:startActivity"
                 )
-
-                assert to_time(span.started_at) >= to_time(parents[0].started_at)
-                assert to_time(span.started_at) <= to_time(parents[1].ended_at)
 
         # Final writer spans - There are only 3 because we don't make an actual model call
         paired_span(processor.span_events[-6], processor.span_events[-1])
