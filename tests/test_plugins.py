@@ -1,3 +1,4 @@
+import dataclasses
 import warnings
 from typing import cast
 
@@ -68,7 +69,10 @@ class MyWorkerPlugin(temporalio.worker.Plugin):
         config["task_queue"] = "replaced_queue"
         runner = config.get("workflow_runner")
         if isinstance(runner, SandboxedWorkflowRunner):
-            runner.restrictions.passthrough_modules.add("my_module")
+            config["workflow_runner"] = dataclasses.replace(
+                runner,
+                restrictions=runner.restrictions.with_passthrough_modules("my_module"),
+            )
         return super().configure_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
