@@ -5118,29 +5118,25 @@ ServiceT = TypeVar("ServiceT")
 
 
 class NexusOperationCancellationType(IntEnum):
-    """Defines behavior of the parent workflow when CancellationScope that wraps Nexus operation
-    is canceled. The result of the cancellation independently of the type is a
-    CanceledFailure thrown from the Nexus operation method. If the caller exits without waiting, the
-    cancellation request may not be delivered to the handler, regardless of indicated cancellation
-    type.
-    """
+    """Controls at which point to report back to lang when a nexus operation is
+    cancelled."""
 
-    WAIT_COMPLETED = 0
-    """Wait for operation completion. Operation may or may not complete as cancelled. Default."""
+    WAIT_CANCELLATION_COMPLETED = 0
+    """Wait for operation cancellation completion. Default."""
 
     ABANDON = 1
-    """Do not request cancellation of the operation."""
+    """Do not request cancellation of the nexus operation if already scheduled."""
 
     TRY_CANCEL = 2
-    """Initiate a cancellation request and immediately report cancellation to the caller. Note that it
-    doesn't guarantee that cancellation is delivered to the operation handler if the caller exits
-    before the delivery is done.
-    """
+    """Initiate a cancellation request for the Nexus operation and immediately report
+    cancellation to the caller. Note that it doesn't guarantee that cancellation is
+    delivered to the operation if calling workflow exits before the delivery is done. If
+    you want to ensure that cancellation is delivered to the operation, use
+    WAIT_CANCELLATION_REQUESTED."""
 
-    WAIT_REQUESTED = 3
-    """Request cancellation of the operation and wait for confirmation that the request was received.
-    Doesn't wait for actual cancellation.
-    """
+    WAIT_CANCELLATION_REQUESTED = 3
+    """Request cancellation of the operation and wait for confirmation that the request
+    was received."""
 
 
 class NexusClient(ABC, Generic[ServiceT]):
