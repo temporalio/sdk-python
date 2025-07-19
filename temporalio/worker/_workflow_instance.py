@@ -54,13 +54,13 @@ import temporalio.api.sdk.v1
 import temporalio.bridge.proto.activity_result
 import temporalio.bridge.proto.child_workflow
 import temporalio.bridge.proto.common
+import temporalio.bridge.proto.nexus
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_commands
 import temporalio.bridge.proto.workflow_completion
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
-import temporalio.nexus
 import temporalio.workflow
 from temporalio.service import __version__
 
@@ -1502,9 +1502,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         service: str,
         operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
         input: Any,
-        output_type: Optional[Type[OutputT]] = None,
-        schedule_to_close_timeout: Optional[timedelta] = None,
-        headers: Optional[Mapping[str, str]] = None,
+        output_type: Optional[Type[OutputT]],
+        schedule_to_close_timeout: Optional[timedelta],
+        cancellation_type: temporalio.workflow.NexusOperationCancellationType,
+        headers: Optional[Mapping[str, str]],
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
         # start_nexus_operation
         return await self._outbound.start_nexus_operation(
@@ -1515,6 +1516,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 input=input,
                 output_type=output_type,
                 schedule_to_close_timeout=schedule_to_close_timeout,
+                cancellation_type=cancellation_type,
                 headers=headers,
             )
         )
@@ -2757,7 +2759,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         if self._input.retry_policy:
             self._input.retry_policy.apply_to_proto(v.retry_policy)
         v.cancellation_type = cast(
-            "temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType",
+            temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType,
             int(self._input.cancellation_type),
         )
 
@@ -2893,7 +2895,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         if self._input.task_timeout:
             v.workflow_task_timeout.FromTimedelta(self._input.task_timeout)
         v.parent_close_policy = cast(
-            "temporalio.bridge.proto.child_workflow.ParentClosePolicy.ValueType",
+            temporalio.bridge.proto.child_workflow.ParentClosePolicy.ValueType,
             int(self._input.parent_close_policy),
         )
         v.workflow_id_reuse_policy = cast(
@@ -2915,7 +2917,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
                 self._input.search_attributes, v.search_attributes
             )
         v.cancellation_type = cast(
-            "temporalio.bridge.proto.child_workflow.ChildWorkflowCancellationType.ValueType",
+            temporalio.bridge.proto.child_workflow.ChildWorkflowCancellationType.ValueType,
             int(self._input.cancellation_type),
         )
         if self._input.versioning_intent:
@@ -3011,11 +3013,6 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
 
     @property
     def operation_token(self) -> Optional[str]:
-        # TODO(nexus-preview): How should this behave?
-        # Java has a separate class that only exists if the operation token exists:
-        # https://github.com/temporalio/sdk-java/blob/master/temporal-sdk/src/main/java/io/temporal/internal/sync/NexusOperationExecutionImpl.java#L26
-        # And Go similar:
-        # https://github.com/temporalio/sdk-go/blob/master/internal/workflow.go#L2770-L2771
         try:
             return self._start_fut.result()
         except BaseException:
@@ -3064,6 +3061,11 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
             v.schedule_to_close_timeout.FromTimedelta(
                 self._input.schedule_to_close_timeout
             )
+        v.cancellation_type = cast(
+            temporalio.bridge.proto.nexus.NexusOperationCancellationType.ValueType,
+            int(self._input.cancellation_type),
+        )
+
         if self._input.headers:
             for key, val in self._input.headers.items():
                 v.nexus_header[key] = val
