@@ -5117,6 +5117,32 @@ class VersioningIntent(Enum):
 ServiceT = TypeVar("ServiceT")
 
 
+class NexusOperationCancellationType(IntEnum):
+    """Defines behavior of the parent workflow when CancellationScope that wraps Nexus operation
+    is canceled. The result of the cancellation independently of the type is a
+    CanceledFailure thrown from the Nexus operation method. If the caller exits without waiting, the
+    cancellation request may not be delivered to the handler, regardless of indicated cancellation
+    type.
+    """
+
+    WAIT_COMPLETED = 0
+    """Wait for operation completion. Operation may or may not complete as cancelled. Default."""
+
+    ABANDON = 1
+    """Do not request cancellation of the operation."""
+
+    TRY_CANCEL = 2
+    """Initiate a cancellation request and immediately report cancellation to the caller. Note that it
+    doesn't guarantee that cancellation is delivered to the operation handler if the caller exits
+    before the delivery is done.
+    """
+
+    WAIT_REQUESTED = 3
+    """Request cancellation of the operation and wait for confirmation that the request was received.
+    Doesn't wait for actual cancellation.
+    """
+
+
 class NexusClient(ABC, Generic[ServiceT]):
     """A client for invoking Nexus operations.
 
