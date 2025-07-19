@@ -225,8 +225,7 @@ class BadDefn(BadDefnBase):
         pass
 
     # Intentionally missing decorator
-    # assert-type-error-pyright: "overrides symbol of same name"
-    def base_update(self):  # type: ignore
+    def base_update(self):  # type: ignore[reportIncompatibleVariableOverride]
         pass
 
 
@@ -289,7 +288,7 @@ class NonAsyncRun:
 
 def test_workflow_defn_non_async_run():
     with pytest.raises(ValueError) as err:
-        # assert-type-error-pyright: "Argument .+ cannot be assigned to parameter"
+        # assert-type-error-pyright: 'Argument .+ cannot be assigned to parameter "fn"'
         workflow.run(NonAsyncRun.run)  # type: ignore
     assert "must be an async function" in str(err.value)
 
@@ -351,10 +350,10 @@ class BadDynamic:
     def some_dynamic1(self):
         pass
 
-    def some_dynamic2(self, no_vararg):
+    def some_dynamic2(self, no_vararg):  # type: ignore[reportMissingParameterType]
         pass
 
-    def old_dynamic(self, name, *args):
+    def old_dynamic(self, name, *args):  # type: ignore[reportMissingParameterType]
         pass
 
 
@@ -384,10 +383,10 @@ def test_workflow_defn_dynamic_handler_warnings():
 
 
 class _TestParametersIdenticalUpToNaming:
-    def a1(self, a):
+    def a1(self, a):  # type: ignore[reportMissingParameterType]
         pass
 
-    def a2(self, b):
+    def a2(self, b):  # type: ignore[reportMissingParameterType]
         pass
 
     def b1(self, a: int):
@@ -402,19 +401,19 @@ class _TestParametersIdenticalUpToNaming:
     def c2(self, b1: int, b2: str) -> int:
         return 0
 
-    def d1(self, a1, a2: str) -> None:
+    def d1(self, a1, a2: str) -> None:  # type: ignore[reportMissingParameterType]
         pass
 
-    def d2(self, b1, b2: str) -> str:
+    def d2(self, b1, b2: str) -> str:  # type: ignore[reportMissingParameterType]
         return ""
 
-    def e1(self, a1, a2: str = "") -> None:
+    def e1(self, a1, a2: str = "") -> None:  # type: ignore[reportMissingParameterType]
         return None
 
-    def e2(self, b1, b2: str = "") -> str:
+    def e2(self, b1, b2: str = "") -> str:  # type: ignore[reportMissingParameterType]
         return ""
 
-    def f1(self, a1, a2: str = "a") -> None:
+    def f1(self, a1, a2: str = "a") -> None:  # type: ignore[reportMissingParameterType]
         return None
 
 

@@ -44,6 +44,8 @@ from typing import (
 )
 
 import nexusrpc.handler
+import xray
+from google.protobuf.json_format import MessageToJson
 from nexusrpc import InputT, OutputT
 from typing_extensions import Self, TypeAlias, TypedDict
 
@@ -197,7 +199,7 @@ _Context: TypeAlias = Dict[str, Any]
 _ExceptionHandler: TypeAlias = Callable[[asyncio.AbstractEventLoop, _Context], Any]
 
 
-class _WorkflowInstanceImpl(
+class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     WorkflowInstance, temporalio.workflow._Runtime, asyncio.AbstractEventLoop
 ):
     def __init__(self, det: WorkflowInstanceDetails) -> None:
@@ -355,7 +357,28 @@ class _WorkflowInstanceImpl(
     # "_make_workflow_input", all other calls are "_apply_" + the job field
     # name.
 
+    # The commented code below had line numbers, which are now removed.
+
     def activate(
+        self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
+    ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
+        with xray.start_as_current_span(
+            actor=xray.Actor.WORKFLOW_USER,
+            workflow_id=self._info.workflow_id,
+            name="handle_activation",
+            request_payload=MessageToJson(act),
+        ) as span:
+            print(
+                f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> WFT {self._info.workflow_id}\n"
+            )
+
+            completion = self._activate(act)
+            print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+            if span:
+                span.set_attribute("sdk.response.payload", MessageToJson(completion))
+        return completion
+
+    def _activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
         # Reset current completion, time, and whether replaying
@@ -490,6 +513,7 @@ class _WorkflowInstanceImpl(
     def _apply(
         self, job: temporalio.bridge.proto.workflow_activation.WorkflowActivationJob
     ) -> None:
+        print("job", job.WhichOneof("variant"))
         if job.HasField("cancel_workflow"):
             self._apply_cancel_workflow(job.cancel_workflow)
         elif job.HasField("do_update"):

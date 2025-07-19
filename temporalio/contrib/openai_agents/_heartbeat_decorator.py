@@ -10,7 +10,7 @@ F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 def _auto_heartbeater(fn: F) -> F:
     # Propagate type hints from the original callable.
     @wraps(fn)
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
         heartbeat_timeout = activity.info().heartbeat_timeout
         heartbeat_task = None
         if heartbeat_timeout:

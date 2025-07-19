@@ -205,7 +205,7 @@ def test_load_profile_disable_env(base_config_file: Path):
     assert config.get("target_host") == "default-address"
 
 
-def test_load_profile_disable_file(monkeypatch):
+def test_load_profile_disable_file(monkeypatch):  # type: ignore[reportMissingParameterType]
     """Test that `disable_file` loads configuration only from environment."""
     monkeypatch.setattr("pathlib.Path.exists", lambda _: False)
     env = {"TEMPORAL_ADDRESS": "env-address"}
@@ -268,7 +268,7 @@ def test_load_profiles_no_env_override(tmp_path: Path, monkeypatch):
     assert connect_config.get("target_host") == "default-address"
 
 
-def test_load_profiles_no_config_file(monkeypatch):
+def test_load_profiles_no_config_file(monkeypatch):  # type: ignore[reportMissingParameterType]
     """Test that load_profiles works when no config file is found."""
     monkeypatch.setattr("pathlib.Path.exists", lambda _: False)
     monkeypatch.setattr(os, "environ", {})
@@ -276,7 +276,7 @@ def test_load_profiles_no_config_file(monkeypatch):
     assert not client_config.profiles
 
 
-def test_load_profiles_discovery(tmp_path: Path, monkeypatch):
+def test_load_profiles_discovery(tmp_path: Path, monkeypatch):  # type: ignore[reportMissingParameterType]
     """Test file discovery via environment variables."""
     config_file = tmp_path / "config.toml"
     config_file.write_text(TOML_CONFIG_BASE)
