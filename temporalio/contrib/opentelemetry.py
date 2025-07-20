@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
+import dataclasses
+import functools
+import inspect
 from typing import (
     Any,
     Callable,
@@ -17,6 +20,7 @@ from typing import (
     cast,
 )
 
+import concurrent.futures
 import opentelemetry.baggage.propagation
 import opentelemetry.context
 import opentelemetry.context.context
@@ -293,7 +297,44 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
             },
             kind=opentelemetry.trace.SpanKind.SERVER,
         ):
+            # Propagate trace_context into synchronous activities running in
+            # ProcessPoolExecutor
+            is_async = inspect.iscoroutinefunction(
+                input.fn
+            ) or inspect.iscoroutinefunction(input.fn.__call__)
+            is_threadpool_executor = isinstance(
+                input.executor, concurrent.futures.ThreadPoolExecutor
+            )
+            if not (is_async or is_threadpool_executor):
+                carrier = {}
+                default_text_map_propagator.inject(carrier)
+                input.fn = ActivityFnWithTraceContext(input.fn, carrier)
+
             return await super().execute_activity(input)
+
+
+# Note: the activity function must be picklable to pass to the ProcessPoolExecutor.
+# We wrap the original function to propagate the trace context as transparently
+# as possible (otherwise _ActivityInboundImpl would need to be modified to pass
+# trace context as an extra arg).
+@dataclasses.dataclass
+class ActivityFnWithTraceContext:
+    fn: Callable[..., Any]
+    context: _CarrierDict
+
+    def __post_init__(self):
+        # Preserve the original function's metadata to support reflection.
+        # Downstream interceptors may inspect these attributes (__module__, __name__, etc.)
+        # e.g. SentryInterceptor in the Python Samples
+        functools.wraps(self.fn)(self)
+
+    def __call__(self, *args: Any, **kwargs: Any):
+        trace_context = default_text_map_propagator.extract(self.context)
+        token = opentelemetry.context.attach(trace_context)
+        try:
+            return self.fn(*args, **kwargs)
+        finally:
+            opentelemetry.context.detach(token)
 
 
 class _InputWithHeaders(Protocol):

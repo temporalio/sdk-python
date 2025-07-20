@@ -11,11 +11,11 @@ from datetime import timedelta
 from typing import Iterable, List, Optional
 
 import concurrent.futures
+import opentelemetry.trace
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import get_tracer, get_current_span
-from opentelemetry.context import get_current
 
 from temporalio import activity, workflow
 from temporalio.worker import SharedStateManager
@@ -440,6 +440,9 @@ async def test_activity_trace_propagation(
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     tracer = get_tracer(__name__, tracer_provider=provider)
 
+    # def initializer() -> None:
+    opentelemetry.trace.set_tracer_provider(provider)
+
     # Create a worker with an process pool activity executor
     async with Worker(
         client,
@@ -447,7 +450,9 @@ async def test_activity_trace_propagation(
         workflows=[ActivityTracePropagationWorkflow],
         activities=[sync_activity],
         interceptors=[TracingInterceptor(tracer)],
-        activity_executor=concurrent.futures.ProcessPoolExecutor(max_workers=1),
+        activity_executor=concurrent.futures.ProcessPoolExecutor(
+            max_workers=1  # , initializer=initializer
+        ),
         shared_state_manager=SharedStateManager.create_from_multiprocessing(
             multiprocessing.Manager()
         ),
