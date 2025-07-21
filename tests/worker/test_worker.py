@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import sys
 import uuid
 from datetime import timedelta
 from typing import Any, Awaitable, Callable, Optional, Sequence
 from urllib.request import urlopen
 
 import temporalio.api.enums.v1
+import temporalio.client
 import temporalio.worker._worker
 from temporalio import activity, workflow
 from temporalio.api.workflowservice.v1 import (
@@ -19,7 +19,11 @@ from temporalio.api.workflowservice.v1 import (
     SetWorkerDeploymentRampingVersionRequest,
     SetWorkerDeploymentRampingVersionResponse,
 )
-from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
+from temporalio.client import (
+    BuildIdOpAddNewDefault,
+    Client,
+    TaskReachabilityType,
+)
 from temporalio.common import PinnedVersioningOverride, RawValue, VersioningBehavior
 from temporalio.runtime import PrometheusConfig, Runtime, TelemetryConfig
 from temporalio.service import RPCError
@@ -38,6 +42,7 @@ from temporalio.worker import (
     SlotReleaseContext,
     SlotReserveContext,
     Worker,
+    WorkerConfig,
     WorkerDeploymentConfig,
     WorkerDeploymentVersion,
     WorkerTuner,
