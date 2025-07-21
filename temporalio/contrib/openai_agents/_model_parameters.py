@@ -23,10 +23,10 @@ class ModelActivityParameters:
     schedule_to_close_timeout: Optional[timedelta] = None
     """Maximum time from scheduling to completion."""
 
-    schedule_to_start_timeout: Optional[timedelta] = timedelta(seconds=60)
+    schedule_to_start_timeout: Optional[timedelta] = None
     """Maximum time from scheduling to starting."""
 
-    start_to_close_timeout: Optional[timedelta] = None
+    start_to_close_timeout: Optional[timedelta] = timedelta(seconds=60)
     """Maximum time for the activity to complete."""
 
     heartbeat_timeout: Optional[timedelta] = None
