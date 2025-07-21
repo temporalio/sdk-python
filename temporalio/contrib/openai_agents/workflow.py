@@ -134,7 +134,7 @@ def activity_as_tool(
             cancellation_type=cancellation_type,
             activity_id=activity_id,
             versioning_intent=versioning_intent,
-            summary=summary,
+            summary=summary or schema.description,
             priority=priority,
         )
         try:

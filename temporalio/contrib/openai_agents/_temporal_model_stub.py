@@ -3,6 +3,12 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+from openai.types.responses import (
+    ResponseOutputMessage,
+    ResponseOutputText,
+    ResponseOutputTextParam,
+)
+
 from temporalio import workflow
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 
@@ -54,7 +60,7 @@ class _TemporalModelStub(Model):
     async def get_response(
         self,
         system_instructions: Optional[str],
-        input: Union[str, list[TResponseInputItem], dict[str, str]],
+        input: Union[str, list[TResponseInputItem]],
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: Optional[AgentOutputSchemaBase],
@@ -65,7 +71,7 @@ class _TemporalModelStub(Model):
         prompt: Optional[ResponsePromptParam],
     ) -> ModelResponse:
         def get_summary(
-            input: Union[str, list[TResponseInputItem], dict[str, str]],
+            input: Union[str, list[TResponseInputItem]],
         ) -> str:
             ### Activity summary shown in the UI
             try:
@@ -73,15 +79,22 @@ class _TemporalModelStub(Model):
                 if isinstance(input, str):
                     return input[:max_size]
                 elif isinstance(input, list):
-                    seq_input = cast(Sequence[Any], input)
-                    last_item = seq_input[-1]
-                    if isinstance(last_item, dict):
-                        return last_item.get("content", "")[:max_size]
-                    elif hasattr(last_item, "content"):
-                        return str(getattr(last_item, "content"))[:max_size]
-                    return str(last_item)[:max_size]
-                elif isinstance(input, dict):
-                    return input.get("content", "")[:max_size]
+                    content: Any = [
+                        item
+                        for item in input
+                        if (item.get("type") or "message") == "message"
+                    ][-1]
+                    if isinstance(content, dict):
+                        content = content.get("content", "")
+                    elif hasattr(content, "content"):
+                        content = getattr(content, "content")
+
+                    if isinstance(content, list):
+                        content = content[-1]
+
+                    if isinstance(content, dict) and content.get("text") is not None:
+                        content = content.get("text")
+                    return str(content)[:max_size]
             except Exception as e:
                 logger.error(f"Error getting summary: {e}")
             return ""
