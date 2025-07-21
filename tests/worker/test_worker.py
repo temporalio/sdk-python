@@ -1192,17 +1192,17 @@ class PollFailureInjector:
 
 
 class MyCombinedPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
-    def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         print("Create worker combined plugin")
         config["task_queue"] = "combined"
-        return super().on_create_worker(config)
+        return super().configure_worker(config)
 
 
 class MyWorkerPlugin(temporalio.worker.Plugin):
-    def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         print("Create worker worker plugin")
         config["task_queue"] = "replaced_queue"
-        return super().on_create_worker(config)
+        return super().configure_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
         await super().run_worker(worker)

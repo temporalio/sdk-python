@@ -1504,9 +1504,9 @@ async def test_cloud_client_simple():
 
 
 class MyPlugin(Plugin):
-    def on_create_client(self, config: ClientConfig) -> ClientConfig:
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
         config["namespace"] = "replaced_namespace"
-        return super().on_create_client(config)
+        return super().configure_client(config)
 
     async def connect_service_client(
         self, config: temporalio.service.ConnectConfig

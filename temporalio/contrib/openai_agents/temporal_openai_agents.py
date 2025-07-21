@@ -36,6 +36,7 @@ from temporalio.contrib.openai_agents._trace_interceptor import (
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker, WorkerConfig
 
+
 @contextmanager
 def set_open_ai_agent_temporal_overrides(
     model_params: Optional[ModelActivityParameters] = None,
@@ -142,20 +143,104 @@ class TestModel(Model):
         """Get a streamed response from the model. Unimplemented."""
         raise NotImplementedError()
 
+
 class Plugin(temporalio.client.Plugin, temporalio.worker.Plugin):
+    """Temporal plugin for integrating OpenAI agents with Temporal workflows.
+
+    .. warning::
+        This class is experimental and may change in future versions.
+        Use with caution in production environments.
+
+    This plugin provides seamless integration between the OpenAI Agents SDK and
+    Temporal workflows. It automatically configures the necessary interceptors,
+    activities, and data converters to enable OpenAI agents to run within
+    Temporal workflows with proper tracing and model execution.
+
+    The plugin:
+    1. Configures the Pydantic data converter for type-safe serialization
+    2. Sets up tracing interceptors for OpenAI agent interactions
+    3. Registers model execution activities
+    4. Manages the OpenAI agent runtime overrides during worker execution
+
+    Args:
+        model_params: Configuration parameters for Temporal activity execution
+            of model calls. If None, default parameters will be used.
+        model_provider: Optional model provider for custom model implementations.
+            Useful for testing or custom model integrations.
+
+    Example:
+        >>> from temporalio.client import Client
+        >>> from temporalio.worker import Worker
+        >>> from temporalio.contrib.openai_agents import Plugin, ModelActivityParameters
+        >>> from datetime import timedelta
+        >>>
+        >>> # Configure model parameters
+        >>> model_params = ModelActivityParameters(
+        ...     start_to_close_timeout=timedelta(seconds=30),
+        ...     retry_policy=RetryPolicy(maximum_attempts=3)
+        ... )
+        >>>
+        >>> # Create plugin
+        >>> plugin = Plugin(model_params=model_params)
+        >>>
+        >>> # Use with client and worker
+        >>> client = await Client.connect(
+        ...     "localhost:7233",
+        ...     plugins=[plugin]
+        ... )
+        >>> worker = Worker(
+        ...     client,
+        ...     task_queue="my-task-queue",
+        ...     workflows=[MyWorkflow],
+        ...     plugins=[plugin]
+        ... )
+    """
+
     def __init__(
         self,
         model_params: Optional[ModelActivityParameters] = None,
         model_provider: Optional[ModelProvider] = None,
     ) -> None:
+        """Initialize the OpenAI agents plugin.
+
+        Args:
+            model_params: Configuration parameters for Temporal activity execution
+                of model calls. If None, default parameters will be used.
+            model_provider: Optional model provider for custom model implementations.
+                Useful for testing or custom model integrations.
+        """
         self._model_params = model_params
         self._model_provider = model_provider
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
+        """Configure the Temporal client for OpenAI agents integration.
+
+        This method sets up the Pydantic data converter to enable proper
+        serialization of OpenAI agent objects and responses.
+
+        Args:
+            config: The client configuration to modify.
+
+        Returns:
+            The modified client configuration.
+        """
         config["data_converter"] = pydantic_data_converter
         return super().configure_client(config)
 
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+        """Configure the Temporal worker for OpenAI agents integration.
+
+        This method adds the necessary interceptors and activities for OpenAI
+        agent execution:
+        - Adds tracing interceptors for OpenAI agent interactions
+        - Registers model execution activities
+
+        Args:
+            config: The worker configuration to modify.
+
+        Returns:
+            The modified worker configuration.
+        """
         config["interceptors"] = list(config.get("interceptors") or []) + [
             OpenAIAgentsTracingInterceptor()
         ]
@@ -165,5 +250,14 @@ class Plugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         return super().configure_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
+        """Run the worker with OpenAI agents temporal overrides.
+
+        This method sets up the necessary runtime overrides for OpenAI agents
+        to work within the Temporal worker context, including custom runners
+        and trace providers.
+
+        Args:
+            worker: The worker instance to run.
+        """
         with set_open_ai_agent_temporal_overrides(self._model_params):
             await super().run_worker(worker)

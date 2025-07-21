@@ -530,68 +530,63 @@ async def test_nexus_tool_workflow(
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     new_config = client.config()
-    new_config["data_converter"] = pydantic_data_converter
+    new_config["plugins"] = [
+        openai_agents.Plugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(TestResearchModel())
+            if use_local_model
+            else None,
+        )
+    ]
     client = Client(**new_config)
 
-    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
-    with set_open_ai_agent_temporal_overrides(model_params):
-        model_activity = ModelActivity(
-            TestModelProvider(
-                TestNexusWeatherModel(  # type: ignore
-                )
-            )
-            if use_local_model
-            else None
+    async with new_worker(
+        client,
+        NexusToolsWorkflow,
+        nexus_service_handlers=[WeatherServiceHandler()],
+    ) as worker:
+        await create_nexus_endpoint(worker.task_queue, client)
+
+        workflow_handle = await client.start_workflow(
+            NexusToolsWorkflow.run,
+            "What is the weather in Tokio?",
+            id=f"nexus-tools-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
         )
-        async with new_worker(
-            client,
-            NexusToolsWorkflow,
-            activities=[
-                model_activity.invoke_model_activity,
-            ],
-            nexus_service_handlers=[WeatherServiceHandler()],
-            interceptors=[OpenAIAgentsTracingInterceptor()],
-        ) as worker:
-            await create_nexus_endpoint(worker.task_queue, client)
+        result = await workflow_handle.result()
 
-            workflow_handle = await client.start_workflow(
-                NexusToolsWorkflow.run,
-                "What is the weather in Tokio?",
-                id=f"nexus-tools-workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=30),
+        if use_local_model:
+            assert result == "Test nexus weather result"
+
+            events = []
+            async for e in workflow_handle.fetch_history_events():
+                if e.HasField("activity_task_completed_event_attributes") or e.HasField(
+                    "nexus_operation_completed_event_attributes"
+                ):
+                    events.append(e)
+
+            assert len(events) == 3
+            assert (
+                "function_call"
+                in events[0]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
             )
-            result = await workflow_handle.result()
-
-            if use_local_model:
-                assert result == "Test nexus weather result"
-
-                events = []
-                async for e in workflow_handle.fetch_history_events():
-                    if e.HasField(
-                        "activity_task_completed_event_attributes"
-                    ) or e.HasField("nexus_operation_completed_event_attributes"):
-                        events.append(e)
-
-                assert len(events) == 3
-                assert (
-                    "function_call"
-                    in events[0]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "Sunny with wind"
-                    in events[
-                        1
-                    ].nexus_operation_completed_event_attributes.result.data.decode()
-                )
-                assert (
-                    "Test nexus weather result"
-                    in events[2]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
+            assert (
+                "Sunny with wind"
+                in events[
+                    1
+                ].nexus_operation_completed_event_attributes.result.data.decode()
+            )
+            assert (
+                "Test nexus weather result"
+                in events[2]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
 
 
 @no_type_check
