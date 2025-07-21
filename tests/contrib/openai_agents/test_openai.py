@@ -431,6 +431,7 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
             get_weather_object,
             get_weather_country,
             get_weather_context,
+            ActivityWeatherService().get_weather_method,
         ],
     ) as worker:
         workflow_handle = await client.start_workflow(
@@ -535,7 +536,7 @@ async def test_nexus_tool_workflow(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=TestModelProvider(TestResearchModel())
+            model_provider=TestModelProvider(TestNexusWeatherModel())
             if use_local_model
             else None,
         )
