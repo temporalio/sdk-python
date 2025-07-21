@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from temporalio.client import WorkflowHistory
-from temporalio.contrib.openai_agents.temporal_openai_agents import (
+from temporalio.contrib.openai_agents._temporal_openai_agents import (
     set_open_ai_agent_temporal_overrides,
 )
 from temporalio.contrib.pydantic import pydantic_data_converter
