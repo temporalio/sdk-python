@@ -1,23 +1,20 @@
 from dataclasses import replace
-from datetime import timedelta
-from typing import Optional, Union
+from typing import Union
 
 from agents import (
     Agent,
     RunConfig,
-    RunHooks,
     RunResult,
     RunResultStreaming,
     TContext,
+    Tool,
     TResponseInputItem,
 )
 from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
 
 from temporalio import workflow
-from temporalio.common import Priority, RetryPolicy
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
-from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 
 class TemporalOpenAIRunner(AgentRunner):
@@ -46,6 +43,12 @@ class TemporalOpenAIRunner(AgentRunner):
                 **kwargs,
             )
 
+        for t in starting_agent.tools:
+            if not isinstance(t, Tool):
+                raise ValueError(
+                    "Provided tool is not a tool type. If using an activity, make sure to wrap it with openai_agents.workflow.activity_as_tool."
+                )
+
         context = kwargs.get("context")
         max_turns = kwargs.get("max_turns", DEFAULT_MAX_TURNS)
         hooks = kwargs.get("hooks")
@@ -67,16 +70,15 @@ class TemporalOpenAIRunner(AgentRunner):
             ),
         )
 
-        with workflow.unsafe.imports_passed_through():
-            return await self._runner.run(
-                starting_agent=starting_agent,
-                input=input,
-                context=context,
-                max_turns=max_turns,
-                hooks=hooks,
-                run_config=updated_run_config,
-                previous_response_id=previous_response_id,
-            )
+        return await self._runner.run(
+            starting_agent=starting_agent,
+            input=input,
+            context=context,
+            max_turns=max_turns,
+            hooks=hooks,
+            run_config=updated_run_config,
+            previous_response_id=previous_response_id,
+        )
 
     def run_sync(
         self,
