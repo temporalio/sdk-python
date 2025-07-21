@@ -28,7 +28,7 @@ from agents import (
     handoff,
     input_guardrail,
     output_guardrail,
-    trace,
+    trace, ModelProvider, Model, OpenAIChatCompletionsModel,
 )
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
 from agents.items import (
@@ -1765,6 +1765,35 @@ async def test_workflow_method_tools(client: Client):
 
     with set_open_ai_agent_temporal_overrides():
         model_activity = ModelActivity(TestModelProvider(WorkflowToolModel()))
+        async with new_worker(
+            client,
+            WorkflowToolWorkflow,
+            activities=[model_activity.invoke_model_activity],
+            interceptors=[OpenAIAgentsTracingInterceptor()],
+        ) as worker:
+            workflow_handle = await client.start_workflow(
+                WorkflowToolWorkflow.run,
+                id=f"workflow-tool-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=10),
+            )
+            await workflow_handle.result()
+
+class CustomModelProvider(ModelProvider):
+    def get_model(self, model_name: str) -> Model:
+        client = AsyncOpenAI(base_url="https://api.openai.com/v1")
+        return OpenAIChatCompletionsModel(model="gpt-4o", openai_client=client)
+
+async def test_chat_completions_model(client: Client):
+    if not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("No openai API key")
+
+    new_config = client.config()
+    new_config["data_converter"] = pydantic_data_converter
+    client = Client(**new_config)
+
+    with set_open_ai_agent_temporal_overrides():
+        model_activity = ModelActivity(model_provider=CustomModelProvider())
         async with new_worker(
             client,
             WorkflowToolWorkflow,
