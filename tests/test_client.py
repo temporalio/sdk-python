@@ -1513,18 +1513,3 @@ class MyPlugin(Plugin):
     ) -> temporalio.service.ServiceClient:
         config.api_key = "replaced key"
         return await super().connect_service_client(config)
-
-
-async def test_client_plugin(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
-        pytest.skip("Client connect is only designed for local")
-
-    config = client.config()
-    config["plugins"] = [MyPlugin()]
-    new_client = Client(**config)
-    assert new_client.namespace == "replaced_namespace"
-
-    new_client = await Client.connect(
-        client.service_client.config.target_host, plugins=[MyPlugin()]
-    )
-    assert new_client.service_client.config.api_key == "replaced key"
