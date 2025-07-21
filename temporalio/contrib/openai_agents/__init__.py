@@ -13,8 +13,9 @@ from temporalio.contrib.openai_agents.temporal_openai_agents import (
     Plugin,
     TestModel,
     TestModelProvider,
-    workflow,
 )
+
+from . import workflow
 
 __all__ = [
     "Plugin",

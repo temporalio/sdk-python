@@ -138,7 +138,7 @@ def test_load_profile_from_data_env_overrides():
         "TEMPORAL_NAMESPACE": "env-namespace",
     }
     profile = ClientConfigProfile.load(
-        config_source=TOML_CONFIG_BASE, profile="custom", env_vars=env
+        config_source=TOML_CONFIG_BASE, profile="custom", override_env_vars=env
     )
     assert profile.address == "env-address"
     assert profile.namespace == "env-namespace"
@@ -156,7 +156,7 @@ def test_load_profile_env_overrides(base_config_file: Path):
         "TEMPORAL_TLS_SERVER_NAME": "env-server-name",
     }
     profile = ClientConfigProfile.load(
-        config_source=base_config_file, profile="custom", env_vars=env
+        config_source=base_config_file, profile="custom", override_env_vars=env
     )
     assert profile.address == "env-address"
     assert profile.namespace == "env-namespace"
@@ -181,7 +181,7 @@ def test_load_profile_grpc_meta_env_overrides(base_config_file: Path):
         "TEMPORAL_GRPC_META_ANOTHER_HEADER": "another-value",
     }
     profile = ClientConfigProfile.load(
-        config_source=base_config_file, profile="custom", env_vars=env
+        config_source=base_config_file, profile="custom", override_env_vars=env
     )
     assert profile.grpc_meta["custom-header"] == "env-value"
     assert profile.grpc_meta["another-header"] == "another-value"
@@ -197,7 +197,7 @@ def test_load_profile_disable_env(base_config_file: Path):
     """Test that `disable_env` prevents environment variable overrides."""
     env = {"TEMPORAL_ADDRESS": "env-address"}
     profile = ClientConfigProfile.load(
-        config_source=base_config_file, env_vars=env, disable_env=True
+        config_source=base_config_file, override_env_vars=env, disable_env=True
     )
     assert profile.address == "default-address"
 
@@ -209,7 +209,7 @@ def test_load_profile_disable_file(monkeypatch):
     """Test that `disable_file` loads configuration only from environment."""
     monkeypatch.setattr("pathlib.Path.exists", lambda _: False)
     env = {"TEMPORAL_ADDRESS": "env-address"}
-    profile = ClientConfigProfile.load(disable_file=True, env_vars=env)
+    profile = ClientConfigProfile.load(disable_file=True, override_env_vars=env)
     assert profile.address == "env-address"
 
     config = profile.to_client_connect_config()
@@ -263,7 +263,7 @@ def test_load_profiles_no_env_override(tmp_path: Path, monkeypatch):
         "TEMPORAL_CONFIG_FILE": str(config_file),
         "TEMPORAL_ADDRESS": "env-address",  # This should be ignored
     }
-    client_config = ClientConfig.load(env_vars=env)
+    client_config = ClientConfig.load(override_env_vars=env)
     connect_config = client_config.profiles["default"].to_client_connect_config()
     assert connect_config.get("target_host") == "default-address"
 
@@ -272,7 +272,7 @@ def test_load_profiles_no_config_file(monkeypatch):
     """Test that load_profiles works when no config file is found."""
     monkeypatch.setattr("pathlib.Path.exists", lambda _: False)
     monkeypatch.setattr(os, "environ", {})
-    client_config = ClientConfig.load(env_vars={})
+    client_config = ClientConfig.load(override_env_vars={})
     assert not client_config.profiles
 
 
@@ -281,14 +281,14 @@ def test_load_profiles_discovery(tmp_path: Path, monkeypatch):
     config_file = tmp_path / "config.toml"
     config_file.write_text(TOML_CONFIG_BASE)
     env = {"TEMPORAL_CONFIG_FILE": str(config_file)}
-    client_config = ClientConfig.load(env_vars=env)
+    client_config = ClientConfig.load(override_env_vars=env)
     assert "default" in client_config.profiles
 
 
 def test_load_profiles_disable_file():
     """Test load_profiles with file loading disabled."""
     # With no env vars, should be empty
-    client_config = ClientConfig.load(disable_file=True, env_vars={})
+    client_config = ClientConfig.load(disable_file=True, override_env_vars={})
     assert not client_config.profiles
 
 

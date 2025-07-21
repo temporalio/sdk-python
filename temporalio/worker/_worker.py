@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import abc
 import asyncio
 import concurrent.futures
 import hashlib
@@ -24,17 +25,9 @@ from typing import (
 
 from typing_extensions import TypeAlias, TypedDict
 
-import temporalio.activity
-import temporalio.api.common.v1
-import temporalio.bridge.client
-import temporalio.bridge.proto
-import temporalio.bridge.proto.activity_result
-import temporalio.bridge.proto.activity_task
-import temporalio.bridge.proto.common
 import temporalio.bridge.worker
 import temporalio.client
-import temporalio.converter
-import temporalio.exceptions
+import temporalio.common
 import temporalio.runtime
 import temporalio.service
 from temporalio.common import (
@@ -96,20 +89,69 @@ PollerBehavior: TypeAlias = Union[
 ]
 
 
-class Plugin:
+class Plugin(abc.ABC):
+    """Base class for worker plugins that can intercept and modify worker behavior.
+
+    Plugins allow customization of worker creation and execution processes
+    through a chain of responsibility pattern. Each plugin can modify the worker
+    configuration or intercept worker execution.
+    """
+
+    def name(self) -> str:
+        """Get the qualified name of this plugin. Can be overridden if desired to provide a more appropriate name.
+
+        Returns:
+            The fully qualified name of the plugin class (module.classname).
+        """
+        return type(self).__module__ + "." + type(self).__qualname__
+
     def init_worker_plugin(self, next: Plugin) -> Plugin:
+        """Initialize this plugin in the plugin chain.
+
+        This method sets up the chain of responsibility pattern by storing a reference
+        to the next plugin in the chain. It is called during worker creation to build
+        the plugin chain.
+
+        Args:
+            next: The next plugin in the chain to delegate to.
+
+        Returns:
+            This plugin instance for method chaining.
+        """
         self.next_worker_plugin = next
         return self
 
-    def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
-        return self.next_worker_plugin.on_create_worker(config)
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+        """Hook called when creating a worker to allow modification of configuration.
+
+        This method is called during worker creation and allows plugins to modify
+        the worker configuration before the worker is fully initialized. Plugins
+        can modify task queue names, adjust concurrency settings, add interceptors,
+        or change other worker settings.
+
+        Args:
+            config: The worker configuration dictionary to potentially modify.
+
+        Returns:
+            The modified worker configuration.
+        """
+        return self.next_worker_plugin.configure_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
+        """Hook called when running a worker to allow interception of execution.
+
+        This method is called when the worker is started and allows plugins to
+        intercept or wrap the worker execution. Plugins can add monitoring,
+        custom lifecycle management, or other execution-time behavior.
+
+        Args:
+            worker: The worker instance to run.
+        """
         await self.next_worker_plugin.run_worker(worker)
 
 
 class _RootPlugin(Plugin):
-    def on_create_worker(self, config: WorkerConfig) -> WorkerConfig:
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         return config
 
     async def run_worker(self, worker: Worker) -> None:
@@ -221,6 +263,10 @@ class Worker:
             workflow_runner: Runner for workflows.
             unsandboxed_workflow_runner: Runner for workflows that opt-out of
                 sandboxing.
+            plugins: Collection of plugins for this worker. Any plugins already
+                on the client that also implement :py:class:`temporalio.worker.Plugin` are
+                prepended to this list and should not be explicitly given here
+                to avoid running the plugin twice.
             interceptors: Collection of interceptors for this worker. Any
                 interceptors already on the client that also implement
                 :py:class:`Interceptor` are prepended to this list and should
@@ -388,18 +434,25 @@ class Worker:
             List[Plugin],
             [p for p in client.config()["plugins"] if isinstance(p, Plugin)],
         )
+        for client_plugin in plugins_from_client:
+            if type(client_plugin) in [type(p) for p in plugins]:
+                warnings.warn(
+                    f"The same plugin type {type(client_plugin)} is present from both client and worker. It may run twice and may not be the intended behavior."
+                )
         plugins = plugins_from_client + list(plugins)
 
         root_plugin: Plugin = _RootPlugin()
-        for plugin in reversed(list(plugins)):
+        for plugin in reversed(plugins):
             root_plugin = plugin.init_worker_plugin(root_plugin)
-        config = root_plugin.on_create_worker(config)
+        config = root_plugin.configure_worker(config)
         self._plugin = root_plugin
 
-        self._init_from_config(config)
+        self._init_from_config(client, config)
 
-    def _init_from_config(self, config: WorkerConfig):
-        """Handles post plugin initialization to ensure original arguments are not used"""
+    def _init_from_config(self, client: temporalio.client.Client, config: WorkerConfig):
+        """Handles post plugin initialization to ensure original arguments are not used.
+        Client is safe to take separately since it can't be modified by worker plugins.
+        """
         self._config = config
 
         # TODO(nexus-preview): max_concurrent_nexus_tasks / tuner support
@@ -470,8 +523,10 @@ class Worker:
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
                 metric_meter=self._runtime.metric_meter,
-                encode_headers=client_config["header_codec_behavior"]
-                == HeaderCodecBehavior.CODEC,
+                client=client,
+                encode_headers=(
+                    client_config["header_codec_behavior"] == HeaderCodecBehavior.CODEC
+                ),
             )
         self._nexus_worker: Optional[_NexusWorker] = None
         if config["nexus_service_handlers"]:
@@ -642,19 +697,19 @@ class Worker:
             Configuration, shallow-copied.
         """
         config = self._config.copy()
-        config["activities"] = list(config["activities"])
-        config["workflows"] = list(config["workflows"])
+        config["activities"] = list(config.get("activities", []))
+        config["workflows"] = list(config.get("workflows", []))
         return config
 
     @property
     def task_queue(self) -> str:
         """Task queue this worker is on."""
-        return self._config["task_queue"]
+        return self._config["task_queue"]  # type: ignore[reportTypedDictNotRequiredAccess]
 
     @property
     def client(self) -> temporalio.client.Client:
         """Client currently set on the worker."""
-        return self._config["client"]
+        return self._config["client"]  # type: ignore[reportTypedDictNotRequiredAccess]
 
     @client.setter
     def client(self, value: temporalio.client.Client) -> None:
@@ -754,9 +809,9 @@ class Worker:
             )
             if exception:
                 logger.error("Worker failed, shutting down", exc_info=exception)
-                if self._config["on_fatal_error"]:
+                if self._config["on_fatal_error"]:  # type: ignore[reportTypedDictNotRequiredAccess]
                     try:
-                        await self._config["on_fatal_error"](exception)
+                        await self._config["on_fatal_error"](exception)  # type: ignore[reportTypedDictNotRequiredAccess]
                     except:
                         logger.warning("Fatal error handler failed")
 
@@ -767,7 +822,7 @@ class Worker:
 
         # Cancel the shutdown task (safe if already done)
         tasks[None].cancel()
-        graceful_timeout = self._config["graceful_shutdown_timeout"]
+        graceful_timeout = self._config["graceful_shutdown_timeout"]  # type: ignore[reportTypedDictNotRequiredAccess]
         logger.info(
             f"Beginning worker shutdown, will wait {graceful_timeout} before cancelling activities"
         )

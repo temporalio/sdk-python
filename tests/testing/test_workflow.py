@@ -4,7 +4,7 @@ import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 from time import monotonic
-from typing import Any, List, Optional, Union
+from typing import Any, Optional, Union
 
 from temporalio import activity, workflow
 from temporalio.client import (
@@ -194,8 +194,8 @@ class AssertFailWorkflow:
 
 
 class SimpleClientInterceptor(Interceptor):
-    def __init__(self) -> None:
-        self.events: List[str] = []
+    def __init__(self) -> None:  # type: ignore[reportMissingSuperCall]
+        self.events: list[str] = []
 
     def intercept_client(self, next: OutboundInterceptor) -> OutboundInterceptor:
         return SimpleClientOutboundInterceptor(self, super().intercept_client(next))

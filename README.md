@@ -94,7 +94,11 @@ informal introduction to the features and their implementation.
         - [Heartbeating and Cancellation](#heartbeating-and-cancellation)
         - [Worker Shutdown](#worker-shutdown)
       - [Testing](#testing-1)
+    - [Interceptors](#interceptors)
     - [Nexus](#nexus)
+    - [Plugins](#plugins)
+      - [Client Plugins](#client-plugins)
+      - [Worker Plugins](#worker-plugins)
     - [Workflow Replay](#workflow-replay)
     - [Observability](#observability)
       - [Metrics](#metrics)
@@ -1256,6 +1260,7 @@ calls in the `temporalio.activity` package make use of it. Specifically:
 
 * `in_activity()` - Whether an activity context is present
 * `info()` - Returns the immutable info of the currently running activity
+* `client()` - Returns the Temporal client used by this worker. Only available in `async def` activities.
 * `heartbeat(*details)` - Record a heartbeat
 * `is_cancelled()` - Whether a cancellation has been requested on this activity
 * `wait_for_cancelled()` - `async` call to wait for cancellation request
@@ -1308,6 +1313,70 @@ affect calls activity code might make to functions on the `temporalio.activity` 
 * `on_heartbeat` property can be set to handle `activity.heartbeat()` calls
 * `cancel()` can be invoked to simulate a cancellation of the activity
 * `worker_shutdown()` can be invoked to simulate a worker shutdown during execution of the activity
+
+
+### Interceptors
+
+The behavior of the SDK can be customized in many useful ways by modifying inbound and outbound calls using
+interceptors. This is similar to the use of middleware in other frameworks.
+
+There are five categories of inbound and outbound calls that you can modify in this way:
+
+1. Outbound client calls, such as `start_workflow()`, `signal_workflow()`, `list_workflows()`, `update_schedule()`, etc.
+
+2. Inbound workflow calls: `execute_workflow()`, `handle_signal()`, `handle_update_handler()`, etc
+
+3. Outbound workflow calls: `start_activity()`, `start_child_workflow()`, `start_nexus_operation()`, etc
+
+4. Inbound call to execute an activity: `execute_activity()`
+
+5. Outbound activity calls: `info()` and `heartbeat()`
+
+
+To modify outbound client calls, define a class inheriting from
+[`client.Interceptor`](https://python.temporal.io/temporalio.client.Interceptor.html), and implement the method
+`intercept_client()` to return an instance of
+[`OutboundInterceptor`](https://python.temporal.io/temporalio.client.OutboundInterceptor.html) that implements the
+subset of outbound client calls that you wish to modify.
+
+Then, pass a list containing an instance of your `client.Interceptor` class as the
+`interceptors` argument of [`Client.connect()`](https://python.temporal.io/temporalio.client.Client.html#connect).
+
+The purpose of the interceptor framework is that the methods you implement on your interceptor classes can perform
+arbitrary side effects and/or arbitrary modifications to the data, before it is received by the SDK's "real"
+implementation. The `interceptors` list can contain multiple interceptors. In this case they form a chain: a method
+implemented on an interceptor instance in the list can perform side effects, and modify the data, before passing it on
+to the corresponding method on the next interceptor in the list. Your interceptor classes need not implement every
+method; the default implementation is always to pass the data on to the next method in the interceptor chain.
+
+The remaining four categories are worker calls. To modify these, define a class inheriting from
+[`worker.Interceptor`](https://python.temporal.io/temporalio.worker.Interceptor.html) and implement methods on that
+class to define the
+[`ActivityInboundInterceptor`](https://python.temporal.io/temporalio.worker.ActivityInboundInterceptor.html),
+[`ActivityOutboundInterceptor`](https://python.temporal.io/temporalio.worker.ActivityOutboundInterceptor.html),
+[`WorkflowInboundInterceptor`](https://python.temporal.io/temporalio.worker.WorkflowInboundInterceptor.html), and
+[`WorkflowOutboundInterceptor`](https://python.temporal.io/temporalio.worker.WorkflowOutboundInterceptor.html) classes
+that you wish to use to effect your modifications. Then, pass a list containing an instance of your `worker.Interceptor`
+class as the `interceptors` argument of the [`Worker()`](https://python.temporal.io/temporalio.worker.Worker.html)
+constructor.
+
+It often happens that your worker and client interceptors will share code because they implement closely related logic.
+For convenience, you can create an interceptor class that inherits from _both_ `client.Interceptor` and
+`worker.Interceptor` (their method sets do not overlap). You can then pass this in the `interceptors` argument of
+`Client.connect()` when starting your worker _as well as_ in your client/starter code. If you do this, your worker will
+automatically pick up the interceptors from its underlying client (and you should not pass them directly to the
+`Worker()` constructor).
+
+This is best explained by example. The [Context Propagation Interceptor
+Sample](https://github.com/temporalio/samples-python/tree/main/context_propagation) is a good starting point. In
+[context_propagation/interceptor.py](https://github.com/temporalio/samples-python/blob/main/context_propagation/interceptor.py)
+a class is defined that inherits from both `client.Interceptor` and `worker.Interceptor`. It implements the various
+methods such that the outbound client and workflow calls set a certain key in the outbound `headers` field, and the
+inbound workflow and activity calls retrieve the header value from the inbound workflow/activity input data. An instance
+of this interceptor class is passed to `Client.connect()` when [starting the
+worker](https://github.com/temporalio/samples-python/blob/main/context_propagation/worker.py) and when connecting the
+client in the [workflow starter
+code](https://github.com/temporalio/samples-python/blob/main/context_propagation/starter.py).
 
 
 ### Nexus
@@ -1414,6 +1483,140 @@ https://github.com/temporalio/samples-python/tree/nexus/hello_nexus).
             sync_result = await sync_operation_handle
             return sync_result, wf_result
     ```
+
+
+### Plugins
+
+Plugins provide a way to extend and customize the behavior of Temporal clients and workers through a chain of 
+responsibility pattern. They allow you to intercept and modify client creation, service connections, worker 
+configuration, and worker execution. Common customizations may include but are not limited to:
+
+1. DataConverter
+2. Activities
+3. Workflows
+4. Interceptors
+
+A single plugin class can implement both client and worker plugin interfaces to share common logic between both 
+contexts. When used with a client, it will automatically be propagated to any workers created with that client.
+
+#### Client Plugins
+
+Client plugins can intercept and modify client configuration and service connections. They are useful for adding 
+authentication, modifying connection parameters, or adding custom behavior during client creation.
+
+Here's an example of a client plugin that adds custom authentication:
+
+```python
+from temporalio.client import Plugin, ClientConfig
+import temporalio.service
+
+class AuthenticationPlugin(Plugin):
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
+        # Modify client configuration
+        config["namespace"] = "my-secure-namespace"
+        return super().configure_client(config)
+
+    async def connect_service_client(
+        self, config: temporalio.service.ConnectConfig
+    ) -> temporalio.service.ServiceClient:
+        # Add authentication to the connection
+        config.api_key = self.api_key
+        return await super().connect_service_client(config)
+
+# Use the plugin when connecting
+client = await Client.connect(
+    "my-server.com:7233",
+    plugins=[AuthenticationPlugin("my-api-key")]
+)
+```
+
+#### Worker Plugins
+
+Worker plugins can modify worker configuration and intercept worker execution. They are useful for adding monitoring, 
+custom lifecycle management, or modifying worker settings.
+
+Here's an example of a worker plugin that adds custom monitoring:
+
+```python
+from temporalio.worker import Plugin, WorkerConfig, Worker
+import logging
+
+class MonitoringPlugin(Plugin):
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+        # Modify worker configuration
+        original_task_queue = config["task_queue"]
+        config["task_queue"] = f"monitored-{original_task_queue}"
+        self.logger.info(f"Worker created for task queue: {config['task_queue']}")
+        return super().configure_worker(config)
+
+    async def run_worker(self, worker: Worker) -> None:
+        self.logger.info("Starting worker execution")
+        try:
+            await super().run_worker(worker)
+        finally:
+            self.logger.info("Worker execution completed")
+
+# Use the plugin when creating a worker
+worker = Worker(
+    client,
+    task_queue="my-task-queue",
+    workflows=[MyWorkflow],
+    activities=[my_activity],
+    plugins=[MonitoringPlugin()]
+)
+```
+
+For plugins that need to work with both clients and workers, you can implement both interfaces in a single class:
+
+```python
+from temporalio.client import Plugin as ClientPlugin, ClientConfig
+from temporalio.worker import Plugin as WorkerPlugin, WorkerConfig
+
+
+class UnifiedPlugin(ClientPlugin, WorkerPlugin):
+  def configure_client(self, config: ClientConfig) -> ClientConfig:
+    # Client-side customization
+    config["namespace"] = "unified-namespace"
+    return super().configure_client(config)
+
+  def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+    # Worker-side customization
+    config["max_cached_workflows"] = 500
+    return super().configure_worker(config)
+
+  async def run_worker(self, worker: Worker) -> None:
+    print("Starting unified worker")
+    await super().run_worker(worker)
+
+
+# Create client with the unified plugin
+client = await Client.connect(
+  "localhost:7233",
+  plugins=[UnifiedPlugin()]
+)
+
+# Worker will automatically inherit the plugin from the client
+worker = Worker(
+  client,
+  task_queue="my-task-queue",
+  workflows=[MyWorkflow],
+  activities=[my_activity]
+)
+```
+
+**Important Notes:**
+
+- Plugins are executed in reverse order (last plugin wraps the first), forming a chain of responsibility
+- Client plugins that also implement worker plugin interfaces are automatically propagated to workers
+- Avoid providing the same plugin to both client and worker to prevent double execution
+- Plugin methods should call `super()` to maintain the plugin chain
+- Each plugin's `name()` method returns a unique identifier for debugging purposes
 
 
 ### Workflow Replay

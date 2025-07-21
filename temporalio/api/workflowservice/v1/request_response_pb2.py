@@ -108,12 +108,15 @@ from temporalio.api.update.v1 import (
 from temporalio.api.version.v1 import (
     message_pb2 as temporal_dot_api_dot_version_dot_v1_dot_message__pb2,
 )
+from temporalio.api.worker.v1 import (
+    message_pb2 as temporal_dot_api_dot_worker_dot_v1_dot_message__pb2,
+)
 from temporalio.api.workflow.v1 import (
     message_pb2 as temporal_dot_api_dot_workflow_dot_v1_dot_message__pb2,
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n6temporal/api/workflowservice/v1/request_response.proto\x12\x1ftemporal.api.workflowservice.v1\x1a+temporal/api/enums/v1/batch_operation.proto\x1a"temporal/api/enums/v1/common.proto\x1a$temporal/api/enums/v1/workflow.proto\x1a%temporal/api/enums/v1/namespace.proto\x1a(temporal/api/enums/v1/failed_cause.proto\x1a!temporal/api/enums/v1/query.proto\x1a!temporal/api/enums/v1/reset.proto\x1a&temporal/api/enums/v1/task_queue.proto\x1a&temporal/api/enums/v1/deployment.proto\x1a"temporal/api/enums/v1/update.proto\x1a&temporal/api/activity/v1/message.proto\x1a$temporal/api/common/v1/message.proto\x1a%temporal/api/history/v1/message.proto\x1a&temporal/api/workflow/v1/message.proto\x1a%temporal/api/command/v1/message.proto\x1a(temporal/api/deployment/v1/message.proto\x1a%temporal/api/failure/v1/message.proto\x1a$temporal/api/filter/v1/message.proto\x1a&temporal/api/protocol/v1/message.proto\x1a\'temporal/api/namespace/v1/message.proto\x1a#temporal/api/query/v1/message.proto\x1a)temporal/api/replication/v1/message.proto\x1a#temporal/api/rules/v1/message.proto\x1a&temporal/api/schedule/v1/message.proto\x1a\'temporal/api/taskqueue/v1/message.proto\x1a$temporal/api/update/v1/message.proto\x1a%temporal/api/version/v1/message.proto\x1a#temporal/api/batch/v1/message.proto\x1a\x30temporal/api/sdk/v1/task_complete_metadata.proto\x1a\'temporal/api/sdk/v1/user_metadata.proto\x1a#temporal/api/nexus/v1/message.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto"\x88\x05\n\x18RegisterNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x13\n\x0bowner_email\x18\x03 \x01(\t\x12\x46\n#workflow_execution_retention_period\x18\x04 \x01(\x0b\x32\x19.google.protobuf.Duration\x12G\n\x08\x63lusters\x18\x05 \x03(\x0b\x32\x35.temporal.api.replication.v1.ClusterReplicationConfig\x12\x1b\n\x13\x61\x63tive_cluster_name\x18\x06 \x01(\t\x12Q\n\x04\x64\x61ta\x18\x07 \x03(\x0b\x32\x43.temporal.api.workflowservice.v1.RegisterNamespaceRequest.DataEntry\x12\x16\n\x0esecurity_token\x18\x08 \x01(\t\x12\x1b\n\x13is_global_namespace\x18\t \x01(\x08\x12\x44\n\x16history_archival_state\x18\n \x01(\x0e\x32$.temporal.api.enums.v1.ArchivalState\x12\x1c\n\x14history_archival_uri\x18\x0b \x01(\t\x12G\n\x19visibility_archival_state\x18\x0c \x01(\x0e\x32$.temporal.api.enums.v1.ArchivalState\x12\x1f\n\x17visibility_archival_uri\x18\r \x01(\t\x1a+\n\tDataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"\x1b\n\x19RegisterNamespaceResponse"\x89\x01\n\x15ListNamespacesRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c\x12\x44\n\x10namespace_filter\x18\x03 \x01(\x0b\x32*.temporal.api.namespace.v1.NamespaceFilter"\x81\x01\n\x16ListNamespacesResponse\x12N\n\nnamespaces\x18\x01 \x03(\x0b\x32:.temporal.api.workflowservice.v1.DescribeNamespaceResponse\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"9\n\x18\x44\x65scribeNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\n\n\x02id\x18\x02 \x01(\t"\xec\x02\n\x19\x44\x65scribeNamespaceResponse\x12@\n\x0enamespace_info\x18\x01 \x01(\x0b\x32(.temporal.api.namespace.v1.NamespaceInfo\x12:\n\x06\x63onfig\x18\x02 \x01(\x0b\x32*.temporal.api.namespace.v1.NamespaceConfig\x12S\n\x12replication_config\x18\x03 \x01(\x0b\x32\x37.temporal.api.replication.v1.NamespaceReplicationConfig\x12\x18\n\x10\x66\x61ilover_version\x18\x04 \x01(\x03\x12\x1b\n\x13is_global_namespace\x18\x05 \x01(\x08\x12\x45\n\x10\x66\x61ilover_history\x18\x06 \x03(\x0b\x32+.temporal.api.replication.v1.FailoverStatus"\xcf\x02\n\x16UpdateNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x43\n\x0bupdate_info\x18\x02 \x01(\x0b\x32..temporal.api.namespace.v1.UpdateNamespaceInfo\x12:\n\x06\x63onfig\x18\x03 \x01(\x0b\x32*.temporal.api.namespace.v1.NamespaceConfig\x12S\n\x12replication_config\x18\x04 \x01(\x0b\x32\x37.temporal.api.replication.v1.NamespaceReplicationConfig\x12\x16\n\x0esecurity_token\x18\x05 \x01(\t\x12\x19\n\x11\x64\x65lete_bad_binary\x18\x06 \x01(\t\x12\x19\n\x11promote_namespace\x18\x07 \x01(\x08"\xa3\x02\n\x17UpdateNamespaceResponse\x12@\n\x0enamespace_info\x18\x01 \x01(\x0b\x32(.temporal.api.namespace.v1.NamespaceInfo\x12:\n\x06\x63onfig\x18\x02 \x01(\x0b\x32*.temporal.api.namespace.v1.NamespaceConfig\x12S\n\x12replication_config\x18\x03 \x01(\x0b\x32\x37.temporal.api.replication.v1.NamespaceReplicationConfig\x12\x18\n\x10\x66\x61ilover_version\x18\x04 \x01(\x03\x12\x1b\n\x13is_global_namespace\x18\x05 \x01(\x08"F\n\x19\x44\x65precateNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x16\n\x0esecurity_token\x18\x02 \x01(\t"\x1c\n\x1a\x44\x65precateNamespaceResponse"\xa9\x0b\n\x1dStartWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12\x38\n\ntask_queue\x18\x04 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12/\n\x05input\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12=\n\x1aworkflow_execution_timeout\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x37\n\x14workflow_run_timeout\x18\x07 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x38\n\x15workflow_task_timeout\x18\x08 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x10\n\x08identity\x18\t \x01(\t\x12\x12\n\nrequest_id\x18\n \x01(\t\x12N\n\x18workflow_id_reuse_policy\x18\x0b \x01(\x0e\x32,.temporal.api.enums.v1.WorkflowIdReusePolicy\x12T\n\x1bworkflow_id_conflict_policy\x18\x16 \x01(\x0e\x32/.temporal.api.enums.v1.WorkflowIdConflictPolicy\x12\x39\n\x0cretry_policy\x18\x0c \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy\x12\x15\n\rcron_schedule\x18\r \x01(\t\x12*\n\x04memo\x18\x0e \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x0f \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12.\n\x06header\x18\x10 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x1f\n\x17request_eager_execution\x18\x11 \x01(\x08\x12;\n\x11\x63ontinued_failure\x18\x12 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12@\n\x16last_completion_result\x18\x13 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x37\n\x14workflow_start_delay\x18\x14 \x01(\x0b\x32\x19.google.protobuf.Duration\x12>\n\x14\x63ompletion_callbacks\x18\x15 \x03(\x0b\x32 .temporal.api.common.v1.Callback\x12\x38\n\ruser_metadata\x18\x17 \x01(\x0b\x32!.temporal.api.sdk.v1.UserMetadata\x12+\n\x05links\x18\x18 \x03(\x0b\x32\x1c.temporal.api.common.v1.Link\x12I\n\x13versioning_override\x18\x19 \x01(\x0b\x32,.temporal.api.workflow.v1.VersioningOverride\x12H\n\x13on_conflict_options\x18\x1a \x01(\x0b\x32+.temporal.api.workflow.v1.OnConflictOptions\x12\x32\n\x08priority\x18\x1b \x01(\x0b\x32 .temporal.api.common.v1.Priority"\x8a\x02\n\x1eStartWorkflowExecutionResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\x0f\n\x07started\x18\x03 \x01(\x08\x12>\n\x06status\x18\x05 \x01(\x0e\x32..temporal.api.enums.v1.WorkflowExecutionStatus\x12[\n\x13\x65\x61ger_workflow_task\x18\x02 \x01(\x0b\x32>.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse\x12*\n\x04link\x18\x04 \x01(\x0b\x32\x1c.temporal.api.common.v1.Link"\xaa\x02\n"GetWorkflowExecutionHistoryRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x19\n\x11maximum_page_size\x18\x03 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x04 \x01(\x0c\x12\x16\n\x0ewait_new_event\x18\x05 \x01(\x08\x12P\n\x19history_event_filter_type\x18\x06 \x01(\x0e\x32-.temporal.api.enums.v1.HistoryEventFilterType\x12\x15\n\rskip_archival\x18\x07 \x01(\x08"\xba\x01\n#GetWorkflowExecutionHistoryResponse\x12\x31\n\x07history\x18\x01 \x01(\x0b\x32 .temporal.api.history.v1.History\x12\x35\n\x0braw_history\x18\x02 \x03(\x0b\x32 .temporal.api.common.v1.DataBlob\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\x10\n\x08\x61rchived\x18\x04 \x01(\x08"\xb0\x01\n)GetWorkflowExecutionHistoryReverseRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x19\n\x11maximum_page_size\x18\x03 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x04 \x01(\x0c"x\n*GetWorkflowExecutionHistoryReverseResponse\x12\x31\n\x07history\x18\x01 \x01(\x0b\x32 .temporal.api.history.v1.History\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c"\xc7\x02\n\x1cPollWorkflowTaskQueueRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x38\n\ntask_queue\x18\x02 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x1b\n\x0f\x62inary_checksum\x18\x04 \x01(\tB\x02\x18\x01\x12Z\n\x1bworker_version_capabilities\x18\x05 \x01(\x0b\x32\x31.temporal.api.common.v1.WorkerVersionCapabilitiesB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\x06 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions"\x91\x07\n\x1dPollWorkflowTaskQueueResponse\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12!\n\x19previous_started_event_id\x18\x04 \x01(\x03\x12\x18\n\x10started_event_id\x18\x05 \x01(\x03\x12\x0f\n\x07\x61ttempt\x18\x06 \x01(\x05\x12\x1a\n\x12\x62\x61\x63klog_count_hint\x18\x07 \x01(\x03\x12\x31\n\x07history\x18\x08 \x01(\x0b\x32 .temporal.api.history.v1.History\x12\x17\n\x0fnext_page_token\x18\t \x01(\x0c\x12\x33\n\x05query\x18\n \x01(\x0b\x32$.temporal.api.query.v1.WorkflowQuery\x12K\n\x1dworkflow_execution_task_queue\x18\x0b \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12\x32\n\x0escheduled_time\x18\x0c \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x30\n\x0cstarted_time\x18\r \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\\\n\x07queries\x18\x0e \x03(\x0b\x32K.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse.QueriesEntry\x12\x33\n\x08messages\x18\x0f \x03(\x0b\x32!.temporal.api.protocol.v1.Message\x12Q\n\x17poller_scaling_decision\x18\x10 \x01(\x0b\x32\x30.temporal.api.taskqueue.v1.PollerScalingDecision\x1aT\n\x0cQueriesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x33\n\x05value\x18\x02 \x01(\x0b\x32$.temporal.api.query.v1.WorkflowQuery:\x02\x38\x01"\xb5\t\n#RespondWorkflowTaskCompletedRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x32\n\x08\x63ommands\x18\x02 \x03(\x0b\x32 .temporal.api.command.v1.Command\x12\x10\n\x08identity\x18\x03 \x01(\t\x12O\n\x11sticky_attributes\x18\x04 \x01(\x0b\x32\x34.temporal.api.taskqueue.v1.StickyExecutionAttributes\x12 \n\x18return_new_workflow_task\x18\x05 \x01(\x08\x12&\n\x1e\x66orce_create_new_workflow_task\x18\x06 \x01(\x08\x12\x1b\n\x0f\x62inary_checksum\x18\x07 \x01(\tB\x02\x18\x01\x12m\n\rquery_results\x18\x08 \x03(\x0b\x32V.temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedRequest.QueryResultsEntry\x12\x11\n\tnamespace\x18\t \x01(\t\x12L\n\x14worker_version_stamp\x18\n \x01(\x0b\x32*.temporal.api.common.v1.WorkerVersionStampB\x02\x18\x01\x12\x33\n\x08messages\x18\x0b \x03(\x0b\x32!.temporal.api.protocol.v1.Message\x12H\n\x0csdk_metadata\x18\x0c \x01(\x0b\x32\x32.temporal.api.sdk.v1.WorkflowTaskCompletedMetadata\x12\x43\n\x11metering_metadata\x18\r \x01(\x0b\x32(.temporal.api.common.v1.MeteringMetadata\x12g\n\x0c\x63\x61pabilities\x18\x0e \x01(\x0b\x32Q.temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedRequest.Capabilities\x12>\n\ndeployment\x18\x0f \x01(\x0b\x32&.temporal.api.deployment.v1.DeploymentB\x02\x18\x01\x12\x46\n\x13versioning_behavior\x18\x10 \x01(\x0e\x32).temporal.api.enums.v1.VersioningBehavior\x12O\n\x12\x64\x65ployment_options\x18\x11 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions\x1a_\n\x11QueryResultsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x39\n\x05value\x18\x02 \x01(\x0b\x32*.temporal.api.query.v1.WorkflowQueryResult:\x02\x38\x01\x1a\x45\n\x0c\x43\x61pabilities\x12\x35\n-discard_speculative_workflow_task_with_events\x18\x01 \x01(\x08"\xf5\x01\n$RespondWorkflowTaskCompletedResponse\x12U\n\rworkflow_task\x18\x01 \x01(\x0b\x32>.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse\x12V\n\x0e\x61\x63tivity_tasks\x18\x02 \x03(\x0b\x32>.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse\x12\x1e\n\x16reset_history_event_id\x18\x03 \x01(\x03"\xf8\x03\n RespondWorkflowTaskFailedRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12=\n\x05\x63\x61use\x18\x02 \x01(\x0e\x32..temporal.api.enums.v1.WorkflowTaskFailedCause\x12\x31\n\x07\x66\x61ilure\x18\x03 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12\x10\n\x08identity\x18\x04 \x01(\t\x12\x1b\n\x0f\x62inary_checksum\x18\x05 \x01(\tB\x02\x18\x01\x12\x11\n\tnamespace\x18\x06 \x01(\t\x12\x33\n\x08messages\x18\x07 \x03(\x0b\x32!.temporal.api.protocol.v1.Message\x12\x46\n\x0eworker_version\x18\x08 \x01(\x0b\x32*.temporal.api.common.v1.WorkerVersionStampB\x02\x18\x01\x12>\n\ndeployment\x18\t \x01(\x0b\x32&.temporal.api.deployment.v1.DeploymentB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\n \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions"#\n!RespondWorkflowTaskFailedResponse"\xf5\x02\n\x1cPollActivityTaskQueueRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x38\n\ntask_queue\x18\x02 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12\x10\n\x08identity\x18\x03 \x01(\t\x12I\n\x13task_queue_metadata\x18\x04 \x01(\x0b\x32,.temporal.api.taskqueue.v1.TaskQueueMetadata\x12Z\n\x1bworker_version_capabilities\x18\x05 \x01(\x0b\x32\x31.temporal.api.common.v1.WorkerVersionCapabilitiesB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\x06 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions"\xef\x07\n\x1dPollActivityTaskQueueResponse\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x1a\n\x12workflow_namespace\x18\x02 \x01(\t\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12\x45\n\x12workflow_execution\x18\x04 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12;\n\ractivity_type\x18\x05 \x01(\x0b\x32$.temporal.api.common.v1.ActivityType\x12\x13\n\x0b\x61\x63tivity_id\x18\x06 \x01(\t\x12.\n\x06header\x18\x07 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12/\n\x05input\x18\x08 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12;\n\x11heartbeat_details\x18\t \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x32\n\x0escheduled_time\x18\n \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x42\n\x1e\x63urrent_attempt_scheduled_time\x18\x0b \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x30\n\x0cstarted_time\x18\x0c \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x0f\n\x07\x61ttempt\x18\r \x01(\x05\x12<\n\x19schedule_to_close_timeout\x18\x0e \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x16start_to_close_timeout\x18\x0f \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x34\n\x11heartbeat_timeout\x18\x10 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x0cretry_policy\x18\x11 \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy\x12Q\n\x17poller_scaling_decision\x18\x12 \x01(\x0b\x32\x30.temporal.api.taskqueue.v1.PollerScalingDecision\x12\x32\n\x08priority\x18\x13 \x01(\x0b\x32 .temporal.api.common.v1.Priority"\x90\x01\n"RecordActivityTaskHeartbeatRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x31\n\x07\x64\x65tails\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t"p\n#RecordActivityTaskHeartbeatResponse\x12\x18\n\x10\x63\x61ncel_requested\x18\x01 \x01(\x08\x12\x17\n\x0f\x61\x63tivity_paused\x18\x02 \x01(\x08\x12\x16\n\x0e\x61\x63tivity_reset\x18\x03 \x01(\x08"\xba\x01\n&RecordActivityTaskHeartbeatByIdRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t\x12\x13\n\x0b\x61\x63tivity_id\x18\x04 \x01(\t\x12\x31\n\x07\x64\x65tails\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x06 \x01(\t"t\n\'RecordActivityTaskHeartbeatByIdResponse\x12\x18\n\x10\x63\x61ncel_requested\x18\x01 \x01(\x08\x12\x17\n\x0f\x61\x63tivity_paused\x18\x02 \x01(\x08\x12\x16\n\x0e\x61\x63tivity_reset\x18\x03 \x01(\x08"\xe9\x02\n#RespondActivityTaskCompletedRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x30\n\x06result\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t\x12\x46\n\x0eworker_version\x18\x05 \x01(\x0b\x32*.temporal.api.common.v1.WorkerVersionStampB\x02\x18\x01\x12>\n\ndeployment\x18\x06 \x01(\x0b\x32&.temporal.api.deployment.v1.DeploymentB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\x07 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions"&\n$RespondActivityTaskCompletedResponse"\xba\x01\n\'RespondActivityTaskCompletedByIdRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t\x12\x13\n\x0b\x61\x63tivity_id\x18\x04 \x01(\t\x12\x30\n\x06result\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x06 \x01(\t"*\n(RespondActivityTaskCompletedByIdResponse"\xa9\x03\n RespondActivityTaskFailedRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x31\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t\x12@\n\x16last_heartbeat_details\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x46\n\x0eworker_version\x18\x06 \x01(\x0b\x32*.temporal.api.common.v1.WorkerVersionStampB\x02\x18\x01\x12>\n\ndeployment\x18\x07 \x01(\x0b\x32&.temporal.api.deployment.v1.DeploymentB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\x08 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions"W\n!RespondActivityTaskFailedResponse\x12\x32\n\x08\x66\x61ilures\x18\x01 \x03(\x0b\x32 .temporal.api.failure.v1.Failure"\xfa\x01\n$RespondActivityTaskFailedByIdRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t\x12\x13\n\x0b\x61\x63tivity_id\x18\x04 \x01(\t\x12\x31\n\x07\x66\x61ilure\x18\x05 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12\x10\n\x08identity\x18\x06 \x01(\t\x12@\n\x16last_heartbeat_details\x18\x07 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"[\n%RespondActivityTaskFailedByIdResponse\x12\x32\n\x08\x66\x61ilures\x18\x01 \x03(\x0b\x32 .temporal.api.failure.v1.Failure"\xe9\x02\n"RespondActivityTaskCanceledRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x31\n\x07\x64\x65tails\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t\x12\x46\n\x0eworker_version\x18\x05 \x01(\x0b\x32*.temporal.api.common.v1.WorkerVersionStampB\x02\x18\x01\x12>\n\ndeployment\x18\x06 \x01(\x0b\x32&.temporal.api.deployment.v1.DeploymentB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\x07 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions"%\n#RespondActivityTaskCanceledResponse"\x8b\x02\n&RespondActivityTaskCanceledByIdRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t\x12\x13\n\x0b\x61\x63tivity_id\x18\x04 \x01(\t\x12\x31\n\x07\x64\x65tails\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x06 \x01(\t\x12O\n\x12\x64\x65ployment_options\x18\x07 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions")\n\'RespondActivityTaskCanceledByIdResponse"\x84\x02\n%RequestCancelWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x12\n\nrequest_id\x18\x04 \x01(\t\x12\x1e\n\x16\x66irst_execution_run_id\x18\x05 \x01(\t\x12\x0e\n\x06reason\x18\x06 \x01(\t\x12+\n\x05links\x18\x07 \x03(\x0b\x32\x1c.temporal.api.common.v1.Link"(\n&RequestCancelWorkflowExecutionResponse"\xda\x02\n\x1eSignalWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x13\n\x0bsignal_name\x18\x03 \x01(\t\x12/\n\x05input\x18\x04 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x05 \x01(\t\x12\x12\n\nrequest_id\x18\x06 \x01(\t\x12\x0f\n\x07\x63ontrol\x18\x07 \x01(\t\x12.\n\x06header\x18\x08 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12+\n\x05links\x18\n \x03(\x0b\x32\x1c.temporal.api.common.v1.LinkJ\x04\x08\t\x10\n"!\n\x1fSignalWorkflowExecutionResponse"\xed\t\n\'SignalWithStartWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12\x38\n\ntask_queue\x18\x04 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12/\n\x05input\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12=\n\x1aworkflow_execution_timeout\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x37\n\x14workflow_run_timeout\x18\x07 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x38\n\x15workflow_task_timeout\x18\x08 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x10\n\x08identity\x18\t \x01(\t\x12\x12\n\nrequest_id\x18\n \x01(\t\x12N\n\x18workflow_id_reuse_policy\x18\x0b \x01(\x0e\x32,.temporal.api.enums.v1.WorkflowIdReusePolicy\x12T\n\x1bworkflow_id_conflict_policy\x18\x16 \x01(\x0e\x32/.temporal.api.enums.v1.WorkflowIdConflictPolicy\x12\x13\n\x0bsignal_name\x18\x0c \x01(\t\x12\x36\n\x0csignal_input\x18\r \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x0f\n\x07\x63ontrol\x18\x0e \x01(\t\x12\x39\n\x0cretry_policy\x18\x0f \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy\x12\x15\n\rcron_schedule\x18\x10 \x01(\t\x12*\n\x04memo\x18\x11 \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x12 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12.\n\x06header\x18\x13 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x37\n\x14workflow_start_delay\x18\x14 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x38\n\ruser_metadata\x18\x17 \x01(\x0b\x32!.temporal.api.sdk.v1.UserMetadata\x12+\n\x05links\x18\x18 \x03(\x0b\x32\x1c.temporal.api.common.v1.Link\x12I\n\x13versioning_override\x18\x19 \x01(\x0b\x32,.temporal.api.workflow.v1.VersioningOverride\x12\x32\n\x08priority\x18\x1a \x01(\x0b\x32 .temporal.api.common.v1.PriorityJ\x04\x08\x15\x10\x16"K\n(SignalWithStartWorkflowExecutionResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\x0f\n\x07started\x18\x02 \x01(\x08"\xab\x03\n\x1dResetWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x0e\n\x06reason\x18\x03 \x01(\t\x12%\n\x1dworkflow_task_finish_event_id\x18\x04 \x01(\x03\x12\x12\n\nrequest_id\x18\x05 \x01(\t\x12\x43\n\x12reset_reapply_type\x18\x06 \x01(\x0e\x32\'.temporal.api.enums.v1.ResetReapplyType\x12S\n\x1breset_reapply_exclude_types\x18\x07 \x03(\x0e\x32..temporal.api.enums.v1.ResetReapplyExcludeType\x12K\n\x15post_reset_operations\x18\x08 \x03(\x0b\x32,.temporal.api.workflow.v1.PostResetOperation"0\n\x1eResetWorkflowExecutionResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t"\x9f\x02\n!TerminateWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x0e\n\x06reason\x18\x03 \x01(\t\x12\x31\n\x07\x64\x65tails\x18\x04 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x05 \x01(\t\x12\x1e\n\x16\x66irst_execution_run_id\x18\x06 \x01(\t\x12+\n\x05links\x18\x07 \x03(\x0b\x32\x1c.temporal.api.common.v1.Link"$\n"TerminateWorkflowExecutionResponse"z\n\x1e\x44\x65leteWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution"!\n\x1f\x44\x65leteWorkflowExecutionResponse"\xc9\x02\n!ListOpenWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x19\n\x11maximum_page_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\x42\n\x11start_time_filter\x18\x04 \x01(\x0b\x32\'.temporal.api.filter.v1.StartTimeFilter\x12K\n\x10\x65xecution_filter\x18\x05 \x01(\x0b\x32/.temporal.api.filter.v1.WorkflowExecutionFilterH\x00\x12\x41\n\x0btype_filter\x18\x06 \x01(\x0b\x32*.temporal.api.filter.v1.WorkflowTypeFilterH\x00\x42\t\n\x07\x66ilters"\x82\x01\n"ListOpenWorkflowExecutionsResponse\x12\x43\n\nexecutions\x18\x01 \x03(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"\x8a\x03\n#ListClosedWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x19\n\x11maximum_page_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\x42\n\x11start_time_filter\x18\x04 \x01(\x0b\x32\'.temporal.api.filter.v1.StartTimeFilter\x12K\n\x10\x65xecution_filter\x18\x05 \x01(\x0b\x32/.temporal.api.filter.v1.WorkflowExecutionFilterH\x00\x12\x41\n\x0btype_filter\x18\x06 \x01(\x0b\x32*.temporal.api.filter.v1.WorkflowTypeFilterH\x00\x12=\n\rstatus_filter\x18\x07 \x01(\x0b\x32$.temporal.api.filter.v1.StatusFilterH\x00\x42\t\n\x07\x66ilters"\x84\x01\n$ListClosedWorkflowExecutionsResponse\x12\x43\n\nexecutions\x18\x01 \x03(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"m\n\x1dListWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\r\n\x05query\x18\x04 \x01(\t"~\n\x1eListWorkflowExecutionsResponse\x12\x43\n\nexecutions\x18\x01 \x03(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"u\n%ListArchivedWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\r\n\x05query\x18\x04 \x01(\t"\x86\x01\n&ListArchivedWorkflowExecutionsResponse\x12\x43\n\nexecutions\x18\x01 \x03(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"m\n\x1dScanWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\r\n\x05query\x18\x04 \x01(\t"~\n\x1eScanWorkflowExecutionsResponse\x12\x43\n\nexecutions\x18\x01 \x03(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"B\n\x1e\x43ountWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\r\n\x05query\x18\x02 \x01(\t"\xed\x01\n\x1f\x43ountWorkflowExecutionsResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x03\x12\x61\n\x06groups\x18\x02 \x03(\x0b\x32Q.temporal.api.workflowservice.v1.CountWorkflowExecutionsResponse.AggregationGroup\x1aX\n\x10\x41ggregationGroup\x12\x35\n\x0cgroup_values\x18\x01 \x03(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12\r\n\x05\x63ount\x18\x02 \x01(\x03"\x1c\n\x1aGetSearchAttributesRequest"\xc9\x01\n\x1bGetSearchAttributesResponse\x12T\n\x04keys\x18\x01 \x03(\x0b\x32\x46.temporal.api.workflowservice.v1.GetSearchAttributesResponse.KeysEntry\x1aT\n\tKeysEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01"\x91\x02\n RespondQueryTaskCompletedRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12>\n\x0e\x63ompleted_type\x18\x02 \x01(\x0e\x32&.temporal.api.enums.v1.QueryResultType\x12\x36\n\x0cquery_result\x18\x03 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x15\n\rerror_message\x18\x04 \x01(\t\x12\x11\n\tnamespace\x18\x06 \x01(\t\x12\x31\n\x07\x66\x61ilure\x18\x07 \x01(\x0b\x32 .temporal.api.failure.v1.FailureJ\x04\x08\x05\x10\x06"#\n!RespondQueryTaskCompletedResponse"n\n\x1bResetStickyTaskQueueRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution"\x1e\n\x1cResetStickyTaskQueueResponse"g\n\x15ShutdownWorkerRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x19\n\x11sticky_task_queue\x18\x02 \x01(\t\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x0e\n\x06reason\x18\x04 \x01(\t"\x18\n\x16ShutdownWorkerResponse"\xe9\x01\n\x14QueryWorkflowRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x33\n\x05query\x18\x03 \x01(\x0b\x32$.temporal.api.query.v1.WorkflowQuery\x12K\n\x16query_reject_condition\x18\x04 \x01(\x0e\x32+.temporal.api.enums.v1.QueryRejectCondition"\x8d\x01\n\x15QueryWorkflowResponse\x12\x36\n\x0cquery_result\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12<\n\x0equery_rejected\x18\x02 \x01(\x0b\x32$.temporal.api.query.v1.QueryRejected"s\n DescribeWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution"\x99\x05\n!DescribeWorkflowExecutionResponse\x12K\n\x10\x65xecution_config\x18\x01 \x01(\x0b\x32\x31.temporal.api.workflow.v1.WorkflowExecutionConfig\x12P\n\x17workflow_execution_info\x18\x02 \x01(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12I\n\x12pending_activities\x18\x03 \x03(\x0b\x32-.temporal.api.workflow.v1.PendingActivityInfo\x12M\n\x10pending_children\x18\x04 \x03(\x0b\x32\x33.temporal.api.workflow.v1.PendingChildExecutionInfo\x12P\n\x15pending_workflow_task\x18\x05 \x01(\x0b\x32\x31.temporal.api.workflow.v1.PendingWorkflowTaskInfo\x12\x39\n\tcallbacks\x18\x06 \x03(\x0b\x32&.temporal.api.workflow.v1.CallbackInfo\x12U\n\x18pending_nexus_operations\x18\x07 \x03(\x0b\x32\x33.temporal.api.workflow.v1.PendingNexusOperationInfo\x12W\n\x16workflow_extended_info\x18\x08 \x01(\x0b\x32\x37.temporal.api.workflow.v1.WorkflowExecutionExtendedInfo"\xe1\x03\n\x18\x44\x65scribeTaskQueueRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x38\n\ntask_queue\x18\x02 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12=\n\x0ftask_queue_type\x18\x03 \x01(\x0e\x32$.temporal.api.enums.v1.TaskQueueType\x12!\n\x19include_task_queue_status\x18\x04 \x01(\x08\x12>\n\x08\x61pi_mode\x18\x05 \x01(\x0e\x32,.temporal.api.enums.v1.DescribeTaskQueueMode\x12\x46\n\x08versions\x18\x06 \x01(\x0b\x32\x34.temporal.api.taskqueue.v1.TaskQueueVersionSelection\x12>\n\x10task_queue_types\x18\x07 \x03(\x0e\x32$.temporal.api.enums.v1.TaskQueueType\x12\x14\n\x0creport_stats\x18\x08 \x01(\x08\x12\x16\n\x0ereport_pollers\x18\t \x01(\x08\x12 \n\x18report_task_reachability\x18\n \x01(\x08"\xb2\x03\n\x19\x44\x65scribeTaskQueueResponse\x12\x36\n\x07pollers\x18\x01 \x03(\x0b\x32%.temporal.api.taskqueue.v1.PollerInfo\x12\x45\n\x11task_queue_status\x18\x02 \x01(\x0b\x32*.temporal.api.taskqueue.v1.TaskQueueStatus\x12\x63\n\rversions_info\x18\x03 \x03(\x0b\x32L.temporal.api.workflowservice.v1.DescribeTaskQueueResponse.VersionsInfoEntry\x12K\n\x0fversioning_info\x18\x04 \x01(\x0b\x32\x32.temporal.api.taskqueue.v1.TaskQueueVersioningInfo\x1a\x64\n\x11VersionsInfoEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12>\n\x05value\x18\x02 \x01(\x0b\x32/.temporal.api.taskqueue.v1.TaskQueueVersionInfo:\x02\x38\x01"\x17\n\x15GetClusterInfoRequest"\x8b\x03\n\x16GetClusterInfoResponse\x12h\n\x11supported_clients\x18\x01 \x03(\x0b\x32M.temporal.api.workflowservice.v1.GetClusterInfoResponse.SupportedClientsEntry\x12\x16\n\x0eserver_version\x18\x02 \x01(\t\x12\x12\n\ncluster_id\x18\x03 \x01(\t\x12:\n\x0cversion_info\x18\x04 \x01(\x0b\x32$.temporal.api.version.v1.VersionInfo\x12\x14\n\x0c\x63luster_name\x18\x05 \x01(\t\x12\x1b\n\x13history_shard_count\x18\x06 \x01(\x05\x12\x19\n\x11persistence_store\x18\x07 \x01(\t\x12\x18\n\x10visibility_store\x18\x08 \x01(\t\x1a\x37\n\x15SupportedClientsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"\x16\n\x14GetSystemInfoRequest"\xf4\x03\n\x15GetSystemInfoResponse\x12\x16\n\x0eserver_version\x18\x01 \x01(\t\x12Y\n\x0c\x63\x61pabilities\x18\x02 \x01(\x0b\x32\x43.temporal.api.workflowservice.v1.GetSystemInfoResponse.Capabilities\x1a\xe7\x02\n\x0c\x43\x61pabilities\x12\x1f\n\x17signal_and_query_header\x18\x01 \x01(\x08\x12&\n\x1einternal_error_differentiation\x18\x02 \x01(\x08\x12*\n"activity_failure_include_heartbeat\x18\x03 \x01(\x08\x12\x1a\n\x12supports_schedules\x18\x04 \x01(\x08\x12"\n\x1a\x65ncoded_failure_attributes\x18\x05 \x01(\x08\x12!\n\x19\x62uild_id_based_versioning\x18\x06 \x01(\x08\x12\x13\n\x0bupsert_memo\x18\x07 \x01(\x08\x12\x1c\n\x14\x65\x61ger_workflow_start\x18\x08 \x01(\x08\x12\x14\n\x0csdk_metadata\x18\t \x01(\x08\x12\'\n\x1f\x63ount_group_by_execution_status\x18\n \x01(\x08\x12\r\n\x05nexus\x18\x0b \x01(\x08"m\n\x1eListTaskQueuePartitionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x38\n\ntask_queue\x18\x02 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue"\xdf\x01\n\x1fListTaskQueuePartitionsResponse\x12]\n\x1e\x61\x63tivity_task_queue_partitions\x18\x01 \x03(\x0b\x32\x35.temporal.api.taskqueue.v1.TaskQueuePartitionMetadata\x12]\n\x1eworkflow_task_queue_partitions\x18\x02 \x03(\x0b\x32\x35.temporal.api.taskqueue.v1.TaskQueuePartitionMetadata"\xcc\x02\n\x15\x43reateScheduleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t\x12\x34\n\x08schedule\x18\x03 \x01(\x0b\x32".temporal.api.schedule.v1.Schedule\x12>\n\rinitial_patch\x18\x04 \x01(\x0b\x32\'.temporal.api.schedule.v1.SchedulePatch\x12\x10\n\x08identity\x18\x05 \x01(\t\x12\x12\n\nrequest_id\x18\x06 \x01(\t\x12*\n\x04memo\x18\x07 \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x08 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes"0\n\x16\x43reateScheduleResponse\x12\x16\n\x0e\x63onflict_token\x18\x01 \x01(\x0c"A\n\x17\x44\x65scribeScheduleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t"\x8f\x02\n\x18\x44\x65scribeScheduleResponse\x12\x34\n\x08schedule\x18\x01 \x01(\x0b\x32".temporal.api.schedule.v1.Schedule\x12\x34\n\x04info\x18\x02 \x01(\x0b\x32&.temporal.api.schedule.v1.ScheduleInfo\x12*\n\x04memo\x18\x03 \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x04 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12\x16\n\x0e\x63onflict_token\x18\x05 \x01(\x0c"\xf8\x01\n\x15UpdateScheduleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t\x12\x34\n\x08schedule\x18\x03 \x01(\x0b\x32".temporal.api.schedule.v1.Schedule\x12\x16\n\x0e\x63onflict_token\x18\x04 \x01(\x0c\x12\x10\n\x08identity\x18\x05 \x01(\t\x12\x12\n\nrequest_id\x18\x06 \x01(\t\x12\x43\n\x11search_attributes\x18\x07 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes"\x18\n\x16UpdateScheduleResponse"\x9c\x01\n\x14PatchScheduleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t\x12\x36\n\x05patch\x18\x03 \x01(\x0b\x32\'.temporal.api.schedule.v1.SchedulePatch\x12\x10\n\x08identity\x18\x04 \x01(\t\x12\x12\n\nrequest_id\x18\x05 \x01(\t"\x17\n\x15PatchScheduleResponse"\xa8\x01\n ListScheduleMatchingTimesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t\x12.\n\nstart_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"S\n!ListScheduleMatchingTimesResponse\x12.\n\nstart_time\x18\x01 \x03(\x0b\x32\x1a.google.protobuf.Timestamp"Q\n\x15\x44\x65leteScheduleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t\x12\x10\n\x08identity\x18\x03 \x01(\t"\x18\n\x16\x44\x65leteScheduleResponse"l\n\x14ListSchedulesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x19\n\x11maximum_page_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\r\n\x05query\x18\x04 \x01(\t"p\n\x15ListSchedulesResponse\x12>\n\tschedules\x18\x01 \x03(\x0b\x32+.temporal.api.schedule.v1.ScheduleListEntry\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"\x86\x05\n\'UpdateWorkerBuildIdCompatibilityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x12\n\ntask_queue\x18\x02 \x01(\t\x12-\n#add_new_build_id_in_new_default_set\x18\x03 \x01(\tH\x00\x12\x87\x01\n\x1b\x61\x64\x64_new_compatible_build_id\x18\x04 \x01(\x0b\x32`.temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest.AddNewCompatibleVersionH\x00\x12!\n\x17promote_set_by_build_id\x18\x05 \x01(\tH\x00\x12%\n\x1bpromote_build_id_within_set\x18\x06 \x01(\tH\x00\x12h\n\nmerge_sets\x18\x07 \x01(\x0b\x32R.temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest.MergeSetsH\x00\x1ao\n\x17\x41\x64\x64NewCompatibleVersion\x12\x14\n\x0cnew_build_id\x18\x01 \x01(\t\x12$\n\x1c\x65xisting_compatible_build_id\x18\x02 \x01(\t\x12\x18\n\x10make_set_default\x18\x03 \x01(\x08\x1aI\n\tMergeSets\x12\x1c\n\x14primary_set_build_id\x18\x01 \x01(\t\x12\x1e\n\x16secondary_set_build_id\x18\x02 \x01(\tB\x0b\n\toperation"@\n(UpdateWorkerBuildIdCompatibilityResponseJ\x04\x08\x01\x10\x02R\x0eversion_set_id"_\n$GetWorkerBuildIdCompatibilityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x12\n\ntask_queue\x18\x02 \x01(\t\x12\x10\n\x08max_sets\x18\x03 \x01(\x05"t\n%GetWorkerBuildIdCompatibilityResponse\x12K\n\x12major_version_sets\x18\x01 \x03(\x0b\x32/.temporal.api.taskqueue.v1.CompatibleVersionSet"\xb5\r\n"UpdateWorkerVersioningRulesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x12\n\ntask_queue\x18\x02 \x01(\t\x12\x16\n\x0e\x63onflict_token\x18\x03 \x01(\x0c\x12\x81\x01\n\x16insert_assignment_rule\x18\x04 \x01(\x0b\x32_.temporal.api.workflowservice.v1.UpdateWorkerVersioningRulesRequest.InsertBuildIdAssignmentRuleH\x00\x12\x83\x01\n\x17replace_assignment_rule\x18\x05 \x01(\x0b\x32`.temporal.api.workflowservice.v1.UpdateWorkerVersioningRulesRequest.ReplaceBuildIdAssignmentRuleH\x00\x12\x81\x01\n\x16\x64\x65lete_assignment_rule\x18\x06 \x01(\x0b\x32_.temporal.api.workflowservice.v1.UpdateWorkerVersioningRulesRequest.DeleteBuildIdAssignmentRuleH\x00\x12\x8c\x01\n\x1c\x61\x64\x64_compatible_redirect_rule\x18\x07 \x01(\x0b\x32\x64.temporal.api.workflowservice.v1.UpdateWorkerVersioningRulesRequest.AddCompatibleBuildIdRedirectRuleH\x00\x12\x94\x01\n replace_compatible_redirect_rule\x18\x08 \x01(\x0b\x32h.temporal.api.workflowservice.v1.UpdateWorkerVersioningRulesRequest.ReplaceCompatibleBuildIdRedirectRuleH\x00\x12\x92\x01\n\x1f\x64\x65lete_compatible_redirect_rule\x18\t \x01(\x0b\x32g.temporal.api.workflowservice.v1.UpdateWorkerVersioningRulesRequest.DeleteCompatibleBuildIdRedirectRuleH\x00\x12l\n\x0f\x63ommit_build_id\x18\n \x01(\x0b\x32Q.temporal.api.workflowservice.v1.UpdateWorkerVersioningRulesRequest.CommitBuildIdH\x00\x1aq\n\x1bInsertBuildIdAssignmentRule\x12\x12\n\nrule_index\x18\x01 \x01(\x05\x12>\n\x04rule\x18\x02 \x01(\x0b\x32\x30.temporal.api.taskqueue.v1.BuildIdAssignmentRule\x1a\x81\x01\n\x1cReplaceBuildIdAssignmentRule\x12\x12\n\nrule_index\x18\x01 \x01(\x05\x12>\n\x04rule\x18\x02 \x01(\x0b\x32\x30.temporal.api.taskqueue.v1.BuildIdAssignmentRule\x12\r\n\x05\x66orce\x18\x03 \x01(\x08\x1a@\n\x1b\x44\x65leteBuildIdAssignmentRule\x12\x12\n\nrule_index\x18\x01 \x01(\x05\x12\r\n\x05\x66orce\x18\x02 \x01(\x08\x1aj\n AddCompatibleBuildIdRedirectRule\x12\x46\n\x04rule\x18\x01 \x01(\x0b\x32\x38.temporal.api.taskqueue.v1.CompatibleBuildIdRedirectRule\x1an\n$ReplaceCompatibleBuildIdRedirectRule\x12\x46\n\x04rule\x18\x01 \x01(\x0b\x32\x38.temporal.api.taskqueue.v1.CompatibleBuildIdRedirectRule\x1a>\n#DeleteCompatibleBuildIdRedirectRule\x12\x17\n\x0fsource_build_id\x18\x01 \x01(\t\x1a\x37\n\rCommitBuildId\x12\x17\n\x0ftarget_build_id\x18\x01 \x01(\t\x12\r\n\x05\x66orce\x18\x02 \x01(\x08\x42\x0b\n\toperation"\xfc\x01\n#UpdateWorkerVersioningRulesResponse\x12U\n\x10\x61ssignment_rules\x18\x01 \x03(\x0b\x32;.temporal.api.taskqueue.v1.TimestampedBuildIdAssignmentRule\x12\x66\n\x19\x63ompatible_redirect_rules\x18\x02 \x03(\x0b\x32\x43.temporal.api.taskqueue.v1.TimestampedCompatibleBuildIdRedirectRule\x12\x16\n\x0e\x63onflict_token\x18\x03 \x01(\x0c"H\n\x1fGetWorkerVersioningRulesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x12\n\ntask_queue\x18\x02 \x01(\t"\xf9\x01\n GetWorkerVersioningRulesResponse\x12U\n\x10\x61ssignment_rules\x18\x01 \x03(\x0b\x32;.temporal.api.taskqueue.v1.TimestampedBuildIdAssignmentRule\x12\x66\n\x19\x63ompatible_redirect_rules\x18\x02 \x03(\x0b\x32\x43.temporal.api.taskqueue.v1.TimestampedCompatibleBuildIdRedirectRule\x12\x16\n\x0e\x63onflict_token\x18\x03 \x01(\x0c"\x9c\x01\n GetWorkerTaskReachabilityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tbuild_ids\x18\x02 \x03(\t\x12\x13\n\x0btask_queues\x18\x03 \x03(\t\x12=\n\x0creachability\x18\x04 \x01(\x0e\x32\'.temporal.api.enums.v1.TaskReachability"r\n!GetWorkerTaskReachabilityResponse\x12M\n\x15\x62uild_id_reachability\x18\x01 \x03(\x0b\x32..temporal.api.taskqueue.v1.BuildIdReachability"\x85\x02\n\x1eUpdateWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x1e\n\x16\x66irst_execution_run_id\x18\x03 \x01(\t\x12\x37\n\x0bwait_policy\x18\x04 \x01(\x0b\x32".temporal.api.update.v1.WaitPolicy\x12\x30\n\x07request\x18\x05 \x01(\x0b\x32\x1f.temporal.api.update.v1.Request"\xd7\x01\n\x1fUpdateWorkflowExecutionResponse\x12\x35\n\nupdate_ref\x18\x01 \x01(\x0b\x32!.temporal.api.update.v1.UpdateRef\x12\x30\n\x07outcome\x18\x02 \x01(\x0b\x32\x1f.temporal.api.update.v1.Outcome\x12K\n\x05stage\x18\x03 \x01(\x0e\x32<.temporal.api.enums.v1.UpdateWorkflowExecutionLifecycleStage"\xaf\x06\n\x1aStartBatchOperationRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x18\n\x10visibility_query\x18\x02 \x01(\t\x12\x0e\n\x06job_id\x18\x03 \x01(\t\x12\x0e\n\x06reason\x18\x04 \x01(\t\x12=\n\nexecutions\x18\x05 \x03(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12!\n\x19max_operations_per_second\x18\x06 \x01(\x02\x12Q\n\x15termination_operation\x18\n \x01(\x0b\x32\x30.temporal.api.batch.v1.BatchOperationTerminationH\x00\x12G\n\x10signal_operation\x18\x0b \x01(\x0b\x32+.temporal.api.batch.v1.BatchOperationSignalH\x00\x12S\n\x16\x63\x61ncellation_operation\x18\x0c \x01(\x0b\x32\x31.temporal.api.batch.v1.BatchOperationCancellationH\x00\x12K\n\x12\x64\x65letion_operation\x18\r \x01(\x0b\x32-.temporal.api.batch.v1.BatchOperationDeletionH\x00\x12\x45\n\x0freset_operation\x18\x0e \x01(\x0b\x32*.temporal.api.batch.v1.BatchOperationResetH\x00\x12p\n!update_workflow_options_operation\x18\x0f \x01(\x0b\x32\x43.temporal.api.batch.v1.BatchOperationUpdateWorkflowExecutionOptionsH\x00\x12^\n\x1cunpause_activities_operation\x18\x10 \x01(\x0b\x32\x36.temporal.api.batch.v1.BatchOperationUnpauseActivitiesH\x00\x42\x0b\n\toperation"\x1d\n\x1bStartBatchOperationResponse"`\n\x19StopBatchOperationRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0e\n\x06job_id\x18\x02 \x01(\t\x12\x0e\n\x06reason\x18\x03 \x01(\t\x12\x10\n\x08identity\x18\x04 \x01(\t"\x1c\n\x1aStopBatchOperationResponse"B\n\x1d\x44\x65scribeBatchOperationRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0e\n\x06job_id\x18\x02 \x01(\t"\x92\x03\n\x1e\x44\x65scribeBatchOperationResponse\x12\x41\n\x0eoperation_type\x18\x01 \x01(\x0e\x32).temporal.api.enums.v1.BatchOperationType\x12\x0e\n\x06job_id\x18\x02 \x01(\t\x12\x39\n\x05state\x18\x03 \x01(\x0e\x32*.temporal.api.enums.v1.BatchOperationState\x12.\n\nstart_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nclose_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1d\n\x15total_operation_count\x18\x06 \x01(\x03\x12 \n\x18\x63omplete_operation_count\x18\x07 \x01(\x03\x12\x1f\n\x17\x66\x61ilure_operation_count\x18\x08 \x01(\x03\x12\x10\n\x08identity\x18\t \x01(\t\x12\x0e\n\x06reason\x18\n \x01(\t"[\n\x1aListBatchOperationsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c"y\n\x1bListBatchOperationsResponse\x12\x41\n\x0eoperation_info\x18\x01 \x03(\x0b\x32).temporal.api.batch.v1.BatchOperationInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"\xb9\x01\n"PollWorkflowExecutionUpdateRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x35\n\nupdate_ref\x18\x02 \x01(\x0b\x32!.temporal.api.update.v1.UpdateRef\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x37\n\x0bwait_policy\x18\x04 \x01(\x0b\x32".temporal.api.update.v1.WaitPolicy"\xdb\x01\n#PollWorkflowExecutionUpdateResponse\x12\x30\n\x07outcome\x18\x01 \x01(\x0b\x32\x1f.temporal.api.update.v1.Outcome\x12K\n\x05stage\x18\x02 \x01(\x0e\x32<.temporal.api.enums.v1.UpdateWorkflowExecutionLifecycleStage\x12\x35\n\nupdate_ref\x18\x03 \x01(\x0b\x32!.temporal.api.update.v1.UpdateRef"\xa7\x02\n\x19PollNexusTaskQueueRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x10\n\x08identity\x18\x02 \x01(\t\x12\x38\n\ntask_queue\x18\x03 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12Z\n\x1bworker_version_capabilities\x18\x04 \x01(\x0b\x32\x31.temporal.api.common.v1.WorkerVersionCapabilitiesB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\x06 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions"\xb4\x01\n\x1aPollNexusTaskQueueResponse\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12/\n\x07request\x18\x02 \x01(\x0b\x32\x1e.temporal.api.nexus.v1.Request\x12Q\n\x17poller_scaling_decision\x18\x03 \x01(\x0b\x32\x30.temporal.api.taskqueue.v1.PollerScalingDecision"\x8e\x01\n RespondNexusTaskCompletedRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x10\n\x08identity\x18\x02 \x01(\t\x12\x12\n\ntask_token\x18\x03 \x01(\x0c\x12\x31\n\x08response\x18\x04 \x01(\x0b\x32\x1f.temporal.api.nexus.v1.Response"#\n!RespondNexusTaskCompletedResponse"\x8c\x01\n\x1dRespondNexusTaskFailedRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x10\n\x08identity\x18\x02 \x01(\t\x12\x12\n\ntask_token\x18\x03 \x01(\x0c\x12\x32\n\x05\x65rror\x18\x04 \x01(\x0b\x32#.temporal.api.nexus.v1.HandlerError" \n\x1eRespondNexusTaskFailedResponse"\xdf\x02\n\x1c\x45xecuteMultiOperationRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12[\n\noperations\x18\x02 \x03(\x0b\x32G.temporal.api.workflowservice.v1.ExecuteMultiOperationRequest.Operation\x1a\xce\x01\n\tOperation\x12X\n\x0estart_workflow\x18\x01 \x01(\x0b\x32>.temporal.api.workflowservice.v1.StartWorkflowExecutionRequestH\x00\x12Z\n\x0fupdate_workflow\x18\x02 \x01(\x0b\x32?.temporal.api.workflowservice.v1.UpdateWorkflowExecutionRequestH\x00\x42\x0b\n\toperation"\xcc\x02\n\x1d\x45xecuteMultiOperationResponse\x12Z\n\tresponses\x18\x01 \x03(\x0b\x32G.temporal.api.workflowservice.v1.ExecuteMultiOperationResponse.Response\x1a\xce\x01\n\x08Response\x12Y\n\x0estart_workflow\x18\x01 \x01(\x0b\x32?.temporal.api.workflowservice.v1.StartWorkflowExecutionResponseH\x00\x12[\n\x0fupdate_workflow\x18\x02 \x01(\x0b\x32@.temporal.api.workflowservice.v1.UpdateWorkflowExecutionResponseH\x00\x42\n\n\x08response"\xa1\x02\n\x1cUpdateActivityOptionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x43\n\x10\x61\x63tivity_options\x18\x04 \x01(\x0b\x32).temporal.api.activity.v1.ActivityOptions\x12/\n\x0bupdate_mask\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\x12\x0c\n\x02id\x18\x06 \x01(\tH\x00\x12\x0e\n\x04type\x18\x07 \x01(\tH\x00\x42\n\n\x08\x61\x63tivity"d\n\x1dUpdateActivityOptionsResponse\x12\x43\n\x10\x61\x63tivity_options\x18\x01 \x01(\x0b\x32).temporal.api.activity.v1.ActivityOptions"\xb3\x01\n\x14PauseActivityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x0c\n\x02id\x18\x04 \x01(\tH\x00\x12\x0e\n\x04type\x18\x05 \x01(\tH\x00\x12\x0e\n\x06reason\x18\x06 \x01(\tB\n\n\x08\x61\x63tivity"\x17\n\x15PauseActivityResponse"\x98\x02\n\x16UnpauseActivityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x0c\n\x02id\x18\x04 \x01(\tH\x00\x12\x0e\n\x04type\x18\x05 \x01(\tH\x00\x12\x15\n\x0bunpause_all\x18\x06 \x01(\x08H\x00\x12\x16\n\x0ereset_attempts\x18\x07 \x01(\x08\x12\x17\n\x0freset_heartbeat\x18\x08 \x01(\x08\x12)\n\x06jitter\x18\t \x01(\x0b\x32\x19.google.protobuf.DurationB\n\n\x08\x61\x63tivity"\x19\n\x17UnpauseActivityResponse"\xfc\x01\n\x14ResetActivityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x0c\n\x02id\x18\x04 \x01(\tH\x00\x12\x0e\n\x04type\x18\x05 \x01(\tH\x00\x12\x17\n\x0freset_heartbeat\x18\x06 \x01(\x08\x12\x13\n\x0bkeep_paused\x18\x07 \x01(\x08\x12)\n\x06jitter\x18\x08 \x01(\x0b\x32\x19.google.protobuf.DurationB\n\n\x08\x61\x63tivity"\x17\n\x15ResetActivityResponse"\x8a\x02\n%UpdateWorkflowExecutionOptionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12V\n\x1aworkflow_execution_options\x18\x03 \x01(\x0b\x32\x32.temporal.api.workflow.v1.WorkflowExecutionOptions\x12/\n\x0bupdate_mask\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.FieldMask"\x80\x01\n&UpdateWorkflowExecutionOptionsResponse\x12V\n\x1aworkflow_execution_options\x18\x01 \x01(\x0b\x32\x32.temporal.api.workflow.v1.WorkflowExecutionOptions"j\n\x19\x44\x65scribeDeploymentRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12:\n\ndeployment\x18\x02 \x01(\x0b\x32&.temporal.api.deployment.v1.Deployment"a\n\x1a\x44\x65scribeDeploymentResponse\x12\x43\n\x0f\x64\x65ployment_info\x18\x01 \x01(\x0b\x32*.temporal.api.deployment.v1.DeploymentInfo"\xa1\x01\n&DescribeWorkerDeploymentVersionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x07version\x18\x02 \x01(\tB\x02\x18\x01\x12O\n\x12\x64\x65ployment_version\x18\x03 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion"\x8a\x01\n\'DescribeWorkerDeploymentVersionResponse\x12_\n\x1eworker_deployment_version_info\x18\x01 \x01(\x0b\x32\x37.temporal.api.deployment.v1.WorkerDeploymentVersionInfo"M\n\x1f\x44\x65scribeWorkerDeploymentRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0f\x64\x65ployment_name\x18\x02 \x01(\t"\x8c\x01\n DescribeWorkerDeploymentResponse\x12\x16\n\x0e\x63onflict_token\x18\x01 \x01(\x0c\x12P\n\x16worker_deployment_info\x18\x02 \x01(\x0b\x32\x30.temporal.api.deployment.v1.WorkerDeploymentInfo"l\n\x16ListDeploymentsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\x13\n\x0bseries_name\x18\x04 \x01(\t"w\n\x17ListDeploymentsResponse\x12\x17\n\x0fnext_page_token\x18\x01 \x01(\x0c\x12\x43\n\x0b\x64\x65ployments\x18\x02 \x03(\x0b\x32..temporal.api.deployment.v1.DeploymentListInfo"\xcd\x01\n\x1bSetCurrentDeploymentRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12:\n\ndeployment\x18\x02 \x01(\x0b\x32&.temporal.api.deployment.v1.Deployment\x12\x10\n\x08identity\x18\x03 \x01(\t\x12M\n\x0fupdate_metadata\x18\x04 \x01(\x0b\x32\x34.temporal.api.deployment.v1.UpdateDeploymentMetadata"\xb9\x01\n\x1cSetCurrentDeploymentResponse\x12K\n\x17\x63urrent_deployment_info\x18\x01 \x01(\x0b\x32*.temporal.api.deployment.v1.DeploymentInfo\x12L\n\x18previous_deployment_info\x18\x02 \x01(\x0b\x32*.temporal.api.deployment.v1.DeploymentInfo"\xcb\x01\n(SetWorkerDeploymentCurrentVersionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0f\x64\x65ployment_name\x18\x02 \x01(\t\x12\x13\n\x07version\x18\x03 \x01(\tB\x02\x18\x01\x12\x10\n\x08\x62uild_id\x18\x07 \x01(\t\x12\x16\n\x0e\x63onflict_token\x18\x04 \x01(\x0c\x12\x10\n\x08identity\x18\x05 \x01(\t\x12"\n\x1aignore_missing_task_queues\x18\x06 \x01(\x08"\xbb\x01\n)SetWorkerDeploymentCurrentVersionResponse\x12\x16\n\x0e\x63onflict_token\x18\x01 \x01(\x0c\x12\x1c\n\x10previous_version\x18\x02 \x01(\tB\x02\x18\x01\x12X\n\x1bprevious_deployment_version\x18\x03 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion"\xdf\x01\n(SetWorkerDeploymentRampingVersionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0f\x64\x65ployment_name\x18\x02 \x01(\t\x12\x13\n\x07version\x18\x03 \x01(\tB\x02\x18\x01\x12\x10\n\x08\x62uild_id\x18\x08 \x01(\t\x12\x12\n\npercentage\x18\x04 \x01(\x02\x12\x16\n\x0e\x63onflict_token\x18\x05 \x01(\x0c\x12\x10\n\x08identity\x18\x06 \x01(\t\x12"\n\x1aignore_missing_task_queues\x18\x07 \x01(\x08"\xd8\x01\n)SetWorkerDeploymentRampingVersionResponse\x12\x16\n\x0e\x63onflict_token\x18\x01 \x01(\x0c\x12\x1c\n\x10previous_version\x18\x02 \x01(\tB\x02\x18\x01\x12X\n\x1bprevious_deployment_version\x18\x04 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x1b\n\x13previous_percentage\x18\x03 \x01(\x02"]\n\x1cListWorkerDeploymentsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c"\xca\x02\n\x1dListWorkerDeploymentsResponse\x12\x17\n\x0fnext_page_token\x18\x01 \x01(\x0c\x12r\n\x12worker_deployments\x18\x02 \x03(\x0b\x32V.temporal.api.workflowservice.v1.ListWorkerDeploymentsResponse.WorkerDeploymentSummary\x1a\x9b\x01\n\x17WorkerDeploymentSummary\x12\x0c\n\x04name\x18\x01 \x01(\t\x12/\n\x0b\x63reate_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x41\n\x0erouting_config\x18\x03 \x01(\x0b\x32).temporal.api.deployment.v1.RoutingConfig"\xc8\x01\n$DeleteWorkerDeploymentVersionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x07version\x18\x02 \x01(\tB\x02\x18\x01\x12O\n\x12\x64\x65ployment_version\x18\x05 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x15\n\rskip_drainage\x18\x03 \x01(\x08\x12\x10\n\x08identity\x18\x04 \x01(\t"\'\n%DeleteWorkerDeploymentVersionResponse"]\n\x1d\x44\x65leteWorkerDeploymentRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0f\x64\x65ployment_name\x18\x02 \x01(\t\x12\x10\n\x08identity\x18\x03 \x01(\t" \n\x1e\x44\x65leteWorkerDeploymentResponse"\x90\x03\n,UpdateWorkerDeploymentVersionMetadataRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x07version\x18\x02 \x01(\tB\x02\x18\x01\x12O\n\x12\x64\x65ployment_version\x18\x05 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12x\n\x0eupsert_entries\x18\x03 \x03(\x0b\x32`.temporal.api.workflowservice.v1.UpdateWorkerDeploymentVersionMetadataRequest.UpsertEntriesEntry\x12\x16\n\x0eremove_entries\x18\x04 \x03(\t\x1aU\n\x12UpsertEntriesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12.\n\x05value\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload:\x02\x38\x01"n\n-UpdateWorkerDeploymentVersionMetadataResponse\x12=\n\x08metadata\x18\x01 \x01(\x0b\x32+.temporal.api.deployment.v1.VersionMetadata"E\n\x1bGetCurrentDeploymentRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bseries_name\x18\x02 \x01(\t"k\n\x1cGetCurrentDeploymentResponse\x12K\n\x17\x63urrent_deployment_info\x18\x01 \x01(\x0b\x32*.temporal.api.deployment.v1.DeploymentInfo"q\n GetDeploymentReachabilityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12:\n\ndeployment\x18\x02 \x01(\x0b\x32&.temporal.api.deployment.v1.Deployment"\xe3\x01\n!GetDeploymentReachabilityResponse\x12\x43\n\x0f\x64\x65ployment_info\x18\x01 \x01(\x0b\x32*.temporal.api.deployment.v1.DeploymentInfo\x12\x43\n\x0creachability\x18\x02 \x01(\x0e\x32-.temporal.api.enums.v1.DeploymentReachability\x12\x34\n\x10last_update_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\xb4\x01\n\x19\x43reateWorkflowRuleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x35\n\x04spec\x18\x02 \x01(\x0b\x32\'.temporal.api.rules.v1.WorkflowRuleSpec\x12\x12\n\nforce_scan\x18\x03 \x01(\x08\x12\x12\n\nrequest_id\x18\x04 \x01(\t\x12\x10\n\x08identity\x18\x05 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x06 \x01(\t"_\n\x1a\x43reateWorkflowRuleResponse\x12\x31\n\x04rule\x18\x01 \x01(\x0b\x32#.temporal.api.rules.v1.WorkflowRule\x12\x0e\n\x06job_id\x18\x02 \x01(\t"A\n\x1b\x44\x65scribeWorkflowRuleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0f\n\x07rule_id\x18\x02 \x01(\t"Q\n\x1c\x44\x65scribeWorkflowRuleResponse\x12\x31\n\x04rule\x18\x01 \x01(\x0b\x32#.temporal.api.rules.v1.WorkflowRule"?\n\x19\x44\x65leteWorkflowRuleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0f\n\x07rule_id\x18\x02 \x01(\t"\x1c\n\x1a\x44\x65leteWorkflowRuleResponse"F\n\x18ListWorkflowRulesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"h\n\x19ListWorkflowRulesResponse\x12\x32\n\x05rules\x18\x01 \x03(\x0b\x32#.temporal.api.rules.v1.WorkflowRule\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"\xce\x01\n\x1aTriggerWorkflowRuleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x0c\n\x02id\x18\x04 \x01(\tH\x00\x12\x37\n\x04spec\x18\x05 \x01(\x0b\x32\'.temporal.api.rules.v1.WorkflowRuleSpecH\x00\x12\x10\n\x08identity\x18\x03 \x01(\tB\x06\n\x04rule".\n\x1bTriggerWorkflowRuleResponse\x12\x0f\n\x07\x61pplied\x18\x01 \x01(\x08\x42\xbe\x01\n"io.temporal.api.workflowservice.v1B\x14RequestResponseProtoP\x01Z5go.temporal.io/api/workflowservice/v1;workflowservice\xaa\x02!Temporalio.Api.WorkflowService.V1\xea\x02$Temporalio::Api::WorkflowService::V1b\x06proto3'
+    b'\n6temporal/api/workflowservice/v1/request_response.proto\x12\x1ftemporal.api.workflowservice.v1\x1a+temporal/api/enums/v1/batch_operation.proto\x1a"temporal/api/enums/v1/common.proto\x1a$temporal/api/enums/v1/workflow.proto\x1a%temporal/api/enums/v1/namespace.proto\x1a(temporal/api/enums/v1/failed_cause.proto\x1a!temporal/api/enums/v1/query.proto\x1a!temporal/api/enums/v1/reset.proto\x1a&temporal/api/enums/v1/task_queue.proto\x1a&temporal/api/enums/v1/deployment.proto\x1a"temporal/api/enums/v1/update.proto\x1a&temporal/api/activity/v1/message.proto\x1a$temporal/api/common/v1/message.proto\x1a%temporal/api/history/v1/message.proto\x1a&temporal/api/workflow/v1/message.proto\x1a%temporal/api/command/v1/message.proto\x1a(temporal/api/deployment/v1/message.proto\x1a%temporal/api/failure/v1/message.proto\x1a$temporal/api/filter/v1/message.proto\x1a&temporal/api/protocol/v1/message.proto\x1a\'temporal/api/namespace/v1/message.proto\x1a#temporal/api/query/v1/message.proto\x1a)temporal/api/replication/v1/message.proto\x1a#temporal/api/rules/v1/message.proto\x1a&temporal/api/schedule/v1/message.proto\x1a\'temporal/api/taskqueue/v1/message.proto\x1a$temporal/api/update/v1/message.proto\x1a%temporal/api/version/v1/message.proto\x1a#temporal/api/batch/v1/message.proto\x1a\x30temporal/api/sdk/v1/task_complete_metadata.proto\x1a\'temporal/api/sdk/v1/user_metadata.proto\x1a#temporal/api/nexus/v1/message.proto\x1a$temporal/api/worker/v1/message.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto"\x88\x05\n\x18RegisterNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x13\n\x0bowner_email\x18\x03 \x01(\t\x12\x46\n#workflow_execution_retention_period\x18\x04 \x01(\x0b\x32\x19.google.protobuf.Duration\x12G\n\x08\x63lusters\x18\x05 \x03(\x0b\x32\x35.temporal.api.replication.v1.ClusterReplicationConfig\x12\x1b\n\x13\x61\x63tive_cluster_name\x18\x06 \x01(\t\x12Q\n\x04\x64\x61ta\x18\x07 \x03(\x0b\x32\x43.temporal.api.workflowservice.v1.RegisterNamespaceRequest.DataEntry\x12\x16\n\x0esecurity_token\x18\x08 \x01(\t\x12\x1b\n\x13is_global_namespace\x18\t \x01(\x08\x12\x44\n\x16history_archival_state\x18\n \x01(\x0e\x32$.temporal.api.enums.v1.ArchivalState\x12\x1c\n\x14history_archival_uri\x18\x0b \x01(\t\x12G\n\x19visibility_archival_state\x18\x0c \x01(\x0e\x32$.temporal.api.enums.v1.ArchivalState\x12\x1f\n\x17visibility_archival_uri\x18\r \x01(\t\x1a+\n\tDataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"\x1b\n\x19RegisterNamespaceResponse"\x89\x01\n\x15ListNamespacesRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c\x12\x44\n\x10namespace_filter\x18\x03 \x01(\x0b\x32*.temporal.api.namespace.v1.NamespaceFilter"\x81\x01\n\x16ListNamespacesResponse\x12N\n\nnamespaces\x18\x01 \x03(\x0b\x32:.temporal.api.workflowservice.v1.DescribeNamespaceResponse\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"9\n\x18\x44\x65scribeNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\n\n\x02id\x18\x02 \x01(\t"\xec\x02\n\x19\x44\x65scribeNamespaceResponse\x12@\n\x0enamespace_info\x18\x01 \x01(\x0b\x32(.temporal.api.namespace.v1.NamespaceInfo\x12:\n\x06\x63onfig\x18\x02 \x01(\x0b\x32*.temporal.api.namespace.v1.NamespaceConfig\x12S\n\x12replication_config\x18\x03 \x01(\x0b\x32\x37.temporal.api.replication.v1.NamespaceReplicationConfig\x12\x18\n\x10\x66\x61ilover_version\x18\x04 \x01(\x03\x12\x1b\n\x13is_global_namespace\x18\x05 \x01(\x08\x12\x45\n\x10\x66\x61ilover_history\x18\x06 \x03(\x0b\x32+.temporal.api.replication.v1.FailoverStatus"\xcf\x02\n\x16UpdateNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x43\n\x0bupdate_info\x18\x02 \x01(\x0b\x32..temporal.api.namespace.v1.UpdateNamespaceInfo\x12:\n\x06\x63onfig\x18\x03 \x01(\x0b\x32*.temporal.api.namespace.v1.NamespaceConfig\x12S\n\x12replication_config\x18\x04 \x01(\x0b\x32\x37.temporal.api.replication.v1.NamespaceReplicationConfig\x12\x16\n\x0esecurity_token\x18\x05 \x01(\t\x12\x19\n\x11\x64\x65lete_bad_binary\x18\x06 \x01(\t\x12\x19\n\x11promote_namespace\x18\x07 \x01(\x08"\xa3\x02\n\x17UpdateNamespaceResponse\x12@\n\x0enamespace_info\x18\x01 \x01(\x0b\x32(.temporal.api.namespace.v1.NamespaceInfo\x12:\n\x06\x63onfig\x18\x02 \x01(\x0b\x32*.temporal.api.namespace.v1.NamespaceConfig\x12S\n\x12replication_config\x18\x03 \x01(\x0b\x32\x37.temporal.api.replication.v1.NamespaceReplicationConfig\x12\x18\n\x10\x66\x61ilover_version\x18\x04 \x01(\x03\x12\x1b\n\x13is_global_namespace\x18\x05 \x01(\x08"F\n\x19\x44\x65precateNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x16\n\x0esecurity_token\x18\x02 \x01(\t"\x1c\n\x1a\x44\x65precateNamespaceResponse"\xa9\x0b\n\x1dStartWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12\x38\n\ntask_queue\x18\x04 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12/\n\x05input\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12=\n\x1aworkflow_execution_timeout\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x37\n\x14workflow_run_timeout\x18\x07 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x38\n\x15workflow_task_timeout\x18\x08 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x10\n\x08identity\x18\t \x01(\t\x12\x12\n\nrequest_id\x18\n \x01(\t\x12N\n\x18workflow_id_reuse_policy\x18\x0b \x01(\x0e\x32,.temporal.api.enums.v1.WorkflowIdReusePolicy\x12T\n\x1bworkflow_id_conflict_policy\x18\x16 \x01(\x0e\x32/.temporal.api.enums.v1.WorkflowIdConflictPolicy\x12\x39\n\x0cretry_policy\x18\x0c \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy\x12\x15\n\rcron_schedule\x18\r \x01(\t\x12*\n\x04memo\x18\x0e \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x0f \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12.\n\x06header\x18\x10 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x1f\n\x17request_eager_execution\x18\x11 \x01(\x08\x12;\n\x11\x63ontinued_failure\x18\x12 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12@\n\x16last_completion_result\x18\x13 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x37\n\x14workflow_start_delay\x18\x14 \x01(\x0b\x32\x19.google.protobuf.Duration\x12>\n\x14\x63ompletion_callbacks\x18\x15 \x03(\x0b\x32 .temporal.api.common.v1.Callback\x12\x38\n\ruser_metadata\x18\x17 \x01(\x0b\x32!.temporal.api.sdk.v1.UserMetadata\x12+\n\x05links\x18\x18 \x03(\x0b\x32\x1c.temporal.api.common.v1.Link\x12I\n\x13versioning_override\x18\x19 \x01(\x0b\x32,.temporal.api.workflow.v1.VersioningOverride\x12H\n\x13on_conflict_options\x18\x1a \x01(\x0b\x32+.temporal.api.workflow.v1.OnConflictOptions\x12\x32\n\x08priority\x18\x1b \x01(\x0b\x32 .temporal.api.common.v1.Priority"\x8a\x02\n\x1eStartWorkflowExecutionResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\x0f\n\x07started\x18\x03 \x01(\x08\x12>\n\x06status\x18\x05 \x01(\x0e\x32..temporal.api.enums.v1.WorkflowExecutionStatus\x12[\n\x13\x65\x61ger_workflow_task\x18\x02 \x01(\x0b\x32>.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse\x12*\n\x04link\x18\x04 \x01(\x0b\x32\x1c.temporal.api.common.v1.Link"\xaa\x02\n"GetWorkflowExecutionHistoryRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x19\n\x11maximum_page_size\x18\x03 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x04 \x01(\x0c\x12\x16\n\x0ewait_new_event\x18\x05 \x01(\x08\x12P\n\x19history_event_filter_type\x18\x06 \x01(\x0e\x32-.temporal.api.enums.v1.HistoryEventFilterType\x12\x15\n\rskip_archival\x18\x07 \x01(\x08"\xba\x01\n#GetWorkflowExecutionHistoryResponse\x12\x31\n\x07history\x18\x01 \x01(\x0b\x32 .temporal.api.history.v1.History\x12\x35\n\x0braw_history\x18\x02 \x03(\x0b\x32 .temporal.api.common.v1.DataBlob\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\x10\n\x08\x61rchived\x18\x04 \x01(\x08"\xb0\x01\n)GetWorkflowExecutionHistoryReverseRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x19\n\x11maximum_page_size\x18\x03 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x04 \x01(\x0c"x\n*GetWorkflowExecutionHistoryReverseResponse\x12\x31\n\x07history\x18\x01 \x01(\x0b\x32 .temporal.api.history.v1.History\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c"\x8a\x03\n\x1cPollWorkflowTaskQueueRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x38\n\ntask_queue\x18\x02 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x1b\n\x0f\x62inary_checksum\x18\x04 \x01(\tB\x02\x18\x01\x12Z\n\x1bworker_version_capabilities\x18\x05 \x01(\x0b\x32\x31.temporal.api.common.v1.WorkerVersionCapabilitiesB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\x06 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions\x12\x41\n\x10worker_heartbeat\x18\x07 \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerHeartbeat"\x91\x07\n\x1dPollWorkflowTaskQueueResponse\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12!\n\x19previous_started_event_id\x18\x04 \x01(\x03\x12\x18\n\x10started_event_id\x18\x05 \x01(\x03\x12\x0f\n\x07\x61ttempt\x18\x06 \x01(\x05\x12\x1a\n\x12\x62\x61\x63klog_count_hint\x18\x07 \x01(\x03\x12\x31\n\x07history\x18\x08 \x01(\x0b\x32 .temporal.api.history.v1.History\x12\x17\n\x0fnext_page_token\x18\t \x01(\x0c\x12\x33\n\x05query\x18\n \x01(\x0b\x32$.temporal.api.query.v1.WorkflowQuery\x12K\n\x1dworkflow_execution_task_queue\x18\x0b \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12\x32\n\x0escheduled_time\x18\x0c \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x30\n\x0cstarted_time\x18\r \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\\\n\x07queries\x18\x0e \x03(\x0b\x32K.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse.QueriesEntry\x12\x33\n\x08messages\x18\x0f \x03(\x0b\x32!.temporal.api.protocol.v1.Message\x12Q\n\x17poller_scaling_decision\x18\x10 \x01(\x0b\x32\x30.temporal.api.taskqueue.v1.PollerScalingDecision\x1aT\n\x0cQueriesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x33\n\x05value\x18\x02 \x01(\x0b\x32$.temporal.api.query.v1.WorkflowQuery:\x02\x38\x01"\xb5\t\n#RespondWorkflowTaskCompletedRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x32\n\x08\x63ommands\x18\x02 \x03(\x0b\x32 .temporal.api.command.v1.Command\x12\x10\n\x08identity\x18\x03 \x01(\t\x12O\n\x11sticky_attributes\x18\x04 \x01(\x0b\x32\x34.temporal.api.taskqueue.v1.StickyExecutionAttributes\x12 \n\x18return_new_workflow_task\x18\x05 \x01(\x08\x12&\n\x1e\x66orce_create_new_workflow_task\x18\x06 \x01(\x08\x12\x1b\n\x0f\x62inary_checksum\x18\x07 \x01(\tB\x02\x18\x01\x12m\n\rquery_results\x18\x08 \x03(\x0b\x32V.temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedRequest.QueryResultsEntry\x12\x11\n\tnamespace\x18\t \x01(\t\x12L\n\x14worker_version_stamp\x18\n \x01(\x0b\x32*.temporal.api.common.v1.WorkerVersionStampB\x02\x18\x01\x12\x33\n\x08messages\x18\x0b \x03(\x0b\x32!.temporal.api.protocol.v1.Message\x12H\n\x0csdk_metadata\x18\x0c \x01(\x0b\x32\x32.temporal.api.sdk.v1.WorkflowTaskCompletedMetadata\x12\x43\n\x11metering_metadata\x18\r \x01(\x0b\x32(.temporal.api.common.v1.MeteringMetadata\x12g\n\x0c\x63\x61pabilities\x18\x0e \x01(\x0b\x32Q.temporal.api.workflowservice.v1.RespondWorkflowTaskCompletedRequest.Capabilities\x12>\n\ndeployment\x18\x0f \x01(\x0b\x32&.temporal.api.deployment.v1.DeploymentB\x02\x18\x01\x12\x46\n\x13versioning_behavior\x18\x10 \x01(\x0e\x32).temporal.api.enums.v1.VersioningBehavior\x12O\n\x12\x64\x65ployment_options\x18\x11 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions\x1a_\n\x11QueryResultsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x39\n\x05value\x18\x02 \x01(\x0b\x32*.temporal.api.query.v1.WorkflowQueryResult:\x02\x38\x01\x1a\x45\n\x0c\x43\x61pabilities\x12\x35\n-discard_speculative_workflow_task_with_events\x18\x01 \x01(\x08"\xf5\x01\n$RespondWorkflowTaskCompletedResponse\x12U\n\rworkflow_task\x18\x01 \x01(\x0b\x32>.temporal.api.workflowservice.v1.PollWorkflowTaskQueueResponse\x12V\n\x0e\x61\x63tivity_tasks\x18\x02 \x03(\x0b\x32>.temporal.api.workflowservice.v1.PollActivityTaskQueueResponse\x12\x1e\n\x16reset_history_event_id\x18\x03 \x01(\x03"\xf8\x03\n RespondWorkflowTaskFailedRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12=\n\x05\x63\x61use\x18\x02 \x01(\x0e\x32..temporal.api.enums.v1.WorkflowTaskFailedCause\x12\x31\n\x07\x66\x61ilure\x18\x03 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12\x10\n\x08identity\x18\x04 \x01(\t\x12\x1b\n\x0f\x62inary_checksum\x18\x05 \x01(\tB\x02\x18\x01\x12\x11\n\tnamespace\x18\x06 \x01(\t\x12\x33\n\x08messages\x18\x07 \x03(\x0b\x32!.temporal.api.protocol.v1.Message\x12\x46\n\x0eworker_version\x18\x08 \x01(\x0b\x32*.temporal.api.common.v1.WorkerVersionStampB\x02\x18\x01\x12>\n\ndeployment\x18\t \x01(\x0b\x32&.temporal.api.deployment.v1.DeploymentB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\n \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions"#\n!RespondWorkflowTaskFailedResponse"\xb8\x03\n\x1cPollActivityTaskQueueRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x38\n\ntask_queue\x18\x02 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12\x10\n\x08identity\x18\x03 \x01(\t\x12I\n\x13task_queue_metadata\x18\x04 \x01(\x0b\x32,.temporal.api.taskqueue.v1.TaskQueueMetadata\x12Z\n\x1bworker_version_capabilities\x18\x05 \x01(\x0b\x32\x31.temporal.api.common.v1.WorkerVersionCapabilitiesB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\x06 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions\x12\x41\n\x10worker_heartbeat\x18\x07 \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerHeartbeat"\xef\x07\n\x1dPollActivityTaskQueueResponse\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x1a\n\x12workflow_namespace\x18\x02 \x01(\t\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12\x45\n\x12workflow_execution\x18\x04 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12;\n\ractivity_type\x18\x05 \x01(\x0b\x32$.temporal.api.common.v1.ActivityType\x12\x13\n\x0b\x61\x63tivity_id\x18\x06 \x01(\t\x12.\n\x06header\x18\x07 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12/\n\x05input\x18\x08 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12;\n\x11heartbeat_details\x18\t \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x32\n\x0escheduled_time\x18\n \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x42\n\x1e\x63urrent_attempt_scheduled_time\x18\x0b \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x30\n\x0cstarted_time\x18\x0c \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x0f\n\x07\x61ttempt\x18\r \x01(\x05\x12<\n\x19schedule_to_close_timeout\x18\x0e \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x16start_to_close_timeout\x18\x0f \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x34\n\x11heartbeat_timeout\x18\x10 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x0cretry_policy\x18\x11 \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy\x12Q\n\x17poller_scaling_decision\x18\x12 \x01(\x0b\x32\x30.temporal.api.taskqueue.v1.PollerScalingDecision\x12\x32\n\x08priority\x18\x13 \x01(\x0b\x32 .temporal.api.common.v1.Priority"\x90\x01\n"RecordActivityTaskHeartbeatRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x31\n\x07\x64\x65tails\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t"p\n#RecordActivityTaskHeartbeatResponse\x12\x18\n\x10\x63\x61ncel_requested\x18\x01 \x01(\x08\x12\x17\n\x0f\x61\x63tivity_paused\x18\x02 \x01(\x08\x12\x16\n\x0e\x61\x63tivity_reset\x18\x03 \x01(\x08"\xba\x01\n&RecordActivityTaskHeartbeatByIdRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t\x12\x13\n\x0b\x61\x63tivity_id\x18\x04 \x01(\t\x12\x31\n\x07\x64\x65tails\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x06 \x01(\t"t\n\'RecordActivityTaskHeartbeatByIdResponse\x12\x18\n\x10\x63\x61ncel_requested\x18\x01 \x01(\x08\x12\x17\n\x0f\x61\x63tivity_paused\x18\x02 \x01(\x08\x12\x16\n\x0e\x61\x63tivity_reset\x18\x03 \x01(\x08"\xe9\x02\n#RespondActivityTaskCompletedRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x30\n\x06result\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t\x12\x46\n\x0eworker_version\x18\x05 \x01(\x0b\x32*.temporal.api.common.v1.WorkerVersionStampB\x02\x18\x01\x12>\n\ndeployment\x18\x06 \x01(\x0b\x32&.temporal.api.deployment.v1.DeploymentB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\x07 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions"&\n$RespondActivityTaskCompletedResponse"\xba\x01\n\'RespondActivityTaskCompletedByIdRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t\x12\x13\n\x0b\x61\x63tivity_id\x18\x04 \x01(\t\x12\x30\n\x06result\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x06 \x01(\t"*\n(RespondActivityTaskCompletedByIdResponse"\xa9\x03\n RespondActivityTaskFailedRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x31\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t\x12@\n\x16last_heartbeat_details\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x46\n\x0eworker_version\x18\x06 \x01(\x0b\x32*.temporal.api.common.v1.WorkerVersionStampB\x02\x18\x01\x12>\n\ndeployment\x18\x07 \x01(\x0b\x32&.temporal.api.deployment.v1.DeploymentB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\x08 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions"W\n!RespondActivityTaskFailedResponse\x12\x32\n\x08\x66\x61ilures\x18\x01 \x03(\x0b\x32 .temporal.api.failure.v1.Failure"\xfa\x01\n$RespondActivityTaskFailedByIdRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t\x12\x13\n\x0b\x61\x63tivity_id\x18\x04 \x01(\t\x12\x31\n\x07\x66\x61ilure\x18\x05 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12\x10\n\x08identity\x18\x06 \x01(\t\x12@\n\x16last_heartbeat_details\x18\x07 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"[\n%RespondActivityTaskFailedByIdResponse\x12\x32\n\x08\x66\x61ilures\x18\x01 \x03(\x0b\x32 .temporal.api.failure.v1.Failure"\xe9\x02\n"RespondActivityTaskCanceledRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12\x31\n\x07\x64\x65tails\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x11\n\tnamespace\x18\x04 \x01(\t\x12\x46\n\x0eworker_version\x18\x05 \x01(\x0b\x32*.temporal.api.common.v1.WorkerVersionStampB\x02\x18\x01\x12>\n\ndeployment\x18\x06 \x01(\x0b\x32&.temporal.api.deployment.v1.DeploymentB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\x07 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions"%\n#RespondActivityTaskCanceledResponse"\x8b\x02\n&RespondActivityTaskCanceledByIdRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t\x12\x13\n\x0b\x61\x63tivity_id\x18\x04 \x01(\t\x12\x31\n\x07\x64\x65tails\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x06 \x01(\t\x12O\n\x12\x64\x65ployment_options\x18\x07 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions")\n\'RespondActivityTaskCanceledByIdResponse"\x84\x02\n%RequestCancelWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x12\n\nrequest_id\x18\x04 \x01(\t\x12\x1e\n\x16\x66irst_execution_run_id\x18\x05 \x01(\t\x12\x0e\n\x06reason\x18\x06 \x01(\t\x12+\n\x05links\x18\x07 \x03(\x0b\x32\x1c.temporal.api.common.v1.Link"(\n&RequestCancelWorkflowExecutionResponse"\xde\x02\n\x1eSignalWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x13\n\x0bsignal_name\x18\x03 \x01(\t\x12/\n\x05input\x18\x04 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x05 \x01(\t\x12\x12\n\nrequest_id\x18\x06 \x01(\t\x12\x13\n\x07\x63ontrol\x18\x07 \x01(\tB\x02\x18\x01\x12.\n\x06header\x18\x08 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12+\n\x05links\x18\n \x03(\x0b\x32\x1c.temporal.api.common.v1.LinkJ\x04\x08\t\x10\n"!\n\x1fSignalWorkflowExecutionResponse"\xf1\t\n\'SignalWithStartWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12\x38\n\ntask_queue\x18\x04 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12/\n\x05input\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12=\n\x1aworkflow_execution_timeout\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x37\n\x14workflow_run_timeout\x18\x07 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x38\n\x15workflow_task_timeout\x18\x08 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x10\n\x08identity\x18\t \x01(\t\x12\x12\n\nrequest_id\x18\n \x01(\t\x12N\n\x18workflow_id_reuse_policy\x18\x0b \x01(\x0e\x32,.temporal.api.enums.v1.WorkflowIdReusePolicy\x12T\n\x1bworkflow_id_conflict_policy\x18\x16 \x01(\x0e\x32/.temporal.api.enums.v1.WorkflowIdConflictPolicy\x12\x13\n\x0bsignal_name\x18\x0c \x01(\t\x12\x36\n\x0csignal_input\x18\r \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x13\n\x07\x63ontrol\x18\x0e \x01(\tB\x02\x18\x01\x12\x39\n\x0cretry_policy\x18\x0f \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy\x12\x15\n\rcron_schedule\x18\x10 \x01(\t\x12*\n\x04memo\x18\x11 \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x12 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12.\n\x06header\x18\x13 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x37\n\x14workflow_start_delay\x18\x14 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x38\n\ruser_metadata\x18\x17 \x01(\x0b\x32!.temporal.api.sdk.v1.UserMetadata\x12+\n\x05links\x18\x18 \x03(\x0b\x32\x1c.temporal.api.common.v1.Link\x12I\n\x13versioning_override\x18\x19 \x01(\x0b\x32,.temporal.api.workflow.v1.VersioningOverride\x12\x32\n\x08priority\x18\x1a \x01(\x0b\x32 .temporal.api.common.v1.PriorityJ\x04\x08\x15\x10\x16"K\n(SignalWithStartWorkflowExecutionResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x12\x0f\n\x07started\x18\x02 \x01(\x08"\xc1\x03\n\x1dResetWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x0e\n\x06reason\x18\x03 \x01(\t\x12%\n\x1dworkflow_task_finish_event_id\x18\x04 \x01(\x03\x12\x12\n\nrequest_id\x18\x05 \x01(\t\x12G\n\x12reset_reapply_type\x18\x06 \x01(\x0e\x32\'.temporal.api.enums.v1.ResetReapplyTypeB\x02\x18\x01\x12S\n\x1breset_reapply_exclude_types\x18\x07 \x03(\x0e\x32..temporal.api.enums.v1.ResetReapplyExcludeType\x12K\n\x15post_reset_operations\x18\x08 \x03(\x0b\x32,.temporal.api.workflow.v1.PostResetOperation\x12\x10\n\x08identity\x18\t \x01(\t"0\n\x1eResetWorkflowExecutionResponse\x12\x0e\n\x06run_id\x18\x01 \x01(\t"\x9f\x02\n!TerminateWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x0e\n\x06reason\x18\x03 \x01(\t\x12\x31\n\x07\x64\x65tails\x18\x04 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x10\n\x08identity\x18\x05 \x01(\t\x12\x1e\n\x16\x66irst_execution_run_id\x18\x06 \x01(\t\x12+\n\x05links\x18\x07 \x03(\x0b\x32\x1c.temporal.api.common.v1.Link"$\n"TerminateWorkflowExecutionResponse"z\n\x1e\x44\x65leteWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution"!\n\x1f\x44\x65leteWorkflowExecutionResponse"\xc9\x02\n!ListOpenWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x19\n\x11maximum_page_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\x42\n\x11start_time_filter\x18\x04 \x01(\x0b\x32\'.temporal.api.filter.v1.StartTimeFilter\x12K\n\x10\x65xecution_filter\x18\x05 \x01(\x0b\x32/.temporal.api.filter.v1.WorkflowExecutionFilterH\x00\x12\x41\n\x0btype_filter\x18\x06 \x01(\x0b\x32*.temporal.api.filter.v1.WorkflowTypeFilterH\x00\x42\t\n\x07\x66ilters"\x82\x01\n"ListOpenWorkflowExecutionsResponse\x12\x43\n\nexecutions\x18\x01 \x03(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"\x8a\x03\n#ListClosedWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x19\n\x11maximum_page_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\x42\n\x11start_time_filter\x18\x04 \x01(\x0b\x32\'.temporal.api.filter.v1.StartTimeFilter\x12K\n\x10\x65xecution_filter\x18\x05 \x01(\x0b\x32/.temporal.api.filter.v1.WorkflowExecutionFilterH\x00\x12\x41\n\x0btype_filter\x18\x06 \x01(\x0b\x32*.temporal.api.filter.v1.WorkflowTypeFilterH\x00\x12=\n\rstatus_filter\x18\x07 \x01(\x0b\x32$.temporal.api.filter.v1.StatusFilterH\x00\x42\t\n\x07\x66ilters"\x84\x01\n$ListClosedWorkflowExecutionsResponse\x12\x43\n\nexecutions\x18\x01 \x03(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"m\n\x1dListWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\r\n\x05query\x18\x04 \x01(\t"~\n\x1eListWorkflowExecutionsResponse\x12\x43\n\nexecutions\x18\x01 \x03(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"u\n%ListArchivedWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\r\n\x05query\x18\x04 \x01(\t"\x86\x01\n&ListArchivedWorkflowExecutionsResponse\x12\x43\n\nexecutions\x18\x01 \x03(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"m\n\x1dScanWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\r\n\x05query\x18\x04 \x01(\t"~\n\x1eScanWorkflowExecutionsResponse\x12\x43\n\nexecutions\x18\x01 \x03(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"B\n\x1e\x43ountWorkflowExecutionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\r\n\x05query\x18\x02 \x01(\t"\xed\x01\n\x1f\x43ountWorkflowExecutionsResponse\x12\r\n\x05\x63ount\x18\x01 \x01(\x03\x12\x61\n\x06groups\x18\x02 \x03(\x0b\x32Q.temporal.api.workflowservice.v1.CountWorkflowExecutionsResponse.AggregationGroup\x1aX\n\x10\x41ggregationGroup\x12\x35\n\x0cgroup_values\x18\x01 \x03(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12\r\n\x05\x63ount\x18\x02 \x01(\x03"\x1c\n\x1aGetSearchAttributesRequest"\xc9\x01\n\x1bGetSearchAttributesResponse\x12T\n\x04keys\x18\x01 \x03(\x0b\x32\x46.temporal.api.workflowservice.v1.GetSearchAttributesResponse.KeysEntry\x1aT\n\tKeysEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01"\xd0\x02\n RespondQueryTaskCompletedRequest\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12>\n\x0e\x63ompleted_type\x18\x02 \x01(\x0e\x32&.temporal.api.enums.v1.QueryResultType\x12\x36\n\x0cquery_result\x18\x03 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x15\n\rerror_message\x18\x04 \x01(\t\x12\x11\n\tnamespace\x18\x06 \x01(\t\x12\x31\n\x07\x66\x61ilure\x18\x07 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12=\n\x05\x63\x61use\x18\x08 \x01(\x0e\x32..temporal.api.enums.v1.WorkflowTaskFailedCauseJ\x04\x08\x05\x10\x06"#\n!RespondQueryTaskCompletedResponse"n\n\x1bResetStickyTaskQueueRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution"\x1e\n\x1cResetStickyTaskQueueResponse"\xaa\x01\n\x15ShutdownWorkerRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x19\n\x11sticky_task_queue\x18\x02 \x01(\t\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x0e\n\x06reason\x18\x04 \x01(\t\x12\x41\n\x10worker_heartbeat\x18\x05 \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerHeartbeat"\x18\n\x16ShutdownWorkerResponse"\xe9\x01\n\x14QueryWorkflowRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x33\n\x05query\x18\x03 \x01(\x0b\x32$.temporal.api.query.v1.WorkflowQuery\x12K\n\x16query_reject_condition\x18\x04 \x01(\x0e\x32+.temporal.api.enums.v1.QueryRejectCondition"\x8d\x01\n\x15QueryWorkflowResponse\x12\x36\n\x0cquery_result\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12<\n\x0equery_rejected\x18\x02 \x01(\x0b\x32$.temporal.api.query.v1.QueryRejected"s\n DescribeWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution"\x99\x05\n!DescribeWorkflowExecutionResponse\x12K\n\x10\x65xecution_config\x18\x01 \x01(\x0b\x32\x31.temporal.api.workflow.v1.WorkflowExecutionConfig\x12P\n\x17workflow_execution_info\x18\x02 \x01(\x0b\x32/.temporal.api.workflow.v1.WorkflowExecutionInfo\x12I\n\x12pending_activities\x18\x03 \x03(\x0b\x32-.temporal.api.workflow.v1.PendingActivityInfo\x12M\n\x10pending_children\x18\x04 \x03(\x0b\x32\x33.temporal.api.workflow.v1.PendingChildExecutionInfo\x12P\n\x15pending_workflow_task\x18\x05 \x01(\x0b\x32\x31.temporal.api.workflow.v1.PendingWorkflowTaskInfo\x12\x39\n\tcallbacks\x18\x06 \x03(\x0b\x32&.temporal.api.workflow.v1.CallbackInfo\x12U\n\x18pending_nexus_operations\x18\x07 \x03(\x0b\x32\x33.temporal.api.workflow.v1.PendingNexusOperationInfo\x12W\n\x16workflow_extended_info\x18\x08 \x01(\x0b\x32\x37.temporal.api.workflow.v1.WorkflowExecutionExtendedInfo"\xf9\x03\n\x18\x44\x65scribeTaskQueueRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x38\n\ntask_queue\x18\x02 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12=\n\x0ftask_queue_type\x18\x03 \x01(\x0e\x32$.temporal.api.enums.v1.TaskQueueType\x12\x14\n\x0creport_stats\x18\x08 \x01(\x08\x12%\n\x19include_task_queue_status\x18\x04 \x01(\x08\x42\x02\x18\x01\x12\x42\n\x08\x61pi_mode\x18\x05 \x01(\x0e\x32,.temporal.api.enums.v1.DescribeTaskQueueModeB\x02\x18\x01\x12J\n\x08versions\x18\x06 \x01(\x0b\x32\x34.temporal.api.taskqueue.v1.TaskQueueVersionSelectionB\x02\x18\x01\x12\x42\n\x10task_queue_types\x18\x07 \x03(\x0e\x32$.temporal.api.enums.v1.TaskQueueTypeB\x02\x18\x01\x12\x1a\n\x0ereport_pollers\x18\t \x01(\x08\x42\x02\x18\x01\x12$\n\x18report_task_reachability\x18\n \x01(\x08\x42\x02\x18\x01"\xf4\x03\n\x19\x44\x65scribeTaskQueueResponse\x12\x36\n\x07pollers\x18\x01 \x03(\x0b\x32%.temporal.api.taskqueue.v1.PollerInfo\x12\x38\n\x05stats\x18\x05 \x01(\x0b\x32).temporal.api.taskqueue.v1.TaskQueueStats\x12K\n\x0fversioning_info\x18\x04 \x01(\x0b\x32\x32.temporal.api.taskqueue.v1.TaskQueueVersioningInfo\x12I\n\x11task_queue_status\x18\x02 \x01(\x0b\x32*.temporal.api.taskqueue.v1.TaskQueueStatusB\x02\x18\x01\x12g\n\rversions_info\x18\x03 \x03(\x0b\x32L.temporal.api.workflowservice.v1.DescribeTaskQueueResponse.VersionsInfoEntryB\x02\x18\x01\x1a\x64\n\x11VersionsInfoEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12>\n\x05value\x18\x02 \x01(\x0b\x32/.temporal.api.taskqueue.v1.TaskQueueVersionInfo:\x02\x38\x01"\x17\n\x15GetClusterInfoRequest"\x8b\x03\n\x16GetClusterInfoResponse\x12h\n\x11supported_clients\x18\x01 \x03(\x0b\x32M.temporal.api.workflowservice.v1.GetClusterInfoResponse.SupportedClientsEntry\x12\x16\n\x0eserver_version\x18\x02 \x01(\t\x12\x12\n\ncluster_id\x18\x03 \x01(\t\x12:\n\x0cversion_info\x18\x04 \x01(\x0b\x32$.temporal.api.version.v1.VersionInfo\x12\x14\n\x0c\x63luster_name\x18\x05 \x01(\t\x12\x1b\n\x13history_shard_count\x18\x06 \x01(\x05\x12\x19\n\x11persistence_store\x18\x07 \x01(\t\x12\x18\n\x10visibility_store\x18\x08 \x01(\t\x1a\x37\n\x15SupportedClientsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"\x16\n\x14GetSystemInfoRequest"\xf4\x03\n\x15GetSystemInfoResponse\x12\x16\n\x0eserver_version\x18\x01 \x01(\t\x12Y\n\x0c\x63\x61pabilities\x18\x02 \x01(\x0b\x32\x43.temporal.api.workflowservice.v1.GetSystemInfoResponse.Capabilities\x1a\xe7\x02\n\x0c\x43\x61pabilities\x12\x1f\n\x17signal_and_query_header\x18\x01 \x01(\x08\x12&\n\x1einternal_error_differentiation\x18\x02 \x01(\x08\x12*\n"activity_failure_include_heartbeat\x18\x03 \x01(\x08\x12\x1a\n\x12supports_schedules\x18\x04 \x01(\x08\x12"\n\x1a\x65ncoded_failure_attributes\x18\x05 \x01(\x08\x12!\n\x19\x62uild_id_based_versioning\x18\x06 \x01(\x08\x12\x13\n\x0bupsert_memo\x18\x07 \x01(\x08\x12\x1c\n\x14\x65\x61ger_workflow_start\x18\x08 \x01(\x08\x12\x14\n\x0csdk_metadata\x18\t \x01(\x08\x12\'\n\x1f\x63ount_group_by_execution_status\x18\n \x01(\x08\x12\r\n\x05nexus\x18\x0b \x01(\x08"m\n\x1eListTaskQueuePartitionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x38\n\ntask_queue\x18\x02 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue"\xdf\x01\n\x1fListTaskQueuePartitionsResponse\x12]\n\x1e\x61\x63tivity_task_queue_partitions\x18\x01 \x03(\x0b\x32\x35.temporal.api.taskqueue.v1.TaskQueuePartitionMetadata\x12]\n\x1eworkflow_task_queue_partitions\x18\x02 \x03(\x0b\x32\x35.temporal.api.taskqueue.v1.TaskQueuePartitionMetadata"\xcc\x02\n\x15\x43reateScheduleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t\x12\x34\n\x08schedule\x18\x03 \x01(\x0b\x32".temporal.api.schedule.v1.Schedule\x12>\n\rinitial_patch\x18\x04 \x01(\x0b\x32\'.temporal.api.schedule.v1.SchedulePatch\x12\x10\n\x08identity\x18\x05 \x01(\t\x12\x12\n\nrequest_id\x18\x06 \x01(\t\x12*\n\x04memo\x18\x07 \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x08 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes"0\n\x16\x43reateScheduleResponse\x12\x16\n\x0e\x63onflict_token\x18\x01 \x01(\x0c"A\n\x17\x44\x65scribeScheduleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t"\x8f\x02\n\x18\x44\x65scribeScheduleResponse\x12\x34\n\x08schedule\x18\x01 \x01(\x0b\x32".temporal.api.schedule.v1.Schedule\x12\x34\n\x04info\x18\x02 \x01(\x0b\x32&.temporal.api.schedule.v1.ScheduleInfo\x12*\n\x04memo\x18\x03 \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x04 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12\x16\n\x0e\x63onflict_token\x18\x05 \x01(\x0c"\xf8\x01\n\x15UpdateScheduleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t\x12\x34\n\x08schedule\x18\x03 \x01(\x0b\x32".temporal.api.schedule.v1.Schedule\x12\x16\n\x0e\x63onflict_token\x18\x04 \x01(\x0c\x12\x10\n\x08identity\x18\x05 \x01(\t\x12\x12\n\nrequest_id\x18\x06 \x01(\t\x12\x43\n\x11search_attributes\x18\x07 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes"\x18\n\x16UpdateScheduleResponse"\x9c\x01\n\x14PatchScheduleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t\x12\x36\n\x05patch\x18\x03 \x01(\x0b\x32\'.temporal.api.schedule.v1.SchedulePatch\x12\x10\n\x08identity\x18\x04 \x01(\t\x12\x12\n\nrequest_id\x18\x05 \x01(\t"\x17\n\x15PatchScheduleResponse"\xa8\x01\n ListScheduleMatchingTimesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t\x12.\n\nstart_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"S\n!ListScheduleMatchingTimesResponse\x12.\n\nstart_time\x18\x01 \x03(\x0b\x32\x1a.google.protobuf.Timestamp"Q\n\x15\x44\x65leteScheduleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bschedule_id\x18\x02 \x01(\t\x12\x10\n\x08identity\x18\x03 \x01(\t"\x18\n\x16\x44\x65leteScheduleResponse"l\n\x14ListSchedulesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x19\n\x11maximum_page_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\r\n\x05query\x18\x04 \x01(\t"p\n\x15ListSchedulesResponse\x12>\n\tschedules\x18\x01 \x03(\x0b\x32+.temporal.api.schedule.v1.ScheduleListEntry\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"\x86\x05\n\'UpdateWorkerBuildIdCompatibilityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x12\n\ntask_queue\x18\x02 \x01(\t\x12-\n#add_new_build_id_in_new_default_set\x18\x03 \x01(\tH\x00\x12\x87\x01\n\x1b\x61\x64\x64_new_compatible_build_id\x18\x04 \x01(\x0b\x32`.temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest.AddNewCompatibleVersionH\x00\x12!\n\x17promote_set_by_build_id\x18\x05 \x01(\tH\x00\x12%\n\x1bpromote_build_id_within_set\x18\x06 \x01(\tH\x00\x12h\n\nmerge_sets\x18\x07 \x01(\x0b\x32R.temporal.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest.MergeSetsH\x00\x1ao\n\x17\x41\x64\x64NewCompatibleVersion\x12\x14\n\x0cnew_build_id\x18\x01 \x01(\t\x12$\n\x1c\x65xisting_compatible_build_id\x18\x02 \x01(\t\x12\x18\n\x10make_set_default\x18\x03 \x01(\x08\x1aI\n\tMergeSets\x12\x1c\n\x14primary_set_build_id\x18\x01 \x01(\t\x12\x1e\n\x16secondary_set_build_id\x18\x02 \x01(\tB\x0b\n\toperation"@\n(UpdateWorkerBuildIdCompatibilityResponseJ\x04\x08\x01\x10\x02R\x0eversion_set_id"_\n$GetWorkerBuildIdCompatibilityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x12\n\ntask_queue\x18\x02 \x01(\t\x12\x10\n\x08max_sets\x18\x03 \x01(\x05"t\n%GetWorkerBuildIdCompatibilityResponse\x12K\n\x12major_version_sets\x18\x01 \x03(\x0b\x32/.temporal.api.taskqueue.v1.CompatibleVersionSet"\xb5\r\n"UpdateWorkerVersioningRulesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x12\n\ntask_queue\x18\x02 \x01(\t\x12\x16\n\x0e\x63onflict_token\x18\x03 \x01(\x0c\x12\x81\x01\n\x16insert_assignment_rule\x18\x04 \x01(\x0b\x32_.temporal.api.workflowservice.v1.UpdateWorkerVersioningRulesRequest.InsertBuildIdAssignmentRuleH\x00\x12\x83\x01\n\x17replace_assignment_rule\x18\x05 \x01(\x0b\x32`.temporal.api.workflowservice.v1.UpdateWorkerVersioningRulesRequest.ReplaceBuildIdAssignmentRuleH\x00\x12\x81\x01\n\x16\x64\x65lete_assignment_rule\x18\x06 \x01(\x0b\x32_.temporal.api.workflowservice.v1.UpdateWorkerVersioningRulesRequest.DeleteBuildIdAssignmentRuleH\x00\x12\x8c\x01\n\x1c\x61\x64\x64_compatible_redirect_rule\x18\x07 \x01(\x0b\x32\x64.temporal.api.workflowservice.v1.UpdateWorkerVersioningRulesRequest.AddCompatibleBuildIdRedirectRuleH\x00\x12\x94\x01\n replace_compatible_redirect_rule\x18\x08 \x01(\x0b\x32h.temporal.api.workflowservice.v1.UpdateWorkerVersioningRulesRequest.ReplaceCompatibleBuildIdRedirectRuleH\x00\x12\x92\x01\n\x1f\x64\x65lete_compatible_redirect_rule\x18\t \x01(\x0b\x32g.temporal.api.workflowservice.v1.UpdateWorkerVersioningRulesRequest.DeleteCompatibleBuildIdRedirectRuleH\x00\x12l\n\x0f\x63ommit_build_id\x18\n \x01(\x0b\x32Q.temporal.api.workflowservice.v1.UpdateWorkerVersioningRulesRequest.CommitBuildIdH\x00\x1aq\n\x1bInsertBuildIdAssignmentRule\x12\x12\n\nrule_index\x18\x01 \x01(\x05\x12>\n\x04rule\x18\x02 \x01(\x0b\x32\x30.temporal.api.taskqueue.v1.BuildIdAssignmentRule\x1a\x81\x01\n\x1cReplaceBuildIdAssignmentRule\x12\x12\n\nrule_index\x18\x01 \x01(\x05\x12>\n\x04rule\x18\x02 \x01(\x0b\x32\x30.temporal.api.taskqueue.v1.BuildIdAssignmentRule\x12\r\n\x05\x66orce\x18\x03 \x01(\x08\x1a@\n\x1b\x44\x65leteBuildIdAssignmentRule\x12\x12\n\nrule_index\x18\x01 \x01(\x05\x12\r\n\x05\x66orce\x18\x02 \x01(\x08\x1aj\n AddCompatibleBuildIdRedirectRule\x12\x46\n\x04rule\x18\x01 \x01(\x0b\x32\x38.temporal.api.taskqueue.v1.CompatibleBuildIdRedirectRule\x1an\n$ReplaceCompatibleBuildIdRedirectRule\x12\x46\n\x04rule\x18\x01 \x01(\x0b\x32\x38.temporal.api.taskqueue.v1.CompatibleBuildIdRedirectRule\x1a>\n#DeleteCompatibleBuildIdRedirectRule\x12\x17\n\x0fsource_build_id\x18\x01 \x01(\t\x1a\x37\n\rCommitBuildId\x12\x17\n\x0ftarget_build_id\x18\x01 \x01(\t\x12\r\n\x05\x66orce\x18\x02 \x01(\x08\x42\x0b\n\toperation"\xfc\x01\n#UpdateWorkerVersioningRulesResponse\x12U\n\x10\x61ssignment_rules\x18\x01 \x03(\x0b\x32;.temporal.api.taskqueue.v1.TimestampedBuildIdAssignmentRule\x12\x66\n\x19\x63ompatible_redirect_rules\x18\x02 \x03(\x0b\x32\x43.temporal.api.taskqueue.v1.TimestampedCompatibleBuildIdRedirectRule\x12\x16\n\x0e\x63onflict_token\x18\x03 \x01(\x0c"H\n\x1fGetWorkerVersioningRulesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x12\n\ntask_queue\x18\x02 \x01(\t"\xf9\x01\n GetWorkerVersioningRulesResponse\x12U\n\x10\x61ssignment_rules\x18\x01 \x03(\x0b\x32;.temporal.api.taskqueue.v1.TimestampedBuildIdAssignmentRule\x12\x66\n\x19\x63ompatible_redirect_rules\x18\x02 \x03(\x0b\x32\x43.temporal.api.taskqueue.v1.TimestampedCompatibleBuildIdRedirectRule\x12\x16\n\x0e\x63onflict_token\x18\x03 \x01(\x0c"\x9c\x01\n GetWorkerTaskReachabilityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tbuild_ids\x18\x02 \x03(\t\x12\x13\n\x0btask_queues\x18\x03 \x03(\t\x12=\n\x0creachability\x18\x04 \x01(\x0e\x32\'.temporal.api.enums.v1.TaskReachability"r\n!GetWorkerTaskReachabilityResponse\x12M\n\x15\x62uild_id_reachability\x18\x01 \x03(\x0b\x32..temporal.api.taskqueue.v1.BuildIdReachability"\x85\x02\n\x1eUpdateWorkflowExecutionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x1e\n\x16\x66irst_execution_run_id\x18\x03 \x01(\t\x12\x37\n\x0bwait_policy\x18\x04 \x01(\x0b\x32".temporal.api.update.v1.WaitPolicy\x12\x30\n\x07request\x18\x05 \x01(\x0b\x32\x1f.temporal.api.update.v1.Request"\xd7\x01\n\x1fUpdateWorkflowExecutionResponse\x12\x35\n\nupdate_ref\x18\x01 \x01(\x0b\x32!.temporal.api.update.v1.UpdateRef\x12\x30\n\x07outcome\x18\x02 \x01(\x0b\x32\x1f.temporal.api.update.v1.Outcome\x12K\n\x05stage\x18\x03 \x01(\x0e\x32<.temporal.api.enums.v1.UpdateWorkflowExecutionLifecycleStage"\xaf\x06\n\x1aStartBatchOperationRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x18\n\x10visibility_query\x18\x02 \x01(\t\x12\x0e\n\x06job_id\x18\x03 \x01(\t\x12\x0e\n\x06reason\x18\x04 \x01(\t\x12=\n\nexecutions\x18\x05 \x03(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12!\n\x19max_operations_per_second\x18\x06 \x01(\x02\x12Q\n\x15termination_operation\x18\n \x01(\x0b\x32\x30.temporal.api.batch.v1.BatchOperationTerminationH\x00\x12G\n\x10signal_operation\x18\x0b \x01(\x0b\x32+.temporal.api.batch.v1.BatchOperationSignalH\x00\x12S\n\x16\x63\x61ncellation_operation\x18\x0c \x01(\x0b\x32\x31.temporal.api.batch.v1.BatchOperationCancellationH\x00\x12K\n\x12\x64\x65letion_operation\x18\r \x01(\x0b\x32-.temporal.api.batch.v1.BatchOperationDeletionH\x00\x12\x45\n\x0freset_operation\x18\x0e \x01(\x0b\x32*.temporal.api.batch.v1.BatchOperationResetH\x00\x12p\n!update_workflow_options_operation\x18\x0f \x01(\x0b\x32\x43.temporal.api.batch.v1.BatchOperationUpdateWorkflowExecutionOptionsH\x00\x12^\n\x1cunpause_activities_operation\x18\x10 \x01(\x0b\x32\x36.temporal.api.batch.v1.BatchOperationUnpauseActivitiesH\x00\x42\x0b\n\toperation"\x1d\n\x1bStartBatchOperationResponse"`\n\x19StopBatchOperationRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0e\n\x06job_id\x18\x02 \x01(\t\x12\x0e\n\x06reason\x18\x03 \x01(\t\x12\x10\n\x08identity\x18\x04 \x01(\t"\x1c\n\x1aStopBatchOperationResponse"B\n\x1d\x44\x65scribeBatchOperationRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0e\n\x06job_id\x18\x02 \x01(\t"\x92\x03\n\x1e\x44\x65scribeBatchOperationResponse\x12\x41\n\x0eoperation_type\x18\x01 \x01(\x0e\x32).temporal.api.enums.v1.BatchOperationType\x12\x0e\n\x06job_id\x18\x02 \x01(\t\x12\x39\n\x05state\x18\x03 \x01(\x0e\x32*.temporal.api.enums.v1.BatchOperationState\x12.\n\nstart_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nclose_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1d\n\x15total_operation_count\x18\x06 \x01(\x03\x12 \n\x18\x63omplete_operation_count\x18\x07 \x01(\x03\x12\x1f\n\x17\x66\x61ilure_operation_count\x18\x08 \x01(\x03\x12\x10\n\x08identity\x18\t \x01(\t\x12\x0e\n\x06reason\x18\n \x01(\t"[\n\x1aListBatchOperationsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c"y\n\x1bListBatchOperationsResponse\x12\x41\n\x0eoperation_info\x18\x01 \x03(\x0b\x32).temporal.api.batch.v1.BatchOperationInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"\xb9\x01\n"PollWorkflowExecutionUpdateRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x35\n\nupdate_ref\x18\x02 \x01(\x0b\x32!.temporal.api.update.v1.UpdateRef\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x37\n\x0bwait_policy\x18\x04 \x01(\x0b\x32".temporal.api.update.v1.WaitPolicy"\xdb\x01\n#PollWorkflowExecutionUpdateResponse\x12\x30\n\x07outcome\x18\x01 \x01(\x0b\x32\x1f.temporal.api.update.v1.Outcome\x12K\n\x05stage\x18\x02 \x01(\x0e\x32<.temporal.api.enums.v1.UpdateWorkflowExecutionLifecycleStage\x12\x35\n\nupdate_ref\x18\x03 \x01(\x0b\x32!.temporal.api.update.v1.UpdateRef"\xea\x02\n\x19PollNexusTaskQueueRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x10\n\x08identity\x18\x02 \x01(\t\x12\x38\n\ntask_queue\x18\x03 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12Z\n\x1bworker_version_capabilities\x18\x04 \x01(\x0b\x32\x31.temporal.api.common.v1.WorkerVersionCapabilitiesB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\x06 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions\x12\x41\n\x10worker_heartbeat\x18\x07 \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerHeartbeat"\xb4\x01\n\x1aPollNexusTaskQueueResponse\x12\x12\n\ntask_token\x18\x01 \x01(\x0c\x12/\n\x07request\x18\x02 \x01(\x0b\x32\x1e.temporal.api.nexus.v1.Request\x12Q\n\x17poller_scaling_decision\x18\x03 \x01(\x0b\x32\x30.temporal.api.taskqueue.v1.PollerScalingDecision"\x8e\x01\n RespondNexusTaskCompletedRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x10\n\x08identity\x18\x02 \x01(\t\x12\x12\n\ntask_token\x18\x03 \x01(\x0c\x12\x31\n\x08response\x18\x04 \x01(\x0b\x32\x1f.temporal.api.nexus.v1.Response"#\n!RespondNexusTaskCompletedResponse"\x8c\x01\n\x1dRespondNexusTaskFailedRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x10\n\x08identity\x18\x02 \x01(\t\x12\x12\n\ntask_token\x18\x03 \x01(\x0c\x12\x32\n\x05\x65rror\x18\x04 \x01(\x0b\x32#.temporal.api.nexus.v1.HandlerError" \n\x1eRespondNexusTaskFailedResponse"\xdf\x02\n\x1c\x45xecuteMultiOperationRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12[\n\noperations\x18\x02 \x03(\x0b\x32G.temporal.api.workflowservice.v1.ExecuteMultiOperationRequest.Operation\x1a\xce\x01\n\tOperation\x12X\n\x0estart_workflow\x18\x01 \x01(\x0b\x32>.temporal.api.workflowservice.v1.StartWorkflowExecutionRequestH\x00\x12Z\n\x0fupdate_workflow\x18\x02 \x01(\x0b\x32?.temporal.api.workflowservice.v1.UpdateWorkflowExecutionRequestH\x00\x42\x0b\n\toperation"\xcc\x02\n\x1d\x45xecuteMultiOperationResponse\x12Z\n\tresponses\x18\x01 \x03(\x0b\x32G.temporal.api.workflowservice.v1.ExecuteMultiOperationResponse.Response\x1a\xce\x01\n\x08Response\x12Y\n\x0estart_workflow\x18\x01 \x01(\x0b\x32?.temporal.api.workflowservice.v1.StartWorkflowExecutionResponseH\x00\x12[\n\x0fupdate_workflow\x18\x02 \x01(\x0b\x32@.temporal.api.workflowservice.v1.UpdateWorkflowExecutionResponseH\x00\x42\n\n\x08response"\xbb\x02\n\x1cUpdateActivityOptionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x43\n\x10\x61\x63tivity_options\x18\x04 \x01(\x0b\x32).temporal.api.activity.v1.ActivityOptions\x12/\n\x0bupdate_mask\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\x12\x0c\n\x02id\x18\x06 \x01(\tH\x00\x12\x0e\n\x04type\x18\x07 \x01(\tH\x00\x12\x18\n\x10restore_original\x18\x08 \x01(\x08\x42\n\n\x08\x61\x63tivity"d\n\x1dUpdateActivityOptionsResponse\x12\x43\n\x10\x61\x63tivity_options\x18\x01 \x01(\x0b\x32).temporal.api.activity.v1.ActivityOptions"\xb3\x01\n\x14PauseActivityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x0c\n\x02id\x18\x04 \x01(\tH\x00\x12\x0e\n\x04type\x18\x05 \x01(\tH\x00\x12\x0e\n\x06reason\x18\x06 \x01(\tB\n\n\x08\x61\x63tivity"\x17\n\x15PauseActivityResponse"\x98\x02\n\x16UnpauseActivityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x0c\n\x02id\x18\x04 \x01(\tH\x00\x12\x0e\n\x04type\x18\x05 \x01(\tH\x00\x12\x15\n\x0bunpause_all\x18\x06 \x01(\x08H\x00\x12\x16\n\x0ereset_attempts\x18\x07 \x01(\x08\x12\x17\n\x0freset_heartbeat\x18\x08 \x01(\x08\x12)\n\x06jitter\x18\t \x01(\x0b\x32\x19.google.protobuf.DurationB\n\n\x08\x61\x63tivity"\x19\n\x17UnpauseActivityResponse"\x9e\x02\n\x14ResetActivityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x10\n\x08identity\x18\x03 \x01(\t\x12\x0c\n\x02id\x18\x04 \x01(\tH\x00\x12\x0e\n\x04type\x18\x05 \x01(\tH\x00\x12\x17\n\x0freset_heartbeat\x18\x06 \x01(\x08\x12\x13\n\x0bkeep_paused\x18\x07 \x01(\x08\x12)\n\x06jitter\x18\x08 \x01(\x0b\x32\x19.google.protobuf.Duration\x12 \n\x18restore_original_options\x18\t \x01(\x08\x42\n\n\x08\x61\x63tivity"\x17\n\x15ResetActivityResponse"\x8a\x02\n%UpdateWorkflowExecutionOptionsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x45\n\x12workflow_execution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12V\n\x1aworkflow_execution_options\x18\x03 \x01(\x0b\x32\x32.temporal.api.workflow.v1.WorkflowExecutionOptions\x12/\n\x0bupdate_mask\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.FieldMask"\x80\x01\n&UpdateWorkflowExecutionOptionsResponse\x12V\n\x1aworkflow_execution_options\x18\x01 \x01(\x0b\x32\x32.temporal.api.workflow.v1.WorkflowExecutionOptions"j\n\x19\x44\x65scribeDeploymentRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12:\n\ndeployment\x18\x02 \x01(\x0b\x32&.temporal.api.deployment.v1.Deployment"a\n\x1a\x44\x65scribeDeploymentResponse\x12\x43\n\x0f\x64\x65ployment_info\x18\x01 \x01(\x0b\x32*.temporal.api.deployment.v1.DeploymentInfo"\xc2\x01\n&DescribeWorkerDeploymentVersionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x07version\x18\x02 \x01(\tB\x02\x18\x01\x12O\n\x12\x64\x65ployment_version\x18\x03 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x1f\n\x17report_task_queue_stats\x18\x04 \x01(\x08"\x93\x03\n\'DescribeWorkerDeploymentVersionResponse\x12_\n\x1eworker_deployment_version_info\x18\x01 \x01(\x0b\x32\x37.temporal.api.deployment.v1.WorkerDeploymentVersionInfo\x12v\n\x13version_task_queues\x18\x02 \x03(\x0b\x32Y.temporal.api.workflowservice.v1.DescribeWorkerDeploymentVersionResponse.VersionTaskQueue\x1a\x8e\x01\n\x10VersionTaskQueue\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x32\n\x04type\x18\x02 \x01(\x0e\x32$.temporal.api.enums.v1.TaskQueueType\x12\x38\n\x05stats\x18\x03 \x01(\x0b\x32).temporal.api.taskqueue.v1.TaskQueueStats"M\n\x1f\x44\x65scribeWorkerDeploymentRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0f\x64\x65ployment_name\x18\x02 \x01(\t"\x8c\x01\n DescribeWorkerDeploymentResponse\x12\x16\n\x0e\x63onflict_token\x18\x01 \x01(\x0c\x12P\n\x16worker_deployment_info\x18\x02 \x01(\x0b\x32\x30.temporal.api.deployment.v1.WorkerDeploymentInfo"l\n\x16ListDeploymentsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\x13\n\x0bseries_name\x18\x04 \x01(\t"w\n\x17ListDeploymentsResponse\x12\x17\n\x0fnext_page_token\x18\x01 \x01(\x0c\x12\x43\n\x0b\x64\x65ployments\x18\x02 \x03(\x0b\x32..temporal.api.deployment.v1.DeploymentListInfo"\xcd\x01\n\x1bSetCurrentDeploymentRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12:\n\ndeployment\x18\x02 \x01(\x0b\x32&.temporal.api.deployment.v1.Deployment\x12\x10\n\x08identity\x18\x03 \x01(\t\x12M\n\x0fupdate_metadata\x18\x04 \x01(\x0b\x32\x34.temporal.api.deployment.v1.UpdateDeploymentMetadata"\xb9\x01\n\x1cSetCurrentDeploymentResponse\x12K\n\x17\x63urrent_deployment_info\x18\x01 \x01(\x0b\x32*.temporal.api.deployment.v1.DeploymentInfo\x12L\n\x18previous_deployment_info\x18\x02 \x01(\x0b\x32*.temporal.api.deployment.v1.DeploymentInfo"\xcb\x01\n(SetWorkerDeploymentCurrentVersionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0f\x64\x65ployment_name\x18\x02 \x01(\t\x12\x13\n\x07version\x18\x03 \x01(\tB\x02\x18\x01\x12\x10\n\x08\x62uild_id\x18\x07 \x01(\t\x12\x16\n\x0e\x63onflict_token\x18\x04 \x01(\x0c\x12\x10\n\x08identity\x18\x05 \x01(\t\x12"\n\x1aignore_missing_task_queues\x18\x06 \x01(\x08"\xbb\x01\n)SetWorkerDeploymentCurrentVersionResponse\x12\x16\n\x0e\x63onflict_token\x18\x01 \x01(\x0c\x12\x1c\n\x10previous_version\x18\x02 \x01(\tB\x02\x18\x01\x12X\n\x1bprevious_deployment_version\x18\x03 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion"\xdf\x01\n(SetWorkerDeploymentRampingVersionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0f\x64\x65ployment_name\x18\x02 \x01(\t\x12\x13\n\x07version\x18\x03 \x01(\tB\x02\x18\x01\x12\x10\n\x08\x62uild_id\x18\x08 \x01(\t\x12\x12\n\npercentage\x18\x04 \x01(\x02\x12\x16\n\x0e\x63onflict_token\x18\x05 \x01(\x0c\x12\x10\n\x08identity\x18\x06 \x01(\t\x12"\n\x1aignore_missing_task_queues\x18\x07 \x01(\x08"\xd8\x01\n)SetWorkerDeploymentRampingVersionResponse\x12\x16\n\x0e\x63onflict_token\x18\x01 \x01(\x0c\x12\x1c\n\x10previous_version\x18\x02 \x01(\tB\x02\x18\x01\x12X\n\x1bprevious_deployment_version\x18\x04 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x1b\n\x13previous_percentage\x18\x03 \x01(\x02"]\n\x1cListWorkerDeploymentsRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c"\x9f\x05\n\x1dListWorkerDeploymentsResponse\x12\x17\n\x0fnext_page_token\x18\x01 \x01(\x0c\x12r\n\x12worker_deployments\x18\x02 \x03(\x0b\x32V.temporal.api.workflowservice.v1.ListWorkerDeploymentsResponse.WorkerDeploymentSummary\x1a\xf0\x03\n\x17WorkerDeploymentSummary\x12\x0c\n\x04name\x18\x01 \x01(\t\x12/\n\x0b\x63reate_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x41\n\x0erouting_config\x18\x03 \x01(\x0b\x32).temporal.api.deployment.v1.RoutingConfig\x12o\n\x16latest_version_summary\x18\x04 \x01(\x0b\x32O.temporal.api.deployment.v1.WorkerDeploymentInfo.WorkerDeploymentVersionSummary\x12p\n\x17\x63urrent_version_summary\x18\x05 \x01(\x0b\x32O.temporal.api.deployment.v1.WorkerDeploymentInfo.WorkerDeploymentVersionSummary\x12p\n\x17ramping_version_summary\x18\x06 \x01(\x0b\x32O.temporal.api.deployment.v1.WorkerDeploymentInfo.WorkerDeploymentVersionSummary"\xc8\x01\n$DeleteWorkerDeploymentVersionRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x07version\x18\x02 \x01(\tB\x02\x18\x01\x12O\n\x12\x64\x65ployment_version\x18\x05 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x15\n\rskip_drainage\x18\x03 \x01(\x08\x12\x10\n\x08identity\x18\x04 \x01(\t"\'\n%DeleteWorkerDeploymentVersionResponse"]\n\x1d\x44\x65leteWorkerDeploymentRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0f\x64\x65ployment_name\x18\x02 \x01(\t\x12\x10\n\x08identity\x18\x03 \x01(\t" \n\x1e\x44\x65leteWorkerDeploymentResponse"\xa2\x03\n,UpdateWorkerDeploymentVersionMetadataRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x07version\x18\x02 \x01(\tB\x02\x18\x01\x12O\n\x12\x64\x65ployment_version\x18\x05 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12x\n\x0eupsert_entries\x18\x03 \x03(\x0b\x32`.temporal.api.workflowservice.v1.UpdateWorkerDeploymentVersionMetadataRequest.UpsertEntriesEntry\x12\x16\n\x0eremove_entries\x18\x04 \x03(\t\x12\x10\n\x08identity\x18\x06 \x01(\t\x1aU\n\x12UpsertEntriesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12.\n\x05value\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload:\x02\x38\x01"n\n-UpdateWorkerDeploymentVersionMetadataResponse\x12=\n\x08metadata\x18\x01 \x01(\x0b\x32+.temporal.api.deployment.v1.VersionMetadata"E\n\x1bGetCurrentDeploymentRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bseries_name\x18\x02 \x01(\t"k\n\x1cGetCurrentDeploymentResponse\x12K\n\x17\x63urrent_deployment_info\x18\x01 \x01(\x0b\x32*.temporal.api.deployment.v1.DeploymentInfo"q\n GetDeploymentReachabilityRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12:\n\ndeployment\x18\x02 \x01(\x0b\x32&.temporal.api.deployment.v1.Deployment"\xe3\x01\n!GetDeploymentReachabilityResponse\x12\x43\n\x0f\x64\x65ployment_info\x18\x01 \x01(\x0b\x32*.temporal.api.deployment.v1.DeploymentInfo\x12\x43\n\x0creachability\x18\x02 \x01(\x0e\x32-.temporal.api.enums.v1.DeploymentReachability\x12\x34\n\x10last_update_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\xb4\x01\n\x19\x43reateWorkflowRuleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x35\n\x04spec\x18\x02 \x01(\x0b\x32\'.temporal.api.rules.v1.WorkflowRuleSpec\x12\x12\n\nforce_scan\x18\x03 \x01(\x08\x12\x12\n\nrequest_id\x18\x04 \x01(\t\x12\x10\n\x08identity\x18\x05 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x06 \x01(\t"_\n\x1a\x43reateWorkflowRuleResponse\x12\x31\n\x04rule\x18\x01 \x01(\x0b\x32#.temporal.api.rules.v1.WorkflowRule\x12\x0e\n\x06job_id\x18\x02 \x01(\t"A\n\x1b\x44\x65scribeWorkflowRuleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0f\n\x07rule_id\x18\x02 \x01(\t"Q\n\x1c\x44\x65scribeWorkflowRuleResponse\x12\x31\n\x04rule\x18\x01 \x01(\x0b\x32#.temporal.api.rules.v1.WorkflowRule"?\n\x19\x44\x65leteWorkflowRuleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x0f\n\x07rule_id\x18\x02 \x01(\t"\x1c\n\x1a\x44\x65leteWorkflowRuleResponse"F\n\x18ListWorkflowRulesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"h\n\x19ListWorkflowRulesResponse\x12\x32\n\x05rules\x18\x01 \x03(\x0b\x32#.temporal.api.rules.v1.WorkflowRule\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"\xce\x01\n\x1aTriggerWorkflowRuleRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x0c\n\x02id\x18\x04 \x01(\tH\x00\x12\x37\n\x04spec\x18\x05 \x01(\x0b\x32\'.temporal.api.rules.v1.WorkflowRuleSpecH\x00\x12\x10\n\x08identity\x18\x03 \x01(\tB\x06\n\x04rule".\n\x1bTriggerWorkflowRuleResponse\x12\x0f\n\x07\x61pplied\x18\x01 \x01(\x08"\x86\x01\n\x1cRecordWorkerHeartbeatRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x10\n\x08identity\x18\x02 \x01(\t\x12\x41\n\x10worker_heartbeat\x18\x03 \x01(\x0b\x32\'.temporal.api.worker.v1.WorkerHeartbeat"\x1f\n\x1dRecordWorkerHeartbeatResponse"b\n\x12ListWorkersRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x11\n\tpage_size\x18\x02 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x03 \x01(\x0c\x12\r\n\x05query\x18\x04 \x01(\t"h\n\x13ListWorkersResponse\x12\x38\n\x0cworkers_info\x18\x01 \x03(\x0b\x32".temporal.api.worker.v1.WorkerInfo\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c\x42\xbe\x01\n"io.temporal.api.workflowservice.v1B\x14RequestResponseProtoP\x01Z5go.temporal.io/api/workflowservice/v1;workflowservice\xaa\x02!Temporalio.Api.WorkflowService.V1\xea\x02$Temporalio::Api::WorkflowService::V1b\x06proto3'
 )
 
 
@@ -551,6 +554,9 @@ _DESCRIBEWORKERDEPLOYMENTVERSIONREQUEST = DESCRIPTOR.message_types_by_name[
 _DESCRIBEWORKERDEPLOYMENTVERSIONRESPONSE = DESCRIPTOR.message_types_by_name[
     "DescribeWorkerDeploymentVersionResponse"
 ]
+_DESCRIBEWORKERDEPLOYMENTVERSIONRESPONSE_VERSIONTASKQUEUE = (
+    _DESCRIBEWORKERDEPLOYMENTVERSIONRESPONSE.nested_types_by_name["VersionTaskQueue"]
+)
 _DESCRIBEWORKERDEPLOYMENTREQUEST = DESCRIPTOR.message_types_by_name[
     "DescribeWorkerDeploymentRequest"
 ]
@@ -649,6 +655,14 @@ _TRIGGERWORKFLOWRULEREQUEST = DESCRIPTOR.message_types_by_name[
 _TRIGGERWORKFLOWRULERESPONSE = DESCRIPTOR.message_types_by_name[
     "TriggerWorkflowRuleResponse"
 ]
+_RECORDWORKERHEARTBEATREQUEST = DESCRIPTOR.message_types_by_name[
+    "RecordWorkerHeartbeatRequest"
+]
+_RECORDWORKERHEARTBEATRESPONSE = DESCRIPTOR.message_types_by_name[
+    "RecordWorkerHeartbeatResponse"
+]
+_LISTWORKERSREQUEST = DESCRIPTOR.message_types_by_name["ListWorkersRequest"]
+_LISTWORKERSRESPONSE = DESCRIPTOR.message_types_by_name["ListWorkersResponse"]
 RegisterNamespaceRequest = _reflection.GeneratedProtocolMessageType(
     "RegisterNamespaceRequest",
     (_message.Message,),
@@ -2410,12 +2424,22 @@ DescribeWorkerDeploymentVersionResponse = _reflection.GeneratedProtocolMessageTy
     "DescribeWorkerDeploymentVersionResponse",
     (_message.Message,),
     {
+        "VersionTaskQueue": _reflection.GeneratedProtocolMessageType(
+            "VersionTaskQueue",
+            (_message.Message,),
+            {
+                "DESCRIPTOR": _DESCRIBEWORKERDEPLOYMENTVERSIONRESPONSE_VERSIONTASKQUEUE,
+                "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
+                # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeWorkerDeploymentVersionResponse.VersionTaskQueue)
+            },
+        ),
         "DESCRIPTOR": _DESCRIBEWORKERDEPLOYMENTVERSIONRESPONSE,
         "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.DescribeWorkerDeploymentVersionResponse)
     },
 )
 _sym_db.RegisterMessage(DescribeWorkerDeploymentVersionResponse)
+_sym_db.RegisterMessage(DescribeWorkerDeploymentVersionResponse.VersionTaskQueue)
 
 DescribeWorkerDeploymentRequest = _reflection.GeneratedProtocolMessageType(
     "DescribeWorkerDeploymentRequest",
@@ -2791,6 +2815,50 @@ TriggerWorkflowRuleResponse = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(TriggerWorkflowRuleResponse)
 
+RecordWorkerHeartbeatRequest = _reflection.GeneratedProtocolMessageType(
+    "RecordWorkerHeartbeatRequest",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _RECORDWORKERHEARTBEATREQUEST,
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RecordWorkerHeartbeatRequest)
+    },
+)
+_sym_db.RegisterMessage(RecordWorkerHeartbeatRequest)
+
+RecordWorkerHeartbeatResponse = _reflection.GeneratedProtocolMessageType(
+    "RecordWorkerHeartbeatResponse",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _RECORDWORKERHEARTBEATRESPONSE,
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.RecordWorkerHeartbeatResponse)
+    },
+)
+_sym_db.RegisterMessage(RecordWorkerHeartbeatResponse)
+
+ListWorkersRequest = _reflection.GeneratedProtocolMessageType(
+    "ListWorkersRequest",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _LISTWORKERSREQUEST,
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListWorkersRequest)
+    },
+)
+_sym_db.RegisterMessage(ListWorkersRequest)
+
+ListWorkersResponse = _reflection.GeneratedProtocolMessageType(
+    "ListWorkersResponse",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _LISTWORKERSRESPONSE,
+        "__module__": "temporal.api.workflowservice.v1.request_response_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.workflowservice.v1.ListWorkersResponse)
+    },
+)
+_sym_db.RegisterMessage(ListWorkersResponse)
+
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b'\n"io.temporal.api.workflowservice.v1B\024RequestResponseProtoP\001Z5go.temporal.io/api/workflowservice/v1;workflowservice\252\002!Temporalio.Api.WorkflowService.V1\352\002$Temporalio::Api::WorkflowService::V1'
@@ -2872,10 +2940,56 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _RESPONDACTIVITYTASKCANCELEDREQUEST.fields_by_name[
         "deployment"
     ]._serialized_options = b"\030\001"
+    _SIGNALWORKFLOWEXECUTIONREQUEST.fields_by_name["control"]._options = None
+    _SIGNALWORKFLOWEXECUTIONREQUEST.fields_by_name[
+        "control"
+    ]._serialized_options = b"\030\001"
+    _SIGNALWITHSTARTWORKFLOWEXECUTIONREQUEST.fields_by_name["control"]._options = None
+    _SIGNALWITHSTARTWORKFLOWEXECUTIONREQUEST.fields_by_name[
+        "control"
+    ]._serialized_options = b"\030\001"
+    _RESETWORKFLOWEXECUTIONREQUEST.fields_by_name["reset_reapply_type"]._options = None
+    _RESETWORKFLOWEXECUTIONREQUEST.fields_by_name[
+        "reset_reapply_type"
+    ]._serialized_options = b"\030\001"
     _GETSEARCHATTRIBUTESRESPONSE_KEYSENTRY._options = None
     _GETSEARCHATTRIBUTESRESPONSE_KEYSENTRY._serialized_options = b"8\001"
+    _DESCRIBETASKQUEUEREQUEST.fields_by_name[
+        "include_task_queue_status"
+    ]._options = None
+    _DESCRIBETASKQUEUEREQUEST.fields_by_name[
+        "include_task_queue_status"
+    ]._serialized_options = b"\030\001"
+    _DESCRIBETASKQUEUEREQUEST.fields_by_name["api_mode"]._options = None
+    _DESCRIBETASKQUEUEREQUEST.fields_by_name[
+        "api_mode"
+    ]._serialized_options = b"\030\001"
+    _DESCRIBETASKQUEUEREQUEST.fields_by_name["versions"]._options = None
+    _DESCRIBETASKQUEUEREQUEST.fields_by_name[
+        "versions"
+    ]._serialized_options = b"\030\001"
+    _DESCRIBETASKQUEUEREQUEST.fields_by_name["task_queue_types"]._options = None
+    _DESCRIBETASKQUEUEREQUEST.fields_by_name[
+        "task_queue_types"
+    ]._serialized_options = b"\030\001"
+    _DESCRIBETASKQUEUEREQUEST.fields_by_name["report_pollers"]._options = None
+    _DESCRIBETASKQUEUEREQUEST.fields_by_name[
+        "report_pollers"
+    ]._serialized_options = b"\030\001"
+    _DESCRIBETASKQUEUEREQUEST.fields_by_name["report_task_reachability"]._options = None
+    _DESCRIBETASKQUEUEREQUEST.fields_by_name[
+        "report_task_reachability"
+    ]._serialized_options = b"\030\001"
     _DESCRIBETASKQUEUERESPONSE_VERSIONSINFOENTRY._options = None
     _DESCRIBETASKQUEUERESPONSE_VERSIONSINFOENTRY._serialized_options = b"8\001"
+    _DESCRIBETASKQUEUERESPONSE.fields_by_name["task_queue_status"]._options = None
+    _DESCRIBETASKQUEUERESPONSE.fields_by_name[
+        "task_queue_status"
+    ]._serialized_options = b"\030\001"
+    _DESCRIBETASKQUEUERESPONSE.fields_by_name["versions_info"]._options = None
+    _DESCRIBETASKQUEUERESPONSE.fields_by_name[
+        "versions_info"
+    ]._serialized_options = b"\030\001"
     _GETCLUSTERINFORESPONSE_SUPPORTEDCLIENTSENTRY._options = None
     _GETCLUSTERINFORESPONSE_SUPPORTEDCLIENTSENTRY._serialized_options = b"8\001"
     _POLLNEXUSTASKQUEUEREQUEST.fields_by_name[
@@ -2920,406 +3034,416 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _UPDATEWORKERDEPLOYMENTVERSIONMETADATAREQUEST.fields_by_name[
         "version"
     ]._serialized_options = b"\030\001"
-    _REGISTERNAMESPACEREQUEST._serialized_start = 1413
-    _REGISTERNAMESPACEREQUEST._serialized_end = 2061
-    _REGISTERNAMESPACEREQUEST_DATAENTRY._serialized_start = 2018
-    _REGISTERNAMESPACEREQUEST_DATAENTRY._serialized_end = 2061
-    _REGISTERNAMESPACERESPONSE._serialized_start = 2063
-    _REGISTERNAMESPACERESPONSE._serialized_end = 2090
-    _LISTNAMESPACESREQUEST._serialized_start = 2093
-    _LISTNAMESPACESREQUEST._serialized_end = 2230
-    _LISTNAMESPACESRESPONSE._serialized_start = 2233
-    _LISTNAMESPACESRESPONSE._serialized_end = 2362
-    _DESCRIBENAMESPACEREQUEST._serialized_start = 2364
-    _DESCRIBENAMESPACEREQUEST._serialized_end = 2421
-    _DESCRIBENAMESPACERESPONSE._serialized_start = 2424
-    _DESCRIBENAMESPACERESPONSE._serialized_end = 2788
-    _UPDATENAMESPACEREQUEST._serialized_start = 2791
-    _UPDATENAMESPACEREQUEST._serialized_end = 3126
-    _UPDATENAMESPACERESPONSE._serialized_start = 3129
-    _UPDATENAMESPACERESPONSE._serialized_end = 3420
-    _DEPRECATENAMESPACEREQUEST._serialized_start = 3422
-    _DEPRECATENAMESPACEREQUEST._serialized_end = 3492
-    _DEPRECATENAMESPACERESPONSE._serialized_start = 3494
-    _DEPRECATENAMESPACERESPONSE._serialized_end = 3522
-    _STARTWORKFLOWEXECUTIONREQUEST._serialized_start = 3525
-    _STARTWORKFLOWEXECUTIONREQUEST._serialized_end = 4974
-    _STARTWORKFLOWEXECUTIONRESPONSE._serialized_start = 4977
-    _STARTWORKFLOWEXECUTIONRESPONSE._serialized_end = 5243
-    _GETWORKFLOWEXECUTIONHISTORYREQUEST._serialized_start = 5246
-    _GETWORKFLOWEXECUTIONHISTORYREQUEST._serialized_end = 5544
-    _GETWORKFLOWEXECUTIONHISTORYRESPONSE._serialized_start = 5547
-    _GETWORKFLOWEXECUTIONHISTORYRESPONSE._serialized_end = 5733
-    _GETWORKFLOWEXECUTIONHISTORYREVERSEREQUEST._serialized_start = 5736
-    _GETWORKFLOWEXECUTIONHISTORYREVERSEREQUEST._serialized_end = 5912
-    _GETWORKFLOWEXECUTIONHISTORYREVERSERESPONSE._serialized_start = 5914
-    _GETWORKFLOWEXECUTIONHISTORYREVERSERESPONSE._serialized_end = 6034
-    _POLLWORKFLOWTASKQUEUEREQUEST._serialized_start = 6037
-    _POLLWORKFLOWTASKQUEUEREQUEST._serialized_end = 6364
-    _POLLWORKFLOWTASKQUEUERESPONSE._serialized_start = 6367
-    _POLLWORKFLOWTASKQUEUERESPONSE._serialized_end = 7280
-    _POLLWORKFLOWTASKQUEUERESPONSE_QUERIESENTRY._serialized_start = 7196
-    _POLLWORKFLOWTASKQUEUERESPONSE_QUERIESENTRY._serialized_end = 7280
-    _RESPONDWORKFLOWTASKCOMPLETEDREQUEST._serialized_start = 7283
-    _RESPONDWORKFLOWTASKCOMPLETEDREQUEST._serialized_end = 8488
-    _RESPONDWORKFLOWTASKCOMPLETEDREQUEST_QUERYRESULTSENTRY._serialized_start = 8322
-    _RESPONDWORKFLOWTASKCOMPLETEDREQUEST_QUERYRESULTSENTRY._serialized_end = 8417
-    _RESPONDWORKFLOWTASKCOMPLETEDREQUEST_CAPABILITIES._serialized_start = 8419
-    _RESPONDWORKFLOWTASKCOMPLETEDREQUEST_CAPABILITIES._serialized_end = 8488
-    _RESPONDWORKFLOWTASKCOMPLETEDRESPONSE._serialized_start = 8491
-    _RESPONDWORKFLOWTASKCOMPLETEDRESPONSE._serialized_end = 8736
-    _RESPONDWORKFLOWTASKFAILEDREQUEST._serialized_start = 8739
-    _RESPONDWORKFLOWTASKFAILEDREQUEST._serialized_end = 9243
-    _RESPONDWORKFLOWTASKFAILEDRESPONSE._serialized_start = 9245
-    _RESPONDWORKFLOWTASKFAILEDRESPONSE._serialized_end = 9280
-    _POLLACTIVITYTASKQUEUEREQUEST._serialized_start = 9283
-    _POLLACTIVITYTASKQUEUEREQUEST._serialized_end = 9656
-    _POLLACTIVITYTASKQUEUERESPONSE._serialized_start = 9659
-    _POLLACTIVITYTASKQUEUERESPONSE._serialized_end = 10666
-    _RECORDACTIVITYTASKHEARTBEATREQUEST._serialized_start = 10669
-    _RECORDACTIVITYTASKHEARTBEATREQUEST._serialized_end = 10813
-    _RECORDACTIVITYTASKHEARTBEATRESPONSE._serialized_start = 10815
-    _RECORDACTIVITYTASKHEARTBEATRESPONSE._serialized_end = 10927
-    _RECORDACTIVITYTASKHEARTBEATBYIDREQUEST._serialized_start = 10930
-    _RECORDACTIVITYTASKHEARTBEATBYIDREQUEST._serialized_end = 11116
-    _RECORDACTIVITYTASKHEARTBEATBYIDRESPONSE._serialized_start = 11118
-    _RECORDACTIVITYTASKHEARTBEATBYIDRESPONSE._serialized_end = 11234
-    _RESPONDACTIVITYTASKCOMPLETEDREQUEST._serialized_start = 11237
-    _RESPONDACTIVITYTASKCOMPLETEDREQUEST._serialized_end = 11598
-    _RESPONDACTIVITYTASKCOMPLETEDRESPONSE._serialized_start = 11600
-    _RESPONDACTIVITYTASKCOMPLETEDRESPONSE._serialized_end = 11638
-    _RESPONDACTIVITYTASKCOMPLETEDBYIDREQUEST._serialized_start = 11641
-    _RESPONDACTIVITYTASKCOMPLETEDBYIDREQUEST._serialized_end = 11827
-    _RESPONDACTIVITYTASKCOMPLETEDBYIDRESPONSE._serialized_start = 11829
-    _RESPONDACTIVITYTASKCOMPLETEDBYIDRESPONSE._serialized_end = 11871
-    _RESPONDACTIVITYTASKFAILEDREQUEST._serialized_start = 11874
-    _RESPONDACTIVITYTASKFAILEDREQUEST._serialized_end = 12299
-    _RESPONDACTIVITYTASKFAILEDRESPONSE._serialized_start = 12301
-    _RESPONDACTIVITYTASKFAILEDRESPONSE._serialized_end = 12388
-    _RESPONDACTIVITYTASKFAILEDBYIDREQUEST._serialized_start = 12391
-    _RESPONDACTIVITYTASKFAILEDBYIDREQUEST._serialized_end = 12641
-    _RESPONDACTIVITYTASKFAILEDBYIDRESPONSE._serialized_start = 12643
-    _RESPONDACTIVITYTASKFAILEDBYIDRESPONSE._serialized_end = 12734
-    _RESPONDACTIVITYTASKCANCELEDREQUEST._serialized_start = 12737
-    _RESPONDACTIVITYTASKCANCELEDREQUEST._serialized_end = 13098
-    _RESPONDACTIVITYTASKCANCELEDRESPONSE._serialized_start = 13100
-    _RESPONDACTIVITYTASKCANCELEDRESPONSE._serialized_end = 13137
-    _RESPONDACTIVITYTASKCANCELEDBYIDREQUEST._serialized_start = 13140
-    _RESPONDACTIVITYTASKCANCELEDBYIDREQUEST._serialized_end = 13407
-    _RESPONDACTIVITYTASKCANCELEDBYIDRESPONSE._serialized_start = 13409
-    _RESPONDACTIVITYTASKCANCELEDBYIDRESPONSE._serialized_end = 13450
-    _REQUESTCANCELWORKFLOWEXECUTIONREQUEST._serialized_start = 13453
-    _REQUESTCANCELWORKFLOWEXECUTIONREQUEST._serialized_end = 13713
-    _REQUESTCANCELWORKFLOWEXECUTIONRESPONSE._serialized_start = 13715
-    _REQUESTCANCELWORKFLOWEXECUTIONRESPONSE._serialized_end = 13755
-    _SIGNALWORKFLOWEXECUTIONREQUEST._serialized_start = 13758
-    _SIGNALWORKFLOWEXECUTIONREQUEST._serialized_end = 14104
-    _SIGNALWORKFLOWEXECUTIONRESPONSE._serialized_start = 14106
-    _SIGNALWORKFLOWEXECUTIONRESPONSE._serialized_end = 14139
-    _SIGNALWITHSTARTWORKFLOWEXECUTIONREQUEST._serialized_start = 14142
-    _SIGNALWITHSTARTWORKFLOWEXECUTIONREQUEST._serialized_end = 15403
-    _SIGNALWITHSTARTWORKFLOWEXECUTIONRESPONSE._serialized_start = 15405
-    _SIGNALWITHSTARTWORKFLOWEXECUTIONRESPONSE._serialized_end = 15480
-    _RESETWORKFLOWEXECUTIONREQUEST._serialized_start = 15483
-    _RESETWORKFLOWEXECUTIONREQUEST._serialized_end = 15910
-    _RESETWORKFLOWEXECUTIONRESPONSE._serialized_start = 15912
-    _RESETWORKFLOWEXECUTIONRESPONSE._serialized_end = 15960
-    _TERMINATEWORKFLOWEXECUTIONREQUEST._serialized_start = 15963
-    _TERMINATEWORKFLOWEXECUTIONREQUEST._serialized_end = 16250
-    _TERMINATEWORKFLOWEXECUTIONRESPONSE._serialized_start = 16252
-    _TERMINATEWORKFLOWEXECUTIONRESPONSE._serialized_end = 16288
-    _DELETEWORKFLOWEXECUTIONREQUEST._serialized_start = 16290
-    _DELETEWORKFLOWEXECUTIONREQUEST._serialized_end = 16412
-    _DELETEWORKFLOWEXECUTIONRESPONSE._serialized_start = 16414
-    _DELETEWORKFLOWEXECUTIONRESPONSE._serialized_end = 16447
-    _LISTOPENWORKFLOWEXECUTIONSREQUEST._serialized_start = 16450
-    _LISTOPENWORKFLOWEXECUTIONSREQUEST._serialized_end = 16779
-    _LISTOPENWORKFLOWEXECUTIONSRESPONSE._serialized_start = 16782
-    _LISTOPENWORKFLOWEXECUTIONSRESPONSE._serialized_end = 16912
-    _LISTCLOSEDWORKFLOWEXECUTIONSREQUEST._serialized_start = 16915
-    _LISTCLOSEDWORKFLOWEXECUTIONSREQUEST._serialized_end = 17309
-    _LISTCLOSEDWORKFLOWEXECUTIONSRESPONSE._serialized_start = 17312
-    _LISTCLOSEDWORKFLOWEXECUTIONSRESPONSE._serialized_end = 17444
-    _LISTWORKFLOWEXECUTIONSREQUEST._serialized_start = 17446
-    _LISTWORKFLOWEXECUTIONSREQUEST._serialized_end = 17555
-    _LISTWORKFLOWEXECUTIONSRESPONSE._serialized_start = 17557
-    _LISTWORKFLOWEXECUTIONSRESPONSE._serialized_end = 17683
-    _LISTARCHIVEDWORKFLOWEXECUTIONSREQUEST._serialized_start = 17685
-    _LISTARCHIVEDWORKFLOWEXECUTIONSREQUEST._serialized_end = 17802
-    _LISTARCHIVEDWORKFLOWEXECUTIONSRESPONSE._serialized_start = 17805
-    _LISTARCHIVEDWORKFLOWEXECUTIONSRESPONSE._serialized_end = 17939
-    _SCANWORKFLOWEXECUTIONSREQUEST._serialized_start = 17941
-    _SCANWORKFLOWEXECUTIONSREQUEST._serialized_end = 18050
-    _SCANWORKFLOWEXECUTIONSRESPONSE._serialized_start = 18052
-    _SCANWORKFLOWEXECUTIONSRESPONSE._serialized_end = 18178
-    _COUNTWORKFLOWEXECUTIONSREQUEST._serialized_start = 18180
-    _COUNTWORKFLOWEXECUTIONSREQUEST._serialized_end = 18246
-    _COUNTWORKFLOWEXECUTIONSRESPONSE._serialized_start = 18249
-    _COUNTWORKFLOWEXECUTIONSRESPONSE._serialized_end = 18486
-    _COUNTWORKFLOWEXECUTIONSRESPONSE_AGGREGATIONGROUP._serialized_start = 18398
-    _COUNTWORKFLOWEXECUTIONSRESPONSE_AGGREGATIONGROUP._serialized_end = 18486
-    _GETSEARCHATTRIBUTESREQUEST._serialized_start = 18488
-    _GETSEARCHATTRIBUTESREQUEST._serialized_end = 18516
-    _GETSEARCHATTRIBUTESRESPONSE._serialized_start = 18519
-    _GETSEARCHATTRIBUTESRESPONSE._serialized_end = 18720
-    _GETSEARCHATTRIBUTESRESPONSE_KEYSENTRY._serialized_start = 18636
-    _GETSEARCHATTRIBUTESRESPONSE_KEYSENTRY._serialized_end = 18720
-    _RESPONDQUERYTASKCOMPLETEDREQUEST._serialized_start = 18723
-    _RESPONDQUERYTASKCOMPLETEDREQUEST._serialized_end = 18996
-    _RESPONDQUERYTASKCOMPLETEDRESPONSE._serialized_start = 18998
-    _RESPONDQUERYTASKCOMPLETEDRESPONSE._serialized_end = 19033
-    _RESETSTICKYTASKQUEUEREQUEST._serialized_start = 19035
-    _RESETSTICKYTASKQUEUEREQUEST._serialized_end = 19145
-    _RESETSTICKYTASKQUEUERESPONSE._serialized_start = 19147
-    _RESETSTICKYTASKQUEUERESPONSE._serialized_end = 19177
-    _SHUTDOWNWORKERREQUEST._serialized_start = 19179
-    _SHUTDOWNWORKERREQUEST._serialized_end = 19282
-    _SHUTDOWNWORKERRESPONSE._serialized_start = 19284
-    _SHUTDOWNWORKERRESPONSE._serialized_end = 19308
-    _QUERYWORKFLOWREQUEST._serialized_start = 19311
-    _QUERYWORKFLOWREQUEST._serialized_end = 19544
-    _QUERYWORKFLOWRESPONSE._serialized_start = 19547
-    _QUERYWORKFLOWRESPONSE._serialized_end = 19688
-    _DESCRIBEWORKFLOWEXECUTIONREQUEST._serialized_start = 19690
-    _DESCRIBEWORKFLOWEXECUTIONREQUEST._serialized_end = 19805
-    _DESCRIBEWORKFLOWEXECUTIONRESPONSE._serialized_start = 19808
-    _DESCRIBEWORKFLOWEXECUTIONRESPONSE._serialized_end = 20473
-    _DESCRIBETASKQUEUEREQUEST._serialized_start = 20476
-    _DESCRIBETASKQUEUEREQUEST._serialized_end = 20957
-    _DESCRIBETASKQUEUERESPONSE._serialized_start = 20960
-    _DESCRIBETASKQUEUERESPONSE._serialized_end = 21394
-    _DESCRIBETASKQUEUERESPONSE_VERSIONSINFOENTRY._serialized_start = 21294
-    _DESCRIBETASKQUEUERESPONSE_VERSIONSINFOENTRY._serialized_end = 21394
-    _GETCLUSTERINFOREQUEST._serialized_start = 21396
-    _GETCLUSTERINFOREQUEST._serialized_end = 21419
-    _GETCLUSTERINFORESPONSE._serialized_start = 21422
-    _GETCLUSTERINFORESPONSE._serialized_end = 21817
-    _GETCLUSTERINFORESPONSE_SUPPORTEDCLIENTSENTRY._serialized_start = 21762
-    _GETCLUSTERINFORESPONSE_SUPPORTEDCLIENTSENTRY._serialized_end = 21817
-    _GETSYSTEMINFOREQUEST._serialized_start = 21819
-    _GETSYSTEMINFOREQUEST._serialized_end = 21841
-    _GETSYSTEMINFORESPONSE._serialized_start = 21844
-    _GETSYSTEMINFORESPONSE._serialized_end = 22344
-    _GETSYSTEMINFORESPONSE_CAPABILITIES._serialized_start = 21985
-    _GETSYSTEMINFORESPONSE_CAPABILITIES._serialized_end = 22344
-    _LISTTASKQUEUEPARTITIONSREQUEST._serialized_start = 22346
-    _LISTTASKQUEUEPARTITIONSREQUEST._serialized_end = 22455
-    _LISTTASKQUEUEPARTITIONSRESPONSE._serialized_start = 22458
-    _LISTTASKQUEUEPARTITIONSRESPONSE._serialized_end = 22681
-    _CREATESCHEDULEREQUEST._serialized_start = 22684
-    _CREATESCHEDULEREQUEST._serialized_end = 23016
-    _CREATESCHEDULERESPONSE._serialized_start = 23018
-    _CREATESCHEDULERESPONSE._serialized_end = 23066
-    _DESCRIBESCHEDULEREQUEST._serialized_start = 23068
-    _DESCRIBESCHEDULEREQUEST._serialized_end = 23133
-    _DESCRIBESCHEDULERESPONSE._serialized_start = 23136
-    _DESCRIBESCHEDULERESPONSE._serialized_end = 23407
-    _UPDATESCHEDULEREQUEST._serialized_start = 23410
-    _UPDATESCHEDULEREQUEST._serialized_end = 23658
-    _UPDATESCHEDULERESPONSE._serialized_start = 23660
-    _UPDATESCHEDULERESPONSE._serialized_end = 23684
-    _PATCHSCHEDULEREQUEST._serialized_start = 23687
-    _PATCHSCHEDULEREQUEST._serialized_end = 23843
-    _PATCHSCHEDULERESPONSE._serialized_start = 23845
-    _PATCHSCHEDULERESPONSE._serialized_end = 23868
-    _LISTSCHEDULEMATCHINGTIMESREQUEST._serialized_start = 23871
-    _LISTSCHEDULEMATCHINGTIMESREQUEST._serialized_end = 24039
-    _LISTSCHEDULEMATCHINGTIMESRESPONSE._serialized_start = 24041
-    _LISTSCHEDULEMATCHINGTIMESRESPONSE._serialized_end = 24124
-    _DELETESCHEDULEREQUEST._serialized_start = 24126
-    _DELETESCHEDULEREQUEST._serialized_end = 24207
-    _DELETESCHEDULERESPONSE._serialized_start = 24209
-    _DELETESCHEDULERESPONSE._serialized_end = 24233
-    _LISTSCHEDULESREQUEST._serialized_start = 24235
-    _LISTSCHEDULESREQUEST._serialized_end = 24343
-    _LISTSCHEDULESRESPONSE._serialized_start = 24345
-    _LISTSCHEDULESRESPONSE._serialized_end = 24457
-    _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST._serialized_start = 24460
-    _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST._serialized_end = 25106
-    _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_ADDNEWCOMPATIBLEVERSION._serialized_start = 24907
+    _REGISTERNAMESPACEREQUEST._serialized_start = 1451
+    _REGISTERNAMESPACEREQUEST._serialized_end = 2099
+    _REGISTERNAMESPACEREQUEST_DATAENTRY._serialized_start = 2056
+    _REGISTERNAMESPACEREQUEST_DATAENTRY._serialized_end = 2099
+    _REGISTERNAMESPACERESPONSE._serialized_start = 2101
+    _REGISTERNAMESPACERESPONSE._serialized_end = 2128
+    _LISTNAMESPACESREQUEST._serialized_start = 2131
+    _LISTNAMESPACESREQUEST._serialized_end = 2268
+    _LISTNAMESPACESRESPONSE._serialized_start = 2271
+    _LISTNAMESPACESRESPONSE._serialized_end = 2400
+    _DESCRIBENAMESPACEREQUEST._serialized_start = 2402
+    _DESCRIBENAMESPACEREQUEST._serialized_end = 2459
+    _DESCRIBENAMESPACERESPONSE._serialized_start = 2462
+    _DESCRIBENAMESPACERESPONSE._serialized_end = 2826
+    _UPDATENAMESPACEREQUEST._serialized_start = 2829
+    _UPDATENAMESPACEREQUEST._serialized_end = 3164
+    _UPDATENAMESPACERESPONSE._serialized_start = 3167
+    _UPDATENAMESPACERESPONSE._serialized_end = 3458
+    _DEPRECATENAMESPACEREQUEST._serialized_start = 3460
+    _DEPRECATENAMESPACEREQUEST._serialized_end = 3530
+    _DEPRECATENAMESPACERESPONSE._serialized_start = 3532
+    _DEPRECATENAMESPACERESPONSE._serialized_end = 3560
+    _STARTWORKFLOWEXECUTIONREQUEST._serialized_start = 3563
+    _STARTWORKFLOWEXECUTIONREQUEST._serialized_end = 5012
+    _STARTWORKFLOWEXECUTIONRESPONSE._serialized_start = 5015
+    _STARTWORKFLOWEXECUTIONRESPONSE._serialized_end = 5281
+    _GETWORKFLOWEXECUTIONHISTORYREQUEST._serialized_start = 5284
+    _GETWORKFLOWEXECUTIONHISTORYREQUEST._serialized_end = 5582
+    _GETWORKFLOWEXECUTIONHISTORYRESPONSE._serialized_start = 5585
+    _GETWORKFLOWEXECUTIONHISTORYRESPONSE._serialized_end = 5771
+    _GETWORKFLOWEXECUTIONHISTORYREVERSEREQUEST._serialized_start = 5774
+    _GETWORKFLOWEXECUTIONHISTORYREVERSEREQUEST._serialized_end = 5950
+    _GETWORKFLOWEXECUTIONHISTORYREVERSERESPONSE._serialized_start = 5952
+    _GETWORKFLOWEXECUTIONHISTORYREVERSERESPONSE._serialized_end = 6072
+    _POLLWORKFLOWTASKQUEUEREQUEST._serialized_start = 6075
+    _POLLWORKFLOWTASKQUEUEREQUEST._serialized_end = 6469
+    _POLLWORKFLOWTASKQUEUERESPONSE._serialized_start = 6472
+    _POLLWORKFLOWTASKQUEUERESPONSE._serialized_end = 7385
+    _POLLWORKFLOWTASKQUEUERESPONSE_QUERIESENTRY._serialized_start = 7301
+    _POLLWORKFLOWTASKQUEUERESPONSE_QUERIESENTRY._serialized_end = 7385
+    _RESPONDWORKFLOWTASKCOMPLETEDREQUEST._serialized_start = 7388
+    _RESPONDWORKFLOWTASKCOMPLETEDREQUEST._serialized_end = 8593
+    _RESPONDWORKFLOWTASKCOMPLETEDREQUEST_QUERYRESULTSENTRY._serialized_start = 8427
+    _RESPONDWORKFLOWTASKCOMPLETEDREQUEST_QUERYRESULTSENTRY._serialized_end = 8522
+    _RESPONDWORKFLOWTASKCOMPLETEDREQUEST_CAPABILITIES._serialized_start = 8524
+    _RESPONDWORKFLOWTASKCOMPLETEDREQUEST_CAPABILITIES._serialized_end = 8593
+    _RESPONDWORKFLOWTASKCOMPLETEDRESPONSE._serialized_start = 8596
+    _RESPONDWORKFLOWTASKCOMPLETEDRESPONSE._serialized_end = 8841
+    _RESPONDWORKFLOWTASKFAILEDREQUEST._serialized_start = 8844
+    _RESPONDWORKFLOWTASKFAILEDREQUEST._serialized_end = 9348
+    _RESPONDWORKFLOWTASKFAILEDRESPONSE._serialized_start = 9350
+    _RESPONDWORKFLOWTASKFAILEDRESPONSE._serialized_end = 9385
+    _POLLACTIVITYTASKQUEUEREQUEST._serialized_start = 9388
+    _POLLACTIVITYTASKQUEUEREQUEST._serialized_end = 9828
+    _POLLACTIVITYTASKQUEUERESPONSE._serialized_start = 9831
+    _POLLACTIVITYTASKQUEUERESPONSE._serialized_end = 10838
+    _RECORDACTIVITYTASKHEARTBEATREQUEST._serialized_start = 10841
+    _RECORDACTIVITYTASKHEARTBEATREQUEST._serialized_end = 10985
+    _RECORDACTIVITYTASKHEARTBEATRESPONSE._serialized_start = 10987
+    _RECORDACTIVITYTASKHEARTBEATRESPONSE._serialized_end = 11099
+    _RECORDACTIVITYTASKHEARTBEATBYIDREQUEST._serialized_start = 11102
+    _RECORDACTIVITYTASKHEARTBEATBYIDREQUEST._serialized_end = 11288
+    _RECORDACTIVITYTASKHEARTBEATBYIDRESPONSE._serialized_start = 11290
+    _RECORDACTIVITYTASKHEARTBEATBYIDRESPONSE._serialized_end = 11406
+    _RESPONDACTIVITYTASKCOMPLETEDREQUEST._serialized_start = 11409
+    _RESPONDACTIVITYTASKCOMPLETEDREQUEST._serialized_end = 11770
+    _RESPONDACTIVITYTASKCOMPLETEDRESPONSE._serialized_start = 11772
+    _RESPONDACTIVITYTASKCOMPLETEDRESPONSE._serialized_end = 11810
+    _RESPONDACTIVITYTASKCOMPLETEDBYIDREQUEST._serialized_start = 11813
+    _RESPONDACTIVITYTASKCOMPLETEDBYIDREQUEST._serialized_end = 11999
+    _RESPONDACTIVITYTASKCOMPLETEDBYIDRESPONSE._serialized_start = 12001
+    _RESPONDACTIVITYTASKCOMPLETEDBYIDRESPONSE._serialized_end = 12043
+    _RESPONDACTIVITYTASKFAILEDREQUEST._serialized_start = 12046
+    _RESPONDACTIVITYTASKFAILEDREQUEST._serialized_end = 12471
+    _RESPONDACTIVITYTASKFAILEDRESPONSE._serialized_start = 12473
+    _RESPONDACTIVITYTASKFAILEDRESPONSE._serialized_end = 12560
+    _RESPONDACTIVITYTASKFAILEDBYIDREQUEST._serialized_start = 12563
+    _RESPONDACTIVITYTASKFAILEDBYIDREQUEST._serialized_end = 12813
+    _RESPONDACTIVITYTASKFAILEDBYIDRESPONSE._serialized_start = 12815
+    _RESPONDACTIVITYTASKFAILEDBYIDRESPONSE._serialized_end = 12906
+    _RESPONDACTIVITYTASKCANCELEDREQUEST._serialized_start = 12909
+    _RESPONDACTIVITYTASKCANCELEDREQUEST._serialized_end = 13270
+    _RESPONDACTIVITYTASKCANCELEDRESPONSE._serialized_start = 13272
+    _RESPONDACTIVITYTASKCANCELEDRESPONSE._serialized_end = 13309
+    _RESPONDACTIVITYTASKCANCELEDBYIDREQUEST._serialized_start = 13312
+    _RESPONDACTIVITYTASKCANCELEDBYIDREQUEST._serialized_end = 13579
+    _RESPONDACTIVITYTASKCANCELEDBYIDRESPONSE._serialized_start = 13581
+    _RESPONDACTIVITYTASKCANCELEDBYIDRESPONSE._serialized_end = 13622
+    _REQUESTCANCELWORKFLOWEXECUTIONREQUEST._serialized_start = 13625
+    _REQUESTCANCELWORKFLOWEXECUTIONREQUEST._serialized_end = 13885
+    _REQUESTCANCELWORKFLOWEXECUTIONRESPONSE._serialized_start = 13887
+    _REQUESTCANCELWORKFLOWEXECUTIONRESPONSE._serialized_end = 13927
+    _SIGNALWORKFLOWEXECUTIONREQUEST._serialized_start = 13930
+    _SIGNALWORKFLOWEXECUTIONREQUEST._serialized_end = 14280
+    _SIGNALWORKFLOWEXECUTIONRESPONSE._serialized_start = 14282
+    _SIGNALWORKFLOWEXECUTIONRESPONSE._serialized_end = 14315
+    _SIGNALWITHSTARTWORKFLOWEXECUTIONREQUEST._serialized_start = 14318
+    _SIGNALWITHSTARTWORKFLOWEXECUTIONREQUEST._serialized_end = 15583
+    _SIGNALWITHSTARTWORKFLOWEXECUTIONRESPONSE._serialized_start = 15585
+    _SIGNALWITHSTARTWORKFLOWEXECUTIONRESPONSE._serialized_end = 15660
+    _RESETWORKFLOWEXECUTIONREQUEST._serialized_start = 15663
+    _RESETWORKFLOWEXECUTIONREQUEST._serialized_end = 16112
+    _RESETWORKFLOWEXECUTIONRESPONSE._serialized_start = 16114
+    _RESETWORKFLOWEXECUTIONRESPONSE._serialized_end = 16162
+    _TERMINATEWORKFLOWEXECUTIONREQUEST._serialized_start = 16165
+    _TERMINATEWORKFLOWEXECUTIONREQUEST._serialized_end = 16452
+    _TERMINATEWORKFLOWEXECUTIONRESPONSE._serialized_start = 16454
+    _TERMINATEWORKFLOWEXECUTIONRESPONSE._serialized_end = 16490
+    _DELETEWORKFLOWEXECUTIONREQUEST._serialized_start = 16492
+    _DELETEWORKFLOWEXECUTIONREQUEST._serialized_end = 16614
+    _DELETEWORKFLOWEXECUTIONRESPONSE._serialized_start = 16616
+    _DELETEWORKFLOWEXECUTIONRESPONSE._serialized_end = 16649
+    _LISTOPENWORKFLOWEXECUTIONSREQUEST._serialized_start = 16652
+    _LISTOPENWORKFLOWEXECUTIONSREQUEST._serialized_end = 16981
+    _LISTOPENWORKFLOWEXECUTIONSRESPONSE._serialized_start = 16984
+    _LISTOPENWORKFLOWEXECUTIONSRESPONSE._serialized_end = 17114
+    _LISTCLOSEDWORKFLOWEXECUTIONSREQUEST._serialized_start = 17117
+    _LISTCLOSEDWORKFLOWEXECUTIONSREQUEST._serialized_end = 17511
+    _LISTCLOSEDWORKFLOWEXECUTIONSRESPONSE._serialized_start = 17514
+    _LISTCLOSEDWORKFLOWEXECUTIONSRESPONSE._serialized_end = 17646
+    _LISTWORKFLOWEXECUTIONSREQUEST._serialized_start = 17648
+    _LISTWORKFLOWEXECUTIONSREQUEST._serialized_end = 17757
+    _LISTWORKFLOWEXECUTIONSRESPONSE._serialized_start = 17759
+    _LISTWORKFLOWEXECUTIONSRESPONSE._serialized_end = 17885
+    _LISTARCHIVEDWORKFLOWEXECUTIONSREQUEST._serialized_start = 17887
+    _LISTARCHIVEDWORKFLOWEXECUTIONSREQUEST._serialized_end = 18004
+    _LISTARCHIVEDWORKFLOWEXECUTIONSRESPONSE._serialized_start = 18007
+    _LISTARCHIVEDWORKFLOWEXECUTIONSRESPONSE._serialized_end = 18141
+    _SCANWORKFLOWEXECUTIONSREQUEST._serialized_start = 18143
+    _SCANWORKFLOWEXECUTIONSREQUEST._serialized_end = 18252
+    _SCANWORKFLOWEXECUTIONSRESPONSE._serialized_start = 18254
+    _SCANWORKFLOWEXECUTIONSRESPONSE._serialized_end = 18380
+    _COUNTWORKFLOWEXECUTIONSREQUEST._serialized_start = 18382
+    _COUNTWORKFLOWEXECUTIONSREQUEST._serialized_end = 18448
+    _COUNTWORKFLOWEXECUTIONSRESPONSE._serialized_start = 18451
+    _COUNTWORKFLOWEXECUTIONSRESPONSE._serialized_end = 18688
+    _COUNTWORKFLOWEXECUTIONSRESPONSE_AGGREGATIONGROUP._serialized_start = 18600
+    _COUNTWORKFLOWEXECUTIONSRESPONSE_AGGREGATIONGROUP._serialized_end = 18688
+    _GETSEARCHATTRIBUTESREQUEST._serialized_start = 18690
+    _GETSEARCHATTRIBUTESREQUEST._serialized_end = 18718
+    _GETSEARCHATTRIBUTESRESPONSE._serialized_start = 18721
+    _GETSEARCHATTRIBUTESRESPONSE._serialized_end = 18922
+    _GETSEARCHATTRIBUTESRESPONSE_KEYSENTRY._serialized_start = 18838
+    _GETSEARCHATTRIBUTESRESPONSE_KEYSENTRY._serialized_end = 18922
+    _RESPONDQUERYTASKCOMPLETEDREQUEST._serialized_start = 18925
+    _RESPONDQUERYTASKCOMPLETEDREQUEST._serialized_end = 19261
+    _RESPONDQUERYTASKCOMPLETEDRESPONSE._serialized_start = 19263
+    _RESPONDQUERYTASKCOMPLETEDRESPONSE._serialized_end = 19298
+    _RESETSTICKYTASKQUEUEREQUEST._serialized_start = 19300
+    _RESETSTICKYTASKQUEUEREQUEST._serialized_end = 19410
+    _RESETSTICKYTASKQUEUERESPONSE._serialized_start = 19412
+    _RESETSTICKYTASKQUEUERESPONSE._serialized_end = 19442
+    _SHUTDOWNWORKERREQUEST._serialized_start = 19445
+    _SHUTDOWNWORKERREQUEST._serialized_end = 19615
+    _SHUTDOWNWORKERRESPONSE._serialized_start = 19617
+    _SHUTDOWNWORKERRESPONSE._serialized_end = 19641
+    _QUERYWORKFLOWREQUEST._serialized_start = 19644
+    _QUERYWORKFLOWREQUEST._serialized_end = 19877
+    _QUERYWORKFLOWRESPONSE._serialized_start = 19880
+    _QUERYWORKFLOWRESPONSE._serialized_end = 20021
+    _DESCRIBEWORKFLOWEXECUTIONREQUEST._serialized_start = 20023
+    _DESCRIBEWORKFLOWEXECUTIONREQUEST._serialized_end = 20138
+    _DESCRIBEWORKFLOWEXECUTIONRESPONSE._serialized_start = 20141
+    _DESCRIBEWORKFLOWEXECUTIONRESPONSE._serialized_end = 20806
+    _DESCRIBETASKQUEUEREQUEST._serialized_start = 20809
+    _DESCRIBETASKQUEUEREQUEST._serialized_end = 21314
+    _DESCRIBETASKQUEUERESPONSE._serialized_start = 21317
+    _DESCRIBETASKQUEUERESPONSE._serialized_end = 21817
+    _DESCRIBETASKQUEUERESPONSE_VERSIONSINFOENTRY._serialized_start = 21717
+    _DESCRIBETASKQUEUERESPONSE_VERSIONSINFOENTRY._serialized_end = 21817
+    _GETCLUSTERINFOREQUEST._serialized_start = 21819
+    _GETCLUSTERINFOREQUEST._serialized_end = 21842
+    _GETCLUSTERINFORESPONSE._serialized_start = 21845
+    _GETCLUSTERINFORESPONSE._serialized_end = 22240
+    _GETCLUSTERINFORESPONSE_SUPPORTEDCLIENTSENTRY._serialized_start = 22185
+    _GETCLUSTERINFORESPONSE_SUPPORTEDCLIENTSENTRY._serialized_end = 22240
+    _GETSYSTEMINFOREQUEST._serialized_start = 22242
+    _GETSYSTEMINFOREQUEST._serialized_end = 22264
+    _GETSYSTEMINFORESPONSE._serialized_start = 22267
+    _GETSYSTEMINFORESPONSE._serialized_end = 22767
+    _GETSYSTEMINFORESPONSE_CAPABILITIES._serialized_start = 22408
+    _GETSYSTEMINFORESPONSE_CAPABILITIES._serialized_end = 22767
+    _LISTTASKQUEUEPARTITIONSREQUEST._serialized_start = 22769
+    _LISTTASKQUEUEPARTITIONSREQUEST._serialized_end = 22878
+    _LISTTASKQUEUEPARTITIONSRESPONSE._serialized_start = 22881
+    _LISTTASKQUEUEPARTITIONSRESPONSE._serialized_end = 23104
+    _CREATESCHEDULEREQUEST._serialized_start = 23107
+    _CREATESCHEDULEREQUEST._serialized_end = 23439
+    _CREATESCHEDULERESPONSE._serialized_start = 23441
+    _CREATESCHEDULERESPONSE._serialized_end = 23489
+    _DESCRIBESCHEDULEREQUEST._serialized_start = 23491
+    _DESCRIBESCHEDULEREQUEST._serialized_end = 23556
+    _DESCRIBESCHEDULERESPONSE._serialized_start = 23559
+    _DESCRIBESCHEDULERESPONSE._serialized_end = 23830
+    _UPDATESCHEDULEREQUEST._serialized_start = 23833
+    _UPDATESCHEDULEREQUEST._serialized_end = 24081
+    _UPDATESCHEDULERESPONSE._serialized_start = 24083
+    _UPDATESCHEDULERESPONSE._serialized_end = 24107
+    _PATCHSCHEDULEREQUEST._serialized_start = 24110
+    _PATCHSCHEDULEREQUEST._serialized_end = 24266
+    _PATCHSCHEDULERESPONSE._serialized_start = 24268
+    _PATCHSCHEDULERESPONSE._serialized_end = 24291
+    _LISTSCHEDULEMATCHINGTIMESREQUEST._serialized_start = 24294
+    _LISTSCHEDULEMATCHINGTIMESREQUEST._serialized_end = 24462
+    _LISTSCHEDULEMATCHINGTIMESRESPONSE._serialized_start = 24464
+    _LISTSCHEDULEMATCHINGTIMESRESPONSE._serialized_end = 24547
+    _DELETESCHEDULEREQUEST._serialized_start = 24549
+    _DELETESCHEDULEREQUEST._serialized_end = 24630
+    _DELETESCHEDULERESPONSE._serialized_start = 24632
+    _DELETESCHEDULERESPONSE._serialized_end = 24656
+    _LISTSCHEDULESREQUEST._serialized_start = 24658
+    _LISTSCHEDULESREQUEST._serialized_end = 24766
+    _LISTSCHEDULESRESPONSE._serialized_start = 24768
+    _LISTSCHEDULESRESPONSE._serialized_end = 24880
+    _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST._serialized_start = 24883
+    _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST._serialized_end = 25529
+    _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_ADDNEWCOMPATIBLEVERSION._serialized_start = 25330
     _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_ADDNEWCOMPATIBLEVERSION._serialized_end = (
-        25018
+        25441
     )
-    _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_MERGESETS._serialized_start = 25020
-    _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_MERGESETS._serialized_end = 25093
-    _UPDATEWORKERBUILDIDCOMPATIBILITYRESPONSE._serialized_start = 25108
-    _UPDATEWORKERBUILDIDCOMPATIBILITYRESPONSE._serialized_end = 25172
-    _GETWORKERBUILDIDCOMPATIBILITYREQUEST._serialized_start = 25174
-    _GETWORKERBUILDIDCOMPATIBILITYREQUEST._serialized_end = 25269
-    _GETWORKERBUILDIDCOMPATIBILITYRESPONSE._serialized_start = 25271
-    _GETWORKERBUILDIDCOMPATIBILITYRESPONSE._serialized_end = 25387
-    _UPDATEWORKERVERSIONINGRULESREQUEST._serialized_start = 25390
-    _UPDATEWORKERVERSIONINGRULESREQUEST._serialized_end = 27107
-    _UPDATEWORKERVERSIONINGRULESREQUEST_INSERTBUILDIDASSIGNMENTRULE._serialized_start = 26442
+    _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_MERGESETS._serialized_start = 25443
+    _UPDATEWORKERBUILDIDCOMPATIBILITYREQUEST_MERGESETS._serialized_end = 25516
+    _UPDATEWORKERBUILDIDCOMPATIBILITYRESPONSE._serialized_start = 25531
+    _UPDATEWORKERBUILDIDCOMPATIBILITYRESPONSE._serialized_end = 25595
+    _GETWORKERBUILDIDCOMPATIBILITYREQUEST._serialized_start = 25597
+    _GETWORKERBUILDIDCOMPATIBILITYREQUEST._serialized_end = 25692
+    _GETWORKERBUILDIDCOMPATIBILITYRESPONSE._serialized_start = 25694
+    _GETWORKERBUILDIDCOMPATIBILITYRESPONSE._serialized_end = 25810
+    _UPDATEWORKERVERSIONINGRULESREQUEST._serialized_start = 25813
+    _UPDATEWORKERVERSIONINGRULESREQUEST._serialized_end = 27530
+    _UPDATEWORKERVERSIONINGRULESREQUEST_INSERTBUILDIDASSIGNMENTRULE._serialized_start = 26865
     _UPDATEWORKERVERSIONINGRULESREQUEST_INSERTBUILDIDASSIGNMENTRULE._serialized_end = (
-        26555
+        26978
     )
-    _UPDATEWORKERVERSIONINGRULESREQUEST_REPLACEBUILDIDASSIGNMENTRULE._serialized_start = 26558
+    _UPDATEWORKERVERSIONINGRULESREQUEST_REPLACEBUILDIDASSIGNMENTRULE._serialized_start = 26981
     _UPDATEWORKERVERSIONINGRULESREQUEST_REPLACEBUILDIDASSIGNMENTRULE._serialized_end = (
-        26687
+        27110
     )
-    _UPDATEWORKERVERSIONINGRULESREQUEST_DELETEBUILDIDASSIGNMENTRULE._serialized_start = 26689
+    _UPDATEWORKERVERSIONINGRULESREQUEST_DELETEBUILDIDASSIGNMENTRULE._serialized_start = 27112
     _UPDATEWORKERVERSIONINGRULESREQUEST_DELETEBUILDIDASSIGNMENTRULE._serialized_end = (
-        26753
+        27176
     )
-    _UPDATEWORKERVERSIONINGRULESREQUEST_ADDCOMPATIBLEBUILDIDREDIRECTRULE._serialized_start = 26755
-    _UPDATEWORKERVERSIONINGRULESREQUEST_ADDCOMPATIBLEBUILDIDREDIRECTRULE._serialized_end = 26861
-    _UPDATEWORKERVERSIONINGRULESREQUEST_REPLACECOMPATIBLEBUILDIDREDIRECTRULE._serialized_start = 26863
-    _UPDATEWORKERVERSIONINGRULESREQUEST_REPLACECOMPATIBLEBUILDIDREDIRECTRULE._serialized_end = 26973
-    _UPDATEWORKERVERSIONINGRULESREQUEST_DELETECOMPATIBLEBUILDIDREDIRECTRULE._serialized_start = 26975
-    _UPDATEWORKERVERSIONINGRULESREQUEST_DELETECOMPATIBLEBUILDIDREDIRECTRULE._serialized_end = 27037
-    _UPDATEWORKERVERSIONINGRULESREQUEST_COMMITBUILDID._serialized_start = 27039
-    _UPDATEWORKERVERSIONINGRULESREQUEST_COMMITBUILDID._serialized_end = 27094
-    _UPDATEWORKERVERSIONINGRULESRESPONSE._serialized_start = 27110
-    _UPDATEWORKERVERSIONINGRULESRESPONSE._serialized_end = 27362
-    _GETWORKERVERSIONINGRULESREQUEST._serialized_start = 27364
-    _GETWORKERVERSIONINGRULESREQUEST._serialized_end = 27436
-    _GETWORKERVERSIONINGRULESRESPONSE._serialized_start = 27439
-    _GETWORKERVERSIONINGRULESRESPONSE._serialized_end = 27688
-    _GETWORKERTASKREACHABILITYREQUEST._serialized_start = 27691
-    _GETWORKERTASKREACHABILITYREQUEST._serialized_end = 27847
-    _GETWORKERTASKREACHABILITYRESPONSE._serialized_start = 27849
-    _GETWORKERTASKREACHABILITYRESPONSE._serialized_end = 27963
-    _UPDATEWORKFLOWEXECUTIONREQUEST._serialized_start = 27966
-    _UPDATEWORKFLOWEXECUTIONREQUEST._serialized_end = 28227
-    _UPDATEWORKFLOWEXECUTIONRESPONSE._serialized_start = 28230
-    _UPDATEWORKFLOWEXECUTIONRESPONSE._serialized_end = 28445
-    _STARTBATCHOPERATIONREQUEST._serialized_start = 28448
-    _STARTBATCHOPERATIONREQUEST._serialized_end = 29263
-    _STARTBATCHOPERATIONRESPONSE._serialized_start = 29265
-    _STARTBATCHOPERATIONRESPONSE._serialized_end = 29294
-    _STOPBATCHOPERATIONREQUEST._serialized_start = 29296
-    _STOPBATCHOPERATIONREQUEST._serialized_end = 29392
-    _STOPBATCHOPERATIONRESPONSE._serialized_start = 29394
-    _STOPBATCHOPERATIONRESPONSE._serialized_end = 29422
-    _DESCRIBEBATCHOPERATIONREQUEST._serialized_start = 29424
-    _DESCRIBEBATCHOPERATIONREQUEST._serialized_end = 29490
-    _DESCRIBEBATCHOPERATIONRESPONSE._serialized_start = 29493
-    _DESCRIBEBATCHOPERATIONRESPONSE._serialized_end = 29895
-    _LISTBATCHOPERATIONSREQUEST._serialized_start = 29897
-    _LISTBATCHOPERATIONSREQUEST._serialized_end = 29988
-    _LISTBATCHOPERATIONSRESPONSE._serialized_start = 29990
-    _LISTBATCHOPERATIONSRESPONSE._serialized_end = 30111
-    _POLLWORKFLOWEXECUTIONUPDATEREQUEST._serialized_start = 30114
-    _POLLWORKFLOWEXECUTIONUPDATEREQUEST._serialized_end = 30299
-    _POLLWORKFLOWEXECUTIONUPDATERESPONSE._serialized_start = 30302
-    _POLLWORKFLOWEXECUTIONUPDATERESPONSE._serialized_end = 30521
-    _POLLNEXUSTASKQUEUEREQUEST._serialized_start = 30524
-    _POLLNEXUSTASKQUEUEREQUEST._serialized_end = 30819
-    _POLLNEXUSTASKQUEUERESPONSE._serialized_start = 30822
-    _POLLNEXUSTASKQUEUERESPONSE._serialized_end = 31002
-    _RESPONDNEXUSTASKCOMPLETEDREQUEST._serialized_start = 31005
-    _RESPONDNEXUSTASKCOMPLETEDREQUEST._serialized_end = 31147
-    _RESPONDNEXUSTASKCOMPLETEDRESPONSE._serialized_start = 31149
-    _RESPONDNEXUSTASKCOMPLETEDRESPONSE._serialized_end = 31184
-    _RESPONDNEXUSTASKFAILEDREQUEST._serialized_start = 31187
-    _RESPONDNEXUSTASKFAILEDREQUEST._serialized_end = 31327
-    _RESPONDNEXUSTASKFAILEDRESPONSE._serialized_start = 31329
-    _RESPONDNEXUSTASKFAILEDRESPONSE._serialized_end = 31361
-    _EXECUTEMULTIOPERATIONREQUEST._serialized_start = 31364
-    _EXECUTEMULTIOPERATIONREQUEST._serialized_end = 31715
-    _EXECUTEMULTIOPERATIONREQUEST_OPERATION._serialized_start = 31509
-    _EXECUTEMULTIOPERATIONREQUEST_OPERATION._serialized_end = 31715
-    _EXECUTEMULTIOPERATIONRESPONSE._serialized_start = 31718
-    _EXECUTEMULTIOPERATIONRESPONSE._serialized_end = 32050
-    _EXECUTEMULTIOPERATIONRESPONSE_RESPONSE._serialized_start = 31844
-    _EXECUTEMULTIOPERATIONRESPONSE_RESPONSE._serialized_end = 32050
-    _UPDATEACTIVITYOPTIONSREQUEST._serialized_start = 32053
-    _UPDATEACTIVITYOPTIONSREQUEST._serialized_end = 32342
-    _UPDATEACTIVITYOPTIONSRESPONSE._serialized_start = 32344
-    _UPDATEACTIVITYOPTIONSRESPONSE._serialized_end = 32444
-    _PAUSEACTIVITYREQUEST._serialized_start = 32447
-    _PAUSEACTIVITYREQUEST._serialized_end = 32626
-    _PAUSEACTIVITYRESPONSE._serialized_start = 32628
-    _PAUSEACTIVITYRESPONSE._serialized_end = 32651
-    _UNPAUSEACTIVITYREQUEST._serialized_start = 32654
-    _UNPAUSEACTIVITYREQUEST._serialized_end = 32934
-    _UNPAUSEACTIVITYRESPONSE._serialized_start = 32936
-    _UNPAUSEACTIVITYRESPONSE._serialized_end = 32961
-    _RESETACTIVITYREQUEST._serialized_start = 32964
-    _RESETACTIVITYREQUEST._serialized_end = 33216
-    _RESETACTIVITYRESPONSE._serialized_start = 33218
-    _RESETACTIVITYRESPONSE._serialized_end = 33241
-    _UPDATEWORKFLOWEXECUTIONOPTIONSREQUEST._serialized_start = 33244
-    _UPDATEWORKFLOWEXECUTIONOPTIONSREQUEST._serialized_end = 33510
-    _UPDATEWORKFLOWEXECUTIONOPTIONSRESPONSE._serialized_start = 33513
-    _UPDATEWORKFLOWEXECUTIONOPTIONSRESPONSE._serialized_end = 33641
-    _DESCRIBEDEPLOYMENTREQUEST._serialized_start = 33643
-    _DESCRIBEDEPLOYMENTREQUEST._serialized_end = 33749
-    _DESCRIBEDEPLOYMENTRESPONSE._serialized_start = 33751
-    _DESCRIBEDEPLOYMENTRESPONSE._serialized_end = 33848
-    _DESCRIBEWORKERDEPLOYMENTVERSIONREQUEST._serialized_start = 33851
-    _DESCRIBEWORKERDEPLOYMENTVERSIONREQUEST._serialized_end = 34012
-    _DESCRIBEWORKERDEPLOYMENTVERSIONRESPONSE._serialized_start = 34015
-    _DESCRIBEWORKERDEPLOYMENTVERSIONRESPONSE._serialized_end = 34153
-    _DESCRIBEWORKERDEPLOYMENTREQUEST._serialized_start = 34155
-    _DESCRIBEWORKERDEPLOYMENTREQUEST._serialized_end = 34232
-    _DESCRIBEWORKERDEPLOYMENTRESPONSE._serialized_start = 34235
-    _DESCRIBEWORKERDEPLOYMENTRESPONSE._serialized_end = 34375
-    _LISTDEPLOYMENTSREQUEST._serialized_start = 34377
-    _LISTDEPLOYMENTSREQUEST._serialized_end = 34485
-    _LISTDEPLOYMENTSRESPONSE._serialized_start = 34487
-    _LISTDEPLOYMENTSRESPONSE._serialized_end = 34606
-    _SETCURRENTDEPLOYMENTREQUEST._serialized_start = 34609
-    _SETCURRENTDEPLOYMENTREQUEST._serialized_end = 34814
-    _SETCURRENTDEPLOYMENTRESPONSE._serialized_start = 34817
-    _SETCURRENTDEPLOYMENTRESPONSE._serialized_end = 35002
-    _SETWORKERDEPLOYMENTCURRENTVERSIONREQUEST._serialized_start = 35005
-    _SETWORKERDEPLOYMENTCURRENTVERSIONREQUEST._serialized_end = 35208
-    _SETWORKERDEPLOYMENTCURRENTVERSIONRESPONSE._serialized_start = 35211
-    _SETWORKERDEPLOYMENTCURRENTVERSIONRESPONSE._serialized_end = 35398
-    _SETWORKERDEPLOYMENTRAMPINGVERSIONREQUEST._serialized_start = 35401
-    _SETWORKERDEPLOYMENTRAMPINGVERSIONREQUEST._serialized_end = 35624
-    _SETWORKERDEPLOYMENTRAMPINGVERSIONRESPONSE._serialized_start = 35627
-    _SETWORKERDEPLOYMENTRAMPINGVERSIONRESPONSE._serialized_end = 35843
-    _LISTWORKERDEPLOYMENTSREQUEST._serialized_start = 35845
-    _LISTWORKERDEPLOYMENTSREQUEST._serialized_end = 35938
-    _LISTWORKERDEPLOYMENTSRESPONSE._serialized_start = 35941
-    _LISTWORKERDEPLOYMENTSRESPONSE._serialized_end = 36271
-    _LISTWORKERDEPLOYMENTSRESPONSE_WORKERDEPLOYMENTSUMMARY._serialized_start = 36116
-    _LISTWORKERDEPLOYMENTSRESPONSE_WORKERDEPLOYMENTSUMMARY._serialized_end = 36271
-    _DELETEWORKERDEPLOYMENTVERSIONREQUEST._serialized_start = 36274
-    _DELETEWORKERDEPLOYMENTVERSIONREQUEST._serialized_end = 36474
-    _DELETEWORKERDEPLOYMENTVERSIONRESPONSE._serialized_start = 36476
-    _DELETEWORKERDEPLOYMENTVERSIONRESPONSE._serialized_end = 36515
-    _DELETEWORKERDEPLOYMENTREQUEST._serialized_start = 36517
-    _DELETEWORKERDEPLOYMENTREQUEST._serialized_end = 36610
-    _DELETEWORKERDEPLOYMENTRESPONSE._serialized_start = 36612
-    _DELETEWORKERDEPLOYMENTRESPONSE._serialized_end = 36644
-    _UPDATEWORKERDEPLOYMENTVERSIONMETADATAREQUEST._serialized_start = 36647
-    _UPDATEWORKERDEPLOYMENTVERSIONMETADATAREQUEST._serialized_end = 37047
-    _UPDATEWORKERDEPLOYMENTVERSIONMETADATAREQUEST_UPSERTENTRIESENTRY._serialized_start = 36962
+    _UPDATEWORKERVERSIONINGRULESREQUEST_ADDCOMPATIBLEBUILDIDREDIRECTRULE._serialized_start = 27178
+    _UPDATEWORKERVERSIONINGRULESREQUEST_ADDCOMPATIBLEBUILDIDREDIRECTRULE._serialized_end = 27284
+    _UPDATEWORKERVERSIONINGRULESREQUEST_REPLACECOMPATIBLEBUILDIDREDIRECTRULE._serialized_start = 27286
+    _UPDATEWORKERVERSIONINGRULESREQUEST_REPLACECOMPATIBLEBUILDIDREDIRECTRULE._serialized_end = 27396
+    _UPDATEWORKERVERSIONINGRULESREQUEST_DELETECOMPATIBLEBUILDIDREDIRECTRULE._serialized_start = 27398
+    _UPDATEWORKERVERSIONINGRULESREQUEST_DELETECOMPATIBLEBUILDIDREDIRECTRULE._serialized_end = 27460
+    _UPDATEWORKERVERSIONINGRULESREQUEST_COMMITBUILDID._serialized_start = 27462
+    _UPDATEWORKERVERSIONINGRULESREQUEST_COMMITBUILDID._serialized_end = 27517
+    _UPDATEWORKERVERSIONINGRULESRESPONSE._serialized_start = 27533
+    _UPDATEWORKERVERSIONINGRULESRESPONSE._serialized_end = 27785
+    _GETWORKERVERSIONINGRULESREQUEST._serialized_start = 27787
+    _GETWORKERVERSIONINGRULESREQUEST._serialized_end = 27859
+    _GETWORKERVERSIONINGRULESRESPONSE._serialized_start = 27862
+    _GETWORKERVERSIONINGRULESRESPONSE._serialized_end = 28111
+    _GETWORKERTASKREACHABILITYREQUEST._serialized_start = 28114
+    _GETWORKERTASKREACHABILITYREQUEST._serialized_end = 28270
+    _GETWORKERTASKREACHABILITYRESPONSE._serialized_start = 28272
+    _GETWORKERTASKREACHABILITYRESPONSE._serialized_end = 28386
+    _UPDATEWORKFLOWEXECUTIONREQUEST._serialized_start = 28389
+    _UPDATEWORKFLOWEXECUTIONREQUEST._serialized_end = 28650
+    _UPDATEWORKFLOWEXECUTIONRESPONSE._serialized_start = 28653
+    _UPDATEWORKFLOWEXECUTIONRESPONSE._serialized_end = 28868
+    _STARTBATCHOPERATIONREQUEST._serialized_start = 28871
+    _STARTBATCHOPERATIONREQUEST._serialized_end = 29686
+    _STARTBATCHOPERATIONRESPONSE._serialized_start = 29688
+    _STARTBATCHOPERATIONRESPONSE._serialized_end = 29717
+    _STOPBATCHOPERATIONREQUEST._serialized_start = 29719
+    _STOPBATCHOPERATIONREQUEST._serialized_end = 29815
+    _STOPBATCHOPERATIONRESPONSE._serialized_start = 29817
+    _STOPBATCHOPERATIONRESPONSE._serialized_end = 29845
+    _DESCRIBEBATCHOPERATIONREQUEST._serialized_start = 29847
+    _DESCRIBEBATCHOPERATIONREQUEST._serialized_end = 29913
+    _DESCRIBEBATCHOPERATIONRESPONSE._serialized_start = 29916
+    _DESCRIBEBATCHOPERATIONRESPONSE._serialized_end = 30318
+    _LISTBATCHOPERATIONSREQUEST._serialized_start = 30320
+    _LISTBATCHOPERATIONSREQUEST._serialized_end = 30411
+    _LISTBATCHOPERATIONSRESPONSE._serialized_start = 30413
+    _LISTBATCHOPERATIONSRESPONSE._serialized_end = 30534
+    _POLLWORKFLOWEXECUTIONUPDATEREQUEST._serialized_start = 30537
+    _POLLWORKFLOWEXECUTIONUPDATEREQUEST._serialized_end = 30722
+    _POLLWORKFLOWEXECUTIONUPDATERESPONSE._serialized_start = 30725
+    _POLLWORKFLOWEXECUTIONUPDATERESPONSE._serialized_end = 30944
+    _POLLNEXUSTASKQUEUEREQUEST._serialized_start = 30947
+    _POLLNEXUSTASKQUEUEREQUEST._serialized_end = 31309
+    _POLLNEXUSTASKQUEUERESPONSE._serialized_start = 31312
+    _POLLNEXUSTASKQUEUERESPONSE._serialized_end = 31492
+    _RESPONDNEXUSTASKCOMPLETEDREQUEST._serialized_start = 31495
+    _RESPONDNEXUSTASKCOMPLETEDREQUEST._serialized_end = 31637
+    _RESPONDNEXUSTASKCOMPLETEDRESPONSE._serialized_start = 31639
+    _RESPONDNEXUSTASKCOMPLETEDRESPONSE._serialized_end = 31674
+    _RESPONDNEXUSTASKFAILEDREQUEST._serialized_start = 31677
+    _RESPONDNEXUSTASKFAILEDREQUEST._serialized_end = 31817
+    _RESPONDNEXUSTASKFAILEDRESPONSE._serialized_start = 31819
+    _RESPONDNEXUSTASKFAILEDRESPONSE._serialized_end = 31851
+    _EXECUTEMULTIOPERATIONREQUEST._serialized_start = 31854
+    _EXECUTEMULTIOPERATIONREQUEST._serialized_end = 32205
+    _EXECUTEMULTIOPERATIONREQUEST_OPERATION._serialized_start = 31999
+    _EXECUTEMULTIOPERATIONREQUEST_OPERATION._serialized_end = 32205
+    _EXECUTEMULTIOPERATIONRESPONSE._serialized_start = 32208
+    _EXECUTEMULTIOPERATIONRESPONSE._serialized_end = 32540
+    _EXECUTEMULTIOPERATIONRESPONSE_RESPONSE._serialized_start = 32334
+    _EXECUTEMULTIOPERATIONRESPONSE_RESPONSE._serialized_end = 32540
+    _UPDATEACTIVITYOPTIONSREQUEST._serialized_start = 32543
+    _UPDATEACTIVITYOPTIONSREQUEST._serialized_end = 32858
+    _UPDATEACTIVITYOPTIONSRESPONSE._serialized_start = 32860
+    _UPDATEACTIVITYOPTIONSRESPONSE._serialized_end = 32960
+    _PAUSEACTIVITYREQUEST._serialized_start = 32963
+    _PAUSEACTIVITYREQUEST._serialized_end = 33142
+    _PAUSEACTIVITYRESPONSE._serialized_start = 33144
+    _PAUSEACTIVITYRESPONSE._serialized_end = 33167
+    _UNPAUSEACTIVITYREQUEST._serialized_start = 33170
+    _UNPAUSEACTIVITYREQUEST._serialized_end = 33450
+    _UNPAUSEACTIVITYRESPONSE._serialized_start = 33452
+    _UNPAUSEACTIVITYRESPONSE._serialized_end = 33477
+    _RESETACTIVITYREQUEST._serialized_start = 33480
+    _RESETACTIVITYREQUEST._serialized_end = 33766
+    _RESETACTIVITYRESPONSE._serialized_start = 33768
+    _RESETACTIVITYRESPONSE._serialized_end = 33791
+    _UPDATEWORKFLOWEXECUTIONOPTIONSREQUEST._serialized_start = 33794
+    _UPDATEWORKFLOWEXECUTIONOPTIONSREQUEST._serialized_end = 34060
+    _UPDATEWORKFLOWEXECUTIONOPTIONSRESPONSE._serialized_start = 34063
+    _UPDATEWORKFLOWEXECUTIONOPTIONSRESPONSE._serialized_end = 34191
+    _DESCRIBEDEPLOYMENTREQUEST._serialized_start = 34193
+    _DESCRIBEDEPLOYMENTREQUEST._serialized_end = 34299
+    _DESCRIBEDEPLOYMENTRESPONSE._serialized_start = 34301
+    _DESCRIBEDEPLOYMENTRESPONSE._serialized_end = 34398
+    _DESCRIBEWORKERDEPLOYMENTVERSIONREQUEST._serialized_start = 34401
+    _DESCRIBEWORKERDEPLOYMENTVERSIONREQUEST._serialized_end = 34595
+    _DESCRIBEWORKERDEPLOYMENTVERSIONRESPONSE._serialized_start = 34598
+    _DESCRIBEWORKERDEPLOYMENTVERSIONRESPONSE._serialized_end = 35001
+    _DESCRIBEWORKERDEPLOYMENTVERSIONRESPONSE_VERSIONTASKQUEUE._serialized_start = 34859
+    _DESCRIBEWORKERDEPLOYMENTVERSIONRESPONSE_VERSIONTASKQUEUE._serialized_end = 35001
+    _DESCRIBEWORKERDEPLOYMENTREQUEST._serialized_start = 35003
+    _DESCRIBEWORKERDEPLOYMENTREQUEST._serialized_end = 35080
+    _DESCRIBEWORKERDEPLOYMENTRESPONSE._serialized_start = 35083
+    _DESCRIBEWORKERDEPLOYMENTRESPONSE._serialized_end = 35223
+    _LISTDEPLOYMENTSREQUEST._serialized_start = 35225
+    _LISTDEPLOYMENTSREQUEST._serialized_end = 35333
+    _LISTDEPLOYMENTSRESPONSE._serialized_start = 35335
+    _LISTDEPLOYMENTSRESPONSE._serialized_end = 35454
+    _SETCURRENTDEPLOYMENTREQUEST._serialized_start = 35457
+    _SETCURRENTDEPLOYMENTREQUEST._serialized_end = 35662
+    _SETCURRENTDEPLOYMENTRESPONSE._serialized_start = 35665
+    _SETCURRENTDEPLOYMENTRESPONSE._serialized_end = 35850
+    _SETWORKERDEPLOYMENTCURRENTVERSIONREQUEST._serialized_start = 35853
+    _SETWORKERDEPLOYMENTCURRENTVERSIONREQUEST._serialized_end = 36056
+    _SETWORKERDEPLOYMENTCURRENTVERSIONRESPONSE._serialized_start = 36059
+    _SETWORKERDEPLOYMENTCURRENTVERSIONRESPONSE._serialized_end = 36246
+    _SETWORKERDEPLOYMENTRAMPINGVERSIONREQUEST._serialized_start = 36249
+    _SETWORKERDEPLOYMENTRAMPINGVERSIONREQUEST._serialized_end = 36472
+    _SETWORKERDEPLOYMENTRAMPINGVERSIONRESPONSE._serialized_start = 36475
+    _SETWORKERDEPLOYMENTRAMPINGVERSIONRESPONSE._serialized_end = 36691
+    _LISTWORKERDEPLOYMENTSREQUEST._serialized_start = 36693
+    _LISTWORKERDEPLOYMENTSREQUEST._serialized_end = 36786
+    _LISTWORKERDEPLOYMENTSRESPONSE._serialized_start = 36789
+    _LISTWORKERDEPLOYMENTSRESPONSE._serialized_end = 37460
+    _LISTWORKERDEPLOYMENTSRESPONSE_WORKERDEPLOYMENTSUMMARY._serialized_start = 36964
+    _LISTWORKERDEPLOYMENTSRESPONSE_WORKERDEPLOYMENTSUMMARY._serialized_end = 37460
+    _DELETEWORKERDEPLOYMENTVERSIONREQUEST._serialized_start = 37463
+    _DELETEWORKERDEPLOYMENTVERSIONREQUEST._serialized_end = 37663
+    _DELETEWORKERDEPLOYMENTVERSIONRESPONSE._serialized_start = 37665
+    _DELETEWORKERDEPLOYMENTVERSIONRESPONSE._serialized_end = 37704
+    _DELETEWORKERDEPLOYMENTREQUEST._serialized_start = 37706
+    _DELETEWORKERDEPLOYMENTREQUEST._serialized_end = 37799
+    _DELETEWORKERDEPLOYMENTRESPONSE._serialized_start = 37801
+    _DELETEWORKERDEPLOYMENTRESPONSE._serialized_end = 37833
+    _UPDATEWORKERDEPLOYMENTVERSIONMETADATAREQUEST._serialized_start = 37836
+    _UPDATEWORKERDEPLOYMENTVERSIONMETADATAREQUEST._serialized_end = 38254
+    _UPDATEWORKERDEPLOYMENTVERSIONMETADATAREQUEST_UPSERTENTRIESENTRY._serialized_start = 38169
     _UPDATEWORKERDEPLOYMENTVERSIONMETADATAREQUEST_UPSERTENTRIESENTRY._serialized_end = (
-        37047
+        38254
     )
-    _UPDATEWORKERDEPLOYMENTVERSIONMETADATARESPONSE._serialized_start = 37049
-    _UPDATEWORKERDEPLOYMENTVERSIONMETADATARESPONSE._serialized_end = 37159
-    _GETCURRENTDEPLOYMENTREQUEST._serialized_start = 37161
-    _GETCURRENTDEPLOYMENTREQUEST._serialized_end = 37230
-    _GETCURRENTDEPLOYMENTRESPONSE._serialized_start = 37232
-    _GETCURRENTDEPLOYMENTRESPONSE._serialized_end = 37339
-    _GETDEPLOYMENTREACHABILITYREQUEST._serialized_start = 37341
-    _GETDEPLOYMENTREACHABILITYREQUEST._serialized_end = 37454
-    _GETDEPLOYMENTREACHABILITYRESPONSE._serialized_start = 37457
-    _GETDEPLOYMENTREACHABILITYRESPONSE._serialized_end = 37684
-    _CREATEWORKFLOWRULEREQUEST._serialized_start = 37687
-    _CREATEWORKFLOWRULEREQUEST._serialized_end = 37867
-    _CREATEWORKFLOWRULERESPONSE._serialized_start = 37869
-    _CREATEWORKFLOWRULERESPONSE._serialized_end = 37964
-    _DESCRIBEWORKFLOWRULEREQUEST._serialized_start = 37966
-    _DESCRIBEWORKFLOWRULEREQUEST._serialized_end = 38031
-    _DESCRIBEWORKFLOWRULERESPONSE._serialized_start = 38033
-    _DESCRIBEWORKFLOWRULERESPONSE._serialized_end = 38114
-    _DELETEWORKFLOWRULEREQUEST._serialized_start = 38116
-    _DELETEWORKFLOWRULEREQUEST._serialized_end = 38179
-    _DELETEWORKFLOWRULERESPONSE._serialized_start = 38181
-    _DELETEWORKFLOWRULERESPONSE._serialized_end = 38209
-    _LISTWORKFLOWRULESREQUEST._serialized_start = 38211
-    _LISTWORKFLOWRULESREQUEST._serialized_end = 38281
-    _LISTWORKFLOWRULESRESPONSE._serialized_start = 38283
-    _LISTWORKFLOWRULESRESPONSE._serialized_end = 38387
-    _TRIGGERWORKFLOWRULEREQUEST._serialized_start = 38390
-    _TRIGGERWORKFLOWRULEREQUEST._serialized_end = 38596
-    _TRIGGERWORKFLOWRULERESPONSE._serialized_start = 38598
-    _TRIGGERWORKFLOWRULERESPONSE._serialized_end = 38644
+    _UPDATEWORKERDEPLOYMENTVERSIONMETADATARESPONSE._serialized_start = 38256
+    _UPDATEWORKERDEPLOYMENTVERSIONMETADATARESPONSE._serialized_end = 38366
+    _GETCURRENTDEPLOYMENTREQUEST._serialized_start = 38368
+    _GETCURRENTDEPLOYMENTREQUEST._serialized_end = 38437
+    _GETCURRENTDEPLOYMENTRESPONSE._serialized_start = 38439
+    _GETCURRENTDEPLOYMENTRESPONSE._serialized_end = 38546
+    _GETDEPLOYMENTREACHABILITYREQUEST._serialized_start = 38548
+    _GETDEPLOYMENTREACHABILITYREQUEST._serialized_end = 38661
+    _GETDEPLOYMENTREACHABILITYRESPONSE._serialized_start = 38664
+    _GETDEPLOYMENTREACHABILITYRESPONSE._serialized_end = 38891
+    _CREATEWORKFLOWRULEREQUEST._serialized_start = 38894
+    _CREATEWORKFLOWRULEREQUEST._serialized_end = 39074
+    _CREATEWORKFLOWRULERESPONSE._serialized_start = 39076
+    _CREATEWORKFLOWRULERESPONSE._serialized_end = 39171
+    _DESCRIBEWORKFLOWRULEREQUEST._serialized_start = 39173
+    _DESCRIBEWORKFLOWRULEREQUEST._serialized_end = 39238
+    _DESCRIBEWORKFLOWRULERESPONSE._serialized_start = 39240
+    _DESCRIBEWORKFLOWRULERESPONSE._serialized_end = 39321
+    _DELETEWORKFLOWRULEREQUEST._serialized_start = 39323
+    _DELETEWORKFLOWRULEREQUEST._serialized_end = 39386
+    _DELETEWORKFLOWRULERESPONSE._serialized_start = 39388
+    _DELETEWORKFLOWRULERESPONSE._serialized_end = 39416
+    _LISTWORKFLOWRULESREQUEST._serialized_start = 39418
+    _LISTWORKFLOWRULESREQUEST._serialized_end = 39488
+    _LISTWORKFLOWRULESRESPONSE._serialized_start = 39490
+    _LISTWORKFLOWRULESRESPONSE._serialized_end = 39594
+    _TRIGGERWORKFLOWRULEREQUEST._serialized_start = 39597
+    _TRIGGERWORKFLOWRULEREQUEST._serialized_end = 39803
+    _TRIGGERWORKFLOWRULERESPONSE._serialized_start = 39805
+    _TRIGGERWORKFLOWRULERESPONSE._serialized_end = 39851
+    _RECORDWORKERHEARTBEATREQUEST._serialized_start = 39854
+    _RECORDWORKERHEARTBEATREQUEST._serialized_end = 39988
+    _RECORDWORKERHEARTBEATRESPONSE._serialized_start = 39990
+    _RECORDWORKERHEARTBEATRESPONSE._serialized_end = 40021
+    _LISTWORKERSREQUEST._serialized_start = 40023
+    _LISTWORKERSREQUEST._serialized_end = 40121
+    _LISTWORKERSRESPONSE._serialized_start = 40123
+    _LISTWORKERSRESPONSE._serialized_end = 40227
 # @@protoc_insertion_point(module_scope)

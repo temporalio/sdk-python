@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Optional, Union, no_type_check
 
+import nexusrpc
 import pytest
 from agents import (
     Agent,
@@ -55,10 +56,12 @@ from temporalio.contrib.openai_agents import (
     TestModelProvider,
 )
 from temporalio.exceptions import CancelledError
+from temporalio.testing import WorkflowEnvironment
 from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
 )
 from tests.helpers import new_worker
+from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 response_index: int = 0
 
@@ -190,6 +193,33 @@ async def get_weather_context(ctx: RunContextWrapper[str], city: str) -> Weather
     return Weather(city=city, temperature_range="14-20C", conditions=ctx.context)
 
 
+class ActivityWeatherService:
+    @activity.defn
+    async def get_weather_method(self, city: str) -> Weather:
+        """
+        Get the weather for a given city.
+        """
+        return Weather(
+            city=city, temperature_range="14-20C", conditions="Sunny with wind."
+        )
+
+
+@nexusrpc.service
+class WeatherService:
+    get_weather_nexus_operation: nexusrpc.Operation[WeatherInput, Weather]
+
+
+@nexusrpc.handler.service_handler(service=WeatherService)
+class WeatherServiceHandler:
+    @nexusrpc.handler.sync_operation
+    async def get_weather_nexus_operation(
+        self, ctx: nexusrpc.handler.StartOperationContext, input: WeatherInput
+    ) -> Weather:
+        return Weather(
+            city=input.city, temperature_range="14-20C", conditions="Sunny with wind."
+        )
+
+
 class TestWeatherModel(StaticTestModel):
     responses = [
         ModelResponse(
@@ -250,6 +280,20 @@ class TestWeatherModel(StaticTestModel):
         ),
         ModelResponse(
             output=[
+                ResponseFunctionToolCall(
+                    arguments='{"city":"Tokyo"}',
+                    call_id="call",
+                    name="get_weather_method",
+                    type="function_call",
+                    id="id",
+                    status="completed",
+                )
+            ],
+            usage=Usage(),
+            response_id=None,
+        ),
+        ModelResponse(
+            output=[
                 ResponseOutputMessage(
                     id="",
                     content=[
@@ -270,11 +314,49 @@ class TestWeatherModel(StaticTestModel):
     ]
 
 
+class TestNexusWeatherModel(StaticTestModel):
+    responses = [
+        ModelResponse(
+            output=[
+                ResponseFunctionToolCall(
+                    arguments='{"input":{"city":"Tokyo"}}',
+                    call_id="call",
+                    name="get_weather_nexus_operation",
+                    type="function_call",
+                    id="id",
+                    status="completed",
+                )
+            ],
+            usage=Usage(),
+            response_id=None,
+        ),
+        ModelResponse(
+            output=[
+                ResponseOutputMessage(
+                    id="",
+                    content=[
+                        ResponseOutputText(
+                            text="Test nexus weather result",
+                            annotations=[],
+                            type="output_text",
+                        )
+                    ],
+                    role="assistant",
+                    status="completed",
+                    type="message",
+                )
+            ],
+            usage=Usage(),
+            response_id=None,
+        ),
+    ]
+
+
 @workflow.defn
 class ToolsWorkflow:
     @workflow.run
     async def run(self, question: str) -> str:
-        agent = Agent(
+        agent: Agent = Agent(
             name="Tools Workflow",
             instructions="You are a helpful agent.",
             tools=[
@@ -289,6 +371,32 @@ class ToolsWorkflow:
                 ),
                 openai_agents.workflow.activity_as_tool(
                     get_weather_context, start_to_close_timeout=timedelta(seconds=10)
+                ),
+                openai_agents.workflow.activity_as_tool(
+                    ActivityWeatherService.get_weather_method,
+                    start_to_close_timeout=timedelta(seconds=10),
+                ),
+            ],
+        )
+        result = await Runner.run(
+            starting_agent=agent, input=question, context="Stormy"
+        )
+        return result.final_output
+
+
+@workflow.defn
+class NexusToolsWorkflow:
+    @workflow.run
+    async def run(self, question: str) -> str:
+        agent = Agent(
+            name="Nexus Tools Workflow",
+            instructions="You are a helpful agent.",
+            tools=[
+                openai_agents.workflow.nexus_operation_as_tool(
+                    WeatherService.get_weather_nexus_operation,
+                    service=WeatherService,
+                    endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+                    schedule_to_close_timeout=timedelta(seconds=10),
                 ),
             ],
         )  # type: Agent
@@ -342,7 +450,7 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
                 if e.HasField("activity_task_completed_event_attributes"):
                     events.append(e)
 
-            assert len(events) == 9
+            assert len(events) == 11
             assert (
                 "function_call"
                 in events[0]
@@ -392,11 +500,98 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
                 .data.decode()
             )
             assert (
-                "Test weather result"
+                "function_call"
                 in events[8]
                 .activity_task_completed_event_attributes.result.payloads[0]
                 .data.decode()
             )
+            assert (
+                "Sunny with wind"
+                in events[9]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Test weather result"
+                in events[10]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+
+
+@pytest.mark.parametrize("use_local_model", [True, False])
+async def test_nexus_tool_workflow(
+    client: Client, env: WorkflowEnvironment, use_local_model: bool
+):
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("No openai API key")
+
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    new_config = client.config()
+    new_config["data_converter"] = pydantic_data_converter
+    client = Client(**new_config)
+
+    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
+    with set_open_ai_agent_temporal_overrides(model_params):
+        model_activity = ModelActivity(
+            TestModelProvider(
+                TestNexusWeatherModel(  # type: ignore
+                )
+            )
+            if use_local_model
+            else None
+        )
+        async with new_worker(
+            client,
+            NexusToolsWorkflow,
+            activities=[
+                model_activity.invoke_model_activity,
+            ],
+            nexus_service_handlers=[WeatherServiceHandler()],
+            interceptors=[OpenAIAgentsTracingInterceptor()],
+        ) as worker:
+            await create_nexus_endpoint(worker.task_queue, client)
+
+            workflow_handle = await client.start_workflow(
+                NexusToolsWorkflow.run,
+                "What is the weather in Tokio?",
+                id=f"nexus-tools-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+            result = await workflow_handle.result()
+
+            if use_local_model:
+                assert result == "Test nexus weather result"
+
+                events = []
+                async for e in workflow_handle.fetch_history_events():
+                    if e.HasField(
+                        "activity_task_completed_event_attributes"
+                    ) or e.HasField("nexus_operation_completed_event_attributes"):
+                        events.append(e)
+
+                assert len(events) == 3
+                assert (
+                    "function_call"
+                    in events[0]
+                    .activity_task_completed_event_attributes.result.payloads[0]
+                    .data.decode()
+                )
+                assert (
+                    "Sunny with wind"
+                    in events[
+                        1
+                    ].nexus_operation_completed_event_attributes.result.data.decode()
+                )
+                assert (
+                    "Test nexus weather result"
+                    in events[2]
+                    .activity_task_completed_event_attributes.result.payloads[0]
+                    .data.decode()
+                )
 
 
 @no_type_check

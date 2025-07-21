@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import abc
 import asyncio
 import copy
 import dataclasses
@@ -133,6 +134,14 @@ class Client:
                 metadata doesn't already have an "authorization" key.
             data_converter: Data converter to use for all data conversions
                 to/from payloads.
+            plugins: Set of plugins that are chained together to allow
+                intercepting and modifying client creation and service connection.
+                The earlier plugins wrap the later ones.
+
+                Any plugins that also implement
+                :py:class:`temporalio.worker.Plugin` will be used as worker
+                plugins too so they should not be given when creating a
+                worker.
             interceptors: Set of interceptors that are chained together to allow
                 intercepting of client calls. The earlier interceptors wrap the
                 later ones.
@@ -181,7 +190,7 @@ class Client:
         )
 
         root_plugin: Plugin = _RootPlugin()
-        for plugin in reversed(list(plugins)):
+        for plugin in reversed(plugins):
             root_plugin = plugin.init_client_plugin(root_plugin)
 
         service_client = await root_plugin.connect_service_client(connect_config)
@@ -225,14 +234,17 @@ class Client:
         )
 
         root_plugin: Plugin = _RootPlugin()
-        for plugin in reversed(list(plugins)):
+        for plugin in reversed(plugins):
             root_plugin = plugin.init_client_plugin(root_plugin)
 
-        self._config = root_plugin.on_create_client(config)
+        self._init_from_config(root_plugin.configure_client(config))
+
+    def _init_from_config(self, config: ClientConfig):
+        self._config = config
 
         # Iterate over interceptors in reverse building the impl
         self._impl: OutboundInterceptor = _ClientImpl(self)
-        for interceptor in reversed(list(interceptors)):
+        for interceptor in reversed(list(self._config["interceptors"])):
             self._impl = interceptor.intercept_client(self._impl)
 
     def config(self) -> ClientConfig:
@@ -953,9 +965,6 @@ class Client:
         the call will not return successfully until the update has been delivered to a
         worker.
 
-        .. warning::
-           This API is experimental
-
         Args:
             update: Update function or name on the workflow. arg: Single argument to the
                 update.
@@ -1560,6 +1569,12 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         result_run_id: Optional[str] = None,
         first_execution_run_id: Optional[str] = None,
         result_type: Optional[Type] = None,
+        start_workflow_response: Optional[
+            Union[
+                temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
+                temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse,
+            ]
+        ] = None,
     ) -> None:
         """Create workflow handle."""
         self._client = client
@@ -1568,6 +1583,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self._result_run_id = result_run_id
         self._first_execution_run_id = first_execution_run_id
         self._result_type = result_type
+        self._start_workflow_response = start_workflow_response
         self.__temporal_eagerly_started = False
 
     @property
@@ -5365,11 +5381,7 @@ class StartWorkflowUpdateInput:
 
 @dataclass
 class UpdateWithStartUpdateWorkflowInput:
-    """Update input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`.
-
-    .. warning::
-       This API is experimental
-    """
+    """Update input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`."""
 
     update_id: Optional[str]
     update: str
@@ -5383,11 +5395,7 @@ class UpdateWithStartUpdateWorkflowInput:
 
 @dataclass
 class UpdateWithStartStartWorkflowInput:
-    """StartWorkflow input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`.
-
-    .. warning::
-       This API is experimental
-    """
+    """StartWorkflow input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`."""
 
     # Similar to StartWorkflowInput but without e.g. run_id, start_signal,
     # start_signal_args, request_eager_start.
@@ -5423,11 +5431,7 @@ class UpdateWithStartStartWorkflowInput:
 
 @dataclass
 class StartWorkflowUpdateWithStartInput:
-    """Input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`.
-
-    .. warning::
-       This API is experimental
-    """
+    """Input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`."""
 
     start_workflow_input: UpdateWithStartStartWorkflowInput
     update_workflow_input: UpdateWithStartUpdateWorkflowInput
@@ -5701,11 +5705,7 @@ class OutboundInterceptor:
     async def start_update_with_start_workflow(
         self, input: StartWorkflowUpdateWithStartInput
     ) -> WorkflowUpdateHandle[Any]:
-        """Called for every :py:meth:`Client.start_update_with_start_workflow` and :py:meth:`Client.execute_update_with_start_workflow` call.
-
-        .. warning::
-            This API is experimental
-        """
+        """Called for every :py:meth:`Client.start_update_with_start_workflow` and :py:meth:`Client.execute_update_with_start_workflow` call."""
         return await self.next.start_update_with_start_workflow(input)
 
     ### Async activity calls
@@ -5790,7 +5790,7 @@ class OutboundInterceptor:
 
 
 class _ClientImpl(OutboundInterceptor):
-    def __init__(self, client: Client) -> None:
+    def __init__(self, client: Client) -> None:  # type: ignore
         # We are intentionally not calling the base class's __init__ here
         self._client = client
 
@@ -5850,6 +5850,7 @@ class _ClientImpl(OutboundInterceptor):
             result_run_id=resp.run_id,
             first_execution_run_id=first_execution_run_id,
             result_type=input.ret_type,
+            start_workflow_response=resp,
         )
         setattr(handle, "__temporal_eagerly_started", eagerly_started)
         return handle
@@ -7387,22 +7388,76 @@ async def _decode_user_metadata(
     )
 
 
-class Plugin:
+class Plugin(abc.ABC):
+    """Base class for client plugins that can intercept and modify client behavior.
+
+    Plugins allow customization of client creation and service connection processes
+    through a chain of responsibility pattern. Each plugin can modify the client
+    configuration or intercept service client connections.
+
+    If the plugin is also a temporalio.worker.Plugin, it will additionally be propagated as a worker plugin.
+    You should likley not also provide it to the worker as that will result in the plugin being applied twice.
+    """
+
+    def name(self) -> str:
+        """Get the name of this plugin. Can be overridden if desired to provide a more appropriate name.
+
+        Returns:
+            The fully qualified name of the plugin class (module.classname).
+        """
+        return type(self).__module__ + "." + type(self).__qualname__
+
     def init_client_plugin(self, next: Plugin) -> Plugin:
+        """Initialize this plugin in the plugin chain.
+
+        This method sets up the chain of responsibility pattern by storing a reference
+        to the next plugin in the chain. It is called during client creation to build
+        the plugin chain. Note, this may be called twice in the case of :py:meth:`connect`.
+
+        Args:
+            next: The next plugin in the chain to delegate to.
+
+        Returns:
+            This plugin instance for method chaining.
+        """
         self.next_client_plugin = next
         return self
 
-    def on_create_client(self, config: ClientConfig) -> ClientConfig:
-        return self.next_client_plugin.on_create_client(config)
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
+        """Hook called when creating a client to allow modification of configuration.
+
+        This method is called during client creation and allows plugins to modify
+        the client configuration before the client is fully initialized. Plugins
+        can add interceptors, modify connection parameters, or change other settings.
+
+        Args:
+            config: The client configuration dictionary to potentially modify.
+
+        Returns:
+            The modified client configuration.
+        """
+        return self.next_client_plugin.configure_client(config)
 
     async def connect_service_client(
         self, config: temporalio.service.ConnectConfig
     ) -> temporalio.service.ServiceClient:
+        """Hook called when connecting to the Temporal service.
+
+        This method is called during service client connection and allows plugins
+        to intercept or modify the connection process. Plugins can modify connection
+        parameters, add authentication, or provide custom connection logic.
+
+        Args:
+            config: The service connection configuration.
+
+        Returns:
+            The connected service client.
+        """
         return await self.next_client_plugin.connect_service_client(config)
 
 
 class _RootPlugin(Plugin):
-    def on_create_client(self, config: ClientConfig) -> ClientConfig:
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
         return config
 
     async def connect_service_client(

@@ -1,9 +1,9 @@
 [project]
 name = "temporalio"
-version = "1.14.0"
+version = "1.14.1"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
-requires-python = "~=3.9"
+requires-python = ">=3.9"
 readme = "README.md"
 license = { file = "LICENSE" }
 keywords = [
@@ -45,7 +45,7 @@ dev = [
     "psutil>=5.9.3,<6",
     "pydocstyle>=6.3.0,<7",
     "pydoctor>=24.11.1,<25",
-    "pyright==1.1.402",
+    "pyright==1.1.403",
     "pytest~=7.4",
     "pytest-asyncio>=0.21,<0.22",
     "pytest-timeout~=2.2",
@@ -69,14 +69,16 @@ lint = [
   {cmd = "uv run ruff check --select I"},
   {cmd = "uv run ruff format --check"},
   {ref = "lint-types"},
-  {cmd = "uv run pyright"},
   {ref = "lint-docs"},
 ]
 bridge-lint = { cmd = "cargo clippy -- -D warnings", cwd = "temporalio/bridge" }
 # TODO(cretz): Why does pydocstyle complain about @overload missing docs after
 # https://github.com/PyCQA/pydocstyle/pull/511?
 lint-docs = "uv run pydocstyle --ignore-decorators=overload"
-lint-types = "uv run mypy --namespace-packages --check-untyped-defs ."
+lint-types = [
+  { cmd = "uv run pyright"},
+  { cmd = "uv run mypy --namespace-packages --check-untyped-defs ."},
+]
 run-bench = "uv run python scripts/run_bench.py"
 test = "uv run pytest"
 
@@ -100,7 +102,7 @@ filterwarnings = [
 [tool.cibuildwheel]
 before-all = "pip install protoc-wheel-0"
 build = "cp39-win_amd64 cp39-manylinux_x86_64 cp39-manylinux_aarch64 cp39-macosx_x86_64 cp39-macosx_arm64"
-build-verbosity = "1"
+build-verbosity = 1
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "10.12" }
@@ -158,6 +160,24 @@ project-name = "Temporal Python"
 sidebar-expand-depth = 2
 
 [tool.pyright]
+enableTypeIgnoreComments = true
+reportAny = "none"
+reportCallInDefaultInitializer = "none"
+reportExplicitAny = "none"
+reportIgnoreCommentWithoutRule = "none"
+reportImplicitOverride = "none"
+reportImplicitStringConcatenation = "none"
+reportImportCycles = "none"
+reportMissingTypeArgument = "none"
+reportPrivateUsage = "none"
+reportUnannotatedClassAttribute = "none"
+reportUnknownArgumentType = "none"
+reportUnknownMemberType = "none"
+reportUnknownParameterType = "none"
+reportUnknownVariableType = "none"
+reportUnnecessaryIsInstance = "none"
+reportUnnecessaryTypeIgnoreComment = "none"
+reportUnusedCallResult = "none"
 include = ["temporalio", "tests"]
 exclude = [
   "temporalio/api",
@@ -216,3 +236,6 @@ exclude = [
 [tool.uv]
 # Prevent uv commands from building the package by default
 package = false
+
+[tool.uv.sources]
+nexus-rpc = { git = "https://github.com/nexus-rpc/sdk-python.git", rev = "35f574c711193a6e2560d3e6665732a5bb7ae92c" }
