@@ -1779,6 +1779,7 @@ async def test_workflow_method_tools(client: Client):
             )
             await workflow_handle.result()
 
+
 async def test_response_serialization(client: Client):
     import json
 
