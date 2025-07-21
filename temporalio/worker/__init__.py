@@ -44,6 +44,7 @@ from ._tuning import (
     WorkflowSlotInfo,
 )
 from ._worker import (
+    Plugin,
     PollerBehavior,
     PollerBehaviorAutoscaling,
     PollerBehaviorSimpleMaximum,
@@ -78,6 +79,7 @@ __all__ = [
     "ActivityOutboundInterceptor",
     "WorkflowInboundInterceptor",
     "WorkflowOutboundInterceptor",
+    "Plugin",
     # Interceptor input
     "ContinueAsNewInput",
     "ExecuteActivityInput",
