@@ -1,4 +1,4 @@
-from collections.abc import Callable
+import typing
 from dataclasses import replace
 from typing import Union
 
@@ -8,6 +8,7 @@ from agents import (
     RunResult,
     RunResultStreaming,
     TContext,
+    Tool,
     TResponseInputItem,
 )
 from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
@@ -43,8 +44,9 @@ class TemporalOpenAIRunner(AgentRunner):
                 **kwargs,
             )
 
+        tool_types = typing.get_args(Tool)
         for t in starting_agent.tools:
-            if isinstance(t, Callable):
+            if isinstance(t, tool_types):
                 raise ValueError(
                     "Provided tool is not a tool type. If using an activity, make sure to wrap it with openai_agents.workflow.activity_as_tool."
                 )
