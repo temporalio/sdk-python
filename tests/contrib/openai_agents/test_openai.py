@@ -1859,7 +1859,7 @@ class WaitModel(Model):
         prompt: Union[ResponsePromptParam, None] = None,
     ) -> ModelResponse:
         activity.logger.info("Waiting")
-        await asyncio.sleep(.5)
+        await asyncio.sleep(0.5)
         activity.logger.info("Returning")
         return ModelResponse(
             output=[
@@ -1900,7 +1900,7 @@ async def test_heartbeat(client: Client):
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
-                heartbeat_timeout=timedelta(seconds=.2),
+                heartbeat_timeout=timedelta(seconds=0.2),
             ),
             model_provider=TestModelProvider(WaitModel()),
         )
