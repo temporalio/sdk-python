@@ -694,7 +694,8 @@ async def test_research_workflow(client: Client, use_local_model: bool):
     response_index = 0
 
     model_params = ModelActivityParameters(
-        start_to_close_timeout=timedelta(seconds=120)
+        start_to_close_timeout=timedelta(seconds=120),
+        schedule_to_close_timeout=timedelta(seconds=120),
     )
     with set_open_ai_agent_temporal_overrides(model_params):
         model_activity = ModelActivity(
