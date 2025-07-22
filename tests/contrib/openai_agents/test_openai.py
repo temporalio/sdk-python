@@ -1798,7 +1798,7 @@ class WaitModel(Model):
         prompt: Union[ResponsePromptParam, None] = None,
     ) -> ModelResponse:
         activity.logger.info("Waiting")
-        await asyncio.sleep(5.0)
+        await asyncio.sleep(.5)
         activity.logger.info("Returning")
         return ModelResponse(
             output=[
@@ -1840,7 +1840,7 @@ async def test_heartbeat(client: Client):
     client = Client(**new_config)
 
     with set_open_ai_agent_temporal_overrides(
-        model_params=ModelActivityParameters(heartbeat_timeout=timedelta(seconds=2))
+        model_params=ModelActivityParameters(heartbeat_timeout=timedelta(seconds=.2))
     ):
         model_activity = ModelActivity(TestModelProvider(WaitModel()))
         async with new_worker(
@@ -1854,6 +1854,6 @@ async def test_heartbeat(client: Client):
                 "Tell me about recursion in programming.",
                 id=f"workflow-tool-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
+                execution_timeout=timedelta(seconds=1),
             )
             await workflow_handle.result()
