@@ -1,6 +1,7 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
 from contextlib import contextmanager
+from datetime import timedelta
 from typing import AsyncIterator, Callable, Optional, Union
 
 from agents import (
@@ -39,7 +40,7 @@ from temporalio.worker import Worker, WorkerConfig
 
 @contextmanager
 def set_open_ai_agent_temporal_overrides(
-    model_params: Optional[ModelActivityParameters] = None,
+    model_params: ModelActivityParameters,
     auto_close_tracing_in_workflows: bool = False,
 ):
     """Configure Temporal-specific overrides for OpenAI agents.
@@ -68,14 +69,6 @@ def set_open_ai_agent_temporal_overrides(
     """
     if model_params is None:
         model_params = ModelActivityParameters()
-
-    if (
-        not model_params.start_to_close_timeout
-        and not model_params.schedule_to_close_timeout
-    ):
-        raise ValueError(
-            "Activity must have start_to_close_timeout or schedule_to_close_timeout"
-        )
 
     previous_runner = get_default_agent_runner()
     previous_trace_provider = get_trace_provider()
@@ -208,6 +201,22 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
             model_provider: Optional model provider for custom model implementations.
                 Useful for testing or custom model integrations.
         """
+        if model_params is None:
+            model_params = ModelActivityParameters()
+
+        # For the default provider, we provide a default start_to_close_timeout of 60 seconds.
+        # Other providers will need to define their own.
+        if (
+            model_params.start_to_close_timeout is None
+            and model_params.schedule_to_close_timeout is None
+        ):
+            if model_provider is None:
+                model_params.start_to_close_timeout = timedelta(seconds=60)
+            else:
+                raise ValueError(
+                    "When configuring a custom provider, the model activity must have start_to_close_timeout or schedule_to_close_timeout"
+                )
+
         self._model_params = model_params
         self._model_provider = model_provider
 

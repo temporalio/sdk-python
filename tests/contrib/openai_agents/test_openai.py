@@ -1800,7 +1800,7 @@ async def assert_status_retry_behavior(status: int, client: Client, should_retry
             model_params=ModelActivityParameters(
                 retry_policy=RetryPolicy(maximum_attempts=2),
             ),
-            model_provider=TestModelProvider(TestModel(lambda: status_error(status)))
+            model_provider=TestModelProvider(TestModel(lambda: status_error(status))),
         )
     ]
     client = Client(**new_config)
