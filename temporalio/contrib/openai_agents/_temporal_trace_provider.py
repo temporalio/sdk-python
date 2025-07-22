@@ -1,7 +1,8 @@
 """Provides support for integration with OpenAI Agents SDK tracing across workflows"""
 
 import uuid
-from typing import Any, Optional, Union, cast
+from types import TracebackType
+from typing import Any, Optional, cast
 
 from agents import SpanData, Trace, TracingProcessor
 from agents.tracing import (
@@ -184,6 +185,11 @@ class TemporalTraceProvider(DefaultTraceProvider):
         """Enter the context of the Temporal trace provider."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException],
+        exc_val: BaseException,
+        exc_tb: TracebackType,
+    ):
         """Exit the context of the Temporal trace provider."""
         self._multi_processor.shutdown()

@@ -1,3 +1,4 @@
+import json
 import os
 import uuid
 from dataclasses import dataclass
@@ -36,7 +37,7 @@ from agents.items import (
     ToolCallItem,
     ToolCallOutputItem,
 )
-from openai import AsyncOpenAI, BaseModel
+from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
     ResponseFunctionToolCall,
     ResponseFunctionWebSearch,
@@ -45,21 +46,20 @@ from openai.types.responses import (
 )
 from openai.types.responses.response_function_web_search import ActionSearch
 from openai.types.responses.response_prompt_param import ResponsePromptParam
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, TypeAdapter
 
+import temporalio.api.cloud.namespace.v1
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
+from temporalio.common import RetryPolicy, SearchAttributeValueType
 from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents import (
-    ModelActivity,
     ModelActivityParameters,
-    OpenAIAgentsTracingInterceptor,
     TestModel,
     TestModelProvider,
-    set_open_ai_agent_temporal_overrides,
 )
 from temporalio.contrib.pydantic import pydantic_data_converter
-from temporalio.exceptions import CancelledError
+from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.testing import WorkflowEnvironment
 from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
@@ -114,10 +114,10 @@ class TestHelloModel(StaticTestModel):
 class HelloWorldAgent:
     @workflow.run
     async def run(self, prompt: str) -> str:
-        agent = Agent(
+        agent = Agent[None](
             name="Assistant",
             instructions="You only respond in haikus.",
-        )  # type: Agent
+        )
         result = await Runner.run(starting_agent=agent, input=prompt)
         return result.final_output
 
@@ -127,26 +127,28 @@ async def test_hello_world_agent(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = pydantic_data_converter
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(TestHelloModel())
+            if use_local_model
+            else None,
+        )
+    ]
     client = Client(**new_config)
 
-    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
-    with set_open_ai_agent_temporal_overrides(model_params):
-        model_activity = ModelActivity(
-            TestModelProvider(TestHelloModel()) if use_local_model else None
+    async with new_worker(client, HelloWorldAgent) as worker:
+        result = await client.execute_workflow(
+            HelloWorldAgent.run,
+            "Tell me about recursion in programming.",
+            id=f"hello-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=5),
         )
-        async with new_worker(
-            client, HelloWorldAgent, activities=[model_activity.invoke_model_activity]
-        ) as worker:
-            result = await client.execute_workflow(
-                HelloWorldAgent.run,
-                "Tell me about recursion in programming.",
-                id=f"hello-workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=5),
-            )
-            if use_local_model:
-                assert result == "test"
+        if use_local_model:
+            assert result == "test"
 
 
 @dataclass
@@ -358,7 +360,7 @@ class TestNexusWeatherModel(StaticTestModel):
 class ToolsWorkflow:
     @workflow.run
     async def run(self, question: str) -> str:
-        agent: Agent = Agent(
+        agent = Agent[str](
             name="Tools Workflow",
             instructions="You are a helpful agent.",
             tools=[
@@ -390,7 +392,7 @@ class ToolsWorkflow:
 class NexusToolsWorkflow:
     @workflow.run
     async def run(self, question: str) -> str:
-        agent = Agent(
+        agent = Agent[str](
             name="Nexus Tools Workflow",
             instructions="You are a helpful agent.",
             tools=[
@@ -401,7 +403,7 @@ class NexusToolsWorkflow:
                     schedule_to_close_timeout=timedelta(seconds=10),
                 ),
             ],
-        )  # type: Agent
+        )
         result = await Runner.run(
             starting_agent=agent, input=question, context="Stormy"
         )
@@ -413,116 +415,113 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = pydantic_data_converter
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(TestWeatherModel())
+            if use_local_model
+            else None,
+        )
+    ]
     client = Client(**new_config)
 
-    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
-    with set_open_ai_agent_temporal_overrides(model_params):
-        model_activity = ModelActivity(
-            TestModelProvider(
-                TestWeatherModel(  # type: ignore
-                )
-            )
-            if use_local_model
-            else None
+    async with new_worker(
+        client,
+        ToolsWorkflow,
+        activities=[
+            get_weather,
+            get_weather_object,
+            get_weather_country,
+            get_weather_context,
+            ActivityWeatherService().get_weather_method,
+        ],
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            ToolsWorkflow.run,
+            "What is the weather in Tokio?",
+            id=f"tools-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
         )
-        async with new_worker(
-            client,
-            ToolsWorkflow,
-            activities=[
-                model_activity.invoke_model_activity,
-                get_weather,
-                get_weather_object,
-                get_weather_country,
-                get_weather_context,
-                ActivityWeatherService().get_weather_method,
-            ],
-            interceptors=[OpenAIAgentsTracingInterceptor()],
-        ) as worker:
-            workflow_handle = await client.start_workflow(
-                ToolsWorkflow.run,
-                "What is the weather in Tokio?",
-                id=f"tools-workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=30),
+        result = await workflow_handle.result()
+
+        if use_local_model:
+            assert result == "Test weather result"
+
+            events = []
+            async for e in workflow_handle.fetch_history_events():
+                if e.HasField("activity_task_completed_event_attributes"):
+                    events.append(e)
+
+            assert len(events) == 11
+            assert (
+                "function_call"
+                in events[0]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
             )
-            result = await workflow_handle.result()
-
-            if use_local_model:
-                assert result == "Test weather result"
-
-                events = []
-                async for e in workflow_handle.fetch_history_events():
-                    if e.HasField("activity_task_completed_event_attributes"):
-                        events.append(e)
-
-                assert len(events) == 11
-                assert (
-                    "function_call"
-                    in events[0]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "Sunny with wind"
-                    in events[1]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "function_call"
-                    in events[2]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "Sunny with wind"
-                    in events[3]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "function_call"
-                    in events[4]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "Sunny with wind"
-                    in events[5]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "function_call"
-                    in events[6]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "Stormy"
-                    in events[7]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "function_call"
-                    in events[8]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "Sunny with wind"
-                    in events[9]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "Test weather result"
-                    in events[10]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
+            assert (
+                "Sunny with wind"
+                in events[1]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "function_call"
+                in events[2]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Sunny with wind"
+                in events[3]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "function_call"
+                in events[4]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Sunny with wind"
+                in events[5]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "function_call"
+                in events[6]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Stormy"
+                in events[7]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "function_call"
+                in events[8]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Sunny with wind"
+                in events[9]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Test weather result"
+                in events[10]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
 
 
 @pytest.mark.parametrize("use_local_model", [True, False])
@@ -536,68 +535,63 @@ async def test_nexus_tool_workflow(
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     new_config = client.config()
-    new_config["data_converter"] = pydantic_data_converter
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(TestNexusWeatherModel())
+            if use_local_model
+            else None,
+        )
+    ]
     client = Client(**new_config)
 
-    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
-    with set_open_ai_agent_temporal_overrides(model_params):
-        model_activity = ModelActivity(
-            TestModelProvider(
-                TestNexusWeatherModel(  # type: ignore
-                )
-            )
-            if use_local_model
-            else None
+    async with new_worker(
+        client,
+        NexusToolsWorkflow,
+        nexus_service_handlers=[WeatherServiceHandler()],
+    ) as worker:
+        await create_nexus_endpoint(worker.task_queue, client)
+
+        workflow_handle = await client.start_workflow(
+            NexusToolsWorkflow.run,
+            "What is the weather in Tokio?",
+            id=f"nexus-tools-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
         )
-        async with new_worker(
-            client,
-            NexusToolsWorkflow,
-            activities=[
-                model_activity.invoke_model_activity,
-            ],
-            nexus_service_handlers=[WeatherServiceHandler()],
-            interceptors=[OpenAIAgentsTracingInterceptor()],
-        ) as worker:
-            await create_nexus_endpoint(worker.task_queue, client)
+        result = await workflow_handle.result()
 
-            workflow_handle = await client.start_workflow(
-                NexusToolsWorkflow.run,
-                "What is the weather in Tokio?",
-                id=f"nexus-tools-workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=30),
+        if use_local_model:
+            assert result == "Test nexus weather result"
+
+            events = []
+            async for e in workflow_handle.fetch_history_events():
+                if e.HasField("activity_task_completed_event_attributes") or e.HasField(
+                    "nexus_operation_completed_event_attributes"
+                ):
+                    events.append(e)
+
+            assert len(events) == 3
+            assert (
+                "function_call"
+                in events[0]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
             )
-            result = await workflow_handle.result()
-
-            if use_local_model:
-                assert result == "Test nexus weather result"
-
-                events = []
-                async for e in workflow_handle.fetch_history_events():
-                    if e.HasField(
-                        "activity_task_completed_event_attributes"
-                    ) or e.HasField("nexus_operation_completed_event_attributes"):
-                        events.append(e)
-
-                assert len(events) == 3
-                assert (
-                    "function_call"
-                    in events[0]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "Sunny with wind"
-                    in events[
-                        1
-                    ].nexus_operation_completed_event_attributes.result.data.decode()
-                )
-                assert (
-                    "Test nexus weather result"
-                    in events[2]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
+            assert (
+                "Sunny with wind"
+                in events[
+                    1
+                ].nexus_operation_completed_event_attributes.result.data.decode()
+            )
+            assert (
+                "Test nexus weather result"
+                in events[2]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
 
 
 @no_type_check
@@ -687,86 +681,83 @@ async def test_research_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = pydantic_data_converter
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=120),
+                schedule_to_close_timeout=timedelta(seconds=120),
+            ),
+            model_provider=TestModelProvider(TestResearchModel())
+            if use_local_model
+            else None,
+        )
+    ]
     client = Client(**new_config)
 
-    global response_index
-    response_index = 0
-
-    model_params = ModelActivityParameters(
-        start_to_close_timeout=timedelta(seconds=120),
-        schedule_to_close_timeout=timedelta(seconds=120),
-    )
-    with set_open_ai_agent_temporal_overrides(model_params):
-        model_activity = ModelActivity(
-            TestModelProvider(TestResearchModel()) if use_local_model else None
+    async with new_worker(
+        client,
+        ResearchWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            ResearchWorkflow.run,
+            "Caribbean vacation spots in April, optimizing for surfing, hiking and water sports",
+            id=f"research-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=120),
         )
-        async with new_worker(
-            client,
-            ResearchWorkflow,
-            activities=[model_activity.invoke_model_activity, get_weather],
-            interceptors=[OpenAIAgentsTracingInterceptor()],
-        ) as worker:
-            workflow_handle = await client.start_workflow(
-                ResearchWorkflow.run,
-                "Caribbean vacation spots in April, optimizing for surfing, hiking and water sports",
-                id=f"research-workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=120),
+        result = await workflow_handle.result()
+
+        if use_local_model:
+            assert result == "report"
+
+            events = []
+            async for e in workflow_handle.fetch_history_events():
+                if e.HasField("activity_task_completed_event_attributes"):
+                    events.append(e)
+
+            assert len(events) == 12
+            assert (
+                '"type":"output_text"'
+                in events[0]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
             )
-            result = await workflow_handle.result()
-
-            if use_local_model:
-                assert result == "report"
-
-                events = []
-                async for e in workflow_handle.fetch_history_events():
-                    if e.HasField("activity_task_completed_event_attributes"):
-                        events.append(e)
-
-                assert len(events) == 12
+            for i in range(1, 11):
                 assert (
-                    '"type":"output_text"'
-                    in events[0]
+                    "web_search_call"
+                    in events[i]
                     .activity_task_completed_event_attributes.result.payloads[0]
                     .data.decode()
                 )
-                for i in range(1, 11):
-                    assert (
-                        "web_search_call"
-                        in events[i]
-                        .activity_task_completed_event_attributes.result.payloads[0]
-                        .data.decode()
-                    )
 
-                assert (
-                    '"type":"output_text"'
-                    in events[11]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
+            assert (
+                '"type":"output_text"'
+                in events[11]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
 
 
 def orchestrator_agent() -> Agent:
-    spanish_agent = Agent(
+    spanish_agent = Agent[None](
         name="spanish_agent",
         instructions="You translate the user's message to Spanish",
         handoff_description="An english to spanish translator",
-    )  # type: Agent
+    )
 
-    french_agent = Agent(
+    french_agent = Agent[None](
         name="french_agent",
         instructions="You translate the user's message to French",
         handoff_description="An english to french translator",
-    )  # type: Agent
+    )
 
-    italian_agent = Agent(
+    italian_agent = Agent[None](
         name="italian_agent",
         instructions="You translate the user's message to Italian",
         handoff_description="An english to italian translator",
-    )  # type: Agent
+    )
 
-    orchestrator_agent = Agent(
+    orchestrator_agent = Agent[None](
         name="orchestrator_agent",
         instructions=(
             "You are a translation agent. You use the tools given to you to translate."
@@ -787,7 +778,7 @@ def orchestrator_agent() -> Agent:
                 tool_description="Translate the user's message to Italian",
             ),
         ],
-    )  # type: Agent
+    )
     return orchestrator_agent
 
 
@@ -905,67 +896,64 @@ async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = pydantic_data_converter
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(AgentAsToolsModel())
+            if use_local_model
+            else None,
+        )
+    ]
     client = Client(**new_config)
 
-    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
-    with set_open_ai_agent_temporal_overrides(model_params):
-        model_activity = ModelActivity(
-            TestModelProvider(
-                AgentAsToolsModel(  # type: ignore
-                )
-            )
-            if use_local_model
-            else None
+    async with new_worker(
+        client,
+        AgentsAsToolsWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            AgentsAsToolsWorkflow.run,
+            "Translate to Spanish: 'I am full'",
+            id=f"agents-as-tools-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
         )
-        async with new_worker(
-            client,
-            AgentsAsToolsWorkflow,
-            activities=[model_activity.invoke_model_activity],
-            interceptors=[OpenAIAgentsTracingInterceptor()],
-        ) as worker:
-            workflow_handle = await client.start_workflow(
-                AgentsAsToolsWorkflow.run,
-                "Translate to Spanish: 'I am full'",
-                id=f"agents-as-tools-workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=30),
+        result = await workflow_handle.result()
+
+        if use_local_model:
+            assert result == 'The translation to Spanish is: "Estoy lleno."'
+
+            events = []
+            async for e in workflow_handle.fetch_history_events():
+                if e.HasField("activity_task_completed_event_attributes"):
+                    events.append(e)
+
+            assert len(events) == 4
+            assert (
+                "function_call"
+                in events[0]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
             )
-            result = await workflow_handle.result()
-
-            if use_local_model:
-                assert result == 'The translation to Spanish is: "Estoy lleno."'
-
-                events = []
-                async for e in workflow_handle.fetch_history_events():
-                    if e.HasField("activity_task_completed_event_attributes"):
-                        events.append(e)
-
-                assert len(events) == 4
-                assert (
-                    "function_call"
-                    in events[0]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "Estoy lleno"
-                    in events[1]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "The translation to Spanish is:"
-                    in events[2]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "The translation to Spanish is:"
-                    in events[3]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
+            assert (
+                "Estoy lleno"
+                in events[1]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "The translation to Spanish is:"
+                in events[2]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "The translation to Spanish is:"
+                in events[3]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
 
 
 class AirlineAgentContext(BaseModel):
@@ -1260,97 +1248,94 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = pydantic_data_converter
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(CustomerServiceModel())
+            if use_local_model
+            else None,
+        )
+    ]
     client = Client(**new_config)
 
     questions = ["Hello", "Book me a flight to PDX", "11111", "Any window seat"]
 
-    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
-    with set_open_ai_agent_temporal_overrides(model_params):
-        model_activity = ModelActivity(
-            TestModelProvider(
-                CustomerServiceModel(  # type: ignore
-                )
-            )
-            if use_local_model
-            else None
+    async with new_worker(
+        client,
+        CustomerServiceWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            CustomerServiceWorkflow.run,
+            id=f"customer-service-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
         )
-        async with new_worker(
-            client,
-            CustomerServiceWorkflow,
-            activities=[model_activity.invoke_model_activity],
-            interceptors=[OpenAIAgentsTracingInterceptor()],
-        ) as worker:
-            workflow_handle = await client.start_workflow(
-                CustomerServiceWorkflow.run,
-                id=f"customer-service-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=30),
+        history: list[Any] = []
+        for q in questions:
+            message_input = ProcessUserMessageInput(
+                user_input=q, chat_length=len(history)
             )
-            history: list[Any] = []
-            for q in questions:
-                message_input = ProcessUserMessageInput(
-                    user_input=q, chat_length=len(history)
-                )
-                new_history = await workflow_handle.execute_update(
-                    CustomerServiceWorkflow.process_user_message, message_input
-                )
-                history.extend(new_history)
-                print(*new_history, sep="\n")
+            new_history = await workflow_handle.execute_update(
+                CustomerServiceWorkflow.process_user_message, message_input
+            )
+            history.extend(new_history)
+            print(*new_history, sep="\n")
 
-            await workflow_handle.cancel()
+        await workflow_handle.cancel()
 
-            with pytest.raises(WorkflowFailureError) as err:
-                await workflow_handle.result()
-            assert isinstance(err.value.cause, CancelledError)
+        with pytest.raises(WorkflowFailureError) as err:
+            await workflow_handle.result()
+        assert isinstance(err.value.cause, CancelledError)
 
-            if use_local_model:
-                events = []
-                async for e in WorkflowHandle(
-                    client,
-                    workflow_handle.id,
-                    run_id=workflow_handle._first_execution_run_id,
-                ).fetch_history_events():
-                    if e.HasField("activity_task_completed_event_attributes"):
-                        events.append(e)
+        if use_local_model:
+            events = []
+            async for e in WorkflowHandle(
+                client,
+                workflow_handle.id,
+                run_id=workflow_handle._first_execution_run_id,
+            ).fetch_history_events():
+                if e.HasField("activity_task_completed_event_attributes"):
+                    events.append(e)
 
-                assert len(events) == 6
-                assert (
-                    "Hi there! How can I assist you today?"
-                    in events[0]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "transfer_to_seat_booking_agent"
-                    in events[1]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "Could you please provide your confirmation number?"
-                    in events[2]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "Thanks! What seat number would you like to change to?"
-                    in events[3]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "update_seat"
-                    in events[4]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
-                assert (
-                    "Your seat has been updated to a window seat. If there's anything else you need, feel free to let me know!"
-                    in events[5]
-                    .activity_task_completed_event_attributes.result.payloads[0]
-                    .data.decode()
-                )
+            assert len(events) == 6
+            assert (
+                "Hi there! How can I assist you today?"
+                in events[0]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "transfer_to_seat_booking_agent"
+                in events[1]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Could you please provide your confirmation number?"
+                in events[2]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Thanks! What seat number would you like to change to?"
+                in events[3]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "update_seat"
+                in events[4]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "Your seat has been updated to a window seat. If there's anything else you need, feel free to let me know!"
+                in events[5]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
 
 
 guardrail_response_index: int = 0
@@ -1553,42 +1538,40 @@ async def test_input_guardrail(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = pydantic_data_converter
-    client = Client(**new_config)
-
-    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
-    with set_open_ai_agent_temporal_overrides(model_params):
-        model_activity = ModelActivity(
-            TestModelProvider(
-                InputGuardrailModel(  # type: ignore
-                    "", openai_client=AsyncOpenAI(api_key="Fake key")
-                )
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(
+                InputGuardrailModel("", openai_client=AsyncOpenAI(api_key="Fake key"))
             )
             if use_local_model
-            else None
+            else None,
         )
-        async with new_worker(
-            client,
-            InputGuardrailWorkflow,
-            activities=[model_activity.invoke_model_activity],
-            interceptors=[OpenAIAgentsTracingInterceptor()],
-        ) as worker:
-            workflow_handle = await client.start_workflow(
-                InputGuardrailWorkflow.run,
-                [
-                    "What's the capital of California?",
-                    "Can you help me solve for x: 2x + 5 = 11",
-                ],
-                id=f"input-guardrail-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
-            )
-            result = await workflow_handle.result()
+    ]
+    client = Client(**new_config)
 
-            if use_local_model:
-                assert len(result) == 2
-                assert result[0] == "The capital of California is Sacramento."
-                assert result[1] == "Sorry, I can't help you with your math homework."
+    async with new_worker(
+        client,
+        InputGuardrailWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            InputGuardrailWorkflow.run,
+            [
+                "What's the capital of California?",
+                "Can you help me solve for x: 2x + 5 = 11",
+            ],
+            id=f"input-guardrail-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+        result = await workflow_handle.result()
+
+        if use_local_model:
+            assert len(result) == 2
+            assert result[0] == "The capital of California is Sacramento."
+            assert result[1] == "Sorry, I can't help you with your math homework."
 
 
 class OutputGuardrailModel(StaticTestModel):
@@ -1670,35 +1653,32 @@ async def test_output_guardrail(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    new_config["data_converter"] = pydantic_data_converter
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(OutputGuardrailModel())
+            if use_local_model
+            else None,
+        )
+    ]
     client = Client(**new_config)
 
-    model_params = ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))
-    with set_open_ai_agent_temporal_overrides(model_params):
-        model_activity = ModelActivity(
-            TestModelProvider(
-                OutputGuardrailModel(  # type: ignore
-                )
-            )
-            if use_local_model
-            else None
+    async with new_worker(
+        client,
+        OutputGuardrailWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            OutputGuardrailWorkflow.run,
+            id=f"output-guardrail-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
         )
-        async with new_worker(
-            client,
-            OutputGuardrailWorkflow,
-            activities=[model_activity.invoke_model_activity],
-            interceptors=[OpenAIAgentsTracingInterceptor()],
-        ) as worker:
-            workflow_handle = await client.start_workflow(
-                OutputGuardrailWorkflow.run,
-                id=f"output-guardrail-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
-            )
-            result = await workflow_handle.result()
+        result = await workflow_handle.result()
 
-            if use_local_model:
-                assert not result
+        if use_local_model:
+            assert not result
 
 
 class WorkflowToolModel(StaticTestModel):
@@ -1761,21 +1741,102 @@ class WorkflowToolWorkflow:
 
 async def test_workflow_method_tools(client: Client):
     new_config = client.config()
-    new_config["data_converter"] = pydantic_data_converter
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(WorkflowToolModel()),
+        )
+    ]
     client = Client(**new_config)
 
-    with set_open_ai_agent_temporal_overrides():
-        model_activity = ModelActivity(TestModelProvider(WorkflowToolModel()))
-        async with new_worker(
-            client,
-            WorkflowToolWorkflow,
-            activities=[model_activity.invoke_model_activity],
-            interceptors=[OpenAIAgentsTracingInterceptor()],
-        ) as worker:
-            workflow_handle = await client.start_workflow(
-                WorkflowToolWorkflow.run,
-                id=f"workflow-tool-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
+    async with new_worker(
+        client,
+        WorkflowToolWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            WorkflowToolWorkflow.run,
+            id=f"workflow-tool-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+        await workflow_handle.result()
+
+
+async def test_response_serialization():
+    # This should not be used in another test, or this test needs to change to use another unloaded type
+    from openai.types.responses.response_output_item import ImageGenerationCall
+
+    data = json.loads(
+        b'{"id": "msg_68757ec43348819d86709f0fcb70316301a1194a3e05b38c","type": "image_generation_call","status": "completed"}'
+    )
+    call = TypeAdapter(ImageGenerationCall).validate_python(data)
+    model_response = ModelResponse(
+        output=[
+            call,
+        ],
+        usage=Usage(),
+        response_id="",
+    )
+    encoded = await pydantic_data_converter.encode([model_response])
+
+
+async def assert_status_retry_behavior(status: int, client: Client, should_retry: bool):
+    def status_error(status: int):
+        with workflow.unsafe.imports_passed_through():
+            with workflow.unsafe.sandbox_unrestricted():
+                import httpx
+            raise APIStatusError(
+                message="Something went wrong.",
+                response=httpx.Response(
+                    status_code=status, request=httpx.Request("GET", url="")
+                ),
+                body=None,
             )
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            ),
+            model_provider=TestModelProvider(TestModel(lambda: status_error(status))),
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        HelloWorldAgent,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            HelloWorldAgent.run,
+            "Input",
+            id=f"workflow-tool-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+        with pytest.raises(WorkflowFailureError) as e:
             await workflow_handle.result()
+
+        found = False
+        async for event in workflow_handle.fetch_history_events():
+            if event.HasField("activity_task_started_event_attributes"):
+                found = True
+                if should_retry:
+                    assert event.activity_task_started_event_attributes.attempt == 2
+                else:
+                    assert event.activity_task_started_event_attributes.attempt == 1
+        assert found
+
+
+async def test_exception_handling(client: Client):
+    await assert_status_retry_behavior(408, client, should_retry=True)
+    await assert_status_retry_behavior(409, client, should_retry=True)
+    await assert_status_retry_behavior(429, client, should_retry=True)
+    await assert_status_retry_behavior(500, client, should_retry=True)
+
+    await assert_status_retry_behavior(400, client, should_retry=False)
+    await assert_status_retry_behavior(403, client, should_retry=False)
+    await assert_status_retry_behavior(404, client, should_retry=False)
