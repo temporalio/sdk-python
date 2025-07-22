@@ -1,3 +1,4 @@
+import json
 import os
 import uuid
 from dataclasses import dataclass
@@ -1780,9 +1781,8 @@ async def test_workflow_method_tools(client: Client):
             await workflow_handle.result()
 
 
-async def test_response_serialization(client: Client):
-    import json
-
+async def test_response_serialization():
+    # This should not be used in another test, or this test needs to change to use another unloaded type
     from openai.types.responses.response_output_item import ImageGenerationCall
 
     data = json.loads(
