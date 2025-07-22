@@ -124,7 +124,7 @@ async def test_hello_world_agent(client: Client, use_local_model: bool):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["plugins"] = [
-        openai_agents.Plugin(
+        openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
@@ -412,7 +412,7 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["plugins"] = [
-        openai_agents.Plugin(
+        openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
@@ -532,7 +532,7 @@ async def test_nexus_tool_workflow(
 
     new_config = client.config()
     new_config["plugins"] = [
-        openai_agents.Plugin(
+        openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
@@ -678,7 +678,7 @@ async def test_research_workflow(client: Client, use_local_model: bool):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["plugins"] = [
-        openai_agents.Plugin(
+        openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
@@ -892,7 +892,7 @@ async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["plugins"] = [
-        openai_agents.Plugin(
+        openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
@@ -1244,7 +1244,7 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["plugins"] = [
-        openai_agents.Plugin(
+        openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
@@ -1534,7 +1534,7 @@ async def test_input_guardrail(client: Client, use_local_model: bool):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["plugins"] = [
-        openai_agents.Plugin(
+        openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
@@ -1649,7 +1649,7 @@ async def test_output_guardrail(client: Client, use_local_model: bool):
         pytest.skip("No openai API key")
     new_config = client.config()
     new_config["plugins"] = [
-        openai_agents.Plugin(
+        openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
@@ -1737,7 +1737,7 @@ class WorkflowToolWorkflow:
 async def test_workflow_method_tools(client: Client):
     new_config = client.config()
     new_config["plugins"] = [
-        openai_agents.Plugin(
+        openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),

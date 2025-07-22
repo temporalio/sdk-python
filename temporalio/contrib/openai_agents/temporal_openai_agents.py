@@ -144,7 +144,7 @@ class TestModel(Model):
         raise NotImplementedError()
 
 
-class Plugin(temporalio.client.Plugin, temporalio.worker.Plugin):
+class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     """Temporal plugin for integrating OpenAI agents with Temporal workflows.
 
     .. warning::
@@ -171,7 +171,7 @@ class Plugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     Example:
         >>> from temporalio.client import Client
         >>> from temporalio.worker import Worker
-        >>> from temporalio.contrib.openai_agents import Plugin, ModelActivityParameters
+        >>> from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
         >>> from datetime import timedelta
         >>>
         >>> # Configure model parameters
@@ -181,7 +181,7 @@ class Plugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         ... )
         >>>
         >>> # Create plugin
-        >>> plugin = Plugin(model_params=model_params)
+        >>> plugin = OpenAIAgentsPlugin(model_params=model_params)
         >>>
         >>> # Use with client and worker
         >>> client = await Client.connect(
@@ -192,7 +192,6 @@ class Plugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         ...     client,
         ...     task_queue="my-task-queue",
         ...     workflows=[MyWorkflow],
-        ...     plugins=[plugin]
         ... )
     """
 

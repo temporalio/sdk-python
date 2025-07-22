@@ -10,7 +10,7 @@ This module provides compatibility between the
 
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents.temporal_openai_agents import (
-    Plugin,
+    OpenAIAgentsPlugin,
     TestModel,
     TestModelProvider,
 )
@@ -18,7 +18,7 @@ from temporalio.contrib.openai_agents.temporal_openai_agents import (
 from . import workflow
 
 __all__ = [
-    "Plugin",
+    "OpenAIAgentsPlugin",
     "ModelActivityParameters",
     "workflow",
     "TestModel",

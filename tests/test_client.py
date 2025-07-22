@@ -1501,15 +1501,3 @@ async def test_cloud_client_simple():
         GetNamespaceRequest(namespace=os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"])
     )
     assert os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"] == result.namespace.namespace
-
-
-class MyPlugin(Plugin):
-    def configure_client(self, config: ClientConfig) -> ClientConfig:
-        config["namespace"] = "replaced_namespace"
-        return super().configure_client(config)
-
-    async def connect_service_client(
-        self, config: temporalio.service.ConnectConfig
-    ) -> temporalio.service.ServiceClient:
-        config.api_key = "replaced key"
-        return await super().connect_service_client(config)

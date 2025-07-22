@@ -41,7 +41,7 @@ class MemoryTracingProcessor(TracingProcessor):
 async def test_tracing(client: Client):
     new_config = client.config()
     new_config["plugins"] = [
-        openai_agents.Plugin(model_provider=TestModelProvider(TestResearchModel()))
+        openai_agents.OpenAIAgentsPlugin(model_provider=TestModelProvider(TestResearchModel()))
     ]
     client = Client(**new_config)
 
