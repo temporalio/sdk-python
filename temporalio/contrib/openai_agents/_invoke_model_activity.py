@@ -173,7 +173,7 @@ class ModelActivity:
                 raise UserError(f"Unknown tool type: {tool.name}")
 
         tools = [make_tool(x) for x in input.get("tools", [])]
-        handoffs = [
+        handoffs: list[Handoff[Any, Any]] = [
             Handoff(
                 tool_name=x.tool_name,
                 tool_description=x.tool_description,
