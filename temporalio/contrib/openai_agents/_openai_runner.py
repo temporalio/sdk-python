@@ -1,6 +1,6 @@
 import typing
 from dataclasses import replace
-from typing import Union
+from typing import Any, Union
 
 from agents import (
     Agent,
@@ -34,7 +34,7 @@ class TemporalOpenAIRunner(AgentRunner):
         self,
         starting_agent: Agent[TContext],
         input: Union[str, list[TResponseInputItem]],
-        **kwargs,
+        **kwargs: Any,
     ) -> RunResult:
         """Run the agent in a Temporal workflow."""
         if not workflow.in_workflow():
@@ -86,7 +86,7 @@ class TemporalOpenAIRunner(AgentRunner):
         self,
         starting_agent: Agent[TContext],
         input: Union[str, list[TResponseInputItem]],
-        **kwargs,
+        **kwargs: Any,
     ) -> RunResult:
         """Run the agent synchronously (not supported in Temporal workflows)."""
         if not workflow.in_workflow():
@@ -101,7 +101,7 @@ class TemporalOpenAIRunner(AgentRunner):
         self,
         starting_agent: Agent[TContext],
         input: Union[str, list[TResponseInputItem]],
-        **kwargs,
+        **kwargs: Any,
     ) -> RunResultStreaming:
         """Run the agent with streaming responses (not supported in Temporal workflows)."""
         if not workflow.in_workflow():
