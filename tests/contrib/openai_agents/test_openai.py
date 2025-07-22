@@ -15,9 +15,12 @@ from agents import (
     InputGuardrailTripwireTriggered,
     ItemHelpers,
     MessageOutputItem,
+    Model,
+    ModelProvider,
     ModelResponse,
     ModelSettings,
     ModelTracing,
+    OpenAIChatCompletionsModel,
     OpenAIResponsesModel,
     OutputGuardrailTripwireTriggered,
     RunContextWrapper,
@@ -29,7 +32,7 @@ from agents import (
     handoff,
     input_guardrail,
     output_guardrail,
-    trace, ModelProvider, Model, OpenAIChatCompletionsModel,
+    trace,
 )
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
 from agents.items import (
@@ -1778,10 +1781,12 @@ async def test_response_serialization():
     )
     encoded = await pydantic_data_converter.encode([model_response])
 
+
 class CustomModelProvider(ModelProvider):
-    def get_model(self, model_name: str) -> Model:
+    def get_model(self, model_name: Optional[str]) -> Model:
         client = AsyncOpenAI(base_url="https://api.openai.com/v1")
         return OpenAIChatCompletionsModel(model="gpt-4o", openai_client=client)
+
 
 async def test_chat_completions_model(client: Client):
     if not os.environ.get("OPENAI_API_KEY"):
