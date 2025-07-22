@@ -102,10 +102,6 @@ class _TemporalModelStub(Model):
             ):
                 return tool
             elif isinstance(tool, HostedMCPTool):
-                # if tool.on_approval_request is not None:
-                #     raise ValueError(
-                #         "HostedMCPTool with approval functions not currently supported."
-                #     )
                 return HostedMCPToolInput(tool_config=tool.tool_config)
             elif isinstance(tool, FunctionTool):
                 return FunctionToolInput(
