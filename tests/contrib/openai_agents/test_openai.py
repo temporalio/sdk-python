@@ -115,10 +115,10 @@ class TestHelloModel(StaticTestModel):
 class HelloWorldAgent:
     @workflow.run
     async def run(self, prompt: str) -> str:
-        agent = Agent(
+        agent = Agent[None](
             name="Assistant",
             instructions="You only respond in haikus.",
-        )  # type: Agent
+        )
         result = await Runner.run(starting_agent=agent, input=prompt)
         return result.final_output
 
@@ -359,7 +359,7 @@ class TestNexusWeatherModel(StaticTestModel):
 class ToolsWorkflow:
     @workflow.run
     async def run(self, question: str) -> str:
-        agent: Agent = Agent(
+        agent = Agent[str](
             name="Tools Workflow",
             instructions="You are a helpful agent.",
             tools=[
@@ -391,7 +391,7 @@ class ToolsWorkflow:
 class NexusToolsWorkflow:
     @workflow.run
     async def run(self, question: str) -> str:
-        agent = Agent(
+        agent = Agent[str](
             name="Nexus Tools Workflow",
             instructions="You are a helpful agent.",
             tools=[
@@ -402,7 +402,7 @@ class NexusToolsWorkflow:
                     schedule_to_close_timeout=timedelta(seconds=10),
                 ),
             ],
-        )  # type: Agent
+        )
         result = await Runner.run(
             starting_agent=agent, input=question, context="Stormy"
         )
@@ -748,25 +748,25 @@ async def test_research_workflow(client: Client, use_local_model: bool):
 
 
 def orchestrator_agent() -> Agent:
-    spanish_agent = Agent(
+    spanish_agent = Agent[None](
         name="spanish_agent",
         instructions="You translate the user's message to Spanish",
         handoff_description="An english to spanish translator",
-    )  # type: Agent
+    )
 
-    french_agent = Agent(
+    french_agent = Agent[None](
         name="french_agent",
         instructions="You translate the user's message to French",
         handoff_description="An english to french translator",
-    )  # type: Agent
+    )
 
-    italian_agent = Agent(
+    italian_agent = Agent[None](
         name="italian_agent",
         instructions="You translate the user's message to Italian",
         handoff_description="An english to italian translator",
-    )  # type: Agent
+    )
 
-    orchestrator_agent = Agent(
+    orchestrator_agent = Agent[None](
         name="orchestrator_agent",
         instructions=(
             "You are a translation agent. You use the tools given to you to translate."
@@ -787,7 +787,7 @@ def orchestrator_agent() -> Agent:
                 tool_description="Translate the user's message to Italian",
             ),
         ],
-    )  # type: Agent
+    )
     return orchestrator_agent
 
 

@@ -2889,7 +2889,7 @@ class WorkflowExecution:
         cls,
         info: temporalio.api.workflow.v1.WorkflowExecutionInfo,
         converter: temporalio.converter.DataConverter,
-        **additional_fields,
+        **additional_fields: Any,
     ) -> WorkflowExecution:
         return cls(
             close_time=info.close_time.ToDatetime().replace(tzinfo=timezone.utc)

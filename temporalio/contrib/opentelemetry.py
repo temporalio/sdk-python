@@ -71,7 +71,7 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
     custom attributes desired.
     """
 
-    def __init__(
+    def __init__(  # type: ignore[reportMissingSuperCall]
         self,
         tracer: Optional[opentelemetry.trace.Tracer] = None,
         *,
@@ -125,11 +125,10 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         :py:meth:`temporalio.worker.Interceptor.workflow_interceptor_class`.
         """
         # Set the externs needed
-        # TODO(cretz): MyPy works w/ spread kwargs instead of direct passing
         input.unsafe_extern_functions.update(
-            **_WorkflowExternFunctions(
-                __temporal_opentelemetry_completed_span=self._completed_workflow_span,
-            )
+            {
+                "__temporal_opentelemetry_completed_span": self._completed_workflow_span,
+            }
         )
         return TracingWorkflowInboundInterceptor
 
