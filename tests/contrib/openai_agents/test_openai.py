@@ -965,7 +965,6 @@ async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
                     .activity_task_completed_event_attributes.result.payloads[0]
                     .data.decode()
                 )
-    assert False
 
 
 class AirlineAgentContext(BaseModel):
