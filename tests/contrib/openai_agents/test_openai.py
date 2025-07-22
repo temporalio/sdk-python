@@ -1783,10 +1783,10 @@ async def test_workflow_method_tools(client: Client):
 
 
 async def assert_status_retry_behavior(status: int, client: Client, should_retry: bool):
-    with workflow.unsafe.sandbox_unrestricted():
-        import httpx
-
-        def status_error(status: int):
+    def status_error(status: int):
+        with workflow.unsafe.imports_passed_through():
+            with workflow.unsafe.sandbox_unrestricted():
+                import httpx
             raise APIStatusError(
                 message="Something went wrong.",
                 response=httpx.Response(
@@ -1795,33 +1795,35 @@ async def assert_status_retry_behavior(status: int, client: Client, should_retry
                 body=None,
             )
 
-        # Test error 500 retries
-        model_activity = ModelActivity(
-            TestModelProvider(TestModel(lambda: status_error(status)))
+    # Test error 500 retries
+    model_activity = ModelActivity(
+        TestModelProvider(TestModel(lambda: status_error(status)))
+    )
+    async with new_worker(
+        client,
+        HelloWorldAgent,
+        activities=[model_activity.invoke_model_activity],
+        interceptors=[OpenAIAgentsTracingInterceptor()],
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            HelloWorldAgent.run,
+            "Input",
+            id=f"workflow-tool-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
         )
-        async with new_worker(
-            client,
-            HelloWorldAgent,
-            activities=[model_activity.invoke_model_activity],
-            interceptors=[OpenAIAgentsTracingInterceptor()],
-        ) as worker:
-            workflow_handle = await client.start_workflow(
-                HelloWorldAgent.run,
-                "Input",
-                id=f"workflow-tool-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
-            )
-            with pytest.raises(WorkflowFailureError) as e:
-                await workflow_handle.result()
+        with pytest.raises(WorkflowFailureError) as e:
+            await workflow_handle.result()
 
-            async for event in workflow_handle.fetch_history_events():
-                if event.HasField("activity_task_started_event_attributes"):
-                    if should_retry:
-                        assert event.activity_task_started_event_attributes.attempt == 2
-                    else:
-                        assert event.activity_task_started_event_attributes.attempt == 1
-
+        found = False
+        async for event in workflow_handle.fetch_history_events():
+            if event.HasField("activity_task_started_event_attributes"):
+                found = True
+                if should_retry:
+                    assert event.activity_task_started_event_attributes.attempt == 2
+                else:
+                    assert event.activity_task_started_event_attributes.attempt == 1
+        assert found
 
 async def test_exception_handling(client: Client):
     new_config = client.config()

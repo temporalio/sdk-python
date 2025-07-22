@@ -6,6 +6,7 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 import enum
 import json
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any, Optional, Union, cast
 
 from agents import (
@@ -197,21 +198,31 @@ class ModelActivity:
                 prompt=input.get("prompt"),
             )
         except APIStatusError as e:
-            # Listen to server hint
+            # Listen to server hints
+            retry_after = None
+            retry_after_ms_header = e.response.headers.get("retry-after-ms")
+            if retry_after_ms_header is not None:
+                retry_after = timedelta(milliseconds=float(retry_after_ms_header))
+
+            if retry_after is None:
+                retry_after_header = e.response.headers.get("retry-after")
+                if retry_after_header is not None:
+                    retry_after = timedelta(seconds=float(retry_after_header))
+
             should_retry_header = e.response.headers.get("x-should-retry")
             if should_retry_header == "true":
                 raise e
             if should_retry_header == "false":
                 raise ApplicationError(
-                    "Non retryable openai error", non_retryable=True
+                    "Non retryable OpenAI error", non_retryable=True, next_retry_delay=retry_after
                 ) from e
 
             # Specifically retryable status codes
             if e.response.status_code in [408, 409, 429, 500]:
                 raise ApplicationError(
-                    "Retryable openai status code", non_retryable=False
+                    "Retryable OpenAI status code", non_retryable=False, next_retry_delay=retry_after
                 ) from e
 
             raise ApplicationError(
-                "Non retryable openai status code", non_retryable=True
+                "Non retryable OpenAI status code", non_retryable=True, next_retry_delay=retry_after
             ) from e
