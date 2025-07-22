@@ -214,15 +214,21 @@ class ModelActivity:
                 raise e
             if should_retry_header == "false":
                 raise ApplicationError(
-                    "Non retryable OpenAI error", non_retryable=True, next_retry_delay=retry_after
+                    "Non retryable OpenAI error",
+                    non_retryable=True,
+                    next_retry_delay=retry_after,
                 ) from e
 
             # Specifically retryable status codes
             if e.response.status_code in [408, 409, 429, 500]:
                 raise ApplicationError(
-                    "Retryable OpenAI status code", non_retryable=False, next_retry_delay=retry_after
+                    "Retryable OpenAI status code",
+                    non_retryable=False,
+                    next_retry_delay=retry_after,
                 ) from e
 
             raise ApplicationError(
-                "Non retryable OpenAI status code", non_retryable=True, next_retry_delay=retry_after
+                "Non retryable OpenAI status code",
+                non_retryable=True,
+                next_retry_delay=retry_after,
             ) from e

@@ -1825,6 +1825,7 @@ async def assert_status_retry_behavior(status: int, client: Client, should_retry
                     assert event.activity_task_started_event_attributes.attempt == 1
         assert found
 
+
 async def test_exception_handling(client: Client):
     new_config = client.config()
     new_config["data_converter"] = pydantic_data_converter
