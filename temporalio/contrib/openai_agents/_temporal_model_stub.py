@@ -23,7 +23,7 @@ from agents import (
     ModelTracing,
     Tool,
     TResponseInputItem,
-    WebSearchTool,
+    WebSearchTool, ImageGenerationTool, CodeInterpreterTool,
 )
 from agents.items import TResponseStreamEvent
 from openai.types.responses.response_prompt_param import ResponsePromptParam
@@ -87,12 +87,8 @@ class _TemporalModelStub(Model):
             return ""
 
         def make_tool_info(tool: Tool) -> ToolInput:
-            if isinstance(tool, (FileSearchTool, WebSearchTool)):
+            if isinstance(tool, (FileSearchTool, WebSearchTool, ImageGenerationTool, CodeInterpreterTool)):
                 return tool
-            elif isinstance(tool, ComputerTool):
-                raise NotImplementedError(
-                    "Computer search preview is not supported in Temporal model"
-                )
             elif isinstance(tool, FunctionTool):
                 return FunctionToolInput(
                     name=tool.name,
@@ -101,7 +97,7 @@ class _TemporalModelStub(Model):
                     strict_json_schema=tool.strict_json_schema,
                 )
             else:
-                raise ValueError(f"Unknown tool type: {tool.name}")
+                raise ValueError(f"Unsupported tool type: {tool.name}")
 
         tool_infos = [make_tool_info(x) for x in tools]
         handoff_infos = [

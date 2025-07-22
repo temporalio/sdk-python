@@ -29,9 +29,10 @@ from agents import (
     handoff,
     input_guardrail,
     output_guardrail,
-    trace,
+    trace, FileSearchTool, ImageGenerationTool, CodeInterpreterTool,
 )
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
+from agents.extensions.models.litellm_provider import LitellmProvider
 from agents.items import (
     HandoffOutputItem,
     ToolCallItem,
@@ -42,10 +43,12 @@ from openai.types.responses import (
     ResponseFunctionToolCall,
     ResponseFunctionWebSearch,
     ResponseOutputMessage,
-    ResponseOutputText,
+    ResponseOutputText, ResponseFileSearchToolCall, ResponseCodeInterpreterToolCall,
 )
+from openai.types.responses.response_file_search_tool_call import Result
 from openai.types.responses.response_function_web_search import ActionSearch
 from openai.types.responses.response_prompt_param import ResponsePromptParam
+from openai.types.responses.tool_param import ImageGeneration
 from pydantic import ConfigDict, Field, TypeAdapter
 
 from temporalio import activity, workflow
@@ -1777,3 +1780,288 @@ async def test_response_serialization():
         response_id="",
     )
     encoded = await pydantic_data_converter.encode([model_response])
+
+async def test_lite_llm(client: Client):
+    if not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("No openai API key")
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=LitellmProvider(),
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+            client,
+            HelloWorldAgent,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            HelloWorldAgent.run,
+            "Tell me about recursion in programming",
+            id=f"lite-llm-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+        await workflow_handle.result()
+
+
+class FileSearchToolModel(StaticTestModel):
+    responses = [
+        ModelResponse(
+            output=[
+                ResponseFileSearchToolCall(
+                    queries=["side character in the Iliad"],
+                    type="file_search_call",
+                    id="id",
+                    status="completed",
+                    results=[
+                        Result(text="Some scene"),
+                        Result(text="Other scene"),
+                    ]
+                ),
+                ResponseOutputMessage(
+                    id="",
+                    content=[
+                        ResponseOutputText(
+                            text="Patroclus",
+                            annotations=[],
+                            type="output_text",
+                        )
+                    ],
+                    role="assistant",
+                    status="completed",
+                    type="message",
+                )
+            ],
+            usage=Usage(),
+            response_id=None,
+        ),
+    ]
+
+@workflow.defn
+class FileSearchToolWorkflow:
+    @workflow.run
+    async def run(self, question: str) -> str:
+        agent = Agent[str](
+            name="File Search Workflow",
+            instructions="You are a librarian. You should use your tools to source all your information.",
+            tools=[
+                FileSearchTool(
+                    max_num_results=3,
+                    vector_store_ids=["vs_687fd7f5e69c8191a2740f06bc9a159d"],
+                    include_search_results=True,
+                )
+            ],
+        )
+        result = await Runner.run(
+            starting_agent=agent, input=question
+        )
+
+        # A file search was performed
+        assert any(isinstance(item, ToolCallItem) and isinstance(item.raw_item, ResponseFileSearchToolCall) for item in result.new_items)
+        return result.final_output
+
+@pytest.mark.parametrize("use_local_model", [True, False])
+async def test_file_search_tool(client: Client, use_local_model):
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("No openai API key")
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(FileSearchToolModel())
+            if use_local_model
+            else None,
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+            client,
+            FileSearchToolWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            FileSearchToolWorkflow.run,
+            "Tell me about a side character in the Iliad.",
+            id=f"file-search-tool-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+        result = await workflow_handle.result()
+        if use_local_model:
+            assert result == "Patroclus"
+
+
+class ImageGenerationModel(StaticTestModel):
+    responses = [
+        ModelResponse(
+            output=[
+                ResponseFileSearchToolCall(
+                    queries=["side character in the Iliad"],
+                    type="file_search_call",
+                    id="id",
+                    status="completed",
+                    results=[
+                        Result(text="Some scene"),
+                        Result(text="Other scene"),
+                    ]
+                ),
+                ResponseOutputMessage(
+                    id="",
+                    content=[
+                        ResponseOutputText(
+                            text="Patroclus",
+                            annotations=[],
+                            type="output_text",
+                        )
+                    ],
+                    role="assistant",
+                    status="completed",
+                    type="message",
+                )
+            ],
+            usage=Usage(),
+            response_id=None,
+        ),
+    ]
+
+@workflow.defn
+class ImageGenerationWorkflow:
+    @workflow.run
+    async def run(self, question: str) -> str:
+        agent = Agent[str](
+            name="Image Generation Workflow",
+            instructions="You are a helpful agent.",
+            tools=[
+                ImageGenerationTool(
+                    tool_config={"type": "image_generation", "quality": "low"},
+                )
+            ],
+        )
+        result = await Runner.run(
+            starting_agent=agent, input=question
+        )
+
+        return result.final_output
+
+@pytest.mark.parametrize("use_local_model", [True, False])
+async def test_image_generation_tool(client: Client, use_local_model):
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("No openai API key")
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(ImageGenerationModel())
+            if use_local_model
+            else None,
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+            client,
+            ImageGenerationWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            ImageGenerationWorkflow.run,
+            "Create an image of a frog eating a pizza, comic book style.",
+            id=f"image-generation-tool-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+        result = await workflow_handle.result()
+
+
+class CodeInterpreterModel(StaticTestModel):
+    responses = [
+        ModelResponse(
+            output=[
+                ResponseCodeInterpreterToolCall(
+                    container_id="",
+                    code="some code",
+                    type="code_interpreter_call",
+                    id="id",
+                    status="completed",
+                ),
+                ResponseOutputMessage(
+                    id="",
+                    content=[
+                        ResponseOutputText(
+                            text="Over 9000",
+                            annotations=[],
+                            type="output_text",
+                        )
+                    ],
+                    role="assistant",
+                    status="completed",
+                    type="message",
+                )
+            ],
+            usage=Usage(),
+            response_id=None,
+        ),
+    ]
+
+@workflow.defn
+class CodeInterpreterWorkflow:
+    @workflow.run
+    async def run(self, question: str) -> str:
+        agent = Agent[str](
+            name="Code Interpreter Workflow",
+            instructions="You are a helpful agent.",
+            tools=[
+                CodeInterpreterTool(
+                    tool_config={"type": "code_interpreter", "container": {"type": "auto"}},
+                )
+            ],
+        )
+        result = await Runner.run(
+            starting_agent=agent, input=question
+        )
+
+        assert any(isinstance(item, ToolCallItem) and isinstance(item.raw_item, ResponseCodeInterpreterToolCall) for item in result.new_items)
+        return result.final_output
+
+@pytest.mark.parametrize("use_local_model", [True, False])
+async def test_code_interpreter_tool(client: Client, use_local_model):
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("No openai API key")
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(CodeInterpreterModel())
+            if use_local_model
+            else None,
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+            client,
+            CodeInterpreterWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            CodeInterpreterWorkflow.run,
+            "What is the square root of273 * 312821 plus 1782?",
+            id=f"code-interpreter-tool-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+        result = await workflow_handle.result()
+        if use_local_model:
+            assert result == "Over 9000"

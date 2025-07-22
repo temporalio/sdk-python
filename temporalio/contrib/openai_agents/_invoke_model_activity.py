@@ -21,7 +21,7 @@ from agents import (
     Tool,
     TResponseInputItem,
     UserError,
-    WebSearchTool,
+    WebSearchTool, ImageGenerationTool, CodeInterpreterTool,
 )
 from agents.models.multi_provider import MultiProvider
 from typing_extensions import Required, TypedDict
@@ -51,7 +51,7 @@ class FunctionToolInput:
     strict_json_schema: bool = True
 
 
-ToolInput = Union[FunctionToolInput, FileSearchTool, WebSearchTool]
+ToolInput = Union[FunctionToolInput, FileSearchTool, WebSearchTool, ImageGenerationTool, CodeInterpreterTool]
 
 
 @dataclass
@@ -143,10 +143,8 @@ class ModelActivity:
         input_input = json.loads(input_json)
 
         def make_tool(tool: ToolInput) -> Tool:
-            if isinstance(tool, FileSearchTool):
-                return cast(FileSearchTool, tool)
-            elif isinstance(tool, WebSearchTool):
-                return cast(WebSearchTool, tool)
+            if isinstance(tool, (FileSearchTool, WebSearchTool, ImageGenerationTool, CodeInterpreterTool)):
+                return cast(Tool, tool)
             elif isinstance(tool, FunctionToolInput):
                 t = cast(FunctionToolInput, tool)
                 return FunctionTool(
