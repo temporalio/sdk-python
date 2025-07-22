@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -39,7 +40,6 @@ from agents import (
     trace,
 )
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
-from agents.extensions.models.litellm_provider import LitellmProvider
 from agents.items import (
     HandoffOutputItem,
     ToolCallItem,
@@ -1853,9 +1853,14 @@ async def test_exception_handling(client: Client):
     await assert_status_retry_behavior(404, client, should_retry=False)
 
 
-async def test_lite_llm(client: Client):
+async def test_lite_llm(client: Client, env: WorkflowEnvironment):
     if not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
+    if sys.version_info < (3, 10):
+        pytest.skip("Lite LLM does not import below 3.10")
+
+    from agents.extensions.models.litellm_provider import LitellmProvider
+
     new_config = client.config()
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
