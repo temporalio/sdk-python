@@ -3,18 +3,12 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from openai.types.responses import (
-    ResponseOutputMessage,
-    ResponseOutputText,
-    ResponseOutputTextParam,
-)
-
 from temporalio import workflow
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 
 logger = logging.getLogger(__name__)
 
-from typing import Any, AsyncIterator, Sequence, Union, cast
+from typing import Any, AsyncIterator, Union, cast
 
 from agents import (
     AgentOutputSchema,
