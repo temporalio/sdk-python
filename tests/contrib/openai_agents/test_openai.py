@@ -40,7 +40,7 @@ from agents.items import (
     ToolCallItem,
     ToolCallOutputItem,
 )
-from openai import AsyncOpenAI, BaseModel
+from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
     ResponseFunctionToolCall,
     ResponseFunctionWebSearch,
@@ -51,8 +51,10 @@ from openai.types.responses.response_function_web_search import ActionSearch
 from openai.types.responses.response_prompt_param import ResponsePromptParam
 from pydantic import ConfigDict, Field, TypeAdapter
 
+import temporalio.api.cloud.namespace.v1
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
+from temporalio.common import RetryPolicy, SearchAttributeValueType
 from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents import (
     ModelActivityParameters,
@@ -60,7 +62,7 @@ from temporalio.contrib.openai_agents import (
     TestModelProvider,
 )
 from temporalio.contrib.pydantic import pydantic_data_converter
-from temporalio.exceptions import CancelledError
+from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.testing import WorkflowEnvironment
 from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
@@ -1780,6 +1782,66 @@ async def test_response_serialization():
         response_id="",
     )
     encoded = await pydantic_data_converter.encode([model_response])
+
+
+async def assert_status_retry_behavior(status: int, client: Client, should_retry: bool):
+    def status_error(status: int):
+        with workflow.unsafe.imports_passed_through():
+            with workflow.unsafe.sandbox_unrestricted():
+                import httpx
+            raise APIStatusError(
+                message="Something went wrong.",
+                response=httpx.Response(
+                    status_code=status, request=httpx.Request("GET", url="")
+                ),
+                body=None,
+            )
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            ),
+            model_provider=TestModelProvider(TestModel(lambda: status_error(status))),
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        HelloWorldAgent,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            HelloWorldAgent.run,
+            "Input",
+            id=f"workflow-tool-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+        with pytest.raises(WorkflowFailureError) as e:
+            await workflow_handle.result()
+
+        found = False
+        async for event in workflow_handle.fetch_history_events():
+            if event.HasField("activity_task_started_event_attributes"):
+                found = True
+                if should_retry:
+                    assert event.activity_task_started_event_attributes.attempt == 2
+                else:
+                    assert event.activity_task_started_event_attributes.attempt == 1
+        assert found
+
+
+async def test_exception_handling(client: Client):
+    await assert_status_retry_behavior(408, client, should_retry=True)
+    await assert_status_retry_behavior(409, client, should_retry=True)
+    await assert_status_retry_behavior(429, client, should_retry=True)
+    await assert_status_retry_behavior(500, client, should_retry=True)
+
+    await assert_status_retry_behavior(400, client, should_retry=False)
+    await assert_status_retry_behavior(403, client, should_retry=False)
+    await assert_status_retry_behavior(404, client, should_retry=False)
 
 
 class CustomModelProvider(ModelProvider):

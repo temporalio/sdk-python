@@ -9,10 +9,13 @@ This module provides compatibility between the
 """
 
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
-from temporalio.contrib.openai_agents.temporal_openai_agents import (
+from temporalio.contrib.openai_agents._temporal_openai_agents import (
     OpenAIAgentsPlugin,
     TestModel,
     TestModelProvider,
+)
+from temporalio.contrib.openai_agents._trace_interceptor import (
+    OpenAIAgentsTracingInterceptor,
 )
 
 from . import workflow
