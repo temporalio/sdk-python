@@ -10,10 +10,17 @@ import pytest
 from agents import (
     Agent,
     AgentOutputSchemaBase,
+    CodeInterpreterTool,
+    FileSearchTool,
     GuardrailFunctionOutput,
     Handoff,
+    HostedMCPTool,
+    ImageGenerationTool,
     InputGuardrailTripwireTriggered,
     ItemHelpers,
+    LocalShellTool,
+    MCPToolApprovalFunctionResult,
+    MCPToolApprovalRequest,
     MessageOutputItem,
     ModelResponse,
     ModelSettings,
@@ -29,7 +36,7 @@ from agents import (
     handoff,
     input_guardrail,
     output_guardrail,
-    trace, FileSearchTool, ImageGenerationTool, CodeInterpreterTool,
+    trace,
 )
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
 from agents.extensions.models.litellm_provider import LitellmProvider
@@ -40,15 +47,17 @@ from agents.items import (
 )
 from openai import AsyncOpenAI, BaseModel
 from openai.types.responses import (
+    ResponseCodeInterpreterToolCall,
+    ResponseFileSearchToolCall,
     ResponseFunctionToolCall,
     ResponseFunctionWebSearch,
     ResponseOutputMessage,
-    ResponseOutputText, ResponseFileSearchToolCall, ResponseCodeInterpreterToolCall,
+    ResponseOutputText,
 )
 from openai.types.responses.response_file_search_tool_call import Result
 from openai.types.responses.response_function_web_search import ActionSearch
+from openai.types.responses.response_output_item import McpApprovalRequest, McpCall
 from openai.types.responses.response_prompt_param import ResponsePromptParam
-from openai.types.responses.tool_param import ImageGeneration
 from pydantic import ConfigDict, Field, TypeAdapter
 
 from temporalio import activity, workflow
@@ -1781,6 +1790,7 @@ async def test_response_serialization():
     )
     encoded = await pydantic_data_converter.encode([model_response])
 
+
 async def test_lite_llm(client: Client):
     if not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
@@ -1796,8 +1806,8 @@ async def test_lite_llm(client: Client):
     client = Client(**new_config)
 
     async with new_worker(
-            client,
-            HelloWorldAgent,
+        client,
+        HelloWorldAgent,
     ) as worker:
         workflow_handle = await client.start_workflow(
             HelloWorldAgent.run,
@@ -1821,7 +1831,7 @@ class FileSearchToolModel(StaticTestModel):
                     results=[
                         Result(text="Some scene"),
                         Result(text="Other scene"),
-                    ]
+                    ],
                 ),
                 ResponseOutputMessage(
                     id="",
@@ -1835,12 +1845,13 @@ class FileSearchToolModel(StaticTestModel):
                     role="assistant",
                     status="completed",
                     type="message",
-                )
+                ),
             ],
             usage=Usage(),
             response_id=None,
         ),
     ]
+
 
 @workflow.defn
 class FileSearchToolWorkflow:
@@ -1857,13 +1868,16 @@ class FileSearchToolWorkflow:
                 )
             ],
         )
-        result = await Runner.run(
-            starting_agent=agent, input=question
-        )
+        result = await Runner.run(starting_agent=agent, input=question)
 
         # A file search was performed
-        assert any(isinstance(item, ToolCallItem) and isinstance(item.raw_item, ResponseFileSearchToolCall) for item in result.new_items)
+        assert any(
+            isinstance(item, ToolCallItem)
+            and isinstance(item.raw_item, ResponseFileSearchToolCall)
+            for item in result.new_items
+        )
         return result.final_output
+
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 async def test_file_search_tool(client: Client, use_local_model):
@@ -1884,8 +1898,8 @@ async def test_file_search_tool(client: Client, use_local_model):
     client = Client(**new_config)
 
     async with new_worker(
-            client,
-            FileSearchToolWorkflow,
+        client,
+        FileSearchToolWorkflow,
     ) as worker:
         workflow_handle = await client.start_workflow(
             FileSearchToolWorkflow.run,
@@ -1911,7 +1925,7 @@ class ImageGenerationModel(StaticTestModel):
                     results=[
                         Result(text="Some scene"),
                         Result(text="Other scene"),
-                    ]
+                    ],
                 ),
                 ResponseOutputMessage(
                     id="",
@@ -1925,12 +1939,13 @@ class ImageGenerationModel(StaticTestModel):
                     role="assistant",
                     status="completed",
                     type="message",
-                )
+                ),
             ],
             usage=Usage(),
             response_id=None,
         ),
     ]
+
 
 @workflow.defn
 class ImageGenerationWorkflow:
@@ -1945,13 +1960,13 @@ class ImageGenerationWorkflow:
                 )
             ],
         )
-        result = await Runner.run(
-            starting_agent=agent, input=question
-        )
+        result = await Runner.run(starting_agent=agent, input=question)
 
         return result.final_output
 
-@pytest.mark.parametrize("use_local_model", [True, False])
+
+# Can't currently validate against real server, we aren't verified for image generation
+@pytest.mark.parametrize("use_local_model", [True])
 async def test_image_generation_tool(client: Client, use_local_model):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
@@ -1970,8 +1985,8 @@ async def test_image_generation_tool(client: Client, use_local_model):
     client = Client(**new_config)
 
     async with new_worker(
-            client,
-            ImageGenerationWorkflow,
+        client,
+        ImageGenerationWorkflow,
     ) as worker:
         workflow_handle = await client.start_workflow(
             ImageGenerationWorkflow.run,
@@ -2006,12 +2021,13 @@ class CodeInterpreterModel(StaticTestModel):
                     role="assistant",
                     status="completed",
                     type="message",
-                )
+                ),
             ],
             usage=Usage(),
             response_id=None,
         ),
     ]
+
 
 @workflow.defn
 class CodeInterpreterWorkflow:
@@ -2022,16 +2038,22 @@ class CodeInterpreterWorkflow:
             instructions="You are a helpful agent.",
             tools=[
                 CodeInterpreterTool(
-                    tool_config={"type": "code_interpreter", "container": {"type": "auto"}},
+                    tool_config={
+                        "type": "code_interpreter",
+                        "container": {"type": "auto"},
+                    },
                 )
             ],
         )
-        result = await Runner.run(
-            starting_agent=agent, input=question
-        )
+        result = await Runner.run(starting_agent=agent, input=question)
 
-        assert any(isinstance(item, ToolCallItem) and isinstance(item.raw_item, ResponseCodeInterpreterToolCall) for item in result.new_items)
+        assert any(
+            isinstance(item, ToolCallItem)
+            and isinstance(item.raw_item, ResponseCodeInterpreterToolCall)
+            for item in result.new_items
+        )
         return result.final_output
+
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 async def test_code_interpreter_tool(client: Client, use_local_model):
@@ -2052,8 +2074,8 @@ async def test_code_interpreter_tool(client: Client, use_local_model):
     client = Client(**new_config)
 
     async with new_worker(
-            client,
-            CodeInterpreterWorkflow,
+        client,
+        CodeInterpreterWorkflow,
     ) as worker:
         workflow_handle = await client.start_workflow(
             CodeInterpreterWorkflow.run,
@@ -2065,3 +2087,117 @@ async def test_code_interpreter_tool(client: Client, use_local_model):
         result = await workflow_handle.result()
         if use_local_model:
             assert result == "Over 9000"
+
+
+class HostedMCPModel(StaticTestModel):
+    responses = [
+        ModelResponse(
+            output=[
+                McpApprovalRequest(
+                    arguments="",
+                    name="",
+                    server_label="gitmcp",
+                    type="mcp_approval_request",
+                    id="id",
+                )
+            ],
+            usage=Usage(),
+            response_id=None,
+        ),
+        ModelResponse(
+            output=[
+                McpCall(
+                    arguments="",
+                    name="",
+                    server_label="",
+                    type="mcp_call",
+                    id="id",
+                    output="Mcp output",
+                ),
+                ResponseOutputMessage(
+                    id="",
+                    content=[
+                        ResponseOutputText(
+                            text="Some language",
+                            annotations=[],
+                            type="output_text",
+                        )
+                    ],
+                    role="assistant",
+                    status="completed",
+                    type="message",
+                ),
+            ],
+            usage=Usage(),
+            response_id=None,
+        ),
+    ]
+
+
+@workflow.defn
+class HostedMCPWorkflow:
+    @workflow.run
+    async def run(self, question: str) -> str:
+        requested_approval = False
+
+        def approve(_: MCPToolApprovalRequest) -> MCPToolApprovalFunctionResult:
+            nonlocal requested_approval
+            requested_approval = True
+            return MCPToolApprovalFunctionResult(approve=True)
+
+        agent = Agent[str](
+            name="Hosted MCP Workflow",
+            instructions="You are a helpful agent.",
+            tools=[
+                HostedMCPTool(
+                    tool_config={
+                        "type": "mcp",
+                        "server_label": "gitmcp",
+                        "server_url": "https://gitmcp.io/openai/codex",
+                        "require_approval": "always",
+                    },
+                    on_approval_request=approve,
+                )
+            ],
+        )
+        result = await Runner.run(starting_agent=agent, input=question)
+        assert requested_approval
+        assert any(
+            isinstance(item, ToolCallItem) and isinstance(item.raw_item, McpCall)
+            for item in result.new_items
+        )
+        return result.final_output
+
+
+@pytest.mark.parametrize("use_local_model", [True, False])
+async def test_hosted_mcp_tool(client: Client, use_local_model):
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("No openai API key")
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=120)
+            ),
+            model_provider=TestModelProvider(HostedMCPModel())
+            if use_local_model
+            else None,
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        HostedMCPWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            HostedMCPWorkflow.run,
+            "Which language is this repo written in?",
+            id=f"hosted-mcp-tool-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=120),
+        )
+        result = await workflow_handle.result()
+        if use_local_model:
+            assert result == "Some language"

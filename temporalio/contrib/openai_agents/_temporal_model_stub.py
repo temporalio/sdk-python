@@ -13,17 +13,20 @@ from typing import Any, AsyncIterator, Sequence, Union, cast
 from agents import (
     AgentOutputSchema,
     AgentOutputSchemaBase,
+    CodeInterpreterTool,
     ComputerTool,
     FileSearchTool,
     FunctionTool,
     Handoff,
+    HostedMCPTool,
+    ImageGenerationTool,
     Model,
     ModelResponse,
     ModelSettings,
     ModelTracing,
     Tool,
     TResponseInputItem,
-    WebSearchTool, ImageGenerationTool, CodeInterpreterTool,
+    WebSearchTool,
 )
 from agents.items import TResponseStreamEvent
 from openai.types.responses.response_prompt_param import ResponsePromptParam
@@ -33,6 +36,7 @@ from temporalio.contrib.openai_agents._invoke_model_activity import (
     AgentOutputSchemaInput,
     FunctionToolInput,
     HandoffInput,
+    HostedMCPToolInput,
     ModelActivity,
     ModelTracingInput,
     ToolInput,
@@ -87,8 +91,22 @@ class _TemporalModelStub(Model):
             return ""
 
         def make_tool_info(tool: Tool) -> ToolInput:
-            if isinstance(tool, (FileSearchTool, WebSearchTool, ImageGenerationTool, CodeInterpreterTool)):
+            if isinstance(
+                tool,
+                (
+                    FileSearchTool,
+                    WebSearchTool,
+                    ImageGenerationTool,
+                    CodeInterpreterTool,
+                ),
+            ):
                 return tool
+            elif isinstance(tool, HostedMCPTool):
+                # if tool.on_approval_request is not None:
+                #     raise ValueError(
+                #         "HostedMCPTool with approval functions not currently supported."
+                #     )
+                return HostedMCPToolInput(tool_config=tool.tool_config)
             elif isinstance(tool, FunctionTool):
                 return FunctionToolInput(
                     name=tool.name,

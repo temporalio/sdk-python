@@ -10,9 +10,12 @@ from typing import Any, Optional, Union, cast
 
 from agents import (
     AgentOutputSchemaBase,
+    CodeInterpreterTool,
     FileSearchTool,
     FunctionTool,
     Handoff,
+    HostedMCPTool,
+    ImageGenerationTool,
     ModelProvider,
     ModelResponse,
     ModelSettings,
@@ -21,9 +24,11 @@ from agents import (
     Tool,
     TResponseInputItem,
     UserError,
-    WebSearchTool, ImageGenerationTool, CodeInterpreterTool,
+    WebSearchTool,
 )
 from agents.models.multi_provider import MultiProvider
+from openai.types.responses.tool_param import Mcp
+from pydantic_core import to_json, to_jsonable_python
 from typing_extensions import Required, TypedDict
 
 from temporalio import activity
@@ -51,7 +56,21 @@ class FunctionToolInput:
     strict_json_schema: bool = True
 
 
-ToolInput = Union[FunctionToolInput, FileSearchTool, WebSearchTool, ImageGenerationTool, CodeInterpreterTool]
+@dataclass
+class HostedMCPToolInput:
+    """Data conversion friendly representation of a HostedMCPTool."""
+
+    tool_config: Mcp
+
+
+ToolInput = Union[
+    FunctionToolInput,
+    FileSearchTool,
+    WebSearchTool,
+    ImageGenerationTool,
+    CodeInterpreterTool,
+    HostedMCPToolInput,
+]
 
 
 @dataclass
@@ -137,22 +156,28 @@ class ModelActivity:
         ) -> Any:
             return None
 
-        # workaround for https://github.com/pydantic/pydantic/issues/9541
-        # ValidatorIterator returned
-        input_json = json.dumps(input["input"], default=str)
-        input_input = json.loads(input_json)
-
         def make_tool(tool: ToolInput) -> Tool:
-            if isinstance(tool, (FileSearchTool, WebSearchTool, ImageGenerationTool, CodeInterpreterTool)):
+            if isinstance(
+                tool,
+                (
+                    FileSearchTool,
+                    WebSearchTool,
+                    ImageGenerationTool,
+                    CodeInterpreterTool,
+                ),
+            ):
                 return cast(Tool, tool)
+            elif isinstance(tool, HostedMCPToolInput):
+                return HostedMCPTool(
+                    tool_config=tool.tool_config,
+                )
             elif isinstance(tool, FunctionToolInput):
-                t = cast(FunctionToolInput, tool)
                 return FunctionTool(
-                    name=t.name,
-                    description=t.description,
-                    params_json_schema=t.params_json_schema,
+                    name=tool.name,
+                    description=tool.description,
+                    params_json_schema=tool.params_json_schema,
                     on_invoke_tool=empty_on_invoke_tool,
-                    strict_json_schema=t.strict_json_schema,
+                    strict_json_schema=tool.strict_json_schema,
                 )
             else:
                 raise UserError(f"Unknown tool type: {tool.name}")
@@ -171,7 +196,7 @@ class ModelActivity:
         ]
         return await model.get_response(
             system_instructions=input.get("system_instructions"),
-            input=input_input,
+            input=input["input"],
             model_settings=input["model_settings"],
             tools=tools,
             output_schema=input.get("output_schema"),
