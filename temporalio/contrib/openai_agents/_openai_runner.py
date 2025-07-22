@@ -46,7 +46,7 @@ class TemporalOpenAIRunner(AgentRunner):
 
         tool_types = typing.get_args(Tool)
         for t in starting_agent.tools:
-            if isinstance(t, tool_types):
+            if not isinstance(t, tool_types):
                 raise ValueError(
                     "Provided tool is not a tool type. If using an activity, make sure to wrap it with openai_agents.workflow.activity_as_tool."
                 )
