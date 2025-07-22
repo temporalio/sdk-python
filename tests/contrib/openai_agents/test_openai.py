@@ -1,3 +1,4 @@
+import json
 import os
 import uuid
 from dataclasses import dataclass
@@ -45,7 +46,7 @@ from openai.types.responses import (
 )
 from openai.types.responses.response_function_web_search import ActionSearch
 from openai.types.responses.response_prompt_param import ResponsePromptParam
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, TypeAdapter
 
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
@@ -55,6 +56,7 @@ from temporalio.contrib.openai_agents import (
     TestModel,
     TestModelProvider,
 )
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import CancelledError
 from temporalio.testing import WorkflowEnvironment
 from tests.contrib.openai_agents.research_agents.research_manager import (
@@ -1757,3 +1759,21 @@ async def test_workflow_method_tools(client: Client):
             execution_timeout=timedelta(seconds=10),
         )
         await workflow_handle.result()
+
+
+async def test_response_serialization():
+    # This should not be used in another test, or this test needs to change to use another unloaded type
+    from openai.types.responses.response_output_item import ImageGenerationCall
+
+    data = json.loads(
+        b'{"id": "msg_68757ec43348819d86709f0fcb70316301a1194a3e05b38c","type": "image_generation_call","status": "completed"}'
+    )
+    call = TypeAdapter(ImageGenerationCall).validate_python(data)
+    model_response = ModelResponse(
+        output=[
+            call,
+        ],
+        usage=Usage(),
+        response_id="",
+    )
+    encoded = await pydantic_data_converter.encode([model_response])
