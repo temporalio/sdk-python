@@ -8,25 +8,22 @@ This module provides compatibility between the
     Use with caution in production environments.
 """
 
-from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
-from temporalio.contrib.openai_agents._trace_interceptor import (
-    OpenAIAgentsTracingInterceptor,
-)
-from temporalio.contrib.openai_agents.temporal_openai_agents import (
+from temporalio.contrib.openai_agents._temporal_openai_agents import (
+    OpenAIAgentsPlugin,
     TestModel,
     TestModelProvider,
-    set_open_ai_agent_temporal_overrides,
+)
+from temporalio.contrib.openai_agents._trace_interceptor import (
+    OpenAIAgentsTracingInterceptor,
 )
 
 from . import workflow
 
 __all__ = [
-    "ModelActivity",
+    "OpenAIAgentsPlugin",
     "ModelActivityParameters",
     "workflow",
-    "set_open_ai_agent_temporal_overrides",
-    "OpenAIAgentsTracingInterceptor",
     "TestModel",
     "TestModelProvider",
 ]

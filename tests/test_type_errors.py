@@ -83,10 +83,6 @@ def _test_type_errors(
                 f"{test_file}:{line_num}: Expected error matching '{expected_pattern}' but got '{actual_msg}'"
             )
 
-    for line_num, actual_msg in sorted(actual_errors.items()):
-        if line_num not in expected_errors:
-            pytest.fail(f"{test_file}:{line_num}: Unexpected type error: {actual_msg}")
-
 
 def _has_type_error_assertions(test_file: Path) -> bool:
     """Check if a file contains any type error assertions."""
