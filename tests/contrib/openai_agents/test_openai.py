@@ -15,9 +15,12 @@ from agents import (
     InputGuardrailTripwireTriggered,
     ItemHelpers,
     MessageOutputItem,
+    Model,
+    ModelProvider,
     ModelResponse,
     ModelSettings,
     ModelTracing,
+    OpenAIChatCompletionsModel,
     OpenAIResponsesModel,
     OutputGuardrailTripwireTriggered,
     RunContextWrapper,
@@ -1839,3 +1842,37 @@ async def test_exception_handling(client: Client):
     await assert_status_retry_behavior(400, client, should_retry=False)
     await assert_status_retry_behavior(403, client, should_retry=False)
     await assert_status_retry_behavior(404, client, should_retry=False)
+
+
+class CustomModelProvider(ModelProvider):
+    def get_model(self, model_name: Optional[str]) -> Model:
+        client = AsyncOpenAI(base_url="https://api.openai.com/v1")
+        return OpenAIChatCompletionsModel(model="gpt-4o", openai_client=client)
+
+
+async def test_chat_completions_model(client: Client):
+    if not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("No openai API key")
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=CustomModelProvider(),
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        WorkflowToolWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            WorkflowToolWorkflow.run,
+            id=f"workflow-tool-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+        await workflow_handle.result()
