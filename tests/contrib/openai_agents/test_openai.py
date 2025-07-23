@@ -1931,7 +1931,10 @@ class WaitModel(Model):
         raise NotImplementedError()
 
 
-async def test_heartbeat(client: Client):
+async def test_heartbeat(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Relies on real timing, skip.")
+
     new_config = client.config()
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
