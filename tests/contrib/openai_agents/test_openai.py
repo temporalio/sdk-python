@@ -42,12 +42,16 @@ from agents.items import (
 )
 from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
+    EasyInputMessageParam,
     ResponseFunctionToolCall,
+    ResponseFunctionToolCallParam,
     ResponseFunctionWebSearch,
+    ResponseInputTextParam,
     ResponseOutputMessage,
     ResponseOutputText,
 )
 from openai.types.responses.response_function_web_search import ActionSearch
+from openai.types.responses.response_input_item_param import Message
 from openai.types.responses.response_prompt_param import ResponsePromptParam
 from pydantic import ConfigDict, Field, TypeAdapter
 
@@ -61,6 +65,7 @@ from temporalio.contrib.openai_agents import (
     TestModel,
     TestModelProvider,
 )
+from temporalio.contrib.openai_agents._temporal_model_stub import _extract_summary
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.testing import WorkflowEnvironment
@@ -1706,7 +1711,7 @@ class WorkflowToolModel(StaticTestModel):
                     id="",
                     content=[
                         ResponseOutputText(
-                            text="",
+                            text="Workflow tool was used",
                             annotations=[],
                             type="output_text",
                         )
@@ -1877,3 +1882,37 @@ async def test_chat_completions_model(client: Client):
             execution_timeout=timedelta(seconds=10),
         )
         await workflow_handle.result()
+
+
+def test_summary_extraction():
+    input: list[TResponseInputItem] = [
+        EasyInputMessageParam(
+            content="First message",
+            role="user",
+        )
+    ]
+
+    assert _extract_summary(input) == "First message"
+
+    input.append(
+        Message(
+            content=[
+                ResponseInputTextParam(
+                    text="Second message",
+                    type="input_text",
+                )
+            ],
+            role="user",
+        )
+    )
+    assert _extract_summary(input) == "Second message"
+
+    input.append(
+        ResponseFunctionToolCallParam(
+            arguments="",
+            call_id="",
+            name="",
+            type="function_call",
+        )
+    )
+    assert _extract_summary(input) == "Second message"

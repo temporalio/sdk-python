@@ -64,35 +64,6 @@ class _TemporalModelStub(Model):
         previous_response_id: Optional[str],
         prompt: Optional[ResponsePromptParam],
     ) -> ModelResponse:
-        def get_summary(
-            input: Union[str, list[TResponseInputItem]],
-        ) -> str:
-            ### Activity summary shown in the UI
-            try:
-                max_size = 100
-                if isinstance(input, str):
-                    return input[:max_size]
-                elif isinstance(input, list):
-                    content: Any = [
-                        item
-                        for item in input
-                        if (item.get("type") or "message") == "message"
-                    ][-1]
-                    if isinstance(content, dict):
-                        content = content.get("content", "")
-                    elif hasattr(content, "content"):
-                        content = getattr(content, "content")
-
-                    if isinstance(content, list):
-                        content = content[-1]
-
-                    if isinstance(content, dict) and content.get("text") is not None:
-                        content = content.get("text")
-                    return str(content)[:max_size]
-            except Exception as e:
-                logger.error(f"Error getting summary: {e}")
-            return ""
-
         def make_tool_info(tool: Tool) -> ToolInput:
             if isinstance(tool, (FileSearchTool, WebSearchTool)):
                 return tool
@@ -157,7 +128,7 @@ class _TemporalModelStub(Model):
         return await workflow.execute_activity_method(
             ModelActivity.invoke_model_activity,
             activity_input,
-            summary=self.model_params.summary_override or get_summary(input),
+            summary=self.model_params.summary_override or _extract_summary(input),
             task_queue=self.model_params.task_queue,
             schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
             schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
@@ -183,3 +154,34 @@ class _TemporalModelStub(Model):
         prompt: ResponsePromptParam | None,
     ) -> AsyncIterator[TResponseStreamEvent]:
         raise NotImplementedError("Temporal model doesn't support streams yet")
+
+
+def _extract_summary(input: Union[str, list[TResponseInputItem]]) -> str:
+    ### Activity summary shown in the UI
+    try:
+        max_size = 100
+        if isinstance(input, str):
+            return input[:max_size]
+        elif isinstance(input, list):
+            # Find all message inputs, which are reasonably summarizable
+            messages: list[TResponseInputItem] = [
+                item for item in input if (item.get("type") or "message") == "message"
+            ]
+            if not messages:
+                return ""
+
+            content: Any = messages[-1].get("content", "")
+
+            # In the case of multiple contents, take the last one
+            if isinstance(content, list):
+                if not content:
+                    return ""
+                content = content[-1]
+
+            # Take the text field from the content if present
+            if isinstance(content, dict) and content.get("text") is not None:
+                content = content.get("text")
+            return str(content)[:max_size]
+    except Exception as e:
+        logger.error(f"Error getting summary: {e}")
+    return ""
