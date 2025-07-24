@@ -45,12 +45,16 @@ from agents.items import (
 )
 from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
+    EasyInputMessageParam,
     ResponseFunctionToolCall,
+    ResponseFunctionToolCallParam,
     ResponseFunctionWebSearch,
+    ResponseInputTextParam,
     ResponseOutputMessage,
     ResponseOutputText,
 )
 from openai.types.responses.response_function_web_search import ActionSearch
+from openai.types.responses.response_input_item_param import Message
 from openai.types.responses.response_prompt_param import ResponsePromptParam
 from pydantic import ConfigDict, Field, TypeAdapter
 
@@ -64,6 +68,7 @@ from temporalio.contrib.openai_agents import (
     TestModel,
     TestModelProvider,
 )
+from temporalio.contrib.openai_agents._temporal_model_stub import _extract_summary
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.testing import WorkflowEnvironment
@@ -681,7 +686,8 @@ async def test_research_workflow(client: Client, use_local_model: bool):
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30)
+                start_to_close_timeout=timedelta(seconds=120),
+                schedule_to_close_timeout=timedelta(seconds=120),
             ),
             model_provider=TestModelProvider(TestResearchModel())
             if use_local_model
@@ -1688,7 +1694,7 @@ class WorkflowToolModel(StaticTestModel):
                     id="",
                     content=[
                         ResponseOutputText(
-                            text="",
+                            text="Workflow tool was used",
                             annotations=[],
                             type="output_text",
                         )
@@ -1939,6 +1945,40 @@ async def test_heartbeat(client: Client, env: WorkflowEnvironment):
             execution_timeout=timedelta(seconds=5.0),
         )
         await workflow_handle.result()
+
+
+def test_summary_extraction():
+    input: list[TResponseInputItem] = [
+        EasyInputMessageParam(
+            content="First message",
+            role="user",
+        )
+    ]
+
+    assert _extract_summary(input) == "First message"
+
+    input.append(
+        Message(
+            content=[
+                ResponseInputTextParam(
+                    text="Second message",
+                    type="input_text",
+                )
+            ],
+            role="user",
+        )
+    )
+    assert _extract_summary(input) == "Second message"
+
+    input.append(
+        ResponseFunctionToolCallParam(
+            arguments="",
+            call_id="",
+            name="",
+            type="function_call",
+        )
+    )
+    assert _extract_summary(input) == "Second message"
 
 
 @workflow.defn
