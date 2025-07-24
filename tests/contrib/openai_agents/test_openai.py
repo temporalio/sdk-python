@@ -56,7 +56,11 @@ from openai.types.responses import (
 )
 from openai.types.responses.response_file_search_tool_call import Result
 from openai.types.responses.response_function_web_search import ActionSearch
-from openai.types.responses.response_output_item import McpApprovalRequest, McpCall, ImageGenerationCall
+from openai.types.responses.response_output_item import (
+    ImageGenerationCall,
+    McpApprovalRequest,
+    McpCall,
+)
 from openai.types.responses.response_prompt_param import ResponsePromptParam
 from pydantic import ConfigDict, Field, TypeAdapter
 
