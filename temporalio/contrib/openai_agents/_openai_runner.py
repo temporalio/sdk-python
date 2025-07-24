@@ -60,14 +60,20 @@ class TemporalOpenAIRunner(AgentRunner):
         if run_config is None:
             run_config = RunConfig()
 
-        if run_config.model is not None and not isinstance(run_config.model, str):
+        # Use run_config.model if specified, otherwise fall back to the agent's model
+        agent_model = getattr(starting_agent, 'model', None)
+        run_config_model = getattr(run_config, 'model', None)
+        
+        model_name = run_config_model if run_config_model is not None else agent_model
+        
+        if model_name is not None and not isinstance(model_name, str):
             raise ValueError(
                 "Temporal workflows require a model name to be a string in the run config."
             )
         updated_run_config = replace(
             run_config,
             model=_TemporalModelStub(
-                run_config.model,
+                model_name,
                 model_params=self.model_params,
             ),
         )

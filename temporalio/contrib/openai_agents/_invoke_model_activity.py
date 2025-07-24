@@ -14,6 +14,7 @@ from agents import (
     FileSearchTool,
     FunctionTool,
     Handoff,
+    Model,
     ModelProvider,
     ModelResponse,
     ModelSettings,
@@ -126,21 +127,73 @@ class ActivityModelInput(TypedDict, total=False):
 
 
 class ModelActivity:
-    """Class wrapper for model invocation activities to allow model customization. By default, we use an OpenAIProvider with retries disabled.
+    """Class wrapper for model invocation activities to allow model customization. 
+    
+    By default, we use an OpenAIProvider with retries disabled. The activity automatically
+    detects models prefixed with 'litellm/' and routes them to LiteLLM when available.
+    
     Disabling retries in your model of choice is recommended to allow activity retries to define the retry model.
     """
 
     def __init__(self, model_provider: Optional[ModelProvider] = None):
         """Initialize the activity with a model provider."""
-        self._model_provider = model_provider or OpenAIProvider(
-            openai_client=AsyncOpenAI(max_retries=0)
-        )
+        self._custom_model_provider = model_provider
+        self._default_model_provider = None  # Lazy initialization
+
+    def _get_openai_provider(self) -> ModelProvider:
+        """Get the OpenAI provider, initializing it lazily to avoid requiring API key upfront."""
+        if self._custom_model_provider:
+            return self._custom_model_provider
+        
+        if self._default_model_provider is None:
+            self._default_model_provider = OpenAIProvider(
+                openai_client=AsyncOpenAI(max_retries=0)
+            )
+        
+        return self._default_model_provider
+
+    def _get_litellm_model(self, model_name: str) -> Model:
+        """Get a LiteLLM model for the given model name.
+        
+        Args:
+            model_name: Model name prefixed with 'litellm/' (e.g., 'litellm/anthropic/claude-3-5-sonnet')
+            
+        Returns:
+            A LiteLLM model instance
+            
+        Raises:
+            ImportError: If LiteLLM is not installed
+            ValueError: If model name is invalid
+        """
+        try:
+            from temporalio.contrib.openai_agents._litellm_model import LiteLLMModel
+        except ImportError:
+            raise ImportError(
+                f"LiteLLM model '{model_name}' requested but LiteLLM is not installed. "
+                "Install with: pip install litellm"
+            )
+        
+        # Remove the 'litellm/' prefix to get the actual model name
+        actual_model_name = model_name[8:]  # len("litellm/") = 8
+        
+        if not actual_model_name:
+            raise ValueError("Model name cannot be just 'litellm/' - provide the actual model after the prefix")
+        
+        return LiteLLMModel(model=actual_model_name)
 
     @activity.defn
     @_auto_heartbeater
     async def invoke_model_activity(self, input: ActivityModelInput) -> ModelResponse:
         """Activity that invokes a model with the given input."""
-        model = self._model_provider.get_model(input.get("model_name"))
+        model_name = input.get("model_name")
+        
+        # Check if this is a LiteLLM model (prefixed with 'litellm/')
+        if model_name and model_name.startswith("litellm/"):
+            model = self._get_litellm_model(model_name)
+        else:
+            # Use regular model provider (AsyncOpenAI by default, lazy initialization)
+            openai_provider = self._get_openai_provider()
+            model = openai_provider.get_model(model_name)
 
         async def empty_on_invoke_tool(ctx: RunContextWrapper[Any], input: str) -> str:
             return ""
