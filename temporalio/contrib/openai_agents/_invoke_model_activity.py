@@ -6,7 +6,7 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 import enum
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, Union
 
 from agents import (
     AgentOutputSchemaBase,
@@ -41,7 +41,9 @@ from temporalio.exceptions import ApplicationError
 
 @dataclass
 class HandoffInput:
-    """Data conversion friendly representation of a Handoff."""
+    """Data conversion friendly representation of a Handoff. Contains only the fields which are needed by the model
+    execution to determine what to handoff to, not the actual handoff invocation, which remains in the workflow context.
+    """
 
     tool_name: str
     tool_description: str
@@ -52,7 +54,9 @@ class HandoffInput:
 
 @dataclass
 class FunctionToolInput:
-    """Data conversion friendly representation of a FunctionTool."""
+    """Data conversion friendly representation of a FunctionTool. Contains only the fields which are needed by the model
+    execution to determine what tool to call, not the actual tool invocation, which remains in the workflow context.
+    """
 
     name: str
     description: str
@@ -62,7 +66,9 @@ class FunctionToolInput:
 
 @dataclass
 class HostedMCPToolInput:
-    """Data conversion friendly representation of a HostedMCPTool."""
+    """Data conversion friendly representation of a HostedMCPTool. Contains only the fields which are needed by the model
+    execution to determine what tool to call, not the actual tool invocation, which remains in the workflow context.
+    """
 
     tool_config: Mcp
 
@@ -174,7 +180,7 @@ class ModelActivity:
                     CodeInterpreterTool,
                 ),
             ):
-                return cast(Tool, tool)
+                return tool
             elif isinstance(tool, HostedMCPToolInput):
                 return HostedMCPTool(
                     tool_config=tool.tool_config,
