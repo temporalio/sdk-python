@@ -24,7 +24,10 @@ def _auto_heartbeater(fn: F) -> F:
             if heartbeat_task:
                 heartbeat_task.cancel()
                 # Wait for heartbeat cancellation to complete
-                await heartbeat_task
+                try:
+                    await heartbeat_task
+                except asyncio.CancelledError:
+                    pass
 
     return cast(F, wrapper)
 

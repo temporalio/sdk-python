@@ -1,10 +1,11 @@
+import asyncio
 import json
 import os
 import sys
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, Union, no_type_check
+from typing import Any, AsyncIterator, Optional, Union, no_type_check
 
 import nexusrpc
 import pytest
@@ -23,9 +24,12 @@ from agents import (
     MCPToolApprovalFunctionResult,
     MCPToolApprovalRequest,
     MessageOutputItem,
+    Model,
+    ModelProvider,
     ModelResponse,
     ModelSettings,
     ModelTracing,
+    OpenAIChatCompletionsModel,
     OpenAIResponsesModel,
     OutputGuardrailTripwireTriggered,
     RunContextWrapper,
@@ -44,18 +48,23 @@ from agents.items import (
     HandoffOutputItem,
     ToolCallItem,
     ToolCallOutputItem,
+    TResponseStreamEvent,
 )
 from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
+    EasyInputMessageParam,
     ResponseCodeInterpreterToolCall,
     ResponseFileSearchToolCall,
     ResponseFunctionToolCall,
+    ResponseFunctionToolCallParam,
     ResponseFunctionWebSearch,
+    ResponseInputTextParam,
     ResponseOutputMessage,
     ResponseOutputText,
 )
 from openai.types.responses.response_file_search_tool_call import Result
 from openai.types.responses.response_function_web_search import ActionSearch
+from openai.types.responses.response_input_item_param import Message
 from openai.types.responses.response_output_item import (
     ImageGenerationCall,
     McpApprovalRequest,
@@ -74,6 +83,7 @@ from temporalio.contrib.openai_agents import (
     TestModel,
     TestModelProvider,
 )
+from temporalio.contrib.openai_agents._temporal_model_stub import _extract_summary
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.testing import WorkflowEnvironment
@@ -83,25 +93,16 @@ from tests.contrib.openai_agents.research_agents.research_manager import (
 from tests.helpers import new_worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
-response_index: int = 0
-
 
 class StaticTestModel(TestModel):
     __test__ = False
     responses: list[ModelResponse] = []
 
-    def response(self):
-        global response_index
-        response = self.responses[response_index]
-        response_index += 1
-        return response
-
     def __init__(
         self,
     ) -> None:
-        global response_index
-        response_index = 0
-        super().__init__(self.response)
+        self._responses = iter(self.responses)
+        super().__init__(lambda: next(self._responses))
 
 
 class TestHelloModel(StaticTestModel):
@@ -700,7 +701,8 @@ async def test_research_workflow(client: Client, use_local_model: bool):
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30)
+                start_to_close_timeout=timedelta(seconds=120),
+                schedule_to_close_timeout=timedelta(seconds=120),
             ),
             model_provider=TestModelProvider(TestResearchModel())
             if use_local_model
@@ -1353,9 +1355,6 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
             )
 
 
-guardrail_response_index: int = 0
-
-
 class InputGuardrailModel(OpenAIResponsesModel):
     __test__ = False
     responses: list[ModelResponse] = [
@@ -1444,11 +1443,9 @@ class InputGuardrailModel(OpenAIResponsesModel):
         model: str,
         openai_client: AsyncOpenAI,
     ) -> None:
-        global response_index
-        response_index = 0
-        global guardrail_response_index
-        guardrail_response_index = 0
         super().__init__(model, openai_client)
+        self._responses = iter(self.responses)
+        self._guardrail_responses = iter(self.guardrail_responses)
 
     async def get_response(
         self,
@@ -1466,15 +1463,9 @@ class InputGuardrailModel(OpenAIResponsesModel):
             system_instructions
             == "Check if the user is asking you to do their math homework."
         ):
-            global guardrail_response_index
-            response = self.guardrail_responses[guardrail_response_index]
-            guardrail_response_index += 1
-            return response
+            return next(self._guardrail_responses)
         else:
-            global response_index
-            response = self.responses[response_index]
-            response_index += 1
-            return response
+            return next(self._responses)
 
 
 ### 1. An agent-based guardrail that is triggered if the user is asking to do math homework
@@ -1718,7 +1709,7 @@ class WorkflowToolModel(StaticTestModel):
                     id="",
                     content=[
                         ResponseOutputText(
-                            text="",
+                            text="Workflow tool was used",
                             annotations=[],
                             type="output_text",
                         )
@@ -1855,6 +1846,154 @@ async def test_exception_handling(client: Client):
     await assert_status_retry_behavior(400, client, should_retry=False)
     await assert_status_retry_behavior(403, client, should_retry=False)
     await assert_status_retry_behavior(404, client, should_retry=False)
+
+
+class CustomModelProvider(ModelProvider):
+    def get_model(self, model_name: Optional[str]) -> Model:
+        client = AsyncOpenAI(base_url="https://api.openai.com/v1")
+        return OpenAIChatCompletionsModel(model="gpt-4o", openai_client=client)
+
+
+async def test_chat_completions_model(client: Client):
+    if not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("No openai API key")
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=CustomModelProvider(),
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        WorkflowToolWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            WorkflowToolWorkflow.run,
+            id=f"workflow-tool-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+        await workflow_handle.result()
+
+
+class WaitModel(Model):
+    async def get_response(
+        self,
+        system_instructions: Union[str, None],
+        input: Union[str, list[TResponseInputItem]],
+        model_settings: ModelSettings,
+        tools: list[Tool],
+        output_schema: Union[AgentOutputSchemaBase, None],
+        handoffs: list[Handoff],
+        tracing: ModelTracing,
+        *,
+        previous_response_id: Union[str, None],
+        prompt: Union[ResponsePromptParam, None] = None,
+    ) -> ModelResponse:
+        activity.logger.info("Waiting")
+        await asyncio.sleep(1.0)
+        activity.logger.info("Returning")
+        return ModelResponse(
+            output=[
+                ResponseOutputMessage(
+                    id="",
+                    content=[
+                        ResponseOutputText(
+                            text="test", annotations=[], type="output_text"
+                        )
+                    ],
+                    role="assistant",
+                    status="completed",
+                    type="message",
+                )
+            ],
+            usage=Usage(),
+            response_id=None,
+        )
+
+    def stream_response(
+        self,
+        system_instructions: Optional[str],
+        input: Union[str, list[TResponseInputItem]],
+        model_settings: ModelSettings,
+        tools: list[Tool],
+        output_schema: Optional[AgentOutputSchemaBase],
+        handoffs: list[Handoff],
+        tracing: ModelTracing,
+        *,
+        previous_response_id: Optional[str],
+        prompt: Optional[ResponsePromptParam],
+    ) -> AsyncIterator[TResponseStreamEvent]:
+        raise NotImplementedError()
+
+
+async def test_heartbeat(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Relies on real timing, skip.")
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                heartbeat_timeout=timedelta(seconds=0.5),
+            ),
+            model_provider=TestModelProvider(WaitModel()),
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        HelloWorldAgent,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            HelloWorldAgent.run,
+            "Tell me about recursion in programming.",
+            id=f"workflow-tool-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=5.0),
+        )
+        await workflow_handle.result()
+
+
+def test_summary_extraction():
+    input: list[TResponseInputItem] = [
+        EasyInputMessageParam(
+            content="First message",
+            role="user",
+        )
+    ]
+
+    assert _extract_summary(input) == "First message"
+
+    input.append(
+        Message(
+            content=[
+                ResponseInputTextParam(
+                    text="Second message",
+                    type="input_text",
+                )
+            ],
+            role="user",
+        )
+    )
+    assert _extract_summary(input) == "Second message"
+
+    input.append(
+        ResponseFunctionToolCallParam(
+            arguments="",
+            call_id="",
+            name="",
+            type="function_call",
+        )
+    )
+    assert _extract_summary(input) == "Second message"
 
 
 async def test_lite_llm(client: Client, env: WorkflowEnvironment):
