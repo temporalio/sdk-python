@@ -1917,6 +1917,49 @@ class WaitModel(Model):
         raise NotImplementedError()
 
 
+@workflow.defn
+class AlternateModelAgent:
+    @workflow.run
+    async def run(self, prompt: str) -> str:
+        agent = Agent[None](
+            name="Assistant",
+            instructions="You only respond in haikus.",
+            model="test_model",
+        )
+        result = await Runner.run(starting_agent=agent, input=prompt)
+        return result.final_output
+
+class CheckModelNameProvider(ModelProvider):
+    def get_model(self, model_name: Optional[str]) -> Model:
+        assert model_name == "test_model"
+        return TestHelloModel()
+
+async def test_alternative_model(client: Client):
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=CheckModelNameProvider(),
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        AlternateModelAgent,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            AlternateModelAgent.run,
+            "Hello",
+            id=f"alternative-model-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+        await workflow_handle.result()
+
+
 async def test_heartbeat(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip("Relies on real timing, skip.")
