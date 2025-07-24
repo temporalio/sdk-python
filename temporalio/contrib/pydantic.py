@@ -16,7 +16,8 @@ Pydantic v1 is not supported.
 from typing import Any, Optional, Type
 
 from pydantic import TypeAdapter
-from pydantic_core import to_json
+from pydantic_core import to_json, SchemaSerializer
+from pydantic_core.core_schema import any_schema
 
 import temporalio.api.common.v1
 from temporalio.converter import (
@@ -44,6 +45,10 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
     See https://docs.pydantic.dev/latest/api/standard_library_types/
     """
 
+    def __init__(self, exclude_unset = False):
+        self._schema_serializer = SchemaSerializer(any_schema())
+        self._exclude_unset = exclude_unset
+
     @property
     def encoding(self) -> str:
         """See base class."""
@@ -57,8 +62,9 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
         See
         https://docs.pydantic.dev/latest/api/pydantic_core/#pydantic_core.to_json.
         """
+        data = self._schema_serializer.to_json(value, exclude_unset=self._exclude_unset) if self._exclude_unset else to_json(value)
         return temporalio.api.common.v1.Payload(
-            metadata={"encoding": self.encoding.encode()}, data=to_json(value)
+            metadata={"encoding": self.encoding.encode()}, data=data
         )
 
     def from_payload(
@@ -85,9 +91,9 @@ class PydanticPayloadConverter(CompositePayloadConverter):
     :py:class:`PydanticJSONPlainPayloadConverter`.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, exclude_unset=False) -> None:
         """Initialize object"""
-        json_payload_converter = PydanticJSONPlainPayloadConverter()
+        json_payload_converter = PydanticJSONPlainPayloadConverter(exclude_unset=exclude_unset)
         super().__init__(
             *(
                 c

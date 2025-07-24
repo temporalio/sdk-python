@@ -4,6 +4,7 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 """
 
 import enum
+import json
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Optional, Union
@@ -32,6 +33,7 @@ from openai import (
     AsyncOpenAI,
 )
 from openai.types.responses.tool_param import Mcp
+from pydantic_core import to_json
 from typing_extensions import Required, TypedDict
 
 from temporalio import activity
@@ -170,6 +172,11 @@ class ModelActivity:
         ) -> Any:
             return None
 
+        # workaround for https://github.com/pydantic/pydantic/issues/9541
+        # ValidatorIterator returned
+        input_json = to_json(input["input"])
+        input_input = json.loads(input_json)
+
         def make_tool(tool: ToolInput) -> Tool:
             if isinstance(
                 tool,
@@ -212,7 +219,7 @@ class ModelActivity:
         try:
             return await model.get_response(
                 system_instructions=input.get("system_instructions"),
-                input=input["input"],
+                input=input_input,
                 model_settings=input["model_settings"],
                 tools=tools,
                 output_schema=input.get("output_schema"),
