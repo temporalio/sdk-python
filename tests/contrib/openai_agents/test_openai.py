@@ -72,25 +72,16 @@ from tests.contrib.openai_agents.research_agents.research_manager import (
 from tests.helpers import new_worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
-response_index: int = 0
-
 
 class StaticTestModel(TestModel):
     __test__ = False
     responses: list[ModelResponse] = []
 
-    def response(self):
-        global response_index
-        response = self.responses[response_index]
-        response_index += 1
-        return response
-
     def __init__(
         self,
     ) -> None:
-        global response_index
-        response_index = 0
-        super().__init__(self.response)
+        self._responses = iter(self.responses)
+        super().__init__(lambda: next(self._responses))
 
 
 class TestHelloModel(StaticTestModel):
@@ -1342,9 +1333,6 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
             )
 
 
-guardrail_response_index: int = 0
-
-
 class InputGuardrailModel(OpenAIResponsesModel):
     __test__ = False
     responses: list[ModelResponse] = [
@@ -1433,11 +1421,9 @@ class InputGuardrailModel(OpenAIResponsesModel):
         model: str,
         openai_client: AsyncOpenAI,
     ) -> None:
-        global response_index
-        response_index = 0
-        global guardrail_response_index
-        guardrail_response_index = 0
         super().__init__(model, openai_client)
+        self._responses = iter(self.responses)
+        self._guardrail_responses = iter(self.guardrail_responses)
 
     async def get_response(
         self,
@@ -1455,15 +1441,9 @@ class InputGuardrailModel(OpenAIResponsesModel):
             system_instructions
             == "Check if the user is asking you to do their math homework."
         ):
-            global guardrail_response_index
-            response = self.guardrail_responses[guardrail_response_index]
-            guardrail_response_index += 1
-            return response
+            return next(self._guardrail_responses)
         else:
-            global response_index
-            response = self.responses[response_index]
-            response_index += 1
-            return response
+            return next(self._responses)
 
 
 ### 1. An agent-based guardrail that is triggered if the user is asking to do math homework
