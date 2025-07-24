@@ -53,7 +53,7 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
     See https://docs.pydantic.dev/latest/api/standard_library_types/
     """
 
-    def __init__(self, to_json_options: Optional[ToJsonOptions]):
+    def __init__(self, to_json_options: Optional[ToJsonOptions] = None):
         """Create a new payload converter."""
         self._schema_serializer = SchemaSerializer(any_schema())
         self._to_json_options = to_json_options
@@ -106,7 +106,7 @@ class PydanticPayloadConverter(CompositePayloadConverter):
     :py:class:`PydanticJSONPlainPayloadConverter`.
     """
 
-    def __init__(self, to_json_options: Optional[ToJsonOptions]) -> None:
+    def __init__(self, to_json_options: Optional[ToJsonOptions] = None) -> None:
         """Initialize object"""
         json_payload_converter = PydanticJSONPlainPayloadConverter(to_json_options)
         super().__init__(
