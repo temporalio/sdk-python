@@ -1,8 +1,10 @@
 """Provides support for integration with OpenAI Agents SDK tracing across workflows"""
 
 import uuid
+from random import Random
 from types import TracebackType
 from typing import Any, Optional, cast
+from uuid import UUID
 
 from agents import SpanData, Trace, TracingProcessor
 from agents.tracing import (
@@ -133,6 +135,15 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
         self._impl.force_flush()
 
 
+def _workflow_uuid() -> str:
+    random = cast(
+        Random, getattr(workflow.instance(), "__temporal_openai_tracing_random")
+    )
+    return UUID(bytes=random.getrandbits(16 * 8).to_bytes(16, "big"), version=4).hex[
+        :24
+    ]
+
+
 class TemporalTraceProvider(DefaultTraceProvider):
     """A trace provider that integrates with Temporal workflows."""
 
@@ -156,7 +167,7 @@ class TemporalTraceProvider(DefaultTraceProvider):
         if workflow.in_workflow():
             try:
                 """Generate a new trace ID."""
-                return f"trace_{workflow.uuid4().hex}"
+                return f"trace_{_workflow_uuid()}"
             except ReadOnlyContextError:
                 return f"trace_{uuid.uuid4().hex}"
         return super().gen_trace_id()
@@ -166,7 +177,7 @@ class TemporalTraceProvider(DefaultTraceProvider):
         if workflow.in_workflow():
             try:
                 """Generate a deterministic span ID."""
-                return f"span_{workflow.uuid4().hex[:24]}"
+                return f"span_{_workflow_uuid()}"
             except ReadOnlyContextError:
                 return f"span_{uuid.uuid4().hex[:24]}"
         return super().gen_span_id()
@@ -176,7 +187,7 @@ class TemporalTraceProvider(DefaultTraceProvider):
         if workflow.in_workflow():
             try:
                 """Generate a deterministic group ID."""
-                return f"group_{workflow.uuid4().hex[:24]}"
+                return f"group_{_workflow_uuid()}"
             except ReadOnlyContextError:
                 return f"group_{uuid.uuid4().hex[:24]}"
         return super().gen_group_id()
