@@ -13,10 +13,11 @@ To use, pass ``pydantic_data_converter`` as the ``data_converter`` argument to
 Pydantic v1 is not supported.
 """
 
+from dataclasses import dataclass
 from typing import Any, Optional, Type
 
 from pydantic import TypeAdapter
-from pydantic_core import to_json, SchemaSerializer
+from pydantic_core import SchemaSerializer, to_json
 from pydantic_core.core_schema import any_schema
 
 import temporalio.api.common.v1
@@ -32,6 +33,13 @@ from temporalio.converter import (
 # implements __get_pydantic_core_schema__ so that pydantic unwraps proxied types.
 
 
+@dataclass
+class ToJsonOptions:
+    """Options for converting to JSON with pydantic."""
+
+    exclude_unset: bool = False
+
+
 class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
     """Pydantic JSON payload converter.
 
@@ -45,9 +53,10 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
     See https://docs.pydantic.dev/latest/api/standard_library_types/
     """
 
-    def __init__(self, exclude_unset = False):
+    def __init__(self, to_json_options: Optional[ToJsonOptions]):
+        """Create a new payload converter."""
         self._schema_serializer = SchemaSerializer(any_schema())
-        self._exclude_unset = exclude_unset
+        self._to_json_options = to_json_options
 
     @property
     def encoding(self) -> str:
@@ -62,7 +71,13 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
         See
         https://docs.pydantic.dev/latest/api/pydantic_core/#pydantic_core.to_json.
         """
-        data = self._schema_serializer.to_json(value, exclude_unset=self._exclude_unset) if self._exclude_unset else to_json(value)
+        data = (
+            self._schema_serializer.to_json(
+                value, exclude_unset=self._to_json_options.exclude_unset
+            )
+            if self._to_json_options
+            else to_json(value)
+        )
         return temporalio.api.common.v1.Payload(
             metadata={"encoding": self.encoding.encode()}, data=data
         )
@@ -91,9 +106,9 @@ class PydanticPayloadConverter(CompositePayloadConverter):
     :py:class:`PydanticJSONPlainPayloadConverter`.
     """
 
-    def __init__(self, exclude_unset=False) -> None:
+    def __init__(self, to_json_options: Optional[ToJsonOptions]) -> None:
         """Initialize object"""
-        json_payload_converter = PydanticJSONPlainPayloadConverter(exclude_unset=exclude_unset)
+        json_payload_converter = PydanticJSONPlainPayloadConverter(to_json_options)
         super().__init__(
             *(
                 c

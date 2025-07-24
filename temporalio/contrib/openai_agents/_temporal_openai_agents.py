@@ -34,17 +34,15 @@ from temporalio.contrib.openai_agents._temporal_trace_provider import (
 from temporalio.contrib.openai_agents._trace_interceptor import (
     OpenAIAgentsTracingInterceptor,
 )
-from temporalio.converter import DataConverter
-from temporalio.contrib.pydantic import PydanticJSONPlainPayloadConverter, PydanticPayloadConverter
+from temporalio.contrib.pydantic import (
+    PydanticPayloadConverter,
+    ToJsonOptions,
+)
+from temporalio.converter import (
+    DataConverter,
+)
 from temporalio.worker import Worker, WorkerConfig
 
-from temporalio.converter import (
-    CompositePayloadConverter,
-    DataConverter,
-    DefaultPayloadConverter,
-    EncodingPayloadConverter,
-    JSONPlainPayloadConverter,
-)
 
 @contextmanager
 def set_open_ai_agent_temporal_overrides(
@@ -144,9 +142,11 @@ class TestModel(Model):
         """Get a streamed response from the model. Unimplemented."""
         raise NotImplementedError()
 
+
 class _OpenAIPayloadConverter(PydanticPayloadConverter):
     def __init__(self) -> None:
-        super().__init__(exclude_unset=True)
+        super().__init__(ToJsonOptions(exclude_unset=True))
+
 
 class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     """Temporal plugin for integrating OpenAI agents with Temporal workflows.
