@@ -72,25 +72,16 @@ from tests.contrib.openai_agents.research_agents.research_manager import (
 from tests.helpers import new_worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
-response_index: int = 0
-
 
 class StaticTestModel(TestModel):
     __test__ = False
     responses: list[ModelResponse] = []
 
-    def response(self):
-        global response_index
-        response = self.responses[response_index]
-        response_index += 1
-        return response
-
     def __init__(
         self,
     ) -> None:
-        global response_index
-        response_index = 0
-        super().__init__(self.response)
+        self._responses = iter(self.responses)
+        super().__init__(lambda: next(self._responses))
 
 
 class TestHelloModel(StaticTestModel):
