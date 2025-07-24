@@ -1929,10 +1929,12 @@ class AlternateModelAgent:
         result = await Runner.run(starting_agent=agent, input=prompt)
         return result.final_output
 
+
 class CheckModelNameProvider(ModelProvider):
     def get_model(self, model_name: Optional[str]) -> Model:
         assert model_name == "test_model"
         return TestHelloModel()
+
 
 async def test_alternative_model(client: Client):
     new_config = client.config()
