@@ -52,6 +52,11 @@ class TemporalOpenAIRunner(AgentRunner):
                     "Provided tool is not a tool type. If using an activity, make sure to wrap it with openai_agents.workflow.activity_as_tool."
                 )
 
+        if starting_agent.mcp_servers:
+            raise ValueError(
+                "Temporal OpenAI agent does not support on demand MCP servers."
+            )
+
         context = kwargs.get("context")
         max_turns = kwargs.get("max_turns", DEFAULT_MAX_TURNS)
         hooks = kwargs.get("hooks")
