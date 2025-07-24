@@ -7,6 +7,7 @@ from agents import (
     RunConfig,
     RunResult,
     RunResultStreaming,
+    SQLiteSession,
     TContext,
     Tool,
     TResponseInputItem,
@@ -56,6 +57,10 @@ class TemporalOpenAIRunner(AgentRunner):
         hooks = kwargs.get("hooks")
         run_config = kwargs.get("run_config")
         previous_response_id = kwargs.get("previous_response_id")
+        session = kwargs.get("session")
+
+        if isinstance(session, SQLiteSession):
+            raise ValueError("Temporal workflows don't support SQLite sessions.")
 
         if run_config is None:
             run_config = RunConfig()
@@ -80,6 +85,7 @@ class TemporalOpenAIRunner(AgentRunner):
             hooks=hooks,
             run_config=updated_run_config,
             previous_response_id=previous_response_id,
+            session=session,
         )
 
     def run_sync(
