@@ -26,6 +26,7 @@ from agents import (
     OutputGuardrailTripwireTriggered,
     RunContextWrapper,
     Runner,
+    SQLiteSession,
     Tool,
     TResponseInputItem,
     Usage,
@@ -74,7 +75,7 @@ from temporalio.testing import WorkflowEnvironment
 from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
 )
-from tests.helpers import new_worker
+from tests.helpers import assert_task_fail_eventually, new_worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 
@@ -2023,3 +2024,44 @@ def test_summary_extraction():
         )
     )
     assert _extract_summary(input) == "Second message"
+
+
+@workflow.defn
+class SessionWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        agent: Agent = Agent(
+            name="Assistant",
+            instructions="You are a helpful assistant.",
+        )
+        await Runner.run(
+            agent,
+            "My phone number is 650-123-4567. Where do you think I live?",
+            session=SQLiteSession(session_id="id"),
+        )
+
+
+async def test_session(client: Client):
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_provider=TestModelProvider(TestHelloModel()),
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        SessionWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            SessionWorkflow.run,
+            id=f"session-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=1.0),
+            retry_policy=RetryPolicy(maximum_attempts=1),
+        )
+        await assert_task_fail_eventually(
+            workflow_handle,
+            message_contains="Temporal workflows don't support SQLite sessions",
+        )
