@@ -56,7 +56,7 @@ from openai.types.responses import (
 )
 from openai.types.responses.response_file_search_tool_call import Result
 from openai.types.responses.response_function_web_search import ActionSearch
-from openai.types.responses.response_output_item import McpApprovalRequest, McpCall
+from openai.types.responses.response_output_item import McpApprovalRequest, McpCall, ImageGenerationCall
 from openai.types.responses.response_prompt_param import ResponsePromptParam
 from pydantic import ConfigDict, Field, TypeAdapter
 
@@ -1777,12 +1777,12 @@ async def test_workflow_method_tools(client: Client):
 
 async def test_response_serialization():
     # This should not be used in another test, or this test needs to change to use another unloaded type
-    from openai.types.responses.response_output_item import ImageGenerationCall
+    from openai.types.responses.response_output_item import LocalShellCall
 
     data = json.loads(
-        b'{"id": "msg_68757ec43348819d86709f0fcb70316301a1194a3e05b38c","type": "image_generation_call","status": "completed"}'
+        b'{"id":"", "action":{"command": [],"env": {},"type": "exec"},"call_id":"","status":"completed","type":"local_shell_call"}'
     )
-    call = TypeAdapter(ImageGenerationCall).validate_python(data)
+    call = TypeAdapter(LocalShellCall).validate_python(data)
     model_response = ModelResponse(
         output=[
             call,
@@ -1984,15 +1984,10 @@ class ImageGenerationModel(StaticTestModel):
     responses = [
         ModelResponse(
             output=[
-                ResponseFileSearchToolCall(
-                    queries=["side character in the Iliad"],
-                    type="file_search_call",
+                ImageGenerationCall(
+                    type="image_generation_call",
                     id="id",
                     status="completed",
-                    results=[
-                        Result(text="Some scene"),
-                        Result(text="Other scene"),
-                    ],
                 ),
                 ResponseOutputMessage(
                     id="",
@@ -2029,6 +2024,12 @@ class ImageGenerationWorkflow:
         )
         result = await Runner.run(starting_agent=agent, input=question)
 
+        # An image generation was performed
+        assert any(
+            isinstance(item, ToolCallItem)
+            and isinstance(item.raw_item, ImageGenerationCall)
+            for item in result.new_items
+        )
         return result.final_output
 
 
