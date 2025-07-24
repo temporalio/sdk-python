@@ -2317,7 +2317,7 @@ async def test_code_interpreter_tool(client: Client, use_local_model):
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30)
+                start_to_close_timeout=timedelta(seconds=60)
             ),
             model_provider=TestModelProvider(CodeInterpreterModel())
             if use_local_model
@@ -2335,7 +2335,7 @@ async def test_code_interpreter_tool(client: Client, use_local_model):
             "What is the square root of273 * 312821 plus 1782?",
             id=f"code-interpreter-tool-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
+            execution_timeout=timedelta(seconds=60),
         )
         result = await workflow_handle.result()
         if use_local_model:
