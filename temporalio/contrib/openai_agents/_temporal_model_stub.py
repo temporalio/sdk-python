@@ -165,7 +165,7 @@ def _extract_summary(input: Union[str, list[TResponseInputItem]]) -> str:
         elif isinstance(input, list):
             # Find all message inputs, which are reasonably summarizable
             messages: list[TResponseInputItem] = [
-                item for item in input if (item.get("type") or "message") == "message"
+                item for item in input if item.get("type", "message") == "message"
             ]
             if not messages:
                 return ""
