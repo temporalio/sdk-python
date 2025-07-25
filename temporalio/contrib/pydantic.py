@@ -13,10 +13,12 @@ To use, pass ``pydantic_data_converter`` as the ``data_converter`` argument to
 Pydantic v1 is not supported.
 """
 
+from dataclasses import dataclass
 from typing import Any, Optional, Type
 
 from pydantic import TypeAdapter
-from pydantic_core import to_json
+from pydantic_core import SchemaSerializer, to_json
+from pydantic_core.core_schema import any_schema
 
 import temporalio.api.common.v1
 from temporalio.converter import (
@@ -29,6 +31,13 @@ from temporalio.converter import (
 
 # Note that in addition to the implementation in this module, _RestrictedProxy
 # implements __get_pydantic_core_schema__ so that pydantic unwraps proxied types.
+
+
+@dataclass
+class ToJsonOptions:
+    """Options for converting to JSON with pydantic."""
+
+    exclude_unset: bool = False
 
 
 class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
@@ -44,6 +53,11 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
     See https://docs.pydantic.dev/latest/api/standard_library_types/
     """
 
+    def __init__(self, to_json_options: Optional[ToJsonOptions] = None):
+        """Create a new payload converter."""
+        self._schema_serializer = SchemaSerializer(any_schema())
+        self._to_json_options = to_json_options
+
     @property
     def encoding(self) -> str:
         """See base class."""
@@ -57,8 +71,15 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
         See
         https://docs.pydantic.dev/latest/api/pydantic_core/#pydantic_core.to_json.
         """
+        data = (
+            self._schema_serializer.to_json(
+                value, exclude_unset=self._to_json_options.exclude_unset
+            )
+            if self._to_json_options
+            else to_json(value)
+        )
         return temporalio.api.common.v1.Payload(
-            metadata={"encoding": self.encoding.encode()}, data=to_json(value)
+            metadata={"encoding": self.encoding.encode()}, data=data
         )
 
     def from_payload(
@@ -85,9 +106,9 @@ class PydanticPayloadConverter(CompositePayloadConverter):
     :py:class:`PydanticJSONPlainPayloadConverter`.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, to_json_options: Optional[ToJsonOptions] = None) -> None:
         """Initialize object"""
-        json_payload_converter = PydanticJSONPlainPayloadConverter()
+        json_payload_converter = PydanticJSONPlainPayloadConverter(to_json_options)
         super().__init__(
             *(
                 c
