@@ -390,7 +390,6 @@ class _ContextPropagationWorkflowOutboundInterceptor(
         span = custom_span(
             name="temporal:startActivity", data={"activity": input.activity}
         )
-        span.finish()
         span.start(mark_as_current=True)
         set_header_from_context(input, temporalio.workflow.payload_converter())
         handle = self.next.start_activity(input)
