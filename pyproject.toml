@@ -80,7 +80,7 @@ lint-types = [
   { cmd = "uv run mypy --namespace-packages --check-untyped-defs ."},
 ]
 run-bench = "uv run python scripts/run_bench.py"
-test = "uv run pytest"
+test = "uv run python -m pytest"
 
 
 [tool.pytest.ini_options]
