@@ -1,18 +1,21 @@
-# OpenAI Agents SDK Support
+# OpenAI Agents SDK Integration for Temporal
 
 ⚠️ **Experimental** - This module is not yet stable and may change in the future.
 
 For questions, please join the [#python-sdk](https://temporalio.slack.com/archives/CTT84RS0P) Slack channel at [temporalio.slack.com](https://temporalio.slack.com/).
 
-This module provides a bridge between Temporal durable execution and the [OpenAI Agents SDK](https://github.com/openai/openai-agents-python).
 
-## Background
+## Introduction
 
-If you want to build production-ready AI agents quickly, you can use this module to combine [Temporal durable execution](https://docs.temporal.io/evaluate/understanding-temporal#durable-execution) with OpenAI Agents.
-Temporal's durable execution provides a crash-proof system foundation, and OpenAI Agents offers a lightweight and yet powerful framework for defining agent functionality.
+If you want to build production-ready AI agents quickly, you can use this module to integrate [OpenAI Agents SDK](https://github.com/openai/openai-agents-python) and [Temporal durable execution](https://docs.temporal.io/evaluate/understanding-temporal#durable-execution).
+Temporal provides a crash-proof system foundation, managing the distributed systems challenges inherent to production agentic systems.
+OpenAI Agents SDK offers a lightweight yet powerful framework for defining those agents.
+The combination lets you build reliable agentic systems quickly.
 
 
-## Approach
+## Core Concepts
+
+This section describes description of AI agents.
 
 The standard control flow of a single AI agent involves:
 
@@ -67,7 +70,7 @@ class HelloWorldAgent:
             instructions="You only respond in haikus.",
         )
 
-        result = await Runner.run(starting_agent=agent, input=prompt)
+        result = await Runner.run(agent, input=prompt)
         return result.final_output
 ```
 
@@ -86,44 +89,43 @@ import asyncio
 from datetime import timedelta
 
 from temporalio.client import Client
-from temporalio.contrib.openai_agents import ModelActivity, ModelActivityParameters, set_open_ai_agent_temporal_overrides
-from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
 from temporalio.worker import Worker
 
 from hello_world_workflow import HelloWorldAgent
 
 
 async def worker_main():
-    # Configure the OpenAI Agents SDK to use Temporal activities for LLM API calls
-    # and for tool calls.
-    model_params = ModelActivityParameters(
-        start_to_close_timeout=timedelta(seconds=10)
+    # Use the plugin to configure Temporal for use with OpenAI Agents SDK
+    client = await Client.connect(
+        "localhost:7233",
+        plugins=[
+            OpenAIAgentsPlugin(
+                model_params=ModelActivityParameters(
+                    start_to_close_timeout=timedelta(seconds=30)
+                )
+            ),
+        ],
     )
-    with set_open_ai_agent_temporal_overrides(model_params):
-        # Create a Temporal client connected to server at the given address
-        # Use the OpenAI data converter to ensure proper serialization/deserialization
-        client = await Client.connect(
-            "localhost:7233",
-            data_converter=pydantic_data_converter,
-        )
 
-        worker = Worker(
-            client,
-            task_queue="my-task-queue",
-            workflows=[HelloWorldAgent],
-            activities=[ModelActivity().invoke_model_activity],
-        )
-        await worker.run()
+    worker = Worker(
+        client,
+        task_queue="my-task-queue",
+        workflows=[HelloWorldAgent],
+    )
+    await worker.run()
 
 
 if __name__ == "__main__":
     asyncio.run(worker_main())
 ```
 
-We wrap the entire `worker_main` function body in the `set_open_ai_agent_temporal_overrides()` context manager.
-This causes a Temporal activity to be invoked whenever the OpenAI Agents SDK invokes an LLM or calls a tool.
-We also pass the `pydantic_data_converter` to the Temporal Client, which ensures proper serialization of pydantic models in OpenAI Agents SDK data.
-We create a `ModelActivity` which serves as a generic wrapper for LLM calls, and we register this wrapper's invocation point, `ModelActivity().invoke_model_activity`, with the worker.
+We use the `OpenAIAgentsPlugin` to configure Temporal for use with OpenAI Agents SDK.
+The plugin automatically handles several important setup tasks:
+- Configures the Pydantic data converter to ensure proper serialization of OpenAI agent objects
+- Sets up tracing interceptors for OpenAI agent interactions
+- Registers model execution activities that wrap LLM calls
+- Manages the runtime overrides needed for OpenAI agents to work within Temporal workflows
 
 In order to launch the agent, use the standard Temporal workflow invocation:
 
@@ -134,7 +136,7 @@ import asyncio
 
 from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
-from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
 from hello_world_workflow import HelloWorldAgent
 
@@ -142,7 +144,7 @@ async def main():
     # Create client connected to server at the given address
     client = await Client.connect(
         "localhost:7233",
-        data_converter=pydantic_data_converter,
+        plugins=[OpenAIAgentsPlugin()],
     )
 
     # Execute a workflow
@@ -161,7 +163,7 @@ if __name__ == "__main__":
 
 This launcher script executes the Temporal workflow to start the agent.
 
-Note that this basic example works without providing the `pydantic_data_converter` to the Temporal client that executes the workflow, but we include it because more complex uses will generally need it.
+Note that we also configure the client with the `OpenAIAgentsPlugin` to ensure proper serialization of OpenAI agent data types when starting and receiving results from the workflow.
 
 
 ## Using Temporal Activities as OpenAI Agents Tools

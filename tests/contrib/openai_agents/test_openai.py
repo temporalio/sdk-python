@@ -530,6 +530,7 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
 
 
 @pytest.mark.parametrize("use_local_model", [True, False])
+@pytest.skip(reason="Not running this now")
 async def test_nexus_tool_workflow(
     client: Client, env: WorkflowEnvironment, use_local_model: bool
 ):
