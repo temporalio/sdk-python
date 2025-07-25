@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Mapping, Optional, Union, cast
+from typing import Any, Dict, Literal, Mapping, Optional, Union, cast
 
 from typing_extensions import TypeAlias, TypedDict
 
@@ -172,11 +172,11 @@ class ClientConnectConfig(TypedDict, total=False):
         Experimental API.
     """
 
-    target_host: Optional[str]
-    namespace: Optional[str]
-    api_key: Optional[str]
-    tls: Optional[Union[bool, temporalio.service.TLSConfig]]
-    rpc_metadata: Optional[Mapping[str, str]]
+    target_host: str
+    namespace: str
+    api_key: str
+    tls: Union[bool, temporalio.service.TLSConfig]
+    rpc_metadata: Mapping[str, str]
 
 
 @dataclass(frozen=True)
@@ -230,18 +230,26 @@ class ClientConfigProfile:
 
     def to_client_connect_config(self) -> ClientConnectConfig:
         """Create a `ClientConnectConfig` from this profile."""
-        config: ClientConnectConfig = {}
-        if self.address:
-            config["target_host"] = self.address
-        if self.namespace:
+        if not self.address:
+            raise ValueError(
+                "Configuration profile must contain an 'address' to be used for "
+                "client connection"
+            )
+
+        # Only include non-None values
+        config: Dict[str, Any] = {}
+        config["target_host"] = self.address
+        if self.namespace is not None:
             config["namespace"] = self.namespace
-        if self.api_key:
+        if self.api_key is not None:
             config["api_key"] = self.api_key
-        if self.tls:
+        if self.tls is not None:
             config["tls"] = self.tls.to_connect_tls_config()
         if self.grpc_meta:
             config["rpc_metadata"] = self.grpc_meta
-        return config
+
+        # Cast to ClientConnectConfig - this is safe because we've only included non-None values
+        return cast(ClientConnectConfig, config)
 
     @staticmethod
     def load(
