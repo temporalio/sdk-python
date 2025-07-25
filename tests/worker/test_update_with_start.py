@@ -5,8 +5,8 @@ import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
-from enum import Enum
-from typing import Any, Iterator, Literal, Mapping, Optional
+from enum import Enum, IntEnum
+from typing import Any, Iterator, Mapping, Optional
 from unittest.mock import patch
 
 import temporalio.api.common.v1
@@ -864,7 +864,9 @@ async def test_start_update_with_start_empty_details(client: Client):
         assert len(err.value.grpc_status.details) == 0
 
 
-ExecutionBehaviorT = Literal["completes", "blocks"]
+class ExecutionBehavior(IntEnum):
+    COMPLETES = 0
+    BLOCKS = 1
 
 
 @workflow.defn
@@ -874,14 +876,14 @@ class WorkflowWithUpdate:
         self._unblock_update = asyncio.Event()
 
     @workflow.run
-    async def run(self, behavior: ExecutionBehaviorT) -> str:
-        if behavior == "blocks":
+    async def run(self, behavior: ExecutionBehavior) -> str:
+        if behavior == ExecutionBehavior.BLOCKS:
             await self._unblock_workflow.wait()
         return str(workflow.uuid4())
 
     @workflow.update(unfinished_policy=workflow.HandlerUnfinishedPolicy.ABANDON)
-    async def update(self, behavior: ExecutionBehaviorT) -> str:
-        if behavior == "blocks":
+    async def update(self, behavior: ExecutionBehavior) -> str:
+        if behavior == ExecutionBehavior.BLOCKS:
             await self._unblock_update.wait()
         return str(workflow.uuid4())
 
@@ -894,7 +896,10 @@ class WorkflowWithUpdate:
         self._unblock_update.set()
 
 
-@pytest.mark.parametrize("workflow_behavior", ["completes", "blocks"])
+@pytest.mark.parametrize(
+    "workflow_behavior_name",
+    [ExecutionBehavior.COMPLETES.name, ExecutionBehavior.BLOCKS.name],
+)
 @pytest.mark.parametrize(
     "id_conflict_policy_name",
     [
@@ -911,7 +916,7 @@ class WorkflowWithUpdate:
 )
 async def test_update_with_start_always_attaches_to_completed_update(
     client: Client,
-    workflow_behavior: ExecutionBehaviorT,
+    workflow_behavior_name: str,
     id_conflict_policy_name: str,
     id_reuse_policy_name: str,
 ):
@@ -923,6 +928,7 @@ async def test_update_with_start_always_attaches_to_completed_update(
     """
     id_conflict_policy = WorkflowIDConflictPolicy[id_conflict_policy_name]
     id_reuse_policy = WorkflowIDReusePolicy[id_reuse_policy_name]
+    workflow_behavior = ExecutionBehavior[workflow_behavior_name]
     shared_workflow_id = f"workflow-id-{uuid.uuid4()}"
     shared_update_id = f"update-id-{uuid.uuid4()}"
     async with new_worker(client, WorkflowWithUpdate) as worker:
@@ -940,14 +946,14 @@ async def test_update_with_start_always_attaches_to_completed_update(
         start_op_1 = start_op()
         update_result_1 = await client.execute_update_with_start_workflow(
             WorkflowWithUpdate.update,
-            "completes",
+            ExecutionBehavior.COMPLETES,
             id=shared_update_id,
             start_workflow_operation=start_op_1,
         )
         wf_handle_1 = await start_op_1.workflow_handle()
         assert (await wf_handle_1.describe()).status == (
             WorkflowExecutionStatus.COMPLETED
-            if workflow_behavior == "completes"
+            if workflow_behavior == ExecutionBehavior.COMPLETES
             else WorkflowExecutionStatus.RUNNING
         )
 
@@ -957,7 +963,7 @@ async def test_update_with_start_always_attaches_to_completed_update(
         start_op_2 = start_op()
         update_result_2 = await client.execute_update_with_start_workflow(
             WorkflowWithUpdate.update,
-            "completes",
+            ExecutionBehavior.COMPLETES,
             id=shared_update_id,
             start_workflow_operation=start_op_2,
         )
@@ -1000,7 +1006,7 @@ async def test_update_with_start_attaches_to_non_completed_update_in_running_wor
         def start_op():
             return WithStartWorkflowOperation(
                 WorkflowWithUpdate.run,
-                "blocks",
+                ExecutionBehavior.BLOCKS,
                 id=shared_workflow_id,
                 task_queue=worker.task_queue,
                 id_conflict_policy=id_conflict_policy,
@@ -1010,7 +1016,7 @@ async def test_update_with_start_attaches_to_non_completed_update_in_running_wor
         start_op_1 = start_op()
         update_handle_1 = await client.start_update_with_start_workflow(
             WorkflowWithUpdate.update,
-            "blocks",
+            ExecutionBehavior.BLOCKS,
             id=shared_update_id,
             start_workflow_operation=start_op_1,
             wait_for_stage=WorkflowUpdateStage.ACCEPTED,
@@ -1024,7 +1030,7 @@ async def test_update_with_start_attaches_to_non_completed_update_in_running_wor
 
         update_handle_2 = await client.start_update_with_start_workflow(
             WorkflowWithUpdate.update,
-            "completes",
+            ExecutionBehavior.COMPLETES,
             id=shared_update_id,
             start_workflow_operation=start_op_2,
             wait_for_stage=WorkflowUpdateStage.ACCEPTED,
@@ -1068,7 +1074,7 @@ async def test_update_with_start_does_not_attach_to_non_completed_update_in_clos
         def start_op():
             return WithStartWorkflowOperation(
                 WorkflowWithUpdate.run,
-                "completes",
+                ExecutionBehavior.COMPLETES,
                 id=shared_workflow_id,
                 task_queue=worker.task_queue,
                 id_conflict_policy=id_conflict_policy,
@@ -1078,7 +1084,7 @@ async def test_update_with_start_does_not_attach_to_non_completed_update_in_clos
         start_op_1 = start_op()
         await client.start_update_with_start_workflow(
             WorkflowWithUpdate.update,
-            "blocks",
+            ExecutionBehavior.BLOCKS,
             id=shared_update_id,
             start_workflow_operation=start_op_1,
             wait_for_stage=WorkflowUpdateStage.ACCEPTED,
@@ -1093,10 +1099,10 @@ async def test_update_with_start_does_not_attach_to_non_completed_update_in_clos
 
         start_op_2 = start_op()
 
-        async def _do_update() -> str:
-            return await client.execute_update_with_start_workflow(  # type: ignore
+        async def _do_update() -> Any:
+            return await client.execute_update_with_start_workflow(
                 WorkflowWithUpdate.update,
-                "completes",
+                ExecutionBehavior.COMPLETES,
                 id=shared_update_id,
                 start_workflow_operation=start_op_2,
             )
