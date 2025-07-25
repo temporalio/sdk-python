@@ -301,6 +301,9 @@ class RunIdRandom:
 
 
 def _ensure_tracing_random() -> None:
+    """We use a custom uuid generator for spans to ensure that changes to user code workflow.random usage
+    do not affect tracing and vice versa.
+    """
     instance = workflow.instance()
     if not hasattr(instance, "__temporal_openai_tracing_random"):
         setattr(
