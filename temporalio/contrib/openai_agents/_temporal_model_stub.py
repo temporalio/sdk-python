@@ -13,10 +13,12 @@ from typing import Any, AsyncIterator, Union, cast
 from agents import (
     AgentOutputSchema,
     AgentOutputSchemaBase,
-    ComputerTool,
+    CodeInterpreterTool,
     FileSearchTool,
     FunctionTool,
     Handoff,
+    HostedMCPTool,
+    ImageGenerationTool,
     Model,
     ModelResponse,
     ModelSettings,
@@ -33,6 +35,7 @@ from temporalio.contrib.openai_agents._invoke_model_activity import (
     AgentOutputSchemaInput,
     FunctionToolInput,
     HandoffInput,
+    HostedMCPToolInput,
     ModelActivity,
     ModelTracingInput,
     ToolInput,
@@ -65,12 +68,18 @@ class _TemporalModelStub(Model):
         prompt: Optional[ResponsePromptParam],
     ) -> ModelResponse:
         def make_tool_info(tool: Tool) -> ToolInput:
-            if isinstance(tool, (FileSearchTool, WebSearchTool)):
+            if isinstance(
+                tool,
+                (
+                    FileSearchTool,
+                    WebSearchTool,
+                    ImageGenerationTool,
+                    CodeInterpreterTool,
+                ),
+            ):
                 return tool
-            elif isinstance(tool, ComputerTool):
-                raise NotImplementedError(
-                    "Computer search preview is not supported in Temporal model"
-                )
+            elif isinstance(tool, HostedMCPTool):
+                return HostedMCPToolInput(tool_config=tool.tool_config)
             elif isinstance(tool, FunctionTool):
                 return FunctionToolInput(
                     name=tool.name,
@@ -79,7 +88,7 @@ class _TemporalModelStub(Model):
                     strict_json_schema=tool.strict_json_schema,
                 )
             else:
-                raise ValueError(f"Unknown tool type: {tool.name}")
+                raise ValueError(f"Unsupported tool type: {tool.name}")
 
         tool_infos = [make_tool_info(x) for x in tools]
         handoff_infos = [
