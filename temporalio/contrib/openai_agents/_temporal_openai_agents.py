@@ -34,7 +34,13 @@ from temporalio.contrib.openai_agents._temporal_trace_provider import (
 from temporalio.contrib.openai_agents._trace_interceptor import (
     OpenAIAgentsTracingInterceptor,
 )
-from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.contrib.pydantic import (
+    PydanticPayloadConverter,
+    ToJsonOptions,
+)
+from temporalio.converter import (
+    DataConverter,
+)
 from temporalio.worker import Worker, WorkerConfig
 
 
@@ -137,6 +143,11 @@ class TestModel(Model):
         raise NotImplementedError()
 
 
+class _OpenAIPayloadConverter(PydanticPayloadConverter):
+    def __init__(self) -> None:
+        super().__init__(ToJsonOptions(exclude_unset=True))
+
+
 class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     """Temporal plugin for integrating OpenAI agents with Temporal workflows.
 
@@ -232,7 +243,9 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         Returns:
             The modified client configuration.
         """
-        config["data_converter"] = pydantic_data_converter
+        config["data_converter"] = DataConverter(
+            payload_converter_class=_OpenAIPayloadConverter
+        )
         return super().configure_client(config)
 
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
