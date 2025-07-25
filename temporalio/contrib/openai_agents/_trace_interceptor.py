@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 from contextlib import contextmanager
 from typing import Any, Mapping, Protocol, Type, cast
 
@@ -283,6 +284,18 @@ class _ContextPropagationActivityInboundInterceptor(
             return await self.next.execute_activity(input)
 
 
+def _ensure_tracing_random() -> None:
+    instance = workflow.instance()
+    if not hasattr(instance, "__temporal_openai_tracing_random"):
+        new_random = random.Random()
+        new_random.setstate(workflow.random().getstate())
+        setattr(
+            workflow.instance(),
+            "__temporal_openai_tracing_random",
+            new_random,
+        )
+
+
 class _ContextPropagationWorkflowInboundInterceptor(
     temporalio.worker.WorkflowInboundInterceptor
 ):
@@ -292,18 +305,21 @@ class _ContextPropagationWorkflowInboundInterceptor(
     async def execute_workflow(
         self, input: temporalio.worker.ExecuteWorkflowInput
     ) -> Any:
+        _ensure_tracing_random()
         with context_from_header(
             "temporal:executeWorkflow", input, temporalio.workflow.payload_converter()
         ):
             return await self.next.execute_workflow(input)
 
     async def handle_signal(self, input: temporalio.worker.HandleSignalInput) -> None:
+        _ensure_tracing_random()
         with context_from_header(
             "temporal:handleSignal", input, temporalio.workflow.payload_converter()
         ):
             return await self.next.handle_signal(input)
 
     async def handle_query(self, input: temporalio.worker.HandleQueryInput) -> Any:
+        _ensure_tracing_random()
         with context_from_header(
             "temporal:handleQuery", input, temporalio.workflow.payload_converter()
         ):
@@ -322,6 +338,7 @@ class _ContextPropagationWorkflowInboundInterceptor(
     async def handle_update_handler(
         self, input: temporalio.worker.HandleUpdateInput
     ) -> Any:
+        _ensure_tracing_random()
         with context_from_header(
             "temporal:handleUpdateHandler",
             input,

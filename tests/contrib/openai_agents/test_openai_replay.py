@@ -7,6 +7,9 @@ from temporalio.contrib.openai_agents import ModelActivityParameters
 from temporalio.contrib.openai_agents._temporal_openai_agents import (
     set_open_ai_agent_temporal_overrides,
 )
+from temporalio.contrib.openai_agents._trace_interceptor import (
+    OpenAIAgentsTracingInterceptor,
+)
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Replayer
 from tests.contrib.openai_agents.test_openai import (
@@ -48,4 +51,5 @@ async def test_replay(file_name: str) -> None:
                     OutputGuardrailWorkflow,
                 ],
                 data_converter=pydantic_data_converter,
+                interceptors=[OpenAIAgentsTracingInterceptor()],
             ).replay_workflow(WorkflowHistory.from_json("fake", history_json))
