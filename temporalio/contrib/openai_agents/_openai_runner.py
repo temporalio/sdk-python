@@ -1,3 +1,4 @@
+import json
 import typing
 from dataclasses import replace
 from typing import Any, Union
@@ -13,6 +14,7 @@ from agents import (
     TResponseInputItem,
 )
 from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
+from pydantic_core import to_json
 
 from temporalio import workflow
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
@@ -56,6 +58,11 @@ class TemporalOpenAIRunner(AgentRunner):
             raise ValueError(
                 "Temporal OpenAI agent does not support on demand MCP servers."
             )
+
+        # workaround for https://github.com/pydantic/pydantic/issues/9541
+        # ValidatorIterator returned
+        input_json = to_json(input)
+        input = json.loads(input_json)
 
         context = kwargs.get("context")
         max_turns = kwargs.get("max_turns", DEFAULT_MAX_TURNS)
