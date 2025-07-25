@@ -1,10 +1,8 @@
 """Provides support for integration with OpenAI Agents SDK tracing across workflows"""
 
 import uuid
-from random import Random
 from types import TracebackType
 from typing import Any, Optional, cast
-from uuid import UUID
 
 from agents import SpanData, Trace, TracingProcessor
 from agents.tracing import (
@@ -17,6 +15,7 @@ from agents.tracing.provider import (
 from agents.tracing.spans import Span
 
 from temporalio import workflow
+from temporalio.contrib.openai_agents._trace_interceptor import RunIdRandom
 from temporalio.workflow import ReadOnlyContextError
 
 
@@ -137,11 +136,9 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
 
 def _workflow_uuid() -> str:
     random = cast(
-        Random, getattr(workflow.instance(), "__temporal_openai_tracing_random")
+        RunIdRandom, getattr(workflow.instance(), "__temporal_openai_tracing_random")
     )
-    return UUID(bytes=random.getrandbits(16 * 8).to_bytes(16, "big"), version=4).hex[
-        :24
-    ]
+    return random.uuid4()
 
 
 class TemporalTraceProvider(DefaultTraceProvider):

@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import random
+import uuid
 from contextlib import contextmanager
-from typing import Any, Mapping, Protocol, Type, cast
+from typing import Any, Mapping, Protocol, Type
 
 from agents import CustomSpanData, custom_span, get_current_span, trace
 from agents.tracing import (
     get_trace_provider,
 )
-from agents.tracing.provider import DefaultTraceProvider
 from agents.tracing.scope import Scope
-from agents.tracing.spans import NoOpSpan, SpanImpl
+from agents.tracing.spans import NoOpSpan
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -284,15 +284,29 @@ class _ContextPropagationActivityInboundInterceptor(
             return await self.next.execute_activity(input)
 
 
+class RunIdRandom:
+    """Random uuid generator seeded by the run id of the workflow.
+    Doesn't currently support replay over reset correctly.
+    """
+
+    def __init__(self):
+        """Create a new random UUID generator."""
+        self._random = random.Random("OpenAIPlugin" + workflow.info().run_id)
+
+    def uuid4(self) -> str:
+        """Generate a random UUID."""
+        return uuid.UUID(
+            bytes=random.getrandbits(16 * 8).to_bytes(16, "big"), version=4
+        ).hex[:24]
+
+
 def _ensure_tracing_random() -> None:
     instance = workflow.instance()
     if not hasattr(instance, "__temporal_openai_tracing_random"):
-        new_random = random.Random()
-        new_random.setstate(workflow.random().getstate())
         setattr(
             workflow.instance(),
             "__temporal_openai_tracing_random",
-            new_random,
+            RunIdRandom(),
         )
 
 
@@ -376,6 +390,7 @@ class _ContextPropagationWorkflowOutboundInterceptor(
         span = custom_span(
             name="temporal:startActivity", data={"activity": input.activity}
         )
+        span.finish()
         span.start(mark_as_current=True)
         set_header_from_context(input, temporalio.workflow.payload_converter())
         handle = self.next.start_activity(input)
