@@ -2488,9 +2488,6 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
 
     Update-With-Start allows you to send an update to a workflow, while starting the
     workflow if necessary.
-
-    .. warning::
-        This API is experimental
     """
 
     # Overload for no-param workflow, with_start
@@ -2658,9 +2655,6 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
     ) -> None:
         """Create a WithStartWorkflowOperation.
 
-        .. warning::
-           This API is experimental
-
         See :py:meth:`temporalio.client.Client.start_workflow` for documentation of the
         arguments.
         """
@@ -2701,11 +2695,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         self._used = False
 
     async def workflow_handle(self) -> WorkflowHandle[SelfType, ReturnType]:
-        """Wait until workflow is running and return a WorkflowHandle.
-
-        .. warning::
-           This API is experimental
-        """
+        """Wait until workflow is running and return a WorkflowHandle."""
         return await self._workflow_handle
 
 
