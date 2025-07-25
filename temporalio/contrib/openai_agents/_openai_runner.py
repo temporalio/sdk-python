@@ -7,6 +7,7 @@ from agents import (
     RunConfig,
     RunResult,
     RunResultStreaming,
+    SQLiteSession,
     TContext,
     Tool,
     TResponseInputItem,
@@ -51,23 +52,33 @@ class TemporalOpenAIRunner(AgentRunner):
                     "Provided tool is not a tool type. If using an activity, make sure to wrap it with openai_agents.workflow.activity_as_tool."
                 )
 
+        if starting_agent.mcp_servers:
+            raise ValueError(
+                "Temporal OpenAI agent does not support on demand MCP servers."
+            )
+
         context = kwargs.get("context")
         max_turns = kwargs.get("max_turns", DEFAULT_MAX_TURNS)
         hooks = kwargs.get("hooks")
         run_config = kwargs.get("run_config")
         previous_response_id = kwargs.get("previous_response_id")
+        session = kwargs.get("session")
+
+        if isinstance(session, SQLiteSession):
+            raise ValueError("Temporal workflows don't support SQLite sessions.")
 
         if run_config is None:
             run_config = RunConfig()
 
-        if run_config.model is not None and not isinstance(run_config.model, str):
+        model_name = run_config.model or starting_agent.model
+        if model_name is not None and not isinstance(model_name, str):
             raise ValueError(
-                "Temporal workflows require a model name to be a string in the run config."
+                "Temporal workflows require a model name to be a string in the run config and/or agent."
             )
         updated_run_config = replace(
             run_config,
             model=_TemporalModelStub(
-                run_config.model,
+                model_name=model_name,
                 model_params=self.model_params,
             ),
         )
@@ -80,6 +91,7 @@ class TemporalOpenAIRunner(AgentRunner):
             hooks=hooks,
             run_config=updated_run_config,
             previous_response_id=previous_response_id,
+            session=session,
         )
 
     def run_sync(
