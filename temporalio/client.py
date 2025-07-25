@@ -528,11 +528,12 @@ class Client:
                 retries and continue as new.
             run_timeout: Timeout of a single workflow run.
             task_timeout: Timeout of a single workflow task.
-            id_reuse_policy: How already-existing IDs are treated.
-            id_conflict_policy: How already-running workflows of the same ID are
-                treated. Default is unspecified which effectively means fail the
-                start attempt. This cannot be set if ``id_reuse_policy`` is set
-                to terminate if running.
+            id_conflict_policy: Behavior when a workflow is currently running with the same ID.
+                Default is UNSPECIFIED, which effectively means fail the start attempt.
+                Set to USE_EXISTING for idempotent deduplication on workflow ID.
+                Cannot be set if ``id_reuse_policy`` is set to TERMINATE_IF_RUNNING.
+            id_reuse_policy: Behavior when a closed workflow with the same ID exists.
+                Default is ALLOW_DUPLICATE.
             retry_policy: Retry policy for the workflow.
             cron_schedule: See https://docs.temporal.io/docs/content/what-is-a-temporal-cron-job/
             memo: Memo for the workflow.
