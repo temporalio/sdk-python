@@ -915,7 +915,7 @@ class WorkflowWithUpdate:
     ],
 )
 async def test_update_with_start_always_attaches_to_completed_update(
-    client: Client,
+    env: WorkflowEnvironment,
     workflow_behavior_name: str,
     id_conflict_policy_name: str,
     id_reuse_policy_name: str,
@@ -926,6 +926,9 @@ async def test_update_with_start_always_attaches_to_completed_update(
     the update is completed. The behavior is unaffected by the conflict policy or id reuse policy (so, for
     example, we attach to an update in an existing workflow even if the conflict policy is FAIL).
     """
+    if env.supports_time_skipping:
+        pytest.skip("TODO: make update_with_start tests pass under Java test server")
+    client = env.client
     id_conflict_policy = WorkflowIDConflictPolicy[id_conflict_policy_name]
     id_reuse_policy = WorkflowIDReusePolicy[id_reuse_policy_name]
     workflow_behavior = ExecutionBehavior[workflow_behavior_name]
@@ -987,7 +990,7 @@ async def test_update_with_start_always_attaches_to_completed_update(
     ],
 )
 async def test_update_with_start_attaches_to_non_completed_update_in_running_workflow(
-    client: Client,
+    env: WorkflowEnvironment,
     id_conflict_policy_name: str,
     id_reuse_policy_name: str,
 ):
@@ -997,6 +1000,9 @@ async def test_update_with_start_attaches_to_non_completed_update_in_running_wor
     or id reuse policy (so, for example, we attach to the update in an existing workflow even if the conflict
     policy is FAIL).
     """
+    if env.supports_time_skipping:
+        pytest.skip("TODO: make update_with_start tests pass under Java test server")
+    client = env.client
     id_conflict_policy = WorkflowIDConflictPolicy[id_conflict_policy_name]
     id_reuse_policy = WorkflowIDReusePolicy[id_reuse_policy_name]
     shared_workflow_id = f"workflow-id-{uuid.uuid4()}"
@@ -1056,7 +1062,7 @@ async def test_update_with_start_attaches_to_non_completed_update_in_running_wor
     ],
 )
 async def test_update_with_start_does_not_attach_to_non_completed_update_in_closed_workflow(
-    client: Client,
+    env: WorkflowEnvironment,
     id_conflict_policy_name: str,
     id_reuse_policy_name: str,
 ):
@@ -1065,6 +1071,9 @@ async def test_update_with_start_does_not_attach_to_non_completed_update_in_clos
     ID and that update ID does not attach to the update. If the id reuse policy is ALLOW_DUPLICATE then a new
     workflow is started and the update is issued.
     """
+    if env.supports_time_skipping:
+        pytest.skip("TODO: make update_with_start tests pass under Java test server")
+    client = env.client
     id_conflict_policy = WorkflowIDConflictPolicy[id_conflict_policy_name]
     id_reuse_policy = WorkflowIDReusePolicy[id_reuse_policy_name]
     shared_workflow_id = f"workflow-id-{uuid.uuid4()}"
