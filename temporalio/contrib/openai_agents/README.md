@@ -11,24 +11,24 @@ If your agent is halfway through analyzing data, calling APIs, or having a conve
 
 This integration combines [OpenAI Agents SDK](https://github.com/openai/openai-agents-python) with [Temporal's durable execution](https://docs.temporal.io/evaluate/understanding-temporal#durable-execution) to build agents that never lose their work and handle long-running, asynchronous, and human-in-the-loop workflows with ease.
 
+<div style="max-width: 600px; margin: 0 auto; text-align: center;">
+
+
 ```mermaid
 block-beta
   columns 4
-  
+
   Agents["Agents"]:1
   Tools["Tools"]:1  
   Guardrails["Guardrails"]:1
   Tracing["Tracing"]:1
-  
-  space:4
-  
-  AgentFramework["Agent Framework: OpenAI Agents SDK"]:4
-  
-  space:2
+
+  AgentFramework["OpenAI Agents SDK"]:4
   
   DurableExecution["Durable Execution: Temporal"]:2
-  AIInference["AI Inference: OpenAI Models"]:2
+  AIInference["AI Inference: OpenAI and third-party models"]:2
 ```
+</div>
 
 ## How the Architecture Works
 
