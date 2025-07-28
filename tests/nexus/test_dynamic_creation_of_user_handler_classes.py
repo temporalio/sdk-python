@@ -76,8 +76,8 @@ async def test_run_nexus_service_from_programmatically_created_service_handler(
     service_handler = nexusrpc.handler._core.ServiceHandler(
         service=nexusrpc.ServiceDefinition(
             name="MyService",
-            operation_definitions={
-                "increment": nexusrpc.OperationDefinition[int, int](
+            operations={
+                "increment": nexusrpc.Operation[int, int](
                     name="increment",
                     method_name="increment",
                     input_type=int,

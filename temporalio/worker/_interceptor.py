@@ -306,7 +306,7 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
         if isinstance(self.operation, nexusrpc.Operation):
             self.output_type = self.operation.output_type
         elif callable(self.operation):
-            if op := nexusrpc.get_operation(self.operation):
+            if op := nexusrpc.get_operation_definition(self.operation):
                 self.output_type = op.output_type
             else:
                 raise ValueError(
@@ -325,7 +325,7 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
         elif isinstance(self.operation, str):
             return self.operation
         elif callable(self.operation):
-            if op := nexusrpc.get_operation(self.operation):
+            if op := nexusrpc.get_operation_definition(self.operation):
                 return op.name
             else:
                 raise ValueError(
