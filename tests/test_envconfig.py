@@ -449,7 +449,7 @@ custom-header = "custom-value"
     config = ClientConfig.load_client_connect_config(config_file=str(config_file))
     assert config.get("target_host") == target_host
     assert config.get("namespace") == namespace
-    new_client = await Client.connect(**config)  # type: ignore
+    new_client = await Client.connect(**config)
     assert new_client.service_client.config.target_host == target_host
     assert new_client.namespace == namespace
 
@@ -462,7 +462,7 @@ custom-header = "custom-value"
     rpc_metadata = config.get("rpc_metadata")
     assert rpc_metadata
     assert "custom-header" in rpc_metadata
-    new_client = await Client.connect(**config)  # type: ignore
+    new_client = await Client.connect(**config)
     assert new_client.service_client.config.target_host == target_host
     assert new_client.namespace == "custom-namespace"
     assert (
@@ -476,7 +476,7 @@ custom-header = "custom-value"
     )
     assert config.get("target_host") == target_host
     assert config.get("namespace") == "env-namespace-override"
-    new_client = await Client.connect(**config)  # type: ignore
+    new_client = await Client.connect(**config)
     assert new_client.namespace == "env-namespace-override"
 
     # Test with env overrides disabled
@@ -487,7 +487,7 @@ custom-header = "custom-value"
     )
     assert config.get("target_host") == target_host
     assert config.get("namespace") == namespace
-    new_client = await Client.connect(**config)  # type: ignore
+    new_client = await Client.connect(**config)
     assert new_client.namespace == namespace
 
     # Test with file loading disabled (so only env is used)
@@ -500,9 +500,16 @@ custom-header = "custom-value"
     )
     assert config.get("target_host") == target_host
     assert config.get("namespace") == "env-only-namespace"
-    new_client = await Client.connect(**config)  # type: ignore
+    new_client = await Client.connect(**config)
     assert new_client.service_client.config.target_host == target_host
     assert new_client.namespace == "env-only-namespace"
+
+
+def test_to_client_connect_config_missing_address_fails():
+    """Test that to_client_connect_config raises a ValueError if address is missing."""
+    profile = ClientConfigProfile()
+    with pytest.raises(ValueError, match="must contain an 'address'"):
+        profile.to_client_connect_config()
 
 
 def test_disables_raise_error():
