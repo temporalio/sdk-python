@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - dan-9999-pin-nexus
       - "releases/*"
 
 jobs:
