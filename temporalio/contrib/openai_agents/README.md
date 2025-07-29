@@ -17,8 +17,8 @@ This document is organized as follows:
  - **[Hello World Agent](#hello-world-durable-agent).** Your first durable agent example.
  - **[Background Concepts](#core-concepts).** Background on durable execution and AI agents.
  - **[Full Example](#full-example)** Complete example.
- - **[Usage Guide].**
- [TODO: Complete links]
+ - **[Tool Calling](#tool-calling).**
+ - **[Feature Support](#feature-support).**
  
 
 The [samples repository](https://github.com/temporalio/samples-python/tree/main/openai_agents) contains examples including basic usage, common agent patterns, and more complete samples.
@@ -140,9 +140,8 @@ We refer to that coordinating logic as *agent orchestration*.
 As a general rule, agent orchestration code executes within the Temporal workflow, whereas model calls and any I/O-bound tool invocations execute as Temporal activities.
 
 The diagram below shows the overall architecture of an agentic application in Temporal.
-The Temporal Server is responsible to tracking program execution and making sure associated state is preserved reliably.
-Temporal Server manages data in encrypted form.
-All data processing occurs on the Worker, which runs the workflow and activities.
+The Temporal Server is responsible to tracking program execution and making sure associated state is preserved reliably (i.e., stored to a database, possibly replicated across cloud regions).
+Temporal Server manages data in encrypted form, so all data processing occurs on the Worker, which runs the workflow and activities.
 
 
 ```text
@@ -180,7 +179,7 @@ See the [Temporal documentation](https://docs.temporal.io/evaluate/understanding
 
 ## Complete Example
 
-To make the [Hello World durable agent](#hello-world-durable-agent) available in Temporal, we need to create a worker program.
+To make the [Hello World durable agent](#hello-world-durable-agent) shown earlier available in Temporal, we need to create a worker program.
 To see it run, we also need a client to launch it.
 We show these files below.
 
@@ -273,9 +272,11 @@ We also configure the client with the `OpenAIAgentsPlugin` to ensure serializati
 
 To run this example, see the detailed instructions in the [Temporal Python Samples Repository](https://github.com/temporalio/samples-python/tree/main/openai_agents).
 
-## Using Temporal Activities as OpenAI Agents Tools
+## Tool Calling
 
-One of the powerful features of this integration is the ability to convert Temporal activities into OpenAI Agents tools using `activity_as_tool`.
+### Temporal Activities as OpenAI Agents Tools
+
+One of the powerful features of this integration is the ability to convert Temporal activities into agent tools using `activity_as_tool`.
 This allows your agent to leverage Temporal's durable execution for tool calls.
 
 In the example below, we apply the `@activity.defn` decorator to the `get_weather` function to create a Temporal activity.
@@ -317,9 +318,9 @@ class WeatherAgent:
         return result.final_output
 ```
 
-## Calling Tools Directly
+### Calling OpenAI Agents Tools inside Temporal Workflows
 
-For simple computations that don't involve external calls you can call the tool directly from the workflow:
+For simple computations that don't involve external calls you can call the tool directly from the workflow by using the standard OpenAI Agents SDK `@functiontool` annotation.
 
 ```python
 from temporalio import workflow
@@ -345,51 +346,14 @@ class MathAssistantAgent:
         return result.final_output
 ```
 
-Note that any tools designed to run in the workflow must respect the workflow execution restrictions, meaning no I/O or non-deterministic operations.
-Of course, you can always invoke an activity from the workflow if needed.
+Note that any tools that run in the workflow must respect the workflow execution restrictions, meaning no I/O or non-deterministic operations.
 
-
-## Agent Handoffs
-
-The OpenAI Agents SDK supports agent handoffs, where one agent transfers control of execution to another agent.
-In this example, one Temporal workflow wraps the multi-agent system:
-
-```python
-@workflow.defn
-class CustomerServiceWorkflow:
-    def __init__(self):
-        self.current_agent = self.init_agents()
-
-    def init_agents(self):
-        faq_agent = Agent(
-            name="FAQ Agent",
-            instructions="Answer frequently asked questions",
-        )
-        
-        booking_agent = Agent(
-            name="Booking Agent", 
-            instructions="Help with booking and seat changes",
-        )
-        
-        triage_agent = Agent(
-            name="Triage Agent",
-            instructions="Route customers to the right agent",
-            handoffs=[faq_agent, booking_agent],
-        )
-        
-        return triage_agent
-
-    @workflow.run
-    async def run(self, customer_message: str) -> str:
-        result = await Runner.run(
-            starting_agent=self.current_agent,
-            input=customer_message,
-            context=self.context,
-        )
-        return result.final_output
-```
-
-
-## Additional Examples
+Such function tools are, however, regular Temporal workflow code, from which you can always invoke an activity if needed.
 
 You can find additional examples in the [Temporal Python Samples Repository](https://github.com/temporalio/samples-python/tree/main/openai_agents).
+
+
+## Feature Support
+
+
+
