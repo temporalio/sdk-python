@@ -50,8 +50,8 @@ In this example, Temporal provides the durable execution wrapper: the `HelloWorl
 The content of that method, is regular OpenAI Agents SDK code.
 
 If you are familiar with Temporal and with Open AI Agents SDK, this code will look very familiar.
-We the `@workflow.defn` annotations on the `HelloWorldAgent` indicates that this class will contain durable execution and the `@workflow.run` annotation defines the entrypoint.
-We use the `Agent` class from OpenAI Agents SDK to define a simple agent, instructing it to always responds with haikus.
+The `@workflow.defn` annotation on the `HelloWorldAgent` indicates that this class will contain durable execution logic. The `@workflow.run` annotation defines the entry point.
+We use the `Agent` class from OpenAI Agents SDK to define a simple agent, instructing it to always respond with haikus.
 We then run that agent, using the `Runner` class from OpenAI Agents SDK, passing through `prompt` as an argument.
 
 
@@ -225,7 +225,7 @@ if __name__ == "__main__":
 
 We use the `OpenAIAgentsPlugin` to configure Temporal for use with OpenAI Agents SDK.
 The plugin automatically handles several important setup tasks:
-- Ensures proper serialization by of Pydantic types
+- Ensures proper serialization of Pydantic types
 - Propagates context for [OpenAI Agents tracing](https://openai.github.io/openai-agents-python/tracing/).
 - Registers an activity for invoking model calls with the Temporal worker.
 - Configures OpenAI Agents SDK to run model calls as Temporal activities.
@@ -441,7 +441,7 @@ SQLite storage is not suited to a distributed environment.
 
 ### Utilities
 
-The REPL utility is not suited to a distributed setting.
+The REPL utility is not suitable for a distributed setting.
 
 | Utility | Supported |
 |:--------|:---------:|
