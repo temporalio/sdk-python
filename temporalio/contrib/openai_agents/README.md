@@ -373,9 +373,9 @@ Certain tools are not suitable for a distributed computing environment, so these
 | Streaming | No |
 
 
-# Tools
+### Tools
 
-## Tool Type
+#### Tool Type
 
 Tools that are not suited to a distributed setting are disabled
 
@@ -390,7 +390,7 @@ Tools that are not suited to a distributed setting are disabled
 | CodeInterpreterTool | Yes |
 | ComputerTool | No |
 
-## Tool Context
+#### Tool Context
 
 | Context Propagation | Supported |
 | --- | --- |
@@ -399,7 +399,7 @@ Tools that are not suited to a distributed setting are disabled
 | Function Tool received context | Yes |
 | Function Tool can update context | Yes |
 
-# MCP
+### MCP
 
 Presently, MCP is supported only via `HostedMCPTool`.
 
@@ -409,14 +409,14 @@ Presently, MCP is supported only via `HostedMCPTool`.
 | MCPServerSse | No |
 | MCPServerStreamableHttp | No |
 
-# Guardrails
+### Guardrails
 
 | Guardrail Type | Supported |
 | --- | --- |
 | Code | Yes |
 | Agent | Yes |
 
-# Sessions
+### Sessions
 
 SQLite storage is not suited to a distributed environment.
 
@@ -424,26 +424,25 @@ SQLite storage is not suited to a distributed environment.
 | --- | --- | --- |
 | SQLiteSession | No |
 
-# Tracing
+### Tracing
 
 | Tracing Provider | Supported | Notes |
 | --- | --- | --- |
 | OpenAI platform | Yes |  |
 
-Generating a comprehensive list of 3rd party tracing providers is out of scope.
 
-### Voice
+### Voice 
 
 | Mode | Supported |
 | --- | --- |
 | Voice agents (pipelines) | No |
 | Realtime agents | No |
 
-## Utilities
+### Utilities
 
-| Utility | Supported |
-| --- | --- | 
-| REPL | No |
+| Utility | Supported | Notes |
+| --- | --- | --- |
+| REPL | No | Not applicable in distributed setting |
 
 
 ## Additional Examples
