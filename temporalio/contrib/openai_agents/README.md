@@ -1,30 +1,32 @@
 # OpenAI Agents SDK Integration for Temporal
 
-⚠️ **Public Preview** - The interface to this module is subject to change prior to General Availability. We welcome your questions and feedback in the [#python-sdk](https://temporalio.slack.com/archives/CTT84RS0P) Slack channel at [temporalio.slack.com](https://temporalio.slack.com/).
+⚠️ **Public Preview** - The interface to this module is subject to change prior to General Availability.
+We welcome questions and feedback in the [#python-sdk](https://temporalio.slack.com/archives/CTT84RS0P) Slack channel at [temporalio.slack.com](https://temporalio.slack.com/).
 
 
 ## Introduction
 
 This integration combines [OpenAI Agents SDK](https://github.com/openai/openai-agents-python) with [Temporal's durable execution](https://docs.temporal.io/evaluate/understanding-temporal#durable-execution).
-It allows you to build AI agents that never lose their progress and handle long-running, asynchronous, and human-in-the-loop workflows with ease.
+It allows you to build durable agents that never lose their progress and handle long-running, asynchronous, and human-in-the-loop workflows with production-grade reliability.
 
+Temporal and OpenAI Agents SDK are complementary technologies, both of which contribute to simplifying what it takes to build highly capable, high-quality AI systems.
 Temporal provides a crash-proof system foundation, taking care of the distributed systems challenges inherent to production agentic systems.
 OpenAI Agents SDK offers a lightweight yet powerful framework for defining those agents.
-The combination lets you build reliable agentic systems quickly.
 
 This document is organized as follows:
  - **[Hello World Agent](#hello-world-durable-agent).** Your first durable agent example.
  - **[Background Concepts](#core-concepts).** Background on durable execution and AI agents.
- - **[Complete Example](#complete-example)** Complete example.
- - **Usage Guide.**
- - **Agent Patterns.**
+ - **[Full Example](#full-example)** Complete example.
+ - **[Usage Guide].**
+ [TODO: Complete links]
+ 
 
-The [samples repository](https://github.com/temporalio/samples-python/tree/main/openai_agents) contains a number of examples spanning various use cases.
+The [samples repository](https://github.com/temporalio/samples-python/tree/main/openai_agents) contains examples including basic usage, common agent patterns, and more complete samples.
 
 
 ## Hello World Durable Agent
 
-The code below shows how straightforward it is to wrap an agent wrapped in durable execution.
+The code below shows how to wrap an agent for durable execution.
 
 ### File 1: Durable Agent (`hello_world.py`)
 
@@ -45,20 +47,23 @@ class HelloWorldAgent:
         return result.final_output
 ```
 
+In this example, Temporal provides the durable execution wrapper: the `HelloWorldAgent.run` method.
+The content of that method, is regular OpenAI Agents SDK code.
+
 If you are familiar with Temporal and with Open AI Agents SDK, this code will look very familiar.
-We annotate the `HelloWorldAgent` class with `@workflow.defn` to define a workflow, then use the `@workflow.run` annotation to define the entrypoint.
+We the `@workflow.defn` annotations on the `HelloWorldAgent` indicates that this class will contain durable execution and the `@workflow.run` annotation defines the entrypoint.
+We use the `Agent` class from OpenAI Agents SDK to define a simple agent, instructing it to always responds with haikus.
+We then run that agent, using the `Runner` class from OpenAI Agents SDK, passing through `prompt` as an argument.
 
-We use the `Agent` class to define a simple agent, instructing it to always responds with haikus.
-Within the workflow, we start the agent using the `Runner`, as is typical, passing through `prompt` as an argument.
 
-We will [complete this example below](#complete-example).
-However, before digging further into the code, it we will share some more background to set the stage.
+We will [complete this example below](#full-example).
+Before digging further into the code, we will review some background that will make it easier to understand.
 
 ## Background Concepts
 
-We encourage you to form a thorough understanding of AI agents and durable execution with Temporal.
-Understanding this will make it easer to design and build durable agents.
-If you are well versed in these topics, you may skim this section or skip ahead.
+We encourage you to review this section thoroughly to gain a solid understanding of AI agents and durable execution with Temporal.
+This knowledge will make it easier to design and build durable agents.
+If you are already well versed in these topics, feel free to skim this section or skip ahead.
 
 ### AI Agents
 
@@ -74,10 +79,9 @@ We describe each of these briefly:
 - *Handoffs*. A handoff occurs when an agent delegates a task to another agent. During a handoff the conversation history remains the same, and passes to a new agent with its own model, instructions, tools.
 - *Context*. This is an overloaded term. Here, context refers to a framework object that is shared across tools and other code, but is not passed to the model.
 
-
-Now, let's look at how these pieces can fit together.
-In one popular pattern, the model receives user input, then performs reasoning to select a tool to call.
-The response from the tool is fed back into the model, which may perform additional tool calls, iterating until the task is complete.
+Now, let's see how these components work together.
+In a common pattern, the model first receives user input and then reasons about which tool to invoke.
+The tool's response is passed back to the model, which may call additional tools, repeating this loop until the task is complete.
 
 The diagram below illustrates this flow.
 
@@ -109,27 +113,31 @@ The diagram below illustrates this flow.
            again, until task is complete)
 ```
 
-Even in a simple example like this, there are many places where something can go wrong.
-Tools call APIs that are sometimes down and models have rate limits, requiring retries.
+Even in a simple example like this, there are many places where things can go wrong.
+Tools call APIs that sometimes fail, while models can encounter rate limits, requiring retries.
 The longer the agent runs, the more costly it is to start the job over.
-In the next section, we turn to durable execution, which can handle such failures seamlessly.
+We next describe durable execution, which handles such failures seamlessly.
 
 ### Durable Execution
 
 In Temporal's durable execution implementation, a program that crashes or encounters an exception while interacting with a model or API will retry until it can successfully complete.
 
-Temporal relies heavily on a replay mechanism to recover from failures.
+Temporal relies primarily on a replay mechanism to recover from failures.
 As the program makes progress, Temporal saves key inputs and decisions, allowing a re-started program to pick up right where it left off.
 
 The key to making this work is to separate the applications repeatable (deterministic) and non-repeatable (non-deterministic) parts:
 
-1. Deterministic pieces, termed *workflows*, execute the same way if re-run with the same inputs.
-2. Non-deterministic pieces, termed *activities*, have no limitations—they may perform I/O and any other operations.
+1. Deterministic pieces, termed *workflows*, execute the same way when re-run with the same inputs.
+2. Non-deterministic pieces, termed *activities*, can run arbitrary code, performing I/O and any other operations.
 
-In the AI agent described in the previous section, model and tool calls run in activities, and the control flow linking them together runs in the workflow.
+Workflow code can run for extended periods and, if interrupted, resume exactly where it left off.
+Activity code faces no restrictions on I/O or external interactions, but if it fails part-way through it restarts from the beginning.
 
-In more complex examples, the control flow may be described as *agent orchestration*.
-Agent orchestration runs within the Temporal workflow, while model calls and any tool calls involving I/O run in activities.
+In the AI-agent example above, model invocations and tool calls run inside activities, while the logic that coordinates them lives in the workflow.
+This pattern generalizes to more sophisticated agents.
+We refer to that coordinating logic as *agent orchestration*.
+
+As a general rule, agent orchestration code executes within the Temporal workflow, whereas model calls and any I/O-bound tool invocations execute as Temporal activities.
 
 The diagram below shows the overall architecture of an agentic application in Temporal.
 The Temporal Server is responsible to tracking program execution and making sure associated state is preserved reliably.
