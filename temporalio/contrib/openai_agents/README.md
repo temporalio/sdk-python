@@ -360,20 +360,18 @@ Certain tools are not suitable for a distributed computing environment, so these
 ### Model Providers
 
 | Model Provider | Supported |
-|----------------|-----------|
-| OpenAI         | Yes       |
-| LiteLLM        | Yes       |
-
+|:--------------|:---------:|
+| OpenAI        |    Yes    |
+| LiteLLM       |    Yes    |
 
 ### Model Response format
 
 This integration does not presently support streaming.
 
 | Model Response | Supported |
-| --- | --- |
-| Get Response | Yes |
-| Streaming | No |
-
+|:--------------|:---------:|
+| Get Response  |    Yes    |
+| Streaming     |    No     |
 
 ### Tools
 
@@ -381,74 +379,73 @@ This integration does not presently support streaming.
 
 `LocalShellTool` and `ComputerTool` are not suited to a distributed computing setting.
 
-| Tool Type | Supported |
-| --- | --- |
-| FunctionTool | Yes |
-| LocalShellTool | No |
-| WebSearchTool | Yes |
-| FileSearchTool | Yes |
-| HostedMCPTool | Yes |
-| ImageGenerationTool | Yes |
-| CodeInterpreterTool | Yes |
-| ComputerTool | No |
+| Tool Type           | Supported |
+|:-------------------|:---------:|
+| FunctionTool        |    Yes    |
+| LocalShellTool      |    No     |
+| WebSearchTool       |    Yes    |
+| FileSearchTool      |    Yes    |
+| HostedMCPTool       |    Yes    |
+| ImageGenerationTool |    Yes    |
+| CodeInterpreterTool |    Yes    |
+| ComputerTool        |    No     |
 
 #### Tool Context
 
 As described in [Tool Calling](#tool-calling), context propagation is read-only when Temporal activities are used as tools.
 
-| Context Propagation | Supported |
-| --- | --- |
-| Activity Tool receives copy of context | Yes |
-| Activity Tool can update context | No |
-| Function Tool received context | Yes |
-| Function Tool can update context | Yes |
+| Context Propagation                     | Supported |
+|:----------------------------------------|:---------:|
+| Activity Tool receives copy of context  |    Yes    |
+| Activity Tool can update context        |    No     |
+| Function Tool received context          |    Yes    |
+| Function Tool can update context        |    Yes    |
 
 ### MCP
 
 Presently, MCP is supported only via `HostedMCPTool`, which is implemented from within OpenAI.
 
-| MCP Class | Supported |
-| --- | --- |
-| MCPServerStdio | No |
-| MCPServerSse | No |
-| MCPServerStreamableHttp | No |
+| MCP Class              | Supported |
+|:-----------------------|:---------:|
+| MCPServerStdio         |    No     |
+| MCPServerSse           |    No     |
+| MCPServerStreamableHttp|    No     |
 
 ### Guardrails
 
 | Guardrail Type | Supported |
-| --- | --- |
-| Code | Yes |
-| Agent | Yes |
+|:---------------|:---------:|
+| Code           |    Yes    |
+| Agent          |    Yes    |
 
 ### Sessions
 
 SQLite storage is not suited to a distributed environment.
 
-| Feature | Supported |
-| --- | --- |
-| SQLiteSession | No |
+| Feature        | Supported |
+|:---------------|:---------:|
+| SQLiteSession  |    No     |
 
 ### Tracing
 
 | Tracing Provider | Supported |
-| --- | --- |
-| OpenAI platform | Yes |
-
+|:-----------------|:---------:|
+| OpenAI platform  |    Yes    |
 
 ### Voice 
 
-| Mode | Supported |
-| --- | --- |
-| Voice agents (pipelines) | No |
-| Realtime agents | No |
+| Mode                    | Supported |
+|:------------------------|:---------:|
+| Voice agents (pipelines)|    No     |
+| Realtime agents         |    No     |
 
 ### Utilities
 
 The REPL utility is not suited to a distributed setting.
 
 | Utility | Supported |
-| --- | --- |
-| REPL | No |
+|:--------|:---------:|
+| REPL    |    No     |
 
 
 ## Additional Examples
