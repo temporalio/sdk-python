@@ -14,12 +14,11 @@ Temporal provides a crash-proof system foundation, taking care of the distribute
 OpenAI Agents SDK offers a lightweight yet powerful framework for defining those agents.
 
 This document is organized as follows:
- - **[Hello World Agent](#hello-world-durable-agent).** Your first durable agent example.
+ - **[Hello World Durable Agent](#hello-world-durable-agent).** Your first durable agent example.
  - **[Background Concepts](#core-concepts).** Background on durable execution and AI agents.
- - **[Full Example](#full-example)** Complete example.
- - **[Tool Calling](#tool-calling).**
- - **[Feature Support](#feature-support).**
- 
+ - **[Full Example](#full-example)** Running the Hello World Durable Agent example.
+ - **[Tool Calling](#tool-calling).** Calling agent Tools in Temporal.
+ - **[Feature Support](#feature-support).** Compatibility matrix.
 
 The [samples repository](https://github.com/temporalio/samples-python/tree/main/openai_agents) contains examples including basic usage, common agent patterns, and more complete samples.
 
@@ -347,13 +346,107 @@ class MathAssistantAgent:
 ```
 
 Note that any tools that run in the workflow must respect the workflow execution restrictions, meaning no I/O or non-deterministic operations.
+Of course, code running in the workflow can invoke a Temporal activity at any time.
 
-Such function tools are, however, regular Temporal workflow code, from which you can always invoke an activity if needed.
-
-You can find additional examples in the [Temporal Python Samples Repository](https://github.com/temporalio/samples-python/tree/main/openai_agents).
+Tools that run in the workflow can also update OpenAI Agents context, which is read-only for tools run as Temporal activities.
 
 
 ## Feature Support
 
+This integration is presently subject to certain limitations.
+Streaming and voice agents are not supported.
+Certain tools are not suitable for a distributed computing environment, so these have been disabled as well.
 
+### Model Providers
+
+| Model Provider | Supported |
+|----------------|-----------|
+| OpenAI         | Yes       |
+| LiteLLM        | Yes       |
+
+
+### Model Response format
+
+| Model Response | Supported |
+| --- | --- |
+| Get Response | Yes |
+| Streaming | No |
+
+
+# Tools
+
+## Tool Type
+
+Tools that are not suited to a distributed setting are disabled
+
+| Tool Type | Supported |
+| --- | --- |
+| FunctionTool | Yes |
+| LocalShellTool | No |
+| WebSearchTool | Yes |
+| FileSearchTool | Yes |
+| HostedMCPTool | Yes |
+| ImageGenerationTool | Yes |
+| CodeInterpreterTool | Yes |
+| ComputerTool | No |
+
+## Tool Context
+
+| Context Propagation | Supported |
+| --- | --- |
+| Activity Tool receives copy of context | Yes |
+| Activity Tool can update context | No |
+| Function Tool received context | Yes |
+| Function Tool can update context | Yes |
+
+# MCP
+
+Presently, MCP is supported only via `HostedMCPTool`.
+
+| MCP Class | Supported |
+| --- | --- |
+| MCPServerStdio | No |
+| MCPServerSse | No |
+| MCPServerStreamableHttp | No |
+
+# Guardrails
+
+| Guardrail Type | Supported |
+| --- | --- |
+| Code | Yes |
+| Agent | Yes |
+
+# Sessions
+
+SQLite storage is not suited to a distributed environment.
+
+| Feature | Supported |
+| --- | --- | --- |
+| SQLiteSession | No |
+
+# Tracing
+
+| Tracing Provider | Supported | Notes |
+| --- | --- | --- |
+| OpenAI platform | Yes |  |
+
+Generating a comprehensive list of 3rd party tracing providers is out of scope.
+
+### Voice
+
+| Mode | Supported |
+| --- | --- |
+| Voice agents (pipelines) | No |
+| Realtime agents | No |
+
+## Utilities
+
+| Utility | Supported |
+| --- | --- | 
+| REPL | No |
+
+
+## Additional Examples
+
+You can find additional examples in the [Temporal Python Samples Repository](https://github.com/temporalio/samples-python/tree/main/openai_agents).
 
