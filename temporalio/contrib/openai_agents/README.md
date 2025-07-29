@@ -403,7 +403,8 @@ As described in [Tool Calling](#tool-calling), context propagation is read-only 
 
 ### MCP
 
-Presently, MCP is supported only via `HostedMCPTool`, which is implemented from within OpenAI.
+Presently, MCP is supported only via `HostedMCPTool`, which uses the OpenAI Responses API and cloud MCP client behind it.
+The OpenAI Agents SDK also supports MCP clients that run in application code, but this integration does not.
 
 | MCP Class              | Supported |
 |:-----------------------|:---------:|
