@@ -1,52 +1,32 @@
 # OpenAI Agents SDK Integration for Temporal
 
-⚠️ **Experimental** - This module is not yet stable and may change in the future.
-
-For questions, please join the [#python-sdk](https://temporalio.slack.com/archives/CTT84RS0P) Slack channel at [temporalio.slack.com](https://temporalio.slack.com/).
-
-## Building Crash-Proof AI Agents
-
-The challenge with AI agents is that they can crash and lose all their progress.
-If your agent is halfway through analyzing data, calling APIs, or having a conversation, a system failure means starting over from scratch.
-
-This integration combines [OpenAI Agents SDK](https://github.com/openai/openai-agents-python) with [Temporal's durable execution](https://docs.temporal.io/evaluate/understanding-temporal#durable-execution) to build agents that never lose their work and handle long-running, asynchronous, and human-in-the-loop workflows with ease.
+⚠️ **Public Preview** - The interface to this module is subject to change prior to General Availability. We welcome your questions and feedback in the [#python-sdk](https://temporalio.slack.com/archives/CTT84RS0P) Slack channel at [temporalio.slack.com](https://temporalio.slack.com/).
 
 
-```mermaid
-block-beta
-  columns 4
+## Introduction
 
-  Agents["Agents"]:1
-  Tools["Tools"]:1  
-  Guardrails["Guardrails"]:1
-  Tracing["Tracing"]:1
+This integration combines [OpenAI Agents SDK](https://github.com/openai/openai-agents-python) with [Temporal's durable execution](https://docs.temporal.io/evaluate/understanding-temporal#durable-execution).
+It allows you to build AI agents that never lose their progress and handle long-running, asynchronous, and human-in-the-loop workflows with ease.
 
-  AgentFramework["OpenAI Agents SDK"]:4
+Temporal provides a crash-proof system foundation, taking care of the distributed systems challenges inherent to production agentic systems.
+OpenAI Agents SDK offers a lightweight yet powerful framework for defining those agents.
+The combination lets you build reliable agentic systems quickly.
 
-  DurableExecution["Durable Execution: Temporal"]:2
-  AIInference["AI Inference: OpenAI and third-party models"]:2
-```
+This document is organized as follows:
+ - **[Hello World Agent](#hello-world-durable-agent).** Your first durable agent example.
+ - **[Background Concepts](#core-concepts).** Background on durable execution and AI agents.
+ - **[Complete Example](#complete-example)** Complete example.
+ - **Usage Guide.**
+ - **Agent Patterns.**
 
-## How the Architecture Works
-
-Understanding the architecture helps you build robust agent systems. Here are the key components:
+The [samples repository](https://github.com/temporalio/samples-python/tree/main/openai_agents) contains a number of examples spanning various use cases.
 
 
-**Temporal Server**: Keeps track of your agent's progress. Every decision, API call, and state change is recorded. If anything crashes, the server knows exactly where to resume. [Setup instructions](https://docs.temporal.io/dev-guide/python/foundations#run-a-temporal-service).
+## Hello World Durable Agent
 
-**Worker Process**: Runs your actual agent code. This can crash, restart, or even run on different machines. The server will send it work and track what gets completed.
+The code below shows how straightforward it is to wrap an agent wrapped in durable execution.
 
-**Temporal Client**: Starts and monitors your agents from your application code. It connects to the server to execute workflows.
-
-The key insight: If your worker crashes, the server remembers everything and restarts from the exact point of failure.
-
-## Your First Durable Agent
-
-An agent is an LLM with instructions that can use tools to accomplish tasks. Let's build one that survives crashes.
-
-This integration requires three files that separate concerns for reliability:
-
-### File 1: Workflow Definition (`hello_world_workflow.py`)
+### File 1: Durable Agent (`hello_world.py`)
 
 ```python
 from temporalio import workflow
@@ -56,20 +36,152 @@ from agents import Agent, Runner
 class HelloWorldAgent:
     @workflow.run
     async def run(self, prompt: str) -> str:
-        # An agent is an LLM with instructions and optional tools
         agent = Agent(
             name="Assistant",
-            instructions="You are a helpful assistant who responds in haikus.",
+            instructions="You only respond in haikus.",
         )
-        
-        # Runner executes the agent's conversation loop  
+
         result = await Runner.run(agent, input=prompt)
         return result.final_output
 ```
 
-### File 2: Worker Setup (`run_worker.py`)
+If you are familiar with Temporal and with Open AI Agents SDK, this code will look very familiar.
+We annotate the `HelloWorldAgent` class with `@workflow.defn` to define a workflow, then use the `@workflow.run` annotation to define the entrypoint.
+
+We use the `Agent` class to define a simple agent, instructing it to always responds with haikus.
+Within the workflow, we start the agent using the `Runner`, as is typical, passing through `prompt` as an argument.
+
+We will [complete this example below](#complete-example).
+However, before digging further into the code, it we will share some more background to set the stage.
+
+## Background Concepts
+
+We encourage you to form a thorough understanding of AI agents and durable execution with Temporal.
+Understanding this will make it easer to design and build durable agents.
+If you are well versed in these topics, you may skim this section or skip ahead.
+
+### AI Agents
+
+In the OpenAI Agents SDK, an agent is an AI model configured with instructions, tools, MCP servers, guardrails, handoffs, context, and more.
+
+We describe each of these briefly:
+
+- *AI model*. An LLM such as OpenAI's GPT, Google's Gemini, or one of many others.
+- *Instructions*. Also known as a system prompt, the instructions contain the initial input to the model, which configures it for the job it will do.
+- *Tools*. Typically, Python functions that the model may choose to invoke. Tools are functions with text-descriptions that explain their functionality to the model.
+- *MCP servers*. Best known for providing tools, MCP offers a pluggable standard for interoperability, including file-like resources, prompt templates, and human approvals. MCP servers may be accessed over the network or run in a local process.
+- *Guardrails*. Checks on the input or the output of an agent to ensure compliance or safety. Guardrails may be implemented as regular code or as AI agents.
+- *Handoffs*. A handoff occurs when an agent delegates a task to another agent. During a handoff the conversation history remains the same, and passes to a new agent with its own model, instructions, tools.
+- *Context*. This is an overloaded term. Here, context refers to a framework object that is shared across tools and other code, but is not passed to the model.
+
+
+Now, let's look at how these pieces can fit together.
+In one popular pattern, the model receives user input, then performs reasoning to select a tool to call.
+The response from the tool is fed back into the model, which may perform additional tool calls, iterating until the task is complete.
+
+The diagram below illustrates this flow.
+
+```text
+           +-------------------+
+           |     User Input    |
+           +-------------------+
+                     |
+                     v
+          +---------------------+
+          |  Reasoning (Model)  |  <--+
+          +---------------------+     |
+                     |                |
+           (decides which action)     |
+                     v                |
+          +---------------------+     |
+          |       Action        |     |
+          | (e.g., use a Tool)  |     |
+          +---------------------+     |
+                     |                |
+                     v                |
+          +---------------------+     |
+          |     Observation     |     |
+          |    (Tool Output)    |     |
+          +---------------------+     |
+                     |                |
+                     +----------------+
+          (loop: uses new info to reason
+           again, until task is complete)
+```
+
+Even in a simple example like this, there are many places where something can go wrong.
+Tools call APIs that are sometimes down and models have rate limits, requiring retries.
+The longer the agent runs, the more costly it is to start the job over.
+In the next section, we turn to durable execution, which can handle such failures seamlessly.
+
+### Durable Execution
+
+In Temporal's durable execution implementation, a program that crashes or encounters an exception while interacting with a model or API will retry until it can successfully complete.
+
+Temporal relies heavily on a replay mechanism to recover from failures.
+As the program makes progress, Temporal saves key inputs and decisions, allowing a re-started program to pick up right where it left off.
+
+The key to making this work is to separate the applications repeatable (deterministic) and non-repeatable (non-deterministic) parts:
+
+1. Deterministic pieces, termed *workflows*, execute the same way if re-run with the same inputs.
+2. Non-deterministic pieces, termed *activities*, have no limitations—they may perform I/O and any other operations.
+
+In the AI agent described in the previous section, model and tool calls run in activities, and the control flow linking them together runs in the workflow.
+
+In more complex examples, the control flow may be described as *agent orchestration*.
+Agent orchestration runs within the Temporal workflow, while model calls and any tool calls involving I/O run in activities.
+
+The diagram below shows the overall architecture of an agentic application in Temporal.
+The Temporal Server is responsible to tracking program execution and making sure associated state is preserved reliably.
+Temporal Server manages data in encrypted form.
+All data processing occurs on the Worker, which runs the workflow and activities.
+
+
+```text
+            +---------------------+
+            |   Temporal Server   |      (Stores workflow state,
+            +---------------------+       schedules activities,
+                     ^                    persists progress)
+                     |
+        Save state,  |   Schedule Tasks,
+        progress,    |   load state on resume
+        timeouts     |
+                     |
++------------------------------------------------------+
+|                      Worker                          |
+|   +----------------------------------------------+   |
+|   |              Workflow Code                   |   |
+|   |       (Agent Orchestration Loop)             |   |
+|   +----------------------------------------------+   |
+|          |          |                |               |
+|          v          v                v               |
+|   +-----------+ +-----------+ +-------------+        |
+|   | Activity  | | Activity  | |  Activity   |        |
+|   | (Tool 1)  | | (Tool 2)  | | (Model API) |        |
+|   +-----------+ +-----------+ +-------------+        |
+|         |           |                |               |
++------------------------------------------------------+
+          |           |                |
+          v           v                v
+      [External APIs, services, databases, etc.]
+```
+
+
+See the [Temporal documentation](https://docs.temporal.io/evaluate/understanding-temporal#temporal-application-the-building-blocks) for more information.
+
+
+## Complete Example
+
+To make the [Hello World durable agent](#hello-world-durable-agent) available in Temporal, we need to create a worker program.
+To see it run, we also need a client to launch it.
+We show these files below.
+
+
+### File 2: Launch Worker (`run_worker.py`)
 
 ```python
+# File: run_worker.py
+
 import asyncio
 from datetime import timedelta
 
@@ -79,8 +191,9 @@ from temporalio.worker import Worker
 
 from hello_world_workflow import HelloWorldAgent
 
+
 async def worker_main():
-    # Configure Temporal client with OpenAI Agents integration
+    # Use the plugin to configure Temporal for use with OpenAI Agents SDK
     client = await Client.connect(
         "localhost:7233",
         plugins=[
@@ -92,28 +205,31 @@ async def worker_main():
         ],
     )
 
-    # Create worker that can execute HelloWorldAgent workflows
     worker = Worker(
         client,
         task_queue="my-task-queue",
         workflows=[HelloWorldAgent],
-        activities=[],  # Model activities are automatically registered by the plugin
     )
     await worker.run()
+
 
 if __name__ == "__main__":
     asyncio.run(worker_main())
 ```
 
-The `OpenAIAgentsPlugin` handles critical setup tasks:
-- Configures data serialization for OpenAI agent objects
-- Sets up tracing for agent interactions  
-- Automatically runs LLM calls as Temporal activities (you don't need to register these)
-- Manages the runtime needed for agents to work within Temporal workflows
+We use the `OpenAIAgentsPlugin` to configure Temporal for use with OpenAI Agents SDK.
+The plugin automatically handles several important setup tasks:
+- Ensures proper serialization by of Pydantic types
+- Propagates context for [OpenAI Agents tracing](https://openai.github.io/openai-agents-python/tracing/).
+- Registers an activity for invoking model calls with the Temporal worker.
+- Configures OpenAI Agents SDK to run model calls as Temporal activities.
+
 
 ### File 3: Client Execution (`run_hello_world_workflow.py`)
 
 ```python
+# File: run_hello_world_workflow.py
+
 import asyncio
 
 from temporalio.client import Client
@@ -123,17 +239,17 @@ from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 from hello_world_workflow import HelloWorldAgent
 
 async def main():
-    # Connect to Temporal server
+    # Create client connected to server at the given address
     client = await Client.connect(
         "localhost:7233",
         plugins=[OpenAIAgentsPlugin()],
     )
 
-    # Execute the agent workflow
+    # Execute a workflow
     result = await client.execute_workflow(
         HelloWorldAgent.run,
         "Tell me about recursion in programming.",
-        id="my-workflow-id",  # Use unique IDs in production
+        id="my-workflow-id",
         task_queue="my-task-queue",
         id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
     )
@@ -143,34 +259,19 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### Running Your Durable Agent
+This file is a standard Temporal launch script.
+We also configure the client with the `OpenAIAgentsPlugin` to ensure serialization is compatible with the worker.
 
-1. Start the Temporal server: `temporal server start-dev`
-2. Start the worker: `python run_worker.py`
-3. Execute the agent: `python run_hello_world_workflow.py`
 
-Try stopping the worker process during execution and restarting it. The agent will resume exactly where it left off.
+To run this example, see the detailed instructions in the [Temporal Python Samples Repository](https://github.com/temporalio/samples-python/tree/main/openai_agents).
 
-## Adding Tools That Can Fail and Retry
+## Using Temporal Activities as OpenAI Agents Tools
 
-Tools let agents interact with the world - calling APIs, accessing databases, reading files. In our integration, you have two patterns for tools:
+One of the powerful features of this integration is the ability to convert Temporal activities into OpenAI Agents tools using `activity_as_tool`.
+This allows your agent to leverage Temporal's durable execution for tool calls.
 
-### Function Tools (Simple, Run in Workflow)
-
-For simple computations that don't involve external calls:
-
-```python
-from agents import function_tool
-
-@function_tool
-def calculate_tip(bill: float, percentage: float) -> float:
-    """Calculate tip amount for a bill."""
-    return bill * (percentage / 100)
-```
-
-### Activity Tools (External Calls, Can Retry)
-
-For anything that might fail - API calls, database queries, file operations:
+In the example below, we apply the `@activity.defn` decorator to the `get_weather` function to create a Temporal activity.
+We then pass this through the `activity_as_tool` helper function to create an OpenAI Agents tool that is passed to the `Agent`.
 
 ```python
 from dataclasses import dataclass
@@ -187,14 +288,8 @@ class Weather:
 
 @activity.defn
 async def get_weather(city: str) -> Weather:
-    """Get weather data from external API."""
-    # This API call can fail and will retry automatically
-    # In a real implementation, you'd call an actual weather API
-    return Weather(
-        city=city, 
-        temperature_range="14-20C", 
-        conditions="Sunny with light wind"
-    )
+    """Get the weather for a given city."""
+    return Weather(city=city, temperature_range="14-20C", conditions="Sunny with wind.")
 
 @workflow.defn
 class WeatherAgent:
@@ -204,353 +299,89 @@ class WeatherAgent:
             name="Weather Assistant",
             instructions="You are a helpful weather agent.",
             tools=[
-                calculate_tip,  # Simple function tool
                 openai_agents.workflow.activity_as_tool(
                     get_weather, 
                     start_to_close_timeout=timedelta(seconds=10)
-                )  # Activity tool with retry capability
+                )
             ],
         )
-        result = await Runner.run(agent, input=question)
+        result = await Runner.run(starting_agent=agent, input=question)
         return result.final_output
 ```
 
-Don't forget to register activity tools in your worker:
+## Calling Tools Directly
 
-```python
-# In your worker file
-worker = Worker(
-    client,
-    task_queue="my-task-queue", 
-    workflows=[WeatherAgent],
-    activities=[get_weather],  # Register your activities
-)
-```
-
-### When to Use Each Pattern
-
-- **Function tools**: Math, string processing, simple logic that can't fail
-- **Activity tools**: API calls, database queries, file I/O, anything that might need retries
-
-Try crashing your worker during an API call. When it restarts, Temporal will retry the failed activity automatically.
-
-### Configuring Retry Policies
-
-You can customize how activities retry when they fail:
-
-```python
-from temporalio.common import RetryPolicy
-from datetime import timedelta
-
-@activity.defn
-async def unreliable_api_call(data: str) -> str:
-    """An API call that might fail and need retries."""
-    # Simulate an API that fails sometimes
-    import random
-    if random.random() < 0.3:  # 30% failure rate
-        raise Exception("API temporarily unavailable")
-    return f"Processed: {data}"
-
-# Use it with custom retry policy
-agent = Agent(
-    name="Resilient Agent",
-    tools=[
-        openai_agents.workflow.activity_as_tool(
-            unreliable_api_call,
-            start_to_close_timeout=timedelta(seconds=30),
-            retry_policy=RetryPolicy(
-                initial_interval=timedelta(seconds=1),
-                maximum_interval=timedelta(seconds=10),
-                maximum_attempts=5,
-                backoff_coefficient=2.0,
-            )
-        )
-    ],
-)
-```
-
-This configuration will:
-- Retry up to 5 times
-- Start with 1-second delays, doubling each time up to 10 seconds
-- Handle transient failures automatically while preserving all agent state
-
-## Conversations That Survive Crashes
-
-Agents need memory to have multi-turn conversations. Our integration uses `RunConfig` to maintain conversation state that survives any failure.
-
-```python
-from temporalio import workflow
-from agents import Agent, Runner, RunConfig
-
-@workflow.defn
-class ConversationAgent:
-    @workflow.run
-    async def run(self, messages: list[str]) -> str:
-        # RunConfig maintains conversation state across all interactions
-        config = RunConfig()
-        
-        agent = Agent(
-            name="Customer Support",
-            instructions="You are a helpful customer support agent. Remember the conversation context.",
-        )
-        
-        # Process each message while maintaining conversation history
-        result = None
-        for message in messages:
-            result = await Runner.run(agent, input=message, run_config=config)
-            # The conversation history is automatically preserved in config
-        
-        return result.final_output if result else "No messages processed"
-```
-
-Usage example:
-
-```python
-# Client code
-messages = [
-    "Hi, I'm having trouble with my order",
-    "My order number is 12345", 
-    "I need to change the shipping address"
-]
-
-import uuid
-
-result = await client.execute_workflow(
-    ConversationAgent.run,
-    messages,
-    id=f"customer-conversation-{uuid.uuid4()}",  # Use unique IDs in production
-    task_queue="my-task-queue",
-)
-```
-
-### Multi-Step Conversations with State
-
-For more complex scenarios where you need to build up conversation state over time:
-
-```python
-@workflow.defn
-class TravelPlanningAgent:
-    @workflow.run
-    async def run(self, destination: str, budget: str, interests: list[str]) -> str:
-        config = RunConfig()
-        
-        agent = Agent(
-            name="Travel Planner",
-            instructions="You are a travel planning expert. Build comprehensive itineraries.",
-            tools=[
-                openai_agents.workflow.activity_as_tool(search_flights),
-                openai_agents.workflow.activity_as_tool(find_hotels),
-                openai_agents.workflow.activity_as_tool(get_attractions),
-            ]
-        )
-        
-        # Step 1: Gather initial preferences
-        result = await Runner.run(
-            agent, 
-            input=f"I want to plan a trip to {destination} with a budget of {budget}",
-            run_config=config
-        )
-        
-        # Step 2: Refine based on interests
-        result = await Runner.run(
-            agent,
-            input=f"My interests include: {', '.join(interests)}. Please find specific recommendations.",
-            run_config=config
-        )
-        
-        # Step 3: Create final itinerary
-        result = await Runner.run(
-            agent,
-            input="Create a detailed day-by-day itinerary with all the information gathered.",
-            run_config=config
-        )
-        
-        return result.final_output
-```
-
-The key insight: All conversation history is automatically preserved, and if anything crashes during this multi-step process, it resumes from the exact step where it failed.
-
-### Production Workflow IDs
-
-In the examples above, we use simple workflow IDs like `"my-workflow-id"` for clarity. In production, you need unique IDs to avoid conflicts:
-
-```python
-import uuid
-from datetime import datetime
-
-# Option 1: UUID-based (most common)
-workflow_id = f"agent-conversation-{uuid.uuid4()}"
-
-# Option 2: Include timestamp and context
-workflow_id = f"customer-support-{customer_id}-{datetime.now().isoformat()}"
-
-# Option 3: Business-meaningful IDs
-workflow_id = f"travel-planning-{user_id}-{trip_date}"
-
-result = await client.execute_workflow(
-    MyAgentWorkflow.run,
-    "user input",
-    id=workflow_id,
-    task_queue="my-task-queue",
-)
-```
-
-Choose IDs that help you identify and debug workflows later. Temporal uses these IDs for deduplication, so the same ID will return the existing workflow result if it's already running or completed.
-
-## Teams of Agents Working Together
-
-Complex tasks often need specialist agents working together. One agent can hand off work to another that's better suited for specific tasks.
-
-In Temporal workflows, we need to use factory functions to create agents (this ensures the workflow can recreate identical agents if it needs to recover from a crash):
+For simple computations that don't involve external calls you can call the tool directly from the workflow:
 
 ```python
 from temporalio import workflow
 from agents import Agent, Runner
+from agents import function_tool
 
-def create_customer_service_agents():
-    """Factory function to create agents for workflow determinism."""
-    
-    faq_agent = Agent(
-        name="FAQ Agent",
-        instructions="""You answer frequently asked questions about our company.
-        If you can't answer a question, transfer to the triage agent.""",
-        handoff_description="Handles frequently asked questions",
-    )
-    
-    billing_agent = Agent(
-        name="Billing Agent", 
-        instructions="""You help customers with billing issues, payment problems, and account questions.
-        If the issue is not billing-related, transfer to the triage agent.""",
-        handoff_description="Handles billing and payment issues",
-    )
-    
-    technical_agent = Agent(
-        name="Technical Support",
-        instructions="""You help customers with technical problems and troubleshooting.
-        If the issue is not technical, transfer to the triage agent.""",
-        handoff_description="Handles technical support issues",
-    )
-    
-    triage_agent = Agent(
-        name="Triage Agent",
-        instructions="""You are the main customer service agent. Analyze customer requests and 
-        transfer them to the appropriate specialist agent. Always be helpful and professional.""",
-        handoffs=[faq_agent, billing_agent, technical_agent],
-    )
-    
-    # Set up reverse handoffs so specialists can return to triage
-    faq_agent.handoffs = [triage_agent]
-    billing_agent.handoffs = [triage_agent] 
-    technical_agent.handoffs = [triage_agent]
-    
-    return triage_agent
+@function_tool
+def calculate_circle_area(radius: float) -> float:
+    """Calculate the area of a circle given its radius."""
+    import math
+    return math.pi * radius ** 2
 
 @workflow.defn
-class CustomerServiceWorkflow:
+class MathAssistantAgent:
     @workflow.run
-    async def run(self, customer_message: str, customer_context: dict = None) -> str:
-        # Create fresh agents for this workflow execution
-        starting_agent = create_customer_service_agents()
-        
-        # Process the customer request
-        result = await Runner.run(
-            agent=starting_agent,
-            input=customer_message,
-            context=customer_context or {}
+    async def run(self, message: str) -> str:
+        agent = Agent(
+            name="Math Assistant",
+            instructions="You are a helpful math assistant. Use the available tools to help with calculations.",
+            tools=[calculate_circle_area],
         )
-        
+        result = await Runner.run(agent, input=message)
         return result.final_output
 ```
 
-### Agent Context Sharing
+Note that any tools designed to run in the workflow must respect the workflow execution restrictions, meaning no I/O or non-deterministic operations.
+Of course, you can always invoke an activity from the workflow if needed.
 
-Agents can share context information across handoffs:
+
+## Agent Handoffs
+
+The OpenAI Agents SDK supports agent handoffs, where one agent transfers control of execution to another agent.
+In this example, one Temporal workflow wraps the multi-agent system:
 
 ```python
-from pydantic import BaseModel
-
-class CustomerContext(BaseModel):
-    customer_id: str = None
-    order_number: str = None
-    issue_type: str = None
-    priority: str = "normal"
-
 @workflow.defn
-class AdvancedCustomerService:
-    @workflow.run
-    async def run(self, message: str, customer_id: str) -> str:
-        # Initialize shared context
-        context = CustomerContext(customer_id=customer_id)
-        
-        starting_agent = create_customer_service_agents()
-        
-        result = await Runner.run(
-            agent=starting_agent,
-            input=message,
-            context=context
+class CustomerServiceWorkflow:
+    def __init__(self):
+        self.current_agent = self.init_agents()
+
+    def init_agents(self):
+        faq_agent = Agent(
+            name="FAQ Agent",
+            instructions="Answer frequently asked questions",
         )
         
+        booking_agent = Agent(
+            name="Booking Agent", 
+            instructions="Help with booking and seat changes",
+        )
+        
+        triage_agent = Agent(
+            name="Triage Agent",
+            instructions="Route customers to the right agent",
+            handoffs=[faq_agent, booking_agent],
+        )
+        
+        return triage_agent
+
+    @workflow.run
+    async def run(self, customer_message: str) -> str:
+        result = await Runner.run(
+            starting_agent=self.current_agent,
+            input=customer_message,
+            context=self.context,
+        )
         return result.final_output
 ```
 
-Try crashing the worker during a handoff between agents. When it restarts, the conversation continues with the correct specialist agent, and all context is preserved.
-
-## Understanding the Trade-offs
-
-This integration gives you powerful capabilities, but it's important to understand what you gain and what you trade off.
-
-### What You Gain
-
-**Complete crash-proof execution**: Your agents will finish their work no matter what fails. Process crashes, network issues, server restarts - none of these affect your agent's ability to complete its task.
-
-**Automatic retries**: Failed API calls, database timeouts, and other transient errors are automatically retried with configurable backoff strategies.
-
-**Perfect observability**: Every decision your agent makes is recorded. You can see the complete history of what happened, when, and why.
-
-**Horizontal scaling**: Run multiple worker processes across different machines. Temporal automatically distributes the work.
-
-**State management**: Conversation history, context, and agent state are automatically preserved and managed.
-
-### Current Limitations
-
-**No real-time streaming**: At this point in time, streaming operations like `Runner.run_streamed()` are not supported. Agents complete their full response before returning results. This limitation may be addressed in future versions.
-
-**No interactive input during execution**: You can't prompt for user input in the middle of a workflow. Design your workflows to take all necessary input as parameters upfront.
-
-**Slightly more complex setup**: Instead of a single script, you need three files (workflow, worker, client) and a running Temporal server.
-
-### When to Use This Integration
-
-**Ideal for:**
-- Long-running agent workflows that can't afford to lose progress
-- Production systems requiring high reliability
-- Multi-step agent processes with external API calls
-- Systems needing audit trails and observability
-- Applications that need to scale across multiple workers
-
-**Consider alternatives for:**
-- Simple, single-shot agent requests
-- Real-time interactive applications requiring streaming
-- Development/prototyping where setup complexity outweighs benefits
-- Applications that require immediate responses without any latency
-
-## Production Considerations
-
-For production deployments, see the [Temporal production deployment guide](https://docs.temporal.io/production-deployment) for information about:
-
-- High availability setup
-- Monitoring and alerting
-- Security configuration  
-- Performance tuning
-- Scaling strategies
 
 ## Additional Examples
 
-You can find more comprehensive examples in the [Temporal Python Samples Repository](https://github.com/temporalio/samples-python/tree/main/openai_agents), including:
-
-- **Basic Examples**: Simple agent workflows and tool usage
-- **Multi-Agent Systems**: Complex handoff patterns and orchestration
-- **Advanced Patterns**: State management, error handling, and scaling
-- **Real-World Use Cases**: Customer service, data analysis, and workflow automation
-
-Each example demonstrates different aspects of building production-ready AI agents with durable execution.
+You can find additional examples in the [Temporal Python Samples Repository](https://github.com/temporalio/samples-python/tree/main/openai_agents).
