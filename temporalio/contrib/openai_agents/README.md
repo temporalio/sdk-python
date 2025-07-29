@@ -86,8 +86,7 @@ import asyncio
 from datetime import timedelta
 
 from temporalio.client import Client
-from temporalio.contrib.openai_agents import ModelActivity, ModelActivityParameters, set_open_ai_agent_temporal_overrides
-from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
 from temporalio.worker import Worker
 
 from hello_world_workflow import HelloWorldAgent
@@ -96,24 +95,24 @@ from hello_world_workflow import HelloWorldAgent
 async def worker_main():
     # Configure the OpenAI Agents SDK to use Temporal activities for LLM API calls
     # and for tool calls.
-    model_params = ModelActivityParameters(
-        start_to_close_timeout=timedelta(seconds=10)
+    # Create a Temporal client connected to server at the given address
+    client = await Client.connect(
+        "localhost:7233",
+        plugins=[
+            OpenAIAgentsPlugin(
+                model_params=ModelActivityParameters(
+                    start_to_close_timeout=timedelta(seconds=10)
+                )
+            )
+        ]
     )
-    with set_open_ai_agent_temporal_overrides(model_params):
-        # Create a Temporal client connected to server at the given address
-        # Use the OpenAI data converter to ensure proper serialization/deserialization
-        client = await Client.connect(
-            "localhost:7233",
-            data_converter=pydantic_data_converter,
-        )
 
-        worker = Worker(
-            client,
-            task_queue="my-task-queue",
-            workflows=[HelloWorldAgent],
-            activities=[ModelActivity().invoke_model_activity],
-        )
-        await worker.run()
+    worker = Worker(
+        client,
+        task_queue="my-task-queue",
+        workflows=[HelloWorldAgent],
+    )
+    await worker.run()
 
 
 if __name__ == "__main__":
@@ -134,7 +133,7 @@ import asyncio
 
 from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
-from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
 from hello_world_workflow import HelloWorldAgent
 
@@ -142,7 +141,7 @@ async def main():
     # Create client connected to server at the given address
     client = await Client.connect(
         "localhost:7233",
-        data_converter=pydantic_data_converter,
+        plugins=[OpenAIAgentsPlugin()]
     )
 
     # Execute a workflow
