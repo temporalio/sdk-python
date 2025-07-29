@@ -367,6 +367,8 @@ Certain tools are not suitable for a distributed computing environment, so these
 
 ### Model Response format
 
+This integration does not presently support streaming.
+
 | Model Response | Supported |
 | --- | --- |
 | Get Response | Yes |
@@ -377,7 +379,7 @@ Certain tools are not suitable for a distributed computing environment, so these
 
 #### Tool Type
 
-Tools that are not suited to a distributed setting are disabled
+`LocalShellTool` and `ComputerTool` are not suited to a distributed computing setting.
 
 | Tool Type | Supported |
 | --- | --- |
@@ -392,6 +394,8 @@ Tools that are not suited to a distributed setting are disabled
 
 #### Tool Context
 
+As described in [Tool Calling](#tool-calling), context propagation is read-only when Temporal activities are used as tools.
+
 | Context Propagation | Supported |
 | --- | --- |
 | Activity Tool receives copy of context | Yes |
@@ -401,7 +405,7 @@ Tools that are not suited to a distributed setting are disabled
 
 ### MCP
 
-Presently, MCP is supported only via `HostedMCPTool`.
+Presently, MCP is supported only via `HostedMCPTool`, which is implemented from within OpenAI.
 
 | MCP Class | Supported |
 | --- | --- |
@@ -421,14 +425,14 @@ Presently, MCP is supported only via `HostedMCPTool`.
 SQLite storage is not suited to a distributed environment.
 
 | Feature | Supported |
-| --- | --- | --- |
+| --- | --- |
 | SQLiteSession | No |
 
 ### Tracing
 
-| Tracing Provider | Supported | Notes |
-| --- | --- | --- |
-| OpenAI platform | Yes |  |
+| Tracing Provider | Supported |
+| --- | --- |
+| OpenAI platform | Yes |
 
 
 ### Voice 
@@ -440,9 +444,11 @@ SQLite storage is not suited to a distributed environment.
 
 ### Utilities
 
-| Utility | Supported | Notes |
-| --- | --- | --- |
-| REPL | No | Not applicable in distributed setting |
+The REPL utility is not suited to a distributed setting.
+
+| Utility | Supported |
+| --- | --- |
+| REPL | No |
 
 
 ## Additional Examples
