@@ -1,6 +1,6 @@
 [project]
 name = "temporalio"
-version = "1.14.1"
+version = "1.15.0"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.9"
@@ -11,7 +11,7 @@ keywords = [
     "workflow",
 ]
 dependencies = [
-    "nexus-rpc>=1.1.0",
+    "nexus-rpc==1.1.0",
     "protobuf>=3.20,<6",
     "python-dateutil>=2.8.2,<3 ; python_version < '3.11'",
     "types-protobuf>=3.20",
@@ -57,6 +57,7 @@ dev = [
     "pytest-cov>=6.1.1",
     "httpx>=0.28.1",
     "pytest-pretty>=1.3.0",
+    "openai-agents[litellm] >= 0.2.3,<0.3"
 ]
 
 [tool.poe.tasks]
@@ -230,6 +231,3 @@ exclude = [
 [tool.uv]
 # Prevent uv commands from building the package by default
 package = false
-
-[tool.uv.sources]
-nexus-rpc = { git = "https://github.com/nexus-rpc/sdk-python.git", rev = "35f574c711193a6e2560d3e6665732a5bb7ae92c" }

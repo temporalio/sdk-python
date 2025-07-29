@@ -123,7 +123,7 @@ def workflow_run_operation(
             return WorkflowRunOperationHandler(_start, input_type, output_type)
 
         method_name = get_callable_name(start)
-        nexusrpc.set_operation(
+        nexusrpc.set_operation_definition(
             operation_handler_factory,
             nexusrpc.Operation(
                 name=name or method_name,

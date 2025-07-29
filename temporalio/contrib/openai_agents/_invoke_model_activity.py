@@ -7,13 +7,16 @@ import enum
 import json
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, Union
 
 from agents import (
     AgentOutputSchemaBase,
+    CodeInterpreterTool,
     FileSearchTool,
     FunctionTool,
     Handoff,
+    HostedMCPTool,
+    ImageGenerationTool,
     ModelProvider,
     ModelResponse,
     ModelSettings,
@@ -25,13 +28,12 @@ from agents import (
     UserError,
     WebSearchTool,
 )
-from agents.models.multi_provider import MultiProvider
 from openai import (
     APIStatusError,
     AsyncOpenAI,
-    AuthenticationError,
-    PermissionDeniedError,
 )
+from openai.types.responses.tool_param import Mcp
+from pydantic_core import to_json
 from typing_extensions import Required, TypedDict
 
 from temporalio import activity
@@ -41,7 +43,9 @@ from temporalio.exceptions import ApplicationError
 
 @dataclass
 class HandoffInput:
-    """Data conversion friendly representation of a Handoff."""
+    """Data conversion friendly representation of a Handoff. Contains only the fields which are needed by the model
+    execution to determine what to handoff to, not the actual handoff invocation, which remains in the workflow context.
+    """
 
     tool_name: str
     tool_description: str
@@ -52,7 +56,9 @@ class HandoffInput:
 
 @dataclass
 class FunctionToolInput:
-    """Data conversion friendly representation of a FunctionTool."""
+    """Data conversion friendly representation of a FunctionTool. Contains only the fields which are needed by the model
+    execution to determine what tool to call, not the actual tool invocation, which remains in the workflow context.
+    """
 
     name: str
     description: str
@@ -60,7 +66,23 @@ class FunctionToolInput:
     strict_json_schema: bool = True
 
 
-ToolInput = Union[FunctionToolInput, FileSearchTool, WebSearchTool]
+@dataclass
+class HostedMCPToolInput:
+    """Data conversion friendly representation of a HostedMCPTool. Contains only the fields which are needed by the model
+    execution to determine what tool to call, not the actual tool invocation, which remains in the workflow context.
+    """
+
+    tool_config: Mcp
+
+
+ToolInput = Union[
+    FunctionToolInput,
+    FileSearchTool,
+    WebSearchTool,
+    ImageGenerationTool,
+    CodeInterpreterTool,
+    HostedMCPToolInput,
+]
 
 
 @dataclass
@@ -152,22 +174,31 @@ class ModelActivity:
 
         # workaround for https://github.com/pydantic/pydantic/issues/9541
         # ValidatorIterator returned
-        input_json = json.dumps(input["input"], default=str)
+        input_json = to_json(input["input"])
         input_input = json.loads(input_json)
 
         def make_tool(tool: ToolInput) -> Tool:
-            if isinstance(tool, FileSearchTool):
-                return cast(FileSearchTool, tool)
-            elif isinstance(tool, WebSearchTool):
-                return cast(WebSearchTool, tool)
+            if isinstance(
+                tool,
+                (
+                    FileSearchTool,
+                    WebSearchTool,
+                    ImageGenerationTool,
+                    CodeInterpreterTool,
+                ),
+            ):
+                return tool
+            elif isinstance(tool, HostedMCPToolInput):
+                return HostedMCPTool(
+                    tool_config=tool.tool_config,
+                )
             elif isinstance(tool, FunctionToolInput):
-                t = cast(FunctionToolInput, tool)
                 return FunctionTool(
-                    name=t.name,
-                    description=t.description,
-                    params_json_schema=t.params_json_schema,
+                    name=tool.name,
+                    description=tool.description,
+                    params_json_schema=tool.params_json_schema,
                     on_invoke_tool=empty_on_invoke_tool,
-                    strict_json_schema=t.strict_json_schema,
+                    strict_json_schema=tool.strict_json_schema,
                 )
             else:
                 raise UserError(f"Unknown tool type: {tool.name}")
