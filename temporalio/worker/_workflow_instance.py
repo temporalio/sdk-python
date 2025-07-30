@@ -2759,6 +2759,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         if self._input.retry_policy:
             self._input.retry_policy.apply_to_proto(v.retry_policy)
         if self._input.summary:
+            print("copying summary")
             command.user_metadata.summary.CopyFrom(
                 self._instance._payload_converter.to_payload(self._input.summary)
             )
