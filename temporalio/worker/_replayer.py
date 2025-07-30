@@ -7,7 +7,7 @@ import concurrent.futures
 import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type
+from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type, Union
 
 from typing_extensions import TypedDict
 
@@ -19,9 +19,11 @@ import temporalio.converter
 import temporalio.runtime
 import temporalio.workflow
 
+
 from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor
-from ._worker import load_default_build_id
+from ._worker import load_default_build_id, WorkerConfig
+from temporalio.client import ClientConfig
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
@@ -42,6 +44,7 @@ class Replayer:
         namespace: str = "ReplayNamespace",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[Interceptor] = [],
+        plugins: Sequence[Union[temporalio.worker.Plugin, temporalio.client.Plugin]] = [],
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
         workflow_failure_exception_types: Sequence[Type[BaseException]] = [],
@@ -62,8 +65,6 @@ class Replayer:
         will be shared across all replay calls and never explicitly shut down.
         Users are encouraged to provide their own if needing more control.
         """
-        if not workflows:
-            raise ValueError("At least one workflow must be specified")
         self._config = ReplayerConfig(
             workflows=list(workflows),
             workflow_task_executor=(
@@ -82,6 +83,24 @@ class Replayer:
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
             header_codec_behavior=header_codec_behavior,
         )
+        root_worker_plugin: temporalio.worker.Plugin = temporalio.worker._worker._RootPlugin()
+        root_client_plugin: temporalio.client.Plugin = temporalio.client._RootPlugin()
+        for plugin in reversed(plugins):
+            root_worker_plugin = plugin.init_worker_plugin(root_worker_plugin)
+            root_client_plugin = plugin.init_client_plugin(root_client_plugin)
+
+        # Allow plugins to configure shared configurations with worker
+        worker_config = WorkerConfig(**{k: v for k, v in self._config.items() if k in WorkerConfig.__annotations__})
+        worker_config = root_worker_plugin.configure_worker(worker_config)
+        self._config.update({k: v for k, v in worker_config.items() if k in ReplayerConfig.__annotations__})
+
+        # Allow plugins to configure shared configurations with client
+        client_config = ClientConfig(**{k: v for k, v in self._config.items() if k in ClientConfig.__annotations__})
+        client_config = root_client_plugin.configure_client(client_config)
+        self._config.update({k: v for k, v in client_config.items() if k in ReplayerConfig.__annotations__})
+
+        if not self._config["workflows"]:
+            raise ValueError("At least one workflow must be specified")
 
     def config(self) -> ReplayerConfig:
         """Config, as a dictionary, used to create this replayer.
