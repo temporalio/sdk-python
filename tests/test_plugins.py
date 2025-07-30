@@ -179,3 +179,20 @@ async def test_replay(client: Client) -> None:
     assert replayer.config()["data_converter"] == pydantic_data_converter
 
     await replayer.replay_workflow(await handle.fetch_history())
+
+    replayer = Replayer(
+        workflows=[HelloWorkflow],
+        plugins=[MyClientPlugin()]
+    )
+    replayer = Replayer(
+        workflows=[HelloWorkflow],
+        plugins=[MyWorkerPlugin()]
+    )
+    replayer = Replayer(
+        workflows=[HelloWorkflow],
+        plugins=[MyClientPlugin(), MyWorkerPlugin()]
+    )
+    replayer = Replayer(
+        workflows=[HelloWorkflow],
+        plugins=[MyWorkerPlugin(), MyClientPlugin(), MyCombinedPlugin()]
+    )

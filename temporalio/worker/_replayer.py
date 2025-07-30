@@ -83,18 +83,21 @@ class Replayer:
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
             header_codec_behavior=header_codec_behavior,
         )
-        root_worker_plugin: temporalio.worker.Plugin = temporalio.worker._worker._RootPlugin()
-        root_client_plugin: temporalio.client.Plugin = temporalio.client._RootPlugin()
-        for plugin in reversed(plugins):
-            root_worker_plugin = plugin.init_worker_plugin(root_worker_plugin)
-            root_client_plugin = plugin.init_client_plugin(root_client_plugin)
 
         # Allow plugins to configure shared configurations with worker
+        root_worker_plugin: temporalio.worker.Plugin = temporalio.worker._worker._RootPlugin()
+        for plugin in reversed([plugin for plugin in plugins if isinstance(plugin, temporalio.worker.Plugin)]):
+            root_worker_plugin = plugin.init_worker_plugin(root_worker_plugin)
+
         worker_config = WorkerConfig(**{k: v for k, v in self._config.items() if k in WorkerConfig.__annotations__})
         worker_config = root_worker_plugin.configure_worker(worker_config)
         self._config.update({k: v for k, v in worker_config.items() if k in ReplayerConfig.__annotations__})
 
         # Allow plugins to configure shared configurations with client
+        root_client_plugin: temporalio.client.Plugin = temporalio.client._RootPlugin()
+        for plugin in reversed([plugin for plugin in plugins if isinstance(plugin, temporalio.client.Plugin)]):
+            root_client_plugin = plugin.init_client_plugin(root_client_plugin)
+
         client_config = ClientConfig(**{k: v for k, v in self._config.items() if k in ClientConfig.__annotations__})
         client_config = root_client_plugin.configure_client(client_config)
         self._config.update({k: v for k, v in client_config.items() if k in ReplayerConfig.__annotations__})
