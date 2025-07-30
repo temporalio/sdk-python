@@ -253,7 +253,7 @@ class ClientConfigProfile:
 
     @staticmethod
     def load(
-        profile: str = "default",
+        profile: Optional[str] = None,
         *,
         config_source: Optional[DataSource] = None,
         disable_file: bool = False,
@@ -377,7 +377,7 @@ class ClientConfig:
 
     @staticmethod
     def load_client_connect_config(
-        profile: str = "default",
+        profile: Optional[str] = None,
         *,
         config_file: Optional[str] = None,
         disable_file: bool = False,
