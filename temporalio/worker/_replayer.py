@@ -7,7 +7,7 @@ import concurrent.futures
 import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type, Union
+from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type, Union, cast
 
 from typing_extensions import TypedDict
 
@@ -18,12 +18,11 @@ import temporalio.client
 import temporalio.converter
 import temporalio.runtime
 import temporalio.workflow
-
+from temporalio.client import ClientConfig
 
 from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor
-from ._worker import load_default_build_id, WorkerConfig
-from temporalio.client import ClientConfig
+from ._worker import WorkerConfig, load_default_build_id
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
@@ -44,7 +43,9 @@ class Replayer:
         namespace: str = "ReplayNamespace",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[Interceptor] = [],
-        plugins: Sequence[Union[temporalio.worker.Plugin, temporalio.client.Plugin]] = [],
+        plugins: Sequence[
+            Union[temporalio.worker.Plugin, temporalio.client.Plugin]
+        ] = [],
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
         workflow_failure_exception_types: Sequence[Type[BaseException]] = [],
@@ -86,21 +87,59 @@ class Replayer:
 
         # Allow plugins to configure shared configurations with worker
         root_worker_plugin: temporalio.worker.Plugin = temporalio.worker._worker._RootPlugin()
-        for plugin in reversed([plugin for plugin in plugins if isinstance(plugin, temporalio.worker.Plugin)]):
+        for plugin in reversed(
+            [
+                plugin
+                for plugin in plugins
+                if isinstance(plugin, temporalio.worker.Plugin)
+            ]
+        ):
             root_worker_plugin = plugin.init_worker_plugin(root_worker_plugin)
 
-        worker_config = WorkerConfig(**{k: v for k, v in self._config.items() if k in WorkerConfig.__annotations__})
+        worker_config = cast(
+            WorkerConfig,
+            {
+                k: v
+                for k, v in self._config.items()
+                if k in WorkerConfig.__annotations__
+            },
+        )
+
         worker_config = root_worker_plugin.configure_worker(worker_config)
-        self._config.update({k: v for k, v in worker_config.items() if k in ReplayerConfig.__annotations__})
+        self._config.update(
+            cast(ReplayerConfig, {
+                k: v
+                for k, v in worker_config.items()
+                if k in ReplayerConfig.__annotations__
+            })
+        )
 
         # Allow plugins to configure shared configurations with client
         root_client_plugin: temporalio.client.Plugin = temporalio.client._RootPlugin()
-        for plugin in reversed([plugin for plugin in plugins if isinstance(plugin, temporalio.client.Plugin)]):
-            root_client_plugin = plugin.init_client_plugin(root_client_plugin)
+        for client_plugin in reversed(
+            [
+                plugin
+                for plugin in plugins
+                if isinstance(plugin, temporalio.client.Plugin)
+            ]
+        ):
+            root_client_plugin = client_plugin.init_client_plugin(root_client_plugin)
 
-        client_config = ClientConfig(**{k: v for k, v in self._config.items() if k in ClientConfig.__annotations__})
+        client_config = cast(ClientConfig,
+            {
+                k: v
+                for k, v in self._config.items()
+                if k in ClientConfig.__annotations__
+            }
+        )
         client_config = root_client_plugin.configure_client(client_config)
-        self._config.update({k: v for k, v in client_config.items() if k in ReplayerConfig.__annotations__})
+        self._config.update(
+            cast(ReplayerConfig, {
+                k: v
+                for k, v in client_config.items()
+                if k in ReplayerConfig.__annotations__
+            })
+        )
 
         if not self._config["workflows"]:
             raise ValueError("At least one workflow must be specified")

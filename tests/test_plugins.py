@@ -11,11 +11,10 @@ from temporalio import workflow
 from temporalio.client import Client, ClientConfig, OutboundInterceptor
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import Worker, WorkerConfig
+from temporalio.worker import Replayer, Worker, WorkerConfig
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
-from tests.worker.test_worker import never_run_activity
-from temporalio.worker import Replayer
 from tests.helpers import new_worker
+from tests.worker.test_worker import never_run_activity
 
 
 class TestClientInterceptor(temporalio.client.Interceptor):
@@ -142,20 +141,23 @@ async def test_worker_sandbox_restrictions(client: Client) -> None:
         ).restrictions.passthrough_modules
     )
 
+
 class ReplayCheckPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
-        config["workflows"] = list(config["workflows"]) + [HelloWorkflow]
+        config["workflows"] = list(config.get("workflows") or []) + [HelloWorkflow]
         return super().configure_worker(config)
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         config["data_converter"] = pydantic_data_converter
         return super().configure_client(config)
 
+
 @workflow.defn
 class HelloWorkflow:
     @workflow.run
     async def run(self, name: str) -> str:
         return f"Hello, {name}!"
+
 
 async def test_replay(client: Client) -> None:
     plugin = ReplayCheckPlugin()
@@ -171,28 +173,18 @@ async def test_replay(client: Client) -> None:
             task_queue=worker.task_queue,
         )
         await handle.result()
-    replayer = Replayer(
-        workflows=[],
-        plugins=[plugin]
-    )
-    assert len(replayer.config()["workflows"])==1
-    assert replayer.config()["data_converter"] == pydantic_data_converter
+    replayer = Replayer(workflows=[], plugins=[plugin])
+    assert len(replayer.config().get("workflows") or []) == 1
+    assert replayer.config().get("data_converter") == pydantic_data_converter
 
     await replayer.replay_workflow(await handle.fetch_history())
 
+    replayer = Replayer(workflows=[HelloWorkflow], plugins=[MyClientPlugin()])
+    replayer = Replayer(workflows=[HelloWorkflow], plugins=[MyWorkerPlugin()])
     replayer = Replayer(
-        workflows=[HelloWorkflow],
-        plugins=[MyClientPlugin()]
+        workflows=[HelloWorkflow], plugins=[MyClientPlugin(), MyWorkerPlugin()]
     )
     replayer = Replayer(
         workflows=[HelloWorkflow],
-        plugins=[MyWorkerPlugin()]
-    )
-    replayer = Replayer(
-        workflows=[HelloWorkflow],
-        plugins=[MyClientPlugin(), MyWorkerPlugin()]
-    )
-    replayer = Replayer(
-        workflows=[HelloWorkflow],
-        plugins=[MyWorkerPlugin(), MyClientPlugin(), MyCombinedPlugin()]
+        plugins=[MyWorkerPlugin(), MyClientPlugin(), MyCombinedPlugin()],
     )
