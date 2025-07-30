@@ -11,7 +11,7 @@ from temporalio import workflow
 from temporalio.client import Client, ClientConfig, OutboundInterceptor
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import Replayer, Worker, WorkerConfig
+from temporalio.worker import Replayer, ReplayerConfig, Worker, WorkerConfig
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 from tests.helpers import new_worker
 from tests.worker.test_worker import never_run_activity
@@ -26,7 +26,7 @@ class TestClientInterceptor(temporalio.client.Interceptor):
         return super().intercept_client(next)
 
 
-class MyClientPlugin(temporalio.client.Plugin):
+class MyClientPlugin(temporalio.worker.ReplayerPlugin, temporalio.client.Plugin):
     def __init__(self):
         self.interceptor = TestClientInterceptor()
 
@@ -62,13 +62,15 @@ async def test_client_plugin(client: Client, env: WorkflowEnvironment):
     assert new_client.service_client.config.api_key == "replaced key"
 
 
-class MyCombinedPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
+class MyCombinedPlugin(
+    temporalio.worker.ReplayerPlugin, temporalio.client.Plugin, temporalio.worker.Plugin
+):
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         config["task_queue"] = "combined"
         return super().configure_worker(config)
 
 
-class MyWorkerPlugin(temporalio.worker.Plugin):
+class MyWorkerPlugin(temporalio.worker.ReplayerPlugin, temporalio.worker.Plugin):
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         config["task_queue"] = "replaced_queue"
         runner = config.get("workflow_runner")
@@ -142,7 +144,9 @@ async def test_worker_sandbox_restrictions(client: Client) -> None:
     )
 
 
-class ReplayCheckPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
+class ReplayCheckPlugin(
+    temporalio.worker.ReplayerPlugin, temporalio.client.Plugin, temporalio.worker.Plugin
+):
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         config["workflows"] = list(config.get("workflows") or []) + [HelloWorkflow]
         return super().configure_worker(config)

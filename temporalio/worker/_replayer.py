@@ -7,7 +7,7 @@ import concurrent.futures
 import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type, Union, cast
+from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type, cast
 
 from typing_extensions import TypedDict
 
@@ -18,7 +18,6 @@ import temporalio.client
 import temporalio.converter
 import temporalio.runtime
 import temporalio.workflow
-from temporalio.client import ClientConfig
 
 from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor
@@ -28,6 +27,88 @@ from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
 
 logger = logging.getLogger(__name__)
+
+
+class ReplayerPlugin:
+    """Base class for replayer plugins that can modify replayer configuration."""
+
+    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
+        """Configure the replayer.
+
+        Default implementation applies shared configuration from worker and client plugins.
+
+        Args:
+            config: The replayer configuration to modify.
+
+        Returns:
+            The modified replayer configuration.
+        """
+        # If this plugin is also a worker plugin, apply shared worker config
+        if isinstance(self, temporalio.worker.Plugin):
+            # Create a minimal worker config with shared fields
+            worker_config = cast(
+                WorkerConfig,
+                {
+                    "workflows": config["workflows"],
+                    "workflow_task_executor": config["workflow_task_executor"],
+                    "workflow_runner": config["workflow_runner"],
+                    "unsandboxed_workflow_runner": config[
+                        "unsandboxed_workflow_runner"
+                    ],
+                    "interceptors": config["interceptors"],
+                    "build_id": config["build_id"],
+                    "identity": config["identity"],
+                    "workflow_failure_exception_types": config[
+                        "workflow_failure_exception_types"
+                    ],
+                    "debug_mode": config["debug_mode"],
+                    "disable_safe_workflow_eviction": config[
+                        "disable_safe_workflow_eviction"
+                    ],
+                },
+            )
+
+            modified_worker_config = self.configure_worker(worker_config)
+            config["workflows"] = modified_worker_config["workflows"]
+            config["workflow_task_executor"] = modified_worker_config[
+                "workflow_task_executor"
+            ]
+            config["workflow_runner"] = modified_worker_config["workflow_runner"]
+            config["unsandboxed_workflow_runner"] = modified_worker_config[
+                "unsandboxed_workflow_runner"
+            ]
+            config["interceptors"] = modified_worker_config["interceptors"]
+            config["build_id"] = modified_worker_config["build_id"]
+            config["identity"] = modified_worker_config["identity"]
+            config["workflow_failure_exception_types"] = modified_worker_config[
+                "workflow_failure_exception_types"
+            ]
+            config["debug_mode"] = modified_worker_config["debug_mode"]
+            config["disable_safe_workflow_eviction"] = modified_worker_config[
+                "disable_safe_workflow_eviction"
+            ]
+
+        # If this plugin is also a client plugin, apply shared client config
+        if isinstance(self, temporalio.client.Plugin):
+            # Only include fields that exist in both ReplayerConfig and ClientConfig
+            # Note: interceptors are different types between client and worker, so excluded
+            client_config = cast(
+                temporalio.client.ClientConfig,
+                {
+                    "namespace": config["namespace"],
+                    "data_converter": config["data_converter"],
+                    "header_codec_behavior": config["header_codec_behavior"],
+                },
+            )
+
+            modified_client_config = self.configure_client(client_config)
+            config["namespace"] = modified_client_config["namespace"]
+            config["data_converter"] = modified_client_config["data_converter"]
+            config["header_codec_behavior"] = modified_client_config[
+                "header_codec_behavior"
+            ]
+
+        return config
 
 
 class Replayer:
@@ -43,9 +124,7 @@ class Replayer:
         namespace: str = "ReplayNamespace",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[Interceptor] = [],
-        plugins: Sequence[
-            Union[temporalio.worker.Plugin, temporalio.client.Plugin]
-        ] = [],
+        plugins: Sequence[ReplayerPlugin] = [],
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
         workflow_failure_exception_types: Sequence[Type[BaseException]] = [],
@@ -85,62 +164,35 @@ class Replayer:
             header_codec_behavior=header_codec_behavior,
         )
 
-        # Allow plugins to configure shared configurations with worker
-        root_worker_plugin: temporalio.worker.Plugin = temporalio.worker._worker._RootPlugin()
-        for plugin in reversed(
+        # Initialize all worker plugins
+        root_worker_plugin: temporalio.worker.Plugin = (
+            temporalio.worker._worker._RootPlugin()
+        )
+        for worker_plugin in reversed(
             [
-                plugin
+                cast(temporalio.worker.Plugin, plugin)
                 for plugin in plugins
                 if isinstance(plugin, temporalio.worker.Plugin)
             ]
         ):
-            root_worker_plugin = plugin.init_worker_plugin(root_worker_plugin)
+            root_worker_plugin = worker_plugin.init_worker_plugin(root_worker_plugin)
 
-        worker_config = cast(
-            WorkerConfig,
-            {
-                k: v
-                for k, v in self._config.items()
-                if k in WorkerConfig.__annotations__
-            },
-        )
-
-        worker_config = root_worker_plugin.configure_worker(worker_config)
-        self._config.update(
-            cast(ReplayerConfig, {
-                k: v
-                for k, v in worker_config.items()
-                if k in ReplayerConfig.__annotations__
-            })
-        )
-
-        # Allow plugins to configure shared configurations with client
+        # Initialize all client plugins
         root_client_plugin: temporalio.client.Plugin = temporalio.client._RootPlugin()
         for client_plugin in reversed(
             [
-                plugin
+                cast(temporalio.client.Plugin, plugin)
                 for plugin in plugins
                 if isinstance(plugin, temporalio.client.Plugin)
             ]
         ):
             root_client_plugin = client_plugin.init_client_plugin(root_client_plugin)
 
-        client_config = cast(ClientConfig,
-            {
-                k: v
-                for k, v in self._config.items()
-                if k in ClientConfig.__annotations__
-            }
-        )
-        client_config = root_client_plugin.configure_client(client_config)
-        self._config.update(
-            cast(ReplayerConfig, {
-                k: v
-                for k, v in client_config.items()
-                if k in ReplayerConfig.__annotations__
-            })
-        )
+        # Apply plugin configuration
+        for plugin in plugins:
+            self._config = plugin.configure_replayer(self._config)
 
+        # Validate workflows after plugin configuration
         if not self._config["workflows"]:
             raise ValueError("At least one workflow must be specified")
 
