@@ -2565,6 +2565,7 @@ class TypedConfigWorkflow:
         local_activity_config = workflow.LocalActivityConfig(
             retry_policy=retry_policy,
             schedule_to_close_timeout=timedelta(seconds=5),
+            summary="Summary",
         )
         result = await workflow.execute_local_activity(
             fail_until_attempt_activity, 2, **local_activity_config
