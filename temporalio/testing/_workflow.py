@@ -89,7 +89,7 @@ class WorkflowEnvironment:
         ip: str = "127.0.0.1",
         port: Optional[int] = None,
         download_dest_dir: Optional[str] = None,
-        ui: bool = False,
+        ui: bool = True,
         runtime: Optional[temporalio.runtime.Runtime] = None,
         search_attributes: Sequence[temporalio.common.SearchAttributeKey] = (),
         dev_server_existing_path: Optional[str] = None,

@@ -686,6 +686,7 @@ class _RunningWorkflow:
                 return
             deadlocked_thread_id = self.instance.get_thread_id()
             if deadlocked_thread_id:
+                print("🌈 _raise_in_thread: interrupting deadlock")
                 temporalio.bridge.runtime.Runtime._raise_in_thread(
                     deadlocked_thread_id, _InterruptDeadlockError
                 )
