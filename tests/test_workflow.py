@@ -1,6 +1,6 @@
 import inspect
 import itertools
-from typing import Sequence
+from typing import Any, Callable, Dict, Optional, Sequence, Set, Type, get_type_hints
 
 from temporalio import workflow
 from temporalio.common import RawValue, VersioningBehavior
@@ -469,3 +469,106 @@ def test_workflow_update_validator_not_update():
         "Update validator method my_validator parameters do not match update method my_update parameters"
         in str(err.value)
     )
+
+
+def _assert_config_function_parity(
+    function_obj: Callable[..., Any],
+    config_class: Type[Any],
+    excluded_params: Set[str],
+) -> None:
+    function_name = function_obj.__name__
+    config_name = config_class.__name__
+
+    # Get the signature and type hints
+    function_sig = inspect.signature(function_obj)
+    config_hints = get_type_hints(config_class)
+
+    # Get parameter names from function (excluding excluded ones and applying mappings)
+    expected_config_params = set(
+        [name for name in function_sig.parameters.keys() if name not in excluded_params]
+    )
+
+    # Get parameter names from config
+    actual_config_params = set(
+        [name for name in config_hints.keys() if name not in excluded_params]
+    )
+
+    # Check for missing and extra parameters
+    missing_in_config = expected_config_params - actual_config_params
+    extra_in_config = actual_config_params - expected_config_params
+
+    # Build detailed error message if there are mismatches
+    if missing_in_config or extra_in_config:
+        error_parts = []
+        if missing_in_config:
+            error_parts.append(
+                f"{config_name} is missing parameters: {sorted(missing_in_config)}"
+            )
+        if extra_in_config:
+            error_parts.append(
+                f"{config_name} has extra parameters: {sorted(extra_in_config)}"
+            )
+
+        error_message = "; ".join(error_parts)
+        error_message += f"\nExpected: {sorted(expected_config_params)}\nActual: {sorted(actual_config_params)}"
+        assert False, error_message
+
+
+async def test_activity_config_parity_with_execute_activity():
+    """Test that ActivityConfig has all the same parameters as execute_activity."""
+    _assert_config_function_parity(
+        workflow.execute_activity,
+        workflow.ActivityConfig,
+        excluded_params={"activity", "arg", "args", "result_type"},
+    )
+
+    with pytest.raises(workflow._NotInWorkflowEventLoopError):
+        await workflow.execute_activity("activity", **workflow.ActivityConfig())
+
+
+def test_activity_config_parity_with_start_activity():
+    """Test that ActivityConfig has all the same parameters as start_activity."""
+    _assert_config_function_parity(
+        workflow.start_activity,
+        workflow.ActivityConfig,
+        excluded_params={"activity", "arg", "args", "result_type"},
+    )
+
+    with pytest.raises(workflow._NotInWorkflowEventLoopError):
+        workflow.start_activity("workflow", **workflow.ActivityConfig())
+
+
+async def test_child_workflow_config_parity_with_execute_child_workflow():
+    """Test that ChildWorkflowConfig has all the same parameters as execute_child_workflow."""
+    _assert_config_function_parity(
+        workflow.execute_child_workflow,
+        workflow.ChildWorkflowConfig,
+        excluded_params={"workflow", "arg", "args", "result_type", "summary"},
+    )
+
+    with pytest.raises(workflow._NotInWorkflowEventLoopError):
+        await workflow.execute_child_workflow(
+            "workflow", **workflow.ChildWorkflowConfig()
+        )
+
+
+async def test_child_workflow_config_parity_with_start_child_workflow():
+    """Test that ChildWorkflowConfig has all the same parameters as start_child_workflow."""
+    _assert_config_function_parity(
+        workflow.start_child_workflow,
+        workflow.ChildWorkflowConfig,
+        excluded_params={
+            "workflow",
+            "arg",
+            "args",
+            "result_type",
+            "summary",
+            "static_summary",
+            "static_details",
+        },
+    )
+
+    with pytest.raises(workflow._NotInWorkflowEventLoopError):
+        await workflow.start_child_workflow(
+            "workflow", **workflow.ChildWorkflowConfig()
+        )
