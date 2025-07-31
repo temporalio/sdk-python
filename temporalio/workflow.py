@@ -2043,6 +2043,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2061,6 +2062,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2080,6 +2082,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2099,6 +2102,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2118,6 +2122,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2137,6 +2142,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2158,6 +2164,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[Any]: ...
 
