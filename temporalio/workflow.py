@@ -2241,6 +2241,7 @@ def start_activity(
         activity_id=activity_id,
         versioning_intent=versioning_intent,
         summary=summary,
+        priority=priority,
     )
 
 
