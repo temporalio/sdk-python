@@ -5119,28 +5119,33 @@ ServiceT = TypeVar("ServiceT")
 
 
 class NexusOperationCancellationType(IntEnum):
-    """Defines behavior of the parent workflow when CancellationScope that wraps Nexus operation
-    is canceled. The result of the cancellation independently of the type is a
-    CanceledFailure thrown from the Nexus operation method. If the caller exits without waiting, the
-    cancellation request may not be delivered to the handler, regardless of indicated cancellation
-    type.
+    """Defines behavior of a Nexus operation when it is cancelled by the caller workflow.
+
+    Pass one of these values to :py:meth:`NexusClient.start_operation` to define cancellation
+    behavior.
+
+    To cancel the operation, use :py:meth:`NexusOperationHandle.cancel` and then `await` the
+    operation handle. This will result in a :py:class:`exceptions.NexusOperationError`. The values
+    of this enum define what is guaranteed to have happened by that point.
     """
 
     WAIT_COMPLETED = 0
-    """Wait for operation completion. Operation may or may not complete as cancelled. Default."""
+    """Wait for operation completion. This is the default. Note that the operation may not
+    complete as cancelled (for example, if it catches the :py:exc:`asyncio.CancelledError`
+    resulting from the cancellation request)."""
 
     ABANDON = 1
-    """Do not request cancellation of the operation."""
+    """Do not send any cancellation request to the operation."""
 
     TRY_CANCEL = 2
-    """Initiate a cancellation request and immediately report cancellation to the caller. Note that it
-    doesn't guarantee that cancellation is delivered to the operation handler if the caller exits
+    """Send a cancellation request but immediately report cancellation to the caller. Note that this
+    does not guarantee that cancellation is delivered to the operation handler if the caller exits
     before the delivery is done.
     """
 
     WAIT_REQUESTED = 3
     """Request cancellation of the operation and wait for confirmation that the request was received.
-    Doesn't wait for actual cancellation.
+    Does not wait for the operation to complete.
     """
 
 
