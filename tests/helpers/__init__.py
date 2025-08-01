@@ -7,7 +7,9 @@ from datetime import timedelta
 from typing import Any, Awaitable, Callable, Optional, Sequence, Type, TypeVar
 
 from temporalio.api.common.v1 import WorkflowExecution
+from temporalio.api.enums.v1 import EventType as EventType
 from temporalio.api.enums.v1 import IndexedValueType
+from temporalio.api.history.v1 import HistoryEvent
 from temporalio.api.operatorservice.v1 import (
     AddSearchAttributesRequest,
     ListSearchAttributesRequest,
@@ -287,3 +289,54 @@ async def unpause_and_assert(client: Client, handle: WorkflowHandle, activity_id
         return not info.paused
 
     await assert_eventually(check_unpaused)
+
+
+async def print_history(handle: WorkflowHandle):
+    i = 1
+    async for evt in handle.fetch_history_events():
+        event = EventType.Name(evt.event_type).removeprefix("EVENT_TYPE_")
+        print(f"{i:2}: {event}")
+        i += 1
+
+
+async def print_interleaved_histories(*handles: WorkflowHandle) -> None:
+    """
+    Print the interleaved history events from multiple workflow handles in columns,
+    with each workflow's events in its own column, sorted chronologically.
+    Each workflow's events are numbered independently.
+    """
+    # Collect all events from all handles with their sequence numbers
+    all_events: list[tuple[WorkflowHandle, HistoryEvent, int]] = []
+
+    for handle in handles:
+        event_num = 1
+        async for event in handle.fetch_history_events():
+            all_events.append((handle, event, event_num))
+            event_num += 1
+
+    # Sort by event time
+    all_events.sort(key=lambda item: item[1].event_time.ToDatetime())
+
+    # Prepare column headers
+    col_width = 40
+    headers = [handle.id for handle in handles]
+
+    # Print headers
+    print("\nInterleaved histories:")
+    print("-" * (col_width * len(handles) + len(handles) - 1))
+    print(" | ".join(f"{h[: col_width - 3]:<{col_width - 3}}" for h in headers))
+    print("-" * (col_width * len(handles) + len(handles) - 1))
+
+    # Print events
+    for handle, event, event_num in all_events:
+        event_type = EventType.Name(event.event_type).removeprefix("EVENT_TYPE_")
+
+        # Create row with empty cells
+        row = [""] * len(handles)
+
+        # Find which column this event belongs to
+        col_idx = handles.index(handle)
+        row[col_idx] = f"{event_num:2}: {event_type[: col_width - 5]}"
+
+        # Print the row
+        print(" | ".join(f"{cell:<{col_width - 3}}" for cell in row))

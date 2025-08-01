@@ -1,6 +1,7 @@
 import asyncio
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 import nexusrpc
@@ -8,6 +9,7 @@ import pytest
 
 from temporalio import exceptions, nexus, workflow
 from temporalio.api.enums.v1 import EventType
+from temporalio.api.history.v1 import HistoryEvent
 from temporalio.client import WorkflowExecutionStatus, WorkflowHandle
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
@@ -104,7 +106,8 @@ async def check_behavior_for_wait_cancellation_completed(
     handler_status = (await handler_wf_handle.describe()).status
     assert handler_status == WorkflowExecutionStatus.CANCELED
     assert await _has_event(
-        handler_wf_handle, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED
+        handler_wf_handle,
+        EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED,
     )
 
 
@@ -120,7 +123,8 @@ async def check_behavior_for_abandon(
     assert handler_status == WorkflowExecutionStatus.RUNNING
     await asyncio.sleep(0.5)
     assert not await _has_event(
-        handler_wf_handle, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED
+        handler_wf_handle,
+        EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED,
     )
 
 
@@ -133,7 +137,8 @@ async def check_behavior_for_wait_cancellation_requested(
     (is still running)
     """
     assert await _has_event(
-        handler_wf_handle, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED
+        handler_wf_handle,
+        EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED,
     )
     # TODO(nexus-preview) We should be able to assert that the workflow has not actually
     # been canceled yet.
@@ -233,6 +238,38 @@ async def _has_event(wf_handle: WorkflowHandle, event_type: EventType.ValueType)
         if e.event_type == event_type:
             return True
     return False
+
+
+async def _assert_event_sequence(
+    expected_events: list[tuple[WorkflowHandle, EventType.ValueType]],
+) -> None:
+    """
+    Given a sequence of (WorkflowHandle, EventType) pairs, assert that the sorted sequence of events
+    from both workflows contains that subsequence.
+    """
+
+    def _event_time(
+        item: tuple[WorkflowHandle, HistoryEvent],
+    ) -> datetime:
+        return item[1].event_time.ToDatetime()
+
+    all_events = []
+    handles = {h for h, _ in expected_events}
+    for h in handles:
+        async for e in h.fetch_history_events():
+            all_events.append((h, e))
+    _all_events = iter(sorted(all_events, key=_event_time))
+    _expected_events = iter(expected_events)
+
+    for expected_handle, expected_event_type in _expected_events:
+        assert next(
+            (
+                (h, e)
+                for h, e in _all_events
+                if h == expected_handle and e.event_type == expected_event_type
+            ),
+            None,
+        ), f"Expected but did not find event {expected_event_type} on {expected_handle}"
 
 
 async def _assert_has_event_eventually(
