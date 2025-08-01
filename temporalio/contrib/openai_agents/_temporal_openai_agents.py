@@ -1,6 +1,6 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
-from contextlib import contextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager
 from datetime import timedelta
 from typing import AsyncIterator, Callable, Optional, Union
 
@@ -41,7 +41,13 @@ from temporalio.contrib.pydantic import (
 from temporalio.converter import (
     DataConverter,
 )
-from temporalio.worker import Worker, WorkerConfig
+from temporalio.worker import (
+    Replayer,
+    ReplayerConfig,
+    Worker,
+    WorkerConfig,
+    WorkflowReplayResult,
+)
 
 
 @contextmanager
@@ -282,3 +288,23 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         """
         with set_open_ai_agent_temporal_overrides(self._model_params):
             await super().run_worker(worker)
+
+    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
+        """Configure the replayer for OpenAI Agents."""
+        config["interceptors"] = list(config.get("interceptors") or []) + [
+            OpenAIAgentsTracingInterceptor()
+        ]
+        config["data_converter"] = DataConverter(
+            payload_converter_class=_OpenAIPayloadConverter
+        )
+        return config
+
+    @asynccontextmanager
+    async def workflow_replay(
+        self,
+        replayer: Replayer,
+        histories: AsyncIterator[temporalio.client.WorkflowHistory],
+    ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
+        with set_open_ai_agent_temporal_overrides(self._model_params):
+            async with super().workflow_replay(replayer, histories) as results:
+                yield results
