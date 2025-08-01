@@ -9,10 +9,12 @@ import hashlib
 import logging
 import sys
 import warnings
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
     Any,
+    AsyncIterator,
     Awaitable,
     Callable,
     List,
@@ -36,6 +38,7 @@ from temporalio.common import (
     WorkerDeploymentVersion,
 )
 
+from . import Replayer, ReplayerConfig, WorkflowReplayResult
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
 from ._nexus import _NexusWorker
@@ -149,6 +152,25 @@ class Plugin(abc.ABC):
         """
         await self.next_worker_plugin.run_worker(worker)
 
+    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
+        """Hook called when creating a replayer to allow modification of configuration.
+
+        This should be used to configure anything in ReplayerConfig needed to make execution match
+        the original. This could include interceptors, DataConverter, workflows, and more.
+
+        Uniquely does not rely on a chain, and is instead called sequentially on the plugins
+        because the replayer cannot instantiate the worker/client component.
+        """
+        return config
+
+    def workflow_replay(
+        self,
+        replayer: Replayer,
+        histories: AsyncIterator[temporalio.client.WorkflowHistory],
+    ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
+        """Hook called when running a replayer to allow interception of execution."""
+        return self.next_worker_plugin.workflow_replay(replayer, histories)
+
 
 class _RootPlugin(Plugin):
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
@@ -156,6 +178,13 @@ class _RootPlugin(Plugin):
 
     async def run_worker(self, worker: Worker) -> None:
         await worker._run()
+
+    def workflow_replay(
+        self,
+        replayer: Replayer,
+        histories: AsyncIterator[temporalio.client.WorkflowHistory],
+    ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
+        return replayer._workflow_replay_iterator(histories)
 
 
 class Worker:

@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import logging
-from contextlib import asynccontextmanager
+import typing
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type, cast
+from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type
 
 from typing_extensions import TypedDict
 
@@ -21,7 +22,6 @@ import temporalio.workflow
 
 from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor
-from ._worker import WorkerConfig, load_default_build_id
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
@@ -29,86 +29,23 @@ from .workflow_sandbox import SandboxedWorkflowRunner
 logger = logging.getLogger(__name__)
 
 
-class ReplayerPlugin:
-    """Base class for replayer plugins that can modify replayer configuration."""
+class ReplayerConfig(TypedDict, total=False):
+    """TypedDict of config originally passed to :py:class:`Replayer`."""
 
-    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
-        """Configure the replayer.
-
-        Default implementation applies shared configuration from worker and client plugins.
-
-        Args:
-            config: The replayer configuration to modify.
-
-        Returns:
-            The modified replayer configuration.
-        """
-        # If this plugin is also a worker plugin, apply shared worker config
-        if isinstance(self, temporalio.worker.Plugin):
-            # Create a minimal worker config with shared fields
-            worker_config = cast(
-                WorkerConfig,
-                {
-                    "workflows": config["workflows"],
-                    "workflow_task_executor": config["workflow_task_executor"],
-                    "workflow_runner": config["workflow_runner"],
-                    "unsandboxed_workflow_runner": config[
-                        "unsandboxed_workflow_runner"
-                    ],
-                    "interceptors": config["interceptors"],
-                    "build_id": config["build_id"],
-                    "identity": config["identity"],
-                    "workflow_failure_exception_types": config[
-                        "workflow_failure_exception_types"
-                    ],
-                    "debug_mode": config["debug_mode"],
-                    "disable_safe_workflow_eviction": config[
-                        "disable_safe_workflow_eviction"
-                    ],
-                },
-            )
-
-            modified_worker_config = self.configure_worker(worker_config)
-            config["workflows"] = modified_worker_config["workflows"]
-            config["workflow_task_executor"] = modified_worker_config[
-                "workflow_task_executor"
-            ]
-            config["workflow_runner"] = modified_worker_config["workflow_runner"]
-            config["unsandboxed_workflow_runner"] = modified_worker_config[
-                "unsandboxed_workflow_runner"
-            ]
-            config["interceptors"] = modified_worker_config["interceptors"]
-            config["build_id"] = modified_worker_config["build_id"]
-            config["identity"] = modified_worker_config["identity"]
-            config["workflow_failure_exception_types"] = modified_worker_config[
-                "workflow_failure_exception_types"
-            ]
-            config["debug_mode"] = modified_worker_config["debug_mode"]
-            config["disable_safe_workflow_eviction"] = modified_worker_config[
-                "disable_safe_workflow_eviction"
-            ]
-
-        # If this plugin is also a client plugin, apply shared client config
-        if isinstance(self, temporalio.client.Plugin):
-            # Only include fields that exist in both ReplayerConfig and ClientConfig
-            # Note: interceptors are different types between client and worker, so excluded
-            client_config = cast(
-                temporalio.client.ClientConfig,
-                {
-                    "namespace": config["namespace"],
-                    "data_converter": config["data_converter"],
-                    "header_codec_behavior": config["header_codec_behavior"],
-                },
-            )
-
-            modified_client_config = self.configure_client(client_config)
-            config["namespace"] = modified_client_config["namespace"]
-            config["data_converter"] = modified_client_config["data_converter"]
-            config["header_codec_behavior"] = modified_client_config[
-                "header_codec_behavior"
-            ]
-
-        return config
+    workflows: Sequence[Type]
+    workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
+    workflow_runner: WorkflowRunner
+    unsandboxed_workflow_runner: WorkflowRunner
+    namespace: str
+    data_converter: temporalio.converter.DataConverter
+    interceptors: Sequence[Interceptor]
+    build_id: Optional[str]
+    identity: Optional[str]
+    workflow_failure_exception_types: Sequence[Type[BaseException]]
+    debug_mode: bool
+    runtime: Optional[temporalio.runtime.Runtime]
+    disable_safe_workflow_eviction: bool
+    header_codec_behavior: HeaderCodecBehavior
 
 
 class Replayer:
@@ -124,7 +61,7 @@ class Replayer:
         namespace: str = "ReplayNamespace",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[Interceptor] = [],
-        plugins: Sequence[ReplayerPlugin] = [],
+        plugins: Sequence[temporalio.worker.Plugin] = [],
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
         workflow_failure_exception_types: Sequence[Type[BaseException]] = [],
@@ -164,32 +101,16 @@ class Replayer:
             header_codec_behavior=header_codec_behavior,
         )
 
-        # Initialize all worker plugins
-        root_worker_plugin: temporalio.worker.Plugin = (
-            temporalio.worker._worker._RootPlugin()
-        )
-        for worker_plugin in reversed(
-            [
-                cast(temporalio.worker.Plugin, plugin)
-                for plugin in plugins
-                if isinstance(plugin, temporalio.worker.Plugin)
-            ]
-        ):
-            root_worker_plugin = worker_plugin.init_worker_plugin(root_worker_plugin)
+        from ._worker import _RootPlugin
 
-        # Initialize all client plugins
-        root_client_plugin: temporalio.client.Plugin = temporalio.client._RootPlugin()
-        for client_plugin in reversed(
-            [
-                cast(temporalio.client.Plugin, plugin)
-                for plugin in plugins
-                if isinstance(plugin, temporalio.client.Plugin)
-            ]
-        ):
-            root_client_plugin = client_plugin.init_client_plugin(root_client_plugin)
+        root_plugin: temporalio.worker.Plugin = _RootPlugin()
+        for plugin in reversed(plugins):
+            root_plugin = plugin.init_worker_plugin(root_plugin)
+        self._config = root_plugin.configure_replayer(self._config)
+        self._plugin = root_plugin
 
         # Apply plugin configuration
-        for plugin in plugins:
+        for plugin in reversed(plugins):
             self._config = plugin.configure_replayer(self._config)
 
         # Validate workflows after plugin configuration
@@ -262,10 +183,9 @@ class Replayer:
                     replay_failures[result.history.run_id] = result.replay_failure
             return WorkflowReplayResults(replay_failures=replay_failures)
 
-    @asynccontextmanager
-    async def workflow_replay_iterator(
+    def workflow_replay_iterator(
         self, histories: AsyncIterator[temporalio.client.WorkflowHistory]
-    ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
+    ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
         """Replay workflows for the given histories.
 
         This is a context manager for use via ``async with``. The value is an
@@ -278,6 +198,12 @@ class Replayer:
             An async iterator that returns replayed workflow results as they are
             replayed.
         """
+        return self._plugin.workflow_replay(self, histories)
+
+    @asynccontextmanager
+    async def _workflow_replay_iterator(
+        self, histories: AsyncIterator[temporalio.client.WorkflowHistory]
+    ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
         try:
             last_replay_failure: Optional[Exception]
             last_replay_complete = asyncio.Event()
@@ -337,6 +263,8 @@ class Replayer:
                 != HeaderCodecBehavior.NO_CODEC,
             )
             # Create bridge worker
+            from ._worker import load_default_build_id
+
             bridge_worker, pusher = temporalio.bridge.worker.Worker.for_replay(
                 runtime._core_runtime,
                 temporalio.bridge.worker.WorkerConfig(
@@ -438,25 +366,6 @@ class Replayer:
                     await bridge_worker.finalize_shutdown()
                 except Exception:
                     logger.warning("Failed to finalize shutdown", exc_info=True)
-
-
-class ReplayerConfig(TypedDict, total=False):
-    """TypedDict of config originally passed to :py:class:`Replayer`."""
-
-    workflows: Sequence[Type]
-    workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
-    workflow_runner: WorkflowRunner
-    unsandboxed_workflow_runner: WorkflowRunner
-    namespace: str
-    data_converter: temporalio.converter.DataConverter
-    interceptors: Sequence[Interceptor]
-    build_id: Optional[str]
-    identity: Optional[str]
-    workflow_failure_exception_types: Sequence[Type[BaseException]]
-    debug_mode: bool
-    runtime: Optional[temporalio.runtime.Runtime]
-    disable_safe_workflow_eviction: bool
-    header_codec_behavior: HeaderCodecBehavior
 
 
 @dataclass(frozen=True)

@@ -24,7 +24,6 @@ from ._interceptor import (
 from ._replayer import (
     Replayer,
     ReplayerConfig,
-    ReplayerPlugin,
     WorkflowReplayResult,
     WorkflowReplayResults,
 )
@@ -69,7 +68,6 @@ __all__ = [
     "WorkerDeploymentVersion",
     "Replayer",
     "ReplayerConfig",
-    "ReplayerPlugin",
     "WorkflowReplayResult",
     "WorkflowReplayResults",
     "PollerBehavior",

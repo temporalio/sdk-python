@@ -1,16 +1,15 @@
+from contextlib import (
+    AbstractAsyncContextManager,
+    AbstractContextManager,
+    asynccontextmanager,
+)
 from pathlib import Path
+from typing import AsyncGenerator
 
 import pytest
 
 from temporalio.client import WorkflowHistory
-from temporalio.contrib.openai_agents import ModelActivityParameters
-from temporalio.contrib.openai_agents._temporal_openai_agents import (
-    set_open_ai_agent_temporal_overrides,
-)
-from temporalio.contrib.openai_agents._trace_interceptor import (
-    OpenAIAgentsTracingInterceptor,
-)
-from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.contrib.openai_agents import ModelActivityParameters, OpenAIAgentsPlugin
 from temporalio.worker import Replayer
 from tests.contrib.openai_agents.test_openai import (
     AgentsAsToolsWorkflow,
@@ -39,17 +38,15 @@ async def test_replay(file_name: str) -> None:
     with (Path(__file__).with_name("histories") / file_name).open("r") as f:
         history_json = f.read()
 
-        with set_open_ai_agent_temporal_overrides(ModelActivityParameters()):
-            await Replayer(
-                workflows=[
-                    ResearchWorkflow,
-                    ToolsWorkflow,
-                    CustomerServiceWorkflow,
-                    AgentsAsToolsWorkflow,
-                    HelloWorldAgent,
-                    InputGuardrailWorkflow,
-                    OutputGuardrailWorkflow,
-                ],
-                data_converter=pydantic_data_converter,
-                interceptors=[OpenAIAgentsTracingInterceptor()],
-            ).replay_workflow(WorkflowHistory.from_json("fake", history_json))
+        await Replayer(
+            workflows=[
+                ResearchWorkflow,
+                ToolsWorkflow,
+                CustomerServiceWorkflow,
+                AgentsAsToolsWorkflow,
+                HelloWorldAgent,
+                InputGuardrailWorkflow,
+                OutputGuardrailWorkflow,
+            ],
+            plugins=[OpenAIAgentsPlugin()],
+        ).replay_workflow(WorkflowHistory.from_json("fake", history_json))

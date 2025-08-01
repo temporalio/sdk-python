@@ -26,7 +26,7 @@ class TestClientInterceptor(temporalio.client.Interceptor):
         return super().intercept_client(next)
 
 
-class MyClientPlugin(temporalio.worker.ReplayerPlugin, temporalio.client.Plugin):
+class MyClientPlugin(temporalio.client.Plugin):
     def __init__(self):
         self.interceptor = TestClientInterceptor()
 
@@ -62,15 +62,13 @@ async def test_client_plugin(client: Client, env: WorkflowEnvironment):
     assert new_client.service_client.config.api_key == "replaced key"
 
 
-class MyCombinedPlugin(
-    temporalio.worker.ReplayerPlugin, temporalio.client.Plugin, temporalio.worker.Plugin
-):
+class MyCombinedPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         config["task_queue"] = "combined"
         return super().configure_worker(config)
 
 
-class MyWorkerPlugin(temporalio.worker.ReplayerPlugin, temporalio.worker.Plugin):
+class MyWorkerPlugin(temporalio.worker.Plugin):
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         config["task_queue"] = "replaced_queue"
         runner = config.get("workflow_runner")
@@ -144,16 +142,19 @@ async def test_worker_sandbox_restrictions(client: Client) -> None:
     )
 
 
-class ReplayCheckPlugin(
-    temporalio.worker.ReplayerPlugin, temporalio.client.Plugin, temporalio.worker.Plugin
-):
+class ReplayCheckPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
+        config["data_converter"] = pydantic_data_converter
+        return super().configure_client(config)
+
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         config["workflows"] = list(config.get("workflows") or []) + [HelloWorkflow]
         return super().configure_worker(config)
 
-    def configure_client(self, config: ClientConfig) -> ClientConfig:
+    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
         config["data_converter"] = pydantic_data_converter
-        return super().configure_client(config)
+        config["workflows"] = list(config.get("workflows") or []) + [HelloWorkflow]
+        return config
 
 
 @workflow.defn
@@ -182,13 +183,3 @@ async def test_replay(client: Client) -> None:
     assert replayer.config().get("data_converter") == pydantic_data_converter
 
     await replayer.replay_workflow(await handle.fetch_history())
-
-    replayer = Replayer(workflows=[HelloWorkflow], plugins=[MyClientPlugin()])
-    replayer = Replayer(workflows=[HelloWorkflow], plugins=[MyWorkerPlugin()])
-    replayer = Replayer(
-        workflows=[HelloWorkflow], plugins=[MyClientPlugin(), MyWorkerPlugin()]
-    )
-    replayer = Replayer(
-        workflows=[HelloWorkflow],
-        plugins=[MyWorkerPlugin(), MyClientPlugin(), MyCombinedPlugin()],
-    )

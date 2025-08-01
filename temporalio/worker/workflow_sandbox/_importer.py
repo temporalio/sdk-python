@@ -285,6 +285,12 @@ class Importer:
     def _maybe_passthrough_module(self, name: str) -> Optional[types.ModuleType]:
         # If imports not passed through and all modules are not passed through
         # and name not in passthrough modules, check parents
+        logger.debug(
+            "Check passthrough module: %s - %s",
+            name,
+            temporalio.workflow.unsafe.is_imports_passed_through()
+            or self.module_configured_passthrough(name),
+        )
         if (
             not temporalio.workflow.unsafe.is_imports_passed_through()
             and not self.module_configured_passthrough(name)
