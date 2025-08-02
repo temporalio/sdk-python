@@ -276,7 +276,8 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         ]
         return super().configure_worker(config)
 
-    async def run_worker(self, worker: Worker) -> None:
+    @asynccontextmanager
+    async def run_worker(self) -> AsyncIterator[None]:
         """Run the worker with OpenAI agents temporal overrides.
 
         This method sets up the necessary runtime overrides for OpenAI agents
@@ -287,7 +288,8 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
             worker: The worker instance to run.
         """
         with set_open_ai_agent_temporal_overrides(self._model_params):
-            await super().run_worker(worker)
+            async with super().run_worker():
+                yield
 
     def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
         """Configure the replayer for OpenAI Agents."""

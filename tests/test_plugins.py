@@ -1,7 +1,9 @@
 import dataclasses
 import uuid
 import warnings
-from typing import cast
+from contextlib import asynccontextmanager
+from datetime import timedelta
+from typing import AsyncIterator, cast
 
 import pytest
 
@@ -68,6 +70,9 @@ class MyCombinedPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         return super().configure_worker(config)
 
 
+IN_CONTEXT: bool = False
+
+
 class MyWorkerPlugin(temporalio.worker.Plugin):
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         config["task_queue"] = "replaced_queue"
@@ -79,8 +84,15 @@ class MyWorkerPlugin(temporalio.worker.Plugin):
             )
         return super().configure_worker(config)
 
-    async def run_worker(self, worker: Worker) -> None:
-        await super().run_worker(worker)
+    @asynccontextmanager
+    async def run_worker(self) -> AsyncIterator[None]:
+        global IN_CONTEXT
+        try:
+            IN_CONTEXT = True
+            async with super().run_worker():
+                yield
+        finally:
+            IN_CONTEXT = False
 
 
 async def test_worker_plugin_basic_config(client: Client) -> None:
@@ -107,6 +119,30 @@ async def test_worker_plugin_basic_config(client: Client) -> None:
         plugins=[MyWorkerPlugin()],
     )
     assert worker.config().get("task_queue") == "replaced_queue"
+
+
+@workflow.defn(sandboxed=False)
+class CheckContextWorkflow:
+    @workflow.run
+    async def run(self) -> bool:
+        return IN_CONTEXT
+
+
+async def test_worker_plugin_run_context(client: Client) -> None:
+    async with Worker(
+        client,
+        task_queue=str(uuid.uuid4()),
+        workflows=[CheckContextWorkflow],
+        activities=[never_run_activity],
+        plugins=[MyWorkerPlugin()],
+    ) as worker:
+        result = await client.execute_workflow(
+            CheckContextWorkflow.run,
+            task_queue=worker.task_queue,
+            id=f"workflow-{uuid.uuid4()}",
+            execution_timeout=timedelta(seconds=1),
+        )
+        assert result
 
 
 async def test_worker_duplicated_plugin(client: Client) -> None:
