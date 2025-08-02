@@ -160,14 +160,6 @@ class Plugin(abc.ABC):
         """
         return config
 
-    def workflow_replay(
-        self,
-        replayer: Replayer,
-        histories: AsyncIterator[temporalio.client.WorkflowHistory],
-    ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
-        """Hook called when running a replayer to allow interception of execution."""
-        return self.next_worker_plugin.workflow_replay(replayer, histories)
-
 
 class _RootPlugin(Plugin):
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
@@ -176,13 +168,6 @@ class _RootPlugin(Plugin):
     @asynccontextmanager
     async def run_worker(self) -> AsyncIterator[None]:
         yield
-
-    def workflow_replay(
-        self,
-        replayer: Replayer,
-        histories: AsyncIterator[temporalio.client.WorkflowHistory],
-    ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
-        return replayer._workflow_replay_iterator(histories)
 
 
 class Worker:

@@ -300,13 +300,3 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
             payload_converter_class=_OpenAIPayloadConverter
         )
         return config
-
-    @asynccontextmanager
-    async def workflow_replay(
-        self,
-        replayer: Replayer,
-        histories: AsyncIterator[temporalio.client.WorkflowHistory],
-    ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
-        with set_open_ai_agent_temporal_overrides(self._model_params):
-            async with super().workflow_replay(replayer, histories) as results:
-                yield results
