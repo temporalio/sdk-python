@@ -1,6 +1,6 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
-from contextlib import contextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager
 from datetime import timedelta
 from typing import AsyncIterator, Callable, Optional, Union
 
@@ -41,7 +41,13 @@ from temporalio.contrib.pydantic import (
 from temporalio.converter import (
     DataConverter,
 )
-from temporalio.worker import Worker, WorkerConfig
+from temporalio.worker import (
+    Replayer,
+    ReplayerConfig,
+    Worker,
+    WorkerConfig,
+    WorkflowReplayResult,
+)
 
 
 @contextmanager
@@ -270,7 +276,8 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         ]
         return super().configure_worker(config)
 
-    async def run_worker(self, worker: Worker) -> None:
+    @asynccontextmanager
+    async def run_worker(self) -> AsyncIterator[None]:
         """Run the worker with OpenAI agents temporal overrides.
 
         This method sets up the necessary runtime overrides for OpenAI agents
@@ -281,4 +288,15 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
             worker: The worker instance to run.
         """
         with set_open_ai_agent_temporal_overrides(self._model_params):
-            await super().run_worker(worker)
+            async with super().run_worker():
+                yield
+
+    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
+        """Configure the replayer for OpenAI Agents."""
+        config["interceptors"] = list(config.get("interceptors") or []) + [
+            OpenAIAgentsTracingInterceptor()
+        ]
+        config["data_converter"] = DataConverter(
+            payload_converter_class=_OpenAIPayloadConverter
+        )
+        return config

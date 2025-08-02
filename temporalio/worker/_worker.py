@@ -9,10 +9,12 @@ import hashlib
 import logging
 import sys
 import warnings
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
     Any,
+    AsyncIterator,
     Awaitable,
     Callable,
     List,
@@ -36,6 +38,7 @@ from temporalio.common import (
     WorkerDeploymentVersion,
 )
 
+from . import Replayer, ReplayerConfig, WorkflowReplayResult
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
 from ._nexus import _NexusWorker
@@ -137,25 +140,34 @@ class Plugin(abc.ABC):
         """
         return self.next_worker_plugin.configure_worker(config)
 
-    async def run_worker(self, worker: Worker) -> None:
+    def run_worker(self) -> AbstractAsyncContextManager[None]:
         """Hook called when running a worker to allow interception of execution.
 
         This method is called when the worker is started and allows plugins to
         intercept or wrap the worker execution. Plugins can add monitoring,
         custom lifecycle management, or other execution-time behavior.
-
-        Args:
-            worker: The worker instance to run.
         """
-        await self.next_worker_plugin.run_worker(worker)
+        return self.next_worker_plugin.run_worker()
+
+    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
+        """Hook called when creating a replayer to allow modification of configuration.
+
+        This should be used to configure anything in ReplayerConfig needed to make execution match
+        the original. This could include interceptors, DataConverter, workflows, and more.
+
+        Uniquely does not rely on a chain, and is instead called sequentially on the plugins
+        because the replayer cannot instantiate the worker/client component.
+        """
+        return config
 
 
 class _RootPlugin(Plugin):
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         return config
 
-    async def run_worker(self, worker: Worker) -> None:
-        await worker._run()
+    @asynccontextmanager
+    async def run_worker(self) -> AsyncIterator[None]:
+        yield
 
 
 class Worker:
@@ -765,7 +777,8 @@ class Worker:
         also cancel the shutdown process. Therefore users are encouraged to use
         explicit shutdown instead.
         """
-        await self._plugin.run_worker(self)
+        async with self._plugin.run_worker():
+            await self._run()
 
     async def _run(self):
         # Eagerly validate which will do a namespace check in Core
