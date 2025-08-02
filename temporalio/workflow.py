@@ -5119,23 +5119,18 @@ ServiceT = TypeVar("ServiceT")
 
 
 class NexusOperationCancellationType(IntEnum):
-    """Defines behavior of a Nexus operation when it is cancelled by the caller workflow.
+    """Defines behavior of a Nexus operation when the caller workflow initiates cancellation.
 
     Pass one of these values to :py:meth:`NexusClient.start_operation` to define cancellation
     behavior.
 
-    To cancel the operation, use :py:meth:`NexusOperationHandle.cancel` and then `await` the
+    To initiate cancellation, use :py:meth:`NexusOperationHandle.cancel` and then `await` the
     operation handle. This will result in a :py:class:`exceptions.NexusOperationError`. The values
     of this enum define what is guaranteed to have happened by that point.
     """
 
-    WAIT_COMPLETED = 0
-    """Wait for operation completion. This is the default. Note that the operation may not
-    complete as cancelled (for example, if it catches the :py:exc:`asyncio.CancelledError`
-    resulting from the cancellation request)."""
-
     ABANDON = 1
-    """Do not send any cancellation request to the operation."""
+    """Do not send any cancellation request to the operation handler; just report cancellation to the caller"""
 
     TRY_CANCEL = 2
     """Send a cancellation request but immediately report cancellation to the caller. Note that this
@@ -5144,9 +5139,14 @@ class NexusOperationCancellationType(IntEnum):
     """
 
     WAIT_REQUESTED = 3
-    """Request cancellation of the operation and wait for confirmation that the request was received.
+    """Send a cancellation request and wait for confirmation that the request was received.
     Does not wait for the operation to complete.
     """
+
+    WAIT_COMPLETED = 0
+    """Send a cancellation request and wait for the operation to complete. This is the default.
+    Note that the operation may not complete as cancelled (for example, if it catches the
+    :py:exc:`asyncio.CancelledError` resulting from the cancellation request)."""
 
 
 class NexusClient(ABC, Generic[ServiceT]):
