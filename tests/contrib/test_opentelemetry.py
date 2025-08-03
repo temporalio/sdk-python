@@ -1,30 +1,34 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import logging
 import multiprocessing
-import trace
+import multiprocessing.managers
+import threading
 import typing
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 
-import concurrent.futures
 import opentelemetry.trace
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export import (
+    SimpleSpanProcessor,
+    SpanExporter,
+    SpanExportResult,
+)
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import get_tracer, get_current_span
+from opentelemetry.trace import get_current_span, get_tracer
 
 from temporalio import activity, workflow
-from temporalio.worker import SharedStateManager
 from temporalio.client import Client
 from temporalio.common import RetryPolicy
 from temporalio.contrib.opentelemetry import TracingInterceptor
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import UnsandboxedWorkflowRunner, Worker
+from temporalio.worker import SharedStateManager, UnsandboxedWorkflowRunner, Worker
 
 # Passing through because Python 3.9 has an import bug at
 # https://github.com/python/cpython/issues/91351
@@ -83,6 +87,58 @@ class TracingWorkflowActionContinueAsNew:
 
 
 ready_for_update: asyncio.Semaphore
+
+
+@dataclass(frozen=True)
+class SerialisableSpan:
+    @dataclass(frozen=True)
+    class SpanContext:
+        trace_id: int
+        span_id: int
+
+        @classmethod
+        def from_span_context(
+            cls, context: opentelemetry.trace.SpanContext
+        ) -> "SerialisableSpan.SpanContext":
+            return cls(
+                trace_id=context.trace_id,
+                span_id=context.span_id,
+            )
+
+        @classmethod
+        def from_optional_span_context(
+            cls, context: Optional[opentelemetry.trace.SpanContext]
+        ) -> Optional["SerialisableSpan.SpanContext"]:
+            if context is None:
+                return None
+            return cls.from_span_context(context)
+
+    @dataclass(frozen=True)
+    class Link:
+        context: SerialisableSpan.SpanContext
+        attributes: Dict[str, Any]
+
+    name: str
+    context: Optional[SpanContext]
+    parent: Optional[SpanContext]
+    attributes: Dict[str, Any]
+    links: Sequence[Link]
+
+    @classmethod
+    def from_readable_span(cls, span: ReadableSpan) -> "SerialisableSpan":
+        return cls(
+            name=span.name,
+            context=cls.SpanContext.from_optional_span_context(span.context),
+            parent=cls.SpanContext.from_optional_span_context(span.parent),
+            attributes=dict(span.attributes or {}),
+            links=tuple(
+                cls.Link(
+                    context=cls.SpanContext.from_span_context(link.context),
+                    attributes=dict(span.attributes or {}),
+                )
+                for link in span.links
+            ),
+        )
 
 
 @workflow.defn
@@ -306,7 +362,7 @@ async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
 
 
 def dump_spans(
-    spans: Iterable[ReadableSpan],
+    spans: Iterable[Union[ReadableSpan, SerialisableSpan]],
     *,
     parent_id: Optional[int] = None,
     with_attributes: bool = True,
@@ -325,7 +381,10 @@ def dump_spans(
                 span_links: List[str] = []
                 for link in span.links:
                     for link_span in spans:
-                        if link_span.context.span_id == link.context.span_id:
+                        if (
+                            link_span.context
+                            and link_span.context.span_id == link.context.span_id
+                        ):
                             span_links.append(link_span.name)
                 span_str += f" (links: {', '.join(span_links)})"
             # Signals can duplicate in rare situations, so we make sure not to
@@ -335,7 +394,7 @@ def dump_spans(
             ret.append(span_str)
             ret += dump_spans(
                 spans,
-                parent_id=span.context.span_id,
+                parent_id=(span.context.span_id if span.context else None),
                 with_attributes=with_attributes,
                 indent_depth=indent_depth + 1,
             )
@@ -408,18 +467,19 @@ class ActivityTracePropagationWorkflow:
         return await workflow.execute_activity(
             sync_activity,
             {},
-            start_to_close_timeout=timedelta(seconds=10),
+            # TODO: Reduce to 10s - increasing to make debugging easier
+            start_to_close_timeout=timedelta(minutes=10),
             retry_policy=retry_policy,
         )
 
 
 @activity.defn
 def sync_activity(param: typing.Any) -> str:
-    current_span = get_current_span()
-    is_recording = current_span.is_recording()
-    logging.debug("[sync_activity] Current span is recording: %s", is_recording)
-    # trace_context = get_current()
-    # logging.debug("Trace context:\n%s", "\n".join(trace_context))
+    """An activity that uses tracing features.
+
+    When executed in a process pool, we expect the trace context to be available
+    from the parent process.
+    """
     inner_tracer = get_tracer("sync_activity")
     with inner_tracer.start_as_current_span(
         "child_span",
@@ -431,8 +491,8 @@ async def test_activity_trace_propagation(
     client: Client,
     env: WorkflowEnvironment,
 ):
-    # TODO: test all kinds of workers (just to check we haven't broken others)
     # TODO: add spy interceptor to check `input.fn` wraps original metadata
+    # TODO: Add Resource to show how resource would be propagated
 
     # Create a tracer that has an in-memory exporter
     exporter = InMemorySpanExporter()
@@ -440,10 +500,14 @@ async def test_activity_trace_propagation(
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     tracer = get_tracer(__name__, tracer_provider=provider)
 
-    # def initializer() -> None:
-    opentelemetry.trace.set_tracer_provider(provider)
+    # Create a proxy list using the server process manager which we'll use
+    # to access finished spans in the process pool
+    manager = multiprocessing.Manager()
+    finished_spans_proxy = typing.cast(
+        multiprocessing.managers.ListProxy[SerialisableSpan], manager.list()
+    )
 
-    # Create a worker with an process pool activity executor
+    # Create a worker with a process pool activity executor
     async with Worker(
         client,
         task_queue=f"task_queue_{uuid.uuid4()}",
@@ -451,11 +515,11 @@ async def test_activity_trace_propagation(
         activities=[sync_activity],
         interceptors=[TracingInterceptor(tracer)],
         activity_executor=concurrent.futures.ProcessPoolExecutor(
-            max_workers=1  # , initializer=initializer
+            max_workers=1,
+            initializer=activity_trace_propagation_initializer,
+            initargs=(finished_spans_proxy,),
         ),
-        shared_state_manager=SharedStateManager.create_from_multiprocessing(
-            multiprocessing.Manager()
-        ),
+        shared_state_manager=SharedStateManager.create_from_multiprocessing(manager),
     ) as worker:
         assert "done" == await client.execute_workflow(
             ActivityTracePropagationWorkflow.run,
@@ -463,10 +527,59 @@ async def test_activity_trace_propagation(
             task_queue=worker.task_queue,
         )
 
-    # Expect the child span to be there
-    spans = exporter.get_finished_spans()
+    spans = exporter.get_finished_spans() + tuple(finished_spans_proxy)
     logging.debug("Spans:\n%s", "\n".join(dump_spans(spans, with_attributes=False)))
-    assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
+    assert dump_spans(spans, with_attributes=False) == [
         "RunActivity:sync_activity",
         "  child_span",
     ]
+
+
+class _ListProxySpanExporter(SpanExporter):
+    """Implementation of :class:`SpanExporter` that exports spans to a
+    list proxy created by a multiprocessing manager.
+
+    This class is used for testing multiprocessing setups, as we can get access
+    to the finished spans from the parent process.
+
+    In production, you would use `OTLPSpanExporter` or similar to export spans.
+    Tracing is designed to be distributed, the child process can push collected
+    spans directly to a collector or backend, which can reassemble the spans
+    into a single trace.
+    """
+
+    def __init__(
+        self, finished_spans: multiprocessing.managers.ListProxy[SerialisableSpan]
+    ) -> None:
+        self._finished_spans = finished_spans
+        self._stopped = False
+        self._lock = threading.Lock()
+
+    def export(self, spans: typing.Sequence[ReadableSpan]) -> SpanExportResult:
+        if self._stopped:
+            return SpanExportResult.FAILURE
+        with self._lock:
+            # Note: ReadableSpan is not picklable, so convert to a DTO
+            # Note: we could use `span.to_json()` but there isn't a `from_json`
+            # and the serialisation isn't easily reversible, e.g. `parent` context
+            # is lost, span/trace IDs are transformed into strings
+            self._finished_spans.extend(
+                [SerialisableSpan.from_readable_span(span) for span in spans]
+            )
+        return SpanExportResult.SUCCESS
+
+    def shutdown(self) -> None:
+        self._stopped = True
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return True
+
+
+def activity_trace_propagation_initializer(
+    _finished_spans_proxy: multiprocessing.managers.ListProxy[SerialisableSpan],
+) -> None:
+    """Initializer for the process pool worker to export spans to a shared list."""
+    _exporter = _ListProxySpanExporter(_finished_spans_proxy)
+    _provider = TracerProvider()
+    _provider.add_span_processor(SimpleSpanProcessor(_exporter))
+    opentelemetry.trace.set_tracer_provider(_provider)

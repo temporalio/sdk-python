@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from dataclasses import dataclass
+import concurrent.futures
 import dataclasses
 import functools
 import inspect
+from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import (
     Any,
     Callable,
@@ -20,7 +21,6 @@ from typing import (
     cast,
 )
 
-import concurrent.futures
 import opentelemetry.baggage.propagation
 import opentelemetry.context
 import opentelemetry.context.context
@@ -301,35 +301,44 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
             # ProcessPoolExecutor
             is_async = inspect.iscoroutinefunction(
                 input.fn
-            ) or inspect.iscoroutinefunction(input.fn.__call__)
+            ) or inspect.iscoroutinefunction(
+                input.fn.__call__  # type: ignore
+            )
             is_threadpool_executor = isinstance(
                 input.executor, concurrent.futures.ThreadPoolExecutor
             )
             if not (is_async or is_threadpool_executor):
-                carrier = {}
+                carrier: _CarrierDict = {}
                 default_text_map_propagator.inject(carrier)
                 input.fn = ActivityFnWithTraceContext(input.fn, carrier)
 
             return await super().execute_activity(input)
 
 
-# Note: the activity function must be picklable to pass to the ProcessPoolExecutor.
-# We wrap the original function to propagate the trace context as transparently
-# as possible (otherwise _ActivityInboundImpl would need to be modified to pass
-# trace context as an extra arg).
 @dataclasses.dataclass
 class ActivityFnWithTraceContext:
+    """Wraps an activity function to inject trace context from a carrier.
+
+    This wrapper is intended for sync activities executed in a process pool executor
+    to ensure tracing features like child spans, trace events, and log-correlation
+    works properly in the user's activity implementation.
+    """
+
     fn: Callable[..., Any]
-    context: _CarrierDict
+    carrier: _CarrierDict
 
     def __post_init__(self):
-        # Preserve the original function's metadata to support reflection.
-        # Downstream interceptors may inspect these attributes (__module__, __name__, etc.)
-        # e.g. SentryInterceptor in the Python Samples
+        """Post-initialization to ensure the function is wrapped correctly.
+
+        Ensures the original function's metadata is preserved for reflection.
+        Downstream interceptors that may inspect the function's attributes,
+        like `__module__`, `__name__`, etc. (e.g. the `SentryInterceptor`
+        in the Python Samples.)
+        """
         functools.wraps(self.fn)(self)
 
-    def __call__(self, *args: Any, **kwargs: Any):
-        trace_context = default_text_map_propagator.extract(self.context)
+    def __call__(self, *args: Any, **kwargs: Any):  # noqa: D102
+        trace_context = default_text_map_propagator.extract(self.carrier)
         token = opentelemetry.context.attach(trace_context)
         try:
             return self.fn(*args, **kwargs)
