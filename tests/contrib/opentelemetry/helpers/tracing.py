@@ -1,34 +1,18 @@
 from __future__ import annotations
 
-import asyncio
-import concurrent.futures
-import logging
 import multiprocessing
 import multiprocessing.managers
 import threading
 import typing
-import uuid
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 
 import opentelemetry.trace
-from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import (
-    SimpleSpanProcessor,
     SpanExporter,
     SpanExportResult,
 )
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import get_current_span, get_tracer
-
-from temporalio import activity, workflow
-from temporalio.client import Client
-from temporalio.common import RetryPolicy
-from temporalio.contrib.opentelemetry import TracingInterceptor
-from temporalio.contrib.opentelemetry import workflow as otel_workflow
-from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import SharedStateManager, UnsandboxedWorkflowRunner, Worker
 
 
 @dataclass(frozen=True)
@@ -85,14 +69,9 @@ class SerialisableSpan:
         )
 
 
-SerialisableSpanListProxy: typing.TypeAlias = multiprocessing.managers.ListProxy[
-    SerialisableSpan
-]
-
-
 def make_span_proxy_list(
     manager: multiprocessing.managers.SyncManager,
-) -> SerialisableSpanListProxy:
+) -> multiprocessing.managers.ListProxy[SerialisableSpan]:
     """Create a list proxy to share `SerialisableSpan` across processes."""
     return manager.list()
 
@@ -110,7 +89,9 @@ class _ListProxySpanExporter(SpanExporter):
     into a single trace.
     """
 
-    def __init__(self, finished_spans: SerialisableSpanListProxy) -> None:
+    def __init__(
+        self, finished_spans: multiprocessing.managers.ListProxy[SerialisableSpan]
+    ) -> None:
         self._finished_spans = finished_spans
         self._stopped = False
         self._lock = threading.Lock()

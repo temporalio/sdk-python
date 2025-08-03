@@ -26,12 +26,15 @@ from temporalio.contrib.opentelemetry import TracingInterceptor
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import SharedStateManager, UnsandboxedWorkflowRunner, Worker
+from tests.contrib.opentelemetry.helpers.reflection_interceptor import (
+    InterceptedActivity,
+    ReflectionInterceptor,
+)
 from tests.contrib.opentelemetry.helpers.tracing import (
     SerialisableSpan,
     _ListProxySpanExporter,
     dump_spans,
     make_span_proxy_list,
-    SerialisableSpanListProxy,
 )
 
 # Passing through because Python 3.9 has an import bug at
@@ -403,9 +406,6 @@ async def test_activity_trace_propagation(
     client: Client,
     env: WorkflowEnvironment,
 ):
-    # TODO: add spy interceptor to check `input.fn` wraps original metadata
-    # TODO: Add Resource to show how resource would be propagated
-
     # Create a tracer that has an in-memory exporter
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
@@ -417,13 +417,16 @@ async def test_activity_trace_propagation(
     manager = multiprocessing.Manager()
     finished_spans_proxy = make_span_proxy_list(manager)
 
+    # Create an interceptor to test we haven't broken reflection
+    reflection_interceptor = ReflectionInterceptor()
+
     # Create a worker with a process pool activity executor
     async with Worker(
         client,
         task_queue=f"task_queue_{uuid.uuid4()}",
         workflows=[ActivityTracePropagationWorkflow],
         activities=[sync_activity],
-        interceptors=[TracingInterceptor(tracer)],
+        interceptors=[TracingInterceptor(tracer), reflection_interceptor],
         activity_executor=concurrent.futures.ProcessPoolExecutor(
             max_workers=1,
             initializer=activity_trace_propagation_initializer,
@@ -437,6 +440,7 @@ async def test_activity_trace_propagation(
             task_queue=worker.task_queue,
         )
 
+    # The dumped spans should include child spans created in the child process
     spans = exporter.get_finished_spans() + tuple(finished_spans_proxy)
     logging.debug("Spans:\n%s", "\n".join(dump_spans(spans, with_attributes=False)))
     assert dump_spans(spans, with_attributes=False) == [
@@ -444,9 +448,21 @@ async def test_activity_trace_propagation(
         "  child_span",
     ]
 
+    # and the activity should still have the original attributes in downstream interceptors
+    assert reflection_interceptor.get_intercepted_activities() == [
+        InterceptedActivity(
+            class_name="ActivityFnWithTraceContext",
+            name="sync_activity",
+            qualname="sync_activity",
+            module="tests.contrib.test_opentelemetry",
+            docstring="An activity that uses tracing features.\n\nWhen executed in a process pool, we expect the trace context to be available\nfrom the parent process.\n",
+            annotations={"param": "typing.Any", "return": "str"},
+        )
+    ]
+
 
 def activity_trace_propagation_initializer(
-    _finished_spans_proxy: SerialisableSpanListProxy,
+    _finished_spans_proxy: multiprocessing.managers.ListProxy[SerialisableSpan],
 ) -> None:
     """Initializer for the process pool worker to export spans to a shared list."""
     _exporter = _ListProxySpanExporter(_finished_spans_proxy)
