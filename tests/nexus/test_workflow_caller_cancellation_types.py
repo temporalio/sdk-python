@@ -16,7 +16,6 @@ from temporalio.client import (
 )
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers import assert_eq_eventually, print_interleaved_histories
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 
@@ -93,9 +92,6 @@ async def check_behavior_for_abandon(
     Check that a cancellation request is not sent.
     """
     await asyncio.sleep(0.5)
-
-    await print_interleaved_histories(caller_wf, handler_wf)
-
     handler_status = (await handler_wf.describe()).status
     assert handler_status == WorkflowExecutionStatus.RUNNING
     await _assert_event_subsequence(
@@ -144,7 +140,6 @@ async def check_behavior_for_wait_cancellation_completed(
     """
     handler_status = (await handler_wf.describe()).status
     assert handler_status == WorkflowExecutionStatus.CANCELED
-    await print_interleaved_histories(caller_wf, handler_wf)
     await _assert_event_subsequence(
         [
             (caller_wf, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED),
@@ -258,9 +253,3 @@ async def _assert_event_subsequence(
             ),
             None,
         ), f"Expected {expected_event_type_name} in {expected_handle.id}"
-
-
-async def _assert_has_event_eventually(
-    wf_handle: WorkflowHandle, event_type: EventType.ValueType
-) -> None:
-    await assert_eq_eventually(True, lambda: _has_event(wf_handle, event_type))
