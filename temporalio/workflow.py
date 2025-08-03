@@ -5129,10 +5129,12 @@ class NexusOperationCancellationType(IntEnum):
     of this enum define what is guaranteed to have happened by that point.
     """
 
-    ABANDON = 1
+    ABANDON = int(temporalio.bridge.proto.nexus.NexusOperationCancellationType.ABANDON)
     """Do not send any cancellation request to the operation handler; just report cancellation to the caller"""
 
-    TRY_CANCEL = 2
+    TRY_CANCEL = int(
+        temporalio.bridge.proto.nexus.NexusOperationCancellationType.TRY_CANCEL
+    )
     """Send a cancellation request but immediately report cancellation to the caller. Note that this
     does not guarantee that cancellation is delivered to the operation handler if the caller exits
     before the delivery is done.
@@ -5141,13 +5143,17 @@ class NexusOperationCancellationType(IntEnum):
     # TODO(nexus-preview): core needs to be updated to handle
     # NexusOperationCancelRequestCompleted and NexusOperationCancelRequestFailed
     # see https://github.com/temporalio/sdk-core/issues/911
-    # WAIT_REQUESTED = 3
+    # WAIT_REQUESTED = int(
+    #     temporalio.bridge.proto.nexus.NexusOperationCancellationType.WAIT_CANCELLATION_REQUESTED
+    # )
     # """Send a cancellation request and wait for confirmation that the request was received.
     # Does not wait for the operation to complete.
     # """
 
-    WAIT_COMPLETED = 0
-    """Send a cancellation request and wait for the operation to complete. This is the default.
+    WAIT_COMPLETED = int(
+        temporalio.bridge.proto.nexus.NexusOperationCancellationType.WAIT_CANCELLATION_COMPLETED
+    )
+    """Send a cancellation request and wait for the operation to complete.
     Note that the operation may not complete as cancelled (for example, if it catches the
     :py:exc:`asyncio.CancelledError` resulting from the cancellation request)."""
 
