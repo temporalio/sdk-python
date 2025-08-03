@@ -5138,10 +5138,13 @@ class NexusOperationCancellationType(IntEnum):
     before the delivery is done.
     """
 
-    WAIT_REQUESTED = 3
-    """Send a cancellation request and wait for confirmation that the request was received.
-    Does not wait for the operation to complete.
-    """
+    # TODO(nexus-preview): core needs to be updated to handle
+    # NexusOperationCancelRequestCompleted and NexusOperationCancelRequestFailed
+    # see https://github.com/temporalio/sdk-core/issues/911
+    # WAIT_REQUESTED = 3
+    # """Send a cancellation request and wait for confirmation that the request was received.
+    # Does not wait for the operation to complete.
+    # """
 
     WAIT_COMPLETED = 0
     """Send a cancellation request and wait for the operation to complete. This is the default.

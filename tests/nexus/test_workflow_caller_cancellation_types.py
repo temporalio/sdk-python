@@ -25,16 +25,7 @@ from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 class HandlerWorkflow:
     @workflow.run
     async def run(self) -> None:
-        try:
-            await asyncio.Future()
-        except asyncio.CancelledError:
-            # TODO: this sleep is so that we can distinguish WAIT_REQUESTED from
-            # WAIT_COMPLETED. In the former case the caller workflow will see the
-            # CancelRequested event but the workflow will still be running, due to this
-            # sleep.
-            print("sleeping")
-            await asyncio.sleep(1.0)
-            raise
+        await asyncio.Future()
 
 
 @nexusrpc.service
@@ -139,31 +130,6 @@ async def check_behavior_for_try_cancel(
     # )
 
 
-async def check_behavior_for_wait_cancellation_requested(
-    caller_wf: WorkflowHandle,
-    handler_wf: WorkflowHandle,
-) -> None:
-    """
-    Check that backing workflow received a cancellation request but has not been canceled
-    (is still running)
-    """
-    # handler_status = (await handler_wf.describe()).status
-    # assert handler_status == WorkflowExecutionStatus.RUNNING
-    await print_interleaved_histories(caller_wf, handler_wf)
-    await _assert_event_sequence(
-        [
-            (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED),
-            (handler_wf, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED),
-        ]
-    )
-
-    # TODO(nexus-preview) We should be able to assert that the workflow has not actually
-    # been canceled yet.
-    # # Check that workflow is still running
-    # desc = await wf_handle.describe()
-    # assert desc.status == WorkflowExecutionStatus.RUNNING
-
-
 async def check_behavior_for_wait_cancellation_completed(
     caller_wf: WorkflowHandle,
     handler_wf: WorkflowHandle,
@@ -196,7 +162,6 @@ async def check_behavior_for_wait_cancellation_completed(
         workflow.NexusOperationCancellationType.ABANDON.name,
         workflow.NexusOperationCancellationType.TRY_CANCEL.name,
         workflow.NexusOperationCancellationType.WAIT_COMPLETED.name,
-        workflow.NexusOperationCancellationType.WAIT_REQUESTED.name,
     ],
 )
 async def test_cancellation_type(
@@ -247,11 +212,6 @@ async def test_cancellation_type(
             == workflow.NexusOperationCancellationType.TRY_CANCEL
         ):
             await check_behavior_for_try_cancel(caller_wf, handler_wf)
-        elif (
-            input.cancellation_type
-            == workflow.NexusOperationCancellationType.WAIT_REQUESTED
-        ):
-            await check_behavior_for_wait_cancellation_requested(caller_wf, handler_wf)
         elif input.cancellation_type in [
             None,
             workflow.NexusOperationCancellationType.WAIT_COMPLETED,
