@@ -390,11 +390,7 @@ class ActivityTracePropagationWorkflow:
 
 @activity.defn
 def sync_activity(param: typing.Any) -> str:
-    """An activity that uses tracing features.
-
-    When executed in a process pool, we expect the trace context to be available
-    from the parent process.
-    """
+    """An activity that uses tracing features."""
     inner_tracer = get_tracer("sync_activity")
     with inner_tracer.start_as_current_span(
         "child_span",
@@ -455,7 +451,7 @@ async def test_activity_trace_propagation(
             name="sync_activity",
             qualname="sync_activity",
             module="tests.contrib.test_opentelemetry",
-            docstring="An activity that uses tracing features.\n\nWhen executed in a process pool, we expect the trace context to be available\nfrom the parent process.\n",
+            docstring="An activity that uses tracing features.",
             annotations={"param": "typing.Any", "return": "str"},
         )
     ]
