@@ -134,7 +134,7 @@ def activity_as_tool(
             cancellation_type=cancellation_type,
             activity_id=activity_id,
             versioning_intent=versioning_intent,
-            summary=summary,
+            summary=summary or schema.description,
             priority=priority,
         )
         try:
@@ -240,4 +240,26 @@ def nexus_operation_as_tool(
 
 
 class ToolSerializationError(TemporalError):
-    """Error that occurs when a tool output could not be serialized."""
+    """Error that occurs when a tool output could not be serialized.
+
+    .. warning::
+        This exception is experimental and may change in future versions.
+        Use with caution in production environments.
+
+    This exception is raised when a tool (created from an activity or Nexus operation)
+    returns a value that cannot be properly serialized for use by the OpenAI agent.
+    All tool outputs must be convertible to strings for the agent to process them.
+
+    The error typically occurs when:
+    - A tool returns a complex object that doesn't have a meaningful string representation
+    - The returned object cannot be converted using str()
+    - Custom serialization is needed but not implemented
+
+    Example:
+        >>> @activity.defn
+        >>> def problematic_tool() -> ComplexObject:
+        ...     return ComplexObject()  # This might cause ToolSerializationError
+
+    To fix this error, ensure your tool returns string-convertible values or
+    modify the tool to return a string representation of the result.
+    """

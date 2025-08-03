@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import sys
 import uuid
 from datetime import timedelta
 from typing import Any, Awaitable, Callable, Optional, Sequence
 from urllib.request import urlopen
 
 import temporalio.api.enums.v1
+import temporalio.client
 import temporalio.worker._worker
 from temporalio import activity, workflow
 from temporalio.api.workflowservice.v1 import (
@@ -19,7 +19,11 @@ from temporalio.api.workflowservice.v1 import (
     SetWorkerDeploymentRampingVersionRequest,
     SetWorkerDeploymentRampingVersionResponse,
 )
-from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
+from temporalio.client import (
+    BuildIdOpAddNewDefault,
+    Client,
+    TaskReachabilityType,
+)
 from temporalio.common import PinnedVersioningOverride, RawValue, VersioningBehavior
 from temporalio.runtime import PrometheusConfig, Runtime, TelemetryConfig
 from temporalio.service import RPCError
@@ -38,6 +42,7 @@ from temporalio.worker import (
     SlotReleaseContext,
     SlotReserveContext,
     Worker,
+    WorkerConfig,
     WorkerDeploymentConfig,
     WorkerDeploymentVersion,
     WorkerTuner,
@@ -424,7 +429,7 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
                 self.seen_release_info_nonempty = True
             self.releases += 1
 
-        def reserve_asserts(self, ctx):
+        def reserve_asserts(self, ctx: SlotReserveContext) -> None:
             assert ctx.task_queue is not None
             assert ctx.worker_identity is not None
             assert ctx.worker_build_id is not None
@@ -811,7 +816,7 @@ class DynamicWorkflowVersioningOnConfigMethod:
 async def _test_worker_deployment_dynamic_workflow(
     client: Client,
     env: WorkflowEnvironment,
-    workflow_class,
+    workflow_class: type[Any],
     expected_versioning_behavior: temporalio.api.enums.v1.VersioningBehavior.ValueType,
 ):
     if env.supports_time_skipping:
@@ -1141,7 +1146,7 @@ class WorkerFailureInjector:
     def __enter__(self) -> WorkerFailureInjector:
         return self
 
-    def __exit__(self, *args, **kwargs) -> None:
+    def __exit__(self, *args: Any, **kwargs: Any) -> None:
         self.workflow.shutdown()
         self.activity.shutdown()
 

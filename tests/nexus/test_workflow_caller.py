@@ -253,12 +253,11 @@ class CallerWorkflow:
         request_cancel: bool,
         task_queue: str,
     ) -> None:
-        service: type[Any] = {
-            CallerReference.IMPL_WITH_INTERFACE: ServiceImpl,
-            CallerReference.INTERFACE: ServiceInterface,
-        }[input.op_input.caller_reference]
         self.nexus_client = workflow.create_nexus_client(
-            service=service,
+            service={
+                CallerReference.IMPL_WITH_INTERFACE: ServiceImpl,
+                CallerReference.INTERFACE: ServiceInterface,
+            }[input.op_input.caller_reference],
             endpoint=make_nexus_endpoint_name(task_queue),
         )
         self._nexus_operation_started = False
@@ -884,7 +883,7 @@ class ServiceInterfaceAndImplCallerWorkflow:
         task_queue: str,
     ) -> ServiceClassNameOutput:
         C, N = CallerReference, NameOverride
-        service_cls: type[Any]
+        service_cls: type
         if (caller_reference, name_override) == (C.INTERFACE, N.YES):
             service_cls = ServiceInterfaceWithNameOverride
         elif (caller_reference, name_override) == (C.INTERFACE, N.NO):
