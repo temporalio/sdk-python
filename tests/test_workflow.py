@@ -543,7 +543,7 @@ async def test_child_workflow_config_parity_with_execute_child_workflow():
     _assert_config_function_parity(
         workflow.execute_child_workflow,
         workflow.ChildWorkflowConfig,
-        excluded_params={"workflow", "arg", "args", "result_type", "summary"},
+        excluded_params={"workflow", "arg", "args", "result_type"},
     )
 
     with pytest.raises(workflow._NotInWorkflowEventLoopError):
@@ -562,9 +562,6 @@ async def test_child_workflow_config_parity_with_start_child_workflow():
             "arg",
             "args",
             "result_type",
-            "summary",
-            "static_summary",
-            "static_details",
         },
     )
 
