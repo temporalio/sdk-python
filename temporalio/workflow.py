@@ -4021,8 +4021,6 @@ class ChildWorkflowConfig(TypedDict, total=False):
     versioning_intent: Optional[VersioningIntent]
     priority: temporalio.common.Priority
 
-    # Summary arguments are currently not supported in the config because start_child_workflow and execute_child_workflow have different parameters
-
 
 # Overload for no-param workflow
 @overload
