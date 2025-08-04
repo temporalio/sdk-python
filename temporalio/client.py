@@ -7398,6 +7398,7 @@ class Plugin(abc.ABC):
         """
         return type(self).__module__ + "." + type(self).__qualname__
 
+    @abstractmethod
     def init_client_plugin(self, next: Plugin) -> Plugin:
         """Initialize this plugin in the plugin chain.
 
@@ -7411,9 +7412,8 @@ class Plugin(abc.ABC):
         Returns:
             This plugin instance for method chaining.
         """
-        self.next_client_plugin = next
-        return self
 
+    @abstractmethod
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         """Hook called when creating a client to allow modification of configuration.
 
@@ -7427,8 +7427,8 @@ class Plugin(abc.ABC):
         Returns:
             The modified client configuration.
         """
-        return self.next_client_plugin.configure_client(config)
 
+    @abstractmethod
     async def connect_service_client(
         self, config: temporalio.service.ConnectConfig
     ) -> temporalio.service.ServiceClient:
@@ -7444,10 +7444,12 @@ class Plugin(abc.ABC):
         Returns:
             The connected service client.
         """
-        return await self.next_client_plugin.connect_service_client(config)
 
 
 class _RootPlugin(Plugin):
+    def init_client_plugin(self, next: Plugin) -> Plugin:
+        raise NotImplementedError()
+
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         return config
 

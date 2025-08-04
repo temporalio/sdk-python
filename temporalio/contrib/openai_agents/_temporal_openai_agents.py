@@ -24,7 +24,7 @@ from openai.types.responses import ResponsePromptParam
 
 import temporalio.client
 import temporalio.worker
-from temporalio.client import ClientConfig
+from temporalio.client import ClientConfig, Plugin
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
@@ -237,6 +237,26 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         self._model_params = model_params
         self._model_provider = model_provider
 
+    def init_client_plugin(
+        self, next: temporalio.client.Plugin
+    ) -> temporalio.client.Plugin:
+        """Set the next client plugin"""
+        self.next_client_plugin = next
+        return self
+
+    async def connect_service_client(
+        self, config: temporalio.service.ConnectConfig
+    ) -> temporalio.service.ServiceClient:
+        """No modifications to service client"""
+        return await self.next_client_plugin.connect_service_client(config)
+
+    def init_worker_plugin(
+        self, next: temporalio.worker.Plugin
+    ) -> temporalio.worker.Plugin:
+        """Set the next worker plugin"""
+        self.next_worker_plugin = next
+        return self
+
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         """Configure the Temporal client for OpenAI agents integration.
 
@@ -252,7 +272,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         config["data_converter"] = DataConverter(
             payload_converter_class=_OpenAIPayloadConverter
         )
-        return super().configure_client(config)
+        return self.next_client_plugin.configure_client(config)
 
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         """Configure the Temporal worker for OpenAI agents integration.
@@ -274,7 +294,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         config["activities"] = list(config.get("activities") or []) + [
             ModelActivity(self._model_provider).invoke_model_activity
         ]
-        return super().configure_worker(config)
+        return self.next_worker_plugin.configure_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
         """Run the worker with OpenAI agents temporal overrides.
@@ -287,7 +307,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
             worker: The worker instance to run.
         """
         with set_open_ai_agent_temporal_overrides(self._model_params):
-            await super().run_worker(worker)
+            await self.next_worker_plugin.run_worker(worker)
 
     def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
         """Configure the replayer for OpenAI Agents."""
@@ -305,6 +325,9 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         replayer: Replayer,
         histories: AsyncIterator[temporalio.client.WorkflowHistory],
     ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
+        """Set the OpenAI Overrides during replay"""
         with set_open_ai_agent_temporal_overrides(self._model_params):
-            async with super().workflow_replay(replayer, histories) as results:
+            async with self.next_worker_plugin.workflow_replay(
+                replayer, histories
+            ) as results:
                 yield results

@@ -98,6 +98,8 @@ class Plugin(abc.ABC):
     Plugins allow customization of worker creation and execution processes
     through a chain of responsibility pattern. Each plugin can modify the worker
     configuration or intercept worker execution.
+
+    WARNING: This is an experimental feature and may change in the future.
     """
 
     def name(self) -> str:
@@ -108,6 +110,7 @@ class Plugin(abc.ABC):
         """
         return type(self).__module__ + "." + type(self).__qualname__
 
+    @abc.abstractmethod
     def init_worker_plugin(self, next: Plugin) -> Plugin:
         """Initialize this plugin in the plugin chain.
 
@@ -121,9 +124,8 @@ class Plugin(abc.ABC):
         Returns:
             This plugin instance for method chaining.
         """
-        self.next_worker_plugin = next
-        return self
 
+    @abc.abstractmethod
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         """Hook called when creating a worker to allow modification of configuration.
 
@@ -138,8 +140,8 @@ class Plugin(abc.ABC):
         Returns:
             The modified worker configuration.
         """
-        return self.next_worker_plugin.configure_worker(config)
 
+    @abc.abstractmethod
     async def run_worker(self, worker: Worker) -> None:
         """Hook called when running a worker to allow interception of execution.
 
@@ -150,8 +152,8 @@ class Plugin(abc.ABC):
         Args:
             worker: The worker instance to run.
         """
-        await self.next_worker_plugin.run_worker(worker)
 
+    @abc.abstractmethod
     def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
         """Hook called when creating a replayer to allow modification of configuration.
 
@@ -164,18 +166,20 @@ class Plugin(abc.ABC):
         Returns:
             The modified replayer configuration.
         """
-        return self.next_worker_plugin.configure_replayer(config)
 
+    @abc.abstractmethod
     def workflow_replay(
         self,
         replayer: Replayer,
         histories: AsyncIterator[temporalio.client.WorkflowHistory],
     ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
         """Hook called when running a replayer to allow interception of execution."""
-        return self.next_worker_plugin.workflow_replay(replayer, histories)
 
 
 class _RootPlugin(Plugin):
+    def init_worker_plugin(self, next: Plugin) -> Plugin:
+        raise NotImplementedError()
+
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         return config
 
