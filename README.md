@@ -1542,7 +1542,9 @@ client = await Client.connect(
 #### Worker Plugins
 
 Worker plugins can modify worker configuration and intercept worker execution. They are useful for adding monitoring, 
-custom lifecycle management, or modifying worker settings.
+custom lifecycle management, or modifying worker settings. Worker plugins can also configure replay. 
+They should do this in the case that they modified the worker in a way which would also need to be present 
+for replay to function. For instance, changing the data converter or adding workflows. 
 
 Here's an example of a worker plugin that adds custom monitoring:
 
@@ -1670,9 +1672,7 @@ worker = Worker(
 )
 ```
 
-Worker plugins can also configure replay. They should do this in the case that they modified the 
-worker in a way which would also need to be present for replay to function. For instance, changing the data converter
-or adding workflows. 
+
 
 ```python
 class ReplayPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
