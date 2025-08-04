@@ -4016,9 +4016,9 @@ class ChildWorkflowConfig(TypedDict, total=False):
             temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
         ]
     ]
+    versioning_intent: Optional[VersioningIntent]
     static_summary: Optional[str]
     static_details: Optional[str]
-    versioning_intent: Optional[VersioningIntent]
     priority: temporalio.common.Priority
 
 
