@@ -2027,6 +2027,8 @@ class ActivityConfig(TypedDict, total=False):
     cancellation_type: ActivityCancellationType
     activity_id: Optional[str]
     versioning_intent: Optional[VersioningIntent]
+    summary: Optional[str]
+    priority: temporalio.common.Priority
 
 
 # Overload for async no-param activity
@@ -2043,6 +2045,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2061,6 +2064,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2080,6 +2084,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2099,6 +2104,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2118,6 +2124,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2137,6 +2144,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2158,6 +2166,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[Any]: ...
 
@@ -2234,6 +2243,7 @@ def start_activity(
         activity_id=activity_id,
         versioning_intent=versioning_intent,
         summary=summary,
+        priority=priority,
     )
 
 
@@ -4006,6 +4016,10 @@ class ChildWorkflowConfig(TypedDict, total=False):
             temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
         ]
     ]
+    versioning_intent: Optional[VersioningIntent]
+    static_summary: Optional[str]
+    static_details: Optional[str]
+    priority: temporalio.common.Priority
 
 
 # Overload for no-param workflow
@@ -4238,7 +4252,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -4266,7 +4281,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -4294,7 +4310,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -4324,7 +4341,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> Any: ...
 
@@ -4352,7 +4370,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> Any:
     """Start a child workflow and wait for completion.
@@ -4379,7 +4398,8 @@ async def execute_child_workflow(
         memo=memo,
         search_attributes=search_attributes,
         versioning_intent=versioning_intent,
-        static_summary=summary,
+        static_summary=static_summary,
+        static_details=static_details,
         priority=priority,
     )
     return await handle
