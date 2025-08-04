@@ -72,7 +72,7 @@ class CallerWorkflow:
                 input=None,
                 cancellation_type=input.cancellation_type,
             )
-            if input.cancellation_type
+            if input.cancellation_type is not None
             else self.nexus_client.start_operation(Service.workflow_op, input=None)
         )
         op_handle.cancel()
