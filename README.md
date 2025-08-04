@@ -1515,18 +1515,22 @@ import temporalio.service
 class AuthenticationPlugin(Plugin):
     def __init__(self, api_key: str):
         self.api_key = api_key
+        
+    def init_client_plugin(self, next: Plugin) -> Plugin:
+      self.next_client_plugin = next
+      return self
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         # Modify client configuration
         config["namespace"] = "my-secure-namespace"
-        return super().configure_client(config)
+        return self.next_client_plugin.configure_client(config)
 
     async def connect_service_client(
         self, config: temporalio.service.ConnectConfig
     ) -> temporalio.service.ServiceClient:
         # Add authentication to the connection
         config.api_key = self.api_key
-        return await super().connect_service_client(config)
+        return await self.next_client_plugin.connect_service_client(config)
 
 # Use the plugin when connecting
 client = await Client.connect(
@@ -1543,26 +1547,48 @@ custom lifecycle management, or modifying worker settings.
 Here's an example of a worker plugin that adds custom monitoring:
 
 ```python
-from temporalio.worker import Plugin, WorkerConfig, Worker
+import temporalio
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+from temporalio.worker import Plugin, WorkerConfig, Worker, ReplayerConfig, Worker, Replayer, WorkflowReplayResult
 import logging
 
 class MonitoringPlugin(Plugin):
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
+    def init_worker_plugin(self, next: Plugin) -> Plugin:
+        self.next_worker_plugin = next
+        return self
+        
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         # Modify worker configuration
         original_task_queue = config["task_queue"]
         config["task_queue"] = f"monitored-{original_task_queue}"
         self.logger.info(f"Worker created for task queue: {config['task_queue']}")
-        return super().configure_worker(config)
+        return self.next_worker_plugin.configure_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
         self.logger.info("Starting worker execution")
         try:
-            await super().run_worker(worker)
+            await self.next_worker_plugin.run_worker(worker)
         finally:
             self.logger.info("Worker execution completed")
+      
+  def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
+      config["data_converter"] = pydantic_data_converter
+      config["workflows"] = list(config.get("workflows") or []) + [HelloWorkflow]
+      return config
+  
+  @asynccontextmanager
+  async def workflow_replay(
+      self,
+      replayer: Replayer,
+      histories: AsyncIterator[temporalio.client.WorkflowHistory],
+  ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
+      with set_some_context():
+          async with super().workflow_replay(replayer, histories) as results:
+              yield results
 
 # Use the plugin when creating a worker
 worker = Worker(
@@ -1577,16 +1603,34 @@ worker = Worker(
 For plugins that need to work with both clients and workers, you can implement both interfaces in a single class:
 
 ```python
+import temporalio
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
 from temporalio.client import Plugin as ClientPlugin, ClientConfig
-from temporalio.worker import Plugin as WorkerPlugin, WorkerConfig
+from temporalio.worker import Plugin as WorkerPlugin, WorkerConfig, ReplayerConfig, Worker, Replayer, WorkflowReplayResult
 
 
 class UnifiedPlugin(ClientPlugin, WorkerPlugin):
+  def init_client_plugin(self, next: ClientPlugin) -> ClientPlugin:
+    self.next_client_plugin = next
+    return self
+
+  def init_worker_plugin(self, next: WorkerPlugin) -> WorkerPlugin:
+    self.next_worker_plugin = next
+    return self
+  
   def configure_client(self, config: ClientConfig) -> ClientConfig:
     # Client-side customization
     config["namespace"] = "unified-namespace"
     return super().configure_client(config)
 
+  async def connect_service_client(
+      self, config: temporalio.service.ConnectConfig
+  ) -> temporalio.service.ServiceClient:
+      # Add authentication to the connection
+      config.api_key = self.api_key
+      return await self.next_client_plugin.connect_service_client(config)
+      
   def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
     # Worker-side customization
     config["max_cached_workflows"] = 500
@@ -1595,8 +1639,22 @@ class UnifiedPlugin(ClientPlugin, WorkerPlugin):
   async def run_worker(self, worker: Worker) -> None:
     print("Starting unified worker")
     await super().run_worker(worker)
-
-
+      
+  def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
+      config["data_converter"] = pydantic_data_converter
+      config["workflows"] = list(config.get("workflows") or []) + [HelloWorkflow]
+      return config
+  
+  @asynccontextmanager
+  async def workflow_replay(
+      self,
+      replayer: Replayer,
+      histories: AsyncIterator[temporalio.client.WorkflowHistory],
+  ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
+      with set_some_context():
+          async with super().workflow_replay(replayer, histories) as results:
+              yield results
+              
 # Create client with the unified plugin
 client = await Client.connect(
   "localhost:7233",
