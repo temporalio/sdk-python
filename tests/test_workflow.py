@@ -1,6 +1,6 @@
 import inspect
 import itertools
-from typing import Any, Callable, Dict, Optional, Sequence, Set, Type, get_type_hints
+from typing import Any, Callable, Sequence, Set, Type, get_type_hints
 
 from temporalio import workflow
 from temporalio.common import RawValue, VersioningBehavior
