@@ -1612,6 +1612,36 @@ worker = Worker(
 )
 ```
 
+Worker plugins can also configure replay. They should do this in the case that they modified the 
+worker in a way which would also need to be present for replay to function. For instance, changing the data converter
+or adding workflows. 
+
+```python
+class ReplayPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
+        config["data_converter"] = pydantic_data_converter
+        return super().configure_client(config)
+
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+        config["workflows"] = list(config.get("workflows") or []) + [HelloWorkflow]
+        return super().configure_worker(config)
+
+    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
+        config["data_converter"] = pydantic_data_converter
+        config["workflows"] = list(config.get("workflows") or []) + [HelloWorkflow]
+        return config
+
+    @asynccontextmanager
+    async def workflow_replay(
+        self,
+        replayer: Replayer,
+        histories: AsyncIterator[temporalio.client.WorkflowHistory],
+    ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
+        with set_some_context():
+            async with super().workflow_replay(replayer, histories) as results:
+                yield results
+```
+
 **Important Notes:**
 
 - Plugins are executed in reverse order (last plugin wraps the first), forming a chain of responsibility

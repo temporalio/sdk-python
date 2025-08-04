@@ -9,7 +9,7 @@ import hashlib
 import logging
 import sys
 import warnings
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
@@ -158,10 +158,13 @@ class Plugin(abc.ABC):
         This should be used to configure anything in ReplayerConfig needed to make execution match
         the original. This could include interceptors, DataConverter, workflows, and more.
 
-        Uniquely does not rely on a chain, and is instead called sequentially on the plugins
-        because the replayer cannot instantiate the worker/client component.
+        Args:
+            config: The replayer configuration dictionary to potentially modify.
+
+        Returns:
+            The modified replayer configuration.
         """
-        return config
+        return self.next_worker_plugin.configure_replayer(config)
 
     def workflow_replay(
         self,
@@ -174,6 +177,9 @@ class Plugin(abc.ABC):
 
 class _RootPlugin(Plugin):
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+        return config
+
+    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
         return config
 
     async def run_worker(self, worker: Worker) -> None:

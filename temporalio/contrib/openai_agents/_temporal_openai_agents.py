@@ -1,6 +1,6 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
-from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from datetime import timedelta
 from typing import AsyncIterator, Callable, Optional, Union
 

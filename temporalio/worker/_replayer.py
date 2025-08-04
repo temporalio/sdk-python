@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import logging
-import typing
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type
@@ -27,25 +26,6 @@ from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
 
 logger = logging.getLogger(__name__)
-
-
-class ReplayerConfig(TypedDict, total=False):
-    """TypedDict of config originally passed to :py:class:`Replayer`."""
-
-    workflows: Sequence[Type]
-    workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
-    workflow_runner: WorkflowRunner
-    unsandboxed_workflow_runner: WorkflowRunner
-    namespace: str
-    data_converter: temporalio.converter.DataConverter
-    interceptors: Sequence[Interceptor]
-    build_id: Optional[str]
-    identity: Optional[str]
-    workflow_failure_exception_types: Sequence[Type[BaseException]]
-    debug_mode: bool
-    runtime: Optional[temporalio.runtime.Runtime]
-    disable_safe_workflow_eviction: bool
-    header_codec_behavior: HeaderCodecBehavior
 
 
 class Replayer:
@@ -103,15 +83,12 @@ class Replayer:
 
         from ._worker import _RootPlugin
 
+        # Apply plugin configuration
         root_plugin: temporalio.worker.Plugin = _RootPlugin()
         for plugin in reversed(plugins):
             root_plugin = plugin.init_worker_plugin(root_plugin)
         self._config = root_plugin.configure_replayer(self._config)
         self._plugin = root_plugin
-
-        # Apply plugin configuration
-        for plugin in reversed(plugins):
-            self._config = plugin.configure_replayer(self._config)
 
         # Validate workflows after plugin configuration
         if not self._config["workflows"]:
@@ -366,6 +343,25 @@ class Replayer:
                     await bridge_worker.finalize_shutdown()
                 except Exception:
                     logger.warning("Failed to finalize shutdown", exc_info=True)
+
+
+class ReplayerConfig(TypedDict, total=False):
+    """TypedDict of config originally passed to :py:class:`Replayer`."""
+
+    workflows: Sequence[Type]
+    workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
+    workflow_runner: WorkflowRunner
+    unsandboxed_workflow_runner: WorkflowRunner
+    namespace: str
+    data_converter: temporalio.converter.DataConverter
+    interceptors: Sequence[Interceptor]
+    build_id: Optional[str]
+    identity: Optional[str]
+    workflow_failure_exception_types: Sequence[Type[BaseException]]
+    debug_mode: bool
+    runtime: Optional[temporalio.runtime.Runtime]
+    disable_safe_workflow_eviction: bool
+    header_codec_behavior: HeaderCodecBehavior
 
 
 @dataclass(frozen=True)
