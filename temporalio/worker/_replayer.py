@@ -21,6 +21,8 @@ import temporalio.workflow
 
 from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor
+from ._plugin import _RootPlugin
+from ._worker import load_default_build_id
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
 from .workflow_sandbox import SandboxedWorkflowRunner
@@ -80,8 +82,6 @@ class Replayer:
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
             header_codec_behavior=header_codec_behavior,
         )
-
-        from ._worker import _RootPlugin
 
         # Apply plugin configuration
         root_plugin: temporalio.worker.Plugin = _RootPlugin()
@@ -240,8 +240,6 @@ class Replayer:
                 != HeaderCodecBehavior.NO_CODEC,
             )
             # Create bridge worker
-            from ._worker import load_default_build_id
-
             bridge_worker, pusher = temporalio.bridge.worker.Worker.for_replay(
                 runtime._core_runtime,
                 temporalio.bridge.worker.WorkerConfig(

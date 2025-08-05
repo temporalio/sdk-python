@@ -1,7 +1,7 @@
 import dataclasses
 import uuid
 import warnings
-from contextlib import AbstractAsyncContextManager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import AsyncIterator, cast
 
 import pytest
@@ -236,12 +236,16 @@ class ReplayCheckPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     ) -> temporalio.service.ServiceClient:
         return await self.next_client_plugin.connect_service_client(config)
 
-    def workflow_replay(
+    @asynccontextmanager
+    async def workflow_replay(
         self,
         replayer: Replayer,
         histories: AsyncIterator[temporalio.client.WorkflowHistory],
-    ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
-        return self.next_worker_plugin.workflow_replay(replayer, histories)
+    ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
+        async with self.next_worker_plugin.workflow_replay(
+            replayer, histories
+        ) as result:
+            yield result
 
 
 @workflow.defn

@@ -1578,9 +1578,7 @@ class MonitoringPlugin(Plugin):
             self.logger.info("Worker execution completed")
       
   def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
-      config["data_converter"] = pydantic_data_converter
-      config["workflows"] = list(config.get("workflows") or []) + [HelloWorkflow]
-      return config
+      return self.next_worker_plugin.configure_replayer(config)
   
   @asynccontextmanager
   async def workflow_replay(
@@ -1588,9 +1586,12 @@ class MonitoringPlugin(Plugin):
       replayer: Replayer,
       histories: AsyncIterator[temporalio.client.WorkflowHistory],
   ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
-      with set_some_context():
-          async with super().workflow_replay(replayer, histories) as results:
+        self.logger.info("Starting replay execution")
+        try:
+          async with self.next_worker_plugin.workflow_replay(replayer, histories) as results:
               yield results
+        finally:
+            self.logger.info("Replay execution completed")
 
 # Use the plugin when creating a worker
 worker = Worker(
@@ -1606,69 +1607,64 @@ For plugins that need to work with both clients and workers, you can implement b
 
 ```python
 import temporalio
-from contextlib import asynccontextmanager
+from contextlib import AbstractAsyncContextManager
 from typing import AsyncIterator
 from temporalio.client import Plugin as ClientPlugin, ClientConfig
 from temporalio.worker import Plugin as WorkerPlugin, WorkerConfig, ReplayerConfig, Worker, Replayer, WorkflowReplayResult
 
 
 class UnifiedPlugin(ClientPlugin, WorkerPlugin):
-  def init_client_plugin(self, next: ClientPlugin) -> ClientPlugin:
-    self.next_client_plugin = next
-    return self
+    def init_client_plugin(self, next: ClientPlugin) -> ClientPlugin:
+        self.next_client_plugin = next
+        return self
 
-  def init_worker_plugin(self, next: WorkerPlugin) -> WorkerPlugin:
-    self.next_worker_plugin = next
-    return self
+    def init_worker_plugin(self, next: WorkerPlugin) -> WorkerPlugin:
+        self.next_worker_plugin = next
+        return self
   
-  def configure_client(self, config: ClientConfig) -> ClientConfig:
-    # Client-side customization
-    config["namespace"] = "unified-namespace"
-    return super().configure_client(config)
-
-  async def connect_service_client(
-      self, config: temporalio.service.ConnectConfig
-  ) -> temporalio.service.ServiceClient:
-      # Add authentication to the connection
-      config.api_key = self.api_key
-      return await self.next_client_plugin.connect_service_client(config)
-      
-  def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
-    # Worker-side customization
-    config["max_cached_workflows"] = 500
-    return super().configure_worker(config)
-
-  async def run_worker(self, worker: Worker) -> None:
-    print("Starting unified worker")
-    await super().run_worker(worker)
-      
-  def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
-      config["data_converter"] = pydantic_data_converter
-      config["workflows"] = list(config.get("workflows") or []) + [HelloWorkflow]
-      return config
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
+        # Client-side customization
+        config["data_converter"] = pydantic_data_converter
+        return super().configure_client(config)
   
-  @asynccontextmanager
-  async def workflow_replay(
-      self,
-      replayer: Replayer,
-      histories: AsyncIterator[temporalio.client.WorkflowHistory],
-  ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
-      with set_some_context():
-          async with super().workflow_replay(replayer, histories) as results:
-              yield results
+    async def connect_service_client(
+        self, config: temporalio.service.ConnectConfig
+    ) -> temporalio.service.ServiceClient:
+        # Add authentication to the connection
+        config.api_key = self.api_key
+        return await self.next_client_plugin.connect_service_client(config)
+        
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+        # Worker-side customization
+        return super().configure_worker(config)
+  
+    async def run_worker(self, worker: Worker) -> None:
+        print("Starting unified worker")
+        await super().run_worker(worker)
+        
+    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
+        config["data_converter"] = pydantic_data_converter
+        return config
+    
+    async def workflow_replay(
+        self,
+        replayer: Replayer,
+        histories: AsyncIterator[temporalio.client.WorkflowHistory],
+    ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
+        return self.next_worker_plugin.workflow_replay(replayer, histories)
               
 # Create client with the unified plugin
 client = await Client.connect(
-  "localhost:7233",
-  plugins=[UnifiedPlugin()]
+    "localhost:7233",
+    plugins=[UnifiedPlugin()]
 )
 
 # Worker will automatically inherit the plugin from the client
 worker = Worker(
-  client,
-  task_queue="my-task-queue",
-  workflows=[MyWorkflow],
-  activities=[my_activity]
+    client,
+    task_queue="my-task-queue",
+    workflows=[MyWorkflow],
+    activities=[my_activity]
 )
 ```
 
