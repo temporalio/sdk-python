@@ -1625,7 +1625,7 @@ class UnifiedPlugin(ClientPlugin, WorkerPlugin):
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         # Client-side customization
         config["data_converter"] = pydantic_data_converter
-        return super().configure_client(config)
+        return self.next_client_plugin.configure_client(config)
   
     async def connect_service_client(
         self, config: temporalio.service.ConnectConfig
@@ -1636,11 +1636,11 @@ class UnifiedPlugin(ClientPlugin, WorkerPlugin):
         
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         # Worker-side customization
-        return super().configure_worker(config)
+        return self.next_worker_plugin.configure_worker(config)
   
     async def run_worker(self, worker: Worker) -> None:
         print("Starting unified worker")
-        await super().run_worker(worker)
+        await self.next_worker_plugin.run_worker(worker)
         
     def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
         config["data_converter"] = pydantic_data_converter
@@ -1668,40 +1668,12 @@ worker = Worker(
 )
 ```
 
-
-
-```python
-class ReplayPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
-    def configure_client(self, config: ClientConfig) -> ClientConfig:
-        config["data_converter"] = pydantic_data_converter
-        return super().configure_client(config)
-
-    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
-        config["workflows"] = list(config.get("workflows") or []) + [HelloWorkflow]
-        return super().configure_worker(config)
-
-    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
-        config["data_converter"] = pydantic_data_converter
-        config["workflows"] = list(config.get("workflows") or []) + [HelloWorkflow]
-        return config
-
-    @asynccontextmanager
-    async def workflow_replay(
-        self,
-        replayer: Replayer,
-        histories: AsyncIterator[temporalio.client.WorkflowHistory],
-    ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
-        with set_some_context():
-            async with super().workflow_replay(replayer, histories) as results:
-                yield results
-```
-
 **Important Notes:**
 
 - Plugins are executed in reverse order (last plugin wraps the first), forming a chain of responsibility
 - Client plugins that also implement worker plugin interfaces are automatically propagated to workers
 - Avoid providing the same plugin to both client and worker to prevent double execution
-- Plugin methods should call `super()` to maintain the plugin chain
+- Plugin methods should call the plugin provided during initialization to maintain the plugin chain
 - Each plugin's `name()` method returns a unique identifier for debugging purposes
 
 
