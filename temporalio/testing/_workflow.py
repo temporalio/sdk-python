@@ -79,6 +79,7 @@ class WorkflowEnvironment:
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[temporalio.client.Interceptor] = [],
+        plugins: Sequence[temporalio.client.Plugin] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
@@ -213,6 +214,7 @@ class WorkflowEnvironment:
                     namespace=namespace,
                     data_converter=data_converter,
                     interceptors=interceptors,
+                    plugins=plugins,
                     default_workflow_query_reject_condition=default_workflow_query_reject_condition,
                     tls=tls,
                     retry_config=retry_config,
@@ -237,6 +239,7 @@ class WorkflowEnvironment:
         *,
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[temporalio.client.Interceptor] = [],
+        plugins: Sequence[temporalio.client.Plugin] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
@@ -332,6 +335,7 @@ class WorkflowEnvironment:
                     server.target,
                     data_converter=data_converter,
                     interceptors=interceptors,
+                    plugins=plugins,
                     default_workflow_query_reject_condition=default_workflow_query_reject_condition,
                     retry_config=retry_config,
                     rpc_metadata=rpc_metadata,
