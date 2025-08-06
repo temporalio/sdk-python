@@ -82,7 +82,7 @@ class Plugin(abc.ABC):
         """Hook called when creating a replayer to allow modification of configuration.
 
         This should be used to configure anything in ReplayerConfig needed to make execution match
-        the original. This could include interceptors, DataConverter, workflows, and more.
+        the worker and client config. This could include interceptors, DataConverter, workflows, and more.
 
         Args:
             config: The replayer configuration dictionary to potentially modify.
