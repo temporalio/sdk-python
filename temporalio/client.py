@@ -7404,9 +7404,11 @@ class Plugin(abc.ABC):
     def init_client_plugin(self, next: Plugin) -> None:
         """Initialize this plugin in the plugin chain.
 
-        This method sets up the chain of responsibility pattern by storing a reference
+        This method sets up the chain of responsibility pattern by providing a reference
         to the next plugin in the chain. It is called during client creation to build
         the plugin chain. Note, this may be called twice in the case of :py:meth:`connect`.
+        Implementations should store this reference and call the corresponding method
+        of the next plugin on method calls.
 
         Args:
             next: The next plugin in the chain to delegate to.
