@@ -86,7 +86,8 @@ class Replayer:
         # Apply plugin configuration
         root_plugin: temporalio.worker.Plugin = _RootPlugin()
         for plugin in reversed(plugins):
-            root_plugin = plugin.init_worker_plugin(root_plugin)
+            plugin.init_worker_plugin(root_plugin)
+            root_plugin = plugin
         self._config = root_plugin.configure_replayer(self._config)
         self._plugin = root_plugin
 
@@ -175,7 +176,7 @@ class Replayer:
             An async iterator that returns replayed workflow results as they are
             replayed.
         """
-        return self._plugin.workflow_replay(self, histories)
+        return self._plugin.run_replayer(self, histories)
 
     @asynccontextmanager
     async def _workflow_replay_iterator(

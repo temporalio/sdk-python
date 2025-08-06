@@ -191,7 +191,8 @@ class Client:
 
         root_plugin: Plugin = _RootPlugin()
         for plugin in reversed(plugins):
-            root_plugin = plugin.init_client_plugin(root_plugin)
+            plugin.init_client_plugin(root_plugin)
+            root_plugin = plugin
 
         service_client = await root_plugin.connect_service_client(connect_config)
 
@@ -235,7 +236,8 @@ class Client:
 
         root_plugin: Plugin = _RootPlugin()
         for plugin in reversed(plugins):
-            root_plugin = plugin.init_client_plugin(root_plugin)
+            plugin.init_client_plugin(root_plugin)
+            root_plugin = plugin
 
         self._init_from_config(root_plugin.configure_client(config))
 
@@ -7399,7 +7401,7 @@ class Plugin(abc.ABC):
         return type(self).__module__ + "." + type(self).__qualname__
 
     @abstractmethod
-    def init_client_plugin(self, next: Plugin) -> Plugin:
+    def init_client_plugin(self, next: Plugin) -> None:
         """Initialize this plugin in the plugin chain.
 
         This method sets up the chain of responsibility pattern by storing a reference
@@ -7408,9 +7410,6 @@ class Plugin(abc.ABC):
 
         Args:
             next: The next plugin in the chain to delegate to.
-
-        Returns:
-            This plugin instance for method chaining.
         """
 
     @abstractmethod
@@ -7447,7 +7446,7 @@ class Plugin(abc.ABC):
 
 
 class _RootPlugin(Plugin):
-    def init_client_plugin(self, next: Plugin) -> Plugin:
+    def init_client_plugin(self, next: Plugin) -> None:
         raise NotImplementedError()
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:

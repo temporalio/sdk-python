@@ -237,12 +237,9 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         self._model_params = model_params
         self._model_provider = model_provider
 
-    def init_client_plugin(
-        self, next: temporalio.client.Plugin
-    ) -> temporalio.client.Plugin:
+    def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
         """Set the next client plugin"""
         self.next_client_plugin = next
-        return self
 
     async def connect_service_client(
         self, config: temporalio.service.ConnectConfig
@@ -250,12 +247,9 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         """No modifications to service client"""
         return await self.next_client_plugin.connect_service_client(config)
 
-    def init_worker_plugin(
-        self, next: temporalio.worker.Plugin
-    ) -> temporalio.worker.Plugin:
+    def init_worker_plugin(self, next: temporalio.worker.Plugin) -> None:
         """Set the next worker plugin"""
         self.next_worker_plugin = next
-        return self
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         """Configure the Temporal client for OpenAI agents integration.
@@ -320,14 +314,14 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         return config
 
     @asynccontextmanager
-    async def workflow_replay(
+    async def run_replayer(
         self,
         replayer: Replayer,
         histories: AsyncIterator[temporalio.client.WorkflowHistory],
     ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
         """Set the OpenAI Overrides during replay"""
         with set_open_ai_agent_temporal_overrides(self._model_params):
-            async with self.next_worker_plugin.workflow_replay(
+            async with self.next_worker_plugin.run_replayer(
                 replayer, histories
             ) as results:
                 yield results

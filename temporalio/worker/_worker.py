@@ -374,7 +374,8 @@ class Worker:
 
         root_plugin: Plugin = _RootPlugin()
         for plugin in reversed(plugins):
-            root_plugin = plugin.init_worker_plugin(root_plugin)
+            plugin.init_worker_plugin(root_plugin)
+            root_plugin = plugin
         config = root_plugin.configure_worker(config)
         self._plugin = root_plugin
 

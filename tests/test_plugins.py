@@ -37,9 +37,8 @@ class MyClientPlugin(temporalio.client.Plugin):
     def __init__(self):
         self.interceptor = TestClientInterceptor()
 
-    def init_client_plugin(self, next: Plugin) -> Plugin:
+    def init_client_plugin(self, next: Plugin) -> None:
         self.next_client_plugin = next
-        return self
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         config["namespace"] = "replaced_namespace"
@@ -74,17 +73,11 @@ async def test_client_plugin(client: Client, env: WorkflowEnvironment):
 
 
 class MyCombinedPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
-    def init_worker_plugin(
-        self, next: temporalio.worker.Plugin
-    ) -> temporalio.worker.Plugin:
+    def init_worker_plugin(self, next: temporalio.worker.Plugin) -> None:
         self.next_worker_plugin = next
-        return self
 
-    def init_client_plugin(
-        self, next: temporalio.client.Plugin
-    ) -> temporalio.client.Plugin:
+    def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
         self.next_client_plugin = next
-        return self
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         return self.next_client_plugin.configure_client(config)
@@ -104,20 +97,17 @@ class MyCombinedPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
         return self.next_worker_plugin.configure_replayer(config)
 
-    def workflow_replay(
+    def run_replayer(
         self,
         replayer: Replayer,
         histories: AsyncIterator[temporalio.client.WorkflowHistory],
     ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
-        return self.next_worker_plugin.workflow_replay(replayer, histories)
+        return self.next_worker_plugin.run_replayer(replayer, histories)
 
 
 class MyWorkerPlugin(temporalio.worker.Plugin):
-    def init_worker_plugin(
-        self, next: temporalio.worker.Plugin
-    ) -> temporalio.worker.Plugin:
+    def init_worker_plugin(self, next: temporalio.worker.Plugin) -> None:
         self.next_worker_plugin = next
-        return self
 
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         config["task_queue"] = "replaced_queue"
@@ -135,12 +125,12 @@ class MyWorkerPlugin(temporalio.worker.Plugin):
     def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
         return self.next_worker_plugin.configure_replayer(config)
 
-    def workflow_replay(
+    def run_replayer(
         self,
         replayer: Replayer,
         histories: AsyncIterator[temporalio.client.WorkflowHistory],
     ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
-        return self.next_worker_plugin.workflow_replay(replayer, histories)
+        return self.next_worker_plugin.run_replayer(replayer, histories)
 
 
 async def test_worker_plugin_basic_config(client: Client) -> None:
@@ -203,17 +193,11 @@ async def test_worker_sandbox_restrictions(client: Client) -> None:
 
 
 class ReplayCheckPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
-    def init_worker_plugin(
-        self, next: temporalio.worker.Plugin
-    ) -> temporalio.worker.Plugin:
+    def init_worker_plugin(self, next: temporalio.worker.Plugin) -> None:
         self.next_worker_plugin = next
-        return self
 
-    def init_client_plugin(
-        self, next: temporalio.client.Plugin
-    ) -> temporalio.client.Plugin:
+    def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
         self.next_client_plugin = next
-        return self
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         config["data_converter"] = pydantic_data_converter
@@ -237,14 +221,12 @@ class ReplayCheckPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         return await self.next_client_plugin.connect_service_client(config)
 
     @asynccontextmanager
-    async def workflow_replay(
+    async def run_replayer(
         self,
         replayer: Replayer,
         histories: AsyncIterator[temporalio.client.WorkflowHistory],
     ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
-        async with self.next_worker_plugin.workflow_replay(
-            replayer, histories
-        ) as result:
+        async with self.next_worker_plugin.run_replayer(replayer, histories) as result:
             yield result
 
 

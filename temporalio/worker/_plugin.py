@@ -35,7 +35,7 @@ class Plugin(abc.ABC):
         return type(self).__module__ + "." + type(self).__qualname__
 
     @abc.abstractmethod
-    def init_worker_plugin(self, next: Plugin) -> Plugin:
+    def init_worker_plugin(self, next: Plugin) -> None:
         """Initialize this plugin in the plugin chain.
 
         This method sets up the chain of responsibility pattern by storing a reference
@@ -44,9 +44,6 @@ class Plugin(abc.ABC):
 
         Args:
             next: The next plugin in the chain to delegate to.
-
-        Returns:
-            This plugin instance for method chaining.
         """
 
     @abc.abstractmethod
@@ -92,7 +89,7 @@ class Plugin(abc.ABC):
         """
 
     @abc.abstractmethod
-    def workflow_replay(
+    def run_replayer(
         self,
         replayer: Replayer,
         histories: AsyncIterator[WorkflowHistory],
@@ -101,7 +98,7 @@ class Plugin(abc.ABC):
 
 
 class _RootPlugin(Plugin):
-    def init_worker_plugin(self, next: Plugin) -> Plugin:
+    def init_worker_plugin(self, next: Plugin) -> None:
         raise NotImplementedError()
 
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
@@ -113,7 +110,7 @@ class _RootPlugin(Plugin):
     async def run_worker(self, worker: Worker) -> None:
         await worker._run()
 
-    def workflow_replay(
+    def run_replayer(
         self,
         replayer: Replayer,
         histories: AsyncIterator[WorkflowHistory],

@@ -1516,9 +1516,8 @@ class AuthenticationPlugin(Plugin):
     def __init__(self, api_key: str):
         self.api_key = api_key
         
-    def init_client_plugin(self, next: Plugin) -> Plugin:
+    def init_client_plugin(self, next: Plugin) -> None:
       self.next_client_plugin = next
-      return self
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         # Modify client configuration
@@ -1552,16 +1551,15 @@ Here's an example of a worker plugin that adds custom monitoring:
 import temporalio
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
-from temporalio.worker import Plugin, WorkerConfig, Worker, ReplayerConfig, Worker, Replayer, WorkflowReplayResult
+from temporalio.worker import Plugin, WorkerConfig, ReplayerConfig, Worker, Replayer, WorkflowReplayResult
 import logging
 
 class MonitoringPlugin(Plugin):
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def init_worker_plugin(self, next: Plugin) -> Plugin:
+    def init_worker_plugin(self, next: Plugin) -> None:
         self.next_worker_plugin = next
-        return self
         
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         # Modify worker configuration
@@ -1581,14 +1579,14 @@ class MonitoringPlugin(Plugin):
       return self.next_worker_plugin.configure_replayer(config)
   
   @asynccontextmanager
-  async def workflow_replay(
+  async def run_replayer(
       self,
       replayer: Replayer,
       histories: AsyncIterator[temporalio.client.WorkflowHistory],
   ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
         self.logger.info("Starting replay execution")
         try:
-          async with self.next_worker_plugin.workflow_replay(replayer, histories) as results:
+          async with self.next_worker_plugin.run_replayer(replayer, histories) as results:
               yield results
         finally:
             self.logger.info("Replay execution completed")
@@ -1614,13 +1612,11 @@ from temporalio.worker import Plugin as WorkerPlugin, WorkerConfig, ReplayerConf
 
 
 class UnifiedPlugin(ClientPlugin, WorkerPlugin):
-    def init_client_plugin(self, next: ClientPlugin) -> ClientPlugin:
+    def init_client_plugin(self, next: ClientPlugin) -> None:
         self.next_client_plugin = next
-        return self
 
-    def init_worker_plugin(self, next: WorkerPlugin) -> WorkerPlugin:
+    def init_worker_plugin(self, next: WorkerPlugin) -> None:
         self.next_worker_plugin = next
-        return self
   
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         # Client-side customization
@@ -1646,12 +1642,12 @@ class UnifiedPlugin(ClientPlugin, WorkerPlugin):
         config["data_converter"] = pydantic_data_converter
         return config
     
-    async def workflow_replay(
+    async def run_replayer(
         self,
         replayer: Replayer,
         histories: AsyncIterator[temporalio.client.WorkflowHistory],
     ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
-        return self.next_worker_plugin.workflow_replay(replayer, histories)
+        return self.next_worker_plugin.run_replayer(replayer, histories)
               
 # Create client with the unified plugin
 client = await Client.connect(
