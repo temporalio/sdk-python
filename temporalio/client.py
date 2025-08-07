@@ -191,7 +191,8 @@ class Client:
 
         root_plugin: Plugin = _RootPlugin()
         for plugin in reversed(plugins):
-            root_plugin = plugin.init_client_plugin(root_plugin)
+            plugin.init_client_plugin(root_plugin)
+            root_plugin = plugin
 
         service_client = await root_plugin.connect_service_client(connect_config)
 
@@ -235,7 +236,8 @@ class Client:
 
         root_plugin: Plugin = _RootPlugin()
         for plugin in reversed(plugins):
-            root_plugin = plugin.init_client_plugin(root_plugin)
+            plugin.init_client_plugin(root_plugin)
+            root_plugin = plugin
 
         self._init_from_config(root_plugin.configure_client(config))
 
@@ -7398,22 +7400,21 @@ class Plugin(abc.ABC):
         """
         return type(self).__module__ + "." + type(self).__qualname__
 
-    def init_client_plugin(self, next: Plugin) -> Plugin:
+    @abstractmethod
+    def init_client_plugin(self, next: Plugin) -> None:
         """Initialize this plugin in the plugin chain.
 
-        This method sets up the chain of responsibility pattern by storing a reference
+        This method sets up the chain of responsibility pattern by providing a reference
         to the next plugin in the chain. It is called during client creation to build
         the plugin chain. Note, this may be called twice in the case of :py:meth:`connect`.
+        Implementations should store this reference and call the corresponding method
+        of the next plugin on method calls.
 
         Args:
             next: The next plugin in the chain to delegate to.
-
-        Returns:
-            This plugin instance for method chaining.
         """
-        self.next_client_plugin = next
-        return self
 
+    @abstractmethod
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         """Hook called when creating a client to allow modification of configuration.
 
@@ -7427,8 +7428,8 @@ class Plugin(abc.ABC):
         Returns:
             The modified client configuration.
         """
-        return self.next_client_plugin.configure_client(config)
 
+    @abstractmethod
     async def connect_service_client(
         self, config: temporalio.service.ConnectConfig
     ) -> temporalio.service.ServiceClient:
@@ -7444,10 +7445,12 @@ class Plugin(abc.ABC):
         Returns:
             The connected service client.
         """
-        return await self.next_client_plugin.connect_service_client(config)
 
 
 class _RootPlugin(Plugin):
+    def init_client_plugin(self, next: Plugin) -> None:
+        raise NotImplementedError()
+
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         return config
 
