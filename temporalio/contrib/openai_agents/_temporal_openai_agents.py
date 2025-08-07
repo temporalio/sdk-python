@@ -1,6 +1,7 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
 import dataclasses
+import typing
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from datetime import timedelta
 from typing import AsyncIterator, Callable, Optional, Sequence, Union
@@ -18,7 +19,6 @@ from agents import (
     set_trace_provider,
 )
 from agents.items import TResponseStreamEvent
-from agents.mcp import MCPServer
 from agents.run import get_default_agent_runner, set_default_agent_runner
 from agents.tracing import get_trace_provider
 from agents.tracing.provider import DefaultTraceProvider
@@ -28,7 +28,6 @@ import temporalio.client
 import temporalio.worker
 from temporalio.client import ClientConfig
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
-from temporalio.contrib.openai_agents._mcp import TemporalMCPServer
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
@@ -52,6 +51,11 @@ from temporalio.worker import (
     WorkflowReplayResult,
 )
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
+
+if typing.TYPE_CHECKING:
+    from agents.mcp import MCPServer
+
+    from temporalio.contrib.openai_agents._mcp import TemporalMCPServer
 
 
 @contextmanager
@@ -232,7 +236,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         self,
         model_params: Optional[ModelActivityParameters] = None,
         model_provider: Optional[ModelProvider] = None,
-        mcp_servers: Sequence[MCPServer] = (),
+        mcp_servers: Sequence["MCPServer"] = (),
     ) -> None:
         """Initialize the OpenAI agents plugin.
 

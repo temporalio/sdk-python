@@ -57,7 +57,6 @@ from agents.items import (
     TResponseOutputItem,
     TResponseStreamEvent,
 )
-from agents.mcp import MCPServer, MCPServerStdio
 from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
     EasyInputMessageParam,
@@ -87,7 +86,6 @@ from temporalio.common import RetryPolicy
 from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents import (
     ModelActivityParameters,
-    TemporalMCPServerWorkflowShim,
     TestModel,
     TestModelProvider,
 )
@@ -2512,7 +2510,10 @@ async def test_hosted_mcp_tool(client: Client, use_local_model):
 class McpServerWorkflow:
     @workflow.run
     async def run(self, question: str) -> str:
-        print("Running")
+        from agents.mcp import MCPServer
+
+        from temporalio.contrib.openai_agents import TemporalMCPServerWorkflowShim
+
         server: MCPServer = TemporalMCPServerWorkflowShim("Filesystem Server, via npx")
         agent = Agent[str](
             name="MCP ServerWorkflow",
@@ -2586,8 +2587,12 @@ class McpServerModel(StaticTestModel):
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 async def test_mcp_server(client: Client, use_local_model: bool):
-    if not os.environ.get("OPENAI_API_KEY"):
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
+
+    if sys.version_info < (3, 10):
+        pytest.skip("Mcp not supported on Python 3.9")
+    from agents.mcp import MCPServer, MCPServerStdio
 
     server = MCPServerStdio(
         name="Filesystem Server, via npx",

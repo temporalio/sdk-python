@@ -8,10 +8,15 @@ This module provides compatibility between the
     Use with caution in production environments.
 """
 
-from temporalio.contrib.openai_agents._mcp import (
-    TemporalMCPServer,
-    TemporalMCPServerWorkflowShim,
-)
+# Best Effort mcp, as it is not supported on Python 3.9
+try:
+    from temporalio.contrib.openai_agents._mcp import (
+        TemporalMCPServer,
+        TemporalMCPServerWorkflowShim,
+    )
+except ImportError:
+    pass
+
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._temporal_openai_agents import (
     OpenAIAgentsPlugin,

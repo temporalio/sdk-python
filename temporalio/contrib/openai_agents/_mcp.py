@@ -3,9 +3,9 @@ from typing import Any, Callable, Optional, Sequence
 
 from agents import AgentBase, RunContextWrapper
 from agents.mcp import MCPServer
-from mcp import GetPromptResult, ListPromptsResult
-from mcp import Tool as MCPTool
-from mcp.types import CallToolResult
+from mcp import GetPromptResult, ListPromptsResult  # type:ignore
+from mcp import Tool as MCPTool  # type:ignore
+from mcp.types import CallToolResult  # type:ignore
 
 from temporalio import activity, workflow
 from temporalio.workflow import LocalActivityConfig
