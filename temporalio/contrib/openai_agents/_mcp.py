@@ -178,31 +178,35 @@ class TemporalMCPServerWorkflowShim(MCPServer):
 
 class TemporalMCPServer(TemporalMCPServerWorkflowShim):
     """Concrete implementation of a Temporal-compatible MCP server wrapper.
-    
-    This class only needs to be used if you want to manage the server lifetime manually.
-    Otherwise, you can simply provide an MCPServer to the OpenAIAgentsPlugin, which will
-    bind the server to the lifetime of the worker.
+
+    **Recommended Usage**: Instead of manually managing TemporalMCPServer instances,
+    use the `mcp_servers` parameter of OpenAIAgentsPlugin, which automatically handles
+    server wrapping, activity registration, and lifecycle management.
+
+    This class only needs to be used if you want to manage the server lifetime manually
+    or need fine-grained control over activity registration. For most use cases, passing
+    your MCP servers directly to OpenAIAgentsPlugin is simpler and more robust.
 
     This class wraps an actual MCP server instance and provides both workflow-safe
     and non-workflow execution modes. When used outside of a workflow context,
     it delegates directly to the wrapped server. When used within a workflow,
     it delegates to the parent shim class which executes operations via Temporal
     activities to maintain determinism.
-    
+
     This dual-mode operation allows the same server instance to be used both
     in workflow and non-workflow contexts, making it convenient for testing
     and mixed-mode applications.
-    
+
     The class also provides activity definitions that can be registered with
     a Temporal worker to enable the workflow-safe operations.
-    
+
     Args:
         server: The actual MCP server instance to wrap.
     """
-    
+
     def __init__(self, server: MCPServer):
         """Initialize the Temporal MCP server wrapper.
-        
+
         Args:
             server: The actual MCP server instance to wrap and delegate to.
         """
@@ -212,7 +216,7 @@ class TemporalMCPServer(TemporalMCPServerWorkflowShim):
     @property
     def name(self) -> str:
         """Get the name of the wrapped MCP server.
-        
+
         Returns:
             The name of the underlying MCP server instance.
         """
@@ -220,7 +224,7 @@ class TemporalMCPServer(TemporalMCPServerWorkflowShim):
 
     async def connect(self) -> None:
         """Connect to the underlying MCP server.
-        
+
         Delegates the connection operation to the wrapped server instance.
         This method can be called directly when not in a workflow context.
         """
@@ -228,7 +232,7 @@ class TemporalMCPServer(TemporalMCPServerWorkflowShim):
 
     async def cleanup(self) -> None:
         """Clean up the underlying MCP server connection.
-        
+
         Delegates the cleanup operation to the wrapped server instance.
         This method can be called directly when not in a workflow context.
         """
@@ -240,15 +244,15 @@ class TemporalMCPServer(TemporalMCPServerWorkflowShim):
         agent: Optional[AgentBase] = None,
     ) -> list[MCPTool]:
         """List available tools with context-aware execution.
-        
+
         When called outside a workflow context, delegates directly to the wrapped
         server. When called within a workflow, delegates to the parent shim class
         which executes the operation via a Temporal activity.
-        
+
         Args:
             run_context: Optional runtime context wrapper for the operation.
             agent: Optional agent instance that may be relevant to tool listing.
-            
+
         Returns:
             A list of MCP tools available from the server.
         """
@@ -261,15 +265,15 @@ class TemporalMCPServer(TemporalMCPServerWorkflowShim):
         self, tool_name: str, arguments: Optional[dict[str, Any]]
     ) -> CallToolResult:
         """Execute a tool with context-aware execution.
-        
+
         When called outside a workflow context, delegates directly to the wrapped
         server. When called within a workflow, delegates to the parent shim class
         which executes the operation via a Temporal activity.
-        
+
         Args:
             tool_name: The name of the tool to execute.
             arguments: Optional dictionary of arguments to pass to the tool.
-            
+
         Returns:
             The result of the tool execution.
         """
@@ -280,7 +284,7 @@ class TemporalMCPServer(TemporalMCPServerWorkflowShim):
 
     async def __aenter__(self):
         """Async context manager entry - connects to the MCP server.
-        
+
         Returns:
             Self, allowing the server to be used within the context.
         """
@@ -289,7 +293,7 @@ class TemporalMCPServer(TemporalMCPServerWorkflowShim):
 
     async def __aexit__(self, exc_type, exc_value, traceback):
         """Async context manager exit - cleans up the MCP server connection.
-        
+
         Args:
             exc_type: Exception type, if any exception occurred.
             exc_value: Exception value, if any exception occurred.
@@ -299,30 +303,38 @@ class TemporalMCPServer(TemporalMCPServerWorkflowShim):
 
     def get_activities(self) -> Sequence[Callable]:
         """Get Temporal activity functions for workflow-safe MCP operations.
-        
+
         This method creates and returns Temporal activity functions that delegate
         to the wrapped MCP server. These activities should be registered with a
         Temporal worker to enable workflow-safe execution of MCP operations.
-        
+
         The returned activities include:
         - {name}-list-tools: Lists available tools
         - {name}-call-tool: Executes a specific tool
         - {name}-list-prompts: Lists available prompts
         - {name}-get-prompt: Retrieves a specific prompt
-        
+
         Returns:
             A sequence of activity functions to register with a Temporal worker.
-            
+
         Example:
             ```python
+            # Manual management (not recommended for most cases)
             async with TemporalMCPServer(my_mcp_server) as server:
                 async with Worker(
                     client,
                     activities=server.get_activities(),
                 ) as worker:
                     ...
+
+            # Recommended: Use OpenAIAgentsPlugin instead
+            plugin = OpenAIAgentsPlugin(mcp_servers=[my_mcp_server])
+            client = await Client.connect("localhost:7233", plugins=[plugin])
+            async with Worker(client, task_queue="my-queue", workflows=[MyWorkflow]):
+                ...
             ```
         """
+
         @activity.defn(name=self.name + "-list-tools")
         async def list_tools() -> list[MCPTool]:
             activity.logger.info("Listing tools in activity")
@@ -348,11 +360,11 @@ class TemporalMCPServer(TemporalMCPServerWorkflowShim):
 
     async def list_prompts(self) -> ListPromptsResult:
         """List available prompts with context-aware execution.
-        
+
         When called outside a workflow context, delegates directly to the wrapped
         server. When called within a workflow, delegates to the parent shim class
         which executes the operation via a Temporal activity.
-        
+
         Returns:
             A list of available prompts from the server.
         """
@@ -365,15 +377,15 @@ class TemporalMCPServer(TemporalMCPServerWorkflowShim):
         self, name: str, arguments: Optional[dict[str, Any]] = None
     ) -> GetPromptResult:
         """Get a specific prompt with context-aware execution.
-        
+
         When called outside a workflow context, delegates directly to the wrapped
         server. When called within a workflow, delegates to the parent shim class
         which executes the operation via a Temporal activity.
-        
+
         Args:
             name: The name of the prompt to retrieve.
             arguments: Optional arguments for the prompt.
-            
+
         Returns:
             The requested prompt from the server.
         """

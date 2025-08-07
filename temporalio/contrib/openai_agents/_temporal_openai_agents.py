@@ -174,18 +174,24 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     1. Configures the Pydantic data converter for type-safe serialization
     2. Sets up tracing interceptors for OpenAI agent interactions
     3. Registers model execution activities
-    4. Manages the OpenAI agent runtime overrides during worker execution
+    4. Automatically registers MCP server activities and manages their lifecycles
+    5. Manages the OpenAI agent runtime overrides during worker execution
 
     Args:
         model_params: Configuration parameters for Temporal activity execution
             of model calls. If None, default parameters will be used.
         model_provider: Optional model provider for custom model implementations.
             Useful for testing or custom model integrations.
+        mcp_servers: Sequence of MCP servers to automatically register with the worker.
+            The plugin will wrap each server in a TemporalMCPServer if needed and
+            manage their connection lifecycles tied to the worker lifetime. This is
+            the recommended way to use MCP servers with Temporal workflows.
 
     Example:
         >>> from temporalio.client import Client
         >>> from temporalio.worker import Worker
         >>> from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
+        >>> from agents.mcp import MCPServerStdio
         >>> from datetime import timedelta
         >>>
         >>> # Configure model parameters
@@ -194,8 +200,17 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         ...     retry_policy=RetryPolicy(maximum_attempts=3)
         ... )
         >>>
-        >>> # Create plugin
-        >>> plugin = OpenAIAgentsPlugin(model_params=model_params)
+        >>> # Create MCP servers
+        >>> filesystem_server = MCPServerStdio(
+        ...     name="Filesystem Server",
+        ...     params={"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]}
+        ... )
+        >>>
+        >>> # Create plugin with MCP servers
+        >>> plugin = OpenAIAgentsPlugin(
+        ...     model_params=model_params,
+        ...     mcp_servers=[filesystem_server]
+        ... )
         >>>
         >>> # Use with client and worker
         >>> client = await Client.connect(
@@ -222,6 +237,10 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
                 of model calls. If None, default parameters will be used.
             model_provider: Optional model provider for custom model implementations.
                 Useful for testing or custom model integrations.
+            mcp_servers: Sequence of MCP servers to automatically register with the worker.
+                Each server will be wrapped in a TemporalMCPServer if not already wrapped,
+                and their activities will be automatically registered with the worker.
+                The plugin manages the connection lifecycle of these servers.
         """
         if model_params is None:
             model_params = ModelActivityParameters()
