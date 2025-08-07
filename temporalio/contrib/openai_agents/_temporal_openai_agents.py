@@ -77,9 +77,7 @@ def set_open_ai_agent_temporal_overrides(
 
     Returns:
         A context manager that yields the configured TemporalTraceProvider.
-
     """
-
     previous_runner = get_default_agent_runner()
     previous_trace_provider = get_trace_provider()
     provider = TemporalTraceProvider(
