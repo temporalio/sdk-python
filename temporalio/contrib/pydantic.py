@@ -95,6 +95,7 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
         See
         https://docs.pydantic.dev/latest/api/type_adapter/#pydantic.type_adapter.TypeAdapter.validate_json.
         """
+        print(f"From_payload {payload} - type: {type_hint}")
         _type_hint = type_hint if type_hint is not None else Any
         return TypeAdapter(_type_hint).validate_json(payload.data)
 
