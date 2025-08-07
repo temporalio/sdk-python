@@ -104,6 +104,8 @@ def set_open_ai_agent_temporal_overrides(
 class TestModelProvider(ModelProvider):
     """Test model provider which simply returns the given module."""
 
+    __test__ = False
+
     def __init__(self, model: Model):
         """Initialize a test model provider with a model."""
         self._model = model
@@ -115,6 +117,8 @@ class TestModelProvider(ModelProvider):
 
 class TestModel(Model):
     """Test model for use mocking model responses."""
+
+    __test__ = False
 
     def __init__(self, fn: Callable[[], ModelResponse]) -> None:
         """Initialize a test model with a callable."""

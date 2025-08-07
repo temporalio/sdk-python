@@ -8,9 +8,7 @@ from datetime import timedelta
 from typing import (
     Any,
     AsyncIterator,
-    Callable,
     Optional,
-    Sequence,
     Union,
     no_type_check,
 )
@@ -19,7 +17,6 @@ import nexusrpc
 import pytest
 from agents import (
     Agent,
-    AgentBase,
     AgentOutputSchemaBase,
     CodeInterpreterTool,
     FileSearchTool,
@@ -29,7 +26,6 @@ from agents import (
     ImageGenerationTool,
     InputGuardrailTripwireTriggered,
     ItemHelpers,
-    LocalShellTool,
     MCPToolApprovalFunctionResult,
     MCPToolApprovalRequest,
     MessageOutputItem,
@@ -58,6 +54,7 @@ from agents.items import (
     HandoffOutputItem,
     ToolCallItem,
     ToolCallOutputItem,
+    TResponseOutputItem,
     TResponseStreamEvent,
 )
 from agents.mcp import MCPServer, MCPServerStdio
@@ -98,10 +95,6 @@ from temporalio.contrib.openai_agents._temporal_model_stub import _extract_summa
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import CancelledError
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker.workflow_sandbox import (
-    SandboxedWorkflowRunner,
-    SandboxRestrictions,
-)
 from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
 )
@@ -2530,7 +2523,69 @@ class McpServerWorkflow:
         return result.final_output
 
 
-async def test_mcp_server(client: Client):
+class ResponseBuilders:
+    @staticmethod
+    def model_response(output: TResponseOutputItem) -> ModelResponse:
+        return ModelResponse(
+            output=[output],
+            usage=Usage(),
+            response_id=None,
+        )
+
+    @staticmethod
+    def tool_call(arguments: str, name: str) -> ModelResponse:
+        return ResponseBuilders.model_response(
+            ResponseFunctionToolCall(
+                arguments=arguments,
+                call_id="call",
+                name=name,
+                type="function_call",
+                id="id",
+                status="completed",
+            )
+        )
+
+    @staticmethod
+    def output_message(text: str) -> ModelResponse:
+        return ResponseBuilders.model_response(
+            ResponseOutputMessage(
+                id="",
+                content=[
+                    ResponseOutputText(
+                        text=text,
+                        annotations=[],
+                        type="output_text",
+                    )
+                ],
+                role="assistant",
+                status="completed",
+                type="message",
+            )
+        )
+
+
+class McpServerModel(StaticTestModel):
+    responses = [
+        ResponseBuilders.tool_call(
+            arguments='{"path":"/"}',
+            name="list_directory",
+        ),
+        ResponseBuilders.tool_call(
+            arguments="{}",
+            name="list_allowed_directories",
+        ),
+        ResponseBuilders.tool_call(
+            arguments='{"path":"."}',
+            name="list_directory",
+        ),
+        ResponseBuilders.output_message(
+            "Here are the files and directories in the allowed path."
+        ),
+    ]
+
+
+@pytest.mark.parametrize("use_local_model", [True, False])
+async def test_mcp_server(client: Client, use_local_model: bool):
     if not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
 
@@ -2562,6 +2617,9 @@ async def test_mcp_server(client: Client):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=120)
             ),
+            model_provider=TestModelProvider(McpServerModel())
+            if use_local_model
+            else None,
             mcp_servers=[server, server2],
         )
     ]
@@ -2579,5 +2637,5 @@ async def test_mcp_server(client: Client):
             execution_timeout=timedelta(seconds=30),
         )
         result = await workflow_handle.result()
-        print(result)
-    assert False
+        if use_local_model:
+            assert result == "Here are the files and directories in the allowed path."
