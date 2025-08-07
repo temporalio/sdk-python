@@ -21,6 +21,7 @@ from ._interceptor import (
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
+from ._plugin import Plugin
 from ._replayer import (
     Replayer,
     ReplayerConfig,
@@ -44,7 +45,6 @@ from ._tuning import (
     WorkflowSlotInfo,
 )
 from ._worker import (
-    Plugin,
     PollerBehavior,
     PollerBehaviorAutoscaling,
     PollerBehaviorSimpleMaximum,

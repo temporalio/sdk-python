@@ -1,15 +1,26 @@
 import dataclasses
+import uuid
 import warnings
-from typing import cast
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from typing import AsyncIterator, cast
 
 import pytest
 
 import temporalio.client
 import temporalio.worker
-from temporalio.client import Client, ClientConfig, OutboundInterceptor
+from temporalio import workflow
+from temporalio.client import Client, ClientConfig, OutboundInterceptor, Plugin
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import Worker, WorkerConfig
+from temporalio.worker import (
+    Replayer,
+    ReplayerConfig,
+    Worker,
+    WorkerConfig,
+    WorkflowReplayResult,
+)
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
+from tests.helpers import new_worker
 from tests.worker.test_worker import never_run_activity
 
 
@@ -26,18 +37,21 @@ class MyClientPlugin(temporalio.client.Plugin):
     def __init__(self):
         self.interceptor = TestClientInterceptor()
 
+    def init_client_plugin(self, next: Plugin) -> None:
+        self.next_client_plugin = next
+
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         config["namespace"] = "replaced_namespace"
         config["interceptors"] = list(config.get("interceptors") or []) + [
             self.interceptor
         ]
-        return super().configure_client(config)
+        return self.next_client_plugin.configure_client(config)
 
     async def connect_service_client(
         self, config: temporalio.service.ConnectConfig
     ) -> temporalio.service.ServiceClient:
         config.api_key = "replaced key"
-        return await super().connect_service_client(config)
+        return await self.next_client_plugin.connect_service_client(config)
 
 
 async def test_client_plugin(client: Client, env: WorkflowEnvironment):
@@ -59,12 +73,42 @@ async def test_client_plugin(client: Client, env: WorkflowEnvironment):
 
 
 class MyCombinedPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
+    def init_worker_plugin(self, next: temporalio.worker.Plugin) -> None:
+        self.next_worker_plugin = next
+
+    def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
+        self.next_client_plugin = next
+
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
+        return self.next_client_plugin.configure_client(config)
+
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         config["task_queue"] = "combined"
-        return super().configure_worker(config)
+        return self.next_worker_plugin.configure_worker(config)
+
+    async def connect_service_client(
+        self, config: temporalio.service.ConnectConfig
+    ) -> temporalio.service.ServiceClient:
+        return await self.next_client_plugin.connect_service_client(config)
+
+    async def run_worker(self, worker: Worker) -> None:
+        await self.next_worker_plugin.run_worker(worker)
+
+    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
+        return self.next_worker_plugin.configure_replayer(config)
+
+    def run_replayer(
+        self,
+        replayer: Replayer,
+        histories: AsyncIterator[temporalio.client.WorkflowHistory],
+    ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
+        return self.next_worker_plugin.run_replayer(replayer, histories)
 
 
 class MyWorkerPlugin(temporalio.worker.Plugin):
+    def init_worker_plugin(self, next: temporalio.worker.Plugin) -> None:
+        self.next_worker_plugin = next
+
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         config["task_queue"] = "replaced_queue"
         runner = config.get("workflow_runner")
@@ -73,10 +117,20 @@ class MyWorkerPlugin(temporalio.worker.Plugin):
                 runner,
                 restrictions=runner.restrictions.with_passthrough_modules("my_module"),
             )
-        return super().configure_worker(config)
+        return self.next_worker_plugin.configure_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
-        await super().run_worker(worker)
+        await self.next_worker_plugin.run_worker(worker)
+
+    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
+        return self.next_worker_plugin.configure_replayer(config)
+
+    def run_replayer(
+        self,
+        replayer: Replayer,
+        histories: AsyncIterator[temporalio.client.WorkflowHistory],
+    ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
+        return self.next_worker_plugin.run_replayer(replayer, histories)
 
 
 async def test_worker_plugin_basic_config(client: Client) -> None:
@@ -136,3 +190,69 @@ async def test_worker_sandbox_restrictions(client: Client) -> None:
             SandboxedWorkflowRunner, worker.config().get("workflow_runner")
         ).restrictions.passthrough_modules
     )
+
+
+class ReplayCheckPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
+    def init_worker_plugin(self, next: temporalio.worker.Plugin) -> None:
+        self.next_worker_plugin = next
+
+    def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
+        self.next_client_plugin = next
+
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
+        config["data_converter"] = pydantic_data_converter
+        return self.next_client_plugin.configure_client(config)
+
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+        config["workflows"] = list(config.get("workflows") or []) + [HelloWorkflow]
+        return self.next_worker_plugin.configure_worker(config)
+
+    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
+        config["data_converter"] = pydantic_data_converter
+        config["workflows"] = list(config.get("workflows") or []) + [HelloWorkflow]
+        return self.next_worker_plugin.configure_replayer(config)
+
+    async def run_worker(self, worker: Worker) -> None:
+        await self.next_worker_plugin.run_worker(worker)
+
+    async def connect_service_client(
+        self, config: temporalio.service.ConnectConfig
+    ) -> temporalio.service.ServiceClient:
+        return await self.next_client_plugin.connect_service_client(config)
+
+    @asynccontextmanager
+    async def run_replayer(
+        self,
+        replayer: Replayer,
+        histories: AsyncIterator[temporalio.client.WorkflowHistory],
+    ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
+        async with self.next_worker_plugin.run_replayer(replayer, histories) as result:
+            yield result
+
+
+@workflow.defn
+class HelloWorkflow:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        return f"Hello, {name}!"
+
+
+async def test_replay(client: Client) -> None:
+    plugin = ReplayCheckPlugin()
+    new_config = client.config()
+    new_config["plugins"] = [plugin]
+    client = Client(**new_config)
+
+    async with new_worker(client) as worker:
+        handle = await client.start_workflow(
+            HelloWorkflow.run,
+            "Tim",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()
+    replayer = Replayer(workflows=[], plugins=[plugin])
+    assert len(replayer.config().get("workflows") or []) == 1
+    assert replayer.config().get("data_converter") == pydantic_data_converter
+
+    await replayer.replay_workflow(await handle.fetch_history())

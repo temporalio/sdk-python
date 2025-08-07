@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import abc
 import asyncio
 import concurrent.futures
 import hashlib
@@ -39,6 +38,7 @@ from temporalio.common import (
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
 from ._nexus import _NexusWorker
+from ._plugin import Plugin, _RootPlugin
 from ._tuning import WorkerTuner
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
@@ -87,75 +87,6 @@ PollerBehavior: TypeAlias = Union[
     PollerBehaviorSimpleMaximum,
     PollerBehaviorAutoscaling,
 ]
-
-
-class Plugin(abc.ABC):
-    """Base class for worker plugins that can intercept and modify worker behavior.
-
-    Plugins allow customization of worker creation and execution processes
-    through a chain of responsibility pattern. Each plugin can modify the worker
-    configuration or intercept worker execution.
-    """
-
-    def name(self) -> str:
-        """Get the qualified name of this plugin. Can be overridden if desired to provide a more appropriate name.
-
-        Returns:
-            The fully qualified name of the plugin class (module.classname).
-        """
-        return type(self).__module__ + "." + type(self).__qualname__
-
-    def init_worker_plugin(self, next: Plugin) -> Plugin:
-        """Initialize this plugin in the plugin chain.
-
-        This method sets up the chain of responsibility pattern by storing a reference
-        to the next plugin in the chain. It is called during worker creation to build
-        the plugin chain.
-
-        Args:
-            next: The next plugin in the chain to delegate to.
-
-        Returns:
-            This plugin instance for method chaining.
-        """
-        self.next_worker_plugin = next
-        return self
-
-    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
-        """Hook called when creating a worker to allow modification of configuration.
-
-        This method is called during worker creation and allows plugins to modify
-        the worker configuration before the worker is fully initialized. Plugins
-        can modify task queue names, adjust concurrency settings, add interceptors,
-        or change other worker settings.
-
-        Args:
-            config: The worker configuration dictionary to potentially modify.
-
-        Returns:
-            The modified worker configuration.
-        """
-        return self.next_worker_plugin.configure_worker(config)
-
-    async def run_worker(self, worker: Worker) -> None:
-        """Hook called when running a worker to allow interception of execution.
-
-        This method is called when the worker is started and allows plugins to
-        intercept or wrap the worker execution. Plugins can add monitoring,
-        custom lifecycle management, or other execution-time behavior.
-
-        Args:
-            worker: The worker instance to run.
-        """
-        await self.next_worker_plugin.run_worker(worker)
-
-
-class _RootPlugin(Plugin):
-    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
-        return config
-
-    async def run_worker(self, worker: Worker) -> None:
-        await worker._run()
 
 
 class Worker:
@@ -443,7 +374,8 @@ class Worker:
 
         root_plugin: Plugin = _RootPlugin()
         for plugin in reversed(plugins):
-            root_plugin = plugin.init_worker_plugin(root_plugin)
+            plugin.init_worker_plugin(root_plugin)
+            root_plugin = plugin
         config = root_plugin.configure_worker(config)
         self._plugin = root_plugin
 
