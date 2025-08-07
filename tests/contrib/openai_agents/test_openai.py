@@ -5,12 +5,21 @@ import sys
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, AsyncIterator, Optional, Union, no_type_check, Callable, Sequence
+from typing import (
+    Any,
+    AsyncIterator,
+    Callable,
+    Optional,
+    Sequence,
+    Union,
+    no_type_check,
+)
 
 import nexusrpc
 import pytest
 from agents import (
     Agent,
+    AgentBase,
     AgentOutputSchemaBase,
     CodeInterpreterTool,
     FileSearchTool,
@@ -42,7 +51,7 @@ from agents import (
     handoff,
     input_guardrail,
     output_guardrail,
-    trace, AgentBase,
+    trace,
 )
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
 from agents.items import (
@@ -51,9 +60,7 @@ from agents.items import (
     ToolCallOutputItem,
     TResponseStreamEvent,
 )
-from agents.mcp import MCPServerStdio, MCPServer, MCPServerStdioParams
-from mcp import GetPromptResult, ListPromptsResult, Tool as MCPTool
-from mcp.types import CallToolResult
+from agents.mcp import MCPServer, MCPServerStdio
 from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
     EasyInputMessageParam,
@@ -77,21 +84,24 @@ from openai.types.responses.response_output_item import (
 from openai.types.responses.response_prompt_param import ResponsePromptParam
 from pydantic import ConfigDict, Field, TypeAdapter
 
-import temporalio.api.cloud.namespace.v1
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
-from temporalio.common import RetryPolicy, SearchAttributeValueType
+from temporalio.common import RetryPolicy
 from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents import (
     ModelActivityParameters,
+    TemporalMCPServerWorkflowShim,
     TestModel,
     TestModelProvider,
 )
 from temporalio.contrib.openai_agents._temporal_model_stub import _extract_summary
 from temporalio.contrib.pydantic import pydantic_data_converter
-from temporalio.exceptions import ApplicationError, CancelledError
+from temporalio.exceptions import CancelledError
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner, SandboxRestrictions
+from temporalio.worker.workflow_sandbox import (
+    SandboxedWorkflowRunner,
+    SandboxRestrictions,
+)
 from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
 )
@@ -2505,95 +2515,6 @@ async def test_hosted_mcp_tool(client: Client, use_local_model):
             assert result == "Some language"
 
 
-class TemporalMCPServerWorkflowShim(MCPServer):
-    def __init__(self, name: str):
-        self.server_name = name
-        super().__init__()
-
-    @property
-    def name(self) -> str:
-        return self.server_name
-
-    async def connect(self) -> None:
-        raise ValueError("Cannot connect to a server shim")
-
-    async def cleanup(self) -> None:
-        raise ValueError("Cannot clean up a server shim")
-
-    async def list_tools(self, run_context: Optional[RunContextWrapper[Any]] = None,
-                         agent: Optional[AgentBase] = None) -> list[MCPTool]:
-        workflow.logger.info("Listing tools")
-        tools: list[MCPTool] = await workflow.execute_local_activity(
-            self.name + "-list-tools",
-            start_to_close_timeout=timedelta(seconds=30),
-            result_type=list[MCPTool],
-        )
-        print(tools[0])
-        print("Tool type:", type(tools[0]))
-        # print(type(MCPTool(**tools[0])))
-        return tools
-
-    async def call_tool(self, tool_name: str, arguments: Optional[dict[str, Any]]) -> CallToolResult:
-        return await workflow.execute_local_activity(
-            self.name + "-call-tool",
-            args = [tool_name, arguments],
-            start_to_close_timeout=timedelta(seconds=30),
-            result_type=CallToolResult)
-
-    async def list_prompts(self) -> ListPromptsResult:
-        raise NotImplementedError()
-
-    async def get_prompt(self, name: str, arguments: Optional[dict[str, Any]] = None) -> GetPromptResult:
-        raise NotImplementedError()
-
-
-class TemporalMCPServer(TemporalMCPServerWorkflowShim):
-    def __init__(self, server: MCPServer):
-        self.server = server
-        super().__init__(server.name)
-
-    @property
-    def name(self) -> str:
-        return self.server.name
-
-    async def connect(self) -> None:
-        await self.server.connect()
-
-    async def cleanup(self) -> None:
-        await self.server.cleanup()
-
-    async def list_tools(self, run_context: Optional[RunContextWrapper[Any]] = None, agent: Optional[AgentBase] = None) -> list[MCPTool]:
-        if not workflow.in_workflow():
-            return await self.server.list_tools(run_context, agent)
-
-        return await super().list_tools(run_context, agent)
-
-    async def call_tool(self, tool_name: str, arguments: Optional[dict[str, Any]]) -> CallToolResult:
-        if not workflow.in_workflow():
-            return await self.server.call_tool(tool_name, arguments)
-
-        return await super().call_tool(tool_name, arguments)
-
-    async def __aenter__(self):
-        await self.connect()
-        return self
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        await self.cleanup()
-
-    def get_activities(self)-> Sequence[Callable]:
-
-        @activity.defn(name=self.name + "-list-tools")
-        async def list_tools() -> list[MCPTool]:
-            activity.logger.info("Listing tools in activity")
-            return await self.server.list_tools()
-
-        @activity.defn(name=self.name + "-call-tool")
-        async def call_tool(tool_name: str, arguments: Optional[dict[str, Any]]) -> CallToolResult:
-            return await self.server.call_tool(tool_name, arguments)
-
-        return list_tools, call_tool
-
 @workflow.defn
 class McpServerWorkflow:
     @workflow.run
@@ -2608,49 +2529,55 @@ class McpServerWorkflow:
         result = await Runner.run(starting_agent=agent, input=question)
         return result.final_output
 
+
 async def test_mcp_server(client: Client):
     if not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
 
+    server = MCPServerStdio(
+        name="Filesystem Server, via npx",
+        params={
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                os.path.dirname(os.path.abspath(__file__)),
+            ],
+        },
+    )
+    server2 = MCPServerStdio(
+        name="Some other server",
+        params={
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                os.path.dirname(os.path.abspath(__file__)),
+            ],
+        },
+    )
     new_config = client.config()
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=120)
             ),
+            mcp_servers=[server, server2],
         )
     ]
     client = Client(**new_config)
 
-    async with TemporalMCPServer(MCPServerStdio(
-        name="Filesystem Server, via npx",
-        params={
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-filesystem", os.path.dirname(os.path.abspath(__file__))],
-        },
-    )) as server:
-        async with TemporalMCPServer(MCPServerStdio(
-                name="Some other server",
-                params={
-                    "command": "npx",
-                    "args": ["-y", "@modelcontextprotocol/server-filesystem",
-                             os.path.dirname(os.path.abspath(__file__))],
-                },
-        )) as server2:
-            async with new_worker(
-                client,
-                McpServerWorkflow,
-                activities=list(server.get_activities()) + list(server2.get_activities()),
-                workflow_runner=SandboxedWorkflowRunner(SandboxRestrictions.default.with_passthrough_all_modules())
-            ) as worker:
-                print("Starting workflow")
-                workflow_handle = await client.start_workflow(
-                    McpServerWorkflow.run,
-                    "Read the files and list them.",
-                    id=f"mcp-server-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                    execution_timeout=timedelta(seconds=30),
-                )
-                result = await workflow_handle.result()
-                print(result)
-            assert False
+    async with new_worker(
+        client,
+        McpServerWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            McpServerWorkflow.run,
+            "Read the files and list them.",
+            id=f"mcp-server-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+        result = await workflow_handle.result()
+        print(result)
+    assert False
