@@ -52,10 +52,14 @@ from temporalio.worker import (
 )
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
+# MCP only supported on python >=3.10
+try:
+    from temporalio.contrib.openai_agents._mcp import TemporalMCPServer
+except ImportError:
+    pass
+
 if typing.TYPE_CHECKING:
     from agents.mcp import MCPServer
-
-    from temporalio.contrib.openai_agents._mcp import TemporalMCPServer
 
 
 @contextmanager
