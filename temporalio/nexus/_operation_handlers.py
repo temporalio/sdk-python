@@ -4,8 +4,6 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Optional,
-    Type,
 )
 
 from nexusrpc import (
@@ -50,8 +48,6 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
             [StartOperationContext, InputT],
             Awaitable[WorkflowHandle[OutputT]],
         ],
-        input_type: Optional[Type[InputT]],
-        output_type: Optional[Type[OutputT]],
     ) -> None:
         """Initialize the workflow run operation handler."""
         if not is_async_callable(start):
@@ -64,8 +60,6 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         if start.__doc__:
             if start_func := getattr(self.start, "__func__", None):
                 start_func.__doc__ = start.__doc__
-        self._input_type = input_type
-        self._output_type = output_type
 
     async def start(
         self, ctx: StartOperationContext, input: InputT
