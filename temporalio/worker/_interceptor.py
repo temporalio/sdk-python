@@ -298,6 +298,7 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
     operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]]
     input: InputT
     schedule_to_close_timeout: Optional[timedelta]
+    cancellation_type: temporalio.workflow.NexusOperationCancellationType
     headers: Optional[Mapping[str, str]]
     output_type: Optional[Type[OutputT]] = None
 

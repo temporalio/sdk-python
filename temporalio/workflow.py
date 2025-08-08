@@ -858,9 +858,10 @@ class _Runtime(ABC):
         service: str,
         operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
         input: Any,
-        output_type: Optional[Type[OutputT]] = None,
-        schedule_to_close_timeout: Optional[timedelta] = None,
-        headers: Optional[Mapping[str, str]] = None,
+        output_type: Optional[Type[OutputT]],
+        schedule_to_close_timeout: Optional[timedelta],
+        cancellation_type: temporalio.workflow.NexusOperationCancellationType,
+        headers: Optional[Mapping[str, str]],
     ) -> NexusOperationHandle[OutputT]: ...
 
     @abstractmethod
@@ -5137,6 +5138,46 @@ class VersioningIntent(Enum):
 ServiceT = TypeVar("ServiceT")
 
 
+class NexusOperationCancellationType(IntEnum):
+    """Defines behavior of a Nexus operation when the caller workflow initiates cancellation.
+
+    Pass one of these values to :py:meth:`NexusClient.start_operation` to define cancellation
+    behavior.
+
+    To initiate cancellation, use :py:meth:`NexusOperationHandle.cancel` and then `await` the
+    operation handle. This will result in a :py:class:`exceptions.NexusOperationError`. The values
+    of this enum define what is guaranteed to have happened by that point.
+    """
+
+    ABANDON = int(temporalio.bridge.proto.nexus.NexusOperationCancellationType.ABANDON)
+    """Do not send any cancellation request to the operation handler; just report cancellation to the caller"""
+
+    TRY_CANCEL = int(
+        temporalio.bridge.proto.nexus.NexusOperationCancellationType.TRY_CANCEL
+    )
+    """Send a cancellation request but immediately report cancellation to the caller. Note that this
+    does not guarantee that cancellation is delivered to the operation handler if the caller exits
+    before the delivery is done.
+    """
+
+    # TODO(nexus-preview): core needs to be updated to handle
+    # NexusOperationCancelRequestCompleted and NexusOperationCancelRequestFailed
+    # see https://github.com/temporalio/sdk-core/issues/911
+    # WAIT_REQUESTED = int(
+    #     temporalio.bridge.proto.nexus.NexusOperationCancellationType.WAIT_CANCELLATION_REQUESTED
+    # )
+    # """Send a cancellation request and wait for confirmation that the request was received.
+    # Does not wait for the operation to complete.
+    # """
+
+    WAIT_COMPLETED = int(
+        temporalio.bridge.proto.nexus.NexusOperationCancellationType.WAIT_CANCELLATION_COMPLETED
+    )
+    """Send a cancellation request and wait for the operation to complete.
+    Note that the operation may not complete as cancelled (for example, if it catches the
+    :py:exc:`asyncio.CancelledError` resulting from the cancellation request)."""
+
+
 class NexusClient(ABC, Generic[ServiceT]):
     """A client for invoking Nexus operations.
 
@@ -5167,6 +5208,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
@@ -5180,6 +5222,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
@@ -5196,6 +5239,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
@@ -5212,6 +5256,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
@@ -5228,6 +5273,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
@@ -5239,6 +5285,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Optional[Mapping[str, str]] = None,
     ) -> Any:
         """Start a Nexus operation and return its handle.
@@ -5268,6 +5315,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
 
@@ -5281,6 +5329,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
 
@@ -5297,6 +5346,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
 
@@ -5316,6 +5366,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
 
@@ -5332,6 +5383,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
 
@@ -5343,6 +5395,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         *,
         output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Optional[Mapping[str, str]] = None,
     ) -> Any:
         """Execute a Nexus operation and return its result.
@@ -5394,6 +5447,7 @@ class _NexusClient(NexusClient[ServiceT]):
         *,
         output_type: Optional[Type] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Optional[Mapping[str, str]] = None,
     ) -> Any:
         return (
@@ -5404,6 +5458,7 @@ class _NexusClient(NexusClient[ServiceT]):
                 input=input,
                 output_type=output_type,
                 schedule_to_close_timeout=schedule_to_close_timeout,
+                cancellation_type=cancellation_type,
                 headers=headers,
             )
         )
@@ -5415,6 +5470,7 @@ class _NexusClient(NexusClient[ServiceT]):
         *,
         output_type: Optional[Type] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Optional[Mapping[str, str]] = None,
     ) -> Any:
         handle = await self.start_operation(
@@ -5422,6 +5478,7 @@ class _NexusClient(NexusClient[ServiceT]):
             input,
             output_type=output_type,
             schedule_to_close_timeout=schedule_to_close_timeout,
+            cancellation_type=cancellation_type,
             headers=headers,
         )
         return await handle
