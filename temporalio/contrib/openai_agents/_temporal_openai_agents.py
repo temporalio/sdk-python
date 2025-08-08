@@ -1,8 +1,10 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
-from contextlib import asynccontextmanager, contextmanager
+import dataclasses
+import typing
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from datetime import timedelta
-from typing import AsyncIterator, Callable, Optional, Union
+from typing import AsyncIterator, Callable, Optional, Sequence, Union
 
 from agents import (
     AgentOutputSchemaBase,
@@ -24,7 +26,7 @@ from openai.types.responses import ResponsePromptParam
 
 import temporalio.client
 import temporalio.worker
-from temporalio.client import ClientConfig, Plugin
+from temporalio.client import ClientConfig
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
@@ -48,6 +50,12 @@ from temporalio.worker import (
     WorkerConfig,
     WorkflowReplayResult,
 )
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
+
+if typing.TYPE_CHECKING:
+    from agents.mcp import MCPServer
+
+    from temporalio.contrib.openai_agents._mcp import TemporalMCPServer
 
 
 @contextmanager
@@ -100,6 +108,8 @@ def set_open_ai_agent_temporal_overrides(
 class TestModelProvider(ModelProvider):
     """Test model provider which simply returns the given module."""
 
+    __test__ = False
+
     def __init__(self, model: Model):
         """Initialize a test model provider with a model."""
         self._model = model
@@ -111,6 +121,8 @@ class TestModelProvider(ModelProvider):
 
 class TestModel(Model):
     """Test model for use mocking model responses."""
+
+    __test__ = False
 
     def __init__(self, fn: Callable[[], ModelResponse]) -> None:
         """Initialize a test model with a callable."""
@@ -170,18 +182,24 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     1. Configures the Pydantic data converter for type-safe serialization
     2. Sets up tracing interceptors for OpenAI agent interactions
     3. Registers model execution activities
-    4. Manages the OpenAI agent runtime overrides during worker execution
+    4. Automatically registers MCP server activities and manages their lifecycles
+    5. Manages the OpenAI agent runtime overrides during worker execution
 
     Args:
         model_params: Configuration parameters for Temporal activity execution
             of model calls. If None, default parameters will be used.
         model_provider: Optional model provider for custom model implementations.
             Useful for testing or custom model integrations.
+        mcp_servers: Sequence of MCP servers to automatically register with the worker.
+            The plugin will wrap each server in a TemporalMCPServer if needed and
+            manage their connection lifecycles tied to the worker lifetime. This is
+            the recommended way to use MCP servers with Temporal workflows.
 
     Example:
         >>> from temporalio.client import Client
         >>> from temporalio.worker import Worker
         >>> from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
+        >>> from agents.mcp import MCPServerStdio
         >>> from datetime import timedelta
         >>>
         >>> # Configure model parameters
@@ -190,8 +208,17 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         ...     retry_policy=RetryPolicy(maximum_attempts=3)
         ... )
         >>>
-        >>> # Create plugin
-        >>> plugin = OpenAIAgentsPlugin(model_params=model_params)
+        >>> # Create MCP servers
+        >>> filesystem_server = MCPServerStdio(
+        ...     name="Filesystem Server",
+        ...     params={"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]}
+        ... )
+        >>>
+        >>> # Create plugin with MCP servers
+        >>> plugin = OpenAIAgentsPlugin(
+        ...     model_params=model_params,
+        ...     mcp_servers=[filesystem_server]
+        ... )
         >>>
         >>> # Use with client and worker
         >>> client = await Client.connect(
@@ -209,6 +236,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         self,
         model_params: Optional[ModelActivityParameters] = None,
         model_provider: Optional[ModelProvider] = None,
+        mcp_servers: Sequence["MCPServer"] = (),
     ) -> None:
         """Initialize the OpenAI agents plugin.
 
@@ -217,6 +245,10 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
                 of model calls. If None, default parameters will be used.
             model_provider: Optional model provider for custom model implementations.
                 Useful for testing or custom model integrations.
+            mcp_servers: Sequence of MCP servers to automatically register with the worker.
+                Each server will be wrapped in a TemporalMCPServer if not already wrapped,
+                and their activities will be automatically registered with the worker.
+                The plugin manages the connection lifecycle of these servers.
         """
         if model_params is None:
             model_params = ModelActivityParameters()
@@ -236,6 +268,19 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
 
         self._model_params = model_params
         self._model_provider = model_provider
+
+        if mcp_servers:
+            # Delayed import as mcp servers only work on python >=3.10
+            from temporalio.contrib.openai_agents._mcp import TemporalMCPServer
+
+            self._mcp_servers = [
+                server
+                if isinstance(server, TemporalMCPServer)
+                else TemporalMCPServer(server)
+                for server in mcp_servers
+            ]
+        else:
+            self._mcp_servers = []
 
     def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
         """Set the next client plugin"""
@@ -285,9 +330,18 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         config["interceptors"] = list(config.get("interceptors") or []) + [
             OpenAIAgentsTracingInterceptor()
         ]
-        config["activities"] = list(config.get("activities") or []) + [
-            ModelActivity(self._model_provider).invoke_model_activity
-        ]
+        new_activities = [ModelActivity(self._model_provider).invoke_model_activity]
+        for mcp_server in self._mcp_servers:
+            new_activities.extend(mcp_server.get_activities())
+        config["activities"] = list(config.get("activities") or []) + new_activities
+
+        runner = config.get("workflow_runner")
+        if isinstance(runner, SandboxedWorkflowRunner):
+            config["workflow_runner"] = dataclasses.replace(
+                runner,
+                restrictions=runner.restrictions.with_passthrough_modules("mcp"),
+            )
+
         return self.next_worker_plugin.configure_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
@@ -301,7 +355,10 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
             worker: The worker instance to run.
         """
         with set_open_ai_agent_temporal_overrides(self._model_params):
-            await self.next_worker_plugin.run_worker(worker)
+            async with AsyncExitStack() as stack:
+                for mcp_server in self._mcp_servers:
+                    await stack.enter_async_context(mcp_server)
+                await self.next_worker_plugin.run_worker(worker)
 
     def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
         """Configure the replayer for OpenAI Agents."""

@@ -5,7 +5,13 @@ import sys
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, AsyncIterator, Optional, Union, no_type_check
+from typing import (
+    Any,
+    AsyncIterator,
+    Optional,
+    Union,
+    no_type_check,
+)
 
 import nexusrpc
 import pytest
@@ -20,7 +26,6 @@ from agents import (
     ImageGenerationTool,
     InputGuardrailTripwireTriggered,
     ItemHelpers,
-    LocalShellTool,
     MCPToolApprovalFunctionResult,
     MCPToolApprovalRequest,
     MessageOutputItem,
@@ -49,6 +54,7 @@ from agents.items import (
     HandoffOutputItem,
     ToolCallItem,
     ToolCallOutputItem,
+    TResponseOutputItem,
     TResponseStreamEvent,
 )
 from openai import APIStatusError, AsyncOpenAI, BaseModel
@@ -74,10 +80,9 @@ from openai.types.responses.response_output_item import (
 from openai.types.responses.response_prompt_param import ResponsePromptParam
 from pydantic import ConfigDict, Field, TypeAdapter
 
-import temporalio.api.cloud.namespace.v1
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
-from temporalio.common import RetryPolicy, SearchAttributeValueType
+from temporalio.common import RetryPolicy
 from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents import (
     ModelActivityParameters,
@@ -86,7 +91,7 @@ from temporalio.contrib.openai_agents import (
 )
 from temporalio.contrib.openai_agents._temporal_model_stub import _extract_summary
 from temporalio.contrib.pydantic import pydantic_data_converter
-from temporalio.exceptions import ApplicationError, CancelledError
+from temporalio.exceptions import CancelledError
 from temporalio.testing import WorkflowEnvironment
 from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
@@ -2499,3 +2504,143 @@ async def test_hosted_mcp_tool(client: Client, use_local_model):
         result = await workflow_handle.result()
         if use_local_model:
             assert result == "Some language"
+
+
+@workflow.defn
+class McpServerWorkflow:
+    @workflow.run
+    async def run(self, question: str) -> str:
+        from agents.mcp import MCPServer
+
+        from temporalio.contrib.openai_agents import TemporalMCPServerWorkflowShim
+
+        server: MCPServer = TemporalMCPServerWorkflowShim("Filesystem Server, via npx")
+        agent = Agent[str](
+            name="MCP ServerWorkflow",
+            instructions="Use the tools to read the filesystem and answer questions based on those files.",
+            mcp_servers=[server],
+        )
+        result = await Runner.run(starting_agent=agent, input=question)
+        return result.final_output
+
+
+class ResponseBuilders:
+    @staticmethod
+    def model_response(output: TResponseOutputItem) -> ModelResponse:
+        return ModelResponse(
+            output=[output],
+            usage=Usage(),
+            response_id=None,
+        )
+
+    @staticmethod
+    def tool_call(arguments: str, name: str) -> ModelResponse:
+        return ResponseBuilders.model_response(
+            ResponseFunctionToolCall(
+                arguments=arguments,
+                call_id="call",
+                name=name,
+                type="function_call",
+                id="id",
+                status="completed",
+            )
+        )
+
+    @staticmethod
+    def output_message(text: str) -> ModelResponse:
+        return ResponseBuilders.model_response(
+            ResponseOutputMessage(
+                id="",
+                content=[
+                    ResponseOutputText(
+                        text=text,
+                        annotations=[],
+                        type="output_text",
+                    )
+                ],
+                role="assistant",
+                status="completed",
+                type="message",
+            )
+        )
+
+
+class McpServerModel(StaticTestModel):
+    responses = [
+        ResponseBuilders.tool_call(
+            arguments='{"path":"/"}',
+            name="list_directory",
+        ),
+        ResponseBuilders.tool_call(
+            arguments="{}",
+            name="list_allowed_directories",
+        ),
+        ResponseBuilders.tool_call(
+            arguments='{"path":"."}',
+            name="list_directory",
+        ),
+        ResponseBuilders.output_message(
+            "Here are the files and directories in the allowed path."
+        ),
+    ]
+
+
+@pytest.mark.parametrize("use_local_model", [True, False])
+async def test_mcp_server(client: Client, use_local_model: bool):
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("No openai API key")
+
+    if sys.version_info < (3, 10):
+        pytest.skip("Mcp not supported on Python 3.9")
+    from agents.mcp import MCPServer, MCPServerStdio
+
+    server = MCPServerStdio(
+        name="Filesystem Server, via npx",
+        params={
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                os.path.dirname(os.path.abspath(__file__)),
+            ],
+        },
+    )
+    server2 = MCPServerStdio(
+        name="Some other server",
+        params={
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                os.path.dirname(os.path.abspath(__file__)),
+            ],
+        },
+    )
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=120)
+            ),
+            model_provider=TestModelProvider(McpServerModel())
+            if use_local_model
+            else None,
+            mcp_servers=[server, server2],
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        McpServerWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            McpServerWorkflow.run,
+            "Read the files and list them.",
+            id=f"mcp-server-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+        result = await workflow_handle.result()
+        if use_local_model:
+            assert result == "Here are the files and directories in the allowed path."
