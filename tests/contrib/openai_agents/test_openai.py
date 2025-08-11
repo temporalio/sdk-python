@@ -8,7 +8,9 @@ from datetime import timedelta
 from typing import (
     Any,
     AsyncIterator,
+    Callable,
     Optional,
+    Sequence,
     Union,
     no_type_check,
 )
@@ -89,11 +91,11 @@ from temporalio.contrib.openai_agents import (
     TestModel,
     TestModelProvider,
 )
-from temporalio.contrib.openai_agents._mcp import StatelessTemporalMCPServer
 from temporalio.contrib.openai_agents._temporal_model_stub import _extract_summary
 from temporalio.contrib.pydantic import pydantic_data_converter
-from temporalio.exceptions import CancelledError
+from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.testing import WorkflowEnvironment
+from temporalio.workflow import ActivityConfig
 from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
 )
@@ -2591,19 +2593,22 @@ async def test_stateless_mcp_server(client: Client, use_local_model: bool):
 
     if sys.version_info < (3, 10):
         pytest.skip("Mcp not supported on Python 3.9")
-    from agents.mcp import MCPServer, MCPServerStdio
-
-    server = StatelessTemporalMCPServer(MCPServerStdio(
-        name="Filesystem-Server",
-        params={
-            "command": "npx",
-            "args": [
-                "-y",
-                "@modelcontextprotocol/server-filesystem",
-                os.path.dirname(os.path.abspath(__file__)),
-            ],
-        },
-    ))
+    from agents.mcp import MCPServerStdio
+    from temporalio.contrib.openai_agents import StatelessTemporalMCPServer
+    
+    server = StatelessTemporalMCPServer(
+        MCPServerStdio(
+            name="Filesystem-Server",
+            params={
+                "command": "npx",
+                "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-filesystem",
+                    os.path.dirname(os.path.abspath(__file__)),
+                ],
+            },
+        )
+    )
 
     new_config = client.config()
     new_config["plugins"] = [
@@ -2634,3 +2639,141 @@ async def test_stateless_mcp_server(client: Client, use_local_model: bool):
         if use_local_model:
             assert result == "Here are the files and directories in the allowed path."
     assert False
+
+
+@workflow.defn
+class McpServerStatefulWorkflow:
+    @workflow.run
+    async def run(self, question: str) -> str:
+        from temporalio.contrib.openai_agents import StatefulTemporalMCPServer
+        async with StatefulTemporalMCPServer(
+            "Filesystem-Server",
+            config=ActivityConfig(
+                schedule_to_start_timeout=timedelta(seconds=1),
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
+        ) as server:
+            agent = Agent[str](
+                name="MCP ServerWorkflow",
+                instructions="Use the tools to read the filesystem and answer questions based on those files.",
+                mcp_servers=[server],
+            )
+            result = await Runner.run(starting_agent=agent, input=question)
+            return result.final_output
+
+
+@pytest.mark.parametrize("use_local_model", [True, False])
+async def test_stateful_mcp_server(client: Client, use_local_model: bool):
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("No openai API key")
+
+    if sys.version_info < (3, 10):
+        pytest.skip("Mcp not supported on Python 3.9")
+    from agents.mcp import MCPServerStdio
+    from temporalio.contrib.openai_agents import StatefulTemporalMCPServer
+
+    server = StatefulTemporalMCPServer(
+        MCPServerStdio(
+            name="Filesystem-Server",
+            params={
+                "command": "npx",
+                "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-filesystem",
+                    os.path.dirname(os.path.abspath(__file__)),
+                ],
+            },
+        )
+    )
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=120)
+            ),
+            model_provider=TestModelProvider(McpServerModel())
+            if use_local_model
+            else None,
+            mcp_servers=[server],
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        McpServerStatefulWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            McpServerStatefulWorkflow.run,
+            "Read the files and list them.",
+            id=f"mcp-server-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+        result = await workflow_handle.result()
+        if use_local_model:
+            assert result == "Here are the files and directories in the allowed path."
+
+
+async def test_stateful_mcp_server_no_worker(client: Client):
+    if sys.version_info < (3, 10):
+        pytest.skip("Mcp not supported on Python 3.9")
+    from agents.mcp import MCPServerStdio
+    from temporalio.contrib.openai_agents import StatefulTemporalMCPServer
+
+    server = StatefulTemporalMCPServer(
+        MCPServerStdio(
+            name="Filesystem-Server",
+            params={
+                "command": "npx",
+                "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-filesystem",
+                    os.path.dirname(os.path.abspath(__file__)),
+                ],
+            },
+        )
+    )
+
+    # Override the connect activity to not actually start a worker
+    @activity.defn(name="Filesystem-Server-stateful-connect")
+    async def connect() -> None:
+        print("Override connect")
+        await asyncio.sleep(30)
+
+    def override_get_activities() -> Sequence[Callable]:
+        return (connect,)
+
+    server.get_activities = override_get_activities  # type:ignore
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=120)
+            ),
+            model_provider=TestModelProvider(McpServerModel()),
+            mcp_servers=[server],
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        McpServerStatefulWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            McpServerStatefulWorkflow.run,
+            "Read the files and list them.",
+            id=f"mcp-server-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+        with pytest.raises(WorkflowFailureError) as err:
+            await workflow_handle.result()
+        assert isinstance(err.value.cause, ApplicationError)
+        assert (
+            err.value.cause.message
+            == "MCP Stateful Server Worker failed to schedule activity."
+        )
