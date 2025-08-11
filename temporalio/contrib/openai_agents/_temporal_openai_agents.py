@@ -52,10 +52,9 @@ from temporalio.worker import (
 )
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
-if typing.TYPE_CHECKING:
-    from agents.mcp import MCPServer
+from agents.mcp import MCPServer
 
-    from temporalio.contrib.openai_agents._mcp import TemporalMCPServer
+from temporalio.contrib.openai_agents._mcp import StatelessTemporalMCPServer
 
 
 @contextmanager
@@ -166,6 +165,18 @@ class _OpenAIPayloadConverter(PydanticPayloadConverter):
         super().__init__(ToJsonOptions(exclude_unset=True))
 
 
+def _transform_mcp_servers(mcp_servers: Sequence[MCPServer]) -> list[MCPServer]:
+    def _transform_mcp_server(server: MCPServer) -> MCPServer:
+        if isinstance(server, StatelessTemporalMCPServer):
+            return server
+        else:
+            raise TypeError(f"Unsupported mcp server type {type(server)}")
+    return [
+        _transform_mcp_server(server)
+        for server in mcp_servers
+    ]
+
+
 class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     """Temporal plugin for integrating OpenAI agents with Temporal workflows.
 
@@ -270,15 +281,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         self._model_provider = model_provider
 
         if mcp_servers:
-            # Delayed import as mcp servers only work on python >=3.10
-            from temporalio.contrib.openai_agents._mcp import TemporalMCPServer
-
-            self._mcp_servers = [
-                server
-                if isinstance(server, TemporalMCPServer)
-                else TemporalMCPServer(server)
-                for server in mcp_servers
-            ]
+            self._mcp_servers = _transform_mcp_servers(mcp_servers)
         else:
             self._mcp_servers = []
 
@@ -355,10 +358,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
             worker: The worker instance to run.
         """
         with set_open_ai_agent_temporal_overrides(self._model_params):
-            async with AsyncExitStack() as stack:
-                for mcp_server in self._mcp_servers:
-                    await stack.enter_async_context(mcp_server)
-                await self.next_worker_plugin.run_worker(worker)
+            await self.next_worker_plugin.run_worker(worker)
 
     def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
         """Configure the replayer for OpenAI Agents."""

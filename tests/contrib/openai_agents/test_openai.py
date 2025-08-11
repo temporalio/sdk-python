@@ -89,6 +89,7 @@ from temporalio.contrib.openai_agents import (
     TestModel,
     TestModelProvider,
 )
+from temporalio.contrib.openai_agents._mcp import StatelessTemporalMCPServer
 from temporalio.contrib.openai_agents._temporal_model_stub import _extract_summary
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import CancelledError
@@ -2512,9 +2513,7 @@ class McpServerWorkflow:
     async def run(self, question: str) -> str:
         from agents.mcp import MCPServer
 
-        from temporalio.contrib.openai_agents import TemporalMCPServerWorkflowShim
-
-        server: MCPServer = TemporalMCPServerWorkflowShim("Filesystem Server, via npx")
+        server: MCPServer = StatelessTemporalMCPServer("Filesystem-Server")
         agent = Agent[str](
             name="MCP ServerWorkflow",
             instructions="Use the tools to read the filesystem and answer questions based on those files.",
@@ -2586,7 +2585,7 @@ class McpServerModel(StaticTestModel):
 
 
 @pytest.mark.parametrize("use_local_model", [True, False])
-async def test_mcp_server(client: Client, use_local_model: bool):
+async def test_stateless_mcp_server(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
 
@@ -2594,8 +2593,8 @@ async def test_mcp_server(client: Client, use_local_model: bool):
         pytest.skip("Mcp not supported on Python 3.9")
     from agents.mcp import MCPServer, MCPServerStdio
 
-    server = MCPServerStdio(
-        name="Filesystem Server, via npx",
+    server = StatelessTemporalMCPServer(MCPServerStdio(
+        name="Filesystem-Server",
         params={
             "command": "npx",
             "args": [
@@ -2604,18 +2603,8 @@ async def test_mcp_server(client: Client, use_local_model: bool):
                 os.path.dirname(os.path.abspath(__file__)),
             ],
         },
-    )
-    server2 = MCPServerStdio(
-        name="Some other server",
-        params={
-            "command": "npx",
-            "args": [
-                "-y",
-                "@modelcontextprotocol/server-filesystem",
-                os.path.dirname(os.path.abspath(__file__)),
-            ],
-        },
-    )
+    ))
+
     new_config = client.config()
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
@@ -2625,7 +2614,7 @@ async def test_mcp_server(client: Client, use_local_model: bool):
             model_provider=TestModelProvider(McpServerModel())
             if use_local_model
             else None,
-            mcp_servers=[server, server2],
+            mcp_servers=[server],
         )
     ]
     client = Client(**new_config)
@@ -2644,3 +2633,4 @@ async def test_mcp_server(client: Client, use_local_model: bool):
         result = await workflow_handle.result()
         if use_local_model:
             assert result == "Here are the files and directories in the allowed path."
+    assert False
