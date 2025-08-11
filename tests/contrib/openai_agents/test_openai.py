@@ -2515,6 +2515,8 @@ class McpServerWorkflow:
     async def run(self, question: str) -> str:
         from agents.mcp import MCPServer
 
+        from temporalio.contrib.openai_agents import StatelessTemporalMCPServer
+
         server: MCPServer = StatelessTemporalMCPServer("Filesystem-Server")
         agent = Agent[str](
             name="MCP ServerWorkflow",
@@ -2594,8 +2596,9 @@ async def test_stateless_mcp_server(client: Client, use_local_model: bool):
     if sys.version_info < (3, 10):
         pytest.skip("Mcp not supported on Python 3.9")
     from agents.mcp import MCPServerStdio
+
     from temporalio.contrib.openai_agents import StatelessTemporalMCPServer
-    
+
     server = StatelessTemporalMCPServer(
         MCPServerStdio(
             name="Filesystem-Server",
@@ -2646,6 +2649,7 @@ class McpServerStatefulWorkflow:
     @workflow.run
     async def run(self, question: str) -> str:
         from temporalio.contrib.openai_agents import StatefulTemporalMCPServer
+
         async with StatefulTemporalMCPServer(
             "Filesystem-Server",
             config=ActivityConfig(
@@ -2670,6 +2674,7 @@ async def test_stateful_mcp_server(client: Client, use_local_model: bool):
     if sys.version_info < (3, 10):
         pytest.skip("Mcp not supported on Python 3.9")
     from agents.mcp import MCPServerStdio
+
     from temporalio.contrib.openai_agents import StatefulTemporalMCPServer
 
     server = StatefulTemporalMCPServer(
@@ -2720,6 +2725,7 @@ async def test_stateful_mcp_server_no_worker(client: Client):
     if sys.version_info < (3, 10):
         pytest.skip("Mcp not supported on Python 3.9")
     from agents.mcp import MCPServerStdio
+
     from temporalio.contrib.openai_agents import StatefulTemporalMCPServer
 
     server = StatefulTemporalMCPServer(

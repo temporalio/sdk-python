@@ -28,7 +28,6 @@ import temporalio.client
 import temporalio.worker
 from temporalio.client import ClientConfig
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
-
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
@@ -56,12 +55,9 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 # Unsupported on python 3.9
 try:
     from agents.mcp import MCPServer
-    from temporalio.contrib.openai_agents._mcp import (
-        StatefulTemporalMCPServer,
-        StatelessTemporalMCPServer,
-    )
 except ImportError:
     pass
+
 
 @contextmanager
 def set_open_ai_agent_temporal_overrides(
@@ -275,10 +271,15 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         self._model_provider = model_provider
 
         if mcp_servers:
+            from temporalio.contrib.openai_agents._mcp import (
+                StatefulTemporalMCPServer,
+                StatelessTemporalMCPServer,
+            )
+
             def _transform_mcp_server(server: "MCPServer") -> "MCPServer":
                 if not (
-                        isinstance(server, StatelessTemporalMCPServer)
-                        or isinstance(server, StatefulTemporalMCPServer)
+                    isinstance(server, StatelessTemporalMCPServer)
+                    or isinstance(server, StatefulTemporalMCPServer)
                 ):
                     warnings.warn(
                         f"Unsupported mcp server type {type(server)} is not guaranteed to behave reasonably."
@@ -286,7 +287,9 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
 
                 return server
 
-            self._mcp_servers = [_transform_mcp_server(server) for server in mcp_servers]
+            self._mcp_servers = [
+                _transform_mcp_server(server) for server in mcp_servers
+            ]
         else:
             self._mcp_servers = []
 
