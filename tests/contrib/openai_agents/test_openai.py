@@ -2141,19 +2141,18 @@ async def test_stateless_mcp_server(client: Client, use_local_model: bool):
         result = await workflow_handle.result()
         if use_local_model:
             assert result == "Here are the files and directories in the allowed path."
-    assert False
 
 
 @workflow.defn
 class McpServerStatefulWorkflow:
     @workflow.run
-    async def run(self, question: str) -> str:
+    async def run(self, timeout: timedelta) -> str:
         from temporalio.contrib.openai_agents import StatefulTemporalMCPServer
 
         async with StatefulTemporalMCPServer(
             "Filesystem-Server",
             config=ActivityConfig(
-                schedule_to_start_timeout=timedelta(seconds=1),
+                schedule_to_start_timeout=timeout,
                 start_to_close_timeout=timedelta(seconds=30),
             ),
         ) as server:
@@ -2162,7 +2161,7 @@ class McpServerStatefulWorkflow:
                 instructions="Use the tools to read the filesystem and answer questions based on those files.",
                 mcp_servers=[server],
             )
-            result = await Runner.run(starting_agent=agent, input=question)
+            result = await Runner.run(starting_agent=agent, input="Read the files and list them.")
             return result.final_output
 
 
@@ -2211,7 +2210,7 @@ async def test_stateful_mcp_server(client: Client, use_local_model: bool):
     ) as worker:
         workflow_handle = await client.start_workflow(
             McpServerStatefulWorkflow.run,
-            "Read the files and list them.",
+            timedelta(seconds=30),
             id=f"mcp-server-{uuid.uuid4()}",
             task_queue=worker.task_queue,
             execution_timeout=timedelta(seconds=30),
@@ -2270,7 +2269,7 @@ async def test_stateful_mcp_server_no_worker(client: Client):
     ) as worker:
         workflow_handle = await client.start_workflow(
             McpServerStatefulWorkflow.run,
-            "Read the files and list them.",
+            timedelta(seconds=1),
             id=f"mcp-server-{uuid.uuid4()}",
             task_queue=worker.task_queue,
             execution_timeout=timedelta(seconds=30),
