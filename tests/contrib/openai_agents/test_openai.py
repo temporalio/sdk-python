@@ -2068,47 +2068,6 @@ class McpServerWorkflow:
         return result.final_output
 
 
-class ResponseBuilders:
-    @staticmethod
-    def model_response(output: TResponseOutputItem) -> ModelResponse:
-        return ModelResponse(
-            output=[output],
-            usage=Usage(),
-            response_id=None,
-        )
-
-    @staticmethod
-    def tool_call(arguments: str, name: str) -> ModelResponse:
-        return ResponseBuilders.model_response(
-            ResponseFunctionToolCall(
-                arguments=arguments,
-                call_id="call",
-                name=name,
-                type="function_call",
-                id="id",
-                status="completed",
-            )
-        )
-
-    @staticmethod
-    def output_message(text: str) -> ModelResponse:
-        return ResponseBuilders.model_response(
-            ResponseOutputMessage(
-                id="",
-                content=[
-                    ResponseOutputText(
-                        text=text,
-                        annotations=[],
-                        type="output_text",
-                    )
-                ],
-                role="assistant",
-                status="completed",
-                type="message",
-            )
-        )
-
-
 class McpServerModel(StaticTestModel):
     responses = [
         ResponseBuilders.tool_call(
