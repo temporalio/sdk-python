@@ -267,7 +267,6 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         self._model_provider = model_provider
         self._mcp_servers = mcp_servers
 
-
     def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
         """Set the next client plugin"""
         self.next_client_plugin = next
