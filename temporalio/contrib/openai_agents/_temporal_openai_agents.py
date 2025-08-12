@@ -195,7 +195,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     Example:
         >>> from temporalio.client import Client
         >>> from temporalio.worker import Worker
-        >>> from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
+        >>> from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters, StatelessTemporalMCPServer
         >>> from agents.mcp import MCPServerStdio
         >>> from datetime import timedelta
         >>>
@@ -206,10 +206,10 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         ... )
         >>>
         >>> # Create MCP servers
-        >>> filesystem_server = MCPServerStdio(
+        >>> filesystem_server = StatelessTemporalMCPServer(MCPServerStdio(
         ...     name="Filesystem Server",
         ...     params={"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]}
-        ... )
+        ... ))
         >>>
         >>> # Create plugin with MCP servers
         >>> plugin = OpenAIAgentsPlugin(
@@ -265,29 +265,8 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
 
         self._model_params = model_params
         self._model_provider = model_provider
+        self._mcp_servers = mcp_servers
 
-        if mcp_servers:
-            from temporalio.contrib.openai_agents._mcp import (
-                StatefulTemporalMCPServer,
-                StatelessTemporalMCPServer,
-            )
-
-            def _transform_mcp_server(server: "MCPServer") -> "MCPServer":
-                if not (
-                    isinstance(server, StatelessTemporalMCPServer)
-                    or isinstance(server, StatefulTemporalMCPServer)
-                ):
-                    warnings.warn(
-                        f"Unsupported mcp server type {type(server)} is not guaranteed to behave reasonably."
-                    )
-
-                return server
-
-            self._mcp_servers = [
-                _transform_mcp_server(server) for server in mcp_servers
-            ]
-        else:
-            self._mcp_servers = []
 
     def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
         """Set the next client plugin"""

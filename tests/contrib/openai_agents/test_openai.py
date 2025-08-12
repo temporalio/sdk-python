@@ -2245,7 +2245,6 @@ async def test_stateful_mcp_server_no_worker(client: Client):
     # Override the connect activity to not actually start a worker
     @activity.defn(name="Filesystem-Server-stateful-connect")
     async def connect() -> None:
-        print("Override connect")
         await asyncio.sleep(30)
 
     def override_get_activities() -> Sequence[Callable]:
