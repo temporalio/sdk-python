@@ -2161,7 +2161,9 @@ class McpServerStatefulWorkflow:
                 instructions="Use the tools to read the filesystem and answer questions based on those files.",
                 mcp_servers=[server],
             )
-            result = await Runner.run(starting_agent=agent, input="Read the files and list them.")
+            result = await Runner.run(
+                starting_agent=agent, input="Read the files and list them."
+            )
             return result.final_output
 
 
