@@ -445,7 +445,7 @@ class Client:
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Optional[Type] = None,
+        result_type: Optional[Type[ReturnType]] = None,
         execution_timeout: Optional[timedelta] = None,
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
@@ -470,7 +470,7 @@ class Client:
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
-    ) -> WorkflowHandle[Any, Any]: ...
+    ) -> WorkflowHandle[Any, ReturnType]: ...
 
     async def start_workflow(
         self,
@@ -726,7 +726,7 @@ class Client:
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Optional[Type] = None,
+        result_type: Optional[Type[ReturnType]] = None,
         execution_timeout: Optional[timedelta] = None,
         run_timeout: Optional[timedelta] = None,
         task_timeout: Optional[timedelta] = None,
@@ -751,7 +751,7 @@ class Client:
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
-    ) -> Any: ...
+    ) -> ReturnType: ...
 
     async def execute_workflow(
         self,
@@ -939,10 +939,10 @@ class Client:
         start_workflow_operation: WithStartWorkflowOperation[Any, Any],
         args: Sequence[Any] = [],
         id: Optional[str] = None,
-        result_type: Optional[Type] = None,
+        result_type: Optional[Type[LocalReturnType]] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> Any: ...
+    ) -> LocalReturnType: ...
 
     async def execute_update_with_start_workflow(
         self,
@@ -1060,10 +1060,10 @@ class Client:
         wait_for_stage: WorkflowUpdateStage,
         args: Sequence[Any] = [],
         id: Optional[str] = None,
-        result_type: Optional[Type] = None,
+        result_type: Optional[Type[LocalReturnType]] = None,
         rpc_metadata: Mapping[str, str] = {},
         rpc_timeout: Optional[timedelta] = None,
-    ) -> WorkflowUpdateHandle[Any]: ...
+    ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
     async def start_update_with_start_workflow(
         self,
