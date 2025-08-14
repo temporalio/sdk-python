@@ -1941,6 +1941,70 @@ async def test_code_interpreter_tool(client: Client, use_local_model):
             assert result == "Over 9000"
 
 
+class LocalShellModel(StaticTestModel):
+    responses = [
+        ModelResponse(
+            output=[
+                ResponseCodeInterpreterToolCall(
+                    container_id="",
+                    code="some code",
+                    type="code_interpreter_call",
+                    id="id",
+                    status="completed",
+                ),
+                ResponseBuilders.response_output_message("Over 9000"),
+            ],
+            usage=Usage(),
+            response_id=None,
+        ),
+    ]
+
+
+@workflow.defn
+class LocalShellWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        agent = Agent[str](
+            name="Local Shell Workflow",
+            instructions="You are a helpful agent. Always use your local shell tool.",
+            tools=[
+                LocalShellTool(
+                    executor=lambda request: "Files"
+                )
+            ],
+        )
+        result = await Runner.run(starting_agent=agent, input="Use your tool to tell me the files in my downloads folder.")
+
+        return result.final_output
+
+
+async def test_local_shell_tool(client: Client):
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=60)
+            ),
+            local_shell_executor=lambda request: "Files",
+            #model_provider=TestModelProvider(LocalShellModel())
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        LocalShellWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            LocalShellWorkflow.run,
+            id=f"local-shell-tool-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=60),
+        )
+        result = await workflow_handle.result()
+        assert result == "Over 9000"
+
+
 class HostedMCPModel(StaticTestModel):
     responses = [
         ModelResponse(

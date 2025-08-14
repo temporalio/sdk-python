@@ -25,7 +25,7 @@ from agents import (
     ModelTracing,
     Tool,
     TResponseInputItem,
-    WebSearchTool,
+    WebSearchTool, LocalShellTool,
 )
 from agents.items import TResponseStreamEvent
 from openai.types.responses.response_prompt_param import ResponsePromptParam
@@ -38,7 +38,7 @@ from temporalio.contrib.openai_agents._invoke_model_activity import (
     HostedMCPToolInput,
     ModelActivity,
     ModelTracingInput,
-    ToolInput,
+    ToolInput, LocalShellInput,
 )
 
 
@@ -68,6 +68,7 @@ class _TemporalModelStub(Model):
         prompt: Optional[ResponsePromptParam],
     ) -> ModelResponse:
         def make_tool_info(tool: Tool) -> ToolInput:
+            print("Input tool:", tool)
             if isinstance(
                 tool,
                 (
@@ -87,6 +88,8 @@ class _TemporalModelStub(Model):
                     params_json_schema=tool.params_json_schema,
                     strict_json_schema=tool.strict_json_schema,
                 )
+            elif isinstance(tool, LocalShellTool):
+                return LocalShellInput()
             else:
                 raise ValueError(f"Unsupported tool type: {tool.name}")
 

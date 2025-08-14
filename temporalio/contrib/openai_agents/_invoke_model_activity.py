@@ -2,9 +2,10 @@
 
 Implements mapping of OpenAI datastructures to Pydantic friendly types.
 """
-
+import asyncio
 import enum
 import json
+from asyncio import iscoroutine
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Optional, Union
@@ -26,7 +27,7 @@ from agents import (
     Tool,
     TResponseInputItem,
     UserError,
-    WebSearchTool,
+    WebSearchTool, LocalShellCommandRequest, LocalShellTool, LocalShellExecutor,
 )
 from openai import (
     APIStatusError,
@@ -75,6 +76,12 @@ class HostedMCPToolInput:
     tool_config: Mcp
 
 
+@dataclass
+class LocalShellInput:
+    """Nothing"""
+    placeholder: None = None
+
+
 ToolInput = Union[
     FunctionToolInput,
     FileSearchTool,
@@ -82,6 +89,7 @@ ToolInput = Union[
     ImageGenerationTool,
     CodeInterpreterTool,
     HostedMCPToolInput,
+    LocalShellInput,
 ]
 
 
@@ -152,11 +160,23 @@ class ModelActivity:
     Disabling retries in your model of choice is recommended to allow activity retries to define the retry model.
     """
 
-    def __init__(self, model_provider: Optional[ModelProvider] = None):
+    def __init__(self, model_provider: Optional[ModelProvider] = None, local_shell_executor: Optional[LocalShellExecutor] = None):
         """Initialize the activity with a model provider."""
         self._model_provider = model_provider or OpenAIProvider(
             openai_client=AsyncOpenAI(max_retries=0)
         )
+        self._local_shell_executor = local_shell_executor
+
+    @activity.defn
+    async def execute_local_shell_command(self, input: LocalShellCommandRequest) -> str:
+        if self._local_shell_executor:
+            result = self._local_shell_executor(input)
+            if iscoroutine(result):
+                return await result
+            else:
+                return result
+
+        raise ApplicationError("Cannot execute local shell command without providing an executor to the worker.")
 
     @activity.defn
     @_auto_heartbeater
@@ -178,6 +198,7 @@ class ModelActivity:
         input_input = json.loads(input_json)
 
         def make_tool(tool: ToolInput) -> Tool:
+            print("Tool input:", tool)
             if isinstance(
                 tool,
                 (
@@ -200,6 +221,12 @@ class ModelActivity:
                     on_invoke_tool=empty_on_invoke_tool,
                     strict_json_schema=tool.strict_json_schema,
                 )
+            elif isinstance(tool, LocalShellInput):
+                async def execute_shell(request: LocalShellCommandRequest) -> str:
+                    return ""
+                return LocalShellTool(
+                    executor=execute_shell
+                )
             else:
                 raise UserError(f"Unknown tool type: {tool.name}")
 
@@ -215,7 +242,7 @@ class ModelActivity:
             )
             for x in input.get("handoffs", [])
         ]
-
+        print("Tools:", tools)
         try:
             return await model.get_response(
                 system_instructions=input.get("system_instructions"),
@@ -263,3 +290,4 @@ class ModelActivity:
                 non_retryable=True,
                 next_retry_delay=retry_after,
             ) from e
+

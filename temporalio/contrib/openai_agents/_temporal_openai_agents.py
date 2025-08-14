@@ -14,7 +14,7 @@ from agents import (
     ModelTracing,
     Tool,
     TResponseInputItem,
-    set_trace_provider,
+    set_trace_provider, LocalShellExecutor,
 )
 from agents.items import TResponseStreamEvent
 from agents.run import get_default_agent_runner, set_default_agent_runner
@@ -205,6 +205,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         self,
         model_params: Optional[ModelActivityParameters] = None,
         model_provider: Optional[ModelProvider] = None,
+        local_shell_executor: Optional[LocalShellExecutor] = None,
     ) -> None:
         """Initialize the OpenAI agents plugin.
 
@@ -232,6 +233,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
 
         self._model_params = model_params
         self._model_provider = model_provider
+        self._local_shell_executor = local_shell_executor
 
     def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
         """Set the next client plugin"""
@@ -282,7 +284,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
             OpenAIAgentsTracingInterceptor()
         ]
         config["activities"] = list(config.get("activities") or []) + [
-            ModelActivity(self._model_provider).invoke_model_activity
+            ModelActivity(self._model_provider, self._local_shell_executor).invoke_model_activity
         ]
         return self.next_worker_plugin.configure_worker(config)
 
