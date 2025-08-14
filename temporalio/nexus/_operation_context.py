@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 from collections.abc import Awaitable, Mapping, MutableMapping, Sequence
+from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import timedelta
@@ -10,6 +11,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Generator,
     Optional,
     Union,
     overload,
@@ -45,6 +47,10 @@ _temporal_start_operation_context: ContextVar[_TemporalStartOperationContext] = 
 
 _temporal_cancel_operation_context: ContextVar[_TemporalCancelOperationContext] = (
     ContextVar("temporal-cancel-operation-context")
+)
+
+_temporal_nexus_backing_workflow_start_context: ContextVar[bool] = ContextVar(
+    "temporal-nexus-backing-workflow-start-context"
 )
 
 
@@ -94,6 +100,19 @@ def _try_temporal_context() -> (
     if start_ctx and cancel_ctx:
         raise RuntimeError("Cannot be in both start and cancel operation contexts.")
     return start_ctx or cancel_ctx
+
+
+@contextmanager
+def _nexus_backing_workflow_start_context() -> Generator[None, None, None]:
+    token = _temporal_nexus_backing_workflow_start_context.set(True)
+    try:
+        yield
+    finally:
+        _temporal_nexus_backing_workflow_start_context.reset(token)
+
+
+def _in_nexus_backing_workflow_start_context() -> bool:
+    return _temporal_nexus_backing_workflow_start_context.get(False)
 
 
 @dataclass
@@ -396,48 +415,40 @@ class WorkflowRunOperationContext(StartOperationContext):
             Nexus caller is itself a workflow, this means that the workflow in the caller
             namespace web UI will contain links to the started workflow, and vice versa.
         """
-        # TODO(nexus-preview): When sdk-python supports on_conflict_options, Typescript does this:
-        # if (workflowOptions.workflowIdConflictPolicy === 'USE_EXISTING') {
-        #     internalOptions.onConflictOptions = {
-        #     attachLinks: true,
-        #     attachCompletionCallbacks: true,
-        #     attachRequestId: true,
-        #     };
-        # }
-
         # We must pass nexus_completion_callbacks, workflow_event_links, and request_id,
         # but these are deliberately not exposed in overloads, hence the type-check
         # violation.
-        wf_handle = await self._temporal_context.client.start_workflow(  # type: ignore
-            workflow=workflow,
-            arg=arg,
-            args=args,
-            id=id,
-            task_queue=task_queue or self._temporal_context.info().task_queue,
-            result_type=result_type,
-            execution_timeout=execution_timeout,
-            run_timeout=run_timeout,
-            task_timeout=task_timeout,
-            id_reuse_policy=id_reuse_policy,
-            id_conflict_policy=id_conflict_policy,
-            retry_policy=retry_policy,
-            cron_schedule=cron_schedule,
-            memo=memo,
-            search_attributes=search_attributes,
-            static_summary=static_summary,
-            static_details=static_details,
-            start_delay=start_delay,
-            start_signal=start_signal,
-            start_signal_args=start_signal_args,
-            rpc_metadata=rpc_metadata,
-            rpc_timeout=rpc_timeout,
-            request_eager_start=request_eager_start,
-            priority=priority,
-            versioning_override=versioning_override,
-            callbacks=self._temporal_context._get_callbacks(),
-            workflow_event_links=self._temporal_context._get_workflow_event_links(),
-            request_id=self._temporal_context.nexus_context.request_id,
-        )
+        with _nexus_backing_workflow_start_context():
+            wf_handle = await self._temporal_context.client.start_workflow(  # type: ignore
+                workflow=workflow,
+                arg=arg,
+                args=args,
+                id=id,
+                task_queue=task_queue or self._temporal_context.info().task_queue,
+                result_type=result_type,
+                execution_timeout=execution_timeout,
+                run_timeout=run_timeout,
+                task_timeout=task_timeout,
+                id_reuse_policy=id_reuse_policy,
+                id_conflict_policy=id_conflict_policy,
+                retry_policy=retry_policy,
+                cron_schedule=cron_schedule,
+                memo=memo,
+                search_attributes=search_attributes,
+                static_summary=static_summary,
+                static_details=static_details,
+                start_delay=start_delay,
+                start_signal=start_signal,
+                start_signal_args=start_signal_args,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+                request_eager_start=request_eager_start,
+                priority=priority,
+                versioning_override=versioning_override,
+                callbacks=self._temporal_context._get_callbacks(),
+                workflow_event_links=self._temporal_context._get_workflow_event_links(),
+                request_id=self._temporal_context.nexus_context.request_id,
+            )
 
         self._temporal_context._add_outbound_links(wf_handle)
 
