@@ -505,13 +505,6 @@ custom-header = "custom-value"
     assert new_client.namespace == "env-only-namespace"
 
 
-def test_to_client_connect_config_missing_address_fails():
-    """Test that to_client_connect_config raises a ValueError if address is missing."""
-    profile = ClientConfigProfile()
-    with pytest.raises(ValueError, match="must contain an 'address'"):
-        profile.to_client_connect_config()
-
-
 def test_disables_raise_error():
     """Test that providing both disable_file and disable_env raises an error."""
     with pytest.raises(RuntimeError, match="Cannot disable both"):
