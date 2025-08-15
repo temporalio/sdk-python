@@ -69,6 +69,7 @@ class _TemporalModelStub(Model):
         previous_response_id: Optional[str],
         prompt: Optional[ResponsePromptParam],
     ) -> ModelResponse:
+        print("Model stub invocation:", self.model_name)
         def make_tool_info(tool: Tool) -> ToolInput:
             if isinstance(
                 tool,

@@ -916,16 +916,6 @@ class CustomerServiceModel(StaticTestModel):
     ]
 
 
-class AssertDifferentModelProvider(ModelProvider):
-    model_names = set()
-
-    def __init__(self, model: Model):
-        self._model = model
-
-    def get_model(self, model_name: Union[str, None]) -> Model:
-        self.model_names.add(model_name)
-        return self._model
-
 
 @workflow.defn
 class CustomerServiceWorkflow:
@@ -999,7 +989,7 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    provider = AssertDifferentModelProvider(CustomerServiceModel())
+    provider = TestModelProvider(CustomerServiceModel())
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
@@ -1089,7 +1079,6 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
                 .data.decode()
             )
 
-            assert len(provider.model_names) == 2
 
 class InputGuardrailModel(OpenAIResponsesModel):
     __test__ = False
@@ -2055,3 +2044,71 @@ async def test_hosted_mcp_tool(client: Client, use_local_model):
         result = await workflow_handle.result()
         if use_local_model:
             assert result == "Some language"
+
+
+class AssertDifferentModelProvider(ModelProvider):
+    model_names = set()
+
+    def __init__(self, model: Model):
+        self._model = model
+
+    def get_model(self, model_name: Union[str, None]) -> Model:
+        self.model_names.add(model_name)
+        return self._model
+
+
+class MultipleModelsModel(StaticTestModel):
+    responses = [
+        ResponseBuilders.tool_call("{}", "transfer_to_underling"),
+        ResponseBuilders.output_message(
+            "I'm here to help! Was there a specific task you needed assistance with regarding the storeroom?"
+        ),
+    ]
+
+@workflow.defn
+class MultipleModelWorkflow:
+    @workflow.run
+    async def run(self):
+        underling = Agent[None](
+            name="Underling",
+            instructions="You do all the work you are told.",
+        )
+
+        starting_agent = Agent[None](
+            name="Lazy Assistant",
+            model="gpt-4o-mini",
+            instructions="You delegate all your work to another agent.",
+            handoffs=[underling]
+        )
+        result = await Runner.run(
+            starting_agent=starting_agent,
+            input="Have you cleaned the store room yet?",
+        )
+        return result.final_output
+
+
+async def test_multiple_models(client: Client):
+    provider = AssertDifferentModelProvider(MultipleModelsModel())
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=120)
+            ),
+            model_provider=provider
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        MultipleModelWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            MultipleModelWorkflow.run,
+            id=f"multiple-model-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=120),
+        )
+        result = await workflow_handle.result()
+        assert provider.model_names == {None, "gpt-4o-mini"}
