@@ -142,7 +142,7 @@ class _TemporalModelStub(Model):
                 self.model_params.summary_override
                 if isinstance(self.model_params.summary_override, str)
                 else (
-                    self.model_params.summary_override(
+                    self.model_params.summary_override.provide(
                         self.agent, system_instructions, input
                     )
                 )

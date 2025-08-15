@@ -86,6 +86,7 @@ from temporalio.contrib.openai_agents import (
     TestModel,
     TestModelProvider,
 )
+from temporalio.contrib.openai_agents._model_parameters import ModelSummaryProvider
 from temporalio.contrib.openai_agents._temporal_model_stub import _extract_summary
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import ApplicationError, CancelledError
@@ -2144,3 +2145,42 @@ async def test_run_config_models(client: Client):
 
         # Only the model from the runconfig override is used
         assert provider.model_names == {"gpt-4o"}
+
+
+async def test_summary_provider(client: Client):
+    class SummaryProvider(ModelSummaryProvider):
+        def provide(
+            self,
+            agent: Optional[Agent[Any]],
+            instructions: Optional[str],
+            input: Union[str, list[TResponseInputItem]],
+        ) -> str:
+            return "My summary"
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=120),
+                summary_override=SummaryProvider(),
+            ),
+            model_provider=TestModelProvider(TestHelloModel()),
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        HelloWorldAgent,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            HelloWorldAgent.run,
+            "Prompt",
+            id=f"summary-provider-model-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+        result = await workflow_handle.result()
+        async for e in workflow_handle.fetch_history_events():
+            if e.HasField("activity_task_scheduled_event_attributes"):
+                assert e.user_metadata.summary.data == b'"My summary"'

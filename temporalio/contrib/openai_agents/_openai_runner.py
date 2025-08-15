@@ -92,37 +92,50 @@ class TemporalOpenAIRunner(AgentRunner):
             )
 
         # Recursively replace models in all agents
-        def convert_agent(agent: Agent[Any]) -> None:
-            # Short circuit if this model was already replaced to prevent looping from circular handoffs
-            if isinstance(agent.model, _TemporalModelStub):
-                return
+        def convert_agent(
+            agent: Agent[Any], seen: Optional[set[int]] = None
+        ) -> Agent[Any]:
+            if seen is None:
+                seen = set()
+
+            # Short circuit if this model was already seen to prevent looping from circular handoffs
+            if id(agent) in seen:
+                return agent
+            seen.add(id(agent))
 
             name = _model_name(agent)
-            agent.model = _TemporalModelStub(
-                model_name=name,
-                model_params=self.model_params,
-                agent=agent,
-            )
 
+            new_handoffs: list[Union[Agent, Handoff]] = []
             for handoff in agent.handoffs:
                 if isinstance(handoff, Agent):
-                    convert_agent(handoff)
+                    new_handoffs.append(convert_agent(handoff))
                 elif isinstance(handoff, Handoff):
                     original_invoke = handoff.on_invoke_handoff
 
                     async def on_invoke(
                         context: RunContextWrapper[Any], args: str
-                    ) -> Agent[Any]:
+                    ) -> Agent:
                         handoff_agent = await original_invoke(context, args)
-                        convert_agent(handoff_agent)
-                        return handoff_agent
+                        return convert_agent(handoff_agent, seen)
 
-                    handoff.on_invoke_handoff = on_invoke
+                    new_handoffs.append(
+                        dataclasses.replace(handoff, on_invoke_handoff=on_invoke)
+                    )
+                else:
+                    raise ValueError(f"Unknown handoff type: {type(handoff)}")
 
-        convert_agent(starting_agent)
+            return dataclasses.replace(
+                agent,
+                model=_TemporalModelStub(
+                    model_name=name,
+                    model_params=self.model_params,
+                    agent=agent,
+                ),
+                handoffs=new_handoffs,
+            )
 
         return await self._runner.run(
-            starting_agent=starting_agent,
+            starting_agent=convert_agent(starting_agent),
             input=input,
             context=context,
             max_turns=max_turns,
