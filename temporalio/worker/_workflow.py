@@ -522,6 +522,7 @@ class _WorkflowWorker:
             execution_timeout=init.workflow_execution_timeout.ToTimedelta()
             if init.HasField("workflow_execution_timeout")
             else None,
+            first_execution_run_id=init.first_execution_run_id,
             headers=dict(init.headers),
             namespace=self._namespace,
             parent=parent,
