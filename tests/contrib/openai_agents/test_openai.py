@@ -32,6 +32,7 @@ from agents import (
     OpenAIChatCompletionsModel,
     OpenAIResponsesModel,
     OutputGuardrailTripwireTriggered,
+    RunConfig,
     RunContextWrapper,
     Runner,
     SQLiteSession,
@@ -861,7 +862,6 @@ def init_agents() -> Agent[AirlineAgentContext]:
 
     seat_booking_agent = Agent[AirlineAgentContext](
         name="Seat Booking Agent",
-        model="gpt-4o-mini",
         handoff_description="A helpful agent that can update a seat on a flight.",
         instructions=f"""{RECOMMENDED_PROMPT_PREFIX}
         You are a seat booking agent. If you are speaking to a customer, you probably were transferred to from the triage agent.
@@ -988,13 +988,14 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
-    provider = TestModelProvider(CustomerServiceModel())
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=provider if use_local_model else None,
+            model_provider=TestModelProvider(CustomerServiceModel())
+            if use_local_model
+            else None,
         )
     ]
     client = Client(**new_config)
@@ -2066,7 +2067,7 @@ class MultipleModelsModel(StaticTestModel):
 @workflow.defn
 class MultipleModelWorkflow:
     @workflow.run
-    async def run(self):
+    async def run(self, use_run_config: bool):
         underling = Agent[None](
             name="Underling",
             instructions="You do all the work you are told.",
@@ -2081,6 +2082,7 @@ class MultipleModelWorkflow:
         result = await Runner.run(
             starting_agent=starting_agent,
             input="Have you cleaned the store room yet?",
+            run_config=RunConfig(model="gpt-4o") if use_run_config else None,
         )
         return result.final_output
 
@@ -2104,9 +2106,40 @@ async def test_multiple_models(client: Client):
     ) as worker:
         workflow_handle = await client.start_workflow(
             MultipleModelWorkflow.run,
+            False,
             id=f"multiple-model-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=120),
+            execution_timeout=timedelta(seconds=10),
         )
         result = await workflow_handle.result()
         assert provider.model_names == {None, "gpt-4o-mini"}
+
+
+async def test_run_config_models(client: Client):
+    provider = AssertDifferentModelProvider(MultipleModelsModel())
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=120)
+            ),
+            model_provider=provider,
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        MultipleModelWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            MultipleModelWorkflow.run,
+            True,
+            id=f"run-config-model-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+        result = await workflow_handle.result()
+
+        # Only the model from the runconfig override is used
+        assert provider.model_names == {"gpt-4o"}

@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import typing
 from typing import Any, Optional, Union
@@ -78,29 +79,30 @@ class TemporalOpenAIRunner(AgentRunner):
         if run_config is None:
             run_config = RunConfig()
 
-        def model_name(agent: Agent[Any]) -> Optional[str]:
-            name = run_config.model or agent.model
-            if name is not None and not isinstance(name, str):
-                print("Name: ", name, " Agent: ", agent)
+        if run_config.model:
+            if not isinstance(run_config.model, str):
                 raise ValueError(
-                    "Temporal workflows require a model name to be a string in the run config and/or agent."
+                    "Temporal workflows require a model name to be a string in the run config."
                 )
-            return name
+            run_config = dataclasses.replace(
+                run_config,
+                model=_TemporalModelStub(
+                    run_config.model, model_params=self.model_params, agent=None
+                ),
+            )
 
+        # Recursively replace models in all agents
         def convert_agent(agent: Agent[Any]) -> None:
-            print("Model: ", agent.model)
-
             # Short circuit if this model was already replaced to prevent looping from circular handoffs
             if isinstance(agent.model, _TemporalModelStub):
                 return
 
-            name = model_name(agent)
+            name = _model_name(agent)
             agent.model = _TemporalModelStub(
                 model_name=name,
                 model_params=self.model_params,
                 agent=agent,
             )
-            print("Model after replace: ", agent.model)
 
             for handoff in agent.handoffs:
                 if isinstance(handoff, Agent):
@@ -159,3 +161,12 @@ class TemporalOpenAIRunner(AgentRunner):
                 **kwargs,
             )
         raise RuntimeError("Temporal workflows do not support streaming.")
+
+
+def _model_name(agent: Agent[Any]) -> Optional[str]:
+    name = agent.model
+    if name is not None and not isinstance(name, str):
+        raise ValueError(
+            "Temporal workflows require a model name to be a string in the agent."
+        )
+    return name

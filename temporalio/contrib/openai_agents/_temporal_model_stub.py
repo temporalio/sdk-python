@@ -51,7 +51,7 @@ class _TemporalModelStub(Model):
         model_name: Optional[str],
         *,
         model_params: ModelActivityParameters,
-        agent: Agent[Any],
+        agent: Optional[Agent[Any]],
     ) -> None:
         self.model_name = model_name
         self.model_params = model_params
@@ -70,8 +70,6 @@ class _TemporalModelStub(Model):
         previous_response_id: Optional[str],
         prompt: Optional[ResponsePromptParam],
     ) -> ModelResponse:
-        print("Model stub invocation:", self.model_name)
-
         def make_tool_info(tool: Tool) -> ToolInput:
             if isinstance(
                 tool,
@@ -149,8 +147,10 @@ class _TemporalModelStub(Model):
                     )
                 )
             )
-        else:
+        elif self.agent:
             summary = self.agent.name
+        else:
+            summary = None
 
         return await workflow.execute_activity_method(
             ModelActivity.invoke_model_activity,

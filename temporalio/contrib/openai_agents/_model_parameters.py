@@ -47,7 +47,12 @@ class ModelActivityParameters:
         Union[
             str,
             Callable[
-                [Agent[Any], Optional[str], Union[str, list[TResponseInputItem]]], str
+                [
+                    Optional[Agent[Any]],
+                    Optional[str],
+                    Union[str, list[TResponseInputItem]],
+                ],
+                str,
             ],
         ]
     ] = None
