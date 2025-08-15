@@ -33,6 +33,7 @@ _fake_info = temporalio.workflow.Info(
     continued_run_id=None,
     cron_schedule=None,
     execution_timeout=None,
+    first_execution_run_id="sandbox-validate-first-run_id",
     headers={},
     namespace="sandbox-validate-namespace",
     parent=None,

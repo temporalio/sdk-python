@@ -1645,6 +1645,7 @@ class ContinueAsNewWorkflow:
         info = workflow.info()
         if info.continued_run_id:
             past_run_ids.append(info.continued_run_id)
+            assert info.first_execution_run_id == past_run_ids[0]
         workflow.continue_as_new(
             past_run_ids,
             # Add memo and retry policy to check

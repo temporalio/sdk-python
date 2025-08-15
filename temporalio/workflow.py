@@ -493,6 +493,7 @@ class Info:
     continued_run_id: Optional[str]
     cron_schedule: Optional[str]
     execution_timeout: Optional[timedelta]
+    first_execution_run_id: str
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     namespace: str
     parent: Optional[ParentInfo]
