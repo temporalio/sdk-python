@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 from typing import Any, AsyncIterator, Union, cast
 
 from agents import (
+    Agent,
     AgentOutputSchema,
     AgentOutputSchemaBase,
     CodeInterpreterTool,
@@ -25,7 +26,7 @@ from agents import (
     ModelTracing,
     Tool,
     TResponseInputItem,
-    WebSearchTool, Agent,
+    WebSearchTool,
 )
 from agents.items import TResponseStreamEvent
 from openai.types.responses.response_prompt_param import ResponsePromptParam
@@ -70,6 +71,7 @@ class _TemporalModelStub(Model):
         prompt: Optional[ResponsePromptParam],
     ) -> ModelResponse:
         print("Model stub invocation:", self.model_name)
+
         def make_tool_info(tool: Tool) -> ToolInput:
             if isinstance(
                 tool,
@@ -138,8 +140,15 @@ class _TemporalModelStub(Model):
         )
 
         if self.model_params.summary_override:
-            summary = self.model_params.summary_override if isinstance(self.model_params.summary_override, str) else (
-                self.model_params.summary_override(self.agent, system_instructions, input))
+            summary = (
+                self.model_params.summary_override
+                if isinstance(self.model_params.summary_override, str)
+                else (
+                    self.model_params.summary_override(
+                        self.agent, system_instructions, input
+                    )
+                )
+            )
         else:
             summary = self.agent.name
 

@@ -916,7 +916,6 @@ class CustomerServiceModel(StaticTestModel):
     ]
 
 
-
 @workflow.defn
 class CustomerServiceWorkflow:
     def __init__(self, input_items: list[TResponseInputItem] = []):
@@ -995,9 +994,7 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider= provider
-            if use_local_model
-            else None,
+            model_provider=provider if use_local_model else None,
         )
     ]
     client = Client(**new_config)
@@ -2047,7 +2044,7 @@ async def test_hosted_mcp_tool(client: Client, use_local_model):
 
 
 class AssertDifferentModelProvider(ModelProvider):
-    model_names = set()
+    model_names: set[Optional[str]] = set()
 
     def __init__(self, model: Model):
         self._model = model
@@ -2065,6 +2062,7 @@ class MultipleModelsModel(StaticTestModel):
         ),
     ]
 
+
 @workflow.defn
 class MultipleModelWorkflow:
     @workflow.run
@@ -2078,7 +2076,7 @@ class MultipleModelWorkflow:
             name="Lazy Assistant",
             model="gpt-4o-mini",
             instructions="You delegate all your work to another agent.",
-            handoffs=[underling]
+            handoffs=[underling],
         )
         result = await Runner.run(
             starting_agent=starting_agent,
@@ -2095,7 +2093,7 @@ async def test_multiple_models(client: Client):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=120)
             ),
-            model_provider=provider
+            model_provider=provider,
         )
     ]
     client = Client(**new_config)

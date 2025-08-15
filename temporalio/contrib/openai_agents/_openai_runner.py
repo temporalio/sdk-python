@@ -1,17 +1,18 @@
 import json
 import typing
-from dataclasses import replace
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 from agents import (
     Agent,
+    Handoff,
     RunConfig,
+    RunContextWrapper,
     RunResult,
     RunResultStreaming,
     SQLiteSession,
     TContext,
     Tool,
-    TResponseInputItem, Handoff, RunContextWrapper,
+    TResponseInputItem,
 )
 from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
 from pydantic_core import to_json
@@ -77,7 +78,7 @@ class TemporalOpenAIRunner(AgentRunner):
         if run_config is None:
             run_config = RunConfig()
 
-        def model_name(agent: Agent[Any]) -> str:
+        def model_name(agent: Agent[Any]) -> Optional[str]:
             name = run_config.model or agent.model
             if name is not None and not isinstance(name, str):
                 print("Name: ", name, " Agent: ", agent)
@@ -106,10 +107,14 @@ class TemporalOpenAIRunner(AgentRunner):
                     convert_agent(handoff)
                 elif isinstance(handoff, Handoff):
                     original_invoke = handoff.on_invoke_handoff
-                    async def on_invoke(context: RunContextWrapper[Any], args: str) -> Agent[Any]:
+
+                    async def on_invoke(
+                        context: RunContextWrapper[Any], args: str
+                    ) -> Agent[Any]:
                         handoff_agent = await original_invoke(context, args)
                         convert_agent(handoff_agent)
                         return handoff_agent
+
                     handoff.on_invoke_handoff = on_invoke
 
         convert_agent(starting_agent)
