@@ -2045,10 +2045,11 @@ async def test_hosted_mcp_tool(client: Client, use_local_model):
 
 
 class AssertDifferentModelProvider(ModelProvider):
-    model_names: set[Optional[str]] = set()
+    model_names: set[Optional[str]]
 
     def __init__(self, model: Model):
         self._model = model
+        self.model_names = set()
 
     def get_model(self, model_name: Union[str, None]) -> Model:
         self.model_names.add(model_name)
