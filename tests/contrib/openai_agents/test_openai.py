@@ -861,6 +861,7 @@ def init_agents() -> Agent[AirlineAgentContext]:
 
     seat_booking_agent = Agent[AirlineAgentContext](
         name="Seat Booking Agent",
+        model="gpt-4o-mini",
         handoff_description="A helpful agent that can update a seat on a flight.",
         instructions=f"""{RECOMMENDED_PROMPT_PREFIX}
         You are a seat booking agent. If you are speaking to a customer, you probably were transferred to from the triage agent.
@@ -913,6 +914,17 @@ class CustomerServiceModel(StaticTestModel):
             "Your seat has been updated to a window seat. If there's anything else you need, feel free to let me know!"
         ),
     ]
+
+
+class AssertDifferentModelProvider(ModelProvider):
+    model_names = set()
+
+    def __init__(self, model: Model):
+        self._model = model
+
+    def get_model(self, model_name: Union[str, None]) -> Model:
+        self.model_names.add(model_name)
+        return self._model
 
 
 @workflow.defn
@@ -987,12 +999,13 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     new_config = client.config()
+    provider = AssertDifferentModelProvider(CustomerServiceModel())
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=TestModelProvider(CustomerServiceModel())
+            model_provider= provider
             if use_local_model
             else None,
         )
@@ -1076,6 +1089,7 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
                 .data.decode()
             )
 
+            assert len(provider.model_names) == 2
 
 class InputGuardrailModel(OpenAIResponsesModel):
     __test__ = False

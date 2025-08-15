@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional
+from typing import Optional, Union, Callable, Any
+
+from agents import Agent, TResponseInputItem
 
 from temporalio.common import Priority, RetryPolicy
 from temporalio.workflow import ActivityCancellationType, VersioningIntent
@@ -41,7 +43,7 @@ class ModelActivityParameters:
     versioning_intent: Optional[VersioningIntent] = None
     """Versioning intent for the activity."""
 
-    summary_override: Optional[str] = None
+    summary_override: Optional[Union[str, Callable[[Agent[Any], Optional[str], Union[str, list[TResponseInputItem]]], str]]] = None
     """Summary for the activity execution."""
 
     priority: Priority = Priority.default

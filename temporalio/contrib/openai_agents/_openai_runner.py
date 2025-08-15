@@ -11,7 +11,7 @@ from agents import (
     SQLiteSession,
     TContext,
     Tool,
-    TResponseInputItem,
+    TResponseInputItem, Handoff, RunContextWrapper,
 )
 from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
 from pydantic_core import to_json
@@ -77,18 +77,42 @@ class TemporalOpenAIRunner(AgentRunner):
         if run_config is None:
             run_config = RunConfig()
 
-        model_name = run_config.model or starting_agent.model
-        if model_name is not None and not isinstance(model_name, str):
-            raise ValueError(
-                "Temporal workflows require a model name to be a string in the run config and/or agent."
-            )
-        updated_run_config = replace(
-            run_config,
-            model=_TemporalModelStub(
-                model_name=model_name,
+        def model_name(agent: Agent[Any]) -> str:
+            name = run_config.model or agent.model
+            if name is not None and not isinstance(name, str):
+                print("Name: ", name, " Agent: ", agent)
+                raise ValueError(
+                    "Temporal workflows require a model name to be a string in the run config and/or agent."
+                )
+            return name
+
+        def convert_agent(agent: Agent[Any]) -> None:
+            print("Model: ", agent.model)
+
+            # Short circuit if this model was already replaced to prevent looping from circular handoffs
+            if isinstance(agent.model, _TemporalModelStub):
+                return
+
+            name = model_name(agent)
+            agent.model = _TemporalModelStub(
+                model_name=name,
                 model_params=self.model_params,
-            ),
-        )
+                agent=agent,
+            )
+            print("Model after replace: ", agent.model)
+
+            for handoff in agent.handoffs:
+                if isinstance(handoff, Agent):
+                    convert_agent(handoff)
+                elif isinstance(handoff, Handoff):
+                    original_invoke = handoff.on_invoke_handoff
+                    async def on_invoke(context: RunContextWrapper[Any], args: str) -> Agent[Any]:
+                        handoff_agent = await original_invoke(context, args)
+                        convert_agent(handoff_agent)
+                        return handoff_agent
+                    handoff.on_invoke_handoff = on_invoke
+
+        convert_agent(starting_agent)
 
         return await self._runner.run(
             starting_agent=starting_agent,
@@ -96,7 +120,7 @@ class TemporalOpenAIRunner(AgentRunner):
             context=context,
             max_turns=max_turns,
             hooks=hooks,
-            run_config=updated_run_config,
+            run_config=run_config,
             previous_response_id=previous_response_id,
             session=session,
         )

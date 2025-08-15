@@ -25,7 +25,7 @@ from agents import (
     ModelTracing,
     Tool,
     TResponseInputItem,
-    WebSearchTool,
+    WebSearchTool, Agent,
 )
 from agents.items import TResponseStreamEvent
 from openai.types.responses.response_prompt_param import ResponsePromptParam
@@ -50,9 +50,11 @@ class _TemporalModelStub(Model):
         model_name: Optional[str],
         *,
         model_params: ModelActivityParameters,
+        agent: Agent[Any],
     ) -> None:
         self.model_name = model_name
         self.model_params = model_params
+        self.agent = agent
 
     async def get_response(
         self,
@@ -124,7 +126,7 @@ class _TemporalModelStub(Model):
         activity_input = ActivityModelInput(
             model_name=self.model_name,
             system_instructions=system_instructions,
-            input=cast(Union[str, list[TResponseInputItem]], input),
+            input=input,
             model_settings=model_settings,
             tools=tool_infos,
             output_schema=output_schema_input,
@@ -134,10 +136,16 @@ class _TemporalModelStub(Model):
             prompt=prompt,
         )
 
+        if self.model_params.summary_override:
+            summary = self.model_params.summary_override if isinstance(self.model_params.summary_override, str) else (
+                self.model_params.summary_override(self.agent, system_instructions, input))
+        else:
+            summary = self.agent.name
+
         return await workflow.execute_activity_method(
             ModelActivity.invoke_model_activity,
             activity_input,
-            summary=self.model_params.summary_override or _extract_summary(input),
+            summary=summary,
             task_queue=self.model_params.task_queue,
             schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
             schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
