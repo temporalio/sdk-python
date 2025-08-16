@@ -1,5 +1,6 @@
 import json
 import typing
+import warnings
 from dataclasses import replace
 from typing import Any, Union
 
@@ -55,9 +56,20 @@ class TemporalOpenAIRunner(AgentRunner):
                 )
 
         if starting_agent.mcp_servers:
-            raise ValueError(
-                "Temporal OpenAI agent does not support on demand MCP servers."
+            from temporalio.contrib.openai_agents import (
+                StatefulTemporalMCPServer,
+                StatelessTemporalMCPServer,
             )
+
+            for s in starting_agent.mcp_servers:
+                if not isinstance(
+                    s, (StatelessTemporalMCPServer, StatefulTemporalMCPServer)
+                ):
+                    warnings.warn(
+                        "Unknown mcp_server type {} may not work durably.".format(
+                            type(s)
+                        )
+                    )
 
         # workaround for https://github.com/pydantic/pydantic/issues/9541
         # ValidatorIterator returned
