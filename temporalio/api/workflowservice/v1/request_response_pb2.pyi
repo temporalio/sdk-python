@@ -7006,7 +7006,11 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that user has set in the worker."""
     @property
-    def worker_heartbeat(self) -> temporalio.api.worker.v1.message_pb2.WorkerHeartbeat:
+    def worker_heartbeat(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
+    ]:
         """Worker info to be sent to the server."""
     def __init__(
         self,
@@ -7018,7 +7022,9 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
         | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
-        worker_heartbeat: temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
+        worker_heartbeat: collections.abc.Iterable[
+            temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
+        ]
         | None = ...,
     ) -> None: ...
     def HasField(
@@ -7028,8 +7034,6 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
             b"deployment_options",
             "task_queue",
             b"task_queue",
-            "worker_heartbeat",
-            b"worker_heartbeat",
             "worker_version_capabilities",
             b"worker_version_capabilities",
         ],
@@ -9363,19 +9367,19 @@ class RecordWorkerHeartbeatRequest(google.protobuf.message.Message):
     @property
     def worker_heartbeat(
         self,
-    ) -> temporalio.api.worker.v1.message_pb2.WorkerHeartbeat: ...
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
+    ]: ...
     def __init__(
         self,
         *,
         namespace: builtins.str = ...,
         identity: builtins.str = ...,
-        worker_heartbeat: temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
+        worker_heartbeat: collections.abc.Iterable[
+            temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
+        ]
         | None = ...,
     ) -> None: ...
-    def HasField(
-        self,
-        field_name: typing_extensions.Literal["worker_heartbeat", b"worker_heartbeat"],
-    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[

@@ -857,23 +857,21 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 f"Failed to find nexus operation handle for job sequence number {job.seq}"
             )
         if job.HasField("operation_token"):
-            # The Nexus operation started asynchronously. A `ResolveNexusOperation` job
+            # The nexus operation started asynchronously. A `ResolveNexusOperation` job
             # will follow in a future activation.
             handle._resolve_start_success(job.operation_token)
         elif job.HasField("started_sync"):
-            # The Nexus operation 'started' in the sense that it's already resolved. A
+            # The nexus operation 'started' in the sense that it's already resolved. A
             # `ResolveNexusOperation` job will be in the same activation.
             handle._resolve_start_success(None)
-        elif job.HasField("cancelled_before_start"):
-            # From proto docs: the operation was cancelled before it was ever
-            # sent to server (same WFT). Note that core will still send a
-            # `ResolveNexusOperation` job in the same activation, so there does
-            # not need to be an exceptional case for this in lang.
-            #
-            # We do not resolve start here because it will be resolved in the by
-            # handle._resolve_failure when handling the follow-up
-            # ResolveNexusOperation from core.
-            pass
+        elif job.HasField("failed"):
+            # The nexus operation start failed; no ResolveNexusOperation will follow.
+            self._pending_nexus_operations.pop(job.seq, None)
+            handle._resolve_failure(
+                self._failure_converter.from_failure(
+                    job.failed, self._payload_converter
+                )
+            )
         else:
             raise ValueError(f"Unknown Nexus operation start status: {job}")
 

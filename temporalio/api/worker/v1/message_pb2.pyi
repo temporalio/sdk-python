@@ -132,13 +132,23 @@ class WorkerHostInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     HOST_NAME_FIELD_NUMBER: builtins.int
+    PROCESS_KEY_FIELD_NUMBER: builtins.int
     PROCESS_ID_FIELD_NUMBER: builtins.int
     CURRENT_HOST_CPU_USAGE_FIELD_NUMBER: builtins.int
     CURRENT_HOST_MEM_USAGE_FIELD_NUMBER: builtins.int
     host_name: builtins.str
     """Worker host identifier."""
+    process_key: builtins.str
+    """Worker process identifier. This id should be unique for all _processes_
+    running workers in the namespace, and should be shared by all workers
+    in the same process.
+    This will be used to build the worker command nexus task queue name:
+    "temporal-sys/worker-commands/{process_key}"
+    """
     process_id: builtins.str
-    """Worker process identifier, should be unique for the host."""
+    """Worker process identifier. Unlike process_key, this id only needs to be unique
+    within one host (so using e.g. a unix pid would be appropriate).
+    """
     current_host_cpu_usage: builtins.float
     """System used CPU as a float in the range [0.0, 1.0] where 1.0 is defined as all
     cores on the host pegged.
@@ -151,6 +161,7 @@ class WorkerHostInfo(google.protobuf.message.Message):
         self,
         *,
         host_name: builtins.str = ...,
+        process_key: builtins.str = ...,
         process_id: builtins.str = ...,
         current_host_cpu_usage: builtins.float = ...,
         current_host_mem_usage: builtins.float = ...,
@@ -166,6 +177,8 @@ class WorkerHostInfo(google.protobuf.message.Message):
             b"host_name",
             "process_id",
             b"process_id",
+            "process_key",
+            b"process_key",
         ],
     ) -> None: ...
 
