@@ -3,31 +3,36 @@
 import functools
 import inspect
 import json
+import typing
 from datetime import timedelta
-from typing import Any, Callable, Optional, Type, Union, overload
+from typing import Any, Callable, Optional, Type
 
 import nexusrpc
 from agents import (
-    Agent,
     RunContextWrapper,
     Tool,
 )
-from agents.function_schema import DocstringStyle, function_schema
+from agents.function_schema import function_schema
 from agents.tool import (
     FunctionTool,
-    ToolErrorFunction,
-    ToolFunction,
-    ToolParams,
-    default_tool_error_function,
-    function_tool,
 )
-from agents.util._types import MaybeAwaitable
 
 from temporalio import activity
 from temporalio import workflow as temporal_workflow
 from temporalio.common import Priority, RetryPolicy
+from temporalio.contrib.openai_agents._mcp import (
+    StatefulTemporalMCPServerReference,
+    StatelessTemporalMCPServerReference,
+)
 from temporalio.exceptions import ApplicationError, TemporalError
-from temporalio.workflow import ActivityCancellationType, VersioningIntent
+from temporalio.workflow import (
+    ActivityCancellationType,
+    ActivityConfig,
+    VersioningIntent,
+)
+
+if typing.TYPE_CHECKING:
+    from agents.mcp import MCPServer
 
 
 def activity_as_tool(
@@ -237,6 +242,20 @@ def nexus_operation_as_tool(
         on_invoke_tool=run_operation,
         strict_json_schema=True,
     )
+
+
+def create_stateless_mcp_server_reference(
+    name: str, config: Optional[ActivityConfig] = None
+) -> "MCPServer":
+    return StatelessTemporalMCPServerReference(name, config)
+
+
+def create_stateful_mcp_server_reference(
+    name: str,
+    config: Optional[ActivityConfig] = None,
+    connect_config: Optional[ActivityConfig] = None,
+) -> "StatefulTemporalMCPServerReference":
+    return StatefulTemporalMCPServerReference(name, config, connect_config)
 
 
 class ToolSerializationError(TemporalError):

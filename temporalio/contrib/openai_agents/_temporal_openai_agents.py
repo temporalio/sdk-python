@@ -1,7 +1,6 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
 import dataclasses
-import warnings
 from contextlib import asynccontextmanager, contextmanager
 from datetime import timedelta
 from typing import AsyncIterator, Callable, Optional, Sequence, Union
@@ -27,7 +26,12 @@ from openai.types.responses import ResponsePromptParam
 import temporalio.client
 import temporalio.worker
 from temporalio.client import ClientConfig
+from temporalio.contrib.openai_agents import (
+    StatefulTemporalMCPServer,
+    StatelessTemporalMCPServer,
+)
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
+from temporalio.contrib.openai_agents._mcp import TemporalMCPServer
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
@@ -233,7 +237,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         self,
         model_params: Optional[ModelActivityParameters] = None,
         model_provider: Optional[ModelProvider] = None,
-        mcp_servers: Sequence["MCPServer"] = (),
+        mcp_servers: Sequence[TemporalMCPServer] = (),
     ) -> None:
         """Initialize the OpenAI agents plugin.
 
@@ -316,6 +320,13 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
             OpenAIAgentsTracingInterceptor()
         ]
         new_activities = [ModelActivity(self._model_provider).invoke_model_activity]
+
+        server_names = [server.name for server in self._mcp_servers]
+        if len(server_names) != len(set(server_names)):
+            raise ValueError(
+                f"More than one mcp server registered with the same name. Please provide unique names."
+            )
+
         for mcp_server in self._mcp_servers:
             if hasattr(mcp_server, "get_activities"):
                 get_activities: Callable[[], Sequence[Callable]] = getattr(

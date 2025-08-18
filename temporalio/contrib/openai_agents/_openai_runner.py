@@ -56,14 +56,18 @@ class TemporalOpenAIRunner(AgentRunner):
                 )
 
         if starting_agent.mcp_servers:
-            from temporalio.contrib.openai_agents import (
-                StatefulTemporalMCPServer,
-                StatelessTemporalMCPServer,
+            from temporalio.contrib.openai_agents._mcp import (
+                StatefulTemporalMCPServerReference,
+                StatelessTemporalMCPServerReference,
             )
 
             for s in starting_agent.mcp_servers:
                 if not isinstance(
-                    s, (StatelessTemporalMCPServer, StatefulTemporalMCPServer)
+                    s,
+                    (
+                        StatelessTemporalMCPServerReference,
+                        StatefulTemporalMCPServerReference,
+                    ),
                 ):
                     warnings.warn(
                         "Unknown mcp_server type {} may not work durably.".format(

@@ -2056,9 +2056,11 @@ class McpServerWorkflow:
     async def run(self, question: str) -> str:
         from agents.mcp import MCPServer
 
-        from temporalio.contrib.openai_agents import StatelessTemporalMCPServer
-
-        server: MCPServer = StatelessTemporalMCPServer("Filesystem-Server")
+        server: MCPServer = (
+            openai_agents.workflow.create_stateless_mcp_server_reference(
+                "Filesystem-Server"
+            )
+        )
         agent = Agent[str](
             name="MCP ServerWorkflow",
             instructions="Use the tools to read the filesystem and answer questions based on those files.",
@@ -2128,8 +2130,7 @@ async def test_stateless_mcp_server(client: Client, use_local_model: bool):
     client = Client(**new_config)
 
     async with new_worker(
-        client,
-        McpServerWorkflow,
+        client, McpServerWorkflow, activities=[get_weather, get_weather]
     ) as worker:
         workflow_handle = await client.start_workflow(
             McpServerWorkflow.run,
@@ -2147,9 +2148,7 @@ async def test_stateless_mcp_server(client: Client, use_local_model: bool):
 class McpServerStatefulWorkflow:
     @workflow.run
     async def run(self, timeout: timedelta) -> str:
-        from temporalio.contrib.openai_agents import StatefulTemporalMCPServer
-
-        async with StatefulTemporalMCPServer(
+        async with openai_agents.workflow.create_stateful_mcp_server_reference(
             "Filesystem-Server",
             config=ActivityConfig(
                 schedule_to_start_timeout=timeout,
