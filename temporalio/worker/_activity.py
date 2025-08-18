@@ -14,19 +14,15 @@ import queue
 import threading
 import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
     Callable,
-    Dict,
-    Iterator,
     NoReturn,
     Optional,
-    Sequence,
-    Tuple,
-    Type,
     Union,
 )
 
@@ -34,12 +30,6 @@ import google.protobuf.duration_pb2
 import google.protobuf.timestamp_pb2
 
 import temporalio.activity
-import temporalio.api.common.v1
-import temporalio.bridge.client
-import temporalio.bridge.proto
-import temporalio.bridge.proto.activity_result
-import temporalio.bridge.proto.activity_task
-import temporalio.bridge.proto.common
 import temporalio.bridge.runtime
 import temporalio.bridge.worker
 import temporalio.client
@@ -69,13 +59,14 @@ class _ActivityWorker:
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         metric_meter: temporalio.common.MetricMeter,
+        client: temporalio.client.Client,
         encode_headers: bool,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._task_queue = task_queue
         self._activity_executor = activity_executor
         self._shared_state_manager = shared_state_manager
-        self._running_activities: Dict[bytes, _RunningActivity] = {}
+        self._running_activities: dict[bytes, _RunningActivity] = {}
         self._data_converter = data_converter
         self._interceptors = interceptors
         self._metric_meter = metric_meter
@@ -86,9 +77,10 @@ class _ActivityWorker:
             None
         )
         self._seen_sync_activity = False
+        self._client = client
 
         # Validate and build activity dict
-        self._activities: Dict[str, temporalio.activity._Definition] = {}
+        self._activities: dict[str, temporalio.activity._Definition] = {}
         self._dynamic_activity: Optional[temporalio.activity._Definition] = None
         for activity in activities:
             # Get definition
@@ -176,7 +168,7 @@ class _ActivityWorker:
                     self._handle_cancel_activity_task(task.task_token, task.cancel)
                 else:
                     raise RuntimeError(f"Unrecognized activity task: {task}")
-            except temporalio.bridge.worker.PollShutdownError:
+            except temporalio.bridge.worker.PollShutdownError:  # type: ignore[reportPrivateLocalImportUsage]
                 exception_task.cancel()
                 return
             except Exception as err:
@@ -193,12 +185,12 @@ class _ActivityWorker:
             try:
                 # Just take all tasks and say we can't handle them
                 task = await self._bridge_worker().poll_activity_task()
-                completion = temporalio.bridge.proto.ActivityTaskCompletion(
+                completion = temporalio.bridge.proto.ActivityTaskCompletion(  # type: ignore[reportAttributeAccessIssue]
                     task_token=task.task_token
                 )
                 completion.result.failed.failure.message = "Worker shutting down"
                 await self._bridge_worker().complete_activity_task(completion)
-            except temporalio.bridge.worker.PollShutdownError:
+            except temporalio.bridge.worker.PollShutdownError:  # type: ignore[reportPrivateLocalImportUsage]
                 return
 
     # Only call this after run()/drain_poll_queue() have returned. This will not
@@ -212,7 +204,9 @@ class _ActivityWorker:
             await asyncio.gather(*running_tasks, return_exceptions=False)
 
     def _handle_cancel_activity_task(
-        self, task_token: bytes, cancel: temporalio.bridge.proto.activity_task.Cancel
+        self,
+        task_token: bytes,
+        cancel: temporalio.bridge.proto.activity_task.Cancel,  # type: ignore[reportAttributeAccessIssue]
     ) -> None:
         """Request cancellation of a running activity task."""
         activity = self._running_activities.get(task_token)
@@ -260,7 +254,9 @@ class _ActivityWorker:
 
         # Perform the heartbeat
         try:
-            heartbeat = temporalio.bridge.proto.ActivityHeartbeat(task_token=task_token)
+            heartbeat = temporalio.bridge.proto.ActivityHeartbeat(  # type: ignore[reportAttributeAccessIssue]
+                task_token=task_token
+            )
             if details:
                 # Convert to core payloads
                 heartbeat.details.extend(await self._data_converter.encode(details))
@@ -282,7 +278,7 @@ class _ActivityWorker:
     async def _handle_start_activity_task(
         self,
         task_token: bytes,
-        start: temporalio.bridge.proto.activity_task.Start,
+        start: temporalio.bridge.proto.activity_task.Start,  # type: ignore[reportAttributeAccessIssue]
         running_activity: _RunningActivity,
     ) -> None:
         """Handle a start activity task.
@@ -294,7 +290,7 @@ class _ActivityWorker:
         # We choose to surround interceptor creation and activity invocation in
         # a try block so we can mark the workflow as failed on any error instead
         # of having error handling in the interceptor
-        completion = temporalio.bridge.proto.ActivityTaskCompletion(
+        completion = temporalio.bridge.proto.ActivityTaskCompletion(  # type: ignore[reportAttributeAccessIssue]
             task_token=task_token
         )
         try:
@@ -411,7 +407,7 @@ class _ActivityWorker:
 
     async def _execute_activity(
         self,
-        start: temporalio.bridge.proto.activity_task.Start,
+        start: temporalio.bridge.proto.activity_task.Start,  # type: ignore[reportAttributeAccessIssue]
         running_activity: _RunningActivity,
         task_token: bytes,
     ) -> Any:
@@ -569,11 +565,14 @@ class _ActivityWorker:
                 heartbeat=None,
                 cancelled_event=running_activity.cancelled_event,
                 worker_shutdown_event=self._worker_shutdown_event,
-                shield_thread_cancel_exception=None
-                if not running_activity.cancel_thread_raiser
-                else running_activity.cancel_thread_raiser.shielded,
+                shield_thread_cancel_exception=(
+                    None
+                    if not running_activity.cancel_thread_raiser
+                    else running_activity.cancel_thread_raiser.shielded
+                ),
                 payload_converter_class_or_instance=self._data_converter.payload_converter,
                 runtime_metric_meter=None if sync_non_threaded else self._metric_meter,
+                client=self._client if not running_activity.sync else None,
                 cancellation_details=running_activity.cancellation_details,
             )
         )
@@ -644,14 +643,14 @@ class _ThreadExceptionRaiser:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._thread_id: Optional[int] = None
-        self._pending_exception: Optional[Type[Exception]] = None
+        self._pending_exception: Optional[type[Exception]] = None
         self._shield_depth = 0
 
     def set_thread_id(self, thread_id: int) -> None:
         with self._lock:
             self._thread_id = thread_id
 
-    def raise_in_thread(self, exc_type: Type[Exception]) -> None:
+    def raise_in_thread(self, exc_type: type[Exception]) -> None:
         with self._lock:
             self._pending_exception = exc_type
             self._raise_in_thread_if_pending_unlocked()
@@ -679,7 +678,7 @@ class _ThreadExceptionRaiser:
 
 
 class _ActivityInboundImpl(ActivityInboundInterceptor):
-    def __init__(
+    def __init__(  # type: ignore[reportMissingSuperCall]
         self, worker: _ActivityWorker, running_activity: _RunningActivity
     ) -> None:
         # We are intentionally not calling the base class's __init__ here
@@ -786,7 +785,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
 
 
 class _ActivityOutboundImpl(ActivityOutboundInterceptor):
-    def __init__(self, worker: _ActivityWorker, info: temporalio.activity.Info) -> None:
+    def __init__(self, worker: _ActivityWorker, info: temporalio.activity.Info) -> None:  # type: ignore[reportMissingSuperCall]
         # We are intentionally not calling the base class's __init__ here
         self._worker = worker
         self._info = info
@@ -807,7 +806,7 @@ def _execute_sync_activity(
     cancelled_event: threading.Event,
     worker_shutdown_event: threading.Event,
     payload_converter_class_or_instance: Union[
-        Type[temporalio.converter.PayloadConverter],
+        type[temporalio.converter.PayloadConverter],
         temporalio.converter.PayloadConverter,
     ],
     runtime_metric_meter: Optional[temporalio.common.MetricMeter],
@@ -819,13 +818,10 @@ def _execute_sync_activity(
         thread_id = threading.current_thread().ident
         if thread_id is not None:
             cancel_thread_raiser.set_thread_id(thread_id)
-    heartbeat_fn: Callable[..., None]
     if isinstance(heartbeat, SharedHeartbeatSender):
-        # To make mypy happy
-        heartbeat_sender = heartbeat
-        heartbeat_fn = lambda *details: heartbeat_sender.send_heartbeat(
-            info.task_token, *details
-        )
+
+        def heartbeat_fn(*details: Any) -> None:
+            heartbeat.send_heartbeat(info.task_token, *details)
     else:
         heartbeat_fn = heartbeat
     temporalio.activity._Context.set(
@@ -838,11 +834,12 @@ def _execute_sync_activity(
             worker_shutdown_event=temporalio.activity._CompositeEvent(
                 thread_event=worker_shutdown_event, async_event=None
             ),
-            shield_thread_cancel_exception=None
-            if not cancel_thread_raiser
-            else cancel_thread_raiser.shielded,
+            shield_thread_cancel_exception=(
+                None if not cancel_thread_raiser else cancel_thread_raiser.shielded
+            ),
             payload_converter_class_or_instance=payload_converter_class_or_instance,
             runtime_metric_meter=runtime_metric_meter,
+            client=None,
             cancellation_details=cancellation_details,
         )
     )
@@ -934,11 +931,11 @@ class _MultiprocessingSharedStateManager(SharedStateManager):
         self._mgr = mgr
         self._queue_poller_executor = queue_poller_executor
         # 1000 in-flight heartbeats should be plenty
-        self._heartbeat_queue: queue.Queue[Tuple[bytes, Sequence[Any]]] = mgr.Queue(
+        self._heartbeat_queue: queue.Queue[tuple[bytes, Sequence[Any]]] = mgr.Queue(
             1000
         )
-        self._heartbeats: Dict[bytes, Callable[..., None]] = {}
-        self._heartbeat_completions: Dict[bytes, Callable] = {}
+        self._heartbeats: dict[bytes, Callable[..., None]] = {}
+        self._heartbeat_completions: dict[bytes, Callable] = {}
 
     def new_event(self) -> threading.Event:
         return self._mgr.Event()
@@ -996,7 +993,7 @@ class _MultiprocessingSharedStateManager(SharedStateManager):
 
 class _MultiprocessingSharedHeartbeatSender(SharedHeartbeatSender):
     def __init__(
-        self, heartbeat_queue: queue.Queue[Tuple[bytes, Sequence[Any]]]
+        self, heartbeat_queue: queue.Queue[tuple[bytes, Sequence[Any]]]
     ) -> None:
         super().__init__()
         self._heartbeat_queue = heartbeat_queue

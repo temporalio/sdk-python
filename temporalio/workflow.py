@@ -493,6 +493,7 @@ class Info:
     continued_run_id: Optional[str]
     cron_schedule: Optional[str]
     execution_timeout: Optional[timedelta]
+    first_execution_run_id: str
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     namespace: str
     parent: Optional[ParentInfo]
@@ -2027,6 +2028,8 @@ class ActivityConfig(TypedDict, total=False):
     cancellation_type: ActivityCancellationType
     activity_id: Optional[str]
     versioning_intent: Optional[VersioningIntent]
+    summary: Optional[str]
+    priority: temporalio.common.Priority
 
 
 # Overload for async no-param activity
@@ -2043,6 +2046,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2061,6 +2065,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2080,6 +2085,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2099,6 +2105,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2118,6 +2125,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2137,6 +2145,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2158,6 +2167,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[Any]: ...
 
@@ -2234,6 +2244,7 @@ def start_activity(
         activity_id=activity_id,
         versioning_intent=versioning_intent,
         summary=summary,
+        priority=priority,
     )
 
 
@@ -4006,6 +4017,10 @@ class ChildWorkflowConfig(TypedDict, total=False):
             temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
         ]
     ]
+    versioning_intent: Optional[VersioningIntent]
+    static_summary: Optional[str]
+    static_details: Optional[str]
+    priority: temporalio.common.Priority
 
 
 # Overload for no-param workflow
@@ -4238,7 +4253,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -4266,7 +4282,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -4294,7 +4311,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -4324,7 +4342,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> Any: ...
 
@@ -4352,7 +4371,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> Any:
     """Start a child workflow and wait for completion.
@@ -4379,7 +4399,8 @@ async def execute_child_workflow(
         memo=memo,
         search_attributes=search_attributes,
         versioning_intent=versioning_intent,
-        static_summary=summary,
+        static_summary=static_summary,
+        static_details=static_details,
         priority=priority,
     )
     return await handle
@@ -5145,7 +5166,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         operation: nexusrpc.Operation[InputT, OutputT],
         input: InputT,
         *,
-        output_type: Optional[type[OutputT]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -5158,7 +5179,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         operation: str,
         input: Any,
         *,
-        output_type: Optional[type[OutputT]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -5174,7 +5195,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         ],
         input: InputT,
         *,
-        output_type: Optional[type[OutputT]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -5190,7 +5211,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         ],
         input: InputT,
         *,
-        output_type: Optional[type[OutputT]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -5206,7 +5227,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         ],
         input: InputT,
         *,
-        output_type: Optional[type[OutputT]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -5217,7 +5238,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         operation: Any,
         input: Any,
         *,
-        output_type: Optional[type[OutputT]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> Any:
@@ -5246,7 +5267,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         operation: nexusrpc.Operation[InputT, OutputT],
         input: InputT,
         *,
-        output_type: Optional[type[OutputT]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
@@ -5259,7 +5280,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         operation: str,
         input: Any,
         *,
-        output_type: Optional[type[OutputT]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
@@ -5275,10 +5296,13 @@ class NexusClient(ABC, Generic[ServiceT]):
         ],
         input: InputT,
         *,
-        output_type: Optional[type[OutputT]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
+
+    # TODO(nexus-preview): in practice, both these overloads match an async def sync
+    # operation (i.e. either can be deleted without causing a type error).
 
     # Overload for sync_operation methods (async def)
     @overload
@@ -5286,12 +5310,12 @@ class NexusClient(ABC, Generic[ServiceT]):
     async def execute_operation(
         self,
         operation: Callable[
-            [ServiceHandlerT, nexusrpc.handler.StartOperationContext, InputT],
+            [ServiceT, nexusrpc.handler.StartOperationContext, InputT],
             Awaitable[OutputT],
         ],
         input: InputT,
         *,
-        output_type: Optional[type[OutputT]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
@@ -5302,12 +5326,12 @@ class NexusClient(ABC, Generic[ServiceT]):
     async def execute_operation(
         self,
         operation: Callable[
-            [ServiceHandlerT, nexusrpc.handler.StartOperationContext, InputT],
+            [ServiceT, nexusrpc.handler.StartOperationContext, InputT],
             OutputT,
         ],
         input: InputT,
         *,
-        output_type: Optional[type[OutputT]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> OutputT: ...
@@ -5318,7 +5342,7 @@ class NexusClient(ABC, Generic[ServiceT]):
         operation: Any,
         input: Any,
         *,
-        output_type: Optional[type[OutputT]] = None,
+        output_type: Optional[Type[OutputT]] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> Any:
@@ -5342,7 +5366,7 @@ class _NexusClient(NexusClient[ServiceT]):
         self,
         *,
         endpoint: str,
-        service: Union[type[ServiceT], str],
+        service: Union[Type[ServiceT], str],
     ) -> None:
         """Create a Nexus client.
 
@@ -5369,7 +5393,7 @@ class _NexusClient(NexusClient[ServiceT]):
         operation: Any,
         input: Any,
         *,
-        output_type: Optional[type] = None,
+        output_type: Optional[Type] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> Any:
@@ -5390,7 +5414,7 @@ class _NexusClient(NexusClient[ServiceT]):
         operation: Any,
         input: Any,
         *,
-        output_type: Optional[type] = None,
+        output_type: Optional[Type] = None,
         schedule_to_close_timeout: Optional[timedelta] = None,
         headers: Optional[Mapping[str, str]] = None,
     ) -> Any:
@@ -5407,7 +5431,7 @@ class _NexusClient(NexusClient[ServiceT]):
 @overload
 def create_nexus_client(
     *,
-    service: type[ServiceT],
+    service: Type[ServiceT],
     endpoint: str,
 ) -> NexusClient[ServiceT]: ...
 
@@ -5422,9 +5446,9 @@ def create_nexus_client(
 
 def create_nexus_client(
     *,
-    service: Union[type[ServiceT], str],
+    service: Union[Type[ServiceT], str],
     endpoint: str,
-) -> NexusClient[Any]:
+) -> NexusClient[ServiceT]:
     """Create a Nexus client.
 
     .. warning::

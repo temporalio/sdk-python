@@ -6,33 +6,46 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 import enum
 import json
 from dataclasses import dataclass
-from typing import Any, Optional, Union, cast
+from datetime import timedelta
+from typing import Any, Optional, Union
 
 from agents import (
     AgentOutputSchemaBase,
+    CodeInterpreterTool,
     FileSearchTool,
     FunctionTool,
     Handoff,
+    HostedMCPTool,
+    ImageGenerationTool,
     ModelProvider,
     ModelResponse,
     ModelSettings,
     ModelTracing,
+    OpenAIProvider,
     RunContextWrapper,
     Tool,
     TResponseInputItem,
     UserError,
     WebSearchTool,
 )
-from agents.models.multi_provider import MultiProvider
+from openai import (
+    APIStatusError,
+    AsyncOpenAI,
+)
+from openai.types.responses.tool_param import Mcp
+from pydantic_core import to_json
 from typing_extensions import Required, TypedDict
 
 from temporalio import activity
 from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbeater
+from temporalio.exceptions import ApplicationError
 
 
 @dataclass
 class HandoffInput:
-    """Data conversion friendly representation of a Handoff."""
+    """Data conversion friendly representation of a Handoff. Contains only the fields which are needed by the model
+    execution to determine what to handoff to, not the actual handoff invocation, which remains in the workflow context.
+    """
 
     tool_name: str
     tool_description: str
@@ -43,7 +56,9 @@ class HandoffInput:
 
 @dataclass
 class FunctionToolInput:
-    """Data conversion friendly representation of a FunctionTool."""
+    """Data conversion friendly representation of a FunctionTool. Contains only the fields which are needed by the model
+    execution to determine what tool to call, not the actual tool invocation, which remains in the workflow context.
+    """
 
     name: str
     description: str
@@ -51,7 +66,23 @@ class FunctionToolInput:
     strict_json_schema: bool = True
 
 
-ToolInput = Union[FunctionToolInput, FileSearchTool, WebSearchTool]
+@dataclass
+class HostedMCPToolInput:
+    """Data conversion friendly representation of a HostedMCPTool. Contains only the fields which are needed by the model
+    execution to determine what tool to call, not the actual tool invocation, which remains in the workflow context.
+    """
+
+    tool_config: Mcp
+
+
+ToolInput = Union[
+    FunctionToolInput,
+    FileSearchTool,
+    WebSearchTool,
+    ImageGenerationTool,
+    CodeInterpreterTool,
+    HostedMCPToolInput,
+]
 
 
 @dataclass
@@ -117,11 +148,15 @@ class ActivityModelInput(TypedDict, total=False):
 
 
 class ModelActivity:
-    """Class wrapper for model invocation activities to allow model customization."""
+    """Class wrapper for model invocation activities to allow model customization. By default, we use an OpenAIProvider with retries disabled.
+    Disabling retries in your model of choice is recommended to allow activity retries to define the retry model.
+    """
 
     def __init__(self, model_provider: Optional[ModelProvider] = None):
         """Initialize the activity with a model provider."""
-        self._model_provider = model_provider or MultiProvider()
+        self._model_provider = model_provider or OpenAIProvider(
+            openai_client=AsyncOpenAI(max_retries=0)
+        )
 
     @activity.defn
     @_auto_heartbeater
@@ -139,28 +174,37 @@ class ModelActivity:
 
         # workaround for https://github.com/pydantic/pydantic/issues/9541
         # ValidatorIterator returned
-        input_json = json.dumps(input["input"], default=str)
+        input_json = to_json(input["input"])
         input_input = json.loads(input_json)
 
         def make_tool(tool: ToolInput) -> Tool:
-            if isinstance(tool, FileSearchTool):
-                return cast(FileSearchTool, tool)
-            elif isinstance(tool, WebSearchTool):
-                return cast(WebSearchTool, tool)
+            if isinstance(
+                tool,
+                (
+                    FileSearchTool,
+                    WebSearchTool,
+                    ImageGenerationTool,
+                    CodeInterpreterTool,
+                ),
+            ):
+                return tool
+            elif isinstance(tool, HostedMCPToolInput):
+                return HostedMCPTool(
+                    tool_config=tool.tool_config,
+                )
             elif isinstance(tool, FunctionToolInput):
-                t = cast(FunctionToolInput, tool)
                 return FunctionTool(
-                    name=t.name,
-                    description=t.description,
-                    params_json_schema=t.params_json_schema,
+                    name=tool.name,
+                    description=tool.description,
+                    params_json_schema=tool.params_json_schema,
                     on_invoke_tool=empty_on_invoke_tool,
-                    strict_json_schema=t.strict_json_schema,
+                    strict_json_schema=tool.strict_json_schema,
                 )
             else:
                 raise UserError(f"Unknown tool type: {tool.name}")
 
         tools = [make_tool(x) for x in input.get("tools", [])]
-        handoffs = [
+        handoffs: list[Handoff[Any, Any]] = [
             Handoff(
                 tool_name=x.tool_name,
                 tool_description=x.tool_description,
@@ -171,14 +215,51 @@ class ModelActivity:
             )
             for x in input.get("handoffs", [])
         ]
-        return await model.get_response(
-            system_instructions=input.get("system_instructions"),
-            input=input_input,
-            model_settings=input["model_settings"],
-            tools=tools,
-            output_schema=input.get("output_schema"),
-            handoffs=handoffs,
-            tracing=ModelTracing(input["tracing"]),
-            previous_response_id=input.get("previous_response_id"),
-            prompt=input.get("prompt"),
-        )
+
+        try:
+            return await model.get_response(
+                system_instructions=input.get("system_instructions"),
+                input=input_input,
+                model_settings=input["model_settings"],
+                tools=tools,
+                output_schema=input.get("output_schema"),
+                handoffs=handoffs,
+                tracing=ModelTracing(input["tracing"]),
+                previous_response_id=input.get("previous_response_id"),
+                prompt=input.get("prompt"),
+            )
+        except APIStatusError as e:
+            # Listen to server hints
+            retry_after = None
+            retry_after_ms_header = e.response.headers.get("retry-after-ms")
+            if retry_after_ms_header is not None:
+                retry_after = timedelta(milliseconds=float(retry_after_ms_header))
+
+            if retry_after is None:
+                retry_after_header = e.response.headers.get("retry-after")
+                if retry_after_header is not None:
+                    retry_after = timedelta(seconds=float(retry_after_header))
+
+            should_retry_header = e.response.headers.get("x-should-retry")
+            if should_retry_header == "true":
+                raise e
+            if should_retry_header == "false":
+                raise ApplicationError(
+                    "Non retryable OpenAI error",
+                    non_retryable=True,
+                    next_retry_delay=retry_after,
+                ) from e
+
+            # Specifically retryable status codes
+            if e.response.status_code in [408, 409, 429, 500]:
+                raise ApplicationError(
+                    "Retryable OpenAI status code",
+                    non_retryable=False,
+                    next_retry_delay=retry_after,
+                ) from e
+
+            raise ApplicationError(
+                "Non retryable OpenAI status code",
+                non_retryable=True,
+                next_retry_delay=retry_after,
+            ) from e

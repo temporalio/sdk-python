@@ -4,8 +4,6 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Optional,
-    Type,
 )
 
 from nexusrpc import (
@@ -24,7 +22,6 @@ from nexusrpc.handler import (
     StartOperationResultAsync,
 )
 
-from temporalio import client
 from temporalio.nexus._operation_context import (
     _temporal_cancel_operation_context,
 )
@@ -50,8 +47,6 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
             [StartOperationContext, InputT],
             Awaitable[WorkflowHandle[OutputT]],
         ],
-        input_type: Optional[Type[InputT]],
-        output_type: Optional[Type[OutputT]],
     ) -> None:
         """Initialize the workflow run operation handler."""
         if not is_async_callable(start):
@@ -64,8 +59,6 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         if start.__doc__:
             if start_func := getattr(self.start, "__func__", None):
                 start_func.__doc__ = start.__doc__
-        self._input_type = input_type
-        self._output_type = output_type
 
     async def start(
         self, ctx: StartOperationContext, input: InputT
@@ -73,15 +66,14 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
         """Start the operation, by starting a workflow and completing asynchronously."""
         handle = await self._start(ctx, input)
         if not isinstance(handle, WorkflowHandle):
-            if isinstance(handle, client.WorkflowHandle):
-                raise RuntimeError(
-                    f"Expected {handle} to be a nexus.WorkflowHandle, but got a client.WorkflowHandle. "
-                    f"You must use WorkflowRunOperationContext.start_workflow "
-                    "to start a workflow that will deliver the result of the Nexus operation, "
-                    "not client.Client.start_workflow."
-                )
             raise RuntimeError(
                 f"Expected {handle} to be a nexus.WorkflowHandle, but got {type(handle)}. "
+                f"When using @workflow_run_operation you must use "
+                "WorkflowRunOperationContext.start_workflow() "
+                "to start a workflow that will deliver the result of the Nexus operation, "
+                "and you must return the nexus.WorkflowHandle that it returns. "
+                "It is not possible to use client.Client.start_workflow() and client.WorkflowHandle "
+                "for this purpose."
             )
         return StartOperationResultAsync(handle.to_token())
 

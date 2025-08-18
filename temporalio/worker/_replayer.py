@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import logging
-from contextlib import asynccontextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type
 
@@ -21,6 +21,7 @@ import temporalio.workflow
 
 from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor
+from ._plugin import _RootPlugin
 from ._worker import load_default_build_id
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
@@ -42,6 +43,7 @@ class Replayer:
         namespace: str = "ReplayNamespace",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[Interceptor] = [],
+        plugins: Sequence[temporalio.worker.Plugin] = [],
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
         workflow_failure_exception_types: Sequence[Type[BaseException]] = [],
@@ -62,8 +64,6 @@ class Replayer:
         will be shared across all replay calls and never explicitly shut down.
         Users are encouraged to provide their own if needing more control.
         """
-        if not workflows:
-            raise ValueError("At least one workflow must be specified")
         self._config = ReplayerConfig(
             workflows=list(workflows),
             workflow_task_executor=(
@@ -82,6 +82,18 @@ class Replayer:
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
             header_codec_behavior=header_codec_behavior,
         )
+
+        # Apply plugin configuration
+        root_plugin: temporalio.worker.Plugin = _RootPlugin()
+        for plugin in reversed(plugins):
+            plugin.init_worker_plugin(root_plugin)
+            root_plugin = plugin
+        self._config = root_plugin.configure_replayer(self._config)
+        self._plugin = root_plugin
+
+        # Validate workflows after plugin configuration
+        if not self._config["workflows"]:
+            raise ValueError("At least one workflow must be specified")
 
     def config(self) -> ReplayerConfig:
         """Config, as a dictionary, used to create this replayer.
@@ -149,10 +161,9 @@ class Replayer:
                     replay_failures[result.history.run_id] = result.replay_failure
             return WorkflowReplayResults(replay_failures=replay_failures)
 
-    @asynccontextmanager
-    async def workflow_replay_iterator(
+    def workflow_replay_iterator(
         self, histories: AsyncIterator[temporalio.client.WorkflowHistory]
-    ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
+    ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
         """Replay workflows for the given histories.
 
         This is a context manager for use via ``async with``. The value is an
@@ -165,6 +176,12 @@ class Replayer:
             An async iterator that returns replayed workflow results as they are
             replayed.
         """
+        return self._plugin.run_replayer(self, histories)
+
+    @asynccontextmanager
+    async def _workflow_replay_iterator(
+        self, histories: AsyncIterator[temporalio.client.WorkflowHistory]
+    ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
         try:
             last_replay_failure: Optional[Exception]
             last_replay_complete = asyncio.Event()

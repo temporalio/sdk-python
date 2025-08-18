@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import abc
 import asyncio
 import copy
 import dataclasses
@@ -55,6 +56,7 @@ import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.nexus
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
@@ -107,6 +109,7 @@ class Client:
         namespace: str = "default",
         api_key: Optional[str] = None,
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
+        plugins: Sequence[Plugin] = [],
         interceptors: Sequence[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
@@ -132,6 +135,14 @@ class Client:
                 metadata doesn't already have an "authorization" key.
             data_converter: Data converter to use for all data conversions
                 to/from payloads.
+            plugins: Set of plugins that are chained together to allow
+                intercepting and modifying client creation and service connection.
+                The earlier plugins wrap the later ones.
+
+                Any plugins that also implement
+                :py:class:`temporalio.worker.Plugin` will be used as worker
+                plugins too so they should not be given when creating a
+                worker.
             interceptors: Set of interceptors that are chained together to allow
                 intercepting of client calls. The earlier interceptors wrap the
                 later ones.
@@ -178,13 +189,22 @@ class Client:
             runtime=runtime,
             http_connect_proxy_config=http_connect_proxy_config,
         )
+
+        root_plugin: Plugin = _RootPlugin()
+        for plugin in reversed(plugins):
+            plugin.init_client_plugin(root_plugin)
+            root_plugin = plugin
+
+        service_client = await root_plugin.connect_service_client(connect_config)
+
         return Client(
-            await temporalio.service.ServiceClient.connect(connect_config),
+            service_client,
             namespace=namespace,
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
             header_codec_behavior=header_codec_behavior,
+            plugins=plugins,
         )
 
     def __init__(
@@ -193,6 +213,7 @@ class Client:
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
+        plugins: Sequence[Plugin] = [],
         interceptors: Sequence[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
@@ -203,20 +224,31 @@ class Client:
 
         See :py:meth:`connect` for details on the parameters.
         """
-        # Iterate over interceptors in reverse building the impl
-        self._impl: OutboundInterceptor = _ClientImpl(self)
-        for interceptor in reversed(list(interceptors)):
-            self._impl = interceptor.intercept_client(self._impl)
-
         # Store the config for tracking
-        self._config = ClientConfig(
+        config = ClientConfig(
             service_client=service_client,
             namespace=namespace,
             data_converter=data_converter,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
             header_codec_behavior=header_codec_behavior,
+            plugins=plugins,
         )
+
+        root_plugin: Plugin = _RootPlugin()
+        for plugin in reversed(plugins):
+            plugin.init_client_plugin(root_plugin)
+            root_plugin = plugin
+
+        self._init_from_config(root_plugin.configure_client(config))
+
+    def _init_from_config(self, config: ClientConfig):
+        self._config = config
+
+        # Iterate over interceptors in reverse building the impl
+        self._impl: OutboundInterceptor = _ClientImpl(self)
+        for interceptor in reversed(list(self._config["interceptors"])):
+            self._impl = interceptor.intercept_client(self._impl)
 
     def config(self) -> ClientConfig:
         """Config, as a dictionary, used to create this client.
@@ -499,11 +531,12 @@ class Client:
                 retries and continue as new.
             run_timeout: Timeout of a single workflow run.
             task_timeout: Timeout of a single workflow task.
-            id_reuse_policy: How already-existing IDs are treated.
-            id_conflict_policy: How already-running workflows of the same ID are
-                treated. Default is unspecified which effectively means fail the
-                start attempt. This cannot be set if ``id_reuse_policy`` is set
-                to terminate if running.
+            id_conflict_policy: Behavior when a workflow is currently running with the same ID.
+                Default is UNSPECIFIED, which effectively means fail the start attempt.
+                Set to USE_EXISTING for idempotent deduplication on workflow ID.
+                Cannot be set if ``id_reuse_policy`` is set to TERMINATE_IF_RUNNING.
+            id_reuse_policy: Behavior when a closed workflow with the same ID exists.
+                Default is ALLOW_DUPLICATE.
             retry_policy: Retry policy for the workflow.
             cron_schedule: See https://docs.temporal.io/docs/content/what-is-a-temporal-cron-job/
             memo: Memo for the workflow.
@@ -935,9 +968,6 @@ class Client:
         the update has completed, and return the update result. Note that this means that
         the call will not return successfully until the update has been delivered to a
         worker.
-
-        .. warning::
-           This API is experimental
 
         Args:
             update: Update function or name on the workflow. arg: Single argument to the
@@ -1510,6 +1540,7 @@ class ClientConfig(TypedDict, total=False):
         Optional[temporalio.common.QueryRejectCondition]
     ]
     header_codec_behavior: Required[HeaderCodecBehavior]
+    plugins: Required[Sequence[Plugin]]
 
 
 class WorkflowHistoryEventFilterType(IntEnum):
@@ -1542,6 +1573,12 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         result_run_id: Optional[str] = None,
         first_execution_run_id: Optional[str] = None,
         result_type: Optional[Type] = None,
+        start_workflow_response: Optional[
+            Union[
+                temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
+                temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse,
+            ]
+        ] = None,
     ) -> None:
         """Create workflow handle."""
         self._client = client
@@ -1550,6 +1587,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self._result_run_id = result_run_id
         self._first_execution_run_id = first_execution_run_id
         self._result_type = result_type
+        self._start_workflow_response = start_workflow_response
         self.__temporal_eagerly_started = False
 
     @property
@@ -2453,9 +2491,6 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
 
     Update-With-Start allows you to send an update to a workflow, while starting the
     workflow if necessary.
-
-    .. warning::
-        This API is experimental
     """
 
     # Overload for no-param workflow, with_start
@@ -2623,9 +2658,6 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
     ) -> None:
         """Create a WithStartWorkflowOperation.
 
-        .. warning::
-           This API is experimental
-
         See :py:meth:`temporalio.client.Client.start_workflow` for documentation of the
         arguments.
         """
@@ -2666,11 +2698,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         self._used = False
 
     async def workflow_handle(self) -> WorkflowHandle[SelfType, ReturnType]:
-        """Wait until workflow is running and return a WorkflowHandle.
-
-        .. warning::
-           This API is experimental
-        """
+        """Wait until workflow is running and return a WorkflowHandle."""
         return await self._workflow_handle
 
 
@@ -2855,7 +2883,7 @@ class WorkflowExecution:
         cls,
         info: temporalio.api.workflow.v1.WorkflowExecutionInfo,
         converter: temporalio.converter.DataConverter,
-        **additional_fields,
+        **additional_fields: Any,
     ) -> WorkflowExecution:
         return cls(
             close_time=info.close_time.ToDatetime().replace(tzinfo=timezone.utc)
@@ -5347,11 +5375,7 @@ class StartWorkflowUpdateInput:
 
 @dataclass
 class UpdateWithStartUpdateWorkflowInput:
-    """Update input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`.
-
-    .. warning::
-       This API is experimental
-    """
+    """Update input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`."""
 
     update_id: Optional[str]
     update: str
@@ -5365,11 +5389,7 @@ class UpdateWithStartUpdateWorkflowInput:
 
 @dataclass
 class UpdateWithStartStartWorkflowInput:
-    """StartWorkflow input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`.
-
-    .. warning::
-       This API is experimental
-    """
+    """StartWorkflow input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`."""
 
     # Similar to StartWorkflowInput but without e.g. run_id, start_signal,
     # start_signal_args, request_eager_start.
@@ -5405,11 +5425,7 @@ class UpdateWithStartStartWorkflowInput:
 
 @dataclass
 class StartWorkflowUpdateWithStartInput:
-    """Input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`.
-
-    .. warning::
-       This API is experimental
-    """
+    """Input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`."""
 
     start_workflow_input: UpdateWithStartStartWorkflowInput
     update_workflow_input: UpdateWithStartUpdateWorkflowInput
@@ -5683,11 +5699,7 @@ class OutboundInterceptor:
     async def start_update_with_start_workflow(
         self, input: StartWorkflowUpdateWithStartInput
     ) -> WorkflowUpdateHandle[Any]:
-        """Called for every :py:meth:`Client.start_update_with_start_workflow` and :py:meth:`Client.execute_update_with_start_workflow` call.
-
-        .. warning::
-            This API is experimental
-        """
+        """Called for every :py:meth:`Client.start_update_with_start_workflow` and :py:meth:`Client.execute_update_with_start_workflow` call."""
         return await self.next.start_update_with_start_workflow(input)
 
     ### Async activity calls
@@ -5832,6 +5844,7 @@ class _ClientImpl(OutboundInterceptor):
             result_run_id=resp.run_id,
             first_execution_run_id=first_execution_run_id,
             result_type=input.ret_type,
+            start_workflow_response=resp,
         )
         setattr(handle, "__temporal_eagerly_started", eagerly_started)
         return handle
@@ -7311,23 +7324,8 @@ class CloudOperationsClient:
         self.service_client.update_api_key(value)
 
 
-@dataclass(frozen=True)
-class NexusCallback:
-    """Nexus callback to attach to events such as workflow completion.
-
-    .. warning::
-        This API is experimental and unstable.
-    """
-
-    url: str
-    """Callback URL."""
-
-    headers: Mapping[str, str]
-    """Header to attach to callback request."""
-
-
 # Intended to become a union of callback types
-Callback = NexusCallback
+Callback = temporalio.nexus.NexusCallback
 
 
 async def _encode_user_metadata(
@@ -7367,3 +7365,82 @@ async def _decode_user_metadata(
         if not metadata.HasField("details")
         else (await converter.decode([metadata.details]))[0],
     )
+
+
+class Plugin(abc.ABC):
+    """Base class for client plugins that can intercept and modify client behavior.
+
+    Plugins allow customization of client creation and service connection processes
+    through a chain of responsibility pattern. Each plugin can modify the client
+    configuration or intercept service client connections.
+
+    If the plugin is also a temporalio.worker.Plugin, it will additionally be propagated as a worker plugin.
+    You should likley not also provide it to the worker as that will result in the plugin being applied twice.
+    """
+
+    def name(self) -> str:
+        """Get the name of this plugin. Can be overridden if desired to provide a more appropriate name.
+
+        Returns:
+            The fully qualified name of the plugin class (module.classname).
+        """
+        return type(self).__module__ + "." + type(self).__qualname__
+
+    @abstractmethod
+    def init_client_plugin(self, next: Plugin) -> None:
+        """Initialize this plugin in the plugin chain.
+
+        This method sets up the chain of responsibility pattern by providing a reference
+        to the next plugin in the chain. It is called during client creation to build
+        the plugin chain. Note, this may be called twice in the case of :py:meth:`connect`.
+        Implementations should store this reference and call the corresponding method
+        of the next plugin on method calls.
+
+        Args:
+            next: The next plugin in the chain to delegate to.
+        """
+
+    @abstractmethod
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
+        """Hook called when creating a client to allow modification of configuration.
+
+        This method is called during client creation and allows plugins to modify
+        the client configuration before the client is fully initialized. Plugins
+        can add interceptors, modify connection parameters, or change other settings.
+
+        Args:
+            config: The client configuration dictionary to potentially modify.
+
+        Returns:
+            The modified client configuration.
+        """
+
+    @abstractmethod
+    async def connect_service_client(
+        self, config: temporalio.service.ConnectConfig
+    ) -> temporalio.service.ServiceClient:
+        """Hook called when connecting to the Temporal service.
+
+        This method is called during service client connection and allows plugins
+        to intercept or modify the connection process. Plugins can modify connection
+        parameters, add authentication, or provide custom connection logic.
+
+        Args:
+            config: The service connection configuration.
+
+        Returns:
+            The connected service client.
+        """
+
+
+class _RootPlugin(Plugin):
+    def init_client_plugin(self, next: Plugin) -> None:
+        raise NotImplementedError()
+
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
+        return config
+
+    async def connect_service_client(
+        self, config: temporalio.service.ConnectConfig
+    ) -> temporalio.service.ServiceClient:
+        return await temporalio.service.ServiceClient.connect(config)

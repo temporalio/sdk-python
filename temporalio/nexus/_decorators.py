@@ -16,16 +16,10 @@ from nexusrpc.handler import (
     StartOperationContext,
 )
 
-from temporalio.nexus._operation_context import (
-    WorkflowRunOperationContext,
-)
-from temporalio.nexus._operation_handlers import (
-    WorkflowRunOperationHandler,
-)
-from temporalio.nexus._token import (
-    WorkflowHandle,
-)
-from temporalio.nexus._util import (
+from ._operation_context import WorkflowRunOperationContext
+from ._operation_handlers import WorkflowRunOperationHandler
+from ._token import WorkflowHandle
+from ._util import (
     get_callable_name,
     get_workflow_run_start_method_input_and_output_type_annotations,
     set_operation_factory,
@@ -120,10 +114,10 @@ def workflow_run_operation(
                 )
 
             _start.__doc__ = start.__doc__
-            return WorkflowRunOperationHandler(_start, input_type, output_type)
+            return WorkflowRunOperationHandler(_start)
 
         method_name = get_callable_name(start)
-        nexusrpc.set_operation(
+        nexusrpc.set_operation_definition(
             operation_handler_factory,
             nexusrpc.Operation(
                 name=name or method_name,

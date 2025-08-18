@@ -1,6 +1,6 @@
 import inspect
 import itertools
-from typing import Sequence
+from typing import Any, Callable, Sequence, Set, Type, get_type_hints
 
 from temporalio import workflow
 from temporalio.common import RawValue, VersioningBehavior
@@ -225,7 +225,7 @@ class BadDefn(BadDefnBase):
         pass
 
     # Intentionally missing decorator
-    def base_update(self):
+    def base_update(self):  # type: ignore[reportIncompatibleVariableOverride]
         pass
 
 
@@ -288,7 +288,8 @@ class NonAsyncRun:
 
 def test_workflow_defn_non_async_run():
     with pytest.raises(ValueError) as err:
-        workflow.run(NonAsyncRun.run)
+        # assert-type-error-pyright: 'Argument .+ cannot be assigned to parameter "fn"'
+        workflow.run(NonAsyncRun.run)  # type: ignore
     assert "must be an async function" in str(err.value)
 
 
@@ -349,10 +350,10 @@ class BadDynamic:
     def some_dynamic1(self):
         pass
 
-    def some_dynamic2(self, no_vararg):
+    def some_dynamic2(self, no_vararg):  # type: ignore[reportMissingParameterType]
         pass
 
-    def old_dynamic(self, name, *args):
+    def old_dynamic(self, name, *args):  # type: ignore[reportMissingParameterType]
         pass
 
 
@@ -382,10 +383,10 @@ def test_workflow_defn_dynamic_handler_warnings():
 
 
 class _TestParametersIdenticalUpToNaming:
-    def a1(self, a):
+    def a1(self, a):  # type: ignore[reportMissingParameterType]
         pass
 
-    def a2(self, b):
+    def a2(self, b):  # type: ignore[reportMissingParameterType]
         pass
 
     def b1(self, a: int):
@@ -400,19 +401,19 @@ class _TestParametersIdenticalUpToNaming:
     def c2(self, b1: int, b2: str) -> int:
         return 0
 
-    def d1(self, a1, a2: str) -> None:
+    def d1(self, a1, a2: str) -> None:  # type: ignore[reportMissingParameterType]
         pass
 
-    def d2(self, b1, b2: str) -> str:
+    def d2(self, b1, b2: str) -> str:  # type: ignore[reportMissingParameterType]
         return ""
 
-    def e1(self, a1, a2: str = "") -> None:
+    def e1(self, a1, a2: str = "") -> None:  # type: ignore[reportMissingParameterType]
         return None
 
-    def e2(self, b1, b2: str = "") -> str:
+    def e2(self, b1, b2: str = "") -> str:  # type: ignore[reportMissingParameterType]
         return ""
 
-    def f1(self, a1, a2: str = "a") -> None:
+    def f1(self, a1, a2: str = "a") -> None:  # type: ignore[reportMissingParameterType]
         return None
 
 
@@ -451,6 +452,7 @@ class BadUpdateValidator:
     def my_update(self, a: str):
         pass
 
+    # assert-type-error-pyright: "Argument of type .+ cannot be assigned to parameter"
     @my_update.validator  # type: ignore
     def my_validator(self, a: int):
         pass
@@ -467,3 +469,103 @@ def test_workflow_update_validator_not_update():
         "Update validator method my_validator parameters do not match update method my_update parameters"
         in str(err.value)
     )
+
+
+def _assert_config_function_parity(
+    function_obj: Callable[..., Any],
+    config_class: Type[Any],
+    excluded_params: Set[str],
+) -> None:
+    function_name = function_obj.__name__
+    config_name = config_class.__name__
+
+    # Get the signature and type hints
+    function_sig = inspect.signature(function_obj)
+    config_hints = get_type_hints(config_class)
+
+    # Get parameter names from function (excluding excluded ones and applying mappings)
+    expected_config_params = set(
+        [name for name in function_sig.parameters.keys() if name not in excluded_params]
+    )
+
+    # Get parameter names from config
+    actual_config_params = set(
+        [name for name in config_hints.keys() if name not in excluded_params]
+    )
+
+    # Check for missing and extra parameters
+    missing_in_config = expected_config_params - actual_config_params
+    extra_in_config = actual_config_params - expected_config_params
+
+    # Build detailed error message if there are mismatches
+    if missing_in_config or extra_in_config:
+        error_parts = []
+        if missing_in_config:
+            error_parts.append(
+                f"{config_name} is missing parameters: {sorted(missing_in_config)}"
+            )
+        if extra_in_config:
+            error_parts.append(
+                f"{config_name} has extra parameters: {sorted(extra_in_config)}"
+            )
+
+        error_message = "; ".join(error_parts)
+        error_message += f"\nExpected: {sorted(expected_config_params)}\nActual: {sorted(actual_config_params)}"
+        assert False, error_message
+
+
+async def test_activity_config_parity_with_execute_activity():
+    """Test that ActivityConfig has all the same parameters as execute_activity."""
+    _assert_config_function_parity(
+        workflow.execute_activity,
+        workflow.ActivityConfig,
+        excluded_params={"activity", "arg", "args", "result_type"},
+    )
+
+    with pytest.raises(workflow._NotInWorkflowEventLoopError):
+        await workflow.execute_activity("activity", **workflow.ActivityConfig())
+
+
+def test_activity_config_parity_with_start_activity():
+    """Test that ActivityConfig has all the same parameters as start_activity."""
+    _assert_config_function_parity(
+        workflow.start_activity,
+        workflow.ActivityConfig,
+        excluded_params={"activity", "arg", "args", "result_type"},
+    )
+
+    with pytest.raises(workflow._NotInWorkflowEventLoopError):
+        workflow.start_activity("workflow", **workflow.ActivityConfig())
+
+
+async def test_child_workflow_config_parity_with_execute_child_workflow():
+    """Test that ChildWorkflowConfig has all the same parameters as execute_child_workflow."""
+    _assert_config_function_parity(
+        workflow.execute_child_workflow,
+        workflow.ChildWorkflowConfig,
+        excluded_params={"workflow", "arg", "args", "result_type"},
+    )
+
+    with pytest.raises(workflow._NotInWorkflowEventLoopError):
+        await workflow.execute_child_workflow(
+            "workflow", **workflow.ChildWorkflowConfig()
+        )
+
+
+async def test_child_workflow_config_parity_with_start_child_workflow():
+    """Test that ChildWorkflowConfig has all the same parameters as start_child_workflow."""
+    _assert_config_function_parity(
+        workflow.start_child_workflow,
+        workflow.ChildWorkflowConfig,
+        excluded_params={
+            "workflow",
+            "arg",
+            "args",
+            "result_type",
+        },
+    )
+
+    with pytest.raises(workflow._NotInWorkflowEventLoopError):
+        await workflow.start_child_workflow(
+            "workflow", **workflow.ChildWorkflowConfig()
+        )

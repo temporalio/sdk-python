@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import random
+import uuid
 from contextlib import contextmanager
 from typing import Any, Mapping, Protocol, Type
 
-from agents import custom_span, get_current_span, trace
+from agents import CustomSpanData, custom_span, get_current_span, trace
 from agents.tracing import (
     get_trace_provider,
 )
+from agents.tracing.scope import Scope
 from agents.tracing.spans import NoOpSpan
 
 import temporalio.activity
@@ -65,11 +68,15 @@ def context_from_header(
             else workflow.info().workflow_type
         )
         data = (
-            {"activityId": activity.info().activity_id}
+            {
+                "activityId": activity.info().activity_id,
+                "activity": activity.info().activity_type,
+            }
             if activity.in_activity()
             else None
         )
-        if get_trace_provider().get_current_trace() is None:
+        current_trace = get_trace_provider().get_current_trace()
+        if current_trace is None:
             metadata = {
                 "temporal:workflowId": activity.info().workflow_id
                 if activity.in_activity()
@@ -79,16 +86,21 @@ def context_from_header(
                 else workflow.info().run_id,
                 "temporal:workflowType": workflow_type,
             }
-            with trace(
+            current_trace = trace(
                 span_info["traceName"],
                 trace_id=span_info["traceId"],
                 metadata=metadata,
-            ) as t:
-                with custom_span(name=span_name, parent=t, data=data):
-                    yield
-        else:
-            with custom_span(name=span_name, parent=None, data=data):
-                yield
+            )
+            Scope.set_current_trace(current_trace)
+        current_span = get_trace_provider().get_current_span()
+        if current_span is None:
+            current_span = get_trace_provider().create_span(
+                span_data=CustomSpanData(name="", data={}), span_id=span_info["spanId"]
+            )
+            Scope.set_current_span(current_span)
+
+        with custom_span(name=span_name, parent=current_span, data=data):
+            yield
 
 
 class OpenAIAgentsTracingInterceptor(
@@ -115,7 +127,7 @@ class OpenAIAgentsTracingInterceptor(
         worker = Worker(client, task_queue="my-task-queue", interceptors=[interceptor])
     """
 
-    def __init__(  # type: ignore[reportMissingSuperCall]
+    def __init__(
         self,
         payload_converter: temporalio.converter.PayloadConverter = temporalio.converter.default().payload_converter,
     ) -> None:
@@ -272,6 +284,35 @@ class _ContextPropagationActivityInboundInterceptor(
             return await self.next.execute_activity(input)
 
 
+class RunIdRandom:
+    """Random uuid generator seeded by the run id of the workflow.
+    Doesn't currently support replay over reset correctly.
+    """
+
+    def __init__(self):
+        """Create a new random UUID generator."""
+        self._random = random.Random("OpenAIPlugin" + workflow.info().run_id)
+
+    def uuid4(self) -> str:
+        """Generate a random UUID."""
+        return uuid.UUID(
+            bytes=random.getrandbits(16 * 8).to_bytes(16, "big"), version=4
+        ).hex[:24]
+
+
+def _ensure_tracing_random() -> None:
+    """We use a custom uuid generator for spans to ensure that changes to user code workflow.random usage
+    do not affect tracing and vice versa.
+    """
+    instance = workflow.instance()
+    if not hasattr(instance, "__temporal_openai_tracing_random"):
+        setattr(
+            workflow.instance(),
+            "__temporal_openai_tracing_random",
+            RunIdRandom(),
+        )
+
+
 class _ContextPropagationWorkflowInboundInterceptor(
     temporalio.worker.WorkflowInboundInterceptor
 ):
@@ -281,18 +322,21 @@ class _ContextPropagationWorkflowInboundInterceptor(
     async def execute_workflow(
         self, input: temporalio.worker.ExecuteWorkflowInput
     ) -> Any:
+        _ensure_tracing_random()
         with context_from_header(
             "temporal:executeWorkflow", input, temporalio.workflow.payload_converter()
         ):
             return await self.next.execute_workflow(input)
 
     async def handle_signal(self, input: temporalio.worker.HandleSignalInput) -> None:
+        _ensure_tracing_random()
         with context_from_header(
             "temporal:handleSignal", input, temporalio.workflow.payload_converter()
         ):
             return await self.next.handle_signal(input)
 
     async def handle_query(self, input: temporalio.worker.HandleQueryInput) -> Any:
+        _ensure_tracing_random()
         with context_from_header(
             "temporal:handleQuery", input, temporalio.workflow.payload_converter()
         ):
@@ -311,6 +355,7 @@ class _ContextPropagationWorkflowInboundInterceptor(
     async def handle_update_handler(
         self, input: temporalio.worker.HandleUpdateInput
     ) -> Any:
+        _ensure_tracing_random()
         with context_from_header(
             "temporal:handleUpdateHandler",
             input,
@@ -325,32 +370,55 @@ class _ContextPropagationWorkflowOutboundInterceptor(
     async def signal_child_workflow(
         self, input: temporalio.worker.SignalChildWorkflowInput
     ) -> None:
-        set_header_from_context(input, temporalio.workflow.payload_converter())
-        return await self.next.signal_child_workflow(input)
+        with custom_span(
+            name="temporal:signalChildWorkflow",
+            data={"workflowId": input.child_workflow_id},
+        ):
+            set_header_from_context(input, temporalio.workflow.payload_converter())
+            await self.next.signal_child_workflow(input)
 
     async def signal_external_workflow(
         self, input: temporalio.worker.SignalExternalWorkflowInput
     ) -> None:
-        set_header_from_context(input, temporalio.workflow.payload_converter())
-        return await self.next.signal_external_workflow(input)
+        with custom_span(
+            name="temporal:signalExternalWorkflow",
+            data={"workflowId": input.workflow_id},
+        ):
+            set_header_from_context(input, temporalio.workflow.payload_converter())
+            await self.next.signal_external_workflow(input)
 
     def start_activity(
         self, input: temporalio.worker.StartActivityInput
     ) -> temporalio.workflow.ActivityHandle:
-        with custom_span(
-            name=f"temporal:startActivity:{input.activity}",
-        ):
-            set_header_from_context(input, temporalio.workflow.payload_converter())
-            return self.next.start_activity(input)
+        span = custom_span(
+            name="temporal:startActivity", data={"activity": input.activity}
+        )
+        span.start(mark_as_current=True)
+        set_header_from_context(input, temporalio.workflow.payload_converter())
+        handle = self.next.start_activity(input)
+        handle.add_done_callback(lambda _: span.finish())
+        return handle
 
     async def start_child_workflow(
         self, input: temporalio.worker.StartChildWorkflowInput
     ) -> temporalio.workflow.ChildWorkflowHandle:
+        span = custom_span(
+            name="temporal:startChildWorkflow", data={"workflow": input.workflow}
+        )
+        span.start(mark_as_current=True)
         set_header_from_context(input, temporalio.workflow.payload_converter())
-        return await self.next.start_child_workflow(input)
+        handle = await self.next.start_child_workflow(input)
+        handle.add_done_callback(lambda _: span.finish())
+        return handle
 
     def start_local_activity(
         self, input: temporalio.worker.StartLocalActivityInput
     ) -> temporalio.workflow.ActivityHandle:
+        span = custom_span(
+            name="temporal:startLocalActivity", data={"activity": input.activity}
+        )
+        span.start(mark_as_current=True)
         set_header_from_context(input, temporalio.workflow.payload_converter())
-        return self.next.start_local_activity(input)
+        handle = self.next.start_local_activity(input)
+        handle.add_done_callback(lambda _: span.finish())
+        return handle

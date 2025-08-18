@@ -42,6 +42,8 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from typing_extensions import Literal, Protocol, runtime_checkable
 
 import temporalio.activity
+import temporalio.api.sdk.v1
+import temporalio.client
 import temporalio.worker
 import temporalio.workflow
 from temporalio import activity, workflow
@@ -51,6 +53,7 @@ from temporalio.api.failure.v1 import Failure
 from temporalio.api.sdk.v1 import EnhancedStackTrace
 from temporalio.api.workflowservice.v1 import (
     GetWorkflowExecutionHistoryRequest,
+    PollWorkflowExecutionUpdateResponse,
     ResetStickyTaskQueueRequest,
 )
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
@@ -1023,6 +1026,8 @@ async def test_workflow_simple_child(client: Client):
 
 @workflow.defn
 class LongSleepWorkflow:
+    _started = False
+
     @workflow.run
     async def run(self) -> None:
         self._started = True
@@ -1085,6 +1090,8 @@ async def wait_forever() -> NoReturn:
 
 @workflow.defn
 class UncaughtCancelWorkflow:
+    _started = False
+
     @workflow.run
     async def run(self, activity: bool) -> NoReturn:
         self._started = True
@@ -1099,6 +1106,7 @@ class UncaughtCancelWorkflow:
                 True,
                 id=f"{workflow.info().workflow_id}_child",
             )
+        raise RuntimeError("Unreachable")
 
     @workflow.query
     def started(self) -> bool:
@@ -1133,6 +1141,7 @@ async def test_workflow_uncaught_cancel(client: Client, activity: bool):
 class CancelChildWorkflow:
     def __init__(self) -> None:
         self._ready = False
+        self._task: Optional[asyncio.Task[Any]] = None
 
     @workflow.run
     async def run(self, use_execute: bool) -> None:
@@ -1155,6 +1164,7 @@ class CancelChildWorkflow:
 
     @workflow.signal
     async def cancel_child(self) -> None:
+        assert self._task
         self._task.cancel()
 
 
@@ -1635,6 +1645,7 @@ class ContinueAsNewWorkflow:
         info = workflow.info()
         if info.continued_run_id:
             past_run_ids.append(info.continued_run_id)
+            assert info.first_execution_run_id == past_run_ids[0]
         workflow.continue_as_new(
             past_run_ids,
             # Add memo and retry policy to check
@@ -2338,7 +2349,7 @@ class DataClassTypedWorkflowProto(Protocol):
 class DataClassTypedWorkflowAbstract(ABC):
     @workflow.run
     @abstractmethod
-    async def run(self, arg: MyDataClass) -> MyDataClass: ...
+    async def run(self, param: MyDataClass) -> MyDataClass: ...
 
     @workflow.signal
     @abstractmethod
@@ -2922,7 +2933,7 @@ async def test_workflow_patch_memoized(client: Client):
         )
 
         # Send signal to both and check results
-        await pre_patch_handle.signal(PatchMemoizedWorkflowPatched.signal)
+        await pre_patch_handle.signal(PatchMemoizedWorkflowUnpatched.signal)
         await post_patch_handle.signal(PatchMemoizedWorkflowPatched.signal)
 
         # Confirm expected values
@@ -3342,6 +3353,8 @@ async def test_workflow_query_does_not_run_condition(client: Client):
 
 @workflow.defn
 class CancelSignalAndTimerFiredInSameTaskWorkflow:
+    timer_task: asyncio.Task[None]  # type: ignore[reportUninitializedInstanceVariable]
+
     @workflow.run
     async def run(self) -> None:
         # Start a 1 hour timer
@@ -3424,6 +3437,7 @@ class CustomErrorWorkflow:
             )
         except ActivityError:
             raise MyCustomError("workflow error!")
+        raise RuntimeError("Unreachable")
 
 
 class CustomFailureConverter(DefaultFailureConverterWithEncodedAttributes):
@@ -4790,7 +4804,9 @@ async def test_workflow_update_timeout_or_cancel(client: Client):
         called = asyncio.Event()
         unpatched_call = client.workflow_service.poll_workflow_execution_update
 
-        async def patched_call(*args, **kwargs):
+        async def patched_call(
+            *args: Any, **kwargs: Any
+        ) -> PollWorkflowExecutionUpdateResponse:
             called.set()
             return await unpatched_call(*args, **kwargs)
 
@@ -5855,7 +5871,7 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
         ):
             with pytest.WarningsRecorder() as warnings:
                 if self.handler_type == "-update-":
-                    assert update_task
+                    assert update_task  # type: ignore[reportUnboundVariable]
                     if self.handler_waiting == "-wait-all-handlers-finish-":
                         await update_task
                     else:
@@ -6053,7 +6069,9 @@ async def test_update_completion_is_honored_when_after_workflow_return_2(
 
 @workflow.defn
 class FirstCompletionCommandIsHonoredWorkflow:
-    def __init__(self, main_workflow_returns_before_signal_completions=False) -> None:
+    def __init__(
+        self, main_workflow_returns_before_signal_completions: bool = False
+    ) -> None:
         self.seen_first_signal = False
         self.seen_second_signal = False
         self.main_workflow_returns_before_signal_completions = (
@@ -6589,7 +6607,7 @@ async def bad_failure_converter_activity() -> None:
 @workflow.defn(sandboxed=False)
 class BadFailureConverterWorkflow:
     @workflow.run
-    async def run(self, fail_workflow_task) -> None:
+    async def run(self, fail_workflow_task: bool) -> None:
         if fail_workflow_task:
             raise BadFailureConverterError
         else:
@@ -6911,7 +6929,7 @@ class HandlerCoroutinesUseLockOrSemaphoreWorkflow(CoroutinesUseLockOrSemaphoreWo
     @workflow.run
     async def run(
         self,
-        _: Optional[UseLockOrSemaphoreWorkflowParameters] = None,
+        params: Optional[UseLockOrSemaphoreWorkflowParameters] = None,
     ) -> LockOrSemaphoreWorkflowConcurrencySummary:
         await workflow.wait_condition(lambda: self.workflow_may_exit)
         return LockOrSemaphoreWorkflowConcurrencySummary(
@@ -7110,7 +7128,7 @@ async def test_update_handler_semaphore_acquisition_respects_timeout(
 @workflow.defn
 class TimeoutErrorWorkflow:
     @workflow.run
-    async def run(self, scenario) -> None:
+    async def run(self, scenario: str) -> None:
         if scenario == "workflow.wait_condition":
             await workflow.wait_condition(lambda: False, timeout=0.01)
         elif scenario == "asyncio.wait_for":
@@ -7509,7 +7527,7 @@ class ExposeRootChildWorkflow:
 @workflow.defn
 class ExposeRootWorkflow:
     @workflow.run
-    async def run(self, child_wf_id) -> Optional[temporalio.workflow.RootInfo]:
+    async def run(self, child_wf_id: str) -> Optional[temporalio.workflow.RootInfo]:
         return await workflow.execute_child_workflow(
             ExposeRootChildWorkflow.run, id=child_wf_id
         )
