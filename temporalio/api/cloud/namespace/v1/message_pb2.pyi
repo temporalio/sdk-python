@@ -14,6 +14,7 @@ import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
+import temporalio.api.cloud.connectivityrule.v1.message_pb2
 import temporalio.api.cloud.resource.v1.message_pb2
 import temporalio.api.cloud.sink.v1.message_pb2
 
@@ -367,6 +368,7 @@ class NamespaceSpec(google.protobuf.message.Message):
     CODEC_SERVER_FIELD_NUMBER: builtins.int
     LIFECYCLE_FIELD_NUMBER: builtins.int
     HIGH_AVAILABILITY_FIELD_NUMBER: builtins.int
+    CONNECTIVITY_RULE_IDS_FIELD_NUMBER: builtins.int
     name: builtins.str
     """The name to use for the namespace.
     This will create a namespace that's available at '<name>.<account>.tmprl.cloud:7233'.
@@ -441,6 +443,14 @@ class NamespaceSpec(google.protobuf.message.Message):
         """The high availability configuration for the namespace.
         temporal:versioning:min_version=v0.4.0
         """
+    @property
+    def connectivity_rule_ids(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """The private connectivity configuration for the namespace.
+        This will apply the connectivity rules specified to the namespace.
+        temporal:versioning:min_version=v0.6.0
+        """
     def __init__(
         self,
         *,
@@ -458,6 +468,7 @@ class NamespaceSpec(google.protobuf.message.Message):
         codec_server: global___CodecServerSpec | None = ...,
         lifecycle: global___LifecycleSpec | None = ...,
         high_availability: global___HighAvailabilitySpec | None = ...,
+        connectivity_rule_ids: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -481,6 +492,8 @@ class NamespaceSpec(google.protobuf.message.Message):
             b"api_key_auth",
             "codec_server",
             b"codec_server",
+            "connectivity_rule_ids",
+            b"connectivity_rule_ids",
             "custom_search_attributes",
             b"custom_search_attributes",
             "high_availability",
@@ -646,6 +659,24 @@ class Namespace(google.protobuf.message.Message):
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
+    class TagsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        value: builtins.str
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
+
     NAMESPACE_FIELD_NUMBER: builtins.int
     RESOURCE_VERSION_FIELD_NUMBER: builtins.int
     SPEC_FIELD_NUMBER: builtins.int
@@ -659,6 +690,8 @@ class Namespace(google.protobuf.message.Message):
     CREATED_TIME_FIELD_NUMBER: builtins.int
     LAST_MODIFIED_TIME_FIELD_NUMBER: builtins.int
     REGION_STATUS_FIELD_NUMBER: builtins.int
+    CONNECTIVITY_RULES_FIELD_NUMBER: builtins.int
+    TAGS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """The namespace identifier."""
     resource_version: builtins.str
@@ -713,6 +746,18 @@ class Namespace(google.protobuf.message.Message):
         """The status of each region where the namespace is available.
         The id of the region is the key and the status is the value of the map.
         """
+    @property
+    def connectivity_rules(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.cloud.connectivityrule.v1.message_pb2.ConnectivityRule
+    ]:
+        """The connectivity rules that are set on this namespace."""
+    @property
+    def tags(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
+        """The tags for the namespace."""
     def __init__(
         self,
         *,
@@ -733,6 +778,11 @@ class Namespace(google.protobuf.message.Message):
             builtins.str, global___NamespaceRegionStatus
         ]
         | None = ...,
+        connectivity_rules: collections.abc.Iterable[
+            temporalio.api.cloud.connectivityrule.v1.message_pb2.ConnectivityRule
+        ]
+        | None = ...,
+        tags: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -756,6 +806,8 @@ class Namespace(google.protobuf.message.Message):
             b"active_region",
             "async_operation_id",
             b"async_operation_id",
+            "connectivity_rules",
+            b"connectivity_rules",
             "created_time",
             b"created_time",
             "endpoints",
@@ -778,6 +830,8 @@ class Namespace(google.protobuf.message.Message):
             b"state",
             "state_deprecated",
             b"state_deprecated",
+            "tags",
+            b"tags",
         ],
     ) -> None: ...
 

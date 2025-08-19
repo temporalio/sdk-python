@@ -4,10 +4,12 @@ isort:skip_file
 """
 
 import builtins
+import collections.abc
 import sys
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
+import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
@@ -215,6 +217,7 @@ class WorkerHeartbeat(google.protobuf.message.Message):
     TOTAL_STICKY_CACHE_HIT_FIELD_NUMBER: builtins.int
     TOTAL_STICKY_CACHE_MISS_FIELD_NUMBER: builtins.int
     CURRENT_STICKY_CACHE_SIZE_FIELD_NUMBER: builtins.int
+    PLUGINS_FIELD_NUMBER: builtins.int
     worker_instance_key: builtins.str
     """Worker identifier, should be unique for the namespace.
     It is distinct from worker identity, which is not necessarily namespace-unique.
@@ -271,6 +274,13 @@ class WorkerHeartbeat(google.protobuf.message.Message):
     """A Workflow Task did not find a cached Workflow execution to run against."""
     current_sticky_cache_size: builtins.int
     """Current cache size, expressed in number of Workflow Executions."""
+    @property
+    def plugins(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___PluginInfo
+    ]:
+        """Plugins currently in use by this SDK."""
     def __init__(
         self,
         *,
@@ -298,6 +308,7 @@ class WorkerHeartbeat(google.protobuf.message.Message):
         total_sticky_cache_hit: builtins.int = ...,
         total_sticky_cache_miss: builtins.int = ...,
         current_sticky_cache_size: builtins.int = ...,
+        plugins: collections.abc.Iterable[global___PluginInfo] | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -353,6 +364,8 @@ class WorkerHeartbeat(google.protobuf.message.Message):
             b"nexus_poller_info",
             "nexus_task_slots_info",
             b"nexus_task_slots_info",
+            "plugins",
+            b"plugins",
             "sdk_name",
             b"sdk_name",
             "sdk_version",
@@ -403,3 +416,25 @@ class WorkerInfo(google.protobuf.message.Message):
     ) -> None: ...
 
 global___WorkerInfo = WorkerInfo
+
+class PluginInfo(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAME_FIELD_NUMBER: builtins.int
+    VERSION_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    """The name of the plugin, required."""
+    version: builtins.str
+    """The version of the plugin, may be empty."""
+    def __init__(
+        self,
+        *,
+        name: builtins.str = ...,
+        version: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["name", b"name", "version", b"version"],
+    ) -> None: ...
+
+global___PluginInfo = PluginInfo
