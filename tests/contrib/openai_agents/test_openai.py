@@ -2056,10 +2056,8 @@ class McpServerWorkflow:
     async def run(self, question: str) -> str:
         from agents.mcp import MCPServer
 
-        server: MCPServer = (
-            openai_agents.workflow.create_stateless_mcp_server_reference(
-                "Filesystem-Server"
-            )
+        server: MCPServer = openai_agents.workflow.get_stateless_mcp_server(
+            "Filesystem-Server"
         )
         agent = Agent[str](
             name="MCP ServerWorkflow",
@@ -2148,7 +2146,7 @@ async def test_stateless_mcp_server(client: Client, use_local_model: bool):
 class McpServerStatefulWorkflow:
     @workflow.run
     async def run(self, timeout: timedelta) -> str:
-        async with openai_agents.workflow.create_stateful_mcp_server_reference(
+        async with openai_agents.workflow.get_stateful_mcp_server(
             "Filesystem-Server",
             config=ActivityConfig(
                 schedule_to_start_timeout=timeout,

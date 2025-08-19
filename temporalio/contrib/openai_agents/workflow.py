@@ -244,13 +244,13 @@ def nexus_operation_as_tool(
     )
 
 
-def create_stateless_mcp_server_reference(
+def get_stateless_mcp_server(
     name: str, config: Optional[ActivityConfig] = None
 ) -> "MCPServer":
     return StatelessTemporalMCPServerReference(name, config)
 
 
-def create_stateful_mcp_server_reference(
+def get_stateful_mcp_server(
     name: str,
     config: Optional[ActivityConfig] = None,
     connect_config: Optional[ActivityConfig] = None,
