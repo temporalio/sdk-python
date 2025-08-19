@@ -865,6 +865,28 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersResponse,
     ]
     """ListWorkers is a visibility API to list worker status information in a specific namespace."""
+    UpdateTaskQueueConfig: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigResponse,
+    ]
+    """Updates task queue configuration.
+    For the overall queue rate limit: the rate limit set by this api overrides the worker-set rate limit,
+    which uncouples the rate limit from the worker lifecycle.
+    If the overall queue rate limit is unset, the worker-set rate limit takes effect.
+    """
+    FetchWorkerConfig: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigResponse,
+    ]
+    """FetchWorkerConfig returns the worker configuration for a specific worker."""
+    UpdateWorkerConfig: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigResponse,
+    ]
+    """UpdateWorkerConfig updates the worker configuration of one or more workers.
+    Can be used to partially update the worker configuration.
+    Can be used to update the configuration of multiple workers.
+    """
 
 class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     """WorkflowService API defines how Temporal SDKs and other clients interact with the Temporal server
@@ -1909,6 +1931,36 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListWorkersResponse:
         """ListWorkers is a visibility API to list worker status information in a specific namespace."""
+    @abc.abstractmethod
+    def UpdateTaskQueueConfig(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateTaskQueueConfigResponse:
+        """Updates task queue configuration.
+        For the overall queue rate limit: the rate limit set by this api overrides the worker-set rate limit,
+        which uncouples the rate limit from the worker lifecycle.
+        If the overall queue rate limit is unset, the worker-set rate limit takes effect.
+        """
+    @abc.abstractmethod
+    def FetchWorkerConfig(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigRequest,
+        context: grpc.ServicerContext,
+    ) -> (
+        temporalio.api.workflowservice.v1.request_response_pb2.FetchWorkerConfigResponse
+    ):
+        """FetchWorkerConfig returns the worker configuration for a specific worker."""
+    @abc.abstractmethod
+    def UpdateWorkerConfig(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerConfigResponse:
+        """UpdateWorkerConfig updates the worker configuration of one or more workers.
+        Can be used to partially update the worker configuration.
+        Can be used to update the configuration of multiple workers.
+        """
 
 def add_WorkflowServiceServicer_to_server(
     servicer: WorkflowServiceServicer, server: grpc.Server
