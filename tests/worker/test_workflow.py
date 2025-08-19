@@ -7437,18 +7437,24 @@ class WorkflowUsingPriorities:
         await workflow.execute_child_workflow(
             WorkflowUsingPriorities.run,
             args=[4, True],
-            priority=Priority(priority_key=4),
+            priority=Priority(
+                priority_key=4, fairness_key="tenant2", fairness_weight=1.0
+            ),
         )
         handle = await workflow.start_child_workflow(
             WorkflowUsingPriorities.run,
             args=[2, True],
-            priority=Priority(priority_key=2),
+            priority=Priority(
+                priority_key=2, fairness_key="tenant3", fairness_weight=0.5
+            ),
         )
         await handle
         await workflow.execute_activity(
             say_hello,
             "hi",
-            priority=Priority(priority_key=5),
+            priority=Priority(
+                priority_key=5, fairness_key="tenant4", fairness_weight=3.0
+            ),
             start_to_close_timeout=timedelta(seconds=5),
         )
         return "Done!"
@@ -7468,36 +7474,39 @@ async def test_workflow_priorities(client: Client, env: WorkflowEnvironment):
             args=[1, False],
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            priority=Priority(priority_key=1),
+            priority=Priority(
+                priority_key=1, fairness_key="tenant1", fairness_weight=2.5
+            ),
         )
         await handle.result()
 
         first_child = True
         async for e in handle.fetch_history_events():
             if e.HasField("workflow_execution_started_event_attributes"):
-                assert (
-                    e.workflow_execution_started_event_attributes.priority.priority_key
-                    == 1
-                )
+                priority = e.workflow_execution_started_event_attributes.priority
+                assert priority.priority_key == 1
+                assert priority.fairness_key == "tenant1"
+                assert priority.fairness_weight == 2.5
             elif e.HasField(
                 "start_child_workflow_execution_initiated_event_attributes"
             ):
+                priority = (
+                    e.start_child_workflow_execution_initiated_event_attributes.priority
+                )
                 if first_child:
-                    assert (
-                        e.start_child_workflow_execution_initiated_event_attributes.priority.priority_key
-                        == 4
-                    )
+                    assert priority.priority_key == 4
+                    assert priority.fairness_key == "tenant2"
+                    assert priority.fairness_weight == 1.0
                     first_child = False
                 else:
-                    assert (
-                        e.start_child_workflow_execution_initiated_event_attributes.priority.priority_key
-                        == 2
-                    )
+                    assert priority.priority_key == 2
+                    assert priority.fairness_key == "tenant3"
+                    assert priority.fairness_weight == 0.5
             elif e.HasField("activity_task_scheduled_event_attributes"):
-                assert (
-                    e.activity_task_scheduled_event_attributes.priority.priority_key
-                    == 5
-                )
+                priority = e.activity_task_scheduled_event_attributes.priority
+                assert priority.priority_key == 5
+                assert priority.fairness_key == "tenant4"
+                assert priority.fairness_weight == 3.0
 
         # Verify a workflow started without priorities sees None for the key
         handle = await client.start_workflow(

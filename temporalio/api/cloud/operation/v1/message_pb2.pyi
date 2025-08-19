@@ -46,6 +46,8 @@ class AsyncOperation(google.protobuf.message.Message):
         """The operation was cancelled."""
         STATE_FULFILLED: AsyncOperation._State.ValueType  # 5
         """The operation was fulfilled."""
+        STATE_REJECTED: AsyncOperation._State.ValueType  # 6
+        """The operation was rejected."""
 
     class State(_State, metaclass=_StateEnumTypeWrapper): ...
     STATE_UNSPECIFIED: AsyncOperation.State.ValueType  # 0
@@ -59,6 +61,8 @@ class AsyncOperation(google.protobuf.message.Message):
     """The operation was cancelled."""
     STATE_FULFILLED: AsyncOperation.State.ValueType  # 5
     """The operation was fulfilled."""
+    STATE_REJECTED: AsyncOperation.State.ValueType  # 6
+    """The operation was rejected."""
 
     ID_FIELD_NUMBER: builtins.int
     STATE_DEPRECATED_FIELD_NUMBER: builtins.int

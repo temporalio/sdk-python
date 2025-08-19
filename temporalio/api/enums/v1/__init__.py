@@ -34,6 +34,7 @@ from .schedule_pb2 import ScheduleOverlapPolicy
 from .task_queue_pb2 import (
     BuildIdTaskReachability,
     DescribeTaskQueueMode,
+    RateLimitSource,
     TaskQueueKind,
     TaskQueueType,
     TaskReachability,
@@ -78,6 +79,7 @@ __all__ = [
     "PendingWorkflowTaskState",
     "QueryRejectCondition",
     "QueryResultType",
+    "RateLimitSource",
     "ReplicationState",
     "ResetReapplyExcludeType",
     "ResetReapplyType",

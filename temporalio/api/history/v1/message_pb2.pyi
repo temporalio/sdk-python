@@ -74,6 +74,7 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     PARENT_PINNED_WORKER_DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
     INHERITED_PINNED_VERSION_FIELD_NUMBER: builtins.int
+    EAGER_EXECUTION_ACCEPTED_FIELD_NUMBER: builtins.int
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
     parent_workflow_namespace: builtins.str
@@ -250,6 +251,11 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
         Pinned override is inherited if Task Queue of new run is compatible with the override version.
         Override is inherited separately and takes precedence over inherited base version.
         """
+    eager_execution_accepted: builtins.bool
+    """A boolean indicating whether the SDK has asked to eagerly execute the first workflow task for this workflow and
+    eager execution was accepted by the server.
+    Only populated by server with version >= 1.29.0.
+    """
     def __init__(
         self,
         *,
@@ -301,6 +307,7 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
         inherited_pinned_version: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion
         | None = ...,
+        eager_execution_accepted: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -362,6 +369,8 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             b"continued_failure",
             "cron_schedule",
             b"cron_schedule",
+            "eager_execution_accepted",
+            b"eager_execution_accepted",
             "first_execution_run_id",
             b"first_execution_run_id",
             "first_workflow_task_backoff",
