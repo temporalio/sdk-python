@@ -979,7 +979,7 @@ class Priority:
 
     The overall semantics of Priority are:
     1. First, consider "priority_key": lower number goes first.
-    (more will be added here later)
+    2. Then consider "fairness_key" and "fairness_weight" for fairness balancing.
     """
 
     priority_key: Optional[int]
@@ -994,18 +994,50 @@ class Priority:
     3.
     """
 
+    fairness_key: Optional[str] = None
+    """A short string (max 64 bytes) that is used as a key for a fairness balancing mechanism.
+    This can correspond to a tenant id or even fixed strings like "high", "low", etc.
+    
+    The fairness mechanism attempts to dispatch tasks for a given key in proportion to its weight.
+    For example, using a thousand distinct tenant ids, each with a weight of 1.0 will result in 
+    each tenant getting a roughly equal share of task dispatch throughput.
+    
+    Default is an empty string.
+    """
+
+    fairness_weight: Optional[float] = None
+    """A float that represents the weight for task dispatch for the associated fairness key.
+    Tasks for a fairness key are dispatched in proportion to their weight.
+    
+    Server will clamp the values between 0.001 and 1000. Default weight is 1.0.
+    
+    The effective weight of a task is determined by the following precedence (highest to lowest):
+    1. Weights overridden in task queue configuration 
+    2. Weights attached to workflow/activity
+    3. Default weight of 1.0
+    """
+
     default: ClassVar[Priority]
     """Singleton default priority instance."""
 
     @staticmethod
     def _from_proto(proto: temporalio.api.common.v1.Priority) -> Priority:
         """Create a Priority instance from the proto object."""
-        return Priority(priority_key=proto.priority_key if proto.priority_key else None)
+        return Priority(
+            priority_key=proto.priority_key if proto.priority_key else None,
+            fairness_key=proto.fairness_key if proto.fairness_key else None,
+            fairness_weight=proto.fairness_weight if proto.fairness_weight else None,
+        )
 
     def _to_proto(self) -> temporalio.api.common.v1.Priority:
-        return temporalio.api.common.v1.Priority(
+        proto = temporalio.api.common.v1.Priority(
             priority_key=self.priority_key or 0,
         )
+        if self.fairness_key is not None:
+            proto.fairness_key = self.fairness_key
+        if self.fairness_weight is not None:
+            proto.fairness_weight = self.fairness_weight
+        return proto
 
     def __post_init__(self):
         """Validates priority settings."""
@@ -1016,7 +1048,7 @@ class Priority:
                 raise ValueError("priority_key must be a positive integer")
 
 
-Priority.default = Priority(priority_key=None)
+Priority.default = Priority(priority_key=None, fairness_key=None, fairness_weight=None)
 
 
 class VersioningBehavior(IntEnum):
