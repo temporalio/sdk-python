@@ -41,6 +41,7 @@ import temporalio.api.rules.v1.message_pb2
 import temporalio.api.schedule.v1.message_pb2
 import temporalio.api.sdk.v1.task_complete_metadata_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
+import temporalio.api.sdk.v1.worker_config_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 import temporalio.api.update.v1.message_pb2
 import temporalio.api.version.v1.message_pb2
@@ -4456,6 +4457,7 @@ class DescribeTaskQueueRequest(google.protobuf.message.Message):
     TASK_QUEUE_FIELD_NUMBER: builtins.int
     TASK_QUEUE_TYPE_FIELD_NUMBER: builtins.int
     REPORT_STATS_FIELD_NUMBER: builtins.int
+    REPORT_CONFIG_FIELD_NUMBER: builtins.int
     INCLUDE_TASK_QUEUE_STATUS_FIELD_NUMBER: builtins.int
     API_MODE_FIELD_NUMBER: builtins.int
     VERSIONS_FIELD_NUMBER: builtins.int
@@ -4472,6 +4474,8 @@ class DescribeTaskQueueRequest(google.protobuf.message.Message):
     """
     report_stats: builtins.bool
     """Report stats for the requested task queue type(s)."""
+    report_config: builtins.bool
+    """Report Task Queue Config"""
     include_task_queue_status: builtins.bool
     """Deprecated, use `report_stats` instead.
     If true, the task queue status will be included in the response.
@@ -4516,6 +4520,7 @@ class DescribeTaskQueueRequest(google.protobuf.message.Message):
         task_queue: temporalio.api.taskqueue.v1.message_pb2.TaskQueue | None = ...,
         task_queue_type: temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType = ...,
         report_stats: builtins.bool = ...,
+        report_config: builtins.bool = ...,
         include_task_queue_status: builtins.bool = ...,
         api_mode: temporalio.api.enums.v1.task_queue_pb2.DescribeTaskQueueMode.ValueType = ...,
         versions: temporalio.api.taskqueue.v1.message_pb2.TaskQueueVersionSelection
@@ -4542,6 +4547,8 @@ class DescribeTaskQueueRequest(google.protobuf.message.Message):
             b"include_task_queue_status",
             "namespace",
             b"namespace",
+            "report_config",
+            b"report_config",
             "report_pollers",
             b"report_pollers",
             "report_stats",
@@ -4563,6 +4570,59 @@ global___DescribeTaskQueueRequest = DescribeTaskQueueRequest
 
 class DescribeTaskQueueResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class StatsByPriorityKeyEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.int
+        @property
+        def value(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.int = ...,
+            value: temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats | None = ...,
+        ) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
+
+    class EffectiveRateLimit(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        REQUESTS_PER_SECOND_FIELD_NUMBER: builtins.int
+        RATE_LIMIT_SOURCE_FIELD_NUMBER: builtins.int
+        requests_per_second: builtins.float
+        """The effective rate limit for the task queue."""
+        rate_limit_source: (
+            temporalio.api.enums.v1.task_queue_pb2.RateLimitSource.ValueType
+        )
+        """Source of the RateLimit Configuration,which can be one of the following values:
+        - SOURCE_API: The rate limit that is set via the TaskQueueConfig api.
+        - SOURCE_WORKER: The rate limit is the value set using the workerOptions in TaskQueueActivitiesPerSecond.
+        - SOURCE_SYSTEM: The rate limit is the default value set by the system
+        """
+        def __init__(
+            self,
+            *,
+            requests_per_second: builtins.float = ...,
+            rate_limit_source: temporalio.api.enums.v1.task_queue_pb2.RateLimitSource.ValueType = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "rate_limit_source",
+                b"rate_limit_source",
+                "requests_per_second",
+                b"requests_per_second",
+            ],
+        ) -> None: ...
 
     class VersionsInfoEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -4591,7 +4651,10 @@ class DescribeTaskQueueResponse(google.protobuf.message.Message):
 
     POLLERS_FIELD_NUMBER: builtins.int
     STATS_FIELD_NUMBER: builtins.int
+    STATS_BY_PRIORITY_KEY_FIELD_NUMBER: builtins.int
     VERSIONING_INFO_FIELD_NUMBER: builtins.int
+    CONFIG_FIELD_NUMBER: builtins.int
+    EFFECTIVE_RATE_LIMIT_FIELD_NUMBER: builtins.int
     TASK_QUEUE_STATUS_FIELD_NUMBER: builtins.int
     VERSIONS_INFO_FIELD_NUMBER: builtins.int
     @property
@@ -4602,7 +4665,20 @@ class DescribeTaskQueueResponse(google.protobuf.message.Message):
     ]: ...
     @property
     def stats(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats:
-        """Statistics for the task queue. Only populated when `report_stats` is set to true in the request."""
+        """Statistics for the task queue.
+        Only set if `report_stats` is set on the request.
+        """
+    @property
+    def stats_by_priority_key(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.int, temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats
+    ]:
+        """Task queue stats breakdown by priority key. Only contains actively used priority keys.
+        Only set if `report_stats` is set on the request.
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "by" is used to clarify the keys and values. --)
+        """
     @property
     def versioning_info(
         self,
@@ -4617,6 +4693,13 @@ class DescribeTaskQueueResponse(google.protobuf.message.Message):
         are typically not Pinned until they complete their first task (unless they are started with
         a Pinned VersioningOverride or are Child Workflows of a Pinned parent).
         """
+    @property
+    def config(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueueConfig:
+        """Only populated if report_task_queue_config is set to true."""
+    @property
+    def effective_rate_limit(
+        self,
+    ) -> global___DescribeTaskQueueResponse.EffectiveRateLimit: ...
     @property
     def task_queue_status(
         self,
@@ -4642,7 +4725,14 @@ class DescribeTaskQueueResponse(google.protobuf.message.Message):
         ]
         | None = ...,
         stats: temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats | None = ...,
+        stats_by_priority_key: collections.abc.Mapping[
+            builtins.int, temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats
+        ]
+        | None = ...,
         versioning_info: temporalio.api.taskqueue.v1.message_pb2.TaskQueueVersioningInfo
+        | None = ...,
+        config: temporalio.api.taskqueue.v1.message_pb2.TaskQueueConfig | None = ...,
+        effective_rate_limit: global___DescribeTaskQueueResponse.EffectiveRateLimit
         | None = ...,
         task_queue_status: temporalio.api.taskqueue.v1.message_pb2.TaskQueueStatus
         | None = ...,
@@ -4654,6 +4744,10 @@ class DescribeTaskQueueResponse(google.protobuf.message.Message):
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "config",
+            b"config",
+            "effective_rate_limit",
+            b"effective_rate_limit",
             "stats",
             b"stats",
             "task_queue_status",
@@ -4665,10 +4759,16 @@ class DescribeTaskQueueResponse(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "config",
+            b"config",
+            "effective_rate_limit",
+            b"effective_rate_limit",
             "pollers",
             b"pollers",
             "stats",
             b"stats",
+            "stats_by_priority_key",
+            b"stats_by_priority_key",
             "task_queue_status",
             b"task_queue_status",
             "versioning_info",
@@ -6491,6 +6591,8 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     RESET_OPERATION_FIELD_NUMBER: builtins.int
     UPDATE_WORKFLOW_OPTIONS_OPERATION_FIELD_NUMBER: builtins.int
     UNPAUSE_ACTIVITIES_OPERATION_FIELD_NUMBER: builtins.int
+    RESET_ACTIVITIES_OPERATION_FIELD_NUMBER: builtins.int
+    UPDATE_ACTIVITY_OPTIONS_OPERATION_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace that contains the batch operation"""
     visibility_query: builtins.str
@@ -6548,6 +6650,14 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
     def unpause_activities_operation(
         self,
     ) -> temporalio.api.batch.v1.message_pb2.BatchOperationUnpauseActivities: ...
+    @property
+    def reset_activities_operation(
+        self,
+    ) -> temporalio.api.batch.v1.message_pb2.BatchOperationResetActivities: ...
+    @property
+    def update_activity_options_operation(
+        self,
+    ) -> temporalio.api.batch.v1.message_pb2.BatchOperationUpdateActivityOptions: ...
     def __init__(
         self,
         *,
@@ -6574,6 +6684,10 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
         | None = ...,
         unpause_activities_operation: temporalio.api.batch.v1.message_pb2.BatchOperationUnpauseActivities
         | None = ...,
+        reset_activities_operation: temporalio.api.batch.v1.message_pb2.BatchOperationResetActivities
+        | None = ...,
+        update_activity_options_operation: temporalio.api.batch.v1.message_pb2.BatchOperationUpdateActivityOptions
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -6584,6 +6698,8 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
             b"deletion_operation",
             "operation",
             b"operation",
+            "reset_activities_operation",
+            b"reset_activities_operation",
             "reset_operation",
             b"reset_operation",
             "signal_operation",
@@ -6592,6 +6708,8 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
             b"termination_operation",
             "unpause_activities_operation",
             b"unpause_activities_operation",
+            "update_activity_options_operation",
+            b"update_activity_options_operation",
             "update_workflow_options_operation",
             b"update_workflow_options_operation",
         ],
@@ -6615,6 +6733,8 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
             b"operation",
             "reason",
             b"reason",
+            "reset_activities_operation",
+            b"reset_activities_operation",
             "reset_operation",
             b"reset_operation",
             "signal_operation",
@@ -6623,6 +6743,8 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
             b"termination_operation",
             "unpause_activities_operation",
             b"unpause_activities_operation",
+            "update_activity_options_operation",
+            b"update_activity_options_operation",
             "update_workflow_options_operation",
             b"update_workflow_options_operation",
             "visibility_query",
@@ -6640,6 +6762,8 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
             "reset_operation",
             "update_workflow_options_operation",
             "unpause_activities_operation",
+            "reset_activities_operation",
+            "update_activity_options_operation",
         ]
         | None
     ): ...
@@ -7367,6 +7491,8 @@ class ExecuteMultiOperationResponse(google.protobuf.message.Message):
 global___ExecuteMultiOperationResponse = ExecuteMultiOperationResponse
 
 class UpdateActivityOptionsRequest(google.protobuf.message.Message):
+    """NOTE: keep in sync with temporalio.api.batch.v1.BatchOperationUpdateActivityOptions"""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: builtins.int
@@ -7376,6 +7502,7 @@ class UpdateActivityOptionsRequest(google.protobuf.message.Message):
     UPDATE_MASK_FIELD_NUMBER: builtins.int
     ID_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int
+    MATCH_ALL_FIELD_NUMBER: builtins.int
     RESTORE_ORIGINAL_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the workflow which scheduled this activity"""
@@ -7396,6 +7523,8 @@ class UpdateActivityOptionsRequest(google.protobuf.message.Message):
     """Only activity with this ID will be updated."""
     type: builtins.str
     """Update all running activities of this type."""
+    match_all: builtins.bool
+    """Update all running activities."""
     restore_original: builtins.bool
     """If set, the activity options will be restored to the default.
     Default options are then options activity was created with.
@@ -7414,6 +7543,7 @@ class UpdateActivityOptionsRequest(google.protobuf.message.Message):
         update_mask: google.protobuf.field_mask_pb2.FieldMask | None = ...,
         id: builtins.str = ...,
         type: builtins.str = ...,
+        match_all: builtins.bool = ...,
         restore_original: builtins.bool = ...,
     ) -> None: ...
     def HasField(
@@ -7427,6 +7557,8 @@ class UpdateActivityOptionsRequest(google.protobuf.message.Message):
             b"execution",
             "id",
             b"id",
+            "match_all",
+            b"match_all",
             "type",
             b"type",
             "update_mask",
@@ -7446,6 +7578,8 @@ class UpdateActivityOptionsRequest(google.protobuf.message.Message):
             b"id",
             "identity",
             b"identity",
+            "match_all",
+            b"match_all",
             "namespace",
             b"namespace",
             "restore_original",
@@ -7458,7 +7592,7 @@ class UpdateActivityOptionsRequest(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["activity", b"activity"]
-    ) -> typing_extensions.Literal["id", "type"] | None: ...
+    ) -> typing_extensions.Literal["id", "type", "match_all"] | None: ...
 
 global___UpdateActivityOptionsRequest = UpdateActivityOptionsRequest
 
@@ -7670,6 +7804,8 @@ class UnpauseActivityResponse(google.protobuf.message.Message):
 global___UnpauseActivityResponse = UnpauseActivityResponse
 
 class ResetActivityRequest(google.protobuf.message.Message):
+    """NOTE: keep in sync with temporalio.api.batch.v1.BatchOperationResetActivities"""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     NAMESPACE_FIELD_NUMBER: builtins.int
@@ -7677,6 +7813,7 @@ class ResetActivityRequest(google.protobuf.message.Message):
     IDENTITY_FIELD_NUMBER: builtins.int
     ID_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int
+    MATCH_ALL_FIELD_NUMBER: builtins.int
     RESET_HEARTBEAT_FIELD_NUMBER: builtins.int
     KEEP_PAUSED_FIELD_NUMBER: builtins.int
     JITTER_FIELD_NUMBER: builtins.int
@@ -7692,12 +7829,14 @@ class ResetActivityRequest(google.protobuf.message.Message):
     """Only activity with this ID will be reset."""
     type: builtins.str
     """Reset all running activities with of this type."""
+    match_all: builtins.bool
+    """Reset all running activities."""
     reset_heartbeat: builtins.bool
     """Indicates that activity should reset heartbeat details.
     This flag will be applied only to the new instance of the activity.
     """
     keep_paused: builtins.bool
-    """if activity is paused, it will remain paused after reset"""
+    """If activity is paused, it will remain paused after reset"""
     @property
     def jitter(self) -> google.protobuf.duration_pb2.Duration:
         """If set, and activity is in backoff, the activity will start at a random time within the specified jitter duration.
@@ -7716,6 +7855,7 @@ class ResetActivityRequest(google.protobuf.message.Message):
         identity: builtins.str = ...,
         id: builtins.str = ...,
         type: builtins.str = ...,
+        match_all: builtins.bool = ...,
         reset_heartbeat: builtins.bool = ...,
         keep_paused: builtins.bool = ...,
         jitter: google.protobuf.duration_pb2.Duration | None = ...,
@@ -7732,6 +7872,8 @@ class ResetActivityRequest(google.protobuf.message.Message):
             b"id",
             "jitter",
             b"jitter",
+            "match_all",
+            b"match_all",
             "type",
             b"type",
         ],
@@ -7751,6 +7893,8 @@ class ResetActivityRequest(google.protobuf.message.Message):
             b"jitter",
             "keep_paused",
             b"keep_paused",
+            "match_all",
+            b"match_all",
             "namespace",
             b"namespace",
             "reset_heartbeat",
@@ -7763,7 +7907,7 @@ class ResetActivityRequest(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["activity", b"activity"]
-    ) -> typing_extensions.Literal["id", "type"] | None: ...
+    ) -> typing_extensions.Literal["id", "type", "match_all"] | None: ...
 
 global___ResetActivityRequest = ResetActivityRequest
 
@@ -7986,20 +8130,61 @@ class DescribeWorkerDeploymentVersionResponse(google.protobuf.message.Message):
 
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+        class StatsByPriorityKeyEntry(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            KEY_FIELD_NUMBER: builtins.int
+            VALUE_FIELD_NUMBER: builtins.int
+            key: builtins.int
+            @property
+            def value(
+                self,
+            ) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats: ...
+            def __init__(
+                self,
+                *,
+                key: builtins.int = ...,
+                value: temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats
+                | None = ...,
+            ) -> None: ...
+            def HasField(
+                self, field_name: typing_extensions.Literal["value", b"value"]
+            ) -> builtins.bool: ...
+            def ClearField(
+                self,
+                field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            ) -> None: ...
+
         NAME_FIELD_NUMBER: builtins.int
         TYPE_FIELD_NUMBER: builtins.int
         STATS_FIELD_NUMBER: builtins.int
+        STATS_BY_PRIORITY_KEY_FIELD_NUMBER: builtins.int
         name: builtins.str
         type: temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType
         @property
         def stats(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats:
             """Only set if `report_task_queue_stats` is set on the request."""
+        @property
+        def stats_by_priority_key(
+            self,
+        ) -> google.protobuf.internal.containers.MessageMap[
+            builtins.int, temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats
+        ]:
+            """Task queue stats breakdown by priority key. Only contains actively used priority keys.
+            Only set if `report_task_queue_stats` is set to true in the request.
+            (-- api-linter: core::0140::prepositions=disabled
+                aip.dev/not-precedent: "by" is used to clarify the key. --)
+            """
         def __init__(
             self,
             *,
             name: builtins.str = ...,
             type: temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType = ...,
             stats: temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats | None = ...,
+            stats_by_priority_key: collections.abc.Mapping[
+                builtins.int, temporalio.api.taskqueue.v1.message_pb2.TaskQueueStats
+            ]
+            | None = ...,
         ) -> None: ...
         def HasField(
             self, field_name: typing_extensions.Literal["stats", b"stats"]
@@ -8007,7 +8192,14 @@ class DescribeWorkerDeploymentVersionResponse(google.protobuf.message.Message):
         def ClearField(
             self,
             field_name: typing_extensions.Literal[
-                "name", b"name", "stats", b"stats", "type", b"type"
+                "name",
+                b"name",
+                "stats",
+                b"stats",
+                "stats_by_priority_key",
+                b"stats_by_priority_key",
+                "type",
+                b"type",
             ],
         ) -> None: ...
 
@@ -9483,3 +9675,287 @@ class ListWorkersResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ListWorkersResponse = ListWorkersResponse
+
+class UpdateTaskQueueConfigRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class RateLimitUpdate(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        RATE_LIMIT_FIELD_NUMBER: builtins.int
+        REASON_FIELD_NUMBER: builtins.int
+        @property
+        def rate_limit(self) -> temporalio.api.taskqueue.v1.message_pb2.RateLimit:
+            """Rate Limit to be updated"""
+        reason: builtins.str
+        """Reason for why the rate limit was set."""
+        def __init__(
+            self,
+            *,
+            rate_limit: temporalio.api.taskqueue.v1.message_pb2.RateLimit | None = ...,
+            reason: builtins.str = ...,
+        ) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["rate_limit", b"rate_limit"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "rate_limit", b"rate_limit", "reason", b"reason"
+            ],
+        ) -> None: ...
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    TASK_QUEUE_FIELD_NUMBER: builtins.int
+    TASK_QUEUE_TYPE_FIELD_NUMBER: builtins.int
+    UPDATE_QUEUE_RATE_LIMIT_FIELD_NUMBER: builtins.int
+    UPDATE_FAIRNESS_KEY_RATE_LIMIT_DEFAULT_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    identity: builtins.str
+    task_queue: builtins.str
+    """Selects the task queue to update."""
+    task_queue_type: temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType
+    @property
+    def update_queue_rate_limit(
+        self,
+    ) -> global___UpdateTaskQueueConfigRequest.RateLimitUpdate:
+        """Update to queue-wide rate limit.
+        If not set, this configuration is unchanged.
+        NOTE: A limit set by the worker is overriden; and restored again when reset.
+        If the `rate_limit` field in the `RateLimitUpdate` is missing, remove the existing rate limit.
+        """
+    @property
+    def update_fairness_key_rate_limit_default(
+        self,
+    ) -> global___UpdateTaskQueueConfigRequest.RateLimitUpdate:
+        """Update to the default fairness key rate limit.
+        If not set, this configuration is unchanged.
+        If the `rate_limit` field in the `RateLimitUpdate` is missing, remove the existing rate limit.
+        """
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        identity: builtins.str = ...,
+        task_queue: builtins.str = ...,
+        task_queue_type: temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType = ...,
+        update_queue_rate_limit: global___UpdateTaskQueueConfigRequest.RateLimitUpdate
+        | None = ...,
+        update_fairness_key_rate_limit_default: global___UpdateTaskQueueConfigRequest.RateLimitUpdate
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "update_fairness_key_rate_limit_default",
+            b"update_fairness_key_rate_limit_default",
+            "update_queue_rate_limit",
+            b"update_queue_rate_limit",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "task_queue",
+            b"task_queue",
+            "task_queue_type",
+            b"task_queue_type",
+            "update_fairness_key_rate_limit_default",
+            b"update_fairness_key_rate_limit_default",
+            "update_queue_rate_limit",
+            b"update_queue_rate_limit",
+        ],
+    ) -> None: ...
+
+global___UpdateTaskQueueConfigRequest = UpdateTaskQueueConfigRequest
+
+class UpdateTaskQueueConfigResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONFIG_FIELD_NUMBER: builtins.int
+    @property
+    def config(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueueConfig: ...
+    def __init__(
+        self,
+        *,
+        config: temporalio.api.taskqueue.v1.message_pb2.TaskQueueConfig | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["config", b"config"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["config", b"config"]
+    ) -> None: ...
+
+global___UpdateTaskQueueConfigResponse = UpdateTaskQueueConfigResponse
+
+class FetchWorkerConfigRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
+    SELECTOR_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Namespace this worker belongs to."""
+    identity: builtins.str
+    """The identity of the client who initiated this request."""
+    reason: builtins.str
+    """Reason for sending worker command, can be used for audit purpose."""
+    @property
+    def selector(self) -> temporalio.api.common.v1.message_pb2.WorkerSelector:
+        """Defines which workers should receive this command.
+        only single worker is supported at this time.
+        """
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        identity: builtins.str = ...,
+        reason: builtins.str = ...,
+        selector: temporalio.api.common.v1.message_pb2.WorkerSelector | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["selector", b"selector"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "reason",
+            b"reason",
+            "selector",
+            b"selector",
+        ],
+    ) -> None: ...
+
+global___FetchWorkerConfigRequest = FetchWorkerConfigRequest
+
+class FetchWorkerConfigResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    WORKER_CONFIG_FIELD_NUMBER: builtins.int
+    @property
+    def worker_config(self) -> temporalio.api.sdk.v1.worker_config_pb2.WorkerConfig:
+        """The worker configuration."""
+    def __init__(
+        self,
+        *,
+        worker_config: temporalio.api.sdk.v1.worker_config_pb2.WorkerConfig
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["worker_config", b"worker_config"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["worker_config", b"worker_config"]
+    ) -> None: ...
+
+global___FetchWorkerConfigResponse = FetchWorkerConfigResponse
+
+class UpdateWorkerConfigRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
+    WORKER_CONFIG_FIELD_NUMBER: builtins.int
+    UPDATE_MASK_FIELD_NUMBER: builtins.int
+    SELECTOR_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Namespace this worker belongs to."""
+    identity: builtins.str
+    """The identity of the client who initiated this request."""
+    reason: builtins.str
+    """Reason for sending worker command, can be used for audit purpose."""
+    @property
+    def worker_config(self) -> temporalio.api.sdk.v1.worker_config_pb2.WorkerConfig:
+        """Partial updates are accepted and controlled by update_mask.
+        The worker configuration to set.
+        """
+    @property
+    def update_mask(self) -> google.protobuf.field_mask_pb2.FieldMask:
+        """Controls which fields from `worker_config` will be applied"""
+    @property
+    def selector(self) -> temporalio.api.common.v1.message_pb2.WorkerSelector:
+        """Defines which workers should receive this command."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        identity: builtins.str = ...,
+        reason: builtins.str = ...,
+        worker_config: temporalio.api.sdk.v1.worker_config_pb2.WorkerConfig
+        | None = ...,
+        update_mask: google.protobuf.field_mask_pb2.FieldMask | None = ...,
+        selector: temporalio.api.common.v1.message_pb2.WorkerSelector | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "selector",
+            b"selector",
+            "update_mask",
+            b"update_mask",
+            "worker_config",
+            b"worker_config",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "reason",
+            b"reason",
+            "selector",
+            b"selector",
+            "update_mask",
+            b"update_mask",
+            "worker_config",
+            b"worker_config",
+        ],
+    ) -> None: ...
+
+global___UpdateWorkerConfigRequest = UpdateWorkerConfigRequest
+
+class UpdateWorkerConfigResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    WORKER_CONFIG_FIELD_NUMBER: builtins.int
+    @property
+    def worker_config(self) -> temporalio.api.sdk.v1.worker_config_pb2.WorkerConfig:
+        """The worker configuration. Will be returned if the command was sent to a single worker."""
+    def __init__(
+        self,
+        *,
+        worker_config: temporalio.api.sdk.v1.worker_config_pb2.WorkerConfig
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "response", b"response", "worker_config", b"worker_config"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "response", b"response", "worker_config", b"worker_config"
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["response", b"response"]
+    ) -> typing_extensions.Literal["worker_config"] | None: ...
+
+global___UpdateWorkerConfigResponse = UpdateWorkerConfigResponse
