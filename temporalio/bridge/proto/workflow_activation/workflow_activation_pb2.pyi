@@ -1304,7 +1304,7 @@ class ResolveNexusOperationStart(google.protobuf.message.Message):
     SEQ_FIELD_NUMBER: builtins.int
     OPERATION_TOKEN_FIELD_NUMBER: builtins.int
     STARTED_SYNC_FIELD_NUMBER: builtins.int
-    CANCELLED_BEFORE_START_FIELD_NUMBER: builtins.int
+    FAILED_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Sequence number as provided by lang in the corresponding ScheduleNexusOperation command"""
     operation_token: builtins.str
@@ -1317,10 +1317,10 @@ class ResolveNexusOperationStart(google.protobuf.message.Message):
     `ResolveNexusOperation` job will be in the same activation.
     """
     @property
-    def cancelled_before_start(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """The operation was cancelled before it was ever sent to server (same WFT).
-        Note that core will still send a `ResolveNexusOperation` job in the same activation, so
-        there does not need to be an exceptional case for this in lang.
+    def failed(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """The operation either failed to start, was cancelled before it started, timed out, or
+        failed synchronously. Details are included inside the message. In this case, the
+        subsequent ResolveNexusOperation will never be sent.
         """
     def __init__(
         self,
@@ -1328,14 +1328,13 @@ class ResolveNexusOperationStart(google.protobuf.message.Message):
         seq: builtins.int = ...,
         operation_token: builtins.str = ...,
         started_sync: builtins.bool = ...,
-        cancelled_before_start: temporalio.api.failure.v1.message_pb2.Failure
-        | None = ...,
+        failed: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "cancelled_before_start",
-            b"cancelled_before_start",
+            "failed",
+            b"failed",
             "operation_token",
             b"operation_token",
             "started_sync",
@@ -1347,8 +1346,8 @@ class ResolveNexusOperationStart(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "cancelled_before_start",
-            b"cancelled_before_start",
+            "failed",
+            b"failed",
             "operation_token",
             b"operation_token",
             "seq",
@@ -1362,10 +1361,7 @@ class ResolveNexusOperationStart(google.protobuf.message.Message):
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["status", b"status"]
     ) -> (
-        typing_extensions.Literal[
-            "operation_token", "started_sync", "cancelled_before_start"
-        ]
-        | None
+        typing_extensions.Literal["operation_token", "started_sync", "failed"] | None
     ): ...
 
 global___ResolveNexusOperationStart = ResolveNexusOperationStart

@@ -260,7 +260,7 @@ class CallerWorkflow:
             }[input.op_input.caller_reference],
             endpoint=make_nexus_endpoint_name(task_queue),
         )
-        self._nexus_operation_started = False
+        self._nexus_operation_start_resolved = False
         self._proceed = False
 
     @workflow.run
@@ -271,12 +271,14 @@ class CallerWorkflow:
         task_queue: str,
     ) -> CallerWfOutput:
         op_input = input.op_input
-        op_handle = await self.nexus_client.start_operation(
-            self._get_operation(op_input),  # type: ignore[arg-type] # test uses non-public operation types
-            op_input,
-            headers=op_input.headers,
-        )
-        self._nexus_operation_started = True
+        try:
+            op_handle = await self.nexus_client.start_operation(
+                self._get_operation(op_input),  # type: ignore[arg-type] # test uses non-public operation types
+                op_input,
+                headers=op_input.headers,
+            )
+        finally:
+            self._nexus_operation_start_resolved = True
         if not input.op_input.response_type.exception_in_operation_start:
             if isinstance(input.op_input.response_type, SyncResponse):
                 assert (
@@ -295,8 +297,8 @@ class CallerWorkflow:
         return CallerWfOutput(op_output=OpOutput(value=op_output.value))
 
     @workflow.update
-    async def wait_nexus_operation_started(self) -> None:
-        await workflow.wait_condition(lambda: self._nexus_operation_started)
+    async def wait_nexus_operation_start_resolved(self) -> None:
+        await workflow.wait_condition(lambda: self._nexus_operation_start_resolved)
 
     @staticmethod
     def _get_operation(
@@ -720,7 +722,7 @@ async def _start_wf_and_nexus_op(
     )
 
     await client.execute_update_with_start_workflow(
-        CallerWorkflow.wait_nexus_operation_started,
+        CallerWorkflow.wait_nexus_operation_start_resolved,
         start_workflow_operation=start_op,
     )
     caller_wf_handle = await start_op.workflow_handle()
