@@ -88,9 +88,7 @@ pub fn connect_client<'a>(
             retry_client: opts
                 .connect_no_namespace(runtime.core.telemetry().get_temporal_metric_meter())
                 .await
-                .map_err(|err| {
-                    PyRuntimeError::new_err(format!("Failed client connect: {err}"))
-                })?,
+                .map_err(|err| PyRuntimeError::new_err(format!("Failed client connect: {err}")))?,
             runtime,
         })
     })
@@ -181,6 +179,7 @@ impl ClientRef {
                     rpc_call!(retry_client, call, describe_workflow_rule)
                 }
                 "execute_multi_operation" => rpc_call!(retry_client, call, execute_multi_operation),
+                "fetch_worker_config" => rpc_call!(retry_client, call, fetch_worker_config),
                 "get_cluster_info" => rpc_call!(retry_client, call, get_cluster_info),
                 "get_current_deployment" => rpc_call!(retry_client, call, get_current_deployment),
                 "get_deployment_reachability" => {
@@ -339,6 +338,10 @@ impl ClientRef {
                     rpc_call_on_trait!(retry_client, call, WorkflowService, update_namespace)
                 }
                 "update_schedule" => rpc_call!(retry_client, call, update_schedule),
+                "update_task_queue_config" => {
+                    rpc_call!(retry_client, call, update_task_queue_config)
+                }
+                "update_worker_config" => rpc_call!(retry_client, call, update_worker_config),
                 "update_worker_deployment_version_metadata" => {
                     rpc_call!(
                         retry_client,
@@ -422,11 +425,17 @@ impl ClientRef {
             let bytes = match call.rpc.as_str() {
                 "add_namespace_region" => rpc_call!(retry_client, call, add_namespace_region),
                 "create_api_key" => rpc_call!(retry_client, call, create_api_key),
+                "create_connectivity_rule" => {
+                    rpc_call!(retry_client, call, create_connectivity_rule)
+                }
                 "create_namespace" => rpc_call!(retry_client, call, create_namespace),
                 "create_service_account" => rpc_call!(retry_client, call, create_service_account),
                 "create_user_group" => rpc_call!(retry_client, call, create_user_group),
                 "create_user" => rpc_call!(retry_client, call, create_user),
                 "delete_api_key" => rpc_call!(retry_client, call, delete_api_key),
+                "delete_connectivity_rule" => {
+                    rpc_call!(retry_client, call, delete_connectivity_rule)
+                }
                 "delete_namespace" => {
                     rpc_call_on_trait!(retry_client, call, CloudService, delete_namespace)
                 }
@@ -439,6 +448,8 @@ impl ClientRef {
                 "get_api_key" => rpc_call!(retry_client, call, get_api_key),
                 "get_api_keys" => rpc_call!(retry_client, call, get_api_keys),
                 "get_async_operation" => rpc_call!(retry_client, call, get_async_operation),
+                "get_connectivity_rule" => rpc_call!(retry_client, call, get_connectivity_rule),
+                "get_connectivity_rules" => rpc_call!(retry_client, call, get_connectivity_rules),
                 "get_namespace" => rpc_call!(retry_client, call, get_namespace),
                 "get_namespaces" => rpc_call!(retry_client, call, get_namespaces),
                 "get_region" => rpc_call!(retry_client, call, get_region),
@@ -462,6 +473,7 @@ impl ClientRef {
                 "update_namespace" => {
                     rpc_call_on_trait!(retry_client, call, CloudService, update_namespace)
                 }
+                "update_namespace_tags" => rpc_call!(retry_client, call, update_namespace_tags),
                 "update_service_account" => rpc_call!(retry_client, call, update_service_account),
                 "update_user_group" => rpc_call!(retry_client, call, update_user_group),
                 "update_user" => rpc_call!(retry_client, call, update_user),
