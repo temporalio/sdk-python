@@ -43,7 +43,7 @@ class Replayer:
         namespace: str = "ReplayNamespace",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[Interceptor] = [],
-        plugins: Sequence[temporalio.worker.Plugin] = [],
+        plugins: Sequence[temporalio.worker.LowLevelPlugin] = [],
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
         workflow_failure_exception_types: Sequence[Type[BaseException]] = [],
@@ -84,7 +84,7 @@ class Replayer:
         )
 
         # Apply plugin configuration
-        root_plugin: temporalio.worker.Plugin = _RootPlugin()
+        root_plugin: temporalio.worker.LowLevelPlugin = _RootPlugin()
         for plugin in reversed(plugins):
             plugin.init_worker_plugin(root_plugin)
             root_plugin = plugin

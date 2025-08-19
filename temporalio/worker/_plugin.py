@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     )
 
 
-class Plugin(abc.ABC):
+class LowLevelPlugin(abc.ABC):
     """Base class for worker plugins that can intercept and modify worker behavior.
 
     Plugins allow customization of worker creation and execution processes
@@ -35,7 +35,7 @@ class Plugin(abc.ABC):
         return type(self).__module__ + "." + type(self).__qualname__
 
     @abc.abstractmethod
-    def init_worker_plugin(self, next: Plugin) -> None:
+    def init_worker_plugin(self, next: LowLevelPlugin) -> None:
         """Initialize this plugin in the plugin chain.
 
         This method sets up the chain of responsibility pattern by providing a reference
@@ -98,8 +98,8 @@ class Plugin(abc.ABC):
         """Hook called when running a replayer to allow interception of execution."""
 
 
-class _RootPlugin(Plugin):
-    def init_worker_plugin(self, next: Plugin) -> None:
+class _RootPlugin(LowLevelPlugin):
+    def init_worker_plugin(self, next: LowLevelPlugin) -> None:
         raise NotImplementedError()
 
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:

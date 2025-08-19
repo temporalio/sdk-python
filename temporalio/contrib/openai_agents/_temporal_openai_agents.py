@@ -24,7 +24,7 @@ from openai.types.responses import ResponsePromptParam
 
 import temporalio.client
 import temporalio.worker
-from temporalio.client import ClientConfig, Plugin
+from temporalio.client import ClientConfig, LowLevelPlugin
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
@@ -150,7 +150,9 @@ class _OpenAIPayloadConverter(PydanticPayloadConverter):
         super().__init__(ToJsonOptions(exclude_unset=True))
 
 
-class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
+class OpenAIAgentsPlugin(
+    temporalio.client.LowLevelPlugin, temporalio.worker.LowLevelPlugin
+):
     """Temporal plugin for integrating OpenAI agents with Temporal workflows.
 
     .. warning::
@@ -233,7 +235,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         self._model_params = model_params
         self._model_provider = model_provider
 
-    def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
+    def init_client_plugin(self, next: temporalio.client.LowLevelPlugin) -> None:
         """Set the next client plugin"""
         self.next_client_plugin = next
 
@@ -243,7 +245,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         """No modifications to service client"""
         return await self.next_client_plugin.connect_service_client(config)
 
-    def init_worker_plugin(self, next: temporalio.worker.Plugin) -> None:
+    def init_worker_plugin(self, next: temporalio.worker.LowLevelPlugin) -> None:
         """Set the next worker plugin"""
         self.next_worker_plugin = next
 

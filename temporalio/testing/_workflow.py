@@ -79,7 +79,7 @@ class WorkflowEnvironment:
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[temporalio.client.Interceptor] = [],
-        plugins: Sequence[temporalio.client.Plugin] = [],
+        plugins: Sequence[temporalio.client.LowLevelPlugin] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
@@ -239,7 +239,7 @@ class WorkflowEnvironment:
         *,
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[temporalio.client.Interceptor] = [],
-        plugins: Sequence[temporalio.client.Plugin] = [],
+        plugins: Sequence[temporalio.client.LowLevelPlugin] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
