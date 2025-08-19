@@ -2128,9 +2128,7 @@ async def test_stateless_mcp_server(client: Client, use_local_model: bool):
     ]
     client = Client(**new_config)
 
-    async with new_worker(
-        client, McpServerWorkflow
-    ) as worker:
+    async with new_worker(client, McpServerWorkflow) as worker:
         workflow_handle = await client.start_workflow(
             McpServerWorkflow.run,
             "Read the files and list them.",
