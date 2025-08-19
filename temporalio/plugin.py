@@ -137,8 +137,9 @@ class Plugin(
         replayer: Replayer,
         histories: AsyncIterator[WorkflowHistory],
     ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
-        async with self.next_worker_plugin.run_replayer(replayer, histories) as results:
-            yield results
+        async with self.run_context():
+            async with self.next_worker_plugin.run_replayer(replayer, histories) as results:
+                yield results
 
     @abc.abstractmethod
     def run_context(self) -> AbstractAsyncContextManager[None]:
