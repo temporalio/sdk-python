@@ -4,6 +4,7 @@ import functools
 import inspect
 import json
 import typing
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from datetime import timedelta
 from typing import Any, Callable, Optional, Type
 
@@ -21,8 +22,8 @@ from temporalio import activity
 from temporalio import workflow as temporal_workflow
 from temporalio.common import Priority, RetryPolicy
 from temporalio.contrib.openai_agents._mcp import (
-    StatefulTemporalMCPServerReference,
-    StatelessTemporalMCPServerReference,
+    _StatefulTemporalMCPServerReference,
+    _StatelessTemporalMCPServerReference,
 )
 from temporalio.exceptions import ApplicationError, TemporalError
 from temporalio.workflow import (
@@ -244,18 +245,55 @@ def nexus_operation_as_tool(
     )
 
 
-def get_stateless_mcp_server(
+def stateless_mcp_server(
     name: str, config: Optional[ActivityConfig] = None
 ) -> "MCPServer":
-    return StatelessTemporalMCPServerReference(name, config)
+    """A stateless MCP server implementation for Temporal workflows.
+
+    .. warning::
+        This API is experimental and may change in future versions.
+        Use with caution in production environments.
+
+    This uses a TemporalMCPServer of the same name registered with the OpenAIAgents plugin to implement
+    durable MCP operations statelessly.
+
+    This approach is suitable for simple use cases where connection overhead is acceptable
+    and you don't need to maintain state between operations. It should be preferred to stateful when possible due to its
+    superior durability guarantees.
+    """
+    return _StatelessTemporalMCPServerReference(name, config)
 
 
-def get_stateful_mcp_server(
+def stateful_mcp_server(
     name: str,
     config: Optional[ActivityConfig] = None,
     connect_config: Optional[ActivityConfig] = None,
-) -> "StatefulTemporalMCPServerReference":
-    return StatefulTemporalMCPServerReference(name, config, connect_config)
+) -> AbstractAsyncContextManager["MCPServer"]:
+    """A stateful MCP server implementation for Temporal workflows.
+
+    .. warning::
+        This API is experimental and may change in future versions.
+        Use with caution in production environments.
+
+    This wraps an MCP server to maintain a persistent connection throughout
+    the workflow execution. It creates a dedicated worker that stays connected to
+    the MCP server and processes operations on a dedicated task queue.
+
+    This approach is more efficient for workflows that make multiple MCP calls,
+    as it avoids connection overhead, but requires more resources to maintain
+    the persistent connection and worker.
+
+    The caller will have to handle cases where the dedicated worker fails, as Temporal is
+    unable to seamlessly recreate any lost state in that case.
+
+    Args:
+        name: A string name for the server. Should match that provided in the plugin.
+        config: Optional activity configuration for MCP operation activities.
+               Defaults to 1-minute start-to-close and 30-second schedule-to-start timeouts.
+        connect_config: Optional activity configuration for the connection activity.
+                       Defaults to 1-hour start-to-close timeout.
+    """
+    return _StatefulTemporalMCPServerReference(name, config, connect_config)
 
 
 class ToolSerializationError(TemporalError):

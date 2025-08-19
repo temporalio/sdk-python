@@ -59,6 +59,7 @@ from agents.items import (
     TResponseOutputItem,
     TResponseStreamEvent,
 )
+from agents.mcp import MCPServerStreamableHttp
 from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
     EasyInputMessageParam,
@@ -2056,7 +2057,7 @@ class McpServerWorkflow:
     async def run(self, question: str) -> str:
         from agents.mcp import MCPServer
 
-        server: MCPServer = openai_agents.workflow.get_stateless_mcp_server(
+        server: MCPServer = openai_agents.workflow.stateless_mcp_server(
             "Filesystem-Server"
         )
         agent = Agent[str](
@@ -2128,7 +2129,7 @@ async def test_stateless_mcp_server(client: Client, use_local_model: bool):
     client = Client(**new_config)
 
     async with new_worker(
-        client, McpServerWorkflow, activities=[get_weather, get_weather]
+        client, McpServerWorkflow
     ) as worker:
         workflow_handle = await client.start_workflow(
             McpServerWorkflow.run,
@@ -2146,7 +2147,7 @@ async def test_stateless_mcp_server(client: Client, use_local_model: bool):
 class McpServerStatefulWorkflow:
     @workflow.run
     async def run(self, timeout: timedelta) -> str:
-        async with openai_agents.workflow.get_stateful_mcp_server(
+        async with openai_agents.workflow.stateful_mcp_server(
             "Filesystem-Server",
             config=ActivityConfig(
                 schedule_to_start_timeout=timeout,
