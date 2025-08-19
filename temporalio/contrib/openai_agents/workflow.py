@@ -260,6 +260,7 @@ def stateless_mcp_server(
     from temporalio.contrib.openai_agents._mcp import (
         _StatelessTemporalMCPServerReference,
     )
+
     return _StatelessTemporalMCPServerReference(name, config)
 
 
@@ -295,6 +296,7 @@ def stateful_mcp_server(
     from temporalio.contrib.openai_agents._mcp import (
         _StatefulTemporalMCPServerReference,
     )
+
     return _StatefulTemporalMCPServerReference(name, config, connect_config)
 
 
