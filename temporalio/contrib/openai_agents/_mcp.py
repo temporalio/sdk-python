@@ -120,7 +120,7 @@ class StatelessTemporalMCPServer(TemporalMCPServer):
         """Get the server name."""
         return self._name
 
-    def get_activities(self) -> Sequence[Callable]:
+    def _get_activities(self) -> Sequence[Callable]:
         """Get the Temporal activities for this MCP server.
 
         Creates and returns the Temporal activity functions that handle MCP operations.
@@ -207,14 +207,14 @@ class _StatefulTemporalMCPServerReference(MCPServer, AbstractAsyncContextManager
         self,
         server: str,
         config: Optional[ActivityConfig] = None,
-        connect_config: Optional[ActivityConfig] = None,
+        server_session_config: Optional[ActivityConfig] = None,
     ):
         self._name = server + "-stateful"
         self._config = config or ActivityConfig(
             start_to_close_timeout=timedelta(minutes=1),
             schedule_to_start_timeout=timedelta(seconds=30),
         )
-        self._connect_config = connect_config or ActivityConfig(
+        self._server_session_config = server_session_config or ActivityConfig(
             start_to_close_timeout=timedelta(hours=1),
         )
         self._connect_handle: Optional[ActivityHandle] = None
@@ -227,9 +227,9 @@ class _StatefulTemporalMCPServerReference(MCPServer, AbstractAsyncContextManager
     async def connect(self) -> None:
         self._config["task_queue"] = workflow.info().workflow_id + "-" + self.name
         self._connect_handle = workflow.start_activity(
-            self.name + "-connect",
+            self.name + "-server-session",
             args=[],
-            **self._connect_config,
+            **self._server_session_config,
         )
 
     async def cleanup(self) -> None:
@@ -324,7 +324,7 @@ class StatefulTemporalMCPServer(TemporalMCPServer):
         """Get the server name."""
         return self._name
 
-    def get_activities(self) -> Sequence[Callable]:
+    def _get_activities(self) -> Sequence[Callable]:
         """Get the Temporal activities for this stateful MCP server.
 
         Creates and returns the Temporal activity functions that handle MCP operations
@@ -365,7 +365,7 @@ class StatefulTemporalMCPServer(TemporalMCPServer):
                 await asyncio.sleep(delay)
                 activity.heartbeat(*details)
 
-        @activity.defn(name=self._name + "-connect")
+        @activity.defn(name=self._name + "-server-session")
         async def connect() -> None:
             heartbeat_task = asyncio.create_task(heartbeat_every(30))
             try:

@@ -59,7 +59,10 @@ except ImportError:
     pass
 
 if typing.TYPE_CHECKING:
-    from temporalio.contrib.openai_agents._mcp import TemporalMCPServer
+    from temporalio.contrib.openai_agents import (
+        StatefulTemporalMCPServer,
+        StatelessTemporalMCPServer,
+    )
 
 
 @contextmanager
@@ -236,7 +239,9 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         self,
         model_params: Optional[ModelActivityParameters] = None,
         model_provider: Optional[ModelProvider] = None,
-        mcp_servers: Sequence["TemporalMCPServer"] = (),
+        mcp_servers: Sequence[
+            Union["StatelessTemporalMCPServer", "StatefulTemporalMCPServer"]
+        ] = (),
     ) -> None:
         """Initialize the OpenAI agents plugin.
 
@@ -327,11 +332,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
             )
 
         for mcp_server in self._mcp_servers:
-            if hasattr(mcp_server, "get_activities"):
-                get_activities: Callable[[], Sequence[Callable]] = getattr(
-                    mcp_server, "get_activities"
-                )
-                new_activities.extend(get_activities())
+            new_activities.extend(mcp_server._get_activities())
         config["activities"] = list(config.get("activities") or []) + new_activities
 
         runner = config.get("workflow_runner")

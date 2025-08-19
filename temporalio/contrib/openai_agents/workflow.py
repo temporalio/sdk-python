@@ -267,7 +267,7 @@ def stateless_mcp_server(
 def stateful_mcp_server(
     name: str,
     config: Optional[ActivityConfig] = None,
-    connect_config: Optional[ActivityConfig] = None,
+    server_session_config: Optional[ActivityConfig] = None,
 ) -> AbstractAsyncContextManager["MCPServer"]:
     """A stateful MCP server implementation for Temporal workflows.
 
@@ -290,14 +290,14 @@ def stateful_mcp_server(
         name: A string name for the server. Should match that provided in the plugin.
         config: Optional activity configuration for MCP operation activities.
                Defaults to 1-minute start-to-close and 30-second schedule-to-start timeouts.
-        connect_config: Optional activity configuration for the connection activity.
+        server_session_config: Optional activity configuration for the connection activity.
                        Defaults to 1-hour start-to-close timeout.
     """
     from temporalio.contrib.openai_agents._mcp import (
         _StatefulTemporalMCPServerReference,
     )
 
-    return _StatefulTemporalMCPServerReference(name, config, connect_config)
+    return _StatefulTemporalMCPServerReference(name, config, server_session_config)
 
 
 class ToolSerializationError(TemporalError):
