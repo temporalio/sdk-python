@@ -7,6 +7,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Optional,
@@ -19,7 +20,6 @@ from typing_extensions import Concatenate
 
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
-import temporalio.client
 import temporalio.common
 from temporalio.nexus import _link_conversion
 from temporalio.nexus._token import WorkflowHandle
@@ -31,6 +31,9 @@ from temporalio.types import (
     ReturnType,
     SelfType,
 )
+
+if TYPE_CHECKING:
+    import temporalio.client
 
 # The Temporal Nexus worker always builds a nexusrpc StartOperationContext or
 # CancelOperationContext and passes it as the first parameter to the nexusrpc operation
@@ -122,7 +125,7 @@ class _TemporalStartOperationContext:
         ctx = self.nexus_context
         return (
             [
-                temporalio.client.NexusCallback(
+                NexusCallback(
                     url=ctx.callback_url,
                     headers=ctx.callback_headers,
                 )
@@ -447,6 +450,21 @@ class WorkflowRunOperationContext(StartOperationContext):
         self._temporal_context._add_outbound_links(wf_handle)
 
         return WorkflowHandle[ReturnType]._unsafe_from_client_workflow_handle(wf_handle)
+
+
+@dataclass(frozen=True)
+class NexusCallback:
+    """Nexus callback to attach to events such as workflow completion.
+
+    .. warning::
+        This API is experimental and unstable.
+    """
+
+    url: str
+    """Callback URL."""
+
+    headers: Mapping[str, str]
+    """Header to attach to callback request."""
 
 
 @dataclass(frozen=True)
