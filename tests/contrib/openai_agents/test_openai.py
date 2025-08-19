@@ -59,7 +59,6 @@ from agents.items import (
     TResponseOutputItem,
     TResponseStreamEvent,
 )
-from agents.mcp import MCPServerStreamableHttp
 from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
     EasyInputMessageParam,

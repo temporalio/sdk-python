@@ -4,7 +4,7 @@ import functools
 import inspect
 import json
 import typing
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextlib import AbstractAsyncContextManager
 from datetime import timedelta
 from typing import Any, Callable, Optional, Type
 
@@ -21,10 +21,6 @@ from agents.tool import (
 from temporalio import activity
 from temporalio import workflow as temporal_workflow
 from temporalio.common import Priority, RetryPolicy
-from temporalio.contrib.openai_agents._mcp import (
-    _StatefulTemporalMCPServerReference,
-    _StatelessTemporalMCPServerReference,
-)
 from temporalio.exceptions import ApplicationError, TemporalError
 from temporalio.workflow import (
     ActivityCancellationType,
@@ -261,6 +257,9 @@ def stateless_mcp_server(
     and you don't need to maintain state between operations. It should be preferred to stateful when possible due to its
     superior durability guarantees.
     """
+    from temporalio.contrib.openai_agents._mcp import (
+        _StatelessTemporalMCPServerReference,
+    )
     return _StatelessTemporalMCPServerReference(name, config)
 
 
@@ -293,6 +292,9 @@ def stateful_mcp_server(
         connect_config: Optional activity configuration for the connection activity.
                        Defaults to 1-hour start-to-close timeout.
     """
+    from temporalio.contrib.openai_agents._mcp import (
+        _StatefulTemporalMCPServerReference,
+    )
     return _StatefulTemporalMCPServerReference(name, config, connect_config)
 
 
