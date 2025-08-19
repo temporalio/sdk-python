@@ -92,9 +92,7 @@ class TemporalOpenAIRunner(AgentRunner):
             )
 
         # Recursively replace models in all agents
-        def convert_agent(
-            agent: Agent[Any], seen: Optional[set[int]] = None
-        ) -> Agent[Any]:
+        def convert_agent(agent: Agent[Any], seen: Optional[set[int]]) -> Agent[Any]:
             if seen is None:
                 seen = set()
 
@@ -103,12 +101,16 @@ class TemporalOpenAIRunner(AgentRunner):
                 return agent
             seen.add(id(agent))
 
+            # This agent has already been processed in some other run
+            if isinstance(agent.model, _TemporalModelStub):
+                return agent
+
             name = _model_name(agent)
 
             new_handoffs: list[Union[Agent, Handoff]] = []
             for handoff in agent.handoffs:
                 if isinstance(handoff, Agent):
-                    new_handoffs.append(convert_agent(handoff))
+                    new_handoffs.append(convert_agent(handoff, seen))
                 elif isinstance(handoff, Handoff):
                     original_invoke = handoff.on_invoke_handoff
 
@@ -135,7 +137,7 @@ class TemporalOpenAIRunner(AgentRunner):
             )
 
         return await self._runner.run(
-            starting_agent=convert_agent(starting_agent),
+            starting_agent=convert_agent(starting_agent, None),
             input=input,
             context=context,
             max_turns=max_turns,

@@ -1011,7 +1011,7 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
             CustomerServiceWorkflow.run,
             id=f"customer-service-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
+            execution_timeout=timedelta(seconds=5),
         )
         history: list[Any] = []
         for q in questions:
