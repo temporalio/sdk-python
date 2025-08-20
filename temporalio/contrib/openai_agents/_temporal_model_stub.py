@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 from typing import Any, AsyncIterator, Union, cast
 
 from agents import (
+    Agent,
     AgentOutputSchema,
     AgentOutputSchemaBase,
     CodeInterpreterTool,
@@ -50,9 +51,11 @@ class _TemporalModelStub(Model):
         model_name: Optional[str],
         *,
         model_params: ModelActivityParameters,
+        agent: Optional[Agent[Any]],
     ) -> None:
         self.model_name = model_name
         self.model_params = model_params
+        self.agent = agent
 
     async def get_response(
         self,
@@ -124,7 +127,7 @@ class _TemporalModelStub(Model):
         activity_input = ActivityModelInput(
             model_name=self.model_name,
             system_instructions=system_instructions,
-            input=cast(Union[str, list[TResponseInputItem]], input),
+            input=input,
             model_settings=model_settings,
             tools=tool_infos,
             output_schema=output_schema_input,
@@ -134,10 +137,25 @@ class _TemporalModelStub(Model):
             prompt=prompt,
         )
 
+        if self.model_params.summary_override:
+            summary = (
+                self.model_params.summary_override
+                if isinstance(self.model_params.summary_override, str)
+                else (
+                    self.model_params.summary_override.provide(
+                        self.agent, system_instructions, input
+                    )
+                )
+            )
+        elif self.agent:
+            summary = self.agent.name
+        else:
+            summary = None
+
         return await workflow.execute_activity_method(
             ModelActivity.invoke_model_activity,
             activity_input,
-            summary=self.model_params.summary_override or _extract_summary(input),
+            summary=summary,
             task_queue=self.model_params.task_queue,
             schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
             schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
