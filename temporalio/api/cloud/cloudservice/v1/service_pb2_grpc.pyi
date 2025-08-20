@@ -273,6 +273,31 @@ class CloudServiceStub:
     """Validates an export sink configuration by delivering an empty test file to the specified sink.
     This operation verifies that the sink is correctly configured, accessible, and ready for data export.
     """
+    UpdateNamespaceTags: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse,
+    ]
+    """Update the tags for a namespace"""
+    CreateConnectivityRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleResponse,
+    ]
+    """Creates a connectivity rule"""
+    GetConnectivityRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleResponse,
+    ]
+    """Gets a connectivity rule by id"""
+    GetConnectivityRules: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesResponse,
+    ]
+    """Lists connectivity rules by account"""
+    DeleteConnectivityRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse,
+    ]
+    """Deletes a connectivity rule by id"""
 
 class CloudServiceServicer(metaclass=abc.ABCMeta):
     """WARNING: This service is currently experimental and may change in
@@ -645,6 +670,41 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
         """Validates an export sink configuration by delivering an empty test file to the specified sink.
         This operation verifies that the sink is correctly configured, accessible, and ready for data export.
         """
+    @abc.abstractmethod
+    def UpdateNamespaceTags(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse:
+        """Update the tags for a namespace"""
+    @abc.abstractmethod
+    def CreateConnectivityRule(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleResponse:
+        """Creates a connectivity rule"""
+    @abc.abstractmethod
+    def GetConnectivityRule(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleResponse:
+        """Gets a connectivity rule by id"""
+    @abc.abstractmethod
+    def GetConnectivityRules(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesResponse:
+        """Lists connectivity rules by account"""
+    @abc.abstractmethod
+    def DeleteConnectivityRule(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse:
+        """Deletes a connectivity rule by id"""
 
 def add_CloudServiceServicer_to_server(
     servicer: CloudServiceServicer, server: grpc.Server

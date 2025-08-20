@@ -1,4 +1,5 @@
 from .message_pb2 import (
+    PluginInfo,
     WorkerHeartbeat,
     WorkerHostInfo,
     WorkerInfo,
@@ -7,6 +8,7 @@ from .message_pb2 import (
 )
 
 __all__ = [
+    "PluginInfo",
     "WorkerHeartbeat",
     "WorkerHostInfo",
     "WorkerInfo",

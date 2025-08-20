@@ -473,6 +473,21 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersResponse.FromString,
         )
+        self.UpdateTaskQueueConfig = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateTaskQueueConfig",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateTaskQueueConfigRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateTaskQueueConfigResponse.FromString,
+        )
+        self.FetchWorkerConfig = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/FetchWorkerConfig",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.FetchWorkerConfigRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.FetchWorkerConfigResponse.FromString,
+        )
+        self.UpdateWorkerConfig = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerConfig",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerConfigRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerConfigResponse.FromString,
+        )
 
 
 class WorkflowServiceServicer(object):
@@ -1419,6 +1434,31 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def UpdateTaskQueueConfig(self, request, context):
+        """Updates task queue configuration.
+        For the overall queue rate limit: the rate limit set by this api overrides the worker-set rate limit,
+        which uncouples the rate limit from the worker lifecycle.
+        If the overall queue rate limit is unset, the worker-set rate limit takes effect.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def FetchWorkerConfig(self, request, context):
+        """FetchWorkerConfig returns the worker configuration for a specific worker."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def UpdateWorkerConfig(self, request, context):
+        """UpdateWorkerConfig updates the worker configuration of one or more workers.
+        Can be used to partially update the worker configuration.
+        Can be used to update the configuration of multiple workers.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
 
 def add_WorkflowServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1866,6 +1906,21 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             servicer.ListWorkers,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersResponse.SerializeToString,
+        ),
+        "UpdateTaskQueueConfig": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateTaskQueueConfig,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateTaskQueueConfigRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateTaskQueueConfigResponse.SerializeToString,
+        ),
+        "FetchWorkerConfig": grpc.unary_unary_rpc_method_handler(
+            servicer.FetchWorkerConfig,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.FetchWorkerConfigRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.FetchWorkerConfigResponse.SerializeToString,
+        ),
+        "UpdateWorkerConfig": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateWorkerConfig,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerConfigRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerConfigResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -4460,6 +4515,93 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/ListWorkers",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListWorkersResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def UpdateTaskQueueConfig(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateTaskQueueConfig",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateTaskQueueConfigRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateTaskQueueConfigResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def FetchWorkerConfig(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/FetchWorkerConfig",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.FetchWorkerConfigRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.FetchWorkerConfigResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def UpdateWorkerConfig(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerConfig",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerConfigRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerConfigResponse.FromString,
             options,
             channel_credentials,
             insecure,
