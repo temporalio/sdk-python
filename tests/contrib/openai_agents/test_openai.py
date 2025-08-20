@@ -40,6 +40,7 @@ from agents import (
     OpenAIChatCompletionsModel,
     OpenAIResponsesModel,
     OutputGuardrailTripwireTriggered,
+    RunConfig,
     RunContextWrapper,
     Runner,
     SQLiteSession,
@@ -92,6 +93,7 @@ from temporalio.contrib.openai_agents import (
     TestModel,
     TestModelProvider,
 )
+from temporalio.contrib.openai_agents._model_parameters import ModelSummaryProvider
 from temporalio.contrib.openai_agents._temporal_model_stub import _extract_summary
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import ApplicationError, CancelledError
@@ -2049,6 +2051,147 @@ async def test_hosted_mcp_tool(client: Client, use_local_model):
         result = await workflow_handle.result()
         if use_local_model:
             assert result == "Some language"
+
+
+class AssertDifferentModelProvider(ModelProvider):
+    model_names: set[Optional[str]]
+
+    def __init__(self, model: Model):
+        self._model = model
+        self.model_names = set()
+
+    def get_model(self, model_name: Union[str, None]) -> Model:
+        self.model_names.add(model_name)
+        return self._model
+
+
+class MultipleModelsModel(StaticTestModel):
+    responses = [
+        ResponseBuilders.tool_call("{}", "transfer_to_underling"),
+        ResponseBuilders.output_message(
+            "I'm here to help! Was there a specific task you needed assistance with regarding the storeroom?"
+        ),
+    ]
+
+
+@workflow.defn
+class MultipleModelWorkflow:
+    @workflow.run
+    async def run(self, use_run_config: bool):
+        underling = Agent[None](
+            name="Underling",
+            instructions="You do all the work you are told.",
+        )
+
+        starting_agent = Agent[None](
+            name="Lazy Assistant",
+            model="gpt-4o-mini",
+            instructions="You delegate all your work to another agent.",
+            handoffs=[underling],
+        )
+        result = await Runner.run(
+            starting_agent=starting_agent,
+            input="Have you cleaned the store room yet?",
+            run_config=RunConfig(model="gpt-4o") if use_run_config else None,
+        )
+        return result.final_output
+
+
+async def test_multiple_models(client: Client):
+    provider = AssertDifferentModelProvider(MultipleModelsModel())
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=120)
+            ),
+            model_provider=provider,
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        MultipleModelWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            MultipleModelWorkflow.run,
+            False,
+            id=f"multiple-model-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+        result = await workflow_handle.result()
+        assert provider.model_names == {None, "gpt-4o-mini"}
+
+
+async def test_run_config_models(client: Client):
+    provider = AssertDifferentModelProvider(MultipleModelsModel())
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=120)
+            ),
+            model_provider=provider,
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        MultipleModelWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            MultipleModelWorkflow.run,
+            True,
+            id=f"run-config-model-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+        result = await workflow_handle.result()
+
+        # Only the model from the runconfig override is used
+        assert provider.model_names == {"gpt-4o"}
+
+
+async def test_summary_provider(client: Client):
+    class SummaryProvider(ModelSummaryProvider):
+        def provide(
+            self,
+            agent: Optional[Agent[Any]],
+            instructions: Optional[str],
+            input: Union[str, list[TResponseInputItem]],
+        ) -> str:
+            return "My summary"
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=120),
+                summary_override=SummaryProvider(),
+            ),
+            model_provider=TestModelProvider(TestHelloModel()),
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        HelloWorldAgent,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            HelloWorldAgent.run,
+            "Prompt",
+            id=f"summary-provider-model-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+        result = await workflow_handle.result()
+        async for e in workflow_handle.fetch_history_events():
+            if e.HasField("activity_task_scheduled_event_attributes"):
+                assert e.user_metadata.summary.data == b'"My summary"'
 
 
 @workflow.defn
