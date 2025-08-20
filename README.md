@@ -1902,20 +1902,18 @@ poe test -s --log-cli-level=DEBUG -k test_sync_activity_thread_cancel_caught
 
 #### Proto Generation and Testing
 
-To allow for backwards compatibility, protobuf code is generated on the 3.x series of the protobuf library. To generate
-protobuf code, you must be on Python <= 3.10, and then run `uv add "protobuf<4"` + `uv sync --all-extras`. Then the
-protobuf files can be generated via `poe gen-protos`. Tests can be run for protobuf version 3 by setting the
-`TEMPORAL_TEST_PROTO3` env var to `1` prior to running tests.
+If you have docker available, run
 
-Do not commit `uv.lock` or `pyproject.toml` changes. To go back from this downgrade, restore both of those files and run
-`uv sync --all-extras`. Make sure you `poe format` the results.
-
-For a less system-intrusive approach, you can:
-```shell
-docker build -f scripts/_proto/Dockerfile .
-docker run --rm -v "${PWD}/temporalio/api:/api_new" -v "${PWD}/temporalio/bridge/proto:/bridge_new" <just built image sha>
-poe format
 ```
+poe gen-protos-docker
+```
+
+Alternatively: to generate protobuf code, you must be on Python <= 3.10, and then run `uv add
+"protobuf<4"` + `uv sync --all-extras`. Then the protobuf files can be generated via `poe
+gen-protos` followed by `poe format`. Do not commit `uv.lock` or `pyproject.toml` changes. To go
+back from this downgrade, restore both of those files and run `uv sync --all-extras`. Tests can be
+run for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var to `1` prior to running
+tests.
 
 ### Style
 
