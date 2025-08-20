@@ -2202,7 +2202,7 @@ async def test_stateful_mcp_server(
         client, McpServerStatefulWorkflow, McpServerWorkflow
     ) as worker:
         if stateful:
-            result = client.execute_workflow(
+            result = await client.execute_workflow(
                 McpServerStatefulWorkflow.run,
                 timedelta(seconds=30),
                 id=f"mcp-server-{uuid.uuid4()}",
@@ -2210,7 +2210,7 @@ async def test_stateful_mcp_server(
                 execution_timeout=timedelta(seconds=30),
             )
         else:
-            result = client.execute_workflow(
+            result = await client.execute_workflow(
                 McpServerWorkflow.run,
                 timedelta(seconds=30),
                 id=f"mcp-server-{uuid.uuid4()}",
