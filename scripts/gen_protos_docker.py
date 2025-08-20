@@ -1,8 +1,15 @@
 import os
 import subprocess
 
-subprocess.run(["docker", "build", "-f", "scripts/_proto/Dockerfile", "."])
-image_id = subprocess.check_output(["docker", "images", "-q"], text=True).split()[0]
+# Build the Docker image and capture its ID
+result = subprocess.run(
+    ["docker", "build", "-q", "-f", "scripts/_proto/Dockerfile", "."],
+    capture_output=True,
+    text=True,
+    check=True,
+)
+image_id = result.stdout.strip()
+
 subprocess.run(
     [
         "docker",
@@ -13,6 +20,7 @@ subprocess.run(
         "-v",
         f"{os.getcwd()}/temporalio/bridge/proto:/bridge_new",
         image_id,
-    ]
+    ],
+    check=True,
 )
-subprocess.run(["uv", "run", "poe", "format"])
+subprocess.run(["uv", "run", "poe", "format"], check=True)
