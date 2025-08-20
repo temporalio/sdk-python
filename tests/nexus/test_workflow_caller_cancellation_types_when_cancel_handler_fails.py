@@ -1,3 +1,7 @@
+"""
+See sibling file test_workflow_caller_cancellation_types.py for explanatory comments.
+"""
+
 import asyncio
 import uuid
 from dataclasses import dataclass, field
@@ -46,19 +50,28 @@ test_context: TestContext
 class HandlerWorkflow:
     def __init__(self):
         self.cancel_handler_released = asyncio.Event()
+        self.caller_op_future_resolved = asyncio.Event()
 
     @workflow.run
     async def run(self) -> None:
         # We want the cancel handler to be invoked, so this workflow must not close before
         # then.
         await self.cancel_handler_released.wait()
-        # TODO: there is technically a race now between (1) caller server writing
-        # NEXUS_OPERATION_CANCEL_REQUEST_FAILED in reponse to failed cancel handler in nexus task
-        # and (2) NEXUS_OPERATION_COMPLETED due to this workflow completing.
+        if (
+            test_context.cancellation_type
+            == workflow.NexusOperationCancellationType.WAIT_REQUESTED
+        ):
+            # For WAIT_REQUESTED, we want to prove that the future can be unblocked before the
+            # handler workflow completes.
+            await self.caller_op_future_resolved.wait()
 
     @workflow.signal
     def set_cancel_handler_released(self) -> None:
         self.cancel_handler_released.set()
+
+    @workflow.signal
+    def set_caller_op_future_resolved(self) -> None:
+        self.caller_op_future_resolved.set()
 
 
 @nexusrpc.service
@@ -159,6 +172,10 @@ class CallerWorkflow:
             test_context.cancellation_type
             == workflow.NexusOperationCancellationType.WAIT_REQUESTED
         ):
+            # For WAIT_REQUESTED, we need core to receive the NexusOperationCancelRequestCompleted
+            # event. That event should trigger a workflow task, but does not currently due to
+            # https://github.com/temporalio/temporal/issues/8175. Force a new WFT, allowing time for
+            # the event hopefully to arrive.
             await workflow.sleep(0.1, summary="Force new WFT")
         error_type, error_cause_type = None, None
         try:
@@ -310,11 +327,12 @@ async def check_behavior_for_wait_cancellation_requested(
     caller_wf: WorkflowHandle[Any, CancellationResult],
     handler_wf: WorkflowHandle,
 ) -> None:
-    await handler_wf.result()
     await caller_wf.signal(CallerWorkflow.release)
     result = await caller_wf.result()
     assert result.error_type == "NexusOperationError"
     assert result.error_cause_type == "HandlerError"
+    await handler_wf.signal(HandlerWorkflow.set_caller_op_future_resolved)
+    await handler_wf.result()
     await assert_event_subsequence(
         [
             (caller_wf, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED),
@@ -328,7 +346,11 @@ async def check_behavior_for_wait_cancellation_requested(
         caller_wf,
         EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_FAILED,
     )
-    assert op_cancel_request_failed < caller_op_future_resolved
+    handler_wf_completed = await get_event_time(
+        handler_wf,
+        EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED,
+    )
+    assert op_cancel_request_failed < caller_op_future_resolved < handler_wf_completed
 
 
 async def check_behavior_for_wait_cancellation_completed(
@@ -339,10 +361,14 @@ async def check_behavior_for_wait_cancellation_completed(
     await caller_wf.signal(CallerWorkflow.release)
     result = await caller_wf.result()
     assert not result.error_type
+    # Note that the relative order of these two events is non-deterministic, since one is the result
+    # of the cancel handler response being processed and the other is the result of the handler
+    # workflow exiting.
+    # (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_FAILED)
+    # (handler_wf, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED)
     await assert_event_subsequence(
         [
             (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED),
-            (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_FAILED),
             (handler_wf, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED),
             (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_COMPLETED),
         ]
