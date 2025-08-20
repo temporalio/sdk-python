@@ -411,7 +411,7 @@ class _ContextPropagationWorkflowOutboundInterceptor(
         set_header_from_context(input, temporalio.workflow.payload_converter())
         handle = self.next.start_activity(input)
         if span:
-            handle.add_done_callback(lambda _: span.finish() if span else None)
+            handle.add_done_callback(lambda _: span.finish())  # type: ignore
         return handle
 
     async def start_child_workflow(
@@ -427,7 +427,7 @@ class _ContextPropagationWorkflowOutboundInterceptor(
         set_header_from_context(input, temporalio.workflow.payload_converter())
         handle = await self.next.start_child_workflow(input)
         if span:
-            handle.add_done_callback(lambda _: span.finish() if span else None)
+            handle.add_done_callback(lambda _: span.finish())  # type: ignore
         return handle
 
     def start_local_activity(
@@ -443,5 +443,5 @@ class _ContextPropagationWorkflowOutboundInterceptor(
         set_header_from_context(input, temporalio.workflow.payload_converter())
         handle = self.next.start_local_activity(input)
         if span:
-            handle.add_done_callback(lambda _: span.finish() if span else None)
+            handle.add_done_callback(lambda _: span.finish())  # type: ignore
         return handle
