@@ -1397,7 +1397,19 @@ async def test_response_serialization():
     encoded = await pydantic_data_converter.encode([model_response])
 
 
-async def assert_status_retry_behavior(status: int, client: Client, should_retry: bool):
+@pytest.mark.parametrize(
+    "status_code, should_retry",
+    [
+        (408, True),
+        (409, True),
+        (429, True),
+        (500, True),
+        (400, False),
+        (403, False),
+        (404, False),
+    ],
+)
+async def test_exception_handling(client: Client, status_code: int, should_retry: bool):
     def status_error(status: int):
         with workflow.unsafe.imports_passed_through():
             with workflow.unsafe.sandbox_unrestricted():
@@ -1416,7 +1428,9 @@ async def assert_status_retry_behavior(status: int, client: Client, should_retry
             model_params=ModelActivityParameters(
                 retry_policy=RetryPolicy(maximum_attempts=2),
             ),
-            model_provider=TestModelProvider(TestModel(lambda: status_error(status))),
+            model_provider=TestModelProvider(
+                TestModel(lambda: status_error(status_code))
+            ),
         )
     ]
     client = Client(**new_config)
@@ -1444,17 +1458,6 @@ async def assert_status_retry_behavior(status: int, client: Client, should_retry
                 else:
                     assert event.activity_task_started_event_attributes.attempt == 1
         assert found
-
-
-async def test_exception_handling(client: Client):
-    await assert_status_retry_behavior(408, client, should_retry=True)
-    await assert_status_retry_behavior(409, client, should_retry=True)
-    await assert_status_retry_behavior(429, client, should_retry=True)
-    await assert_status_retry_behavior(500, client, should_retry=True)
-
-    await assert_status_retry_behavior(400, client, should_retry=False)
-    await assert_status_retry_behavior(403, client, should_retry=False)
-    await assert_status_retry_behavior(404, client, should_retry=False)
 
 
 class CustomModelProvider(ModelProvider):
