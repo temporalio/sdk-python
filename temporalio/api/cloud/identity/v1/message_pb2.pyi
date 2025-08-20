@@ -72,6 +72,8 @@ class AccountAccess(google.protobuf.message.Message):
         """Gives read only access and write access for billing."""
         ROLE_READ: AccountAccess._Role.ValueType  # 5
         """Gives read only access to the account."""
+        ROLE_METRICS_READ: AccountAccess._Role.ValueType  # 6
+        """Gives read only access to the account metrics."""
 
     class Role(_Role, metaclass=_RoleEnumTypeWrapper): ...
     ROLE_UNSPECIFIED: AccountAccess.Role.ValueType  # 0
@@ -85,16 +87,19 @@ class AccountAccess(google.protobuf.message.Message):
     """Gives read only access and write access for billing."""
     ROLE_READ: AccountAccess.Role.ValueType  # 5
     """Gives read only access to the account."""
+    ROLE_METRICS_READ: AccountAccess.Role.ValueType  # 6
+    """Gives read only access to the account metrics."""
 
     ROLE_DEPRECATED_FIELD_NUMBER: builtins.int
     ROLE_FIELD_NUMBER: builtins.int
     role_deprecated: builtins.str
-    """The role on the account, should be one of [owner, admin, developer, financeadmin, read]
+    """The role on the account, should be one of [owner, admin, developer, financeadmin, read, metricsread]
     owner - gives full access to the account, including users, namespaces, and billing
     admin - gives full access the account, including users and namespaces
     developer - gives access to create namespaces on the account
     financeadmin - gives read only access and write access for billing
     read - gives read only access to the account
+    metricsread - gives read only access to all namespace metrics
     Deprecated: Not supported after v0.3.0 api version. Use role instead.
     temporal:versioning:max_version=v0.3.0
     """

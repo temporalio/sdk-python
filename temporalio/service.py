@@ -395,6 +395,11 @@ class WorkflowService:
             wsv1.ExecuteMultiOperationRequest,
             wsv1.ExecuteMultiOperationResponse,
         )
+        self.fetch_worker_config = client._new_call(
+            "fetch_worker_config",
+            wsv1.FetchWorkerConfigRequest,
+            wsv1.FetchWorkerConfigResponse,
+        )
         self.get_cluster_info = client._new_call(
             "get_cluster_info",
             wsv1.GetClusterInfoRequest,
@@ -720,6 +725,16 @@ class WorkflowService:
             wsv1.UpdateScheduleRequest,
             wsv1.UpdateScheduleResponse,
         )
+        self.update_task_queue_config = client._new_call(
+            "update_task_queue_config",
+            wsv1.UpdateTaskQueueConfigRequest,
+            wsv1.UpdateTaskQueueConfigResponse,
+        )
+        self.update_worker_config = client._new_call(
+            "update_worker_config",
+            wsv1.UpdateWorkerConfigRequest,
+            wsv1.UpdateWorkerConfigResponse,
+        )
         self.update_worker_deployment_version_metadata = client._new_call(
             "update_worker_deployment_version_metadata",
             wsv1.UpdateWorkerDeploymentVersionMetadataRequest,
@@ -851,6 +866,12 @@ class CloudService:
             clv1.CreateApiKeyResponse,
             service="cloud",
         )
+        self.create_connectivity_rule = client._new_call(
+            "create_connectivity_rule",
+            clv1.CreateConnectivityRuleRequest,
+            clv1.CreateConnectivityRuleResponse,
+            service="cloud",
+        )
         self.create_namespace = client._new_call(
             "create_namespace",
             clv1.CreateNamespaceRequest,
@@ -891,6 +912,12 @@ class CloudService:
             "delete_api_key",
             clv1.DeleteApiKeyRequest,
             clv1.DeleteApiKeyResponse,
+            service="cloud",
+        )
+        self.delete_connectivity_rule = client._new_call(
+            "delete_connectivity_rule",
+            clv1.DeleteConnectivityRuleRequest,
+            clv1.DeleteConnectivityRuleResponse,
             service="cloud",
         )
         self.delete_namespace = client._new_call(
@@ -963,6 +990,18 @@ class CloudService:
             "get_async_operation",
             clv1.GetAsyncOperationRequest,
             clv1.GetAsyncOperationResponse,
+            service="cloud",
+        )
+        self.get_connectivity_rule = client._new_call(
+            "get_connectivity_rule",
+            clv1.GetConnectivityRuleRequest,
+            clv1.GetConnectivityRuleResponse,
+            service="cloud",
+        )
+        self.get_connectivity_rules = client._new_call(
+            "get_connectivity_rules",
+            clv1.GetConnectivityRulesRequest,
+            clv1.GetConnectivityRulesResponse,
             service="cloud",
         )
         self.get_namespace = client._new_call(
@@ -1107,6 +1146,12 @@ class CloudService:
             "update_namespace_export_sink",
             clv1.UpdateNamespaceExportSinkRequest,
             clv1.UpdateNamespaceExportSinkResponse,
+            service="cloud",
+        )
+        self.update_namespace_tags = client._new_call(
+            "update_namespace_tags",
+            clv1.UpdateNamespaceTagsRequest,
+            clv1.UpdateNamespaceTagsResponse,
             service="cloud",
         )
         self.update_nexus_endpoint = client._new_call(

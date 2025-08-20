@@ -926,3 +926,130 @@ class PollerScalingDecision(google.protobuf.message.Message):
     ) -> None: ...
 
 global___PollerScalingDecision = PollerScalingDecision
+
+class RateLimit(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    REQUESTS_PER_SECOND_FIELD_NUMBER: builtins.int
+    requests_per_second: builtins.float
+    """Zero is a valid rate limit."""
+    def __init__(
+        self,
+        *,
+        requests_per_second: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "requests_per_second", b"requests_per_second"
+        ],
+    ) -> None: ...
+
+global___RateLimit = RateLimit
+
+class ConfigMetadata(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    REASON_FIELD_NUMBER: builtins.int
+    UPDATE_IDENTITY_FIELD_NUMBER: builtins.int
+    UPDATE_TIME_FIELD_NUMBER: builtins.int
+    reason: builtins.str
+    """Reason for why the config was set."""
+    update_identity: builtins.str
+    """Identity of the last updater.
+    Set by the request's identity field.
+    """
+    @property
+    def update_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Time of the last update."""
+    def __init__(
+        self,
+        *,
+        reason: builtins.str = ...,
+        update_identity: builtins.str = ...,
+        update_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["update_time", b"update_time"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "reason",
+            b"reason",
+            "update_identity",
+            b"update_identity",
+            "update_time",
+            b"update_time",
+        ],
+    ) -> None: ...
+
+global___ConfigMetadata = ConfigMetadata
+
+class RateLimitConfig(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    RATE_LIMIT_FIELD_NUMBER: builtins.int
+    METADATA_FIELD_NUMBER: builtins.int
+    @property
+    def rate_limit(self) -> global___RateLimit: ...
+    @property
+    def metadata(self) -> global___ConfigMetadata: ...
+    def __init__(
+        self,
+        *,
+        rate_limit: global___RateLimit | None = ...,
+        metadata: global___ConfigMetadata | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "metadata", b"metadata", "rate_limit", b"rate_limit"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "metadata", b"metadata", "rate_limit", b"rate_limit"
+        ],
+    ) -> None: ...
+
+global___RateLimitConfig = RateLimitConfig
+
+class TaskQueueConfig(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    QUEUE_RATE_LIMIT_FIELD_NUMBER: builtins.int
+    FAIRNESS_KEYS_RATE_LIMIT_DEFAULT_FIELD_NUMBER: builtins.int
+    @property
+    def queue_rate_limit(self) -> global___RateLimitConfig:
+        """Unless modified, this is the system-defined rate limit."""
+    @property
+    def fairness_keys_rate_limit_default(self) -> global___RateLimitConfig:
+        """If set, each individual fairness key will be limited to this rate, scaled by the weight of the fairness key."""
+    def __init__(
+        self,
+        *,
+        queue_rate_limit: global___RateLimitConfig | None = ...,
+        fairness_keys_rate_limit_default: global___RateLimitConfig | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "fairness_keys_rate_limit_default",
+            b"fairness_keys_rate_limit_default",
+            "queue_rate_limit",
+            b"queue_rate_limit",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "fairness_keys_rate_limit_default",
+            b"fairness_keys_rate_limit_default",
+            "queue_rate_limit",
+            b"queue_rate_limit",
+        ],
+    ) -> None: ...
+
+global___TaskQueueConfig = TaskQueueConfig

@@ -238,3 +238,34 @@ DESCRIBE_TASK_QUEUE_MODE_UNSPECIFIED: DescribeTaskQueueMode.ValueType  # 0
 DESCRIBE_TASK_QUEUE_MODE_ENHANCED: DescribeTaskQueueMode.ValueType  # 1
 """Enhanced mode reports aggregated results for all partitions, supports Build IDs, and reports richer info."""
 global___DescribeTaskQueueMode = DescribeTaskQueueMode
+
+class _RateLimitSource:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _RateLimitSourceEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _RateLimitSource.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    RATE_LIMIT_SOURCE_UNSPECIFIED: _RateLimitSource.ValueType  # 0
+    RATE_LIMIT_SOURCE_API: _RateLimitSource.ValueType  # 1
+    """The value was set by the API."""
+    RATE_LIMIT_SOURCE_WORKER: _RateLimitSource.ValueType  # 2
+    """The value was set by a worker."""
+    RATE_LIMIT_SOURCE_SYSTEM: _RateLimitSource.ValueType  # 3
+    """The value was set as the system default."""
+
+class RateLimitSource(_RateLimitSource, metaclass=_RateLimitSourceEnumTypeWrapper):
+    """Source for the effective rate limit."""
+
+RATE_LIMIT_SOURCE_UNSPECIFIED: RateLimitSource.ValueType  # 0
+RATE_LIMIT_SOURCE_API: RateLimitSource.ValueType  # 1
+"""The value was set by the API."""
+RATE_LIMIT_SOURCE_WORKER: RateLimitSource.ValueType  # 2
+"""The value was set by a worker."""
+RATE_LIMIT_SOURCE_SYSTEM: RateLimitSource.ValueType  # 3
+"""The value was set as the system default."""
+global___RateLimitSource = RateLimitSource

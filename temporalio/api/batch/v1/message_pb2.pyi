@@ -14,6 +14,7 @@ import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
+import temporalio.api.activity.v1.message_pb2
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.batch_operation_pb2
 import temporalio.api.enums.v1.reset_pb2
@@ -336,9 +337,9 @@ class BatchOperationUnpauseActivities(google.protobuf.message.Message):
     type: builtins.str
     match_all: builtins.bool
     reset_attempts: builtins.bool
-    """Providing this flag will also reset the number of attempts."""
+    """Setting this flag will also reset the number of attempts."""
     reset_heartbeat: builtins.bool
-    """Providing this flag will also reset the heartbeat details."""
+    """Setting this flag will also reset the heartbeat details."""
     @property
     def jitter(self) -> google.protobuf.duration_pb2.Duration:
         """If set, the activity will start at a random time within the specified jitter
@@ -431,3 +432,175 @@ class BatchOperationTriggerWorkflowRule(google.protobuf.message.Message):
     ) -> typing_extensions.Literal["id", "spec"] | None: ...
 
 global___BatchOperationTriggerWorkflowRule = BatchOperationTriggerWorkflowRule
+
+class BatchOperationResetActivities(google.protobuf.message.Message):
+    """BatchOperationResetActivities sends activity reset requests in a batch.
+    NOTE: keep in sync with temporalio.api.workflowservice.v1.ResetActivityRequest
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IDENTITY_FIELD_NUMBER: builtins.int
+    TYPE_FIELD_NUMBER: builtins.int
+    MATCH_ALL_FIELD_NUMBER: builtins.int
+    RESET_ATTEMPTS_FIELD_NUMBER: builtins.int
+    RESET_HEARTBEAT_FIELD_NUMBER: builtins.int
+    KEEP_PAUSED_FIELD_NUMBER: builtins.int
+    JITTER_FIELD_NUMBER: builtins.int
+    RESTORE_ORIGINAL_OPTIONS_FIELD_NUMBER: builtins.int
+    identity: builtins.str
+    """The identity of the worker/client."""
+    type: builtins.str
+    match_all: builtins.bool
+    reset_attempts: builtins.bool
+    """Setting this flag will also reset the number of attempts."""
+    reset_heartbeat: builtins.bool
+    """Setting this flag will also reset the heartbeat details."""
+    keep_paused: builtins.bool
+    """If activity is paused, it will remain paused after reset"""
+    @property
+    def jitter(self) -> google.protobuf.duration_pb2.Duration:
+        """If set, the activity will start at a random time within the specified jitter
+        duration, introducing variability to the start time.
+        """
+    restore_original_options: builtins.bool
+    """If set, the activity options will be restored to the defaults.
+    Default options are then options activity was created with.
+    They are part of the first ActivityTaskScheduled event.
+    """
+    def __init__(
+        self,
+        *,
+        identity: builtins.str = ...,
+        type: builtins.str = ...,
+        match_all: builtins.bool = ...,
+        reset_attempts: builtins.bool = ...,
+        reset_heartbeat: builtins.bool = ...,
+        keep_paused: builtins.bool = ...,
+        jitter: google.protobuf.duration_pb2.Duration | None = ...,
+        restore_original_options: builtins.bool = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity",
+            b"activity",
+            "jitter",
+            b"jitter",
+            "match_all",
+            b"match_all",
+            "type",
+            b"type",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity",
+            b"activity",
+            "identity",
+            b"identity",
+            "jitter",
+            b"jitter",
+            "keep_paused",
+            b"keep_paused",
+            "match_all",
+            b"match_all",
+            "reset_attempts",
+            b"reset_attempts",
+            "reset_heartbeat",
+            b"reset_heartbeat",
+            "restore_original_options",
+            b"restore_original_options",
+            "type",
+            b"type",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["activity", b"activity"]
+    ) -> typing_extensions.Literal["type", "match_all"] | None: ...
+
+global___BatchOperationResetActivities = BatchOperationResetActivities
+
+class BatchOperationUpdateActivityOptions(google.protobuf.message.Message):
+    """BatchOperationUpdateActivityOptions sends an update-activity-options requests in a batch.
+    NOTE: keep in sync with temporalio.api.workflowservice.v1.UpdateActivityRequest
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IDENTITY_FIELD_NUMBER: builtins.int
+    TYPE_FIELD_NUMBER: builtins.int
+    MATCH_ALL_FIELD_NUMBER: builtins.int
+    ACTIVITY_OPTIONS_FIELD_NUMBER: builtins.int
+    UPDATE_MASK_FIELD_NUMBER: builtins.int
+    RESTORE_ORIGINAL_FIELD_NUMBER: builtins.int
+    identity: builtins.str
+    """The identity of the worker/client."""
+    type: builtins.str
+    match_all: builtins.bool
+    @property
+    def activity_options(
+        self,
+    ) -> temporalio.api.activity.v1.message_pb2.ActivityOptions:
+        """Update Activity options. Partial updates are accepted and controlled by update_mask."""
+    @property
+    def update_mask(self) -> google.protobuf.field_mask_pb2.FieldMask:
+        """Controls which fields from `activity_options` will be applied"""
+    restore_original: builtins.bool
+    """If set, the activity options will be restored to the default.
+    Default options are then options activity was created with.
+    They are part of the first ActivityTaskScheduled event.
+    This flag cannot be combined with any other option; if you supply
+    restore_original together with other options, the request will be rejected.
+    """
+    def __init__(
+        self,
+        *,
+        identity: builtins.str = ...,
+        type: builtins.str = ...,
+        match_all: builtins.bool = ...,
+        activity_options: temporalio.api.activity.v1.message_pb2.ActivityOptions
+        | None = ...,
+        update_mask: google.protobuf.field_mask_pb2.FieldMask | None = ...,
+        restore_original: builtins.bool = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity",
+            b"activity",
+            "activity_options",
+            b"activity_options",
+            "match_all",
+            b"match_all",
+            "type",
+            b"type",
+            "update_mask",
+            b"update_mask",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity",
+            b"activity",
+            "activity_options",
+            b"activity_options",
+            "identity",
+            b"identity",
+            "match_all",
+            b"match_all",
+            "restore_original",
+            b"restore_original",
+            "type",
+            b"type",
+            "update_mask",
+            b"update_mask",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["activity", b"activity"]
+    ) -> typing_extensions.Literal["type", "match_all"] | None: ...
+
+global___BatchOperationUpdateActivityOptions = BatchOperationUpdateActivityOptions

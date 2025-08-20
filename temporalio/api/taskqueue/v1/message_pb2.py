@@ -29,7 +29,7 @@ from temporalio.api.enums.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n\'temporal/api/taskqueue/v1/message.proto\x12\x19temporal.api.taskqueue.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/wrappers.proto\x1a&temporal/api/enums/v1/task_queue.proto\x1a$temporal/api/common/v1/message.proto\x1a(temporal/api/deployment/v1/message.proto"b\n\tTaskQueue\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x32\n\x04kind\x18\x02 \x01(\x0e\x32$.temporal.api.enums.v1.TaskQueueKind\x12\x13\n\x0bnormal_name\x18\x03 \x01(\t"O\n\x11TaskQueueMetadata\x12:\n\x14max_tasks_per_second\x18\x01 \x01(\x0b\x32\x1c.google.protobuf.DoubleValue"\xda\x02\n\x17TaskQueueVersioningInfo\x12W\n\x1a\x63urrent_deployment_version\x18\x07 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x1b\n\x0f\x63urrent_version\x18\x01 \x01(\tB\x02\x18\x01\x12W\n\x1aramping_deployment_version\x18\t \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x1b\n\x0framping_version\x18\x02 \x01(\tB\x02\x18\x01\x12"\n\x1aramping_version_percentage\x18\x03 \x01(\x02\x12/\n\x0bupdate_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"W\n\x19TaskQueueVersionSelection\x12\x11\n\tbuild_ids\x18\x01 \x03(\t\x12\x13\n\x0bunversioned\x18\x02 \x01(\x08\x12\x12\n\nall_active\x18\x03 \x01(\x08"\x95\x02\n\x14TaskQueueVersionInfo\x12R\n\ntypes_info\x18\x01 \x03(\x0b\x32>.temporal.api.taskqueue.v1.TaskQueueVersionInfo.TypesInfoEntry\x12I\n\x11task_reachability\x18\x02 \x01(\x0e\x32..temporal.api.enums.v1.BuildIdTaskReachability\x1a^\n\x0eTypesInfoEntry\x12\x0b\n\x03key\x18\x01 \x01(\x05\x12;\n\x05value\x18\x02 \x01(\x0b\x32,.temporal.api.taskqueue.v1.TaskQueueTypeInfo:\x02\x38\x01"\x85\x01\n\x11TaskQueueTypeInfo\x12\x36\n\x07pollers\x18\x01 \x03(\x0b\x32%.temporal.api.taskqueue.v1.PollerInfo\x12\x38\n\x05stats\x18\x02 \x01(\x0b\x32).temporal.api.taskqueue.v1.TaskQueueStats"\xa4\x01\n\x0eTaskQueueStats\x12!\n\x19\x61pproximate_backlog_count\x18\x01 \x01(\x03\x12:\n\x17\x61pproximate_backlog_age\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x16\n\x0etasks_add_rate\x18\x03 \x01(\x02\x12\x1b\n\x13tasks_dispatch_rate\x18\x04 \x01(\x02"\xac\x01\n\x0fTaskQueueStatus\x12\x1a\n\x12\x62\x61\x63klog_count_hint\x18\x01 \x01(\x03\x12\x12\n\nread_level\x18\x02 \x01(\x03\x12\x11\n\tack_level\x18\x03 \x01(\x03\x12\x17\n\x0frate_per_second\x18\x04 \x01(\x01\x12=\n\rtask_id_block\x18\x05 \x01(\x0b\x32&.temporal.api.taskqueue.v1.TaskIdBlock"/\n\x0bTaskIdBlock\x12\x10\n\x08start_id\x18\x01 \x01(\x03\x12\x0e\n\x06\x65nd_id\x18\x02 \x01(\x03"B\n\x1aTaskQueuePartitionMetadata\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x17\n\x0fowner_host_name\x18\x02 \x01(\t"\x9a\x02\n\nPollerInfo\x12\x34\n\x10last_access_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x10\n\x08identity\x18\x02 \x01(\t\x12\x17\n\x0frate_per_second\x18\x03 \x01(\x01\x12Z\n\x1bworker_version_capabilities\x18\x04 \x01(\x0b\x32\x31.temporal.api.common.v1.WorkerVersionCapabilitiesB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\x05 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions"\x9a\x01\n\x19StickyExecutionAttributes\x12?\n\x11worker_task_queue\x18\x01 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12<\n\x19schedule_to_start_timeout\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration")\n\x14\x43ompatibleVersionSet\x12\x11\n\tbuild_ids\x18\x01 \x03(\t"j\n\x15TaskQueueReachability\x12\x12\n\ntask_queue\x18\x01 \x01(\t\x12=\n\x0creachability\x18\x02 \x03(\x0e\x32\'.temporal.api.enums.v1.TaskReachability"z\n\x13\x42uildIdReachability\x12\x10\n\x08\x62uild_id\x18\x01 \x01(\t\x12Q\n\x17task_queue_reachability\x18\x02 \x03(\x0b\x32\x30.temporal.api.taskqueue.v1.TaskQueueReachability"+\n\x10RampByPercentage\x12\x17\n\x0framp_percentage\x18\x01 \x01(\x02"\x80\x01\n\x15\x42uildIdAssignmentRule\x12\x17\n\x0ftarget_build_id\x18\x01 \x01(\t\x12\x46\n\x0fpercentage_ramp\x18\x03 \x01(\x0b\x32+.temporal.api.taskqueue.v1.RampByPercentageH\x00\x42\x06\n\x04ramp"Q\n\x1d\x43ompatibleBuildIdRedirectRule\x12\x17\n\x0fsource_build_id\x18\x01 \x01(\t\x12\x17\n\x0ftarget_build_id\x18\x02 \x01(\t"\x93\x01\n TimestampedBuildIdAssignmentRule\x12>\n\x04rule\x18\x01 \x01(\x0b\x32\x30.temporal.api.taskqueue.v1.BuildIdAssignmentRule\x12/\n\x0b\x63reate_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\xa3\x01\n(TimestampedCompatibleBuildIdRedirectRule\x12\x46\n\x04rule\x18\x01 \x01(\x0b\x32\x38.temporal.api.taskqueue.v1.CompatibleBuildIdRedirectRule\x12/\n\x0b\x63reate_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp">\n\x15PollerScalingDecision\x12%\n\x1dpoll_request_delta_suggestion\x18\x01 \x01(\x05\x42\x98\x01\n\x1cio.temporal.api.taskqueue.v1B\x0cMessageProtoP\x01Z)go.temporal.io/api/taskqueue/v1;taskqueue\xaa\x02\x1bTemporalio.Api.TaskQueue.V1\xea\x02\x1eTemporalio::Api::TaskQueue::V1b\x06proto3'
+    b'\n\'temporal/api/taskqueue/v1/message.proto\x12\x19temporal.api.taskqueue.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/wrappers.proto\x1a&temporal/api/enums/v1/task_queue.proto\x1a$temporal/api/common/v1/message.proto\x1a(temporal/api/deployment/v1/message.proto"b\n\tTaskQueue\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x32\n\x04kind\x18\x02 \x01(\x0e\x32$.temporal.api.enums.v1.TaskQueueKind\x12\x13\n\x0bnormal_name\x18\x03 \x01(\t"O\n\x11TaskQueueMetadata\x12:\n\x14max_tasks_per_second\x18\x01 \x01(\x0b\x32\x1c.google.protobuf.DoubleValue"\xda\x02\n\x17TaskQueueVersioningInfo\x12W\n\x1a\x63urrent_deployment_version\x18\x07 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x1b\n\x0f\x63urrent_version\x18\x01 \x01(\tB\x02\x18\x01\x12W\n\x1aramping_deployment_version\x18\t \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x1b\n\x0framping_version\x18\x02 \x01(\tB\x02\x18\x01\x12"\n\x1aramping_version_percentage\x18\x03 \x01(\x02\x12/\n\x0bupdate_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"W\n\x19TaskQueueVersionSelection\x12\x11\n\tbuild_ids\x18\x01 \x03(\t\x12\x13\n\x0bunversioned\x18\x02 \x01(\x08\x12\x12\n\nall_active\x18\x03 \x01(\x08"\x95\x02\n\x14TaskQueueVersionInfo\x12R\n\ntypes_info\x18\x01 \x03(\x0b\x32>.temporal.api.taskqueue.v1.TaskQueueVersionInfo.TypesInfoEntry\x12I\n\x11task_reachability\x18\x02 \x01(\x0e\x32..temporal.api.enums.v1.BuildIdTaskReachability\x1a^\n\x0eTypesInfoEntry\x12\x0b\n\x03key\x18\x01 \x01(\x05\x12;\n\x05value\x18\x02 \x01(\x0b\x32,.temporal.api.taskqueue.v1.TaskQueueTypeInfo:\x02\x38\x01"\x85\x01\n\x11TaskQueueTypeInfo\x12\x36\n\x07pollers\x18\x01 \x03(\x0b\x32%.temporal.api.taskqueue.v1.PollerInfo\x12\x38\n\x05stats\x18\x02 \x01(\x0b\x32).temporal.api.taskqueue.v1.TaskQueueStats"\xa4\x01\n\x0eTaskQueueStats\x12!\n\x19\x61pproximate_backlog_count\x18\x01 \x01(\x03\x12:\n\x17\x61pproximate_backlog_age\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x16\n\x0etasks_add_rate\x18\x03 \x01(\x02\x12\x1b\n\x13tasks_dispatch_rate\x18\x04 \x01(\x02"\xac\x01\n\x0fTaskQueueStatus\x12\x1a\n\x12\x62\x61\x63klog_count_hint\x18\x01 \x01(\x03\x12\x12\n\nread_level\x18\x02 \x01(\x03\x12\x11\n\tack_level\x18\x03 \x01(\x03\x12\x17\n\x0frate_per_second\x18\x04 \x01(\x01\x12=\n\rtask_id_block\x18\x05 \x01(\x0b\x32&.temporal.api.taskqueue.v1.TaskIdBlock"/\n\x0bTaskIdBlock\x12\x10\n\x08start_id\x18\x01 \x01(\x03\x12\x0e\n\x06\x65nd_id\x18\x02 \x01(\x03"B\n\x1aTaskQueuePartitionMetadata\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x17\n\x0fowner_host_name\x18\x02 \x01(\t"\x9a\x02\n\nPollerInfo\x12\x34\n\x10last_access_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x10\n\x08identity\x18\x02 \x01(\t\x12\x17\n\x0frate_per_second\x18\x03 \x01(\x01\x12Z\n\x1bworker_version_capabilities\x18\x04 \x01(\x0b\x32\x31.temporal.api.common.v1.WorkerVersionCapabilitiesB\x02\x18\x01\x12O\n\x12\x64\x65ployment_options\x18\x05 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentOptions"\x9a\x01\n\x19StickyExecutionAttributes\x12?\n\x11worker_task_queue\x18\x01 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12<\n\x19schedule_to_start_timeout\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration")\n\x14\x43ompatibleVersionSet\x12\x11\n\tbuild_ids\x18\x01 \x03(\t"j\n\x15TaskQueueReachability\x12\x12\n\ntask_queue\x18\x01 \x01(\t\x12=\n\x0creachability\x18\x02 \x03(\x0e\x32\'.temporal.api.enums.v1.TaskReachability"z\n\x13\x42uildIdReachability\x12\x10\n\x08\x62uild_id\x18\x01 \x01(\t\x12Q\n\x17task_queue_reachability\x18\x02 \x03(\x0b\x32\x30.temporal.api.taskqueue.v1.TaskQueueReachability"+\n\x10RampByPercentage\x12\x17\n\x0framp_percentage\x18\x01 \x01(\x02"\x80\x01\n\x15\x42uildIdAssignmentRule\x12\x17\n\x0ftarget_build_id\x18\x01 \x01(\t\x12\x46\n\x0fpercentage_ramp\x18\x03 \x01(\x0b\x32+.temporal.api.taskqueue.v1.RampByPercentageH\x00\x42\x06\n\x04ramp"Q\n\x1d\x43ompatibleBuildIdRedirectRule\x12\x17\n\x0fsource_build_id\x18\x01 \x01(\t\x12\x17\n\x0ftarget_build_id\x18\x02 \x01(\t"\x93\x01\n TimestampedBuildIdAssignmentRule\x12>\n\x04rule\x18\x01 \x01(\x0b\x32\x30.temporal.api.taskqueue.v1.BuildIdAssignmentRule\x12/\n\x0b\x63reate_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\xa3\x01\n(TimestampedCompatibleBuildIdRedirectRule\x12\x46\n\x04rule\x18\x01 \x01(\x0b\x32\x38.temporal.api.taskqueue.v1.CompatibleBuildIdRedirectRule\x12/\n\x0b\x63reate_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp">\n\x15PollerScalingDecision\x12%\n\x1dpoll_request_delta_suggestion\x18\x01 \x01(\x05"(\n\tRateLimit\x12\x1b\n\x13requests_per_second\x18\x01 \x01(\x02"j\n\x0e\x43onfigMetadata\x12\x0e\n\x06reason\x18\x01 \x01(\t\x12\x17\n\x0fupdate_identity\x18\x02 \x01(\t\x12/\n\x0bupdate_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\x88\x01\n\x0fRateLimitConfig\x12\x38\n\nrate_limit\x18\x01 \x01(\x0b\x32$.temporal.api.taskqueue.v1.RateLimit\x12;\n\x08metadata\x18\x02 \x01(\x0b\x32).temporal.api.taskqueue.v1.ConfigMetadata"\xad\x01\n\x0fTaskQueueConfig\x12\x44\n\x10queue_rate_limit\x18\x01 \x01(\x0b\x32*.temporal.api.taskqueue.v1.RateLimitConfig\x12T\n fairness_keys_rate_limit_default\x18\x02 \x01(\x0b\x32*.temporal.api.taskqueue.v1.RateLimitConfigB\x98\x01\n\x1cio.temporal.api.taskqueue.v1B\x0cMessageProtoP\x01Z)go.temporal.io/api/taskqueue/v1;taskqueue\xaa\x02\x1bTemporalio.Api.TaskQueue.V1\xea\x02\x1eTemporalio::Api::TaskQueue::V1b\x06proto3'
 )
 
 
@@ -69,6 +69,10 @@ _TIMESTAMPEDCOMPATIBLEBUILDIDREDIRECTRULE = DESCRIPTOR.message_types_by_name[
     "TimestampedCompatibleBuildIdRedirectRule"
 ]
 _POLLERSCALINGDECISION = DESCRIPTOR.message_types_by_name["PollerScalingDecision"]
+_RATELIMIT = DESCRIPTOR.message_types_by_name["RateLimit"]
+_CONFIGMETADATA = DESCRIPTOR.message_types_by_name["ConfigMetadata"]
+_RATELIMITCONFIG = DESCRIPTOR.message_types_by_name["RateLimitConfig"]
+_TASKQUEUECONFIG = DESCRIPTOR.message_types_by_name["TaskQueueConfig"]
 TaskQueue = _reflection.GeneratedProtocolMessageType(
     "TaskQueue",
     (_message.Message,),
@@ -310,6 +314,50 @@ PollerScalingDecision = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(PollerScalingDecision)
 
+RateLimit = _reflection.GeneratedProtocolMessageType(
+    "RateLimit",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _RATELIMIT,
+        "__module__": "temporal.api.taskqueue.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.RateLimit)
+    },
+)
+_sym_db.RegisterMessage(RateLimit)
+
+ConfigMetadata = _reflection.GeneratedProtocolMessageType(
+    "ConfigMetadata",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _CONFIGMETADATA,
+        "__module__": "temporal.api.taskqueue.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.ConfigMetadata)
+    },
+)
+_sym_db.RegisterMessage(ConfigMetadata)
+
+RateLimitConfig = _reflection.GeneratedProtocolMessageType(
+    "RateLimitConfig",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _RATELIMITCONFIG,
+        "__module__": "temporal.api.taskqueue.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.RateLimitConfig)
+    },
+)
+_sym_db.RegisterMessage(RateLimitConfig)
+
+TaskQueueConfig = _reflection.GeneratedProtocolMessageType(
+    "TaskQueueConfig",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _TASKQUEUECONFIG,
+        "__module__": "temporal.api.taskqueue.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.taskqueue.v1.TaskQueueConfig)
+    },
+)
+_sym_db.RegisterMessage(TaskQueueConfig)
+
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\034io.temporal.api.taskqueue.v1B\014MessageProtoP\001Z)go.temporal.io/api/taskqueue/v1;taskqueue\252\002\033Temporalio.Api.TaskQueue.V1\352\002\036Temporalio::Api::TaskQueue::V1"
@@ -371,4 +419,12 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _TIMESTAMPEDCOMPATIBLEBUILDIDREDIRECTRULE._serialized_end = 3071
     _POLLERSCALINGDECISION._serialized_start = 3073
     _POLLERSCALINGDECISION._serialized_end = 3135
+    _RATELIMIT._serialized_start = 3137
+    _RATELIMIT._serialized_end = 3177
+    _CONFIGMETADATA._serialized_start = 3179
+    _CONFIGMETADATA._serialized_end = 3285
+    _RATELIMITCONFIG._serialized_start = 3288
+    _RATELIMITCONFIG._serialized_end = 3424
+    _TASKQUEUECONFIG._serialized_start = 3427
+    _TASKQUEUECONFIG._serialized_end = 3600
 # @@protoc_insertion_point(module_scope)
