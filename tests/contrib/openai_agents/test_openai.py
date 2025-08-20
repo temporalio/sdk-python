@@ -89,7 +89,6 @@ from temporalio.common import RetryPolicy
 from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents import (
     ModelActivityParameters,
-    StatelessMCPServer,
     TestModel,
     TestModelProvider,
 )
@@ -2117,11 +2116,11 @@ async def test_stateful_mcp_server(
     if sys.version_info < (3, 10):
         pytest.skip("Mcp not supported on Python 3.9")
     from agents.mcp import MCPServer
-    from mcp import GetPromptResult, ListPromptsResult
-    from mcp import Tool as MCPTool
-    from mcp.types import CallToolResult, TextContent
+    from mcp import GetPromptResult, ListPromptsResult  # type: ignore
+    from mcp import Tool as MCPTool  # type: ignore
+    from mcp.types import CallToolResult, TextContent  # type: ignore
 
-    from temporalio.contrib.openai_agents import StatefulMCPServer
+    from temporalio.contrib.openai_agents import StatefulMCPServer, StatelessMCPServer
 
     class TrackingMCPServer(MCPServer):
         calls: list[str]
