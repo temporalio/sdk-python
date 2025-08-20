@@ -19,6 +19,7 @@ import nexusrpc
 import pytest
 from agents import (
     Agent,
+    AgentBase,
     AgentOutputSchemaBase,
     CodeInterpreterTool,
     FileSearchTool,
@@ -88,6 +89,7 @@ from temporalio.common import RetryPolicy
 from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents import (
     ModelActivityParameters,
+    StatelessMCPServer,
     TestModel,
     TestModelProvider,
 )
@@ -2053,91 +2055,19 @@ async def test_hosted_mcp_tool(client: Client, use_local_model):
 @workflow.defn
 class McpServerWorkflow:
     @workflow.run
-    async def run(self, question: str) -> str:
+    async def run(self, timeout: timedelta) -> str:
         from agents.mcp import MCPServer
 
-        server: MCPServer = openai_agents.workflow.stateless_mcp_server(
-            "Filesystem-Server"
-        )
+        server: MCPServer = openai_agents.workflow.stateless_mcp_server("HelloServer")
         agent = Agent[str](
             name="MCP ServerWorkflow",
-            instructions="Use the tools to read the filesystem and answer questions based on those files.",
+            instructions="Use the tools to assist the customer.",
             mcp_servers=[server],
         )
-        result = await Runner.run(starting_agent=agent, input=question)
+        result = await Runner.run(
+            starting_agent=agent, input="Say hello to Tom and Tim."
+        )
         return result.final_output
-
-
-class McpServerModel(StaticTestModel):
-    responses = [
-        ResponseBuilders.tool_call(
-            arguments='{"path":"/"}',
-            name="list_directory",
-        ),
-        ResponseBuilders.tool_call(
-            arguments="{}",
-            name="list_allowed_directories",
-        ),
-        ResponseBuilders.tool_call(
-            arguments='{"path":"."}',
-            name="list_directory",
-        ),
-        ResponseBuilders.output_message(
-            "Here are the files and directories in the allowed path."
-        ),
-    ]
-
-
-@pytest.mark.parametrize("use_local_model", [True, False])
-async def test_stateless_mcp_server(client: Client, use_local_model: bool):
-    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
-        pytest.skip("No openai API key")
-
-    if sys.version_info < (3, 10):
-        pytest.skip("Mcp not supported on Python 3.9")
-    from agents.mcp import MCPServerStdio
-
-    from temporalio.contrib.openai_agents import StatelessTemporalMCPServer
-
-    server = StatelessTemporalMCPServer(
-        MCPServerStdio(
-            name="Filesystem-Server",
-            params={
-                "command": "npx",
-                "args": [
-                    "-y",
-                    "@modelcontextprotocol/server-filesystem",
-                    os.path.dirname(os.path.abspath(__file__)),
-                ],
-            },
-        )
-    )
-
-    new_config = client.config()
-    new_config["plugins"] = [
-        openai_agents.OpenAIAgentsPlugin(
-            model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=120)
-            ),
-            model_provider=TestModelProvider(McpServerModel())
-            if use_local_model
-            else None,
-            mcp_servers=[server],
-        )
-    ]
-    client = Client(**new_config)
-
-    async with new_worker(client, McpServerWorkflow) as worker:
-        workflow_handle = await client.start_workflow(
-            McpServerWorkflow.run,
-            "Read the files and list them.",
-            id=f"mcp-server-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
-        )
-        result = await workflow_handle.result()
-        if use_local_model:
-            assert result == "Here are the files and directories in the allowed path."
 
 
 @workflow.defn
@@ -2145,7 +2075,7 @@ class McpServerStatefulWorkflow:
     @workflow.run
     async def run(self, timeout: timedelta) -> str:
         async with openai_agents.workflow.stateful_mcp_server(
-            "Filesystem-Server",
+            "HelloServer",
             config=ActivityConfig(
                 schedule_to_start_timeout=timeout,
                 start_to_close_timeout=timedelta(seconds=30),
@@ -2153,38 +2083,106 @@ class McpServerStatefulWorkflow:
         ) as server:
             agent = Agent[str](
                 name="MCP ServerWorkflow",
-                instructions="Use the tools to read the filesystem and answer questions based on those files.",
+                instructions="Use the tools to assist the customer.",
                 mcp_servers=[server],
             )
             result = await Runner.run(
-                starting_agent=agent, input="Read the files and list them."
+                starting_agent=agent, input="Say hello to Tom and Tim."
             )
             return result.final_output
 
 
+class TrackingMCPModel(StaticTestModel):
+    responses = [
+        ResponseBuilders.tool_call(
+            arguments='{"name":"Tom"}',
+            name="Say-Hello",
+        ),
+        ResponseBuilders.tool_call(
+            arguments='{"name":"Tim"}',
+            name="Say-Hello",
+        ),
+        ResponseBuilders.output_message("Hi Tom and Tim!"),
+    ]
+
+
 @pytest.mark.parametrize("use_local_model", [True, False])
-async def test_stateful_mcp_server(client: Client, use_local_model: bool):
+@pytest.mark.parametrize("stateful", [True, False])
+async def test_stateful_mcp_server(
+    client: Client, use_local_model: bool, stateful: bool
+):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
 
     if sys.version_info < (3, 10):
         pytest.skip("Mcp not supported on Python 3.9")
-    from agents.mcp import MCPServerStdio
+    from agents.mcp import MCPServer
+    from mcp import GetPromptResult, ListPromptsResult
+    from mcp import Tool as MCPTool
+    from mcp.types import CallToolResult, TextContent
 
-    from temporalio.contrib.openai_agents import StatefulTemporalMCPServer
+    from temporalio.contrib.openai_agents import StatefulMCPServer
 
-    server = StatefulTemporalMCPServer(
-        MCPServerStdio(
-            name="Filesystem-Server",
-            params={
-                "command": "npx",
-                "args": [
-                    "-y",
-                    "@modelcontextprotocol/server-filesystem",
-                    os.path.dirname(os.path.abspath(__file__)),
-                ],
-            },
-        )
+    class TrackingMCPServer(MCPServer):
+        calls: list[str]
+
+        def __init__(self, name: str):
+            self._name = name
+            self.calls = []
+            super().__init__()
+
+        async def connect(self):
+            self.calls.append("connect")
+
+        @property
+        def name(self) -> str:
+            return self._name
+
+        async def cleanup(self):
+            self.calls.append("cleanup")
+
+        async def list_tools(
+            self,
+            run_context: Optional[RunContextWrapper[Any]] = None,
+            agent: Optional[AgentBase] = None,
+        ) -> list[MCPTool]:
+            self.calls.append("list_tools")
+            return [
+                MCPTool(
+                    name="Say-Hello",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                        },
+                        "required": ["name"],
+                        "$schema": "http://json-schema.org/draft-07/schema#",
+                    },
+                )
+            ]
+
+        async def call_tool(
+            self, tool_name: str, arguments: Optional[dict[str, Any]]
+        ) -> CallToolResult:
+            self.calls.append("call_tool")
+            name = (arguments or {}).get("name") or "John Doe"
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Hello {name}")]
+            )
+
+        async def list_prompts(self) -> ListPromptsResult:
+            raise NotImplementedError()
+
+        async def get_prompt(
+            self, name: str, arguments: Optional[dict[str, Any]] = None
+        ) -> GetPromptResult:
+            raise NotImplementedError()
+
+    tracking_server = TrackingMCPServer(name="HelloServer")
+    server: Union[StatefulMCPServer, StatelessMCPServer] = (
+        StatefulMCPServer(tracking_server)
+        if stateful
+        else StatelessMCPServer(tracking_server)
     )
 
     new_config = client.config()
@@ -2193,7 +2191,7 @@ async def test_stateful_mcp_server(client: Client, use_local_model: bool):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=120)
             ),
-            model_provider=TestModelProvider(McpServerModel())
+            model_provider=TestModelProvider(TrackingMCPModel())
             if use_local_model
             else None,
             mcp_servers=[server],
@@ -2202,19 +2200,56 @@ async def test_stateful_mcp_server(client: Client, use_local_model: bool):
     client = Client(**new_config)
 
     async with new_worker(
-        client,
-        McpServerStatefulWorkflow,
+        client, McpServerStatefulWorkflow, McpServerWorkflow
     ) as worker:
-        workflow_handle = await client.start_workflow(
-            McpServerStatefulWorkflow.run,
-            timedelta(seconds=30),
-            id=f"mcp-server-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
-        )
-        result = await workflow_handle.result()
+        if stateful:
+            result = client.execute_workflow(
+                McpServerStatefulWorkflow.run,
+                timedelta(seconds=30),
+                id=f"mcp-server-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+        else:
+            result = client.execute_workflow(
+                McpServerWorkflow.run,
+                timedelta(seconds=30),
+                id=f"mcp-server-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
         if use_local_model:
-            assert result == "Here are the files and directories in the allowed path."
+            assert result == "Hi Tom and Tim!"
+    if use_local_model:
+        print(tracking_server.calls)
+        if stateful:
+            assert tracking_server.calls == [
+                "connect",
+                "list_tools",
+                "call_tool",
+                "list_tools",
+                "call_tool",
+                "list_tools",
+                "cleanup",
+            ]
+        else:
+            assert tracking_server.calls == [
+                "connect",
+                "list_tools",
+                "cleanup",
+                "connect",
+                "call_tool",
+                "cleanup",
+                "connect",
+                "list_tools",
+                "cleanup",
+                "connect",
+                "call_tool",
+                "cleanup",
+                "connect",
+                "list_tools",
+                "cleanup",
+            ]
 
 
 async def test_stateful_mcp_server_no_worker(client: Client):
@@ -2222,9 +2257,9 @@ async def test_stateful_mcp_server_no_worker(client: Client):
         pytest.skip("Mcp not supported on Python 3.9")
     from agents.mcp import MCPServerStdio
 
-    from temporalio.contrib.openai_agents import StatefulTemporalMCPServer
+    from temporalio.contrib.openai_agents import StatefulMCPServer
 
-    server = StatefulTemporalMCPServer(
+    server = StatefulMCPServer(
         MCPServerStdio(
             name="Filesystem-Server",
             params={
@@ -2254,7 +2289,7 @@ async def test_stateful_mcp_server_no_worker(client: Client):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=120)
             ),
-            model_provider=TestModelProvider(McpServerModel()),
+            model_provider=TestModelProvider(TrackingMCPModel()),
             mcp_servers=[server],
         )
     ]

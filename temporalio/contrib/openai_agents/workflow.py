@@ -258,10 +258,10 @@ def stateless_mcp_server(
     superior durability guarantees.
     """
     from temporalio.contrib.openai_agents._mcp import (
-        _StatelessTemporalMCPServerReference,
+        _StatelessMCPServerReference,
     )
 
-    return _StatelessTemporalMCPServerReference(name, config)
+    return _StatelessMCPServerReference(name, config)
 
 
 def stateful_mcp_server(
@@ -294,10 +294,10 @@ def stateful_mcp_server(
                        Defaults to 1-hour start-to-close timeout.
     """
     from temporalio.contrib.openai_agents._mcp import (
-        _StatefulTemporalMCPServerReference,
+        _StatefulMCPServerReference,
     )
 
-    return _StatefulTemporalMCPServerReference(name, config, server_session_config)
+    return _StatefulMCPServerReference(name, config, server_session_config)
 
 
 class ToolSerializationError(TemporalError):

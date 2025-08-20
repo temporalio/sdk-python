@@ -11,8 +11,8 @@ This module provides compatibility between the
 # Best Effort mcp, as it is not supported on Python 3.9
 try:
     from temporalio.contrib.openai_agents._mcp import (
-        StatefulTemporalMCPServer,
-        StatelessTemporalMCPServer,
+        StatefulMCPServer,
+        StatelessMCPServer,
     )
 except ImportError:
     pass
@@ -33,8 +33,8 @@ __all__ = [
     "OpenAIAgentsPlugin",
     "ModelActivityParameters",
     "workflow",
-    "StatelessTemporalMCPServer",
-    "StatefulTemporalMCPServer",
+    "StatelessMCPServer",
+    "StatefulMCPServer",
     "TestModel",
     "TestModelProvider",
 ]

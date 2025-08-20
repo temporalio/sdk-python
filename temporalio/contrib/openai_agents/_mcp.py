@@ -24,7 +24,7 @@ from temporalio.workflow import ActivityConfig, ActivityHandle
 logger = logging.getLogger(__name__)
 
 
-class _StatelessTemporalMCPServerReference(MCPServer):
+class _StatelessMCPServerReference(MCPServer):
     def __init__(self, server: str, config: Optional[ActivityConfig] = None):
         self._name = server + "-stateless"
         self._config = config or ActivityConfig(
@@ -83,7 +83,7 @@ class _StatelessTemporalMCPServerReference(MCPServer):
         )
 
 
-class StatelessTemporalMCPServer:
+class StatelessMCPServer:
     """A stateless MCP server implementation for Temporal workflows.
 
     This class wraps an MCP server to make it stateless by executing each MCP operation
@@ -180,7 +180,7 @@ def _handle_worker_failure(func):
     return wrapper
 
 
-class _StatefulTemporalMCPServerReference(MCPServer, AbstractAsyncContextManager):
+class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
     def __init__(
         self,
         server: str,
@@ -266,7 +266,7 @@ class _StatefulTemporalMCPServerReference(MCPServer, AbstractAsyncContextManager
         )
 
 
-class StatefulTemporalMCPServer:
+class StatefulMCPServer:
     """A stateful MCP server implementation for Temporal workflows.
 
     This class wraps an MCP server to maintain a persistent connection throughout
@@ -343,6 +343,7 @@ class StatefulTemporalMCPServer:
 
                 await worker.run()
             finally:
+                print("Cleanup")
                 await self._server.cleanup()
                 heartbeat_task.cancel()
                 try:

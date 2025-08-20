@@ -57,16 +57,16 @@ class TemporalOpenAIRunner(AgentRunner):
 
         if starting_agent.mcp_servers:
             from temporalio.contrib.openai_agents._mcp import (
-                _StatefulTemporalMCPServerReference,
-                _StatelessTemporalMCPServerReference,
+                _StatefulMCPServerReference,
+                _StatelessMCPServerReference,
             )
 
             for s in starting_agent.mcp_servers:
                 if not isinstance(
                     s,
                     (
-                        _StatelessTemporalMCPServerReference,
-                        _StatefulTemporalMCPServerReference,
+                        _StatelessMCPServerReference,
+                        _StatefulMCPServerReference,
                     ),
                 ):
                     raise ValueError(
