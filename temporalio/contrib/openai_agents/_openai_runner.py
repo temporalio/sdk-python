@@ -69,10 +69,8 @@ class TemporalOpenAIRunner(AgentRunner):
                         _StatefulTemporalMCPServerReference,
                     ),
                 ):
-                    warnings.warn(
-                        "Unknown mcp_server type {} may not work durably.".format(
-                            type(s)
-                        )
+                    raise ValueError(
+                        f"Unknown mcp_server type {type(s)} may not work durably."
                     )
 
         # workaround for https://github.com/pydantic/pydantic/issues/9541
