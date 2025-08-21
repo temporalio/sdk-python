@@ -982,7 +982,7 @@ class Priority:
     2. Then consider "fairness_key" and "fairness_weight" for fairness balancing.
     """
 
-    priority_key: Optional[int]
+    priority_key: Optional[int] = None
     """Priority key is a positive integer from 1 to n, where smaller integers correspond to higher
     priorities (tasks run sooner). In general, tasks in a queue should be processed in close to
     priority order, although small deviations are possible.
@@ -997,22 +997,22 @@ class Priority:
     fairness_key: Optional[str] = None
     """A short string (max 64 bytes) that is used as a key for a fairness balancing mechanism.
     This can correspond to a tenant id or even fixed strings like "high", "low", etc.
-    
+
     The fairness mechanism attempts to dispatch tasks for a given key in proportion to its weight.
-    For example, using a thousand distinct tenant ids, each with a weight of 1.0 will result in 
+    For example, using a thousand distinct tenant ids, each with a weight of 1.0 will result in
     each tenant getting a roughly equal share of task dispatch throughput.
-    
+
     Default is an empty string.
     """
 
     fairness_weight: Optional[float] = None
     """A float that represents the weight for task dispatch for the associated fairness key.
     Tasks for a fairness key are dispatched in proportion to their weight.
-    
+
     Server will clamp the values between 0.001 and 1000. Default weight is 1.0.
-    
+
     The effective weight of a task is determined by the following precedence (highest to lowest):
-    1. Weights overridden in task queue configuration 
+    1. Weights overridden in task queue configuration
     2. Weights attached to workflow/activity
     3. Default weight of 1.0
     """
