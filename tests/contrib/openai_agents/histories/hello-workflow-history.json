@@ -96,7 +96,7 @@
       "activityTaskScheduledEventAttributes": {
         "activityId": "1",
         "activityType": {
-          "name": "invoke_model_activity"
+          "name": "invoke_model"
         },
         "taskQueue": {
           "name": "5dd7a6ba-834c-4206-bcbc-a02599f1b54c",
