@@ -96,7 +96,7 @@
       "activityTaskScheduledEventAttributes": {
         "activityId": "1",
         "activityType": {
-          "name": "invoke_model_activity"
+          "name": "invoke_model"
         },
         "taskQueue": {
           "name": "98bba13c-e75a-446d-a2f8-077680fb23af",
@@ -362,7 +362,7 @@
       "activityTaskScheduledEventAttributes": {
         "activityId": "3",
         "activityType": {
-          "name": "invoke_model_activity"
+          "name": "invoke_model"
         },
         "taskQueue": {
           "name": "98bba13c-e75a-446d-a2f8-077680fb23af",

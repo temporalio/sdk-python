@@ -160,7 +160,7 @@ class ModelActivity:
 
     @activity.defn
     @_auto_heartbeater
-    async def invoke_model_activity(self, input: ActivityModelInput) -> ModelResponse:
+    async def invoke_model(self, input: ActivityModelInput) -> ModelResponse:
         """Activity that invokes a model with the given input."""
         model = self._model_provider.get_model(input.get("model_name"))
 

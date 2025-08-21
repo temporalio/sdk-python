@@ -282,7 +282,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
             OpenAIAgentsTracingInterceptor()
         ]
         config["activities"] = list(config.get("activities") or []) + [
-            ModelActivity(self._model_provider).invoke_model_activity
+            ModelActivity(self._model_provider).invoke_model,
         ]
         return self.next_worker_plugin.configure_worker(config)
 

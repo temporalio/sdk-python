@@ -96,7 +96,7 @@
       "activityTaskScheduledEventAttributes": {
         "activityId": "1",
         "activityType": {
-          "name": "invoke_model_activity"
+          "name": "invoke_model"
         },
         "taskQueue": {
           "name": "e488932b-c66d-48b6-97cb-7b8feaa1c41c",
@@ -151,7 +151,7 @@
       "activityTaskScheduledEventAttributes": {
         "activityId": "2",
         "activityType": {
-          "name": "invoke_model_activity"
+          "name": "invoke_model"
         },
         "taskQueue": {
           "name": "e488932b-c66d-48b6-97cb-7b8feaa1c41c",
@@ -370,7 +370,7 @@
       "activityTaskScheduledEventAttributes": {
         "activityId": "3",
         "activityType": {
-          "name": "invoke_model_activity"
+          "name": "invoke_model"
         },
         "taskQueue": {
           "name": "e488932b-c66d-48b6-97cb-7b8feaa1c41c",
@@ -425,7 +425,7 @@
       "activityTaskScheduledEventAttributes": {
         "activityId": "4",
         "activityType": {
-          "name": "invoke_model_activity"
+          "name": "invoke_model"
         },
         "taskQueue": {
           "name": "e488932b-c66d-48b6-97cb-7b8feaa1c41c",
