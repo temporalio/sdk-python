@@ -153,7 +153,7 @@ class _TemporalModelStub(Model):
             summary = None
 
         return await workflow.execute_activity_method(
-            ModelActivity.invoke_model_activity,
+            ModelActivity.invoke_model,
             activity_input,
             summary=summary,
             task_queue=self.model_params.task_queue,
