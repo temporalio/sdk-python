@@ -7,10 +7,12 @@ from typing import AsyncIterator, cast
 import pytest
 
 import temporalio.client
+import temporalio.plugin
 import temporalio.worker
 from temporalio import workflow
-from temporalio.client import Client, ClientConfig, OutboundInterceptor, Plugin
+from temporalio.client import Client, ClientConfig, LowLevelPlugin, OutboundInterceptor
 from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.plugin import PluginConfig
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     Replayer,
@@ -33,11 +35,11 @@ class TestClientInterceptor(temporalio.client.Interceptor):
         return super().intercept_client(next)
 
 
-class MyClientPlugin(temporalio.client.Plugin):
+class MyClientPlugin(temporalio.client.LowLevelPlugin):
     def __init__(self):
         self.interceptor = TestClientInterceptor()
 
-    def init_client_plugin(self, next: Plugin) -> None:
+    def init_client_plugin(self, next: LowLevelPlugin) -> None:
         self.next_client_plugin = next
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
@@ -72,11 +74,13 @@ async def test_client_plugin(client: Client, env: WorkflowEnvironment):
     assert new_client.service_client.config.api_key == "replaced key"
 
 
-class MyCombinedPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
-    def init_worker_plugin(self, next: temporalio.worker.Plugin) -> None:
+class MyCombinedPlugin(
+    temporalio.client.LowLevelPlugin, temporalio.worker.LowLevelPlugin
+):
+    def init_worker_plugin(self, next: temporalio.worker.LowLevelPlugin) -> None:
         self.next_worker_plugin = next
 
-    def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
+    def init_client_plugin(self, next: temporalio.client.LowLevelPlugin) -> None:
         self.next_client_plugin = next
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
@@ -105,8 +109,8 @@ class MyCombinedPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         return self.next_worker_plugin.run_replayer(replayer, histories)
 
 
-class MyWorkerPlugin(temporalio.worker.Plugin):
-    def init_worker_plugin(self, next: temporalio.worker.Plugin) -> None:
+class MyWorkerPlugin(temporalio.worker.LowLevelPlugin):
+    def init_worker_plugin(self, next: temporalio.worker.LowLevelPlugin) -> None:
         self.next_worker_plugin = next
 
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
@@ -192,11 +196,13 @@ async def test_worker_sandbox_restrictions(client: Client) -> None:
     )
 
 
-class ReplayCheckPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
-    def init_worker_plugin(self, next: temporalio.worker.Plugin) -> None:
+class ReplayCheckPlugin(
+    temporalio.client.LowLevelPlugin, temporalio.worker.LowLevelPlugin
+):
+    def init_worker_plugin(self, next: temporalio.worker.LowLevelPlugin) -> None:
         self.next_worker_plugin = next
 
-    def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
+    def init_client_plugin(self, next: temporalio.client.LowLevelPlugin) -> None:
         self.next_client_plugin = next
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
@@ -256,3 +262,31 @@ async def test_replay(client: Client) -> None:
     assert replayer.config().get("data_converter") == pydantic_data_converter
 
     await replayer.replay_workflow(await handle.fetch_history())
+
+
+class SimplePlugin(temporalio.plugin.Plugin):
+    @asynccontextmanager
+    async def run_context(self) -> AsyncIterator[None]:
+        yield
+
+    def configuration(self) -> PluginConfig:
+        return PluginConfig(
+            data_converter=pydantic_data_converter,
+            workflows=[HelloWorkflow],
+        )
+
+
+async def test_simple_plugin(client: Client) -> None:
+    plugin = SimplePlugin()
+    new_config = client.config()
+    new_config["plugins"] = [plugin]
+    client = Client(**new_config)
+
+    async with new_worker(client) as worker:
+        handle = await client.start_workflow(
+            HelloWorkflow.run,
+            "Tim",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()

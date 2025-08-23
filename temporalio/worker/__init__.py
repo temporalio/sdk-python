@@ -21,7 +21,7 @@ from ._interceptor import (
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
-from ._plugin import Plugin
+from ._plugin import LowLevelPlugin
 from ._replayer import (
     Replayer,
     ReplayerConfig,
@@ -79,7 +79,7 @@ __all__ = [
     "ActivityOutboundInterceptor",
     "WorkflowInboundInterceptor",
     "WorkflowOutboundInterceptor",
-    "Plugin",
+    "LowLevelPlugin",
     # Interceptor input
     "ContinueAsNewInput",
     "ExecuteActivityInput",

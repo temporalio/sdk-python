@@ -38,7 +38,7 @@ from temporalio.common import (
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
 from ._nexus import _NexusWorker
-from ._plugin import Plugin, _RootPlugin
+from ._plugin import LowLevelPlugin, _RootPlugin
 from ._tuning import WorkerTuner
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
@@ -111,7 +111,7 @@ class Worker:
         nexus_task_executor: Optional[concurrent.futures.Executor] = None,
         workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
         unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
-        plugins: Sequence[Plugin] = [],
+        plugins: Sequence[LowLevelPlugin] = [],
         interceptors: Sequence[Interceptor] = [],
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
@@ -362,8 +362,8 @@ class Worker:
         )
 
         plugins_from_client = cast(
-            List[Plugin],
-            [p for p in client.config()["plugins"] if isinstance(p, Plugin)],
+            List[LowLevelPlugin],
+            [p for p in client.config()["plugins"] if isinstance(p, LowLevelPlugin)],
         )
         for client_plugin in plugins_from_client:
             if type(client_plugin) in [type(p) for p in plugins]:
@@ -372,7 +372,7 @@ class Worker:
                 )
         plugins = plugins_from_client + list(plugins)
 
-        root_plugin: Plugin = _RootPlugin()
+        root_plugin: LowLevelPlugin = _RootPlugin()
         for plugin in reversed(plugins):
             plugin.init_worker_plugin(root_plugin)
             root_plugin = plugin
