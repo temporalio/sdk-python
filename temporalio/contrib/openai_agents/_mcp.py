@@ -343,7 +343,6 @@ class StatefulMCPServer:
 
                 await worker.run()
             finally:
-                print("Cleanup")
                 await self._server.cleanup()
                 heartbeat_task.cancel()
                 try:
