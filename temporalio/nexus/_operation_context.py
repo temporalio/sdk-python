@@ -49,6 +49,10 @@ _temporal_cancel_operation_context: ContextVar[_TemporalCancelOperationContext] 
     ContextVar("temporal-cancel-operation-context")
 )
 
+# A Nexus start handler might start zero or more workflows as usual using a Temporal client. In
+# addition, it may start one "nexus-backing" workflow, using
+# WorkflowRunOperationContext.start_workflow. This context is active while the latter is being done.
+# It is thus a narrower context than _temporal_start_operation_context.
 _temporal_nexus_backing_workflow_start_context: ContextVar[bool] = ContextVar(
     "temporal-nexus-backing-workflow-start-context"
 )
@@ -418,6 +422,12 @@ class WorkflowRunOperationContext(StartOperationContext):
         # We must pass nexus_completion_callbacks, workflow_event_links, and request_id,
         # but these are deliberately not exposed in overloads, hence the type-check
         # violation.
+
+        # Here we are starting a "nexus-backing" workflow. That means that the StartWorkflow request
+        # contains nexus-specific data such as a completion callback (used by the handler server
+        # namespace to deliver the result to the caller namespace when the workflow reaches a
+        # terminal state) and inbound links to the caller workflow (attached to history events of
+        # the workflow started in the handler namespace, and displayed in the UI).
         with _nexus_backing_workflow_start_context():
             wf_handle = await self._temporal_context.client.start_workflow(  # type: ignore
                 workflow=workflow,
