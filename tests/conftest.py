@@ -118,6 +118,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "system.enableDeploymentVersions=true",
                 "--dynamic-config-value",
                 "frontend.activityAPIsEnabled=true",
+                "--dynamic-config-value",
+                "component.nexusoperations.recordCancelRequestCompletionEvents=true",
                 "--http-port",
                 str(http_port),
             ],

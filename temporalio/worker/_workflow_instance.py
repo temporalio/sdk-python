@@ -54,13 +54,13 @@ import temporalio.api.sdk.v1
 import temporalio.bridge.proto.activity_result
 import temporalio.bridge.proto.child_workflow
 import temporalio.bridge.proto.common
+import temporalio.bridge.proto.nexus
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_commands
 import temporalio.bridge.proto.workflow_completion
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
-import temporalio.nexus
 import temporalio.workflow
 from temporalio.service import __version__
 
@@ -881,9 +881,17 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     ) -> None:
         handle = self._pending_nexus_operations.pop(job.seq, None)
         if not handle:
-            raise RuntimeError(
-                f"Failed to find nexus operation handle for job sequence number {job.seq}"
-            )
+            # One way this can occur is:
+            # 1. Cancel request issued with cancellation_type=WaitRequested.
+            # 2. Server receives nexus cancel handler task completion and writes
+            #    NexusOperationCancelRequestCompleted / NexusOperationCancelRequestFailed. On
+            #    consuming this event, core sends an activation resolving the handle future as
+            #    completed / failed.
+            # 4. Subsequently, the nexus operation completes as completed/failed, causing the server
+            #    to write NexusOperationCompleted / NexusOperationFailed. On consuming this event,
+            #    core sends an activation which would attempt to resolve the handle future as
+            #    completed / failed, but it has already been resolved.
+            return
 
         # Handle the four oneof variants of NexusOperationResult
         result = job.result
@@ -1500,9 +1508,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         service: str,
         operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
         input: Any,
-        output_type: Optional[Type[OutputT]] = None,
-        schedule_to_close_timeout: Optional[timedelta] = None,
-        headers: Optional[Mapping[str, str]] = None,
+        output_type: Optional[Type[OutputT]],
+        schedule_to_close_timeout: Optional[timedelta],
+        cancellation_type: temporalio.workflow.NexusOperationCancellationType,
+        headers: Optional[Mapping[str, str]],
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
         # start_nexus_operation
         return await self._outbound.start_nexus_operation(
@@ -1513,6 +1522,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 input=input,
                 output_type=output_type,
                 schedule_to_close_timeout=schedule_to_close_timeout,
+                cancellation_type=cancellation_type,
                 headers=headers,
             )
         )
@@ -1824,20 +1834,19 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     async def _outbound_start_nexus_operation(
         self, input: StartNexusOperationInput[Any, OutputT]
     ) -> _NexusOperationHandle[OutputT]:
-        # A Nexus operation handle contains two futures: self._start_fut is resolved as a
-        # result of the Nexus operation starting (activation job:
-        # resolve_nexus_operation_start), and self._result_fut is resolved as a result of
-        # the Nexus operation completing (activation job: resolve_nexus_operation). The
-        # handle itself corresponds to an asyncio.Task which waits on self.result_fut,
-        # handling CancelledError by emitting a RequestCancelNexusOperation command. We do
-        # not return the handle until we receive resolve_nexus_operation_start, like
-        # ChildWorkflowHandle and unlike ActivityHandle. Note that a Nexus operation may
-        # complete synchronously (in which case both jobs will be sent in the same
-        # activation, and start will be resolved without an operation token), or
-        # asynchronously (in which case start they may be sent in separate activations,
-        # and start will be resolved with an operation token). See comments in
-        # tests/worker/test_nexus.py for worked examples of the evolution of the resulting
-        # handle state machine in the sync and async Nexus response cases.
+        # A Nexus operation handle contains two futures: self._start_fut is resolved as a result of
+        # the Nexus operation starting (activation job: resolve_nexus_operation_start), and
+        # self._result_fut is resolved as a result of the Nexus operation completing (activation
+        # job: resolve_nexus_operation). The handle itself corresponds to an asyncio.Task which
+        # waits on self.result_fut, handling CancelledError by emitting a
+        # RequestCancelNexusOperation command. We do not return the handle until we receive
+        # resolve_nexus_operation_start, like ChildWorkflowHandle and unlike ActivityHandle. Note
+        # that a Nexus operation may complete synchronously (in which case both jobs will be sent in
+        # the same activation, and start will be resolved without an operation token), or
+        # asynchronously (in which case they may be sent in separate activations, and start will be
+        # resolved with an operation token). See comments in tests/worker/test_nexus.py for worked
+        # examples of the evolution of the resulting handle state machine in the sync and async
+        # Nexus response cases.
         handle: _NexusOperationHandle[OutputT]
 
         async def operation_handle_fn() -> OutputT:
@@ -2758,7 +2767,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         if self._input.retry_policy:
             self._input.retry_policy.apply_to_proto(v.retry_policy)
         v.cancellation_type = cast(
-            "temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType",
+            temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType,
             int(self._input.cancellation_type),
         )
 
@@ -2894,7 +2903,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         if self._input.task_timeout:
             v.workflow_task_timeout.FromTimedelta(self._input.task_timeout)
         v.parent_close_policy = cast(
-            "temporalio.bridge.proto.child_workflow.ParentClosePolicy.ValueType",
+            temporalio.bridge.proto.child_workflow.ParentClosePolicy.ValueType,
             int(self._input.parent_close_policy),
         )
         v.workflow_id_reuse_policy = cast(
@@ -2916,7 +2925,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
                 self._input.search_attributes, v.search_attributes
             )
         v.cancellation_type = cast(
-            "temporalio.bridge.proto.child_workflow.ChildWorkflowCancellationType.ValueType",
+            temporalio.bridge.proto.child_workflow.ChildWorkflowCancellationType.ValueType,
             int(self._input.cancellation_type),
         )
         if self._input.versioning_intent:
@@ -3012,11 +3021,6 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
 
     @property
     def operation_token(self) -> Optional[str]:
-        # TODO(nexus-preview): How should this behave?
-        # Java has a separate class that only exists if the operation token exists:
-        # https://github.com/temporalio/sdk-java/blob/master/temporal-sdk/src/main/java/io/temporal/internal/sync/NexusOperationExecutionImpl.java#L26
-        # And Go similar:
-        # https://github.com/temporalio/sdk-go/blob/master/internal/workflow.go#L2770-L2771
         try:
             return self._start_fut.result()
         except BaseException:
@@ -3024,13 +3028,6 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
 
     def __await__(self) -> Generator[Any, Any, OutputT]:
         return self._task.__await__()
-
-    def __repr__(self) -> str:
-        return (
-            f"{self._start_fut} "
-            f"{self._result_fut} "
-            f"Task[{self._task._state}] fut_waiter = {self._task._fut_waiter}) ({self._task._must_cancel})"  # type: ignore
-        )
 
     def cancel(self) -> bool:
         return self._task.cancel()
@@ -3065,6 +3062,11 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
             v.schedule_to_close_timeout.FromTimedelta(
                 self._input.schedule_to_close_timeout
             )
+        v.cancellation_type = cast(
+            temporalio.bridge.proto.nexus.NexusOperationCancellationType.ValueType,
+            int(self._input.cancellation_type),
+        )
+
         if self._input.headers:
             for key, val in self._input.headers.items():
                 v.nexus_header[key] = val

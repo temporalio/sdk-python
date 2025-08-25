@@ -3,11 +3,14 @@ import socket
 import time
 import uuid
 from contextlib import closing
-from datetime import timedelta
-from typing import Any, Awaitable, Callable, Optional, Sequence, Type, TypeVar
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Any, Awaitable, Callable, Optional, Sequence, Type, TypeVar, Union
 
 from temporalio.api.common.v1 import WorkflowExecution
+from temporalio.api.enums.v1 import EventType as EventType
 from temporalio.api.enums.v1 import IndexedValueType
+from temporalio.api.history.v1 import HistoryEvent
 from temporalio.api.operatorservice.v1 import (
     AddSearchAttributesRequest,
     ListSearchAttributesRequest,
@@ -21,6 +24,7 @@ from temporalio.api.workflowservice.v1 import (
 )
 from temporalio.client import BuildIdOpAddNewDefault, Client, WorkflowHandle
 from temporalio.common import SearchAttributeKey
+from temporalio.converter import DataConverter
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import Worker, WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
@@ -287,3 +291,113 @@ async def unpause_and_assert(client: Client, handle: WorkflowHandle, activity_id
         return not info.paused
 
     await assert_eventually(check_unpaused)
+
+
+async def print_history(handle: WorkflowHandle):
+    i = 1
+    async for evt in handle.fetch_history_events():
+        event = EventType.Name(evt.event_type).removeprefix("EVENT_TYPE_")
+        print(f"{i:2}: {event}")
+        i += 1
+
+
+@dataclass
+class InterleavedHistoryEvent:
+    handle: WorkflowHandle
+    event: Union[HistoryEvent, str]
+    number: Optional[int]
+    time: datetime
+
+
+async def print_interleaved_histories(
+    handles: list[WorkflowHandle],
+    extra_events: Optional[list[tuple[WorkflowHandle, str, datetime]]] = None,
+) -> None:
+    """
+    Print the interleaved history events from multiple workflow handles in columns.
+
+    A column entry looks like
+
+    <event_num>: <elapsed_ms> <event_type>
+
+    where <elapsed_ms> is the number of milliseconds since the first event in any of the workflows.
+    """
+    all_events: list[InterleavedHistoryEvent] = []
+    workflow_start_times: dict[WorkflowHandle, datetime] = {}
+
+    for handle in handles:
+        event_num = 1
+        first_event = True
+        async for history_event in handle.fetch_history_events():
+            event_time = history_event.event_time.ToDatetime()
+            if first_event:
+                workflow_start_times[handle] = event_time
+                first_event = False
+            all_events.append(
+                InterleavedHistoryEvent(handle, history_event, event_num, event_time)
+            )
+            event_num += 1
+
+    if extra_events:
+        for handle, event_str, event_time in extra_events:
+            # Ensure timezone-naive
+            if event_time.tzinfo is not None:
+                event_time = event_time.astimezone(timezone.utc).replace(tzinfo=None)
+            all_events.append(
+                InterleavedHistoryEvent(handle, event_str, None, event_time)
+            )
+
+    zero_time = min(workflow_start_times.values())
+
+    all_events.sort(key=lambda item: item.time)
+    col_width = 50
+
+    def _format_row(items: list[str], truncate: bool = False) -> str:
+        if truncate:
+            items = [item[: col_width - 3] for item in items]
+        return " | ".join(f"{item:<{col_width - 3}}" for item in items)
+
+    headers = [handle.id for handle in handles]
+    print("\n" + _format_row(headers, truncate=True))
+    print("-" * (col_width * len(handles) + len(handles) - 1))
+
+    for event in all_events:
+        elapsed_ms = int((event.time - zero_time).total_seconds() * 1000)
+
+        if isinstance(event.event, str):
+            event_desc = f" *: {elapsed_ms:>4} {event.event}"
+            summary = None
+        else:
+            event_type = EventType.Name(event.event.event_type).removeprefix(
+                "EVENT_TYPE_"
+            )
+            event_desc = f"{event.number:2}: {elapsed_ms:>4} {event_type}"
+
+            # Extract summary from user_metadata if present
+            summary = None
+            if event.event.HasField(
+                "user_metadata"
+            ) and event.event.user_metadata.HasField("summary"):
+                try:
+                    summary = DataConverter.default.payload_converter.from_payload(
+                        event.event.user_metadata.summary
+                    )
+                except Exception:
+                    pass  # Ignore decoding errors
+
+        row = [""] * len(handles)
+        col_idx = handles.index(event.handle)
+        row[col_idx] = event_desc[: col_width - 3]
+        print(_format_row(row))
+
+        # Print summary on new line if present
+        if summary:
+            summary_row = [""] * len(handles)
+            # Left-align with event type name (after "<event_num>: <elapsed_ms> ")
+            # Calculate the padding needed
+            if event.number is not None:
+                padding = len(f"{event.number:2}: {elapsed_ms:>4} ")
+            else:
+                padding = len(f" *: {elapsed_ms:>4} ")
+            summary_row[col_idx] = f"{' ' * padding}[{summary}]"[: col_width - 3]
+            print(_format_row(summary_row))
