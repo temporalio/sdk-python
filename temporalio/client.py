@@ -110,7 +110,7 @@ class Client:
         namespace: str = "default",
         api_key: Optional[str] = None,
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
-        plugins: Sequence[Plugin] = [],
+        plugins: Sequence[LowLevelPlugin] = [],
         interceptors: Sequence[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
@@ -191,7 +191,7 @@ class Client:
             http_connect_proxy_config=http_connect_proxy_config,
         )
 
-        root_plugin: Plugin = _RootPlugin()
+        root_plugin: LowLevelPlugin = _RootPlugin()
         for plugin in reversed(plugins):
             plugin.init_client_plugin(root_plugin)
             root_plugin = plugin
@@ -214,7 +214,7 @@ class Client:
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
-        plugins: Sequence[Plugin] = [],
+        plugins: Sequence[LowLevelPlugin] = [],
         interceptors: Sequence[Interceptor] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
@@ -236,7 +236,7 @@ class Client:
             plugins=plugins,
         )
 
-        root_plugin: Plugin = _RootPlugin()
+        root_plugin: LowLevelPlugin = _RootPlugin()
         for plugin in reversed(plugins):
             plugin.init_client_plugin(root_plugin)
             root_plugin = plugin
@@ -1541,7 +1541,7 @@ class ClientConfig(TypedDict, total=False):
         Optional[temporalio.common.QueryRejectCondition]
     ]
     header_codec_behavior: Required[HeaderCodecBehavior]
-    plugins: Required[Sequence[Plugin]]
+    plugins: Required[Sequence[LowLevelPlugin]]
 
 
 class WorkflowHistoryEventFilterType(IntEnum):
@@ -7375,7 +7375,7 @@ async def _decode_user_metadata(
     )
 
 
-class Plugin(abc.ABC):
+class LowLevelPlugin(abc.ABC):
     """Base class for client plugins that can intercept and modify client behavior.
 
     Plugins allow customization of client creation and service connection processes
@@ -7395,7 +7395,7 @@ class Plugin(abc.ABC):
         return type(self).__module__ + "." + type(self).__qualname__
 
     @abstractmethod
-    def init_client_plugin(self, next: Plugin) -> None:
+    def init_client_plugin(self, next: LowLevelPlugin) -> None:
         """Initialize this plugin in the plugin chain.
 
         This method sets up the chain of responsibility pattern by providing a reference
@@ -7441,8 +7441,8 @@ class Plugin(abc.ABC):
         """
 
 
-class _RootPlugin(Plugin):
-    def init_client_plugin(self, next: Plugin) -> None:
+class _RootPlugin(LowLevelPlugin):
+    def init_client_plugin(self, next: LowLevelPlugin) -> None:
         raise NotImplementedError()
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
