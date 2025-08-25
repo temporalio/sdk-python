@@ -3029,13 +3029,6 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
     def __await__(self) -> Generator[Any, Any, OutputT]:
         return self._task.__await__()
 
-    def __repr__(self) -> str:
-        return (
-            f"{self._start_fut} "
-            f"{self._result_fut} "
-            f"Task[{self._task._state}] fut_waiter = {self._task._fut_waiter}) ({self._task._must_cancel})"  # type: ignore
-        )
-
     def cancel(self) -> bool:
         return self._task.cancel()
 

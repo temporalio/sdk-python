@@ -57,6 +57,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.nexus
+import temporalio.nexus._operation_context
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
@@ -5877,6 +5878,12 @@ class _ClientImpl(OutboundInterceptor):
         )
         # Links are duplicated on request for compatibility with older server versions.
         req.links.extend(links)
+
+        if temporalio.nexus._operation_context._in_nexus_backing_workflow_start_context():
+            req.on_conflict_options.attach_request_id = True
+            req.on_conflict_options.attach_completion_callbacks = True
+            req.on_conflict_options.attach_links = True
+
         return req
 
     async def _build_signal_with_start_workflow_execution_request(
@@ -5932,6 +5939,7 @@ class _ClientImpl(OutboundInterceptor):
             "temporalio.api.enums.v1.WorkflowIdConflictPolicy.ValueType",
             int(input.id_conflict_policy),
         )
+
         if input.retry_policy is not None:
             input.retry_policy.apply_to_proto(req.retry_policy)
         req.cron_schedule = input.cron_schedule
