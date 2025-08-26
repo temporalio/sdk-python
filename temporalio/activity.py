@@ -124,6 +124,7 @@ class Info:
     workflow_run_id: str
     workflow_type: str
     priority: temporalio.common.Priority
+    retry_policy: Optional[temporalio.common.RetryPolicy]
     # TODO(cretz): Consider putting identity on here for "worker_id" for logger?
 
     def _logger_details(self) -> Mapping[str, Any]:
