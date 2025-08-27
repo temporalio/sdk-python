@@ -313,8 +313,12 @@ async def check_behavior_for_try_cancel(
 ) -> None:
     """
     Check that a cancellation request is sent and the caller workflow nexus op future is unblocked
-    as cancelled before the cancel handler returns (i.e. before the
-    NexusOperationCancelRequestCompleted in the caller workflow history).
+    as cancelled before the caller server writes CANCEL_REQUESTED.
+
+    There is a race between (a) the caller server writing CANCEL_REQUEST_COMPLETED in response to
+    the cancel handler returning, and (b) the caller server writing CANCELED in response to the
+    handler workflow exiting as canceled. If (b) happens first then (a) may never happen, therefore
+    we do not make any assertions regarding CANCEL_REQUEST_COMPLETED.
     """
     try:
         await handler_wf.result()
@@ -343,7 +347,6 @@ async def check_behavior_for_try_cancel(
     await assert_event_subsequence(
         [
             (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED),
-            (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_COMPLETED),
             (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCELED),
         ]
     )
@@ -351,15 +354,7 @@ async def check_behavior_for_try_cancel(
         caller_wf,
         EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED,
     )
-    op_cancel_request_completed_event = await get_event_time(
-        caller_wf,
-        EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_COMPLETED,
-    )
-    assert (
-        caller_op_future_resolved
-        < op_cancel_requested_event
-        < op_cancel_request_completed_event
-    )
+    assert caller_op_future_resolved < op_cancel_requested_event
 
 
 async def check_behavior_for_wait_cancellation_requested(
