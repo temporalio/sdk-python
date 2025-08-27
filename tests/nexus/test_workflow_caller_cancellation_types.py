@@ -431,11 +431,11 @@ async def check_behavior_for_wait_cancellation_completed(
             (caller_wf, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED),
         ]
     )
-    handler_wf_canceled_event_time = await get_event_time(
+    handler_wf_canceled_event = await get_event_time(
         handler_wf,
         EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED,
     )
-    assert result.caller_op_future_resolved > handler_wf_canceled_event_time
+    assert handler_wf_canceled_event < result.caller_op_future_resolved
 
 
 async def has_event(wf_handle: WorkflowHandle, event_type: EventType.ValueType):
