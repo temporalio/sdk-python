@@ -189,9 +189,7 @@ class CallerWorkflow:
         try:
             await op_handle
         except exceptions.NexusOperationError:
-            test_context.caller_op_future_resolved.set_result(
-                datetime.now(timezone.utc)
-            )
+            test_context.caller_op_future_resolved.set_result(workflow.now())
             assert op_handle.operation_token
             if input.cancellation_type in [
                 workflow.NexusOperationCancellationType.TRY_CANCEL,

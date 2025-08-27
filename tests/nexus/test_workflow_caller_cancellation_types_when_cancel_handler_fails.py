@@ -185,7 +185,7 @@ class CallerWorkflow:
             error_type = err.__class__.__name__
             error_cause_type = err.__cause__.__class__.__name__
 
-        test_context.caller_op_future_resolved.set_result(datetime.now(timezone.utc))
+        test_context.caller_op_future_resolved.set_result(workflow.now())
         assert op_handle.operation_token
         await workflow.wait_condition(lambda: self.released)
         return CancellationResult(
