@@ -5,6 +5,7 @@ from typing import Any, Optional, Union
 
 from agents import (
     Agent,
+    AgentsException,
     Handoff,
     RunConfig,
     RunContextWrapper,
@@ -21,6 +22,16 @@ from pydantic_core import to_json
 from temporalio import workflow
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
+from temporalio.exceptions import ApplicationError, TemporalError
+
+
+class AgentsWorkflowFailure(TemporalError):
+    """Error that occurs when the agents SDK raises an error which should terminate the calling workflow.
+
+    .. warning::
+        This exception is experimental and may change in future versions.
+        Use with caution in production environments.
+    """
 
 
 class TemporalOpenAIRunner(AgentRunner):
@@ -136,16 +147,28 @@ class TemporalOpenAIRunner(AgentRunner):
                 handoffs=new_handoffs,
             )
 
-        return await self._runner.run(
-            starting_agent=convert_agent(starting_agent, None),
-            input=input,
-            context=context,
-            max_turns=max_turns,
-            hooks=hooks,
-            run_config=run_config,
-            previous_response_id=previous_response_id,
-            session=session,
-        )
+        try:
+            return await self._runner.run(
+                starting_agent=convert_agent(starting_agent, None),
+                input=input,
+                context=context,
+                max_turns=max_turns,
+                hooks=hooks,
+                run_config=run_config,
+                previous_response_id=previous_response_id,
+                session=session,
+            )
+        except AgentsException as e:
+            # In order for workflow failures to properly fail the workflow, we need to rewrap them in
+            # a Temporal error
+            if e.__cause__ and workflow.is_workflow_failure_exception(e.__cause__):
+                reraise = AgentsWorkflowFailure(
+                    f"Workflow failure exception in Agents Framework: {e}"
+                )
+                reraise.__traceback__ = e.__traceback__
+                raise reraise from e.__cause__
+            else:
+                raise e
 
     def run_sync(
         self,

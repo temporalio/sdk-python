@@ -9,6 +9,7 @@ This module provides compatibility between the
 """
 
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
+from temporalio.contrib.openai_agents._openai_runner import AgentsWorkflowFailure
 from temporalio.contrib.openai_agents._temporal_openai_agents import (
     OpenAIAgentsPlugin,
     TestModel,
@@ -21,6 +22,7 @@ from temporalio.contrib.openai_agents._trace_interceptor import (
 from . import workflow
 
 __all__ = [
+    "AgentsWorkflowFailure",
     "OpenAIAgentsPlugin",
     "ModelActivityParameters",
     "workflow",

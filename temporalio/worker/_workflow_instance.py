@@ -414,7 +414,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # We want some errors during activation, like those that can happen
             # during payload conversion, to be able to fail the workflow not the
             # task
-            if self._is_workflow_failure_exception(err):
+            if self.is_workflow_failure_exception(err):
                 try:
                     self._set_workflow_failure(err)
                 except Exception as inner_err:
@@ -629,7 +629,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 # Validation failures are always update failures. We reuse
                 # workflow failure logic to decide task failure vs update
                 # failure after validation.
-                if not past_validation or self._is_workflow_failure_exception(err):
+                if not past_validation or self.is_workflow_failure_exception(err):
                     if command is None:
                         command = self._add_command()
                         command.update_response.protocol_instance_id = (
@@ -1939,7 +1939,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # Don't wrap payload conversion errors that would fail the workflow
             raise
         except Exception as err:
-            if self._is_workflow_failure_exception(err):
+            if self.is_workflow_failure_exception(err):
                 raise
             raise RuntimeError("Failed decoding arguments") from err
 
@@ -1982,7 +1982,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
         return workflow_instance
 
-    def _is_workflow_failure_exception(self, err: BaseException) -> bool:
+    def is_workflow_failure_exception(self, err: BaseException) -> bool:
         # An exception is a failure instead of a task fail if it's already a
         # failure error or if it is a timeout error or if it is an instance of
         # any of the failure types in the worker or workflow-level setting
@@ -2192,7 +2192,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 err
             ):
                 self._add_command().cancel_workflow_execution.SetInParent()
-            elif self._is_workflow_failure_exception(err):
+            elif self.is_workflow_failure_exception(err):
                 # All other failure errors fail the workflow
                 self._set_workflow_failure(err)
             else:
