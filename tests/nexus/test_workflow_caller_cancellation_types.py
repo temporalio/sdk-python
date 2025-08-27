@@ -21,7 +21,6 @@ from temporalio.client import (
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers import print_interleaved_histories
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 
@@ -345,18 +344,6 @@ async def check_behavior_for_try_cancel(
 
     handler_status = (await handler_wf.describe()).status
     assert handler_status == WorkflowExecutionStatus.CANCELED
-
-    await print_interleaved_histories(
-        [caller_wf, handler_wf],
-        extra_events=[
-            (
-                caller_wf,
-                "Caller op future resolved",
-                result.caller_op_future_resolved,
-            )
-        ],
-    )
-
     await assert_event_subsequence(
         [
             (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED),
