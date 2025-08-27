@@ -1640,9 +1640,9 @@ class UnifiedPlugin(ClientPlugin, WorkerPlugin):
         
     def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
         config["data_converter"] = pydantic_data_converter
-        return config
+        return self.next_worker_plugin.configure_replayer(config)
     
-    async def run_replayer(
+    def run_replayer(
         self,
         replayer: Replayer,
         histories: AsyncIterator[temporalio.client.WorkflowHistory],
