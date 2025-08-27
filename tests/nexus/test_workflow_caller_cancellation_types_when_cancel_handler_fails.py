@@ -302,7 +302,16 @@ async def check_behavior_for_try_cancel(
     assert result.error_cause_type == "CancelledError"
 
     caller_op_future_resolved = test_context.caller_op_future_resolved.result()
-    await print_interleaved_histories([caller_wf, handler_wf])
+    await print_interleaved_histories(
+        [caller_wf, handler_wf],
+        extra_events=[
+            (
+                caller_wf,
+                "Caller op future resolved",
+                caller_op_future_resolved,
+            )
+        ],
+    )
 
     await assert_event_subsequence(
         [
