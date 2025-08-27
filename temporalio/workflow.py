@@ -985,6 +985,11 @@ def memo() -> Mapping[str, Any]:
 
 
 def is_workflow_failure_exception(err: BaseException) -> bool:
+    """Checks if the given exception is a workflow failure in the current workflow.
+
+    Returns:
+        True if the given exception is a workflow failure in the current workflow.
+    """
     return _Runtime.current().is_workflow_failure_exception(err)
 
 
