@@ -81,7 +81,7 @@ lint-types = [
   { cmd = "uv run mypy --namespace-packages --check-untyped-defs ."},
 ]
 run-bench = "uv run python scripts/run_bench.py"
-test = "uv run pytest -s 'tests/nexus/test_workflow_caller_cancellation_types.py::test_cancellation_type[TRY_CANCEL]' 'tests/nexus/test_workflow_caller_cancellation_types_when_cancel_handler_fails.py::test_cancellation_type[TRY_CANCEL]'"
+test = "uv run pytest"
 
 
 [tool.pytest.ini_options]
