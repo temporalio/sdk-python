@@ -94,9 +94,11 @@ class WorkflowOpHandler(
             # by the caller server. At that point, the caller server will write
             # NexusOperationCancelRequestCompleted. For TRY_CANCEL we want to prove that the nexus
             # op handle future can be resolved as cancelled before any of that.
-            caller_wf = nexus.client().get_workflow_handle_for(
-                CallerWorkflow.run,
-                workflow_id=test_context.caller_workflow_id,
+            caller_wf: WorkflowHandle[Any, CancellationResult] = (
+                nexus.client().get_workflow_handle_for(
+                    CallerWorkflow.run,
+                    workflow_id=test_context.caller_workflow_id,
+                )
             )
             await caller_wf.execute_update(
                 CallerWorkflow.wait_caller_op_future_resolved
