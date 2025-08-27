@@ -53,6 +53,7 @@ from temporalio.converter import (
     _JSONTypeConverterUnhandled,
     decode_search_attributes,
     encode_search_attribute_values,
+    value_to_type,
 )
 from temporalio.exceptions import ApplicationError, FailureError
 
@@ -89,6 +90,14 @@ class MyDataClass:
 @dataclass
 class DatetimeClass:
     datetime: datetime
+
+
+MyNewTypeStr = NewType("MyNewTypeStr", str)
+
+
+@dataclass
+class NewTypeMessage:
+    data: dict[MyNewTypeStr, str]
 
 
 async def test_converter_default():
@@ -213,6 +222,22 @@ async def test_converter_default():
         "json/plain",
         '{"datetime":"2020-01-01T01:01:01"}',
         type_hint=DatetimeClass,
+    )
+
+    # Newtype String
+    await assert_payload(
+        MyNewTypeStr("somestr"),
+        "json/plain",
+        '"somestr"',
+        type_hint=MyNewTypeStr,
+    )
+
+    # Newtype String key
+    await assert_payload(
+        NewTypeMessage({MyNewTypeStr("key"): "value"}),
+        "json/plain",
+        '{"data":{"key":"value"}}',
+        type_hint=NewTypeMessage,
     )
 
 
