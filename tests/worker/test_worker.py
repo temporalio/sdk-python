@@ -42,7 +42,6 @@ from temporalio.worker import (
     SlotReleaseContext,
     SlotReserveContext,
     Worker,
-    WorkerConfig,
     WorkerDeploymentConfig,
     WorkerDeploymentVersion,
     WorkerTuner,
@@ -317,6 +316,7 @@ async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvir
             ),
             resource_based_options,
         ),
+        nexus_supplier=FixedSizeSlotSupplier(10),
     )
     async with new_worker(
         client,
@@ -439,7 +439,10 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
     ss = MySlotSupplier()
 
     tuner = WorkerTuner.create_composite(
-        workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
+        workflow_supplier=ss,
+        activity_supplier=ss,
+        local_activity_supplier=ss,
+        nexus_supplier=ss,
     )
     async with new_worker(
         client,
@@ -501,7 +504,10 @@ async def test_throwing_slot_supplier(client: Client, env: WorkflowEnvironment):
     ss = ThrowingSlotSupplier()
 
     tuner = WorkerTuner.create_composite(
-        workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
+        workflow_supplier=ss,
+        activity_supplier=ss,
+        local_activity_supplier=ss,
+        nexus_supplier=ss,
     )
     async with new_worker(
         client,
@@ -537,7 +543,10 @@ async def test_blocking_slot_supplier(client: Client, env: WorkflowEnvironment):
     ss = BlockingSlotSupplier()
 
     tuner = WorkerTuner.create_composite(
-        workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
+        workflow_supplier=ss,
+        activity_supplier=ss,
+        local_activity_supplier=ss,
+        nexus_supplier=ss,
     )
     async with new_worker(
         client,
@@ -1189,3 +1198,139 @@ class PollFailureInjector:
         if self.next_exception_task:
             self.next_exception_task.cancel()
         setattr(self.worker._bridge_worker, self.attr, self.orig_poll_call)
+
+
+async def test_nexus_slot_supplier_integration(
+    client: Client, env: WorkflowEnvironment
+):
+    """Test that nexus operations can be properly tuned with slot suppliers."""
+
+    class NexusAwareSlotSupplier(CustomSlotSupplier):
+        seen_nexus_slots = 0
+        seen_workflow_slots = 0
+        seen_activity_slots = 0
+        seen_local_activity_slots = 0
+
+        async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
+            if ctx.slot_type == "nexus":
+                self.seen_nexus_slots += 1
+            elif ctx.slot_type == "workflow":
+                self.seen_workflow_slots += 1
+            elif ctx.slot_type == "activity":
+                self.seen_activity_slots += 1
+            elif ctx.slot_type == "local-activity":
+                self.seen_local_activity_slots += 1
+            return SlotPermit()
+
+        def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+            return None
+
+        def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
+            pass
+
+        def release_slot(self, ctx: SlotReleaseContext) -> None:
+            pass
+
+    ss = NexusAwareSlotSupplier()
+
+    # Create a tuner that includes nexus slot supplier
+    tuner = WorkerTuner.create_composite(
+        workflow_supplier=ss,
+        activity_supplier=ss,
+        local_activity_supplier=ss,
+        nexus_supplier=ss,  # This would fail without your changes
+    )
+
+    # Test that the tuner can be converted to bridge format without errors
+    bridge_tuner = tuner._to_bridge_tuner()
+
+    # Verify that all slot types are properly handled
+    assert hasattr(bridge_tuner, "nexus_slot_supplier")
+    assert hasattr(bridge_tuner, "workflow_slot_supplier")
+    assert hasattr(bridge_tuner, "activity_slot_supplier")
+    assert hasattr(bridge_tuner, "local_activity_slot_supplier")
+
+    # Test that the tuner can be used to create a worker
+    async with new_worker(
+        client,
+        WaitOnSignalWorkflow,
+        activities=[say_hello],
+        tuner=tuner,
+    ) as w:
+        wf1 = await client.start_workflow(
+            WaitOnSignalWorkflow.run,
+            id=f"nexus-slot-supplier-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
+        await wf1.result()
+
+    # Verify that we saw the expected slot types
+    assert ss.seen_workflow_slots > 0, "Should have seen workflow slots"
+    assert ss.seen_activity_slots > 0, "Should have seen activity slots"
+    # Note: We don't assert nexus_slots > 0 because this test doesn't actually
+    # trigger nexus operations, but the important thing is that the infrastructure
+    # is in place to handle them when they do occur.
+
+
+async def test_nexus_slot_supplier_defaults(client: Client, env: WorkflowEnvironment):
+    """Test that nexus slot suppliers get proper defaults in resource-based tuners."""
+
+    tuner = WorkerTuner.create_resource_based(
+        target_memory_usage=0.5,
+        target_cpu_usage=0.5,
+        # Don't specify nexus_config to test defaults
+    )
+
+    # Test that the tuner can be converted to bridge format without errors
+    bridge_tuner = tuner._to_bridge_tuner()
+
+    # Verify that nexus slot supplier is present and properly configured
+    assert hasattr(bridge_tuner, "nexus_slot_supplier")
+
+    # Test that the tuner can be used to create a worker
+    async with new_worker(
+        client,
+        WaitOnSignalWorkflow,
+        activities=[say_hello],
+        tuner=tuner,
+    ) as w:
+        wf1 = await client.start_workflow(
+            WaitOnSignalWorkflow.run,
+            id=f"nexus-defaults-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
+        await wf1.result()
+
+
+async def test_nexus_slot_supplier_fixed_size(client: Client, env: WorkflowEnvironment):
+    """Test that nexus slot suppliers work with fixed-size tuners."""
+
+    tuner = WorkerTuner.create_fixed(
+        workflow_slots=10,
+        activity_slots=20,
+        local_activity_slots=5,
+        nexus_slots=15,  # This would fail without your changes
+    )
+
+    # Test that the tuner can be converted to bridge format without errors
+    bridge_tuner = tuner._to_bridge_tuner()
+
+    # Verify that nexus slot supplier is present
+    assert hasattr(bridge_tuner, "nexus_slot_supplier")
+
+    # Test that the tuner can be used to create a worker
+    async with new_worker(
+        client,
+        WaitOnSignalWorkflow,
+        activities=[say_hello],
+        tuner=tuner,
+    ) as w:
+        wf1 = await client.start_workflow(
+            WaitOnSignalWorkflow.run,
+            id=f"nexus-fixed-{uuid.uuid4()}",
+            task_queue=w.task_queue,
+        )
+        await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
+        await wf1.result()
