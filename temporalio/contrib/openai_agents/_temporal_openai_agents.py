@@ -24,11 +24,11 @@ from openai.types.responses import ResponsePromptParam
 
 import temporalio.client
 import temporalio.worker
-from temporalio.client import ClientConfig, Plugin
+from temporalio.client import ClientConfig
+from temporalio.contrib.openai_agents import AgentsWorkflowError
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._openai_runner import (
-    AgentsWorkflowError,
     TemporalOpenAIRunner,
 )
 from temporalio.contrib.openai_agents._temporal_trace_provider import (

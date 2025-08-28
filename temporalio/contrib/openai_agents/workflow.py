@@ -266,7 +266,7 @@ class ToolSerializationError(TemporalError):
 
 
 class AgentsWorkflowError(TemporalError):
-    """Error that occurs when the agents SDK raises an error which should terminate the calling workflow.
+    """Error that occurs when the agents SDK raises an error which should terminate the calling workflow or update.
 
     .. warning::
         This exception is experimental and may change in future versions.
