@@ -263,3 +263,12 @@ class ToolSerializationError(TemporalError):
     To fix this error, ensure your tool returns string-convertible values or
     modify the tool to return a string representation of the result.
     """
+
+
+class AgentsWorkflowError(TemporalError):
+    """Error that occurs when the agents SDK raises an error which should terminate the calling workflow.
+
+    .. warning::
+        This exception is experimental and may change in future versions.
+        Use with caution in production environments.
+    """

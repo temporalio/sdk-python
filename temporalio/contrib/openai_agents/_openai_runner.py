@@ -22,16 +22,7 @@ from pydantic_core import to_json
 from temporalio import workflow
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
-from temporalio.exceptions import ApplicationError, TemporalError
-
-
-class AgentsWorkflowFailure(TemporalError):
-    """Error that occurs when the agents SDK raises an error which should terminate the calling workflow.
-
-    .. warning::
-        This exception is experimental and may change in future versions.
-        Use with caution in production environments.
-    """
+from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 
 
 class TemporalOpenAIRunner(AgentRunner):
@@ -161,8 +152,8 @@ class TemporalOpenAIRunner(AgentRunner):
         except AgentsException as e:
             # In order for workflow failures to properly fail the workflow, we need to rewrap them in
             # a Temporal error
-            if e.__cause__ and workflow.is_workflow_failure_exception(e.__cause__):
-                reraise = AgentsWorkflowFailure(
+            if e.__cause__ and workflow.is_failure_exception(e.__cause__):
+                reraise = AgentsWorkflowError(
                     f"Workflow failure exception in Agents Framework: {e}"
                 )
                 reraise.__traceback__ = e.__traceback__

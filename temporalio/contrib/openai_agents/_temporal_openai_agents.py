@@ -28,7 +28,7 @@ from temporalio.client import ClientConfig, Plugin
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._openai_runner import (
-    AgentsWorkflowFailure,
+    AgentsWorkflowError,
     TemporalOpenAIRunner,
 )
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
@@ -289,7 +289,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         ]
         config["workflow_failure_exception_types"] = list(
             config.get("workflow_failure_exception_types") or []
-        ) + [AgentsWorkflowFailure]
+        ) + [AgentsWorkflowError]
         return self.next_worker_plugin.configure_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
