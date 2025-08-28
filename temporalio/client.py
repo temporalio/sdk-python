@@ -6363,12 +6363,16 @@ class _ClientImpl(OutboundInterceptor):
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             )
-            if resp_by_id.cancel_requested or resp_by_id.activity_paused or resp_by_id.activity_reset:
+            if (
+                resp_by_id.cancel_requested
+                or resp_by_id.activity_paused
+                or resp_by_id.activity_reset
+            ):
                 raise AsyncActivityCancelledError(
                     details=ActivityCancellationDetails(
                         cancel_requested=resp_by_id.cancel_requested,
                         paused=resp_by_id.activity_paused,
-                        reset=resp_by_id.activity_reset
+                        reset=resp_by_id.activity_reset,
                     )
                 )
 
@@ -6389,6 +6393,7 @@ class _ClientImpl(OutboundInterceptor):
                     details=ActivityCancellationDetails(
                         cancel_requested=resp.cancel_requested,
                         paused=resp.activity_paused,
+                        reset=resp.activity_reset,
                     )
                 )
 
