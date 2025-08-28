@@ -2606,6 +2606,7 @@ async def test_workflow_typed_config(client: Client):
                 break
         assert found_marker
 
+
 @activity.defn
 async def fail_until_attempt_activity(until_attempt: int) -> str:
     if activity.info().attempt < until_attempt:
