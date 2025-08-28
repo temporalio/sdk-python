@@ -897,6 +897,9 @@ class _Runtime(ABC):
     @abstractmethod
     def workflow_set_current_details(self, details: str): ...
 
+    @abstractmethod
+    def workflow_last_completion_result(self, type_hint: Optional[Type]) -> Optional[Any]: ...
+
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
     "__temporal_current_update_info"
@@ -1037,6 +1040,19 @@ def get_current_details() -> str:
     This can be in Temporal markdown format and can span multiple lines.
     """
     return _Runtime.current().workflow_get_current_details()
+
+
+@overload
+def get_last_completion_result(type_hint: Type[ParamType]) -> Optional[ParamType]: ...
+
+
+def get_last_completion_result(type_hint: Optional[Type] = None) -> Optional[Any]:
+    """Get the current details of the workflow which may appear in the UI/CLI.
+    Unlike static details set at start, this value can be updated throughout
+    the life of the workflow and is independent of the static details.
+    This can be in Temporal markdown format and can span multiple lines.
+    """
+    return _Runtime.current().workflow_last_completion_result(type_hint)
 
 
 def set_current_details(description: str) -> None:

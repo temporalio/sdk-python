@@ -27,6 +27,7 @@ from .._workflow_instance import (
 )
 from ._importer import Importer
 from ._restrictions import RestrictionContext, SandboxRestrictions
+from ...api.common.v1.message_pb2 import Payloads
 
 _fake_info = temporalio.workflow.Info(
     attempt=-1,
@@ -84,6 +85,7 @@ class SandboxedWorkflowRunner(WorkflowRunner):
                 extern_functions={},
                 disable_eager_activity_execution=False,
                 worker_level_failure_exception_types=self._worker_level_failure_exception_types,
+                last_completion_result=Payloads(),
             ),
         )
 
