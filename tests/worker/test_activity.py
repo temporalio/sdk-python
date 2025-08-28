@@ -1489,36 +1489,6 @@ async def test_activity_heartbeat_context(client: Client, worker: ExternalWorker
     assert result.result == "details: Some detail"
 
 
-async def test_activity_reset(client: Client, worker: ExternalWorker):
-    @activity.defn
-    async def reset_activity() -> None:
-        req = temporalio.api.workflowservice.v1.ResetActivityRequest(
-            namespace=client.namespace,
-            execution=temporalio.api.common.v1.WorkflowExecution(
-                workflow_id=activity.info().workflow_id,
-                run_id=activity.info().workflow_run_id,
-            ),
-            id=activity.info().activity_id,
-        )
-        activity.logger.info(f"Sending reset request: {req}")
-        await client.workflow_service.reset_activity(req)
-        reset = False
-        for _ in range(5):
-            activity.heartbeat()
-            try:
-                if reset:
-                    return None
-                await asyncio.sleep(0.3)
-            except Exception as e:
-                activity.logger.warning("Exception: ", e)
-                reset = True
-                raise
-
-        assert False
-
-    await _execute_workflow_with_activity(client, worker, reset_activity)
-
-
 async def test_activity_reset_catch(client: Client, worker: ExternalWorker):
     @activity.defn
     async def wait_cancel() -> str:

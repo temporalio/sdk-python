@@ -152,8 +152,6 @@ class _ActivityWorker:
                     await exception_task
                 task = await poll_task
 
-                logger.info(f"Activity task {task}")
-
                 if task.HasField("start"):
                     # Cancelled event and sync field will be updated inside
                     # _run_activity when the activity function is obtained. Max
