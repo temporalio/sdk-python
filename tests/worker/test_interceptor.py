@@ -5,7 +5,7 @@ from typing import Any, Callable, List, NoReturn, Optional, Tuple, Type
 
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowUpdateFailedError
-from temporalio.exceptions import ApplicationError
+from temporalio.exceptions import ApplicationError, NexusOperationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     ActivityInboundInterceptor,
@@ -27,6 +27,8 @@ from temporalio.worker import (
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
+from temporalio.worker._interceptor import StartNexusOperationInput
+from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 # Passing through because Python 3.9 has an import bug at
 # https://github.com/python/cpython/issues/91351
@@ -127,6 +129,12 @@ class TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
         interceptor_traces.append(("workflow.start_local_activity", input))
         return super().start_local_activity(input)
 
+    async def start_nexus_operation(
+        self, input: StartNexusOperationInput
+    ) -> workflow.NexusOperationHandle:
+        interceptor_traces.append(("workflow.start_nexus_operation", input))
+        return await super().start_nexus_operation(input)
+
 
 @activity.defn
 async def intercepted_activity(param: str) -> str:
@@ -169,6 +177,24 @@ class InterceptedWorkflow:
         )
         await child_handle
 
+        nexus_client = workflow.create_nexus_client(
+            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+            service="non-existent-nexus-service",
+        )
+        try:
+            await nexus_client.start_operation(
+                operation="non-existent-nexus-operation",
+                input={"test": "data"},
+                schedule_to_close_timeout=timedelta(microseconds=1),
+            )
+            raise Exception("unreachable")
+        except NexusOperationError:
+            # The test requires only that the workflow attempts to schedule the nexus operation.
+            # Instead of setting up a nexus service, we deliberately schedule a call to a
+            # non-existent nexus operation with an insufficiently long timeout, and expect this
+            # error.
+            pass
+
         await self.finish.wait()
         workflow.continue_as_new("continue-as-new")
 
@@ -200,7 +226,9 @@ async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
         )
-    task_queue = f"task_queue_{uuid.uuid4()}"
+    task_queue = f"task-queue-{uuid.uuid4()}"
+    await create_nexus_endpoint(task_queue, client)
+
     async with Worker(
         client,
         task_queue=task_queue,
@@ -276,6 +304,8 @@ async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
             "workflow.signal_external_workflow",
             lambda v: v.args[0] == "external-signal-val",
         )
+        assert pop_trace("workflow.info")
+        assert pop_trace("workflow.start_nexus_operation")
         assert pop_trace(
             "workflow.signal", lambda v: v.args[0] == "external-signal-val"
         )
