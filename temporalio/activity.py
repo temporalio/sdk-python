@@ -162,6 +162,7 @@ class ActivityCancellationDetails:
     def _from_proto(
         proto: temporalio.bridge.proto.activity_task.ActivityCancellationDetails,
     ) -> ActivityCancellationDetails:
+        print(f"Building activity cancellation details, reset: {proto.is_reset}")
         return ActivityCancellationDetails(
             not_found=proto.is_not_found,
             cancel_requested=proto.is_cancelled,
