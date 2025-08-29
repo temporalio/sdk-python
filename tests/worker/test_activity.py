@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, List, NoReturn, Optional, Sequence, Type
 
+import temporalio.api.workflowservice.v1
 from temporalio import activity, workflow
 from temporalio.client import (
     AsyncActivityHandle,
@@ -1486,3 +1487,33 @@ async def test_activity_heartbeat_context(client: Client, worker: ExternalWorker
         client, worker, heartbeat, retry_max_attempts=2
     )
     assert result.result == "details: Some detail"
+
+
+async def test_activity_reset_catch(client: Client, worker: ExternalWorker):
+    @activity.defn
+    async def wait_cancel() -> str:
+        req = temporalio.api.workflowservice.v1.ResetActivityRequest(
+            namespace=client.namespace,
+            execution=temporalio.api.common.v1.WorkflowExecution(
+                workflow_id=activity.info().workflow_id,
+                run_id=activity.info().workflow_run_id,
+            ),
+            id=activity.info().activity_id,
+        )
+        activity.logger.info(f"Sending reset request: {req}")
+        await client.workflow_service.reset_activity(req)
+        try:
+            while True:
+                await asyncio.sleep(0.3)
+                activity.heartbeat()
+        except asyncio.CancelledError:
+            details = activity.cancellation_details()
+            assert details is not None
+            return "Got cancelled error, reset? " + str(details.reset)
+
+    result = await _execute_workflow_with_activity(
+        client,
+        worker,
+        wait_cancel,
+    )
+    assert result.result == "Got cancelled error, reset? True"

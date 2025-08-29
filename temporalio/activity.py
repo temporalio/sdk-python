@@ -154,6 +154,7 @@ class ActivityCancellationDetails:
     not_found: bool = False
     cancel_requested: bool = False
     paused: bool = False
+    reset: bool = False
     timed_out: bool = False
     worker_shutdown: bool = False
 
@@ -167,6 +168,7 @@ class ActivityCancellationDetails:
             paused=proto.is_paused,
             timed_out=proto.is_timed_out,
             worker_shutdown=proto.is_worker_shutdown,
+            reset=proto.is_reset,
         )
 
 
