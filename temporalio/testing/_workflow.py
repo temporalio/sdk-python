@@ -573,7 +573,7 @@ class _TimeSkippingWorkflowHandle(temporalio.client.WorkflowHandle):
         self,
         *,
         follow_runs: bool = True,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> Any:
         async with self.env.time_skipping_unlocked():

@@ -36,9 +36,9 @@ def assert_time_remaining(context: ServicerContext, expected: int) -> None:
 class SimpleWorkflowServer(WorkflowServiceServicer):
     def __init__(self) -> None:
         super().__init__()
-        self.last_metadata: Mapping[str, str] = {}
+        self.last_metadata: Mapping[str, str | bytes] = {}
 
-    def assert_last_metadata(self, expected: Mapping[str, str]) -> None:
+    def assert_last_metadata(self, expected: Mapping[str, str | bytes]) -> None:
         for k, v in expected.items():
             assert self.last_metadata.get(k) == v
 
@@ -132,6 +132,21 @@ async def test_grpc_metadata():
         {
             "authorization": "Bearer my-api-key",
             "my-meta-key": "my-meta-val",
+        }
+    )
+
+    # Binary metadata values should work:
+    await client.workflow_service.get_system_info(
+        GetSystemInfoRequest(),
+        metadata={
+            "my-binary-key-bin": b"\x00\x01",
+        },
+    )
+    workflow_server.assert_last_metadata(
+        {
+            "authorization": "Bearer my-api-key",
+            "my-meta-key": "my-meta-val",
+            "my-binary-key-bin": b"\x00\x01",
         }
     )
 

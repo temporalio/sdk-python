@@ -77,7 +77,7 @@ class RpcCall:
     rpc: str
     req: bytes
     retry: bool
-    metadata: Mapping[str, str]
+    metadata: Mapping[str, str | bytes]
     timeout_millis: Optional[int]
 
 
@@ -124,7 +124,7 @@ class Client:
         req: google.protobuf.message.Message,
         resp_type: Type[ProtoMessage],
         retry: bool,
-        metadata: Mapping[str, str],
+        metadata: Mapping[str, str | bytes],
         timeout: Optional[timedelta],
     ) -> ProtoMessage:
         """Make RPC call using SDK Core."""

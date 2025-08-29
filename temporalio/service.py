@@ -228,7 +228,7 @@ class ServiceClient(ABC):
         *,
         service: str = "temporal.api.workflowservice.v1.WorkflowService",
         retry: bool = False,
-        metadata: Mapping[str, str] = {},
+        metadata: Mapping[str, str | bytes] = {},
         timeout: Optional[timedelta] = None,
     ) -> bool:
         """Check whether the WorkflowService is up.
@@ -278,7 +278,7 @@ class ServiceClient(ABC):
         *,
         service: str,
         retry: bool,
-        metadata: Mapping[str, str],
+        metadata: Mapping[str, str | bytes],
         timeout: Optional[timedelta],
     ) -> ServiceResponse:
         raise NotImplementedError
@@ -1253,7 +1253,7 @@ class ServiceCall(Generic[ServiceRequest, ServiceResponse]):
         req: ServiceRequest,
         *,
         retry: bool = False,
-        metadata: Mapping[str, str] = {},
+        metadata: Mapping[str, str | bytes] = {},
         timeout: Optional[timedelta] = None,
     ) -> ServiceResponse:
         """Invoke underlying client with the given request.
@@ -1336,7 +1336,7 @@ class _BridgeServiceClient(ServiceClient):
         *,
         service: str,
         retry: bool,
-        metadata: Mapping[str, str],
+        metadata: Mapping[str, str | bytes],
         timeout: Optional[timedelta],
     ) -> ServiceResponse:
         global LOG_PROTOS
