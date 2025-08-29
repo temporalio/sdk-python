@@ -358,7 +358,7 @@ class Client:
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
@@ -393,7 +393,7 @@ class Client:
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
@@ -430,7 +430,7 @@ class Client:
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
@@ -467,7 +467,7 @@ class Client:
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
@@ -502,7 +502,7 @@ class Client:
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
@@ -639,7 +639,7 @@ class Client:
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
@@ -674,7 +674,7 @@ class Client:
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
@@ -711,7 +711,7 @@ class Client:
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
@@ -748,7 +748,7 @@ class Client:
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
@@ -783,7 +783,7 @@ class Client:
         start_delay: Optional[timedelta] = None,
         start_signal: Optional[str] = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
@@ -897,7 +897,7 @@ class Client:
         *,
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         id: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType: ...
 
@@ -912,7 +912,7 @@ class Client:
         *,
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         id: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType: ...
 
@@ -927,7 +927,7 @@ class Client:
         args: MultiParamSpec.args,  # pyright: ignore
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         id: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType: ...
 
@@ -942,7 +942,7 @@ class Client:
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> Any: ...
 
@@ -955,7 +955,7 @@ class Client:
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> Any:
         """Send an update-with-start request and wait for the update to complete.
@@ -1015,7 +1015,7 @@ class Client:
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         wait_for_stage: WorkflowUpdateStage,
         id: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
@@ -1031,7 +1031,7 @@ class Client:
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         wait_for_stage: WorkflowUpdateStage,
         id: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
@@ -1047,7 +1047,7 @@ class Client:
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         wait_for_stage: WorkflowUpdateStage,
         id: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
@@ -1063,7 +1063,7 @@ class Client:
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowUpdateHandle[Any]: ...
 
@@ -1077,7 +1077,7 @@ class Client:
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowUpdateHandle[Any]:
         """Send an update-with-start request and wait for it to be accepted.
@@ -1143,7 +1143,7 @@ class Client:
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
         start_workflow_operation: WithStartWorkflowOperation[SelfType, ReturnType],
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowUpdateHandle[Any]:
         if wait_for_stage == WorkflowUpdateStage.ADMITTED:
@@ -1202,7 +1202,7 @@ class Client:
         limit: Optional[int] = None,
         page_size: int = 1000,
         next_page_token: Optional[bytes] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowExecutionAsyncIterator:
         """List workflows.
@@ -1243,7 +1243,7 @@ class Client:
     async def count_workflows(
         self,
         query: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowExecutionCount:
         """Count workflows.
@@ -1332,7 +1332,7 @@ class Client:
         ] = None,
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> ScheduleHandle:
         """Create a schedule and return its handle.
@@ -1391,7 +1391,7 @@ class Client:
         *,
         page_size: int = 1000,
         next_page_token: Optional[bytes] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> ScheduleAsyncIterator:
         """List schedules.
@@ -1431,7 +1431,7 @@ class Client:
         self,
         task_queue: str,
         operation: BuildIdOp,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Used to add new Build IDs or otherwise update the relative compatibility of Build Ids as
@@ -1462,7 +1462,7 @@ class Client:
         self,
         task_queue: str,
         max_sets: Optional[int] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkerBuildIdVersionSets:
         """Get the Build ID compatibility sets for a specific task queue.
@@ -1494,7 +1494,7 @@ class Client:
         build_ids: Sequence[str],
         task_queues: Sequence[str] = [],
         reachability_type: Optional[TaskReachabilityType] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkerTaskReachability:
         """Determine if some Build IDs for certain Task Queues could have tasks dispatched to them.
@@ -1642,7 +1642,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self,
         *,
         follow_runs: bool = True,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> ReturnType:
         """Wait for result of the workflow.
@@ -1773,7 +1773,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     async def cancel(
         self,
         *,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Cancel the workflow.
@@ -1809,7 +1809,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     async def describe(
         self,
         *,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowExecutionDescription:
         """Get workflow details.
@@ -1848,7 +1848,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         *,
         event_filter_type: WorkflowHistoryEventFilterType = WorkflowHistoryEventFilterType.ALL_EVENT,
         skip_archival: bool = False,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHistory:
         """Get workflow history.
@@ -1877,7 +1877,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         wait_new_event: bool = False,
         event_filter_type: WorkflowHistoryEventFilterType = WorkflowHistoryEventFilterType.ALL_EVENT,
         skip_archival: bool = False,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHistoryEventAsyncIterator:
         """Get workflow history events as an async iterator.
@@ -1919,7 +1919,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         wait_new_event: bool = False,
         event_filter_type: WorkflowHistoryEventFilterType = WorkflowHistoryEventFilterType.ALL_EVENT,
         skip_archival: bool = False,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowHistoryEventAsyncIterator:
         return self._client._impl.fetch_workflow_history_events(
@@ -1943,7 +1943,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         query: MethodSyncOrAsyncNoParam[SelfType, LocalReturnType],
         *,
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType: ...
 
@@ -1955,7 +1955,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         arg: ParamType,
         *,
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType: ...
 
@@ -1970,7 +1970,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         *,
         args: Sequence[Any],
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType: ...
 
@@ -1984,7 +1984,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         args: Sequence[Any] = [],
         result_type: Optional[Type] = None,
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> Any: ...
 
@@ -1996,7 +1996,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         args: Sequence[Any] = [],
         result_type: Optional[Type] = None,
         reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> Any:
         """Query the workflow.
@@ -2067,7 +2067,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self,
         signal: MethodSyncOrAsyncNoParam[SelfType, None],
         *,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None: ...
 
@@ -2078,7 +2078,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         signal: MethodSyncOrAsyncSingleParam[SelfType, ParamType, None],
         arg: ParamType,
         *,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None: ...
 
@@ -2091,7 +2091,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         ],
         *,
         args: Sequence[Any],
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None: ...
 
@@ -2103,7 +2103,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None: ...
 
@@ -2113,7 +2113,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Send a signal to the workflow.
@@ -2156,7 +2156,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self,
         *args: Any,
         reason: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Terminate the workflow.
@@ -2200,7 +2200,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         update: temporalio.workflow.UpdateMethodMultiParam[[SelfType], LocalReturnType],
         *,
         id: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType: ...
 
@@ -2214,7 +2214,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         arg: ParamType,
         *,
         id: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType: ...
 
@@ -2228,7 +2228,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         *,
         args: MultiParamSpec.args,  # pyright: ignore
         id: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType: ...
 
@@ -2242,7 +2242,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> Any: ...
 
@@ -2254,7 +2254,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> Any:
         """Send an update request to the workflow and wait for it to complete.
@@ -2300,7 +2300,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         *,
         wait_for_stage: WorkflowUpdateStage,
         id: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
@@ -2315,7 +2315,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         *,
         wait_for_stage: WorkflowUpdateStage,
         id: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
@@ -2330,7 +2330,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         args: MultiParamSpec.args,  # pyright: ignore
         wait_for_stage: WorkflowUpdateStage,
         id: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
@@ -2345,7 +2345,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowUpdateHandle[Any]: ...
 
@@ -2358,7 +2358,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowUpdateHandle[Any]:
         """Send an update request to the workflow and return a handle to it.
@@ -2406,7 +2406,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         args: Sequence[Any] = [],
         id: Optional[str] = None,
         result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> WorkflowUpdateHandle[Any]:
         if wait_for_stage == WorkflowUpdateStage.ADMITTED:
@@ -2520,7 +2520,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
@@ -2552,7 +2552,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
@@ -2586,7 +2586,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
@@ -2620,7 +2620,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
@@ -2652,7 +2652,7 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         static_summary: Optional[str] = None,
         static_details: Optional[str] = None,
         start_delay: Optional[timedelta] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         versioning_override: Optional[temporalio.common.VersioningOverride] = None,
@@ -2726,7 +2726,7 @@ class AsyncActivityHandle:
     async def heartbeat(
         self,
         *details: Any,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Record a heartbeat for the activity.
@@ -2750,7 +2750,7 @@ class AsyncActivityHandle:
         self,
         result: Optional[Any] = temporalio.common._arg_unset,
         *,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Complete the activity.
@@ -2775,7 +2775,7 @@ class AsyncActivityHandle:
         error: Exception,
         *,
         last_heartbeat_details: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Fail the activity.
@@ -2800,7 +2800,7 @@ class AsyncActivityHandle:
     async def report_cancellation(
         self,
         *details: Any,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Report the activity as cancelled.
@@ -3222,7 +3222,7 @@ class WorkflowExecutionAsyncIterator:
         *,
         event_filter_type: WorkflowHistoryEventFilterType = WorkflowHistoryEventFilterType.ALL_EVENT,
         skip_archival: bool = False,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> AsyncIterator[WorkflowHistory]:
         """Create an async iterator consuming all workflows and calling
@@ -3425,7 +3425,7 @@ class ScheduleHandle:
     async def backfill(
         self,
         *backfill: ScheduleBackfill,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Backfill the schedule by going through the specified time periods as
@@ -3451,7 +3451,7 @@ class ScheduleHandle:
     async def delete(
         self,
         *,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Delete this schedule.
@@ -3472,7 +3472,7 @@ class ScheduleHandle:
     async def describe(
         self,
         *,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> ScheduleDescription:
         """Fetch this schedule's description.
@@ -3494,7 +3494,7 @@ class ScheduleHandle:
         self,
         *,
         note: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Pause the schedule and set a note.
@@ -3518,7 +3518,7 @@ class ScheduleHandle:
         self,
         *,
         overlap: Optional[ScheduleOverlapPolicy] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Trigger an action on this schedule to happen immediately.
@@ -3542,7 +3542,7 @@ class ScheduleHandle:
         self,
         *,
         note: Optional[str] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Unpause the schedule and set a note.
@@ -3567,7 +3567,7 @@ class ScheduleHandle:
         self,
         updater: Callable[[ScheduleUpdateInput], Optional[ScheduleUpdate]],
         *,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None: ...
 
@@ -3576,7 +3576,7 @@ class ScheduleHandle:
         self,
         updater: Callable[[ScheduleUpdateInput], Awaitable[Optional[ScheduleUpdate]]],
         *,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None: ...
 
@@ -3587,7 +3587,7 @@ class ScheduleHandle:
             Union[Optional[ScheduleUpdate], Awaitable[Optional[ScheduleUpdate]]],
         ],
         *,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Update a schedule using a callback to build the update from the
@@ -5004,7 +5004,7 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
     async def result(
         self,
         *,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> LocalReturnType:
         """Wait for and return the result of the update. The result may already be known in which case no network call
@@ -5050,7 +5050,7 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
 
     async def _poll_until_outcome(
         self,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         if self._known_outcome:
@@ -5248,7 +5248,7 @@ class StartWorkflowInput:
     static_details: Optional[str]
     # Type may be absent
     ret_type: Optional[Type]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
     request_eager_start: bool
     priority: temporalio.common.Priority
@@ -5266,7 +5266,7 @@ class CancelWorkflowInput:
     id: str
     run_id: Optional[str]
     first_execution_run_id: Optional[str]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5276,7 +5276,7 @@ class DescribeWorkflowInput:
 
     id: str
     run_id: Optional[str]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5291,7 +5291,7 @@ class FetchWorkflowHistoryEventsInput:
     wait_new_event: bool
     event_filter_type: WorkflowHistoryEventFilterType
     skip_archival: bool
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5302,7 +5302,7 @@ class ListWorkflowsInput:
     query: Optional[str]
     page_size: int
     next_page_token: Optional[bytes]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
     limit: Optional[int]
 
@@ -5312,7 +5312,7 @@ class CountWorkflowsInput:
     """Input for :py:meth:`OutboundInterceptor.count_workflows`."""
 
     query: Optional[str]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5328,7 +5328,7 @@ class QueryWorkflowInput:
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     # Type may be absent
     ret_type: Optional[Type]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5341,7 +5341,7 @@ class SignalWorkflowInput:
     signal: str
     args: Sequence[Any]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5354,7 +5354,7 @@ class TerminateWorkflowInput:
     first_execution_run_id: Optional[str]
     args: Sequence[Any]
     reason: Optional[str]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5371,7 +5371,7 @@ class StartWorkflowUpdateInput:
     wait_for_stage: WorkflowUpdateStage
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     ret_type: Optional[Type]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5385,7 +5385,7 @@ class UpdateWithStartUpdateWorkflowInput:
     wait_for_stage: WorkflowUpdateStage
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     ret_type: Optional[Type]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5419,7 +5419,7 @@ class UpdateWithStartStartWorkflowInput:
     static_details: Optional[str]
     # Type may be absent
     ret_type: Optional[Type]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
     priority: temporalio.common.Priority
     versioning_override: Optional[temporalio.common.VersioningOverride] = None
@@ -5443,7 +5443,7 @@ class HeartbeatAsyncActivityInput:
 
     id_or_token: Union[AsyncActivityIDReference, bytes]
     details: Sequence[Any]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5453,7 +5453,7 @@ class CompleteAsyncActivityInput:
 
     id_or_token: Union[AsyncActivityIDReference, bytes]
     result: Optional[Any]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5464,7 +5464,7 @@ class FailAsyncActivityInput:
     id_or_token: Union[AsyncActivityIDReference, bytes]
     error: Exception
     last_heartbeat_details: Sequence[Any]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5474,7 +5474,7 @@ class ReportCancellationAsyncActivityInput:
 
     id_or_token: Union[AsyncActivityIDReference, bytes]
     details: Sequence[Any]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5492,7 +5492,7 @@ class CreateScheduleInput:
             temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
         ]
     ]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5502,7 +5502,7 @@ class ListSchedulesInput:
 
     page_size: int
     next_page_token: Optional[bytes]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
     query: Optional[str] = None
 
@@ -5513,7 +5513,7 @@ class BackfillScheduleInput:
 
     id: str
     backfills: Sequence[ScheduleBackfill]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5522,7 +5522,7 @@ class DeleteScheduleInput:
     """Input for :py:meth:`OutboundInterceptor.delete_schedule`."""
 
     id: str
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5531,7 +5531,7 @@ class DescribeScheduleInput:
     """Input for :py:meth:`OutboundInterceptor.describe_schedule`."""
 
     id: str
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5541,7 +5541,7 @@ class PauseScheduleInput:
 
     id: str
     note: Optional[str]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5551,7 +5551,7 @@ class TriggerScheduleInput:
 
     id: str
     overlap: Optional[ScheduleOverlapPolicy]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5561,7 +5561,7 @@ class UnpauseScheduleInput:
 
     id: str
     note: Optional[str]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5574,7 +5574,7 @@ class UpdateScheduleInput:
         [ScheduleUpdateInput],
         Union[Optional[ScheduleUpdate], Awaitable[Optional[ScheduleUpdate]]],
     ]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5584,7 +5584,7 @@ class UpdateWorkerBuildIdCompatibilityInput:
 
     task_queue: str
     operation: BuildIdOp
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5594,7 +5594,7 @@ class GetWorkerBuildIdCompatibilityInput:
 
     task_queue: str
     max_sets: Optional[int]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 
@@ -5605,7 +5605,7 @@ class GetWorkerTaskReachabilityInput:
     build_ids: Sequence[str]
     task_queues: Sequence[str]
     reachability: Optional[TaskReachabilityType]
-    rpc_metadata: Mapping[str, str]
+    rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: Optional[timedelta]
 
 

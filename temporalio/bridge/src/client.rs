@@ -8,7 +8,9 @@ use temporal_client::{
     ConfiguredClient, HealthService, HttpConnectProxyOptions, RetryClient, RetryConfig,
     TemporalServiceClientWithMetrics, TestService, TlsConfig, WorkflowService,
 };
-use tonic::metadata::MetadataKey;
+use tonic::metadata::{
+    AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataKey, BinaryMetadataValue,
+};
 use url::Url;
 
 use crate::runtime;
@@ -72,8 +74,16 @@ struct RpcCall {
     rpc: String,
     req: Vec<u8>,
     retry: bool,
-    metadata: HashMap<String, String>,
+    metadata: HashMap<String, RpcMetadataValue>,
     timeout_millis: Option<u64>,
+}
+
+#[derive(FromPyObject)]
+enum RpcMetadataValue {
+    #[pyo3(transparent, annotation = "str")]
+    Str(String),
+    #[pyo3(transparent, annotation = "bytes")]
+    Bytes(Vec<u8>),
 }
 
 pub fn connect_client<'a>(
@@ -536,12 +546,32 @@ fn rpc_req<P: prost::Message + Default>(call: RpcCall) -> PyResult<tonic::Reques
         .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
     let mut req = tonic::Request::new(proto);
     for (k, v) in call.metadata {
-        req.metadata_mut().insert(
-            MetadataKey::from_str(k.as_str())
-                .map_err(|err| PyValueError::new_err(format!("Invalid metadata key: {err}")))?,
-            v.parse()
-                .map_err(|err| PyValueError::new_err(format!("Invalid metadata value: {err}")))?,
-        );
+        if let Ok(binary_key) = BinaryMetadataKey::from_str(&k) {
+            let RpcMetadataValue::Bytes(bytes) = v else {
+                return Err(PyValueError::new_err(format!(
+                    "Invalid metadata value for binary key {k}: expected bytes"
+                )));
+            };
+
+            req.metadata_mut()
+                .insert_bin(binary_key, BinaryMetadataValue::from_bytes(&bytes));
+        } else {
+            let ascii_key = AsciiMetadataKey::from_str(&k)
+                .map_err(|err| PyValueError::new_err(format!("Invalid metadata key: {err}")))?;
+
+            let RpcMetadataValue::Str(string) = v else {
+                return Err(PyValueError::new_err(format!(
+                    "Invalid metadata value for ASCII key {k}: expected str"
+                )));
+            };
+
+            req.metadata_mut().insert(
+                ascii_key,
+                AsciiMetadataValue::from_str(&string).map_err(|err| {
+                    PyValueError::new_err(format!("Invalid metadata value: {err}"))
+                })?,
+            );
+        }
     }
     if let Some(timeout_millis) = call.timeout_millis {
         req.set_timeout(Duration::from_millis(timeout_millis));
