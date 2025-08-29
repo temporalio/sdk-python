@@ -318,6 +318,10 @@ class ToolsWorkflow:
                     ActivityWeatherService.get_weather_method,
                     start_to_close_timeout=timedelta(seconds=10),
                 ),
+                openai_agents.workflow.activity_as_tool(
+                    get_weather_failure,
+                    start_to_close_timeout=timedelta(seconds=10),
+                ),
             ],
         )
         result = await Runner.run(
@@ -460,6 +464,53 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
                 .activity_task_completed_event_attributes.result.payloads[0]
                 .data.decode()
             )
+
+
+@activity.defn
+async def get_weather_failure(city: str) -> Weather:
+    """
+    Get the weather for a given city.
+    """
+    raise ApplicationError("No weather", non_retryable=True)
+
+
+class TestWeatherFailureModel(StaticTestModel):
+    responses = [
+        ResponseBuilders.tool_call('{"city":"Tokyo"}', "get_weather_failure"),
+    ]
+
+
+async def test_tool_failure_workflow(client: Client):
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(TestWeatherFailureModel()),
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        ToolsWorkflow,
+        activities=[
+            get_weather_failure,
+        ],
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            ToolsWorkflow.run,
+            "What is the weather in Tokio?",
+            id=f"tools-failure-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=2),
+        )
+        with pytest.raises(WorkflowFailureError) as e:
+            result = await workflow_handle.result()
+        cause = e.value.cause
+        assert isinstance(cause, ApplicationError)
+        assert "Workflow failure exception in Agents Framework" in cause.message
 
 
 @pytest.mark.parametrize("use_local_model", [True, False])

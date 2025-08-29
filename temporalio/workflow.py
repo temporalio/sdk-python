@@ -897,6 +897,9 @@ class _Runtime(ABC):
     @abstractmethod
     def workflow_set_current_details(self, details: str): ...
 
+    @abstractmethod
+    def workflow_is_failure_exception(self, err: BaseException) -> bool: ...
+
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
     "__temporal_current_update_info"
@@ -979,6 +982,15 @@ def memo() -> Mapping[str, Any]:
         Mapping of all memo keys and they values without type hints.
     """
     return _Runtime.current().workflow_memo()
+
+
+def is_failure_exception(err: BaseException) -> bool:
+    """Checks if the given exception is a workflow failure in the current workflow.
+
+    Returns:
+        True if the given exception is a workflow failure in the current workflow.
+    """
+    return _Runtime.current().workflow_is_failure_exception(err)
 
 
 @overload

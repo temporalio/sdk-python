@@ -17,10 +17,12 @@ from temporalio.contrib.openai_agents._temporal_openai_agents import (
 from temporalio.contrib.openai_agents._trace_interceptor import (
     OpenAIAgentsTracingInterceptor,
 )
+from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 
 from . import workflow
 
 __all__ = [
+    "AgentsWorkflowError",
     "OpenAIAgentsPlugin",
     "ModelActivityParameters",
     "workflow",
