@@ -145,6 +145,7 @@ class WorkflowInstanceDetails:
     worker_level_failure_exception_types: Sequence[Type[BaseException]]
     last_completion_result: temporalio.api.common.v1.Payloads
 
+
 class WorkflowInstance(ABC):
     """Instance of a workflow that can handle activations."""
 
@@ -1688,14 +1689,25 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._assert_not_read_only("set current details")
         self._current_details = details
 
-    def workflow_last_completion_result(self, type_hint: Optional[Type]) -> Optional[Any]:
+    def workflow_last_completion_result(
+        self, type_hint: Optional[Type]
+    ) -> Optional[Any]:
         if len(self._last_completion_result.payloads) == 0:
             return None
         elif len(self._last_completion_result.payloads) > 1:
-            warnings.warn(f"Expected single last completion result, got {len(self._last_completion_result.payloads)}")
+            warnings.warn(
+                f"Expected single last completion result, got {len(self._last_completion_result.payloads)}"
+            )
             return None
 
-        return self._payload_converter.from_payload(self._last_completion_result.payloads[0], type_hint)
+        if type_hint is None:
+            return self._payload_converter.from_payload(
+                self._last_completion_result.payloads[0]
+            )
+        else:
+            return self._payload_converter.from_payload(
+                self._last_completion_result.payloads[0], type_hint
+            )
 
     #### Calls from outbound impl ####
     # These are in alphabetical order and all start with "_outbound_".

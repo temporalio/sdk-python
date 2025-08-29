@@ -4,7 +4,7 @@ import json
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Mapping, Optional, cast, Tuple
+from typing import Any, List, Mapping, Optional, Tuple, cast
 from unittest import mock
 
 import google.protobuf.any_pb2
@@ -92,9 +92,10 @@ from temporalio.service import ServiceCall
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     assert_eq_eventually,
+    assert_eventually,
     ensure_search_attributes_present,
     new_worker,
-    worker_versioning_enabled, assert_eventually,
+    worker_versioning_enabled,
 )
 from tests.helpers.worker import (
     ExternalWorker,
@@ -1534,20 +1535,26 @@ async def test_schedule_last_completion_result(
             ),
         )
         await handle.trigger()
+
         async def get_schedule_result() -> Tuple[int, Optional[str]]:
             desc = await handle.describe()
             length = len(desc.info.recent_actions)
             if length == 0:
                 return length, None
             else:
-                workflow_id = cast(ScheduleActionExecutionStartWorkflow, desc.info.recent_actions[-1].action).workflow_id
+                workflow_id = cast(
+                    ScheduleActionExecutionStartWorkflow,
+                    desc.info.recent_actions[-1].action,
+                ).workflow_id
                 workflow_handle = client.get_workflow_handle(workflow_id)
                 result = await workflow_handle.result()
                 return length, result
 
         assert await get_schedule_result() == (1, "My First Result")
         await handle.trigger()
-        assert await get_schedule_result() == (2, "From last completion: My First Result")
+        assert await get_schedule_result() == (
+            2,
+            "From last completion: My First Result",
+        )
 
         await handle.delete()
-

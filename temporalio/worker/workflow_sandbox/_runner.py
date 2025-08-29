@@ -18,6 +18,8 @@ import temporalio.converter
 import temporalio.worker._workflow_instance
 import temporalio.workflow
 
+from ...api.common.v1.message_pb2 import Payloads
+
 # Workflow instance has to be relative import
 from .._workflow_instance import (
     UnsandboxedWorkflowRunner,
@@ -27,7 +29,6 @@ from .._workflow_instance import (
 )
 from ._importer import Importer
 from ._restrictions import RestrictionContext, SandboxRestrictions
-from ...api.common.v1.message_pb2 import Payloads
 
 _fake_info = temporalio.workflow.Info(
     attempt=-1,

@@ -898,7 +898,9 @@ class _Runtime(ABC):
     def workflow_set_current_details(self, details: str): ...
 
     @abstractmethod
-    def workflow_last_completion_result(self, type_hint: Optional[Type]) -> Optional[Any]: ...
+    def workflow_last_completion_result(
+        self, type_hint: Optional[Type]
+    ) -> Optional[Any]: ...
 
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
@@ -1040,6 +1042,10 @@ def get_current_details() -> str:
     This can be in Temporal markdown format and can span multiple lines.
     """
     return _Runtime.current().workflow_get_current_details()
+
+
+@overload
+def get_last_completion_result() -> Optional[Any]: ...
 
 
 @overload
