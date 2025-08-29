@@ -1,9 +1,10 @@
+import asyncio
 import dataclasses
 import json
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Mapping, Optional, cast
+from typing import Any, List, Mapping, Optional, Tuple, cast
 from unittest import mock
 
 import google.protobuf.any_pb2
@@ -91,6 +92,7 @@ from temporalio.service import ServiceCall
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     assert_eq_eventually,
+    assert_eventually,
     ensure_search_attributes_present,
     new_worker,
     worker_versioning_enabled,
@@ -1501,3 +1503,58 @@ async def test_cloud_client_simple():
         GetNamespaceRequest(namespace=os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"])
     )
     assert os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"] == result.namespace.namespace
+
+
+@workflow.defn
+class LastCompletionResultWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        last_result = workflow.get_last_completion_result(type_hint=str)
+        if last_result is not None:
+            return "From last completion: " + last_result
+        else:
+            return "My First Result"
+
+
+async def test_schedule_last_completion_result(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server doesn't support schedules")
+
+    async with new_worker(client, LastCompletionResultWorkflow) as worker:
+        handle = await client.create_schedule(
+            f"schedule-{uuid.uuid4()}",
+            Schedule(
+                action=ScheduleActionStartWorkflow(
+                    "LastCompletionResultWorkflow",
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                ),
+                spec=ScheduleSpec(),
+            ),
+        )
+        await handle.trigger()
+
+        async def get_schedule_result() -> Tuple[int, Optional[str]]:
+            desc = await handle.describe()
+            length = len(desc.info.recent_actions)
+            if length == 0:
+                return length, None
+            else:
+                workflow_id = cast(
+                    ScheduleActionExecutionStartWorkflow,
+                    desc.info.recent_actions[-1].action,
+                ).workflow_id
+                workflow_handle = client.get_workflow_handle(workflow_id)
+                result = await workflow_handle.result()
+                return length, result
+
+        assert await get_schedule_result() == (1, "My First Result")
+        await handle.trigger()
+        assert await get_schedule_result() == (
+            2,
+            "From last completion: My First Result",
+        )
+
+        await handle.delete()
