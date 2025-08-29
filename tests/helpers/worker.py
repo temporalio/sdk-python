@@ -140,12 +140,9 @@ class KitchenSinkWorkflow:
             opt = action.execute_activity
             config = workflow.ActivityConfig(
                 task_queue=opt.task_queue,
-                retry_policy=RetryPolicy(
-                    initial_interval=timedelta(milliseconds=1),
-                    backoff_coefficient=1.01,
-                    maximum_interval=timedelta(milliseconds=2),
-                    maximum_attempts=opt.retry_max_attempts or 1,
-                    non_retryable_error_types=opt.non_retryable_error_types or [],
+                retry_policy=kitchen_sink_retry_policy(
+                    maximum_attempts=opt.retry_max_attempts,
+                    non_retryable_error_types=opt.non_retryable_error_types,
                 ),
             )
             if opt.schedule_to_close_timeout_ms:
@@ -205,6 +202,19 @@ class KitchenSinkWorkflow:
             # Otherwise return last result
             return True, last_result
         return False, None
+
+
+def kitchen_sink_retry_policy(
+    maximum_attempts: Optional[int] = None,
+    non_retryable_error_types: Optional[Sequence[str]] = None,
+) -> RetryPolicy:
+    return RetryPolicy(
+        initial_interval=timedelta(milliseconds=1),
+        backoff_coefficient=1.01,
+        maximum_interval=timedelta(milliseconds=2),
+        maximum_attempts=maximum_attempts or 1,
+        non_retryable_error_types=non_retryable_error_types,
+    )
 
 
 async def cancel_after(task: asyncio.Task, after: float) -> None:

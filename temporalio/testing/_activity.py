@@ -41,6 +41,7 @@ _default_info = temporalio.activity.Info(
     workflow_run_id="test-run",
     workflow_type="test",
     priority=temporalio.common.Priority.default,
+    retry_policy=None,
 )
 
 
