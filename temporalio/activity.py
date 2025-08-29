@@ -125,6 +125,12 @@ class Info:
     workflow_type: str
     priority: temporalio.common.Priority
     retry_policy: Optional[temporalio.common.RetryPolicy]
+    """The retry policy of this activity.
+
+    Note that the server may have set a different policy than the one provided when scheduling the activity.
+    If the value is None, it means the server didn't send information about retry policy (e.g. due to old server
+    version), but it may still be defined server-side."""
+
     # TODO(cretz): Consider putting identity on here for "worker_id" for logger?
 
     def _logger_details(self) -> Mapping[str, Any]:
