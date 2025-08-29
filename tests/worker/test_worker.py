@@ -42,7 +42,6 @@ from temporalio.worker import (
     SlotReleaseContext,
     SlotReserveContext,
     Worker,
-    WorkerConfig,
     WorkerDeploymentConfig,
     WorkerDeploymentVersion,
     WorkerTuner,
@@ -317,6 +316,7 @@ async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvir
             ),
             resource_based_options,
         ),
+        nexus_supplier=FixedSizeSlotSupplier(10),
     )
     async with new_worker(
         client,
@@ -439,7 +439,10 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
     ss = MySlotSupplier()
 
     tuner = WorkerTuner.create_composite(
-        workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
+        workflow_supplier=ss,
+        activity_supplier=ss,
+        local_activity_supplier=ss,
+        nexus_supplier=ss,
     )
     async with new_worker(
         client,
@@ -501,7 +504,10 @@ async def test_throwing_slot_supplier(client: Client, env: WorkflowEnvironment):
     ss = ThrowingSlotSupplier()
 
     tuner = WorkerTuner.create_composite(
-        workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
+        workflow_supplier=ss,
+        activity_supplier=ss,
+        local_activity_supplier=ss,
+        nexus_supplier=ss,
     )
     async with new_worker(
         client,
@@ -537,7 +543,10 @@ async def test_blocking_slot_supplier(client: Client, env: WorkflowEnvironment):
     ss = BlockingSlotSupplier()
 
     tuner = WorkerTuner.create_composite(
-        workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
+        workflow_supplier=ss,
+        activity_supplier=ss,
+        local_activity_supplier=ss,
+        nexus_supplier=ss,
     )
     async with new_worker(
         client,

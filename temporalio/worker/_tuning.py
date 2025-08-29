@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 from abc import ABC, abstractmethod
@@ -303,7 +305,8 @@ class _BridgeSlotSupplierWrapper:
 
 
 def _to_bridge_slot_supplier(
-    slot_supplier: SlotSupplier, kind: Literal["workflow", "activity", "local_activity"]
+    slot_supplier: SlotSupplier,
+    kind: Literal["workflow", "activity", "local_activity", "nexus"],
 ) -> temporalio.bridge.worker.SlotSupplier:
     if isinstance(slot_supplier, FixedSizeSlotSupplier):
         return temporalio.bridge.worker.FixedSizeSlotSupplier(slot_supplier.num_slots)
@@ -347,7 +350,8 @@ class WorkerTuner(ABC):
         workflow_config: Optional[ResourceBasedSlotConfig] = None,
         activity_config: Optional[ResourceBasedSlotConfig] = None,
         local_activity_config: Optional[ResourceBasedSlotConfig] = None,
-    ) -> "WorkerTuner":
+        nexus_config: Optional[ResourceBasedSlotConfig] = None,
+    ) -> WorkerTuner:
         """Create a resource-based tuner with the provided options."""
         resource_cfg = ResourceBasedTunerConfig(target_memory_usage, target_cpu_usage)
         wf = ResourceBasedSlotSupplier(
@@ -359,10 +363,14 @@ class WorkerTuner(ABC):
         local_act = ResourceBasedSlotSupplier(
             local_activity_config or ResourceBasedSlotConfig(), resource_cfg
         )
+        nexus = ResourceBasedSlotSupplier(
+            nexus_config or ResourceBasedSlotConfig(), resource_cfg
+        )
         return _CompositeTuner(
             wf,
             act,
             local_act,
+            nexus,
         )
 
     @staticmethod
@@ -371,7 +379,8 @@ class WorkerTuner(ABC):
         workflow_slots: Optional[int],
         activity_slots: Optional[int],
         local_activity_slots: Optional[int],
-    ) -> "WorkerTuner":
+        nexus_slots: Optional[int],
+    ) -> WorkerTuner:
         """Create a fixed-size tuner with the provided number of slots. Any unspecified slots will default to 100."""
         return _CompositeTuner(
             FixedSizeSlotSupplier(workflow_slots if workflow_slots else 100),
@@ -379,6 +388,7 @@ class WorkerTuner(ABC):
             FixedSizeSlotSupplier(
                 local_activity_slots if local_activity_slots else 100
             ),
+            FixedSizeSlotSupplier(nexus_slots if nexus_slots else 100),
         )
 
     @staticmethod
@@ -387,12 +397,14 @@ class WorkerTuner(ABC):
         workflow_supplier: SlotSupplier,
         activity_supplier: SlotSupplier,
         local_activity_supplier: SlotSupplier,
-    ) -> "WorkerTuner":
+        nexus_supplier: SlotSupplier,
+    ) -> WorkerTuner:
         """Create a tuner composed of the provided slot suppliers."""
         return _CompositeTuner(
             workflow_supplier,
             activity_supplier,
             local_activity_supplier,
+            nexus_supplier,
         )
 
     @abstractmethod
@@ -407,6 +419,10 @@ class WorkerTuner(ABC):
     def _get_local_activity_task_slot_supplier(self) -> SlotSupplier:
         raise NotImplementedError
 
+    @abstractmethod
+    def _get_nexus_slot_supplier(self) -> SlotSupplier:
+        raise NotImplementedError
+
     def _to_bridge_tuner(self) -> temporalio.bridge.worker.TunerHolder:
         return temporalio.bridge.worker.TunerHolder(
             _to_bridge_slot_supplier(
@@ -418,6 +434,7 @@ class WorkerTuner(ABC):
             _to_bridge_slot_supplier(
                 self._get_local_activity_task_slot_supplier(), "local_activity"
             ),
+            _to_bridge_slot_supplier(self._get_nexus_slot_supplier(), "nexus"),
         )
 
     def _get_activities_max(self) -> Optional[int]:
@@ -436,6 +453,7 @@ class _CompositeTuner(WorkerTuner):
     workflow_slot_supplier: SlotSupplier
     activity_slot_supplier: SlotSupplier
     local_activity_slot_supplier: SlotSupplier
+    nexus_slot_supplier: SlotSupplier
 
     def _get_workflow_task_slot_supplier(self) -> SlotSupplier:
         return self.workflow_slot_supplier
@@ -445,3 +463,6 @@ class _CompositeTuner(WorkerTuner):
 
     def _get_local_activity_task_slot_supplier(self) -> SlotSupplier:
         return self.local_activity_slot_supplier
+
+    def _get_nexus_slot_supplier(self) -> SlotSupplier:
+        return self.nexus_slot_supplier
