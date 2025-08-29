@@ -2780,14 +2780,10 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             v.start_to_close_timeout.FromTimedelta(self._input.start_to_close_timeout)
         if self._input.retry_policy:
             self._input.retry_policy.apply_to_proto(v.retry_policy)
-<<<<<<< Updated upstream
-=======
-        print("Input summary:", self._input.summary)
         if self._input.summary:
             command.user_metadata.summary.CopyFrom(
                 self._instance._payload_converter.to_payload(self._input.summary)
             )
->>>>>>> Stashed changes
         v.cancellation_type = cast(
             temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType,
             int(self._input.cancellation_type),
@@ -2808,10 +2804,6 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             if self._input.versioning_intent:
                 command.schedule_activity.versioning_intent = (
                     self._input.versioning_intent._to_proto()
-                )
-            if self._input.summary:
-                command.user_metadata.summary.CopyFrom(
-                    self._instance._payload_converter.to_payload(self._input.summary)
                 )
             if self._input.priority:
                 command.schedule_activity.priority.CopyFrom(
