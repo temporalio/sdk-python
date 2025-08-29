@@ -79,7 +79,6 @@ from ._interceptor import (
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
 )
-from ..api.common.v1.message_pb2 import Payloads
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +143,7 @@ class WorkflowInstanceDetails:
     extern_functions: Mapping[str, Callable]
     disable_eager_activity_execution: bool
     worker_level_failure_exception_types: Sequence[Type[BaseException]]
-    last_completion_result: Payloads
+    last_completion_result: temporalio.api.common.v1.Payloads
 
 class WorkflowInstance(ABC):
     """Instance of a workflow that can handle activations."""
@@ -1690,14 +1689,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._current_details = details
 
     def workflow_last_completion_result(self, type_hint: Optional[Type]) -> Optional[Any]:
-        print("workflow_last_completion_result: ", self._last_completion_result, type(self._last_completion_result), "payload length:", len(self._last_completion_result.payloads))
         if len(self._last_completion_result.payloads) == 0:
             return None
         elif len(self._last_completion_result.payloads) > 1:
             warnings.warn(f"Expected single last completion result, got {len(self._last_completion_result.payloads)}")
             return None
 
-        print("Payload:", self._last_completion_result.payloads[0])
         return self._payload_converter.from_payload(self._last_completion_result.payloads[0], type_hint)
 
     #### Calls from outbound impl ####
@@ -2780,10 +2777,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             v.start_to_close_timeout.FromTimedelta(self._input.start_to_close_timeout)
         if self._input.retry_policy:
             self._input.retry_policy.apply_to_proto(v.retry_policy)
-        if self._input.summary:
-            command.user_metadata.summary.CopyFrom(
-                self._instance._payload_converter.to_payload(self._input.summary)
-            )
+
         v.cancellation_type = cast(
             temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType,
             int(self._input.cancellation_type),
@@ -2804,6 +2798,10 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             if self._input.versioning_intent:
                 command.schedule_activity.versioning_intent = (
                     self._input.versioning_intent._to_proto()
+                )
+            if self._input.summary:
+                command.user_metadata.summary.CopyFrom(
+                    self._instance._payload_converter.to_payload(self._input.summary)
                 )
             if self._input.priority:
                 command.schedule_activity.priority.CopyFrom(
