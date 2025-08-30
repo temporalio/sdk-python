@@ -150,6 +150,25 @@ async def test_grpc_metadata():
         }
     )
 
+    # Binary metadata should be configurable on the client:
+    client.rpc_metadata = {
+        "my-binary-key-bin": b"\x00\x01",
+        "my-binary-key-bin2": b"\x02\x03",
+    }
+    await client.workflow_service.get_system_info(
+        GetSystemInfoRequest(),
+        metadata={
+            "my-binary-key-bin": b"abc",
+        },
+    )
+    workflow_server.assert_last_metadata(
+        {
+            "authorization": "Bearer my-api-key",
+            "my-binary-key-bin": b"abc",
+            "my-binary-key-bin2": b"\x02\x03",
+        }
+    )
+
     # Overwrite API key via client RPC metadata, confirm there
     client.rpc_metadata = {
         "authorization": "my-auth-val1",
