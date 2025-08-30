@@ -59,7 +59,7 @@ class ClientConfig:
     """Python representation of the Rust struct for configuring the client."""
 
     target_url: str
-    metadata: Mapping[str, str]
+    metadata: Mapping[str, str | bytes]
     api_key: Optional[str]
     identity: str
     tls_config: Optional[ClientTlsConfig]
@@ -108,7 +108,7 @@ class Client:
         self._runtime = runtime
         self._ref = ref
 
-    def update_metadata(self, metadata: Mapping[str, str]) -> None:
+    def update_metadata(self, metadata: Mapping[str, str | bytes]) -> None:
         """Update underlying metadata on Core client."""
         self._ref.update_metadata(metadata)
 
