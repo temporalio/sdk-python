@@ -30,7 +30,7 @@ pub struct ClientConfig {
     target_url: String,
     client_name: String,
     client_version: String,
-    metadata: HashMap<String, String>,
+    metadata: HashMap<String, RpcMetadataValue>,
     api_key: Option<String>,
     identity: String,
     tls_config: Option<ClientTlsConfig>,
@@ -126,8 +126,10 @@ macro_rules! rpc_call_on_trait {
 
 #[pymethods]
 impl ClientRef {
-    fn update_metadata(&self, headers: HashMap<String, String>) {
-        self.retry_client.get_client().set_headers(headers);
+    fn update_metadata(&self, headers: HashMap<String, RpcMetadataValue>) {
+        let (ascii_headers, binary_headers) = partition_headers(headers);
+        self.retry_client.get_client().set_headers(ascii_headers);
+        self.retry_client.get_client().set_binary_headers(binary_headers);
     }
 
     fn update_api_key(&self, api_key: Option<String>) {
@@ -598,11 +600,41 @@ where
     }
 }
 
+fn partition_headers(
+    headers: HashMap<String, RpcMetadataValue>,
+) -> (HashMap<String, String>, HashMap<String, Vec<u8>>) {
+    let (ascii_enum_headers, binary_enum_headers): (HashMap<_, _>, HashMap<_, _>) = headers
+        .into_iter()
+        .partition(|(_, v)| matches!(v, RpcMetadataValue::Str(_)));
+
+    let ascii_headers = ascii_enum_headers
+        .into_iter()
+        .map(|(k, v)| {
+            let RpcMetadataValue::Str(s) = v else {
+                unreachable!();
+            };
+            (k, s)
+        })
+        .collect();
+    let binary_headers = binary_enum_headers
+        .into_iter()
+        .map(|(k, v)| {
+            let RpcMetadataValue::Bytes(b) = v else {
+                unreachable!();
+            };
+            (k, b)
+        })
+        .collect();
+
+    (ascii_headers, binary_headers)
+}
+
 impl TryFrom<ClientConfig> for ClientOptions {
     type Error = PyErr;
 
     fn try_from(opts: ClientConfig) -> PyResult<Self> {
         let mut gateway_opts = ClientOptionsBuilder::default();
+        let (ascii_headers, binary_headers) = partition_headers(opts.metadata);
         gateway_opts
             .target_url(
                 Url::parse(&opts.target_url)
@@ -617,7 +649,8 @@ impl TryFrom<ClientConfig> for ClientOptions {
             )
             .keep_alive(opts.keep_alive_config.map(Into::into))
             .http_connect_proxy(opts.http_connect_proxy_config.map(Into::into))
-            .headers(Some(opts.metadata))
+            .headers(Some(ascii_headers))
+            .binary_headers(Some(binary_headers))
             .api_key(opts.api_key);
         // Builder does not allow us to set option here, so we have to make
         // a conditional to even call it

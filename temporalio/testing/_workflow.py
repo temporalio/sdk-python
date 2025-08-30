@@ -84,7 +84,7 @@ class WorkflowEnvironment:
             temporalio.common.QueryRejectCondition
         ] = None,
         retry_config: Optional[temporalio.client.RetryConfig] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         identity: Optional[str] = None,
         tls: bool | temporalio.client.TLSConfig = False,
         ip: str = "127.0.0.1",
@@ -244,7 +244,7 @@ class WorkflowEnvironment:
             temporalio.common.QueryRejectCondition
         ] = None,
         retry_config: Optional[temporalio.client.RetryConfig] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         identity: Optional[str] = None,
         port: Optional[int] = None,
         download_dest_dir: Optional[str] = None,

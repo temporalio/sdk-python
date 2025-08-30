@@ -143,7 +143,7 @@ class ConnectConfig:
     tls: Union[bool, TLSConfig] = False
     retry_config: Optional[RetryConfig] = None
     keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default
-    rpc_metadata: Mapping[str, str] = field(default_factory=dict)
+    rpc_metadata: Mapping[str, str | bytes] = field(default_factory=dict)
     identity: str = ""
     lazy: bool = False
     runtime: Optional[temporalio.runtime.Runtime] = None
@@ -264,7 +264,7 @@ class ServiceClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def update_rpc_metadata(self, metadata: Mapping[str, str]) -> None:
+    def update_rpc_metadata(self, metadata: Mapping[str, str | bytes]) -> None:
         """Update service client's RPC metadata."""
         raise NotImplementedError
 
@@ -1316,7 +1316,7 @@ class _BridgeServiceClient(ServiceClient):
         """Underlying service client."""
         return self
 
-    def update_rpc_metadata(self, metadata: Mapping[str, str]) -> None:
+    def update_rpc_metadata(self, metadata: Mapping[str, str | bytes]) -> None:
         """Update Core client metadata."""
         # Mutate the bridge config and then only mutate the running client
         # metadata if already connected

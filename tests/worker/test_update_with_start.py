@@ -822,7 +822,7 @@ async def test_start_update_with_start_empty_details(client: Client):
             req: temporalio.api.workflowservice.v1.ExecuteMultiOperationRequest,
             *,
             retry: bool = False,
-            metadata: Mapping[str, str] = {},
+            metadata: Mapping[str, str | bytes] = {},
             timeout: Optional[timedelta] = None,
         ) -> temporalio.api.workflowservice.v1.ExecuteMultiOperationResponse:
             raise self.empty_details_err

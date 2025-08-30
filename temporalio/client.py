@@ -118,7 +118,7 @@ class Client:
         tls: Union[bool, TLSConfig] = False,
         retry_config: Optional[RetryConfig] = None,
         keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         identity: Optional[str] = None,
         lazy: bool = False,
         runtime: Optional[temporalio.runtime.Runtime] = None,
@@ -296,7 +296,7 @@ class Client:
         return self._config["data_converter"]
 
     @property
-    def rpc_metadata(self) -> Mapping[str, str]:
+    def rpc_metadata(self) -> Mapping[str, str | bytes]:
         """Headers for every call made by this client.
 
         Do not use mutate this mapping. Rather, set this property with an
@@ -305,7 +305,7 @@ class Client:
         return self.service_client.config.rpc_metadata
 
     @rpc_metadata.setter
-    def rpc_metadata(self, value: Mapping[str, str]) -> None:
+    def rpc_metadata(self, value: Mapping[str, str | bytes]) -> None:
         """Update the headers for this client.
 
         Do not mutate this mapping after set. Rather, set an entirely new
@@ -7209,7 +7209,7 @@ class CloudOperationsClient:
         tls: Union[bool, TLSConfig] = True,
         retry_config: Optional[RetryConfig] = None,
         keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, str | bytes] = {},
         identity: Optional[str] = None,
         lazy: bool = False,
         runtime: Optional[temporalio.runtime.Runtime] = None,
@@ -7301,7 +7301,7 @@ class CloudOperationsClient:
         return self._service_client.config.identity
 
     @property
-    def rpc_metadata(self) -> Mapping[str, str]:
+    def rpc_metadata(self) -> Mapping[str, str | bytes]:
         """Headers for every call made by this client.
 
         Do not use mutate this mapping. Rather, set this property with an
@@ -7311,7 +7311,7 @@ class CloudOperationsClient:
         return self.service_client.config.rpc_metadata
 
     @rpc_metadata.setter
-    def rpc_metadata(self, value: Mapping[str, str]) -> None:
+    def rpc_metadata(self, value: Mapping[str, str | bytes]) -> None:
         """Update the headers for this client.
 
         Do not mutate this mapping after set. Rather, set an entirely new
