@@ -35,9 +35,6 @@ from tests.nexus.test_workflow_caller_cancellation_types import (
 class TestContext:
     __test__ = False
     cancellation_type: workflow.NexusOperationCancellationType
-    caller_op_future_resolved: asyncio.Future[datetime] = field(
-        default_factory=asyncio.Future
-    )
     cancel_handler_released: asyncio.Future[datetime] = field(
         default_factory=asyncio.Future
     )
@@ -129,6 +126,7 @@ class Input:
 @dataclass
 class CancellationResult:
     operation_token: str
+    caller_op_future_resolved: datetime
     error_type: Optional[str] = None
     error_cause_type: Optional[str] = None
 
@@ -143,6 +141,7 @@ class CallerWorkflow:
         )
         self.released = False
         self.operation_token: Optional[str] = None
+        self.caller_op_future_resolved: asyncio.Future[datetime] = asyncio.Future()
 
     @workflow.signal
     def release(self):
@@ -184,13 +183,14 @@ class CallerWorkflow:
             error_type = err.__class__.__name__
             error_cause_type = err.__cause__.__class__.__name__
 
-        test_context.caller_op_future_resolved.set_result(datetime.now(timezone.utc))
+        self.caller_op_future_resolved.set_result(workflow.now())
         assert op_handle.operation_token
         await workflow.wait_condition(lambda: self.released)
         return CancellationResult(
             operation_token=op_handle.operation_token,
             error_type=error_type,
             error_cause_type=error_cause_type,
+            caller_op_future_resolved=self.caller_op_future_resolved.result(),
         )
 
 
@@ -300,7 +300,6 @@ async def check_behavior_for_try_cancel(
     assert result.error_type == "NexusOperationError"
     assert result.error_cause_type == "CancelledError"
 
-    caller_op_future_resolved = test_context.caller_op_future_resolved.result()
     await assert_event_subsequence(
         [
             (caller_wf, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED),
@@ -317,7 +316,7 @@ async def check_behavior_for_try_cancel(
         EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_FAILED,
     )
     assert (
-        caller_op_future_resolved
+        result.caller_op_future_resolved
         < op_cancel_requested_event
         < op_cancel_request_failed_event
     )
@@ -341,7 +340,6 @@ async def check_behavior_for_wait_cancellation_requested(
             (caller_wf, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED),
         ]
     )
-    caller_op_future_resolved = test_context.caller_op_future_resolved.result()
     op_cancel_request_failed = await get_event_time(
         caller_wf,
         EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_FAILED,
@@ -350,7 +348,11 @@ async def check_behavior_for_wait_cancellation_requested(
         handler_wf,
         EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED,
     )
-    assert op_cancel_request_failed < caller_op_future_resolved < handler_wf_completed
+    assert (
+        op_cancel_request_failed
+        < result.caller_op_future_resolved
+        < handler_wf_completed
+    )
 
 
 async def check_behavior_for_wait_cancellation_completed(
@@ -373,9 +375,8 @@ async def check_behavior_for_wait_cancellation_completed(
             (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_COMPLETED),
         ]
     )
-    caller_op_future_resolved = test_context.caller_op_future_resolved.result()
     handler_wf_completed = await get_event_time(
         handler_wf,
         EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED,
     )
-    assert handler_wf_completed < caller_op_future_resolved
+    assert handler_wf_completed < result.caller_op_future_resolved
