@@ -563,6 +563,7 @@ class _WorkflowWorker:
             extern_functions=self._extern_functions,
             disable_eager_activity_execution=self._disable_eager_activity_execution,
             worker_level_failure_exception_types=self._workflow_failure_exception_types,
+            last_completion_result=init.last_completion_result,
         )
         if defn.sandboxed:
             return self._workflow_runner.create_instance(det)

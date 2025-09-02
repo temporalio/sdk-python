@@ -35,13 +35,12 @@ import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 import temporalio.exceptions
+from temporalio.api.common.v1.message_pb2 import Payload
 from temporalio.bridge.temporal_sdk_bridge import (
     CustomSlotSupplier as BridgeCustomSlotSupplier,
 )
 from temporalio.bridge.temporal_sdk_bridge import PollShutdownError  # type: ignore
-
-from temporalio.api.common.v1.message_pb2 import Payload
-from temporalio.bridge.visitor import visit_payloads, visit_message
+from temporalio.bridge.visitor import PayloadVisitor
 
 
 @dataclass
@@ -367,16 +366,6 @@ async def _decode_payload(
     return await _apply_to_payload(payload, codec.decode)
 
 
-async def _encode_payloads(
-    payloads: PayloadContainer,
-    codec: temporalio.converter.PayloadCodec,
-) -> None:
-    """Encode payloads with the given codec."""
-    async def visitor(payload: Payload) -> Payload:
-        return (await codec.encode([payload]))[0]
-    return await visit_payloads(visitor, payloads)
-
-
 async def decode_activation(
     act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
     codec: temporalio.converter.PayloadCodec,
@@ -386,7 +375,7 @@ async def decode_activation(
     async def visitor(payload: Payload) -> Payload:
         return (await codec.decode([payload]))[0]
 
-    await visit_message(visitor, act)
+    await PayloadVisitor(skip_search_attributes=True, skip_headers=not decode_headers).visit_message(visitor, act)
 
 async def encode_completion(
     comp: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
@@ -397,4 +386,4 @@ async def encode_completion(
     async def visitor(payload: Payload) -> Payload:
         return (await codec.encode([payload]))[0]
 
-    await visit_message(visitor, comp)
+    await PayloadVisitor(skip_search_attributes=True, skip_headers=not encode_headers).visit_message(visitor, comp)
