@@ -20,6 +20,7 @@ from typing import (
 )
 
 import google.protobuf.internal.containers
+from google.protobuf.message import Message
 from typing_extensions import TypeAlias
 
 import temporalio.api.common.v1
@@ -38,6 +39,9 @@ from temporalio.bridge.temporal_sdk_bridge import (
     CustomSlotSupplier as BridgeCustomSlotSupplier,
 )
 from temporalio.bridge.temporal_sdk_bridge import PollShutdownError  # type: ignore
+
+from temporalio.api.common.v1.message_pb2 import Payload
+from temporalio.bridge.visitor import visit_payloads, visit_message
 
 
 @dataclass
@@ -368,15 +372,9 @@ async def _encode_payloads(
     codec: temporalio.converter.PayloadCodec,
 ) -> None:
     """Encode payloads with the given codec."""
-    return await _apply_to_payloads(payloads, codec.encode)
-
-
-async def _encode_payload(
-    payload: temporalio.api.common.v1.Payload,
-    codec: temporalio.converter.PayloadCodec,
-) -> None:
-    """Decode a payload with the given codec."""
-    return await _apply_to_payload(payload, codec.encode)
+    async def visitor(payload: Payload) -> Payload:
+        return (await codec.encode([payload]))[0]
+    return await visit_payloads(visitor, payloads)
 
 
 async def decode_activation(
@@ -385,77 +383,10 @@ async def decode_activation(
     decode_headers: bool,
 ) -> None:
     """Decode the given activation with the codec."""
-    for job in act.jobs:
-        if job.HasField("query_workflow"):
-            await _decode_payloads(job.query_workflow.arguments, codec)
-            if decode_headers:
-                await _decode_headers(job.query_workflow.headers, codec)
-        elif job.HasField("resolve_activity"):
-            if job.resolve_activity.result.HasField("cancelled"):
-                await codec.decode_failure(
-                    job.resolve_activity.result.cancelled.failure
-                )
-            elif job.resolve_activity.result.HasField("completed"):
-                if job.resolve_activity.result.completed.HasField("result"):
-                    await _decode_payload(
-                        job.resolve_activity.result.completed.result, codec
-                    )
-            elif job.resolve_activity.result.HasField("failed"):
-                await codec.decode_failure(job.resolve_activity.result.failed.failure)
-        elif job.HasField("resolve_child_workflow_execution"):
-            if job.resolve_child_workflow_execution.result.HasField("cancelled"):
-                await codec.decode_failure(
-                    job.resolve_child_workflow_execution.result.cancelled.failure
-                )
-            elif job.resolve_child_workflow_execution.result.HasField(
-                "completed"
-            ) and job.resolve_child_workflow_execution.result.completed.HasField(
-                "result"
-            ):
-                await _decode_payload(
-                    job.resolve_child_workflow_execution.result.completed.result, codec
-                )
-            elif job.resolve_child_workflow_execution.result.HasField("failed"):
-                await codec.decode_failure(
-                    job.resolve_child_workflow_execution.result.failed.failure
-                )
-        elif job.HasField("resolve_child_workflow_execution_start"):
-            if job.resolve_child_workflow_execution_start.HasField("cancelled"):
-                await codec.decode_failure(
-                    job.resolve_child_workflow_execution_start.cancelled.failure
-                )
-        elif job.HasField("resolve_request_cancel_external_workflow"):
-            if job.resolve_request_cancel_external_workflow.HasField("failure"):
-                await codec.decode_failure(
-                    job.resolve_request_cancel_external_workflow.failure
-                )
-        elif job.HasField("resolve_signal_external_workflow"):
-            if job.resolve_signal_external_workflow.HasField("failure"):
-                await codec.decode_failure(job.resolve_signal_external_workflow.failure)
-        elif job.HasField("signal_workflow"):
-            await _decode_payloads(job.signal_workflow.input, codec)
-            if decode_headers:
-                await _decode_headers(job.signal_workflow.headers, codec)
-        elif job.HasField("initialize_workflow"):
-            await _decode_payloads(job.initialize_workflow.arguments, codec)
-            if decode_headers:
-                await _decode_headers(job.initialize_workflow.headers, codec)
-            if job.initialize_workflow.HasField("continued_failure"):
-                await codec.decode_failure(job.initialize_workflow.continued_failure)
-            for val in job.initialize_workflow.memo.fields.values():
-                # This uses API payload not bridge payload
-                new_payload = (await codec.decode([val]))[0]
-                # Make a shallow copy, in case new_payload.metadata and val.metadata are
-                # references to the same memory, e.g. decode() returns its input unchanged.
-                new_metadata = dict(new_payload.metadata)
-                val.metadata.clear()
-                val.metadata.update(new_metadata)
-                val.data = new_payload.data
-        elif job.HasField("do_update"):
-            await _decode_payloads(job.do_update.input, codec)
-            if decode_headers:
-                await _decode_headers(job.do_update.headers, codec)
+    async def visitor(payload: Payload) -> Payload:
+        return (await codec.decode([payload]))[0]
 
+    await visit_message(visitor, act)
 
 async def encode_completion(
     comp: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
@@ -463,66 +394,7 @@ async def encode_completion(
     encode_headers: bool,
 ) -> None:
     """Recursively encode the given completion with the codec."""
-    if comp.HasField("failed"):
-        await codec.encode_failure(comp.failed.failure)
-    elif comp.HasField("successful"):
-        for command in comp.successful.commands:
-            if command.HasField("complete_workflow_execution"):
-                if command.complete_workflow_execution.HasField("result"):
-                    await _encode_payload(
-                        command.complete_workflow_execution.result, codec
-                    )
-            elif command.HasField("continue_as_new_workflow_execution"):
-                await _encode_payloads(
-                    command.continue_as_new_workflow_execution.arguments, codec
-                )
-                if encode_headers:
-                    await _encode_headers(
-                        command.continue_as_new_workflow_execution.headers, codec
-                    )
-                for val in command.continue_as_new_workflow_execution.memo.values():
-                    await _encode_payload(val, codec)
-            elif command.HasField("fail_workflow_execution"):
-                await codec.encode_failure(command.fail_workflow_execution.failure)
-            elif command.HasField("respond_to_query"):
-                if command.respond_to_query.HasField("failed"):
-                    await codec.encode_failure(command.respond_to_query.failed)
-                elif command.respond_to_query.HasField(
-                    "succeeded"
-                ) and command.respond_to_query.succeeded.HasField("response"):
-                    await _encode_payload(
-                        command.respond_to_query.succeeded.response, codec
-                    )
-            elif command.HasField("schedule_activity"):
-                await _encode_payloads(command.schedule_activity.arguments, codec)
-                if encode_headers:
-                    await _encode_headers(command.schedule_activity.headers, codec)
-            elif command.HasField("schedule_local_activity"):
-                await _encode_payloads(command.schedule_local_activity.arguments, codec)
-                if encode_headers:
-                    await _encode_headers(
-                        command.schedule_local_activity.headers, codec
-                    )
-            elif command.HasField("signal_external_workflow_execution"):
-                await _encode_payloads(
-                    command.signal_external_workflow_execution.args, codec
-                )
-                if encode_headers:
-                    await _encode_headers(
-                        command.signal_external_workflow_execution.headers, codec
-                    )
-            elif command.HasField("start_child_workflow_execution"):
-                await _encode_payloads(
-                    command.start_child_workflow_execution.input, codec
-                )
-                if encode_headers:
-                    await _encode_headers(
-                        command.start_child_workflow_execution.headers, codec
-                    )
-                for val in command.start_child_workflow_execution.memo.values():
-                    await _encode_payload(val, codec)
-            elif command.HasField("update_response"):
-                if command.update_response.HasField("completed"):
-                    await _encode_payload(command.update_response.completed, codec)
-                elif command.update_response.HasField("rejected"):
-                    await codec.encode_failure(command.update_response.rejected)
+    async def visitor(payload: Payload) -> Payload:
+        return (await codec.encode([payload]))[0]
+
+    await visit_message(visitor, comp)

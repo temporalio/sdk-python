@@ -8275,6 +8275,7 @@ async def test_workflow_headers_with_codec(
             "Temporal",
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=1),
         )
         assert await workflow_handle.result() == "Hello, Temporal!"
 
@@ -8288,6 +8289,7 @@ async def test_workflow_headers_with_codec(
             SignalAndQueryWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=1),
         )
 
         # Simple signals and queries
@@ -8327,3 +8329,4 @@ async def test_workflow_headers_with_codec(
             assert headers["foo"].data == b"bar"
         else:
             assert headers["foo"].data != b"bar"
+    assert False
