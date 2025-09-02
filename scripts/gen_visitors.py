@@ -13,6 +13,7 @@ from temporalio.bridge.proto.workflow_completion.workflow_completion_pb2 import 
 
 base_dir = Path(__file__).parent.parent
 
+
 def gen_workflow_activation_payload_visitor_code() -> str:
     """
     Generate Python source code that, given a function f(Payload) -> Payload,
@@ -23,29 +24,44 @@ def gen_workflow_activation_payload_visitor_code() -> str:
     for repeated fields and map entries, and a convenience entrypoint
     function `visit_workflow_activation_payloads`.
     """
+
     def name_for(desc: Descriptor) -> str:
         # Use fully-qualified name to avoid collisions; replace dots with underscores
-        return desc.full_name.replace('.', '_')
+        return desc.full_name.replace(".", "_")
 
-    def emit_loop(lines: list[str], field_name: str, iter_expr: str, var_name: str, child_method: str) -> None:
+    def emit_loop(
+        lines: list[str],
+        field_name: str,
+        iter_expr: str,
+        var_name: str,
+        child_method: str,
+    ) -> None:
         # Helper to emit a for-loop over a collection with optional headers guard
         if field_name == "headers":
             lines.append("        if not self.skip_headers:")
             lines.append(f"            for {var_name} in {iter_expr}:")
-            lines.append(f"                await self.visit_{child_method}(f, {var_name})")
+            lines.append(
+                f"                await self.visit_{child_method}(f, {var_name})"
+            )
         else:
             lines.append(f"        for {var_name} in {iter_expr}:")
             lines.append(f"            await self.visit_{child_method}(f, {var_name})")
 
-    def emit_singular(lines: list[str], field_name: str, access_expr: str, child_method: str) -> None:
+    def emit_singular(
+        lines: list[str], field_name: str, access_expr: str, child_method: str
+    ) -> None:
         # Helper to emit a singular field visit with presence check and optional headers guard
         if field_name == "headers":
             lines.append("        if not self.skip_headers:")
             lines.append(f"            if o.HasField('{field_name}'):")
-            lines.append(f"                await self.visit_{child_method}(f, {access_expr})")
+            lines.append(
+                f"                await self.visit_{child_method}(f, {access_expr})"
+            )
         else:
             lines.append(f"        if o.HasField('{field_name}'):")
-            lines.append(f"            await self.visit_{child_method}(f, {access_expr})")
+            lines.append(
+                f"            await self.visit_{child_method}(f, {access_expr})"
+            )
 
     # Track which message descriptors have visitor methods generated
     generated: dict[str, bool] = {}
@@ -83,36 +99,65 @@ def gen_workflow_activation_payload_visitor_code() -> str:
 
             # Repeated fields (including maps which are represented as repeated messages)
             if field.label == FieldDescriptor.LABEL_REPEATED:
-                if field.message_type is not None and field.message_type.GetOptions().map_entry:
+                if (
+                    field.message_type is not None
+                    and field.message_type.GetOptions().map_entry
+                ):
                     entry_desc = field.message_type
                     key_fd = entry_desc.fields_by_name.get("key")
                     val_fd = entry_desc.fields_by_name.get("value")
 
-                    if val_fd is not None and val_fd.type == FieldDescriptor.TYPE_MESSAGE:
+                    if (
+                        val_fd is not None
+                        and val_fd.type == FieldDescriptor.TYPE_MESSAGE
+                    ):
                         child_desc = val_fd.message_type
                         child_needed = walk(child_desc)
                         needed |= child_needed
                         if child_needed:
-                            emit_loop(lines, field.name, f"o.{field.name}.values()", "v", name_for(child_desc))
+                            emit_loop(
+                                lines,
+                                field.name,
+                                f"o.{field.name}.values()",
+                                "v",
+                                name_for(child_desc),
+                            )
 
-                    if key_fd is not None and key_fd.type == FieldDescriptor.TYPE_MESSAGE:
+                    if (
+                        key_fd is not None
+                        and key_fd.type == FieldDescriptor.TYPE_MESSAGE
+                    ):
                         key_desc = key_fd.message_type
                         child_needed = walk(key_desc)
                         needed |= child_needed
                         if child_needed:
-                            emit_loop(lines, field.name, f"o.{field.name}.keys()", "k", name_for(key_desc))
+                            emit_loop(
+                                lines,
+                                field.name,
+                                f"o.{field.name}.keys()",
+                                "k",
+                                name_for(key_desc),
+                            )
                 else:
                     child_desc = field.message_type
                     child_needed = walk(child_desc)
                     needed |= child_needed
                     if child_needed:
-                        emit_loop(lines, field.name, f"o.{field.name}", "v", name_for(child_desc))
+                        emit_loop(
+                            lines,
+                            field.name,
+                            f"o.{field.name}",
+                            "v",
+                            name_for(child_desc),
+                        )
             else:
                 child_desc = field.message_type
                 child_needed = walk(child_desc)
                 needed |= child_needed
                 if child_needed:
-                    emit_singular(lines, field.name, f"o.{field.name}", name_for(child_desc))
+                    emit_singular(
+                        lines, field.name, f"o.{field.name}", name_for(child_desc)
+                    )
 
         generated[key] = needed
         in_progress.discard(key)
@@ -134,7 +179,7 @@ def gen_workflow_activation_payload_visitor_code() -> str:
         walk(r)
 
     header = (
-        "from typing import Awaitable, Callable, Any\n\n"
+        "from typing import Any, Awaitable, Callable\n\n"
         "from temporalio.api.common.v1.message_pb2 import Payload\n\n\n"
         "class PayloadVisitor:\n"
         "    def __init__(self, *, skip_search_attributes: bool = False, skip_headers: bool = False):\n"
@@ -156,7 +201,7 @@ def write_generated_visitors_into_visitor_generated_py() -> None:
     code = gen_workflow_activation_payload_visitor_code()
     out_path.write_text(code)
 
+
 if __name__ == "__main__":
     print("Generating temporalio/bridge/visitor_generated.py...", file=sys.stderr)
     write_generated_visitors_into_visitor_generated_py()
-

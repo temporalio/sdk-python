@@ -372,10 +372,14 @@ async def decode_activation(
     decode_headers: bool,
 ) -> None:
     """Decode the given activation with the codec."""
+
     async def visitor(payload: Payload) -> Payload:
         return (await codec.decode([payload]))[0]
 
-    await PayloadVisitor(skip_search_attributes=True, skip_headers=not decode_headers).visit_message(visitor, act)
+    await PayloadVisitor(
+        skip_search_attributes=True, skip_headers=not decode_headers
+    ).visit_message(visitor, act)
+
 
 async def encode_completion(
     comp: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
@@ -383,7 +387,10 @@ async def encode_completion(
     encode_headers: bool,
 ) -> None:
     """Recursively encode the given completion with the codec."""
+
     async def visitor(payload: Payload) -> Payload:
         return (await codec.encode([payload]))[0]
 
-    await PayloadVisitor(skip_search_attributes=True, skip_headers=not encode_headers).visit_message(visitor, comp)
+    await PayloadVisitor(
+        skip_search_attributes=True, skip_headers=not encode_headers
+    ).visit_message(visitor, comp)

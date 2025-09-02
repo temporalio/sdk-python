@@ -201,6 +201,7 @@ def generate_protos(output_dir: Path):
             / v,
         )
 
+
 if __name__ == "__main__":
     check_proto_toolchain_versions()
     print("Generating protos...", file=sys.stderr)

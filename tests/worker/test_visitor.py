@@ -44,9 +44,7 @@ async def test_workflow_activation_completion():
                         schedule_to_close_timeout=Duration(seconds=5),
                         priority=Priority(),
                     ),
-                    user_metadata=UserMetadata(
-                        summary=Payload(data=b"Summary")
-                    ),
+                    user_metadata=UserMetadata(summary=Payload(data=b"Summary")),
                 )
             ],
         ),
@@ -78,9 +76,7 @@ async def test_workflow_activation():
                         Payload(data=b"repeated1"),
                         Payload(data=b"repeated2"),
                     ],
-                    headers={
-                        "header":Payload(data=b"map")
-                    },
+                    headers={"header": Payload(data=b"map")},
                     last_completion_result=Payloads(
                         payloads=[
                             Payload(data=b"obj1"),
@@ -89,9 +85,9 @@ async def test_workflow_activation():
                     ),
                     search_attributes=SearchAttributes(
                         indexed_fields={
-                            "sakey":Payload(data=b"saobj"),
+                            "sakey": Payload(data=b"saobj"),
                         }
-                    )
+                    ),
                 ),
             )
         ]
@@ -110,13 +106,29 @@ async def test_workflow_activation():
     assert act.jobs[0].initialize_workflow.arguments[0].metadata["visited"]
     assert act.jobs[0].initialize_workflow.arguments[1].metadata["visited"]
     assert act.jobs[0].initialize_workflow.headers["header"].metadata["visited"]
-    assert act.jobs[0].initialize_workflow.last_completion_result.payloads[0].metadata["visited"]
-    assert act.jobs[0].initialize_workflow.last_completion_result.payloads[1].metadata["visited"]
-    assert act.jobs[0].initialize_workflow.search_attributes.indexed_fields["sakey"].metadata["visited"]
+    assert (
+        act.jobs[0]
+        .initialize_workflow.last_completion_result.payloads[0]
+        .metadata["visited"]
+    )
+    assert (
+        act.jobs[0]
+        .initialize_workflow.last_completion_result.payloads[1]
+        .metadata["visited"]
+    )
+    assert (
+        act.jobs[0]
+        .initialize_workflow.search_attributes.indexed_fields["sakey"]
+        .metadata["visited"]
+    )
 
     act = original.__deepcopy__()
     await PayloadVisitor(skip_search_attributes=True).visit(visitor, act)
-    assert not act.jobs[0].initialize_workflow.search_attributes.indexed_fields["sakey"].metadata["visited"]
+    assert (
+        not act.jobs[0]
+        .initialize_workflow.search_attributes.indexed_fields["sakey"]
+        .metadata["visited"]
+    )
 
     act = original.__deepcopy__()
     await PayloadVisitor(skip_headers=True).visit(visitor, act)
@@ -197,6 +209,7 @@ async def test_visit_payloads_on_other_commands():
 
     ur = cmds[4].update_response
     assert ur.completed.data == b"visited:e1"
+
 
 async def test_code_gen():
     # Smoke test the generated visitor on a simple activation containing payloads

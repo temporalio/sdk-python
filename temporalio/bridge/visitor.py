@@ -9,7 +9,9 @@ from temporalio.api.common.v1.message_pb2 import Payload, SearchAttributes
 
 
 class PayloadVisitor:
-    def __init__(self, *, skip_search_attributes: bool = False, skip_headers: bool = False):
+    def __init__(
+        self, *, skip_search_attributes: bool = False, skip_headers: bool = False
+    ):
         self.skip_search_attributes = skip_search_attributes
         self.skip_headers = skip_headers
 
@@ -31,8 +33,10 @@ class PayloadVisitor:
             for o in root:
                 await self.visit_payloads(f, o)
         elif isinstance(root, Message):
-            await self.visit_message(f, root,)
-
+            await self.visit_message(
+                f,
+                root,
+            )
 
     async def visit_message(
         self, f: Callable[[Payload], Awaitable[Payload]], root: Message
@@ -44,7 +48,10 @@ class PayloadVisitor:
             # Repeated fields (including maps which are represented as repeated messages)
             if field.label == FieldDescriptor.LABEL_REPEATED:
                 value = getattr(root, field.name)
-                if field.message_type is not None and field.message_type.GetOptions().map_entry:
+                if (
+                    field.message_type is not None
+                    and field.message_type.GetOptions().map_entry
+                ):
                     for k, v in value.items():
                         await self.visit_payloads(f, k)
                         await self.visit_payloads(f, v)
@@ -53,6 +60,8 @@ class PayloadVisitor:
                         await self.visit_payloads(f, item)
             else:
                 # Only descend into singular message fields if present
-                if field.type == FieldDescriptor.TYPE_MESSAGE and root.HasField(field.name):
+                if field.type == FieldDescriptor.TYPE_MESSAGE and root.HasField(
+                    field.name
+                ):
                     value = getattr(root, field.name)
                     await self.visit_payloads(f, value)

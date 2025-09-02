@@ -1,4 +1,4 @@
-from typing import Awaitable, Callable, Any
+from typing import Any, Awaitable, Callable
 
 from temporalio.api.common.v1.message_pb2 import Payload
 

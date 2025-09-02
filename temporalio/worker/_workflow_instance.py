@@ -146,6 +146,7 @@ class WorkflowInstanceDetails:
     worker_level_failure_exception_types: Sequence[Type[BaseException]]
     last_completion_result: Payloads
 
+
 class WorkflowInstance(ABC):
     """Instance of a workflow that can handle activations."""
 
@@ -1689,16 +1690,28 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._assert_not_read_only("set current details")
         self._current_details = details
 
-    def workflow_last_completion_result(self, type_hint: Optional[Type]) -> Optional[Any]:
-        print("workflow_last_completion_result: ", self._last_completion_result, type(self._last_completion_result), "payload length:", len(self._last_completion_result.payloads))
+    def workflow_last_completion_result(
+        self, type_hint: Optional[Type]
+    ) -> Optional[Any]:
+        print(
+            "workflow_last_completion_result: ",
+            self._last_completion_result,
+            type(self._last_completion_result),
+            "payload length:",
+            len(self._last_completion_result.payloads),
+        )
         if len(self._last_completion_result.payloads) == 0:
             return None
         elif len(self._last_completion_result.payloads) > 1:
-            warnings.warn(f"Expected single last completion result, got {len(self._last_completion_result.payloads)}")
+            warnings.warn(
+                f"Expected single last completion result, got {len(self._last_completion_result.payloads)}"
+            )
             return None
 
         print("Payload:", self._last_completion_result.payloads[0])
-        return self._payload_converter.from_payload(self._last_completion_result.payloads[0], type_hint)
+        return self._payload_converter.from_payload(
+            self._last_completion_result.payloads[0], type_hint
+        )
 
     #### Calls from outbound impl ####
     # These are in alphabetical order and all start with "_outbound_".

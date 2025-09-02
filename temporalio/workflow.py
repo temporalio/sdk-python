@@ -898,7 +898,9 @@ class _Runtime(ABC):
     def workflow_set_current_details(self, details: str): ...
 
     @abstractmethod
-    def workflow_last_completion_result(self, type_hint: Optional[Type]) -> Optional[Any]: ...
+    def workflow_last_completion_result(
+        self, type_hint: Optional[Type]
+    ) -> Optional[Any]: ...
 
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(

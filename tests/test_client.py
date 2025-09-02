@@ -1541,4 +1541,3 @@ async def test_schedule_last_completion_result(
 
         await handle.delete()
         assert False
-
