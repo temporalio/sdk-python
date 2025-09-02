@@ -339,6 +339,24 @@ class _ActivityWorker:
                         err,
                         (asyncio.CancelledError, temporalio.exceptions.CancelledError),
                     )
+                    and running_activity.cancellation_details.details
+                    and running_activity.cancellation_details.details.reset
+                ):
+                    temporalio.activity.logger.warning(
+                        "Completing as failure due to unhandled cancel error produced by activity reset",
+                    )
+                    await self._data_converter.encode_failure(
+                        temporalio.exceptions.ApplicationError(
+                            type="ActivityReset",
+                            message="Unhandled activity cancel error produced by activity reset",
+                        ),
+                        completion.result.failed.failure,
+                    )
+                elif (
+                    isinstance(
+                        err,
+                        (asyncio.CancelledError, temporalio.exceptions.CancelledError),
+                    )
                     and running_activity.cancelled_by_request
                 ):
                     temporalio.activity.logger.debug("Completing as cancelled")

@@ -2791,6 +2791,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
                 command.user_metadata.summary.CopyFrom(
                     self._instance._payload_converter.to_payload(self._input.summary)
                 )
+            print("Activity summary: ", command.user_metadata.summary)
             if self._input.priority:
                 command.schedule_activity.priority.CopyFrom(
                     self._input.priority._to_proto()

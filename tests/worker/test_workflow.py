@@ -814,7 +814,10 @@ class SimpleActivityWorkflow:
     @workflow.run
     async def run(self, name: str) -> str:
         return await workflow.execute_activity(
-            say_hello, name, schedule_to_close_timeout=timedelta(seconds=5)
+            say_hello,
+            name,
+            schedule_to_close_timeout=timedelta(seconds=5),
+            summary="Do a thing",
         )
 
 
@@ -8327,3 +8330,28 @@ async def test_workflow_headers_with_codec(
             assert headers["foo"].data == b"bar"
         else:
             assert headers["foo"].data != b"bar"
+
+
+async def test_summary_with_codec(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Time skipping server doesn't persist headers.")
+
+    # Make client with this codec and run a couple of existing tests
+    config = client.config()
+    config["data_converter"] = DataConverter(payload_codec=SimpleCodec())
+    client = Client(**config)
+
+    async with new_worker(
+        client,
+        SimpleActivityWorkflow,
+        SignalAndQueryWorkflow,
+        activities=[say_hello],
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            SimpleActivityWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert await workflow_handle.result() == "Hello, Temporal!"
+    assert False

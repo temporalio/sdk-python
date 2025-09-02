@@ -9,10 +9,12 @@ import signal
 import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from time import sleep
 from typing import Any, Callable, List, NoReturn, Optional, Sequence, Type
 
 import temporalio.api.workflowservice.v1
@@ -1500,7 +1502,6 @@ async def test_activity_reset_catch(client: Client, worker: ExternalWorker):
             ),
             id=activity.info().activity_id,
         )
-        activity.logger.info(f"Sending reset request: {req}")
         await client.workflow_service.reset_activity(req)
         try:
             while True:
@@ -1511,9 +1512,42 @@ async def test_activity_reset_catch(client: Client, worker: ExternalWorker):
             assert details is not None
             return "Got cancelled error, reset? " + str(details.reset)
 
+    @activity.defn
+    def sync_wait_cancel() -> str:
+        req = temporalio.api.workflowservice.v1.ResetActivityRequest(
+            namespace=client.namespace,
+            execution=temporalio.api.common.v1.WorkflowExecution(
+                workflow_id=activity.info().workflow_id,
+                run_id=activity.info().workflow_run_id,
+            ),
+            id=activity.info().activity_id,
+        )
+        asyncio.run(client.workflow_service.reset_activity(req))
+        try:
+            while True:
+                sleep(0.3)
+                activity.heartbeat()
+        except temporalio.exceptions.CancelledError:
+            details = activity.cancellation_details()
+            assert details is not None
+            return "Got cancelled error, reset? " + str(details.reset)
+        except Exception as e:
+            return str(type(e)) + str(e)
+
     result = await _execute_workflow_with_activity(
         client,
         worker,
         wait_cancel,
+    )
+    assert result.result == "Got cancelled error, reset? True"
+
+    config = WorkerConfig(
+        activity_executor=ThreadPoolExecutor(max_workers=1),
+    )
+    result = await _execute_workflow_with_activity(
+        client,
+        worker,
+        sync_wait_cancel,
+        worker_config=config,
     )
     assert result.result == "Got cancelled error, reset? True"
