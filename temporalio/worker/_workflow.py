@@ -552,6 +552,10 @@ class _WorkflowWorker:
             priority=temporalio.common.Priority._from_proto(init.priority),
         )
 
+        previous_run_failure = None
+        if init.HasField("continued_failure"):
+            previous_run_failure = init.continued_failure
+
         # Create instance from details
         det = WorkflowInstanceDetails(
             payload_converter_class=self._data_converter.payload_converter_class,
@@ -564,6 +568,7 @@ class _WorkflowWorker:
             disable_eager_activity_execution=self._disable_eager_activity_execution,
             worker_level_failure_exception_types=self._workflow_failure_exception_types,
             last_completion_result=init.last_completion_result,
+            previous_run_failure=previous_run_failure,
         )
         if defn.sandboxed:
             return self._workflow_runner.create_instance(det)

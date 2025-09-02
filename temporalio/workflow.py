@@ -61,6 +61,7 @@ import temporalio.nexus
 import temporalio.workflow
 from temporalio.nexus._util import ServiceHandlerT
 
+from .api.failure.v1.message_pb2 import Failure
 from .types import (
     AnyType,
     CallableAsyncNoParam,
@@ -898,9 +899,15 @@ class _Runtime(ABC):
     def workflow_set_current_details(self, details: str): ...
 
     @abstractmethod
+    def workflow_has_last_completion_result(self) -> bool: ...
+
+    @abstractmethod
     def workflow_last_completion_result(
         self, type_hint: Optional[Type]
     ) -> Optional[Any]: ...
+
+    @abstractmethod
+    def workflow_previous_run_failure(self) -> Optional[BaseException]: ...
 
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
@@ -1044,6 +1051,13 @@ def get_current_details() -> str:
     return _Runtime.current().workflow_get_current_details()
 
 
+def has_last_completion_result() -> bool:
+    """Get the last completion result of the workflow. This be None if there was
+    no previous completion or the result was None
+    """
+    return _Runtime.current().workflow_has_last_completion_result()
+
+
 @overload
 def get_last_completion_result() -> Optional[Any]: ...
 
@@ -1053,12 +1067,16 @@ def get_last_completion_result(type_hint: Type[ParamType]) -> Optional[ParamType
 
 
 def get_last_completion_result(type_hint: Optional[Type] = None) -> Optional[Any]:
-    """Get the current details of the workflow which may appear in the UI/CLI.
-    Unlike static details set at start, this value can be updated throughout
-    the life of the workflow and is independent of the static details.
-    This can be in Temporal markdown format and can span multiple lines.
+    """Get the last completion result of the workflow. This be None if there was
+    no previous completion or the result was None. has_last_completion_result()
+    can be used to differentiate.
     """
     return _Runtime.current().workflow_last_completion_result(type_hint)
+
+
+def get_previous_run_failure() -> Optional[BaseException]:
+    """Get the last failure of the workflow."""
+    return _Runtime.current().workflow_previous_run_failure()
 
 
 def set_current_details(description: str) -> None:
