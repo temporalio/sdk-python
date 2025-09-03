@@ -20,7 +20,6 @@ from typing import (
 )
 
 import google.protobuf.internal.containers
-from google.protobuf.message import Message
 from typing_extensions import TypeAlias
 
 import temporalio.api.common.v1
@@ -276,94 +275,6 @@ class Worker:
         ref = self._ref
         self._ref = None
         await ref.finalize_shutdown()
-
-
-# See https://mypy.readthedocs.io/en/stable/runtime_troubles.html#using-classes-that-are-generic-in-stubs-but-not-at-runtime
-if TYPE_CHECKING:
-    PayloadContainer: TypeAlias = (
-        google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-            temporalio.api.common.v1.Payload
-        ]
-    )
-else:
-    PayloadContainer: TypeAlias = (
-        google.protobuf.internal.containers.RepeatedCompositeFieldContainer
-    )
-
-
-async def _apply_to_headers(
-    headers: Mapping[str, temporalio.api.common.v1.Payload],
-    cb: Callable[
-        [Sequence[temporalio.api.common.v1.Payload]],
-        Awaitable[List[temporalio.api.common.v1.Payload]],
-    ],
-) -> None:
-    """Apply API payload callback to headers."""
-    for payload in headers.values():
-        new_payload = (await cb([payload]))[0]
-        payload.CopyFrom(new_payload)
-
-
-async def _decode_headers(
-    headers: Mapping[str, temporalio.api.common.v1.Payload],
-    codec: temporalio.converter.PayloadCodec,
-) -> None:
-    """Decode headers with the given codec."""
-    return await _apply_to_headers(headers, codec.decode)
-
-
-async def _encode_headers(
-    headers: Mapping[str, temporalio.api.common.v1.Payload],
-    codec: temporalio.converter.PayloadCodec,
-) -> None:
-    """Encode headers with the given codec."""
-    return await _apply_to_headers(headers, codec.encode)
-
-
-async def _apply_to_payloads(
-    payloads: PayloadContainer,
-    cb: Callable[
-        [Sequence[temporalio.api.common.v1.Payload]],
-        Awaitable[List[temporalio.api.common.v1.Payload]],
-    ],
-) -> None:
-    """Apply API payload callback to payloads."""
-    if len(payloads) == 0:
-        return
-    new_payloads = await cb(payloads)
-    if new_payloads is payloads:
-        return
-    del payloads[:]
-    # TODO(cretz): Copy too expensive?
-    payloads.extend(new_payloads)
-
-
-async def _apply_to_payload(
-    payload: temporalio.api.common.v1.Payload,
-    cb: Callable[
-        [Sequence[temporalio.api.common.v1.Payload]],
-        Awaitable[List[temporalio.api.common.v1.Payload]],
-    ],
-) -> None:
-    """Apply API payload callback to payload."""
-    new_payload = (await cb([payload]))[0]
-    payload.CopyFrom(new_payload)
-
-
-async def _decode_payloads(
-    payloads: PayloadContainer,
-    codec: temporalio.converter.PayloadCodec,
-) -> None:
-    """Decode payloads with the given codec."""
-    return await _apply_to_payloads(payloads, codec.decode)
-
-
-async def _decode_payload(
-    payload: temporalio.api.common.v1.Payload,
-    codec: temporalio.converter.PayloadCodec,
-) -> None:
-    """Decode a payload with the given codec."""
-    return await _apply_to_payload(payload, codec.decode)
 
 
 async def decode_activation(
