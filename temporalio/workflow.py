@@ -899,6 +899,9 @@ class _Runtime(ABC):
     def workflow_set_current_details(self, details: str): ...
 
     @abstractmethod
+    def workflow_is_failure_exception(self, err: BaseException) -> bool: ...
+
+    @abstractmethod
     def workflow_has_last_completion_result(self) -> bool: ...
 
     @abstractmethod
@@ -991,6 +994,15 @@ def memo() -> Mapping[str, Any]:
         Mapping of all memo keys and they values without type hints.
     """
     return _Runtime.current().workflow_memo()
+
+
+def is_failure_exception(err: BaseException) -> bool:
+    """Checks if the given exception is a workflow failure in the current workflow.
+
+    Returns:
+        True if the given exception is a workflow failure in the current workflow.
+    """
+    return _Runtime.current().workflow_is_failure_exception(err)
 
 
 @overload
