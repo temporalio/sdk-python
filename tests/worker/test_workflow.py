@@ -8330,4 +8330,3 @@ async def test_workflow_headers_with_codec(
             assert headers["foo"].data == b"bar"
         else:
             assert headers["foo"].data != b"bar"
-

@@ -1551,3 +1551,33 @@ async def test_activity_reset_catch(client: Client, worker: ExternalWorker):
         worker_config=config,
     )
     assert result.result == "Got cancelled error, reset? True"
+
+
+async def test_activity_reset_history(client: Client, worker: ExternalWorker):
+    @activity.defn
+    async def wait_cancel() -> str:
+        req = temporalio.api.workflowservice.v1.ResetActivityRequest(
+            namespace=client.namespace,
+            execution=temporalio.api.common.v1.WorkflowExecution(
+                workflow_id=activity.info().workflow_id,
+                run_id=activity.info().workflow_run_id,
+            ),
+            id=activity.info().activity_id,
+        )
+        await client.workflow_service.reset_activity(req)
+        while True:
+            await asyncio.sleep(0.3)
+            activity.heartbeat()
+
+    with pytest.raises(WorkflowFailureError) as e:
+        result = await _execute_workflow_with_activity(
+            client,
+            worker,
+            wait_cancel,
+        )
+    assert isinstance(e.value.cause, ActivityError)
+    assert isinstance(e.value.cause.cause, ApplicationError)
+    assert (
+        e.value.cause.cause.message
+        == "Unhandled activity cancel error produced by activity reset"
+    )
