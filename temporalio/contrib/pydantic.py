@@ -56,7 +56,6 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
     def __init__(self, to_json_options: Optional[ToJsonOptions] = None):
         """Create a new payload converter."""
         self._schema_serializer = SchemaSerializer(any_schema())
-        print("Init:", self._schema_serializer)
         self._to_json_options = to_json_options
 
     @property
@@ -72,8 +71,6 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
         See
         https://docs.pydantic.dev/latest/api/pydantic_core/#pydantic_core.to_json.
         """
-        print("To payload:", self._schema_serializer)
-        print(f"value:{value}, type:{type(value)}")
         data = (
             self._schema_serializer.to_json(
                 value, exclude_unset=self._to_json_options.exclude_unset
