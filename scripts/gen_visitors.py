@@ -198,10 +198,12 @@ class PayloadVisitor:
         self, f: Callable[[Payload], Awaitable[Payload]], root: Any
     ) -> None:
         \"\"\"Visits the given root message with the given function.\"\"\"
-        method_name = "visit_" + root.DESCRIPTOR.full_name.replace(".", "_")
+        method_name = "_visit_" + root.DESCRIPTOR.full_name.replace(".", "_")
         method = getattr(self, method_name, None)
         if method is not None:
             await method(f, root)
+        else:
+            raise ValueError(f"Unknown root message type: {root.DESCRIPTOR.full_name}")
 
 """
 
