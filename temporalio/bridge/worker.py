@@ -12,6 +12,7 @@ from typing import (
     Callable,
     List,
     Mapping,
+    MutableSequence,
     Optional,
     Sequence,
     Set,
@@ -34,8 +35,8 @@ import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 import temporalio.exceptions
-from temporalio.api.common.v1.message_pb2 import Payload
-from temporalio.bridge._visitor import PayloadVisitor
+from temporalio.api.common.v1.message_pb2 import Payload, Payloads
+from temporalio.bridge._visitor import PayloadVisitor, VisitorFunctions
 from temporalio.bridge.temporal_sdk_bridge import (
     CustomSlotSupplier as BridgeCustomSlotSupplier,
 )
@@ -277,19 +278,33 @@ class Worker:
         await ref.finalize_shutdown()
 
 
+class _Visitor(VisitorFunctions):
+    def __init__(self, f: Callable[[Sequence[Payload]], Awaitable[List[Payload]]]):
+        self._f = f
+
+    async def visit_payload(self, payload: Payload) -> None:
+        new_payload = (await self._f([payload]))[0]
+        payload.CopyFrom(new_payload)
+
+    async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+        if len(payloads) == 0:
+            return
+        new_payloads = await self._f(payloads)
+        if new_payloads is payloads:
+            return
+        del payloads[:]
+        payloads.extend(new_payloads)
+
+
 async def decode_activation(
     act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
     codec: temporalio.converter.PayloadCodec,
     decode_headers: bool,
 ) -> None:
     """Decode the given activation with the codec."""
-
-    async def visitor(payload: Payload) -> Payload:
-        return (await codec.decode([payload]))[0]
-
     await PayloadVisitor(
         skip_search_attributes=True, skip_headers=not decode_headers
-    ).visit(visitor, act)
+    ).visit(_Visitor(codec.decode), act)
 
 
 async def encode_completion(
@@ -298,10 +313,6 @@ async def encode_completion(
     encode_headers: bool,
 ) -> None:
     """Recursively encode the given completion with the codec."""
-
-    async def visitor(payload: Payload) -> Payload:
-        return (await codec.encode([payload]))[0]
-
     await PayloadVisitor(
         skip_search_attributes=True, skip_headers=not encode_headers
-    ).visit(visitor, comp)
+    ).visit(_Visitor(codec.encode), comp)

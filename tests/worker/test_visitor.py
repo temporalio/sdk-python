@@ -1,5 +1,8 @@
+from typing import MutableSequence
+
 from google.protobuf.duration_pb2 import Duration
 
+import temporalio.bridge.worker
 from temporalio.api.common.v1.message_pb2 import (
     Payload,
     Payloads,
@@ -7,7 +10,7 @@ from temporalio.api.common.v1.message_pb2 import (
     SearchAttributes,
 )
 from temporalio.api.sdk.v1.user_metadata_pb2 import UserMetadata
-from temporalio.bridge._visitor import PayloadVisitor
+from temporalio.bridge._visitor import PayloadVisitor, VisitorFunctions
 from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import (
     InitializeWorkflow,
     WorkflowActivation,
@@ -26,6 +29,16 @@ from temporalio.bridge.proto.workflow_completion.workflow_completion_pb2 import 
     Success,
     WorkflowActivationCompletion,
 )
+from tests.worker.test_workflow import SimpleCodec
+
+
+class Visitor(VisitorFunctions):
+    async def visit_payload(self, payload: Payload) -> None:
+        payload.metadata["visited"] = b"True"
+
+    async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+        for payload in payloads:
+            payload.metadata["visited"] = b"True"
 
 
 async def test_workflow_activation_completion():
@@ -50,21 +63,14 @@ async def test_workflow_activation_completion():
         ),
     )
 
-    async def visitor(payload: Payload) -> Payload:
-        # Mark visited by prefixing data
-        new_payload = Payload()
-        new_payload.metadata.update(payload.metadata)
-        new_payload.data = b"visited:" + payload.data
-        return new_payload
-
-    await PayloadVisitor().visit(visitor, comp)
+    await PayloadVisitor().visit(Visitor(), comp)
 
     cmd = comp.successful.commands[0]
     sa = cmd.schedule_activity
-    assert sa.headers["foo"].data == b"visited:bar"
-    assert len(sa.arguments) == 1 and sa.arguments[0].data == b"visited:baz"
+    assert sa.headers["foo"].metadata["visited"]
+    assert len(sa.arguments) == 1 and sa.arguments[0].metadata["visited"]
 
-    assert cmd.user_metadata.summary.data == b"visited:Summary"
+    assert cmd.user_metadata.summary.metadata["visited"]
 
 
 async def test_workflow_activation():
@@ -102,7 +108,7 @@ async def test_workflow_activation():
         return new_payload
 
     act = original.__deepcopy__()
-    await PayloadVisitor().visit(visitor, act)
+    await PayloadVisitor().visit(Visitor(), act)
     assert act.jobs[0].initialize_workflow.arguments[0].metadata["visited"]
     assert act.jobs[0].initialize_workflow.arguments[1].metadata["visited"]
     assert act.jobs[0].initialize_workflow.headers["header"].metadata["visited"]
@@ -123,7 +129,7 @@ async def test_workflow_activation():
     )
 
     act = original.__deepcopy__()
-    await PayloadVisitor(skip_search_attributes=True).visit(visitor, act)
+    await PayloadVisitor(skip_search_attributes=True).visit(Visitor(), act)
     assert (
         not act.jobs[0]
         .initialize_workflow.search_attributes.indexed_fields["sakey"]
@@ -131,7 +137,7 @@ async def test_workflow_activation():
     )
 
     act = original.__deepcopy__()
-    await PayloadVisitor(skip_headers=True).visit(visitor, act)
+    await PayloadVisitor(skip_headers=True).visit(Visitor(), act)
     assert not act.jobs[0].initialize_workflow.headers["header"].metadata["visited"]
 
 
@@ -180,58 +186,62 @@ async def test_visit_payloads_on_other_commands():
         ),
     )
 
-    async def visitor(payload: Payload) -> Payload:
-        new_payload = Payload()
-        new_payload.metadata.update(payload.metadata)
-        new_payload.data = b"visited:" + payload.data
-        return new_payload
-
-    await PayloadVisitor().visit(visitor, comp)
+    await PayloadVisitor().visit(Visitor(), comp)
 
     cmds = comp.successful.commands
     can = cmds[0].continue_as_new_workflow_execution
-    assert can.arguments[0].data == b"visited:a1"
-    assert can.headers["h1"].data == b"visited:a2"
-    assert can.memo["m1"].data == b"visited:a3"
+    assert can.arguments[0].metadata["visited"]
+    assert can.headers["h1"].metadata["visited"]
+    assert can.memo["m1"].metadata["visited"]
 
     sc = cmds[1].start_child_workflow_execution
-    assert sc.input[0].data == b"visited:b1"
-    assert sc.headers["h2"].data == b"visited:b2"
-    assert sc.memo["m2"].data == b"visited:b3"
+    assert sc.input[0].metadata["visited"]
+    assert sc.headers["h2"].metadata["visited"]
+    assert sc.memo["m2"].metadata["visited"]
 
     se = cmds[2].signal_external_workflow_execution
-    assert se.args[0].data == b"visited:c1"
-    assert se.headers["h3"].data == b"visited:c2"
+    assert se.args[0].metadata["visited"]
+    assert se.headers["h3"].metadata["visited"]
 
     sla = cmds[3].schedule_local_activity
-    assert sla.arguments[0].data == b"visited:d1"
-    assert sla.headers["h4"].data == b"visited:d2"
+    assert sla.arguments[0].metadata["visited"]
+    assert sla.headers["h4"].metadata["visited"]
 
     ur = cmds[4].update_response
-    assert ur.completed.data == b"visited:e1"
+    assert ur.completed.metadata["visited"]
 
 
-async def test_code_gen():
-    # Smoke test the generated visitor on a simple activation containing payloads
-    act = WorkflowActivation(
-        jobs=[
-            WorkflowActivationJob(
-                initialize_workflow=InitializeWorkflow(
-                    arguments=[Payload(data=b"x1"), Payload(data=b"x2")],
-                    headers={"h": Payload(data=b"x3")},
+async def test_bridge_encoding():
+    comp = WorkflowActivationCompletion(
+        run_id="1",
+        successful=Success(
+            commands=[
+                WorkflowCommand(
+                    schedule_activity=ScheduleActivity(
+                        seq=1,
+                        activity_id="1",
+                        activity_type="",
+                        task_queue="",
+                        headers={"foo": Payload(data=b"bar")},
+                        arguments=[
+                            Payload(data=b"repeated1"),
+                            Payload(data=b"repeated2"),
+                        ],
+                        schedule_to_close_timeout=Duration(seconds=5),
+                        priority=Priority(),
+                    ),
+                    user_metadata=UserMetadata(summary=Payload(data=b"Summary")),
                 )
-            )
-        ]
+            ],
+        ),
     )
 
-    async def _f(p: Payload) -> Payload:
-        q = Payload()
-        q.metadata.update(p.metadata)
-        q.data = b"v:" + p.data
-        return q
+    await temporalio.bridge.worker.encode_completion(comp, SimpleCodec(), True)
 
-    await PayloadVisitor().visit(_f, act)
-    init = act.jobs[0].initialize_workflow
-    assert init.arguments[0].data == b"v:x1"
-    assert init.arguments[1].data == b"v:x2"
-    assert init.headers["h"].data == b"v:x3"
+    cmd = comp.successful.commands[0]
+    sa = cmd.schedule_activity
+    assert sa.headers["foo"].metadata["simple-codec"]
+    assert len(sa.arguments) == 1
+    assert sa.arguments[0].metadata["simple-codec"]
+
+    assert cmd.user_metadata.summary.metadata["simple-codec"]
