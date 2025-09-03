@@ -23,7 +23,7 @@ def gen_workflow_activation_payload_visitor_code() -> str:
     The generated code defines async visitor functions for each reachable
     protobuf message type starting from WorkflowActivation, including support
     for repeated fields and map entries, and a convenience entrypoint
-    function `visit_workflow_activation_payloads`.
+    function `visit`.
     """
 
     def name_for(desc: Descriptor) -> str:
