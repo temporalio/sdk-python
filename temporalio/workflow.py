@@ -907,7 +907,7 @@ class _Runtime(ABC):
     ) -> Optional[Any]: ...
 
     @abstractmethod
-    def workflow_previous_run_failure(self) -> Optional[BaseException]: ...
+    def workflow_last_failure(self) -> Optional[BaseException]: ...
 
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
@@ -1074,9 +1074,9 @@ def get_last_completion_result(type_hint: Optional[Type] = None) -> Optional[Any
     return _Runtime.current().workflow_last_completion_result(type_hint)
 
 
-def get_previous_run_failure() -> Optional[BaseException]:
+def get_last_failure() -> Optional[BaseException]:
     """Get the last failure of the workflow."""
-    return _Runtime.current().workflow_previous_run_failure()
+    return _Runtime.current().workflow_last_failure()
 
 
 def set_current_details(description: str) -> None:

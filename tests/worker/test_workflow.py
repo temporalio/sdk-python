@@ -8334,7 +8334,7 @@ class PreviousRunFailureWorkflow:
     @workflow.run
     async def run(self) -> str:
         if workflow.info().attempt != 1:
-            previous_failure = workflow.get_previous_run_failure()
+            previous_failure = workflow.get_last_failure()
             assert isinstance(previous_failure, ApplicationError)
             assert previous_failure.message == "Intentional Failure"
             return "Done"

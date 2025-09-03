@@ -1715,7 +1715,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 self._last_completion_result.payloads[0], type_hint
             )
 
-    def workflow_previous_run_failure(self) -> Optional[BaseException]:
+    def workflow_last_failure(self) -> Optional[BaseException]:
         if self._previous_run_failure:
             return self._failure_converter.from_failure(
                 self._previous_run_failure, self._payload_converter
