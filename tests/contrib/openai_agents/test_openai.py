@@ -1960,11 +1960,7 @@ class CodeInterpreterWorkflow:
         return result.final_output
 
 
-@pytest.mark.parametrize("use_local_model", [True, False])
-async def test_code_interpreter_tool(client: Client, use_local_model):
-    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
-        pytest.skip("No openai API key")
-
+async def test_code_interpreter_tool(client: Client):
     new_config = client.config()
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
@@ -1972,8 +1968,6 @@ async def test_code_interpreter_tool(client: Client, use_local_model):
                 start_to_close_timeout=timedelta(seconds=60)
             ),
             model_provider=TestModelProvider(CodeInterpreterModel())
-            if use_local_model
-            else None,
         )
     ]
     client = Client(**new_config)
@@ -1990,8 +1984,7 @@ async def test_code_interpreter_tool(client: Client, use_local_model):
             execution_timeout=timedelta(seconds=60),
         )
         result = await workflow_handle.result()
-        if use_local_model:
-            assert result == "Over 9000"
+        assert result == "Over 9000"
 
 
 class HostedMCPModel(StaticTestModel):
@@ -2062,11 +2055,7 @@ class HostedMCPWorkflow:
         return result.final_output
 
 
-@pytest.mark.parametrize("use_local_model", [True, False])
-async def test_hosted_mcp_tool(client: Client, use_local_model):
-    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
-        pytest.skip("No openai API key")
-
+async def test_hosted_mcp_tool(client: Client):
     new_config = client.config()
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
@@ -2074,8 +2063,6 @@ async def test_hosted_mcp_tool(client: Client, use_local_model):
                 start_to_close_timeout=timedelta(seconds=120)
             ),
             model_provider=TestModelProvider(HostedMCPModel())
-            if use_local_model
-            else None,
         )
     ]
     client = Client(**new_config)
@@ -2092,8 +2079,7 @@ async def test_hosted_mcp_tool(client: Client, use_local_model):
             execution_timeout=timedelta(seconds=120),
         )
         result = await workflow_handle.result()
-        if use_local_model:
-            assert result == "Some language"
+        assert result == "Some language"
 
 
 class AssertDifferentModelProvider(ModelProvider):
