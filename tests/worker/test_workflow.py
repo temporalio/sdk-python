@@ -2600,6 +2600,7 @@ async def test_workflow_typed_config(client: Client):
         found_marker = False
         async for e in handle.fetch_history_events():
             if e.HasField("marker_recorded_event_attributes"):
+                print("SUMMARY:", e.user_metadata.summary)
                 assert b'"Summary"' == e.user_metadata.summary.data
                 found_marker = True
                 break
