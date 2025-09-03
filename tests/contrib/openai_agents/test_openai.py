@@ -1967,7 +1967,7 @@ async def test_code_interpreter_tool(client: Client):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=60)
             ),
-            model_provider=TestModelProvider(CodeInterpreterModel())
+            model_provider=TestModelProvider(CodeInterpreterModel()),
         )
     ]
     client = Client(**new_config)
@@ -2062,7 +2062,7 @@ async def test_hosted_mcp_tool(client: Client):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=120)
             ),
-            model_provider=TestModelProvider(HostedMCPModel())
+            model_provider=TestModelProvider(HostedMCPModel()),
         )
     ]
     client = Client(**new_config)
