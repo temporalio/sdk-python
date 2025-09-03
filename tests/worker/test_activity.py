@@ -1491,7 +1491,12 @@ async def test_activity_heartbeat_context(client: Client, worker: ExternalWorker
     assert result.result == "details: Some detail"
 
 
-async def test_activity_reset_catch(client: Client, worker: ExternalWorker):
+async def test_activity_reset_catch(
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Time skipping server doesn't support activity reset")
+
     @activity.defn
     async def wait_cancel() -> str:
         req = temporalio.api.workflowservice.v1.ResetActivityRequest(
@@ -1553,7 +1558,12 @@ async def test_activity_reset_catch(client: Client, worker: ExternalWorker):
     assert result.result == "Got cancelled error, reset? True"
 
 
-async def test_activity_reset_history(client: Client, worker: ExternalWorker):
+async def test_activity_reset_history(
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Time skipping server doesn't support activity reset")
+
     @activity.defn
     async def wait_cancel() -> str:
         req = temporalio.api.workflowservice.v1.ResetActivityRequest(
