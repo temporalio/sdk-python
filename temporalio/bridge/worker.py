@@ -284,7 +284,8 @@ class _Visitor(VisitorFunctions):
 
     async def visit_payload(self, payload: Payload) -> None:
         new_payload = (await self._f([payload]))[0]
-        payload.CopyFrom(new_payload)
+        if new_payload is not payload:
+            payload.CopyFrom(new_payload)
 
     async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
         if len(payloads) == 0:
