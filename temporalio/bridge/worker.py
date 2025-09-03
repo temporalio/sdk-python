@@ -36,11 +36,11 @@ import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 import temporalio.exceptions
 from temporalio.api.common.v1.message_pb2 import Payload
+from temporalio.bridge._visitor import PayloadVisitor
 from temporalio.bridge.temporal_sdk_bridge import (
     CustomSlotSupplier as BridgeCustomSlotSupplier,
 )
 from temporalio.bridge.temporal_sdk_bridge import PollShutdownError  # type: ignore
-from temporalio.bridge.visitor import PayloadVisitor
 
 
 @dataclass
@@ -378,7 +378,7 @@ async def decode_activation(
 
     await PayloadVisitor(
         skip_search_attributes=True, skip_headers=not decode_headers
-    ).visit_message(visitor, act)
+    ).visit(visitor, act)
 
 
 async def encode_completion(
@@ -393,4 +393,4 @@ async def encode_completion(
 
     await PayloadVisitor(
         skip_search_attributes=True, skip_headers=not encode_headers
-    ).visit_message(visitor, comp)
+    ).visit(visitor, comp)

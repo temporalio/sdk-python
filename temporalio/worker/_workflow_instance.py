@@ -1709,9 +1709,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             return None
 
         print("Payload:", self._last_completion_result.payloads[0])
-        return self._payload_converter.from_payload(
-            self._last_completion_result.payloads[0], type_hint
-        )
+        if type_hint is None:
+            return self._payload_converter.from_payload(
+                self._last_completion_result.payloads[0]
+            )
+        else:
+            return self._payload_converter.from_payload(
+                self._last_completion_result.payloads[0], type_hint
+            )
 
     #### Calls from outbound impl ####
     # These are in alphabetical order and all start with "_outbound_".
@@ -2793,10 +2798,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             v.start_to_close_timeout.FromTimedelta(self._input.start_to_close_timeout)
         if self._input.retry_policy:
             self._input.retry_policy.apply_to_proto(v.retry_policy)
-        if self._input.summary:
-            command.user_metadata.summary.CopyFrom(
-                self._instance._payload_converter.to_payload(self._input.summary)
-            )
+
         v.cancellation_type = cast(
             temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType,
             int(self._input.cancellation_type),

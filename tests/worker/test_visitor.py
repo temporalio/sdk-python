@@ -7,6 +7,7 @@ from temporalio.api.common.v1.message_pb2 import (
     SearchAttributes,
 )
 from temporalio.api.sdk.v1.user_metadata_pb2 import UserMetadata
+from temporalio.bridge._visitor import PayloadVisitor
 from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import (
     InitializeWorkflow,
     WorkflowActivation,
@@ -25,7 +26,6 @@ from temporalio.bridge.proto.workflow_completion.workflow_completion_pb2 import 
     Success,
     WorkflowActivationCompletion,
 )
-from temporalio.bridge.visitor_generated import PayloadVisitor
 
 
 async def test_workflow_activation_completion():
