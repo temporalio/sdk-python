@@ -2002,7 +2002,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         """Query the workflow.
 
         This will query for :py:attr:`run_id` if present. To use a different
-        run ID, create a new handle with via
+        run ID, create a new handle with
         :py:meth:`Client.get_workflow_handle`.
 
         .. warning::
