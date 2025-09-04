@@ -1,4 +1,5 @@
-from .message_pb2 import GCSSpec, S3Spec
+from .message_pb2 import S3Spec
+from .message_pb2 import GCSSpec
 
 __all__ = [
     "GCSSpec",

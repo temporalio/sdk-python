@@ -4,20 +4,17 @@ isort:skip_file
 *
 Definitions of the different activity tasks returned from [crate::Core::poll_task].
 """
-
 import builtins
 import collections.abc
-import sys
-import typing
-
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
-
+import sys
 import temporalio.api.common.v1.message_pb2
+import typing
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -30,12 +27,7 @@ class _ActivityCancelReason:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
 
-class _ActivityCancelReasonEnumTypeWrapper(
-    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
-        _ActivityCancelReason.ValueType
-    ],
-    builtins.type,
-):  # noqa: F821
+class _ActivityCancelReasonEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ActivityCancelReason.ValueType], builtins.type):  # noqa: F821
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NOT_FOUND: _ActivityCancelReason.ValueType  # 0
     """The activity no longer exists according to server (may be already completed)"""
@@ -50,9 +42,7 @@ class _ActivityCancelReasonEnumTypeWrapper(
     RESET: _ActivityCancelReason.ValueType  # 5
     """Activity was reset"""
 
-class ActivityCancelReason(
-    _ActivityCancelReason, metaclass=_ActivityCancelReasonEnumTypeWrapper
-): ...
+class ActivityCancelReason(_ActivityCancelReason, metaclass=_ActivityCancelReasonEnumTypeWrapper): ...
 
 NOT_FOUND: ActivityCancelReason.ValueType  # 0
 """The activity no longer exists according to server (may be already completed)"""
@@ -89,28 +79,9 @@ class ActivityTask(google.protobuf.message.Message):
         start: global___Start | None = ...,
         cancel: global___Cancel | None = ...,
     ) -> None: ...
-    def HasField(
-        self,
-        field_name: typing_extensions.Literal[
-            "cancel", b"cancel", "start", b"start", "variant", b"variant"
-        ],
-    ) -> builtins.bool: ...
-    def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "cancel",
-            b"cancel",
-            "start",
-            b"start",
-            "task_token",
-            b"task_token",
-            "variant",
-            b"variant",
-        ],
-    ) -> None: ...
-    def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-    ) -> typing_extensions.Literal["start", "cancel"] | None: ...
+    def HasField(self, field_name: typing_extensions.Literal["cancel", b"cancel", "start", b"start", "variant", b"variant"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["cancel", b"cancel", "start", b"start", "task_token", b"task_token", "variant", b"variant"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing_extensions.Literal["variant", b"variant"]) -> typing_extensions.Literal["start", "cancel"] | None: ...
 
 global___ActivityTask = ActivityTask
 
@@ -133,13 +104,8 @@ class Start(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         ) -> None: ...
-        def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
-        ) -> builtins.bool: ...
-        def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
-        ) -> None: ...
+        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
+        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
 
     WORKFLOW_NAMESPACE_FIELD_NUMBER: builtins.int
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
@@ -164,33 +130,19 @@ class Start(google.protobuf.message.Message):
     workflow_type: builtins.str
     """The workflow's type name or function identifier"""
     @property
-    def workflow_execution(
-        self,
-    ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
+    def workflow_execution(self) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
         """The workflow execution which requested this activity"""
     activity_id: builtins.str
     """The activity's ID"""
     activity_type: builtins.str
     """The activity's type name or function identifier"""
     @property
-    def header_fields(
-        self,
-    ) -> google.protobuf.internal.containers.MessageMap[
-        builtins.str, temporalio.api.common.v1.message_pb2.Payload
-    ]: ...
+    def header_fields(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, temporalio.api.common.v1.message_pb2.Payload]: ...
     @property
-    def input(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        temporalio.api.common.v1.message_pb2.Payload
-    ]:
+    def input(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[temporalio.api.common.v1.message_pb2.Payload]:
         """Arguments to the activity"""
     @property
-    def heartbeat_details(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        temporalio.api.common.v1.message_pb2.Payload
-    ]:
+    def heartbeat_details(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[temporalio.api.common.v1.message_pb2.Payload]:
         """The last details that were recorded by a heartbeat when this task was generated"""
     @property
     def scheduled_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
@@ -229,23 +181,14 @@ class Start(google.protobuf.message.Message):
         *,
         workflow_namespace: builtins.str = ...,
         workflow_type: builtins.str = ...,
-        workflow_execution: temporalio.api.common.v1.message_pb2.WorkflowExecution
-        | None = ...,
+        workflow_execution: temporalio.api.common.v1.message_pb2.WorkflowExecution | None = ...,
         activity_id: builtins.str = ...,
         activity_type: builtins.str = ...,
-        header_fields: collections.abc.Mapping[
-            builtins.str, temporalio.api.common.v1.message_pb2.Payload
-        ]
-        | None = ...,
-        input: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload]
-        | None = ...,
-        heartbeat_details: collections.abc.Iterable[
-            temporalio.api.common.v1.message_pb2.Payload
-        ]
-        | None = ...,
+        header_fields: collections.abc.Mapping[builtins.str, temporalio.api.common.v1.message_pb2.Payload] | None = ...,
+        input: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload] | None = ...,
+        heartbeat_details: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload] | None = ...,
         scheduled_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
-        current_attempt_scheduled_time: google.protobuf.timestamp_pb2.Timestamp
-        | None = ...,
+        current_attempt_scheduled_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         started_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         attempt: builtins.int = ...,
         schedule_to_close_timeout: google.protobuf.duration_pb2.Duration | None = ...,
@@ -255,70 +198,8 @@ class Start(google.protobuf.message.Message):
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
         is_local: builtins.bool = ...,
     ) -> None: ...
-    def HasField(
-        self,
-        field_name: typing_extensions.Literal[
-            "current_attempt_scheduled_time",
-            b"current_attempt_scheduled_time",
-            "heartbeat_timeout",
-            b"heartbeat_timeout",
-            "priority",
-            b"priority",
-            "retry_policy",
-            b"retry_policy",
-            "schedule_to_close_timeout",
-            b"schedule_to_close_timeout",
-            "scheduled_time",
-            b"scheduled_time",
-            "start_to_close_timeout",
-            b"start_to_close_timeout",
-            "started_time",
-            b"started_time",
-            "workflow_execution",
-            b"workflow_execution",
-        ],
-    ) -> builtins.bool: ...
-    def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "activity_id",
-            b"activity_id",
-            "activity_type",
-            b"activity_type",
-            "attempt",
-            b"attempt",
-            "current_attempt_scheduled_time",
-            b"current_attempt_scheduled_time",
-            "header_fields",
-            b"header_fields",
-            "heartbeat_details",
-            b"heartbeat_details",
-            "heartbeat_timeout",
-            b"heartbeat_timeout",
-            "input",
-            b"input",
-            "is_local",
-            b"is_local",
-            "priority",
-            b"priority",
-            "retry_policy",
-            b"retry_policy",
-            "schedule_to_close_timeout",
-            b"schedule_to_close_timeout",
-            "scheduled_time",
-            b"scheduled_time",
-            "start_to_close_timeout",
-            b"start_to_close_timeout",
-            "started_time",
-            b"started_time",
-            "workflow_execution",
-            b"workflow_execution",
-            "workflow_namespace",
-            b"workflow_namespace",
-            "workflow_type",
-            b"workflow_type",
-        ],
-    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["current_attempt_scheduled_time", b"current_attempt_scheduled_time", "heartbeat_timeout", b"heartbeat_timeout", "priority", b"priority", "retry_policy", b"retry_policy", "schedule_to_close_timeout", b"schedule_to_close_timeout", "scheduled_time", b"scheduled_time", "start_to_close_timeout", b"start_to_close_timeout", "started_time", b"started_time", "workflow_execution", b"workflow_execution"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["activity_id", b"activity_id", "activity_type", b"activity_type", "attempt", b"attempt", "current_attempt_scheduled_time", b"current_attempt_scheduled_time", "header_fields", b"header_fields", "heartbeat_details", b"heartbeat_details", "heartbeat_timeout", b"heartbeat_timeout", "input", b"input", "is_local", b"is_local", "priority", b"priority", "retry_policy", b"retry_policy", "schedule_to_close_timeout", b"schedule_to_close_timeout", "scheduled_time", b"scheduled_time", "start_to_close_timeout", b"start_to_close_timeout", "started_time", b"started_time", "workflow_execution", b"workflow_execution", "workflow_namespace", b"workflow_namespace", "workflow_type", b"workflow_type"]) -> None: ...
 
 global___Start = Start
 
@@ -340,15 +221,8 @@ class Cancel(google.protobuf.message.Message):
         reason: global___ActivityCancelReason.ValueType = ...,
         details: global___ActivityCancellationDetails | None = ...,
     ) -> None: ...
-    def HasField(
-        self, field_name: typing_extensions.Literal["details", b"details"]
-    ) -> builtins.bool: ...
-    def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "details", b"details", "reason", b"reason"
-        ],
-    ) -> None: ...
+    def HasField(self, field_name: typing_extensions.Literal["details", b"details"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["details", b"details", "reason", b"reason"]) -> None: ...
 
 global___Cancel = Cancel
 
@@ -377,22 +251,6 @@ class ActivityCancellationDetails(google.protobuf.message.Message):
         is_worker_shutdown: builtins.bool = ...,
         is_reset: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "is_cancelled",
-            b"is_cancelled",
-            "is_not_found",
-            b"is_not_found",
-            "is_paused",
-            b"is_paused",
-            "is_reset",
-            b"is_reset",
-            "is_timed_out",
-            b"is_timed_out",
-            "is_worker_shutdown",
-            b"is_worker_shutdown",
-        ],
-    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["is_cancelled", b"is_cancelled", "is_not_found", b"is_not_found", "is_paused", b"is_paused", "is_reset", b"is_reset", "is_timed_out", b"is_timed_out", "is_worker_shutdown", b"is_worker_shutdown"]) -> None: ...
 
 global___ActivityCancellationDetails = ActivityCancellationDetails
