@@ -2568,6 +2568,7 @@ class TypedConfigWorkflow:
         local_activity_config = workflow.LocalActivityConfig(
             retry_policy=retry_policy,
             schedule_to_close_timeout=timedelta(seconds=5),
+            summary="Summary",
         )
         result = await workflow.execute_local_activity(
             fail_until_attempt_activity, 2, **local_activity_config
@@ -2591,11 +2592,21 @@ async def test_workflow_typed_config(client: Client):
         FailUntilAttemptWorkflow,
         activities=[fail_until_attempt_activity],
     ) as worker:
-        await client.execute_workflow(
+        handle = await client.start_workflow(
             TypedConfigWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+        await handle.result()
+
+        # Check that summary showed up in history
+        found_marker = False
+        async for e in handle.fetch_history_events():
+            if e.HasField("marker_recorded_event_attributes"):
+                assert b'"Summary"' == e.user_metadata.summary.data
+                found_marker = True
+                break
+        assert found_marker
 
 
 @activity.defn

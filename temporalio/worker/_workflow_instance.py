@@ -1470,6 +1470,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         local_retry_threshold: Optional[timedelta],
         cancellation_type: temporalio.workflow.ActivityCancellationType,
         activity_id: Optional[str],
+        summary: Optional[str],
     ) -> temporalio.workflow.ActivityHandle[Any]:
         # Get activity definition if it's callable
         name: str
@@ -1502,6 +1503,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 retry_policy=retry_policy,
                 local_retry_threshold=local_retry_threshold,
                 cancellation_type=cancellation_type,
+                summary=summary,
                 headers={},
                 arg_types=arg_types,
                 ret_type=ret_type,
@@ -2803,7 +2805,10 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             v.start_to_close_timeout.FromTimedelta(self._input.start_to_close_timeout)
         if self._input.retry_policy:
             self._input.retry_policy.apply_to_proto(v.retry_policy)
-
+        if self._input.summary:
+            command.user_metadata.summary.CopyFrom(
+                self._instance._payload_converter.to_payload(self._input.summary)
+            )
         v.cancellation_type = cast(
             temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType,
             int(self._input.cancellation_type),
@@ -2825,11 +2830,6 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
                 command.schedule_activity.versioning_intent = (
                     self._input.versioning_intent._to_proto()
                 )
-            if self._input.summary:
-                command.user_metadata.summary.CopyFrom(
-                    self._instance._payload_converter.to_payload(self._input.summary)
-                )
-            print("Activity summary: ", command.user_metadata.summary)
             if self._input.priority:
                 command.schedule_activity.priority.CopyFrom(
                     self._input.priority._to_proto()
