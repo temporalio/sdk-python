@@ -6,14 +6,17 @@ isort:skip_file
 (-- api-linter: core::0203::input-only=disabled
     aip.dev/not-precedent: field_behavior annotation not available in our gogo fork --)
 """
+
 import builtins
 import collections.abc
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.schedule_pb2
 import temporalio.api.enums.v1.workflow_pb2
@@ -88,7 +91,27 @@ class CalendarSpec(google.protobuf.message.Message):
         day_of_week: builtins.str = ...,
         comment: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["comment", b"comment", "day_of_month", b"day_of_month", "day_of_week", b"day_of_week", "hour", b"hour", "minute", b"minute", "month", b"month", "second", b"second", "year", b"year"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "comment",
+            b"comment",
+            "day_of_month",
+            b"day_of_month",
+            "day_of_week",
+            b"day_of_week",
+            "hour",
+            b"hour",
+            "minute",
+            b"minute",
+            "month",
+            b"month",
+            "second",
+            b"second",
+            "year",
+            b"year",
+        ],
+    ) -> None: ...
 
 global___CalendarSpec = CalendarSpec
 
@@ -117,7 +140,12 @@ class Range(google.protobuf.message.Message):
         end: builtins.int = ...,
         step: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end", b"end", "start", b"start", "step", b"step"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "end", b"end", "start", b"start", "step", b"step"
+        ],
+    ) -> None: ...
 
 global___Range = Range
 
@@ -144,28 +172,56 @@ class StructuredCalendarSpec(google.protobuf.message.Message):
     DAY_OF_WEEK_FIELD_NUMBER: builtins.int
     COMMENT_FIELD_NUMBER: builtins.int
     @property
-    def second(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Range]:
+    def second(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Range
+    ]:
         """Match seconds (0-59)"""
     @property
-    def minute(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Range]:
+    def minute(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Range
+    ]:
         """Match minutes (0-59)"""
     @property
-    def hour(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Range]:
+    def hour(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Range
+    ]:
         """Match hours (0-23)"""
     @property
-    def day_of_month(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Range]:
+    def day_of_month(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Range
+    ]:
         """Match days of the month (1-31)
         (-- api-linter: core::0140::prepositions=disabled
             aip.dev/not-precedent: standard name of field --)
         """
     @property
-    def month(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Range]:
+    def month(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Range
+    ]:
         """Match months (1-12)"""
     @property
-    def year(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Range]:
+    def year(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Range
+    ]:
         """Match years."""
     @property
-    def day_of_week(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___Range]:
+    def day_of_week(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Range
+    ]:
         """Match days of the week (0-6; 0 is Sunday)."""
     comment: builtins.str
     """Free-form comment describing the intention of this spec."""
@@ -181,7 +237,27 @@ class StructuredCalendarSpec(google.protobuf.message.Message):
         day_of_week: collections.abc.Iterable[global___Range] | None = ...,
         comment: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["comment", b"comment", "day_of_month", b"day_of_month", "day_of_week", b"day_of_week", "hour", b"hour", "minute", b"minute", "month", b"month", "second", b"second", "year", b"year"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "comment",
+            b"comment",
+            "day_of_month",
+            b"day_of_month",
+            "day_of_week",
+            b"day_of_week",
+            "hour",
+            b"hour",
+            "minute",
+            b"minute",
+            "month",
+            b"month",
+            "second",
+            b"second",
+            "year",
+            b"year",
+        ],
+    ) -> None: ...
 
 global___StructuredCalendarSpec = StructuredCalendarSpec
 
@@ -213,8 +289,18 @@ class IntervalSpec(google.protobuf.message.Message):
         interval: google.protobuf.duration_pb2.Duration | None = ...,
         phase: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["interval", b"interval", "phase", b"phase"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["interval", b"interval", "phase", b"phase"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "interval", b"interval", "phase", b"phase"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "interval", b"interval", "phase", b"phase"
+        ],
+    ) -> None: ...
 
 global___IntervalSpec = IntervalSpec
 
@@ -253,10 +339,16 @@ class ScheduleSpec(google.protobuf.message.Message):
     TIMEZONE_NAME_FIELD_NUMBER: builtins.int
     TIMEZONE_DATA_FIELD_NUMBER: builtins.int
     @property
-    def structured_calendar(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___StructuredCalendarSpec]:
+    def structured_calendar(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___StructuredCalendarSpec
+    ]:
         """Calendar-based specifications of times."""
     @property
-    def cron_string(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+    def cron_string(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """cron_string holds a traditional cron specification as a string. It
         accepts 5, 6, or 7 fields, separated by spaces, and interprets them the
         same way as CalendarSpec.
@@ -279,18 +371,34 @@ class ScheduleSpec(google.protobuf.message.Message):
         with a unit suffix s, m, h, or d.
         """
     @property
-    def calendar(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___CalendarSpec]:
+    def calendar(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___CalendarSpec
+    ]:
         """Calendar-based specifications of times."""
     @property
-    def interval(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___IntervalSpec]:
+    def interval(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___IntervalSpec
+    ]:
         """Interval-based specifications of times."""
     @property
-    def exclude_calendar(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___CalendarSpec]:
+    def exclude_calendar(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___CalendarSpec
+    ]:
         """Any timestamps matching any of exclude_* will be skipped.
         Deprecated. Use exclude_structured_calendar.
         """
     @property
-    def exclude_structured_calendar(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___StructuredCalendarSpec]: ...
+    def exclude_structured_calendar(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___StructuredCalendarSpec
+    ]: ...
     @property
     def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """If start_time is set, any timestamps before start_time will be skipped.
@@ -332,20 +440,55 @@ class ScheduleSpec(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        structured_calendar: collections.abc.Iterable[global___StructuredCalendarSpec] | None = ...,
+        structured_calendar: collections.abc.Iterable[global___StructuredCalendarSpec]
+        | None = ...,
         cron_string: collections.abc.Iterable[builtins.str] | None = ...,
         calendar: collections.abc.Iterable[global___CalendarSpec] | None = ...,
         interval: collections.abc.Iterable[global___IntervalSpec] | None = ...,
         exclude_calendar: collections.abc.Iterable[global___CalendarSpec] | None = ...,
-        exclude_structured_calendar: collections.abc.Iterable[global___StructuredCalendarSpec] | None = ...,
+        exclude_structured_calendar: collections.abc.Iterable[
+            global___StructuredCalendarSpec
+        ]
+        | None = ...,
         start_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         end_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         jitter: google.protobuf.duration_pb2.Duration | None = ...,
         timezone_name: builtins.str = ...,
         timezone_data: builtins.bytes = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["end_time", b"end_time", "jitter", b"jitter", "start_time", b"start_time"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["calendar", b"calendar", "cron_string", b"cron_string", "end_time", b"end_time", "exclude_calendar", b"exclude_calendar", "exclude_structured_calendar", b"exclude_structured_calendar", "interval", b"interval", "jitter", b"jitter", "start_time", b"start_time", "structured_calendar", b"structured_calendar", "timezone_data", b"timezone_data", "timezone_name", b"timezone_name"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "end_time", b"end_time", "jitter", b"jitter", "start_time", b"start_time"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "calendar",
+            b"calendar",
+            "cron_string",
+            b"cron_string",
+            "end_time",
+            b"end_time",
+            "exclude_calendar",
+            b"exclude_calendar",
+            "exclude_structured_calendar",
+            b"exclude_structured_calendar",
+            "interval",
+            b"interval",
+            "jitter",
+            b"jitter",
+            "start_time",
+            b"start_time",
+            "structured_calendar",
+            b"structured_calendar",
+            "timezone_data",
+            b"timezone_data",
+            "timezone_name",
+            b"timezone_name",
+        ],
+    ) -> None: ...
 
 global___ScheduleSpec = ScheduleSpec
 
@@ -387,8 +530,22 @@ class SchedulePolicies(google.protobuf.message.Message):
         pause_on_failure: builtins.bool = ...,
         keep_original_workflow_id: builtins.bool = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["catchup_window", b"catchup_window"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["catchup_window", b"catchup_window", "keep_original_workflow_id", b"keep_original_workflow_id", "overlap_policy", b"overlap_policy", "pause_on_failure", b"pause_on_failure"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["catchup_window", b"catchup_window"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "catchup_window",
+            b"catchup_window",
+            "keep_original_workflow_id",
+            b"keep_original_workflow_id",
+            "overlap_policy",
+            b"overlap_policy",
+            "pause_on_failure",
+            b"pause_on_failure",
+        ],
+    ) -> None: ...
 
 global___SchedulePolicies = SchedulePolicies
 
@@ -397,7 +554,9 @@ class ScheduleAction(google.protobuf.message.Message):
 
     START_WORKFLOW_FIELD_NUMBER: builtins.int
     @property
-    def start_workflow(self) -> temporalio.api.workflow.v1.message_pb2.NewWorkflowExecutionInfo:
+    def start_workflow(
+        self,
+    ) -> temporalio.api.workflow.v1.message_pb2.NewWorkflowExecutionInfo:
         """All fields of NewWorkflowExecutionInfo are valid except for:
         - workflow_id_reuse_policy
         - cron_schedule
@@ -407,11 +566,24 @@ class ScheduleAction(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        start_workflow: temporalio.api.workflow.v1.message_pb2.NewWorkflowExecutionInfo | None = ...,
+        start_workflow: temporalio.api.workflow.v1.message_pb2.NewWorkflowExecutionInfo
+        | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["action", b"action", "start_workflow", b"start_workflow"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["action", b"action", "start_workflow", b"start_workflow"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["action", b"action"]) -> typing_extensions.Literal["start_workflow"] | None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "action", b"action", "start_workflow", b"start_workflow"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "action", b"action", "start_workflow", b"start_workflow"
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["action", b"action"]
+    ) -> typing_extensions.Literal["start_workflow"] | None: ...
 
 global___ScheduleAction = ScheduleAction
 
@@ -429,9 +601,13 @@ class ScheduleActionResult(google.protobuf.message.Message):
     def actual_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Time that the action was taken (real time)."""
     @property
-    def start_workflow_result(self) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
+    def start_workflow_result(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
         """If action was start_workflow:"""
-    start_workflow_status: temporalio.api.enums.v1.workflow_pb2.WorkflowExecutionStatus.ValueType
+    start_workflow_status: (
+        temporalio.api.enums.v1.workflow_pb2.WorkflowExecutionStatus.ValueType
+    )
     """If the action was start_workflow, this field will reflect an
     eventually-consistent view of the started workflow's status.
     """
@@ -440,11 +616,34 @@ class ScheduleActionResult(google.protobuf.message.Message):
         *,
         schedule_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         actual_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
-        start_workflow_result: temporalio.api.common.v1.message_pb2.WorkflowExecution | None = ...,
+        start_workflow_result: temporalio.api.common.v1.message_pb2.WorkflowExecution
+        | None = ...,
         start_workflow_status: temporalio.api.enums.v1.workflow_pb2.WorkflowExecutionStatus.ValueType = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["actual_time", b"actual_time", "schedule_time", b"schedule_time", "start_workflow_result", b"start_workflow_result"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["actual_time", b"actual_time", "schedule_time", b"schedule_time", "start_workflow_result", b"start_workflow_result", "start_workflow_status", b"start_workflow_status"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "actual_time",
+            b"actual_time",
+            "schedule_time",
+            b"schedule_time",
+            "start_workflow_result",
+            b"start_workflow_result",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "actual_time",
+            b"actual_time",
+            "schedule_time",
+            b"schedule_time",
+            "start_workflow_result",
+            b"start_workflow_result",
+            "start_workflow_status",
+            b"start_workflow_status",
+        ],
+    ) -> None: ...
 
 global___ScheduleActionResult = ScheduleActionResult
 
@@ -480,7 +679,19 @@ class ScheduleState(google.protobuf.message.Message):
         limited_actions: builtins.bool = ...,
         remaining_actions: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["limited_actions", b"limited_actions", "notes", b"notes", "paused", b"paused", "remaining_actions", b"remaining_actions"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "limited_actions",
+            b"limited_actions",
+            "notes",
+            b"notes",
+            "paused",
+            b"paused",
+            "remaining_actions",
+            b"remaining_actions",
+        ],
+    ) -> None: ...
 
 global___ScheduleState = ScheduleState
 
@@ -502,8 +713,15 @@ class TriggerImmediatelyRequest(google.protobuf.message.Message):
         overlap_policy: temporalio.api.enums.v1.schedule_pb2.ScheduleOverlapPolicy.ValueType = ...,
         scheduled_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["scheduled_time", b"scheduled_time"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["overlap_policy", b"overlap_policy", "scheduled_time", b"scheduled_time"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["scheduled_time", b"scheduled_time"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "overlap_policy", b"overlap_policy", "scheduled_time", b"scheduled_time"
+        ],
+    ) -> None: ...
 
 global___TriggerImmediatelyRequest = TriggerImmediatelyRequest
 
@@ -533,8 +751,23 @@ class BackfillRequest(google.protobuf.message.Message):
         end_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         overlap_policy: temporalio.api.enums.v1.schedule_pb2.ScheduleOverlapPolicy.ValueType = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["end_time", b"end_time", "start_time", b"start_time"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["end_time", b"end_time", "overlap_policy", b"overlap_policy", "start_time", b"start_time"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "end_time", b"end_time", "start_time", b"start_time"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "end_time",
+            b"end_time",
+            "overlap_policy",
+            b"overlap_policy",
+            "start_time",
+            b"start_time",
+        ],
+    ) -> None: ...
 
 global___BackfillRequest = BackfillRequest
 
@@ -549,7 +782,11 @@ class SchedulePatch(google.protobuf.message.Message):
     def trigger_immediately(self) -> global___TriggerImmediatelyRequest:
         """If set, trigger one action immediately."""
     @property
-    def backfill_request(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___BackfillRequest]:
+    def backfill_request(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___BackfillRequest
+    ]:
         """If set, runs though the specified time period(s) and takes actions as if that time
         passed by right now, all at once. The overlap policy can be overridden for the
         scope of the backfill.
@@ -563,12 +800,30 @@ class SchedulePatch(google.protobuf.message.Message):
         self,
         *,
         trigger_immediately: global___TriggerImmediatelyRequest | None = ...,
-        backfill_request: collections.abc.Iterable[global___BackfillRequest] | None = ...,
+        backfill_request: collections.abc.Iterable[global___BackfillRequest]
+        | None = ...,
         pause: builtins.str = ...,
         unpause: builtins.str = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["trigger_immediately", b"trigger_immediately"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["backfill_request", b"backfill_request", "pause", b"pause", "trigger_immediately", b"trigger_immediately", "unpause", b"unpause"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "trigger_immediately", b"trigger_immediately"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "backfill_request",
+            b"backfill_request",
+            "pause",
+            b"pause",
+            "trigger_immediately",
+            b"trigger_immediately",
+            "unpause",
+            b"unpause",
+        ],
+    ) -> None: ...
 
 global___SchedulePatch = SchedulePatch
 
@@ -600,7 +855,11 @@ class ScheduleInfo(google.protobuf.message.Message):
     the normal schedule or a backfill.
     """
     @property
-    def running_workflows(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[temporalio.api.common.v1.message_pb2.WorkflowExecution]:
+    def running_workflows(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.WorkflowExecution
+    ]:
         """Currently-running workflows started by this schedule. (There might be
         more than one if the overlap policy allows overlaps.)
         Note that the run_ids in here are the original execution run ids as
@@ -608,10 +867,18 @@ class ScheduleInfo(google.protobuf.message.Message):
         or were reset, they might still be running but with a different run_id.
         """
     @property
-    def recent_actions(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ScheduleActionResult]:
+    def recent_actions(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___ScheduleActionResult
+    ]:
         """Most recent ten actual action times (including manual triggers)."""
     @property
-    def future_action_times(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[google.protobuf.timestamp_pb2.Timestamp]:
+    def future_action_times(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        google.protobuf.timestamp_pb2.Timestamp
+    ]:
         """Next ten scheduled action times."""
     @property
     def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
@@ -628,15 +895,53 @@ class ScheduleInfo(google.protobuf.message.Message):
         overlap_skipped: builtins.int = ...,
         buffer_dropped: builtins.int = ...,
         buffer_size: builtins.int = ...,
-        running_workflows: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.WorkflowExecution] | None = ...,
-        recent_actions: collections.abc.Iterable[global___ScheduleActionResult] | None = ...,
-        future_action_times: collections.abc.Iterable[google.protobuf.timestamp_pb2.Timestamp] | None = ...,
+        running_workflows: collections.abc.Iterable[
+            temporalio.api.common.v1.message_pb2.WorkflowExecution
+        ]
+        | None = ...,
+        recent_actions: collections.abc.Iterable[global___ScheduleActionResult]
+        | None = ...,
+        future_action_times: collections.abc.Iterable[
+            google.protobuf.timestamp_pb2.Timestamp
+        ]
+        | None = ...,
         create_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         update_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         invalid_schedule_error: builtins.str = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["create_time", b"create_time", "update_time", b"update_time"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["action_count", b"action_count", "buffer_dropped", b"buffer_dropped", "buffer_size", b"buffer_size", "create_time", b"create_time", "future_action_times", b"future_action_times", "invalid_schedule_error", b"invalid_schedule_error", "missed_catchup_window", b"missed_catchup_window", "overlap_skipped", b"overlap_skipped", "recent_actions", b"recent_actions", "running_workflows", b"running_workflows", "update_time", b"update_time"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "create_time", b"create_time", "update_time", b"update_time"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "action_count",
+            b"action_count",
+            "buffer_dropped",
+            b"buffer_dropped",
+            "buffer_size",
+            b"buffer_size",
+            "create_time",
+            b"create_time",
+            "future_action_times",
+            b"future_action_times",
+            "invalid_schedule_error",
+            b"invalid_schedule_error",
+            "missed_catchup_window",
+            b"missed_catchup_window",
+            "overlap_skipped",
+            b"overlap_skipped",
+            "recent_actions",
+            b"recent_actions",
+            "running_workflows",
+            b"running_workflows",
+            "update_time",
+            b"update_time",
+        ],
+    ) -> None: ...
 
 global___ScheduleInfo = ScheduleInfo
 
@@ -663,8 +968,32 @@ class Schedule(google.protobuf.message.Message):
         policies: global___SchedulePolicies | None = ...,
         state: global___ScheduleState | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["action", b"action", "policies", b"policies", "spec", b"spec", "state", b"state"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["action", b"action", "policies", b"policies", "spec", b"spec", "state", b"state"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "action",
+            b"action",
+            "policies",
+            b"policies",
+            "spec",
+            b"spec",
+            "state",
+            b"state",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "action",
+            b"action",
+            "policies",
+            b"policies",
+            "spec",
+            b"spec",
+            "state",
+            b"state",
+        ],
+    ) -> None: ...
 
 global___Schedule = Schedule
 
@@ -696,10 +1025,18 @@ class ScheduleListInfo(google.protobuf.message.Message):
     """From state:"""
     paused: builtins.bool
     @property
-    def recent_actions(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___ScheduleActionResult]:
+    def recent_actions(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___ScheduleActionResult
+    ]:
         """From info (maybe fewer entries):"""
     @property
-    def future_action_times(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[google.protobuf.timestamp_pb2.Timestamp]: ...
+    def future_action_times(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        google.protobuf.timestamp_pb2.Timestamp
+    ]: ...
     def __init__(
         self,
         *,
@@ -707,11 +1044,36 @@ class ScheduleListInfo(google.protobuf.message.Message):
         workflow_type: temporalio.api.common.v1.message_pb2.WorkflowType | None = ...,
         notes: builtins.str = ...,
         paused: builtins.bool = ...,
-        recent_actions: collections.abc.Iterable[global___ScheduleActionResult] | None = ...,
-        future_action_times: collections.abc.Iterable[google.protobuf.timestamp_pb2.Timestamp] | None = ...,
+        recent_actions: collections.abc.Iterable[global___ScheduleActionResult]
+        | None = ...,
+        future_action_times: collections.abc.Iterable[
+            google.protobuf.timestamp_pb2.Timestamp
+        ]
+        | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["spec", b"spec", "workflow_type", b"workflow_type"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["future_action_times", b"future_action_times", "notes", b"notes", "paused", b"paused", "recent_actions", b"recent_actions", "spec", b"spec", "workflow_type", b"workflow_type"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "spec", b"spec", "workflow_type", b"workflow_type"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "future_action_times",
+            b"future_action_times",
+            "notes",
+            b"notes",
+            "paused",
+            b"paused",
+            "recent_actions",
+            b"recent_actions",
+            "spec",
+            b"spec",
+            "workflow_type",
+            b"workflow_type",
+        ],
+    ) -> None: ...
 
 global___ScheduleListInfo = ScheduleListInfo
 
@@ -728,7 +1090,9 @@ class ScheduleListEntry(google.protobuf.message.Message):
     @property
     def memo(self) -> temporalio.api.common.v1.message_pb2.Memo: ...
     @property
-    def search_attributes(self) -> temporalio.api.common.v1.message_pb2.SearchAttributes: ...
+    def search_attributes(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.SearchAttributes: ...
     @property
     def info(self) -> global___ScheduleListInfo: ...
     def __init__(
@@ -736,10 +1100,28 @@ class ScheduleListEntry(google.protobuf.message.Message):
         *,
         schedule_id: builtins.str = ...,
         memo: temporalio.api.common.v1.message_pb2.Memo | None = ...,
-        search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes | None = ...,
+        search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
+        | None = ...,
         info: global___ScheduleListInfo | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["info", b"info", "memo", b"memo", "search_attributes", b"search_attributes"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["info", b"info", "memo", b"memo", "schedule_id", b"schedule_id", "search_attributes", b"search_attributes"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "info", b"info", "memo", b"memo", "search_attributes", b"search_attributes"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "info",
+            b"info",
+            "memo",
+            b"memo",
+            "schedule_id",
+            b"schedule_id",
+            "search_attributes",
+            b"search_attributes",
+        ],
+    ) -> None: ...
 
 global___ScheduleListEntry = ScheduleListEntry

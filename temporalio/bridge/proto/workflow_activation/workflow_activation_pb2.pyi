@@ -5,15 +5,19 @@ isort:skip_file
 Definitions of the different workflow activation jobs returned from [crate::Core::poll_task]. The
 lang SDK applies these activation jobs to drive workflows.
 """
+
 import builtins
 import collections.abc
+import sys
+import typing
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
-import sys
+
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
@@ -22,7 +26,6 @@ import temporalio.bridge.proto.activity_result.activity_result_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
 import temporalio.bridge.proto.nexus.nexus_pb2
-import typing
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -103,10 +106,16 @@ class WorkflowActivation(google.protobuf.message.Message):
     This ensures that the number is always deterministic
     """
     @property
-    def jobs(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___WorkflowActivationJob]:
+    def jobs(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___WorkflowActivationJob
+    ]:
         """The things to do upon activating the workflow"""
     @property
-    def available_internal_flags(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
+    def available_internal_flags(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
         """Internal flags which are available for use by lang. If `is_replaying` is false, all
         internal flags may be used. This is not a delta - all previously used flags always
         appear since this representation is cheap.
@@ -116,7 +125,9 @@ class WorkflowActivation(google.protobuf.message.Message):
     continue_as_new_suggested: builtins.bool
     """Set true if the most recent WFT started event had this suggestion"""
     @property
-    def deployment_version_for_current_task(self) -> temporalio.bridge.proto.common.common_pb2.WorkerDeploymentVersion:
+    def deployment_version_for_current_task(
+        self,
+    ) -> temporalio.bridge.proto.common.common_pb2.WorkerDeploymentVersion:
         """Set to the deployment version of the worker that processed this task,
         which may be empty. During replay this version may not equal the version
         of the replaying worker. If not replaying and this worker has a defined
@@ -136,10 +147,41 @@ class WorkflowActivation(google.protobuf.message.Message):
         available_internal_flags: collections.abc.Iterable[builtins.int] | None = ...,
         history_size_bytes: builtins.int = ...,
         continue_as_new_suggested: builtins.bool = ...,
-        deployment_version_for_current_task: temporalio.bridge.proto.common.common_pb2.WorkerDeploymentVersion | None = ...,
+        deployment_version_for_current_task: temporalio.bridge.proto.common.common_pb2.WorkerDeploymentVersion
+        | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["deployment_version_for_current_task", b"deployment_version_for_current_task", "timestamp", b"timestamp"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["available_internal_flags", b"available_internal_flags", "continue_as_new_suggested", b"continue_as_new_suggested", "deployment_version_for_current_task", b"deployment_version_for_current_task", "history_length", b"history_length", "history_size_bytes", b"history_size_bytes", "is_replaying", b"is_replaying", "jobs", b"jobs", "run_id", b"run_id", "timestamp", b"timestamp"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "deployment_version_for_current_task",
+            b"deployment_version_for_current_task",
+            "timestamp",
+            b"timestamp",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "available_internal_flags",
+            b"available_internal_flags",
+            "continue_as_new_suggested",
+            b"continue_as_new_suggested",
+            "deployment_version_for_current_task",
+            b"deployment_version_for_current_task",
+            "history_length",
+            b"history_length",
+            "history_size_bytes",
+            b"history_size_bytes",
+            "is_replaying",
+            b"is_replaying",
+            "jobs",
+            b"jobs",
+            "run_id",
+            b"run_id",
+            "timestamp",
+            b"timestamp",
+        ],
+    ) -> None: ...
 
 global___WorkflowActivation = WorkflowActivation
 
@@ -192,16 +234,24 @@ class WorkflowActivationJob(google.protobuf.message.Message):
         command being sent first.
         """
     @property
-    def resolve_child_workflow_execution_start(self) -> global___ResolveChildWorkflowExecutionStart:
+    def resolve_child_workflow_execution_start(
+        self,
+    ) -> global___ResolveChildWorkflowExecutionStart:
         """A child workflow execution has started or failed to start"""
     @property
-    def resolve_child_workflow_execution(self) -> global___ResolveChildWorkflowExecution:
+    def resolve_child_workflow_execution(
+        self,
+    ) -> global___ResolveChildWorkflowExecution:
         """A child workflow was resolved, result could be completed or failed"""
     @property
-    def resolve_signal_external_workflow(self) -> global___ResolveSignalExternalWorkflow:
+    def resolve_signal_external_workflow(
+        self,
+    ) -> global___ResolveSignalExternalWorkflow:
         """An attempt to signal an external workflow resolved"""
     @property
-    def resolve_request_cancel_external_workflow(self) -> global___ResolveRequestCancelExternalWorkflow:
+    def resolve_request_cancel_external_workflow(
+        self,
+    ) -> global___ResolveRequestCancelExternalWorkflow:
         """An attempt to cancel an external workflow resolved"""
     @property
     def do_update(self) -> global___DoUpdate:
@@ -229,18 +279,120 @@ class WorkflowActivationJob(google.protobuf.message.Message):
         signal_workflow: global___SignalWorkflow | None = ...,
         resolve_activity: global___ResolveActivity | None = ...,
         notify_has_patch: global___NotifyHasPatch | None = ...,
-        resolve_child_workflow_execution_start: global___ResolveChildWorkflowExecutionStart | None = ...,
-        resolve_child_workflow_execution: global___ResolveChildWorkflowExecution | None = ...,
-        resolve_signal_external_workflow: global___ResolveSignalExternalWorkflow | None = ...,
-        resolve_request_cancel_external_workflow: global___ResolveRequestCancelExternalWorkflow | None = ...,
+        resolve_child_workflow_execution_start: global___ResolveChildWorkflowExecutionStart
+        | None = ...,
+        resolve_child_workflow_execution: global___ResolveChildWorkflowExecution
+        | None = ...,
+        resolve_signal_external_workflow: global___ResolveSignalExternalWorkflow
+        | None = ...,
+        resolve_request_cancel_external_workflow: global___ResolveRequestCancelExternalWorkflow
+        | None = ...,
         do_update: global___DoUpdate | None = ...,
         resolve_nexus_operation_start: global___ResolveNexusOperationStart | None = ...,
         resolve_nexus_operation: global___ResolveNexusOperation | None = ...,
         remove_from_cache: global___RemoveFromCache | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["cancel_workflow", b"cancel_workflow", "do_update", b"do_update", "fire_timer", b"fire_timer", "initialize_workflow", b"initialize_workflow", "notify_has_patch", b"notify_has_patch", "query_workflow", b"query_workflow", "remove_from_cache", b"remove_from_cache", "resolve_activity", b"resolve_activity", "resolve_child_workflow_execution", b"resolve_child_workflow_execution", "resolve_child_workflow_execution_start", b"resolve_child_workflow_execution_start", "resolve_nexus_operation", b"resolve_nexus_operation", "resolve_nexus_operation_start", b"resolve_nexus_operation_start", "resolve_request_cancel_external_workflow", b"resolve_request_cancel_external_workflow", "resolve_signal_external_workflow", b"resolve_signal_external_workflow", "signal_workflow", b"signal_workflow", "update_random_seed", b"update_random_seed", "variant", b"variant"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["cancel_workflow", b"cancel_workflow", "do_update", b"do_update", "fire_timer", b"fire_timer", "initialize_workflow", b"initialize_workflow", "notify_has_patch", b"notify_has_patch", "query_workflow", b"query_workflow", "remove_from_cache", b"remove_from_cache", "resolve_activity", b"resolve_activity", "resolve_child_workflow_execution", b"resolve_child_workflow_execution", "resolve_child_workflow_execution_start", b"resolve_child_workflow_execution_start", "resolve_nexus_operation", b"resolve_nexus_operation", "resolve_nexus_operation_start", b"resolve_nexus_operation_start", "resolve_request_cancel_external_workflow", b"resolve_request_cancel_external_workflow", "resolve_signal_external_workflow", b"resolve_signal_external_workflow", "signal_workflow", b"signal_workflow", "update_random_seed", b"update_random_seed", "variant", b"variant"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["variant", b"variant"]) -> typing_extensions.Literal["initialize_workflow", "fire_timer", "update_random_seed", "query_workflow", "cancel_workflow", "signal_workflow", "resolve_activity", "notify_has_patch", "resolve_child_workflow_execution_start", "resolve_child_workflow_execution", "resolve_signal_external_workflow", "resolve_request_cancel_external_workflow", "do_update", "resolve_nexus_operation_start", "resolve_nexus_operation", "remove_from_cache"] | None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancel_workflow",
+            b"cancel_workflow",
+            "do_update",
+            b"do_update",
+            "fire_timer",
+            b"fire_timer",
+            "initialize_workflow",
+            b"initialize_workflow",
+            "notify_has_patch",
+            b"notify_has_patch",
+            "query_workflow",
+            b"query_workflow",
+            "remove_from_cache",
+            b"remove_from_cache",
+            "resolve_activity",
+            b"resolve_activity",
+            "resolve_child_workflow_execution",
+            b"resolve_child_workflow_execution",
+            "resolve_child_workflow_execution_start",
+            b"resolve_child_workflow_execution_start",
+            "resolve_nexus_operation",
+            b"resolve_nexus_operation",
+            "resolve_nexus_operation_start",
+            b"resolve_nexus_operation_start",
+            "resolve_request_cancel_external_workflow",
+            b"resolve_request_cancel_external_workflow",
+            "resolve_signal_external_workflow",
+            b"resolve_signal_external_workflow",
+            "signal_workflow",
+            b"signal_workflow",
+            "update_random_seed",
+            b"update_random_seed",
+            "variant",
+            b"variant",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancel_workflow",
+            b"cancel_workflow",
+            "do_update",
+            b"do_update",
+            "fire_timer",
+            b"fire_timer",
+            "initialize_workflow",
+            b"initialize_workflow",
+            "notify_has_patch",
+            b"notify_has_patch",
+            "query_workflow",
+            b"query_workflow",
+            "remove_from_cache",
+            b"remove_from_cache",
+            "resolve_activity",
+            b"resolve_activity",
+            "resolve_child_workflow_execution",
+            b"resolve_child_workflow_execution",
+            "resolve_child_workflow_execution_start",
+            b"resolve_child_workflow_execution_start",
+            "resolve_nexus_operation",
+            b"resolve_nexus_operation",
+            "resolve_nexus_operation_start",
+            b"resolve_nexus_operation_start",
+            "resolve_request_cancel_external_workflow",
+            b"resolve_request_cancel_external_workflow",
+            "resolve_signal_external_workflow",
+            b"resolve_signal_external_workflow",
+            "signal_workflow",
+            b"signal_workflow",
+            "update_random_seed",
+            b"update_random_seed",
+            "variant",
+            b"variant",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
+    ) -> (
+        typing_extensions.Literal[
+            "initialize_workflow",
+            "fire_timer",
+            "update_random_seed",
+            "query_workflow",
+            "cancel_workflow",
+            "signal_workflow",
+            "resolve_activity",
+            "notify_has_patch",
+            "resolve_child_workflow_execution_start",
+            "resolve_child_workflow_execution",
+            "resolve_signal_external_workflow",
+            "resolve_request_cancel_external_workflow",
+            "do_update",
+            "resolve_nexus_operation_start",
+            "resolve_nexus_operation",
+            "remove_from_cache",
+        ]
+        | None
+    ): ...
 
 global___WorkflowActivationJob = WorkflowActivationJob
 
@@ -263,8 +415,13 @@ class InitializeWorkflow(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     WORKFLOW_TYPE_FIELD_NUMBER: builtins.int
     WORKFLOW_ID_FIELD_NUMBER: builtins.int
@@ -296,19 +453,29 @@ class InitializeWorkflow(google.protobuf.message.Message):
     workflow_id: builtins.str
     """The workflow id used on the temporal server"""
     @property
-    def arguments(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[temporalio.api.common.v1.message_pb2.Payload]:
+    def arguments(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Payload
+    ]:
         """Inputs to the workflow code"""
     randomness_seed: builtins.int
     """The seed must be used to initialize the random generator used by SDK.
     RandomSeedUpdatedAttributes are used to deliver seed updates.
     """
     @property
-    def headers(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, temporalio.api.common.v1.message_pb2.Payload]:
+    def headers(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, temporalio.api.common.v1.message_pb2.Payload
+    ]:
         """Used to add metadata e.g. for tracing and auth, meant to be read and written to by interceptors."""
     identity: builtins.str
     """Identity of the client who requested this execution"""
     @property
-    def parent_workflow_info(self) -> temporalio.bridge.proto.common.common_pb2.NamespacedWorkflowExecution:
+    def parent_workflow_info(
+        self,
+    ) -> temporalio.bridge.proto.common.common_pb2.NamespacedWorkflowExecution:
         """If this workflow is a child, information about the parent"""
     @property
     def workflow_execution_timeout(self) -> google.protobuf.duration_pb2.Duration:
@@ -323,7 +490,9 @@ class InitializeWorkflow(google.protobuf.message.Message):
     """Run id of the previous workflow which continued-as-new or retired or cron executed into this
     workflow, if any.
     """
-    continued_initiator: temporalio.api.enums.v1.workflow_pb2.ContinueAsNewInitiator.ValueType
+    continued_initiator: (
+        temporalio.api.enums.v1.workflow_pb2.ContinueAsNewInitiator.ValueType
+    )
     """If this workflow was a continuation, indicates the type of continuation."""
     @property
     def continued_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
@@ -341,12 +510,16 @@ class InitializeWorkflow(google.protobuf.message.Message):
     cron_schedule: builtins.str
     """If this workflow runs on a cron schedule, it will appear here"""
     @property
-    def workflow_execution_expiration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+    def workflow_execution_expiration_time(
+        self,
+    ) -> google.protobuf.timestamp_pb2.Timestamp:
         """The absolute time at which the workflow will be timed out.
         This is passed without change to the next run/retry of a workflow.
         """
     @property
-    def cron_schedule_to_schedule_interval(self) -> google.protobuf.duration_pb2.Duration:
+    def cron_schedule_to_schedule_interval(
+        self,
+    ) -> google.protobuf.duration_pb2.Duration:
         """For a cron workflow, this contains the amount of time between when this iteration of
         the cron workflow was scheduled and when it should run next per its cron_schedule.
         """
@@ -354,7 +527,9 @@ class InitializeWorkflow(google.protobuf.message.Message):
     def memo(self) -> temporalio.api.common.v1.message_pb2.Memo:
         """User-defined memo"""
     @property
-    def search_attributes(self) -> temporalio.api.common.v1.message_pb2.SearchAttributes:
+    def search_attributes(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.SearchAttributes:
         """Search attributes created/updated when this workflow was started"""
     @property
     def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
@@ -380,32 +555,130 @@ class InitializeWorkflow(google.protobuf.message.Message):
         *,
         workflow_type: builtins.str = ...,
         workflow_id: builtins.str = ...,
-        arguments: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload] | None = ...,
+        arguments: collections.abc.Iterable[
+            temporalio.api.common.v1.message_pb2.Payload
+        ]
+        | None = ...,
         randomness_seed: builtins.int = ...,
-        headers: collections.abc.Mapping[builtins.str, temporalio.api.common.v1.message_pb2.Payload] | None = ...,
+        headers: collections.abc.Mapping[
+            builtins.str, temporalio.api.common.v1.message_pb2.Payload
+        ]
+        | None = ...,
         identity: builtins.str = ...,
-        parent_workflow_info: temporalio.bridge.proto.common.common_pb2.NamespacedWorkflowExecution | None = ...,
+        parent_workflow_info: temporalio.bridge.proto.common.common_pb2.NamespacedWorkflowExecution
+        | None = ...,
         workflow_execution_timeout: google.protobuf.duration_pb2.Duration | None = ...,
         workflow_run_timeout: google.protobuf.duration_pb2.Duration | None = ...,
         workflow_task_timeout: google.protobuf.duration_pb2.Duration | None = ...,
         continued_from_execution_run_id: builtins.str = ...,
         continued_initiator: temporalio.api.enums.v1.workflow_pb2.ContinueAsNewInitiator.ValueType = ...,
         continued_failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
-        last_completion_result: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
+        last_completion_result: temporalio.api.common.v1.message_pb2.Payloads
+        | None = ...,
         first_execution_run_id: builtins.str = ...,
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
         attempt: builtins.int = ...,
         cron_schedule: builtins.str = ...,
-        workflow_execution_expiration_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
-        cron_schedule_to_schedule_interval: google.protobuf.duration_pb2.Duration | None = ...,
+        workflow_execution_expiration_time: google.protobuf.timestamp_pb2.Timestamp
+        | None = ...,
+        cron_schedule_to_schedule_interval: google.protobuf.duration_pb2.Duration
+        | None = ...,
         memo: temporalio.api.common.v1.message_pb2.Memo | None = ...,
-        search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes | None = ...,
+        search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
+        | None = ...,
         start_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
-        root_workflow: temporalio.api.common.v1.message_pb2.WorkflowExecution | None = ...,
+        root_workflow: temporalio.api.common.v1.message_pb2.WorkflowExecution
+        | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["continued_failure", b"continued_failure", "cron_schedule_to_schedule_interval", b"cron_schedule_to_schedule_interval", "last_completion_result", b"last_completion_result", "memo", b"memo", "parent_workflow_info", b"parent_workflow_info", "priority", b"priority", "retry_policy", b"retry_policy", "root_workflow", b"root_workflow", "search_attributes", b"search_attributes", "start_time", b"start_time", "workflow_execution_expiration_time", b"workflow_execution_expiration_time", "workflow_execution_timeout", b"workflow_execution_timeout", "workflow_run_timeout", b"workflow_run_timeout", "workflow_task_timeout", b"workflow_task_timeout"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["arguments", b"arguments", "attempt", b"attempt", "continued_failure", b"continued_failure", "continued_from_execution_run_id", b"continued_from_execution_run_id", "continued_initiator", b"continued_initiator", "cron_schedule", b"cron_schedule", "cron_schedule_to_schedule_interval", b"cron_schedule_to_schedule_interval", "first_execution_run_id", b"first_execution_run_id", "headers", b"headers", "identity", b"identity", "last_completion_result", b"last_completion_result", "memo", b"memo", "parent_workflow_info", b"parent_workflow_info", "priority", b"priority", "randomness_seed", b"randomness_seed", "retry_policy", b"retry_policy", "root_workflow", b"root_workflow", "search_attributes", b"search_attributes", "start_time", b"start_time", "workflow_execution_expiration_time", b"workflow_execution_expiration_time", "workflow_execution_timeout", b"workflow_execution_timeout", "workflow_id", b"workflow_id", "workflow_run_timeout", b"workflow_run_timeout", "workflow_task_timeout", b"workflow_task_timeout", "workflow_type", b"workflow_type"]) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "continued_failure",
+            b"continued_failure",
+            "cron_schedule_to_schedule_interval",
+            b"cron_schedule_to_schedule_interval",
+            "last_completion_result",
+            b"last_completion_result",
+            "memo",
+            b"memo",
+            "parent_workflow_info",
+            b"parent_workflow_info",
+            "priority",
+            b"priority",
+            "retry_policy",
+            b"retry_policy",
+            "root_workflow",
+            b"root_workflow",
+            "search_attributes",
+            b"search_attributes",
+            "start_time",
+            b"start_time",
+            "workflow_execution_expiration_time",
+            b"workflow_execution_expiration_time",
+            "workflow_execution_timeout",
+            b"workflow_execution_timeout",
+            "workflow_run_timeout",
+            b"workflow_run_timeout",
+            "workflow_task_timeout",
+            b"workflow_task_timeout",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "arguments",
+            b"arguments",
+            "attempt",
+            b"attempt",
+            "continued_failure",
+            b"continued_failure",
+            "continued_from_execution_run_id",
+            b"continued_from_execution_run_id",
+            "continued_initiator",
+            b"continued_initiator",
+            "cron_schedule",
+            b"cron_schedule",
+            "cron_schedule_to_schedule_interval",
+            b"cron_schedule_to_schedule_interval",
+            "first_execution_run_id",
+            b"first_execution_run_id",
+            "headers",
+            b"headers",
+            "identity",
+            b"identity",
+            "last_completion_result",
+            b"last_completion_result",
+            "memo",
+            b"memo",
+            "parent_workflow_info",
+            b"parent_workflow_info",
+            "priority",
+            b"priority",
+            "randomness_seed",
+            b"randomness_seed",
+            "retry_policy",
+            b"retry_policy",
+            "root_workflow",
+            b"root_workflow",
+            "search_attributes",
+            b"search_attributes",
+            "start_time",
+            b"start_time",
+            "workflow_execution_expiration_time",
+            b"workflow_execution_expiration_time",
+            "workflow_execution_timeout",
+            b"workflow_execution_timeout",
+            "workflow_id",
+            b"workflow_id",
+            "workflow_run_timeout",
+            b"workflow_run_timeout",
+            "workflow_task_timeout",
+            b"workflow_task_timeout",
+            "workflow_type",
+            b"workflow_type",
+        ],
+    ) -> None: ...
 
 global___InitializeWorkflow = InitializeWorkflow
 
@@ -422,7 +695,9 @@ class FireTimer(google.protobuf.message.Message):
         *,
         seq: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["seq", b"seq"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["seq", b"seq"]
+    ) -> None: ...
 
 global___FireTimer = FireTimer
 
@@ -437,7 +712,11 @@ class ResolveActivity(google.protobuf.message.Message):
     seq: builtins.int
     """Sequence number as provided by lang in the corresponding ScheduleActivity command"""
     @property
-    def result(self) -> temporalio.bridge.proto.activity_result.activity_result_pb2.ActivityResolution: ...
+    def result(
+        self,
+    ) -> (
+        temporalio.bridge.proto.activity_result.activity_result_pb2.ActivityResolution
+    ): ...
     is_local: builtins.bool
     """Set to true if the resolution is for a local activity. This is used internally by Core and
     lang does not need to care about it.
@@ -446,11 +725,19 @@ class ResolveActivity(google.protobuf.message.Message):
         self,
         *,
         seq: builtins.int = ...,
-        result: temporalio.bridge.proto.activity_result.activity_result_pb2.ActivityResolution | None = ...,
+        result: temporalio.bridge.proto.activity_result.activity_result_pb2.ActivityResolution
+        | None = ...,
         is_local: builtins.bool = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["result", b"result"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["is_local", b"is_local", "result", b"result", "seq", b"seq"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["result", b"result"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "is_local", b"is_local", "result", b"result", "seq", b"seq"
+        ],
+    ) -> None: ...
 
 global___ResolveActivity = ResolveActivity
 
@@ -481,9 +768,37 @@ class ResolveChildWorkflowExecutionStart(google.protobuf.message.Message):
         failed: global___ResolveChildWorkflowExecutionStartFailure | None = ...,
         cancelled: global___ResolveChildWorkflowExecutionStartCancelled | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["cancelled", b"cancelled", "failed", b"failed", "status", b"status", "succeeded", b"succeeded"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["cancelled", b"cancelled", "failed", b"failed", "seq", b"seq", "status", b"status", "succeeded", b"succeeded"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["status", b"status"]) -> typing_extensions.Literal["succeeded", "failed", "cancelled"] | None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancelled",
+            b"cancelled",
+            "failed",
+            b"failed",
+            "status",
+            b"status",
+            "succeeded",
+            b"succeeded",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cancelled",
+            b"cancelled",
+            "failed",
+            b"failed",
+            "seq",
+            b"seq",
+            "status",
+            b"status",
+            "succeeded",
+            b"succeeded",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["status", b"status"]
+    ) -> typing_extensions.Literal["succeeded", "failed", "cancelled"] | None: ...
 
 global___ResolveChildWorkflowExecutionStart = ResolveChildWorkflowExecutionStart
 
@@ -499,9 +814,13 @@ class ResolveChildWorkflowExecutionStartSuccess(google.protobuf.message.Message)
         *,
         run_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["run_id", b"run_id"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["run_id", b"run_id"]
+    ) -> None: ...
 
-global___ResolveChildWorkflowExecutionStartSuccess = ResolveChildWorkflowExecutionStartSuccess
+global___ResolveChildWorkflowExecutionStartSuccess = (
+    ResolveChildWorkflowExecutionStartSuccess
+)
 
 class ResolveChildWorkflowExecutionStartFailure(google.protobuf.message.Message):
     """Provide lang the cause of failure"""
@@ -524,9 +843,21 @@ class ResolveChildWorkflowExecutionStartFailure(google.protobuf.message.Message)
         workflow_type: builtins.str = ...,
         cause: temporalio.bridge.proto.child_workflow.child_workflow_pb2.StartChildWorkflowExecutionFailedCause.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["cause", b"cause", "workflow_id", b"workflow_id", "workflow_type", b"workflow_type"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "cause",
+            b"cause",
+            "workflow_id",
+            b"workflow_id",
+            "workflow_type",
+            b"workflow_type",
+        ],
+    ) -> None: ...
 
-global___ResolveChildWorkflowExecutionStartFailure = ResolveChildWorkflowExecutionStartFailure
+global___ResolveChildWorkflowExecutionStartFailure = (
+    ResolveChildWorkflowExecutionStartFailure
+)
 
 class ResolveChildWorkflowExecutionStartCancelled(google.protobuf.message.Message):
     """`failure` should be ChildWorkflowFailure with cause set to CancelledFailure.
@@ -543,10 +874,16 @@ class ResolveChildWorkflowExecutionStartCancelled(google.protobuf.message.Messag
         *,
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["failure", b"failure"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["failure", b"failure"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["failure", b"failure"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["failure", b"failure"]
+    ) -> None: ...
 
-global___ResolveChildWorkflowExecutionStartCancelled = ResolveChildWorkflowExecutionStartCancelled
+global___ResolveChildWorkflowExecutionStartCancelled = (
+    ResolveChildWorkflowExecutionStartCancelled
+)
 
 class ResolveChildWorkflowExecution(google.protobuf.message.Message):
     """Notify a workflow that a child workflow execution has been resolved"""
@@ -558,15 +895,24 @@ class ResolveChildWorkflowExecution(google.protobuf.message.Message):
     seq: builtins.int
     """Sequence number as provided by lang in the corresponding StartChildWorkflowExecution command"""
     @property
-    def result(self) -> temporalio.bridge.proto.child_workflow.child_workflow_pb2.ChildWorkflowResult: ...
+    def result(
+        self,
+    ) -> (
+        temporalio.bridge.proto.child_workflow.child_workflow_pb2.ChildWorkflowResult
+    ): ...
     def __init__(
         self,
         *,
         seq: builtins.int = ...,
-        result: temporalio.bridge.proto.child_workflow.child_workflow_pb2.ChildWorkflowResult | None = ...,
+        result: temporalio.bridge.proto.child_workflow.child_workflow_pb2.ChildWorkflowResult
+        | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["result", b"result"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["result", b"result", "seq", b"seq"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["result", b"result"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["result", b"result", "seq", b"seq"]
+    ) -> None: ...
 
 global___ResolveChildWorkflowExecution = ResolveChildWorkflowExecution
 
@@ -582,7 +928,10 @@ class UpdateRandomSeed(google.protobuf.message.Message):
         *,
         randomness_seed: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["randomness_seed", b"randomness_seed"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["randomness_seed", b"randomness_seed"],
+    ) -> None: ...
 
 global___UpdateRandomSeed = UpdateRandomSeed
 
@@ -605,8 +954,13 @@ class QueryWorkflow(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     QUERY_ID_FIELD_NUMBER: builtins.int
     QUERY_TYPE_FIELD_NUMBER: builtins.int
@@ -620,19 +974,45 @@ class QueryWorkflow(google.protobuf.message.Message):
     query_type: builtins.str
     """The query's function/method/etc name"""
     @property
-    def arguments(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[temporalio.api.common.v1.message_pb2.Payload]: ...
+    def arguments(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Payload
+    ]: ...
     @property
-    def headers(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, temporalio.api.common.v1.message_pb2.Payload]:
+    def headers(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, temporalio.api.common.v1.message_pb2.Payload
+    ]:
         """Headers attached to the query"""
     def __init__(
         self,
         *,
         query_id: builtins.str = ...,
         query_type: builtins.str = ...,
-        arguments: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload] | None = ...,
-        headers: collections.abc.Mapping[builtins.str, temporalio.api.common.v1.message_pb2.Payload] | None = ...,
+        arguments: collections.abc.Iterable[
+            temporalio.api.common.v1.message_pb2.Payload
+        ]
+        | None = ...,
+        headers: collections.abc.Mapping[
+            builtins.str, temporalio.api.common.v1.message_pb2.Payload
+        ]
+        | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["arguments", b"arguments", "headers", b"headers", "query_id", b"query_id", "query_type", b"query_type"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "arguments",
+            b"arguments",
+            "headers",
+            b"headers",
+            "query_id",
+            b"query_id",
+            "query_type",
+            b"query_type",
+        ],
+    ) -> None: ...
 
 global___QueryWorkflow = QueryWorkflow
 
@@ -649,7 +1029,9 @@ class CancelWorkflow(google.protobuf.message.Message):
         *,
         reason: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["reason", b"reason"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["reason", b"reason"]
+    ) -> None: ...
 
 global___CancelWorkflow = CancelWorkflow
 
@@ -672,8 +1054,13 @@ class SignalWorkflow(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     SIGNAL_NAME_FIELD_NUMBER: builtins.int
     INPUT_FIELD_NUMBER: builtins.int
@@ -681,21 +1068,45 @@ class SignalWorkflow(google.protobuf.message.Message):
     HEADERS_FIELD_NUMBER: builtins.int
     signal_name: builtins.str
     @property
-    def input(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[temporalio.api.common.v1.message_pb2.Payload]: ...
+    def input(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Payload
+    ]: ...
     identity: builtins.str
     """Identity of the sender of the signal"""
     @property
-    def headers(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, temporalio.api.common.v1.message_pb2.Payload]:
+    def headers(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, temporalio.api.common.v1.message_pb2.Payload
+    ]:
         """Headers attached to the signal"""
     def __init__(
         self,
         *,
         signal_name: builtins.str = ...,
-        input: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload] | None = ...,
+        input: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload]
+        | None = ...,
         identity: builtins.str = ...,
-        headers: collections.abc.Mapping[builtins.str, temporalio.api.common.v1.message_pb2.Payload] | None = ...,
+        headers: collections.abc.Mapping[
+            builtins.str, temporalio.api.common.v1.message_pb2.Payload
+        ]
+        | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["headers", b"headers", "identity", b"identity", "input", b"input", "signal_name", b"signal_name"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "headers",
+            b"headers",
+            "identity",
+            b"identity",
+            "input",
+            b"input",
+            "signal_name",
+            b"signal_name",
+        ],
+    ) -> None: ...
 
 global___SignalWorkflow = SignalWorkflow
 
@@ -713,7 +1124,9 @@ class NotifyHasPatch(google.protobuf.message.Message):
         *,
         patch_id: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["patch_id", b"patch_id"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["patch_id", b"patch_id"]
+    ) -> None: ...
 
 global___NotifyHasPatch = NotifyHasPatch
 
@@ -737,8 +1150,13 @@ class ResolveSignalExternalWorkflow(google.protobuf.message.Message):
         seq: builtins.int = ...,
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["failure", b"failure"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["failure", b"failure", "seq", b"seq"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["failure", b"failure"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["failure", b"failure", "seq", b"seq"],
+    ) -> None: ...
 
 global___ResolveSignalExternalWorkflow = ResolveSignalExternalWorkflow
 
@@ -762,8 +1180,13 @@ class ResolveRequestCancelExternalWorkflow(google.protobuf.message.Message):
         seq: builtins.int = ...,
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["failure", b"failure"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["failure", b"failure", "seq", b"seq"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["failure", b"failure"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["failure", b"failure", "seq", b"seq"],
+    ) -> None: ...
 
 global___ResolveRequestCancelExternalWorkflow = ResolveRequestCancelExternalWorkflow
 
@@ -789,8 +1212,13 @@ class DoUpdate(google.protobuf.message.Message):
             key: builtins.str = ...,
             value: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         ) -> None: ...
-        def HasField(self, field_name: typing_extensions.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
 
     ID_FIELD_NUMBER: builtins.int
     PROTOCOL_INSTANCE_ID_FIELD_NUMBER: builtins.int
@@ -808,10 +1236,18 @@ class DoUpdate(google.protobuf.message.Message):
     name: builtins.str
     """The name of the update handler"""
     @property
-    def input(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[temporalio.api.common.v1.message_pb2.Payload]:
+    def input(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Payload
+    ]:
         """The input to the update"""
     @property
-    def headers(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, temporalio.api.common.v1.message_pb2.Payload]:
+    def headers(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, temporalio.api.common.v1.message_pb2.Payload
+    ]:
         """Headers attached to the update"""
     @property
     def meta(self) -> temporalio.api.update.v1.message_pb2.Meta:
@@ -828,13 +1264,37 @@ class DoUpdate(google.protobuf.message.Message):
         id: builtins.str = ...,
         protocol_instance_id: builtins.str = ...,
         name: builtins.str = ...,
-        input: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload] | None = ...,
-        headers: collections.abc.Mapping[builtins.str, temporalio.api.common.v1.message_pb2.Payload] | None = ...,
+        input: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload]
+        | None = ...,
+        headers: collections.abc.Mapping[
+            builtins.str, temporalio.api.common.v1.message_pb2.Payload
+        ]
+        | None = ...,
         meta: temporalio.api.update.v1.message_pb2.Meta | None = ...,
         run_validator: builtins.bool = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["meta", b"meta"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["headers", b"headers", "id", b"id", "input", b"input", "meta", b"meta", "name", b"name", "protocol_instance_id", b"protocol_instance_id", "run_validator", b"run_validator"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["meta", b"meta"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "headers",
+            b"headers",
+            "id",
+            b"id",
+            "input",
+            b"input",
+            "meta",
+            b"meta",
+            "name",
+            b"name",
+            "protocol_instance_id",
+            b"protocol_instance_id",
+            "run_validator",
+            b"run_validator",
+        ],
+    ) -> None: ...
 
 global___DoUpdate = DoUpdate
 
@@ -870,9 +1330,39 @@ class ResolveNexusOperationStart(google.protobuf.message.Message):
         started_sync: builtins.bool = ...,
         failed: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["failed", b"failed", "operation_token", b"operation_token", "started_sync", b"started_sync", "status", b"status"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["failed", b"failed", "operation_token", b"operation_token", "seq", b"seq", "started_sync", b"started_sync", "status", b"status"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing_extensions.Literal["status", b"status"]) -> typing_extensions.Literal["operation_token", "started_sync", "failed"] | None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "failed",
+            b"failed",
+            "operation_token",
+            b"operation_token",
+            "started_sync",
+            b"started_sync",
+            "status",
+            b"status",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "failed",
+            b"failed",
+            "operation_token",
+            b"operation_token",
+            "seq",
+            b"seq",
+            "started_sync",
+            b"started_sync",
+            "status",
+            b"status",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["status", b"status"]
+    ) -> (
+        typing_extensions.Literal["operation_token", "started_sync", "failed"] | None
+    ): ...
 
 global___ResolveNexusOperationStart = ResolveNexusOperationStart
 
@@ -884,15 +1374,22 @@ class ResolveNexusOperation(google.protobuf.message.Message):
     seq: builtins.int
     """Sequence number as provided by lang in the corresponding ScheduleNexusOperation command"""
     @property
-    def result(self) -> temporalio.bridge.proto.nexus.nexus_pb2.NexusOperationResult: ...
+    def result(
+        self,
+    ) -> temporalio.bridge.proto.nexus.nexus_pb2.NexusOperationResult: ...
     def __init__(
         self,
         *,
         seq: builtins.int = ...,
-        result: temporalio.bridge.proto.nexus.nexus_pb2.NexusOperationResult | None = ...,
+        result: temporalio.bridge.proto.nexus.nexus_pb2.NexusOperationResult
+        | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["result", b"result"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["result", b"result", "seq", b"seq"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["result", b"result"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["result", b"result", "seq", b"seq"]
+    ) -> None: ...
 
 global___ResolveNexusOperation = ResolveNexusOperation
 
@@ -903,7 +1400,12 @@ class RemoveFromCache(google.protobuf.message.Message):
         ValueType = typing.NewType("ValueType", builtins.int)
         V: typing_extensions.TypeAlias = ValueType
 
-    class _EvictionReasonEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[RemoveFromCache._EvictionReason.ValueType], builtins.type):  # noqa: F821
+    class _EvictionReasonEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            RemoveFromCache._EvictionReason.ValueType
+        ],
+        builtins.type,
+    ):  # noqa: F821
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         UNSPECIFIED: RemoveFromCache._EvictionReason.ValueType  # 0
         CACHE_FULL: RemoveFromCache._EvictionReason.ValueType  # 1
@@ -980,6 +1482,11 @@ class RemoveFromCache(google.protobuf.message.Message):
         message: builtins.str = ...,
         reason: global___RemoveFromCache.EvictionReason.ValueType = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["message", b"message", "reason", b"reason"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "message", b"message", "reason", b"reason"
+        ],
+    ) -> None: ...
 
 global___RemoveFromCache = RemoveFromCache

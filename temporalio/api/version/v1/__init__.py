@@ -1,6 +1,4 @@
-from .message_pb2 import ReleaseInfo
-from .message_pb2 import Alert
-from .message_pb2 import VersionInfo
+from .message_pb2 import Alert, ReleaseInfo, VersionInfo
 
 __all__ = [
     "Alert",
