@@ -25,6 +25,9 @@ import opentelemetry.propagators.textmap
 import opentelemetry.trace
 import opentelemetry.trace.propagation.tracecontext
 import opentelemetry.util.types
+from opentelemetry.context import Context
+from opentelemetry.trace import SpanKind, _Links, Span, StatusCode, Status
+from opentelemetry.util import types
 from typing_extensions import Protocol, TypeAlias, TypedDict
 
 import temporalio.activity
@@ -34,6 +37,7 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.worker
 import temporalio.workflow
+from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 
 # OpenTelemetry dynamically, lazily chooses its context implementation at
 # runtime. When first accessed, they use pkg_resources.iter_entry_points + load.
@@ -659,6 +663,50 @@ class _TracingWorkflowOutboundInterceptor(
             kind=opentelemetry.trace.SpanKind.CLIENT,
         )
         return super().start_local_activity(input)
+
+
+class TemporalTracer(opentelemetry.trace.Tracer):
+    def __init__(self, tracer: opentelemetry.trace.Tracer):
+        self._tracer = tracer
+        super().__init__()
+
+    def start_span(self, name: str, context: Optional[Context] = None, kind: SpanKind = SpanKind.INTERNAL,
+                   attributes: types.Attributes = None, links: _Links = None, start_time: Optional[int] = None,
+                   record_exception: bool = True, set_status_on_exception: bool = True) -> Span:
+        return self._tracer.start_span(name, context, kind, attributes, links, start_time, record_exception, set_status_on_exception)
+
+    @staticmethod
+    def handle_exception(exc: Exception, span: Span, record_exception: bool, set_status_on_exception: bool) -> None:
+        if record_exception:
+            span.record_exception(exc)
+
+        # Set status in case exception was raised
+        if set_status_on_exception:
+            span.set_status(
+                Status(
+                    status_code=StatusCode.ERROR,
+                    description=f"{type(exc).__name__}: {exc}",
+                )
+            )
+
+    @contextmanager
+    def start_as_current_span(self, name: str, context: Optional[Context] = None, kind: SpanKind = SpanKind.INTERNAL,
+                              attributes: types.Attributes = None, links: _Links = None,
+                              start_time: Optional[int] = None, record_exception: bool = True,
+                              set_status_on_exception: bool = True, end_on_exit: bool = True) -> Iterator[Span]:
+
+        with self._tracer.start_as_current_span(name, context, kind, attributes, links, start_time, False, False, end_on_exit) as span:
+            try:
+                yield span
+
+            # TODO: Catch base exception and handle cancellation errors
+            except ApplicationError as exc:
+                if exc.category != ApplicationErrorCategory.BENIGN:
+                    self.handle_exception(exc, span, record_exception, set_status_on_exception)
+                raise
+            except Exception as exc:
+                self.handle_exception(exc, span, record_exception, set_status_on_exception)
+                raise
 
 
 class workflow:
