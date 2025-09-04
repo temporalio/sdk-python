@@ -1653,8 +1653,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
         Args:
             follow_runs: If true (default), workflow runs will be continually
-                fetched, until the most recent one is found. If false, the first
-                result is used.
+                fetched, until the most recent one is found. If false, return
+                the result from the first run targeted by the request if that run
+                ends in a result, otherwise raise an exception.
             rpc_metadata: Headers used on the RPC call. Keys here override
                 client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for each RPC call. Note,
