@@ -152,7 +152,22 @@ class LocalActivitySlotInfo(Protocol):
     activity_type: str
 
 
-SlotInfo: TypeAlias = Union[WorkflowSlotInfo, ActivitySlotInfo, LocalActivitySlotInfo]
+# WARNING: This must match Rust worker::NexusSlotInfo
+@runtime_checkable
+class NexusSlotInfo(Protocol):
+    """Info about a nexus task slot usage.
+
+    .. warning::
+        Custom slot suppliers are currently experimental.
+    """
+
+    service: str
+    operation: str
+
+
+SlotInfo: TypeAlias = Union[
+    WorkflowSlotInfo, ActivitySlotInfo, LocalActivitySlotInfo, NexusSlotInfo
+]
 
 
 # WARNING: This must match Rust worker::SlotMarkUsedCtx
