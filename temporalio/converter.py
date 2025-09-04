@@ -689,11 +689,17 @@ class PayloadCodec(ABC):
         payloads.payloads.extend(new_payloads)
 
     async def encode_failure(self, failure: temporalio.api.failure.v1.Failure) -> None:
-        """Encode payloads of a failure."""
+        """Encode payloads of a failure. Intended as a helper method, not for overriding.
+        It is not guaranteed that all failures will be encoded with this method rather
+        than encoding the underlying payloads.
+        """
         await self._apply_to_failure_payloads(failure, self.encode_wrapper)
 
     async def decode_failure(self, failure: temporalio.api.failure.v1.Failure) -> None:
-        """Decode payloads of a failure."""
+        """Decode payloads of a failure. Intended as a helper method, not for overriding.
+        It is not guaranteed that all failures will be decoded with this method rather
+        than decoding the underlying payloads.
+        """
         await self._apply_to_failure_payloads(failure, self.decode_wrapper)
 
     async def _apply_to_failure_payloads(

@@ -1,0 +1,431 @@
+import abc
+from typing import Any, MutableSequence
+
+from temporalio.api.common.v1.message_pb2 import Payload
+
+
+class VisitorFunctions(abc.ABC):
+    """Set of functions which can be called by the visitor. Allows handling payloads as a sequence."""
+
+    @abc.abstractmethod
+    async def visit_payload(self, payload: Payload) -> None:
+        """Called when encountering a single payload."""
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+        """Called when encountering multiple payloads together."""
+        raise NotImplementedError()
+
+
+class PayloadVisitor:
+    """A visitor for payloads. Applies a function to every payload in a tree of messages."""
+
+    def __init__(
+        self, *, skip_search_attributes: bool = False, skip_headers: bool = False
+    ):
+        """Creates a new payload visitor."""
+        self.skip_search_attributes = skip_search_attributes
+        self.skip_headers = skip_headers
+
+    async def visit(self, fs: VisitorFunctions, root: Any) -> None:
+        """Visits the given root message with the given function."""
+        method_name = "_visit_" + root.DESCRIPTOR.full_name.replace(".", "_")
+        method = getattr(self, method_name, None)
+        if method is not None:
+            await method(fs, root)
+        else:
+            raise ValueError(f"Unknown root message type: {root.DESCRIPTOR.full_name}")
+
+    async def _visit_temporal_api_common_v1_Payload(self, fs, o):
+        await fs.visit_payload(o)
+
+    async def _visit_temporal_api_common_v1_Payloads(self, fs, o):
+        await fs.visit_payloads(o.payloads)
+
+    async def _visit_payload_container(self, fs, o):
+        await fs.visit_payloads(o)
+
+    async def _visit_temporal_api_failure_v1_ApplicationFailureInfo(self, fs, o):
+        if o.HasField("details"):
+            await self._visit_temporal_api_common_v1_Payloads(fs, o.details)
+
+    async def _visit_temporal_api_failure_v1_TimeoutFailureInfo(self, fs, o):
+        if o.HasField("last_heartbeat_details"):
+            await self._visit_temporal_api_common_v1_Payloads(
+                fs, o.last_heartbeat_details
+            )
+
+    async def _visit_temporal_api_failure_v1_CanceledFailureInfo(self, fs, o):
+        if o.HasField("details"):
+            await self._visit_temporal_api_common_v1_Payloads(fs, o.details)
+
+    async def _visit_temporal_api_failure_v1_ResetWorkflowFailureInfo(self, fs, o):
+        if o.HasField("last_heartbeat_details"):
+            await self._visit_temporal_api_common_v1_Payloads(
+                fs, o.last_heartbeat_details
+            )
+
+    async def _visit_temporal_api_failure_v1_Failure(self, fs, o):
+        if o.HasField("encoded_attributes"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.encoded_attributes)
+        if o.HasField("application_failure_info"):
+            await self._visit_temporal_api_failure_v1_ApplicationFailureInfo(
+                fs, o.application_failure_info
+            )
+        if o.HasField("timeout_failure_info"):
+            await self._visit_temporal_api_failure_v1_TimeoutFailureInfo(
+                fs, o.timeout_failure_info
+            )
+        if o.HasField("canceled_failure_info"):
+            await self._visit_temporal_api_failure_v1_CanceledFailureInfo(
+                fs, o.canceled_failure_info
+            )
+        if o.HasField("reset_workflow_failure_info"):
+            await self._visit_temporal_api_failure_v1_ResetWorkflowFailureInfo(
+                fs, o.reset_workflow_failure_info
+            )
+
+    async def _visit_temporal_api_common_v1_Memo(self, fs, o):
+        for v in o.fields.values():
+            await self._visit_temporal_api_common_v1_Payload(fs, v)
+
+    async def _visit_temporal_api_common_v1_SearchAttributes(self, fs, o):
+        if self.skip_search_attributes:
+            return
+        for v in o.indexed_fields.values():
+            await self._visit_temporal_api_common_v1_Payload(fs, v)
+
+    async def _visit_coresdk_workflow_activation_InitializeWorkflow(self, fs, o):
+        await self._visit_payload_container(fs, o.arguments)
+        if not self.skip_headers:
+            for v in o.headers.values():
+                await self._visit_temporal_api_common_v1_Payload(fs, v)
+        if o.HasField("continued_failure"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.continued_failure)
+        if o.HasField("last_completion_result"):
+            await self._visit_temporal_api_common_v1_Payloads(
+                fs, o.last_completion_result
+            )
+        if o.HasField("memo"):
+            await self._visit_temporal_api_common_v1_Memo(fs, o.memo)
+        if o.HasField("search_attributes"):
+            await self._visit_temporal_api_common_v1_SearchAttributes(
+                fs, o.search_attributes
+            )
+
+    async def _visit_coresdk_workflow_activation_QueryWorkflow(self, fs, o):
+        await self._visit_payload_container(fs, o.arguments)
+        if not self.skip_headers:
+            for v in o.headers.values():
+                await self._visit_temporal_api_common_v1_Payload(fs, v)
+
+    async def _visit_coresdk_workflow_activation_SignalWorkflow(self, fs, o):
+        await self._visit_payload_container(fs, o.input)
+        if not self.skip_headers:
+            for v in o.headers.values():
+                await self._visit_temporal_api_common_v1_Payload(fs, v)
+
+    async def _visit_coresdk_activity_result_Success(self, fs, o):
+        if o.HasField("result"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.result)
+
+    async def _visit_coresdk_activity_result_Failure(self, fs, o):
+        if o.HasField("failure"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failure)
+
+    async def _visit_coresdk_activity_result_Cancellation(self, fs, o):
+        if o.HasField("failure"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failure)
+
+    async def _visit_coresdk_activity_result_ActivityResolution(self, fs, o):
+        if o.HasField("completed"):
+            await self._visit_coresdk_activity_result_Success(fs, o.completed)
+        if o.HasField("failed"):
+            await self._visit_coresdk_activity_result_Failure(fs, o.failed)
+        if o.HasField("cancelled"):
+            await self._visit_coresdk_activity_result_Cancellation(fs, o.cancelled)
+
+    async def _visit_coresdk_workflow_activation_ResolveActivity(self, fs, o):
+        if o.HasField("result"):
+            await self._visit_coresdk_activity_result_ActivityResolution(fs, o.result)
+
+    async def _visit_coresdk_workflow_activation_ResolveChildWorkflowExecutionStartCancelled(
+        self, fs, o
+    ):
+        if o.HasField("failure"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failure)
+
+    async def _visit_coresdk_workflow_activation_ResolveChildWorkflowExecutionStart(
+        self, fs, o
+    ):
+        if o.HasField("cancelled"):
+            await self._visit_coresdk_workflow_activation_ResolveChildWorkflowExecutionStartCancelled(
+                fs, o.cancelled
+            )
+
+    async def _visit_coresdk_child_workflow_Success(self, fs, o):
+        if o.HasField("result"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.result)
+
+    async def _visit_coresdk_child_workflow_Failure(self, fs, o):
+        if o.HasField("failure"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failure)
+
+    async def _visit_coresdk_child_workflow_Cancellation(self, fs, o):
+        if o.HasField("failure"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failure)
+
+    async def _visit_coresdk_child_workflow_ChildWorkflowResult(self, fs, o):
+        if o.HasField("completed"):
+            await self._visit_coresdk_child_workflow_Success(fs, o.completed)
+        if o.HasField("failed"):
+            await self._visit_coresdk_child_workflow_Failure(fs, o.failed)
+        if o.HasField("cancelled"):
+            await self._visit_coresdk_child_workflow_Cancellation(fs, o.cancelled)
+
+    async def _visit_coresdk_workflow_activation_ResolveChildWorkflowExecution(
+        self, fs, o
+    ):
+        if o.HasField("result"):
+            await self._visit_coresdk_child_workflow_ChildWorkflowResult(fs, o.result)
+
+    async def _visit_coresdk_workflow_activation_ResolveSignalExternalWorkflow(
+        self, fs, o
+    ):
+        if o.HasField("failure"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failure)
+
+    async def _visit_coresdk_workflow_activation_ResolveRequestCancelExternalWorkflow(
+        self, fs, o
+    ):
+        if o.HasField("failure"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failure)
+
+    async def _visit_coresdk_workflow_activation_DoUpdate(self, fs, o):
+        await self._visit_payload_container(fs, o.input)
+        if not self.skip_headers:
+            for v in o.headers.values():
+                await self._visit_temporal_api_common_v1_Payload(fs, v)
+
+    async def _visit_coresdk_workflow_activation_ResolveNexusOperationStart(
+        self, fs, o
+    ):
+        if o.HasField("failed"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failed)
+
+    async def _visit_coresdk_nexus_NexusOperationResult(self, fs, o):
+        if o.HasField("completed"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.completed)
+        if o.HasField("failed"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failed)
+        if o.HasField("cancelled"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.cancelled)
+        if o.HasField("timed_out"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.timed_out)
+
+    async def _visit_coresdk_workflow_activation_ResolveNexusOperation(self, fs, o):
+        if o.HasField("result"):
+            await self._visit_coresdk_nexus_NexusOperationResult(fs, o.result)
+
+    async def _visit_coresdk_workflow_activation_WorkflowActivationJob(self, fs, o):
+        if o.HasField("initialize_workflow"):
+            await self._visit_coresdk_workflow_activation_InitializeWorkflow(
+                fs, o.initialize_workflow
+            )
+        if o.HasField("query_workflow"):
+            await self._visit_coresdk_workflow_activation_QueryWorkflow(
+                fs, o.query_workflow
+            )
+        if o.HasField("signal_workflow"):
+            await self._visit_coresdk_workflow_activation_SignalWorkflow(
+                fs, o.signal_workflow
+            )
+        if o.HasField("resolve_activity"):
+            await self._visit_coresdk_workflow_activation_ResolveActivity(
+                fs, o.resolve_activity
+            )
+        if o.HasField("resolve_child_workflow_execution_start"):
+            await self._visit_coresdk_workflow_activation_ResolveChildWorkflowExecutionStart(
+                fs, o.resolve_child_workflow_execution_start
+            )
+        if o.HasField("resolve_child_workflow_execution"):
+            await self._visit_coresdk_workflow_activation_ResolveChildWorkflowExecution(
+                fs, o.resolve_child_workflow_execution
+            )
+        if o.HasField("resolve_signal_external_workflow"):
+            await self._visit_coresdk_workflow_activation_ResolveSignalExternalWorkflow(
+                fs, o.resolve_signal_external_workflow
+            )
+        if o.HasField("resolve_request_cancel_external_workflow"):
+            await self._visit_coresdk_workflow_activation_ResolveRequestCancelExternalWorkflow(
+                fs, o.resolve_request_cancel_external_workflow
+            )
+        if o.HasField("do_update"):
+            await self._visit_coresdk_workflow_activation_DoUpdate(fs, o.do_update)
+        if o.HasField("resolve_nexus_operation_start"):
+            await self._visit_coresdk_workflow_activation_ResolveNexusOperationStart(
+                fs, o.resolve_nexus_operation_start
+            )
+        if o.HasField("resolve_nexus_operation"):
+            await self._visit_coresdk_workflow_activation_ResolveNexusOperation(
+                fs, o.resolve_nexus_operation
+            )
+
+    async def _visit_coresdk_workflow_activation_WorkflowActivation(self, fs, o):
+        for v in o.jobs:
+            await self._visit_coresdk_workflow_activation_WorkflowActivationJob(fs, v)
+
+    async def _visit_temporal_api_sdk_v1_UserMetadata(self, fs, o):
+        if o.HasField("summary"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.summary)
+        if o.HasField("details"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.details)
+
+    async def _visit_coresdk_workflow_commands_ScheduleActivity(self, fs, o):
+        if not self.skip_headers:
+            for v in o.headers.values():
+                await self._visit_temporal_api_common_v1_Payload(fs, v)
+        await self._visit_payload_container(fs, o.arguments)
+
+    async def _visit_coresdk_workflow_commands_QuerySuccess(self, fs, o):
+        if o.HasField("response"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.response)
+
+    async def _visit_coresdk_workflow_commands_QueryResult(self, fs, o):
+        if o.HasField("succeeded"):
+            await self._visit_coresdk_workflow_commands_QuerySuccess(fs, o.succeeded)
+        if o.HasField("failed"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failed)
+
+    async def _visit_coresdk_workflow_commands_CompleteWorkflowExecution(self, fs, o):
+        if o.HasField("result"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.result)
+
+    async def _visit_coresdk_workflow_commands_FailWorkflowExecution(self, fs, o):
+        if o.HasField("failure"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failure)
+
+    async def _visit_coresdk_workflow_commands_ContinueAsNewWorkflowExecution(
+        self, fs, o
+    ):
+        await self._visit_payload_container(fs, o.arguments)
+        for v in o.memo.values():
+            await self._visit_temporal_api_common_v1_Payload(fs, v)
+        if not self.skip_headers:
+            for v in o.headers.values():
+                await self._visit_temporal_api_common_v1_Payload(fs, v)
+        for v in o.search_attributes.values():
+            await self._visit_temporal_api_common_v1_Payload(fs, v)
+
+    async def _visit_coresdk_workflow_commands_StartChildWorkflowExecution(self, fs, o):
+        await self._visit_payload_container(fs, o.input)
+        if not self.skip_headers:
+            for v in o.headers.values():
+                await self._visit_temporal_api_common_v1_Payload(fs, v)
+        for v in o.memo.values():
+            await self._visit_temporal_api_common_v1_Payload(fs, v)
+        for v in o.search_attributes.values():
+            await self._visit_temporal_api_common_v1_Payload(fs, v)
+
+    async def _visit_coresdk_workflow_commands_SignalExternalWorkflowExecution(
+        self, fs, o
+    ):
+        await self._visit_payload_container(fs, o.args)
+        if not self.skip_headers:
+            for v in o.headers.values():
+                await self._visit_temporal_api_common_v1_Payload(fs, v)
+
+    async def _visit_coresdk_workflow_commands_ScheduleLocalActivity(self, fs, o):
+        if not self.skip_headers:
+            for v in o.headers.values():
+                await self._visit_temporal_api_common_v1_Payload(fs, v)
+        await self._visit_payload_container(fs, o.arguments)
+
+    async def _visit_coresdk_workflow_commands_UpsertWorkflowSearchAttributes(
+        self, fs, o
+    ):
+        for v in o.search_attributes.values():
+            await self._visit_temporal_api_common_v1_Payload(fs, v)
+
+    async def _visit_coresdk_workflow_commands_ModifyWorkflowProperties(self, fs, o):
+        if o.HasField("upserted_memo"):
+            await self._visit_temporal_api_common_v1_Memo(fs, o.upserted_memo)
+
+    async def _visit_coresdk_workflow_commands_UpdateResponse(self, fs, o):
+        if o.HasField("rejected"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.rejected)
+        if o.HasField("completed"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.completed)
+
+    async def _visit_coresdk_workflow_commands_ScheduleNexusOperation(self, fs, o):
+        if o.HasField("input"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.input)
+
+    async def _visit_coresdk_workflow_commands_WorkflowCommand(self, fs, o):
+        if o.HasField("user_metadata"):
+            await self._visit_temporal_api_sdk_v1_UserMetadata(fs, o.user_metadata)
+        if o.HasField("schedule_activity"):
+            await self._visit_coresdk_workflow_commands_ScheduleActivity(
+                fs, o.schedule_activity
+            )
+        if o.HasField("respond_to_query"):
+            await self._visit_coresdk_workflow_commands_QueryResult(
+                fs, o.respond_to_query
+            )
+        if o.HasField("complete_workflow_execution"):
+            await self._visit_coresdk_workflow_commands_CompleteWorkflowExecution(
+                fs, o.complete_workflow_execution
+            )
+        if o.HasField("fail_workflow_execution"):
+            await self._visit_coresdk_workflow_commands_FailWorkflowExecution(
+                fs, o.fail_workflow_execution
+            )
+        if o.HasField("continue_as_new_workflow_execution"):
+            await self._visit_coresdk_workflow_commands_ContinueAsNewWorkflowExecution(
+                fs, o.continue_as_new_workflow_execution
+            )
+        if o.HasField("start_child_workflow_execution"):
+            await self._visit_coresdk_workflow_commands_StartChildWorkflowExecution(
+                fs, o.start_child_workflow_execution
+            )
+        if o.HasField("signal_external_workflow_execution"):
+            await self._visit_coresdk_workflow_commands_SignalExternalWorkflowExecution(
+                fs, o.signal_external_workflow_execution
+            )
+        if o.HasField("schedule_local_activity"):
+            await self._visit_coresdk_workflow_commands_ScheduleLocalActivity(
+                fs, o.schedule_local_activity
+            )
+        if o.HasField("upsert_workflow_search_attributes"):
+            await self._visit_coresdk_workflow_commands_UpsertWorkflowSearchAttributes(
+                fs, o.upsert_workflow_search_attributes
+            )
+        if o.HasField("modify_workflow_properties"):
+            await self._visit_coresdk_workflow_commands_ModifyWorkflowProperties(
+                fs, o.modify_workflow_properties
+            )
+        if o.HasField("update_response"):
+            await self._visit_coresdk_workflow_commands_UpdateResponse(
+                fs, o.update_response
+            )
+        if o.HasField("schedule_nexus_operation"):
+            await self._visit_coresdk_workflow_commands_ScheduleNexusOperation(
+                fs, o.schedule_nexus_operation
+            )
+
+    async def _visit_coresdk_workflow_completion_Success(self, fs, o):
+        for v in o.commands:
+            await self._visit_coresdk_workflow_commands_WorkflowCommand(fs, v)
+
+    async def _visit_coresdk_workflow_completion_Failure(self, fs, o):
+        if o.HasField("failure"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failure)
+
+    async def _visit_coresdk_workflow_completion_WorkflowActivationCompletion(
+        self, fs, o
+    ):
+        if o.HasField("successful"):
+            await self._visit_coresdk_workflow_completion_Success(fs, o.successful)
+        if o.HasField("failed"):
+            await self._visit_coresdk_workflow_completion_Failure(fs, o.failed)
