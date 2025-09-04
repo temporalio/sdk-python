@@ -719,7 +719,6 @@ async def test_update_with_start_no_param(client: Client):
             "my_update",
             wait_for_stage=WorkflowUpdateStage.COMPLETED,
             start_workflow_operation=no_param_start_op,
-            result_type=UpdateResult,
         )
         assert await update_handle.result() == UpdateResult(result="update-result")
         wf_handle = await no_param_start_op.workflow_handle()
@@ -760,7 +759,6 @@ async def test_update_with_start_one_param(client: Client):
             "update-arg",
             wait_for_stage=WorkflowUpdateStage.COMPLETED,
             start_workflow_operation=one_param_start_op,
-            result_type=UpdateResult,
         )
         assert await update_handle.result() == UpdateResult(result="update-arg")
         wf_handle = await one_param_start_op.workflow_handle()
@@ -805,7 +803,6 @@ async def test_update_with_start_two_param(client: Client):
             args=("update-arg1", "update-arg2"),
             wait_for_stage=WorkflowUpdateStage.COMPLETED,
             start_workflow_operation=two_param_start_op,
-            result_type=UpdateResult,
         )
         assert await update_handle.result() == UpdateResult(
             result="update-arg1-update-arg2"

@@ -313,7 +313,7 @@ async def test_search_attributes_on_dev_server(
         ],
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
     ) as env:
-        handle = await env.client.start_workflow(
+        handle: WorkflowHandle[Any, Any] = await env.client.start_workflow(
             "some-workflow",
             id=f"wf-{uuid.uuid4()}",
             task_queue=f"tq-{uuid.uuid4()}",

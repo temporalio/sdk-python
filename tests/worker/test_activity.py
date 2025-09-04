@@ -505,7 +505,9 @@ async def test_sync_activity_thread_cancel_on_worker_shutdown(client: Client):
     ) as executor:
         async with new_worker():
             # Start the workflow
-            handle = await client.start_workflow(
+            handle: temporalio.client.WorkflowHandle[
+                Any, Any
+            ] = await client.start_workflow(
                 CancelOnWorkerShutdownWorkflow.run,
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=task_queue,
@@ -903,7 +905,7 @@ async def test_activity_worker_shutdown(client: Client, worker: ExternalWorker):
     act_worker = Worker(client, task_queue=act_task_queue, activities=[wait_on_event])
     asyncio.create_task(act_worker.run())
     # Start workflow
-    handle = await client.start_workflow(
+    handle: temporalio.client.WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(
             actions=[
@@ -946,7 +948,7 @@ async def test_activity_worker_shutdown_graceful(
     )
     asyncio.create_task(act_worker.run())
     # Start workflow
-    handle = await client.start_workflow(
+    handle: temporalio.client.WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(
             actions=[
@@ -989,7 +991,9 @@ async def test_sync_activity_process_worker_shutdown_graceful(
         asyncio.create_task(act_worker.run())
 
         # Start workflow
-        handle = await client.start_workflow(
+        handle: temporalio.client.WorkflowHandle[
+            Any, Any
+        ] = await client.start_workflow(
             "kitchen_sink",
             KSWorkflowParams(
                 actions=[
@@ -1376,7 +1380,9 @@ async def _execute_workflow_with_activity(
         worker_config["max_concurrent_activities"] = default_max_concurrent_activities
     async with Worker(**worker_config):
         try:
-            handle = await client.start_workflow(
+            handle: temporalio.client.WorkflowHandle[
+                Any, Any
+            ] = await client.start_workflow(
                 "kitchen_sink",
                 KSWorkflowParams(
                     actions=[

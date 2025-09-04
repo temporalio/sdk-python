@@ -307,7 +307,7 @@ async def test_no_type_annotations(client: Client):
         task_queue=task_queue_name,
         workflows=[NoTypeAnnotationsWorkflow],
     ):
-        result = await client.execute_workflow(
+        result: list[int] = await client.execute_workflow(
             "NoTypeAnnotationsWorkflow",
             (7,),
             id=str(uuid.uuid4()),

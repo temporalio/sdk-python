@@ -41,11 +41,9 @@ from temporalio.client import (
     BuildIdOpPromoteSetByBuildId,
     CancelWorkflowInput,
     Client,
-    ClientConfig,
     CloudOperationsClient,
     Interceptor,
     OutboundInterceptor,
-    Plugin,
     QueryWorkflowInput,
     RPCError,
     RPCStatusCode,
@@ -123,7 +121,7 @@ async def test_start_id_reuse(
         )
     # Run to return "some result"
     id = str(uuid.uuid4())
-    handle = await client.start_workflow(
+    handle: WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(
             actions=[KSAction(result=KSResultAction(value="some result"))]
@@ -159,7 +157,7 @@ async def test_start_id_reuse(
 
 
 async def test_start_with_signal(client: Client, worker: ExternalWorker):
-    handle = await client.start_workflow(
+    handle: WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(action_signal="my-signal"),
         id=str(uuid.uuid4()),
@@ -176,7 +174,7 @@ async def test_start_delay(
     if env.supports_time_skipping:
         pytest.skip("Java test server does not support start delay")
     start_delay = timedelta(hours=1, minutes=20, seconds=30)
-    handle = await client.start_workflow(
+    handle: WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(
             actions=[KSAction(result=KSResultAction(value="some result"))]
@@ -199,7 +197,7 @@ async def test_signal_with_start_delay(
     if env.supports_time_skipping:
         pytest.skip("Java test server does not support start delay")
     start_delay = timedelta(hours=1, minutes=20, seconds=30)
-    handle = await client.start_workflow(
+    handle: WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(
             actions=[KSAction(result=KSResultAction(value="some result"))]
@@ -225,7 +223,7 @@ async def test_result_follow_continue_as_new(
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
         )
-    handle = await client.start_workflow(
+    handle: WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(
             actions=[
@@ -247,7 +245,7 @@ async def test_result_follow_continue_as_new(
 
 
 async def test_workflow_failed(client: Client, worker: ExternalWorker):
-    handle = await client.start_workflow(
+    handle: WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(
             actions=[
@@ -269,7 +267,7 @@ async def test_workflow_failed(client: Client, worker: ExternalWorker):
 
 
 async def test_cancel(client: Client, worker: ExternalWorker):
-    handle = await client.start_workflow(
+    handle: WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(actions=[KSAction(sleep=KSSleepAction(millis=50000))]),
         id=str(uuid.uuid4()),
@@ -282,7 +280,7 @@ async def test_cancel(client: Client, worker: ExternalWorker):
 
 
 async def test_terminate(client: Client, worker: ExternalWorker):
-    handle = await client.start_workflow(
+    handle: WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(actions=[KSAction(sleep=KSSleepAction(millis=50000))]),
         id=str(uuid.uuid4()),
@@ -349,7 +347,7 @@ async def test_describe(
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1425"
         )
-    handle = await client.start_workflow(
+    handle: WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(actions=[KSAction(result=KSResultAction(value="some value"))]),
         id=str(uuid.uuid4()),
@@ -378,7 +376,7 @@ async def test_describe(
 
 
 async def test_query(client: Client, worker: ExternalWorker):
-    handle = await client.start_workflow(
+    handle: WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(
             actions=[KSAction(query_handler=KSQueryHandlerAction(name="some query"))]
@@ -395,7 +393,7 @@ async def test_query(client: Client, worker: ExternalWorker):
 
 async def test_query_rejected(client: Client, worker: ExternalWorker):
     # Make a queryable workflow that waits on a signal
-    handle = await client.start_workflow(
+    handle: WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(
             actions=[
@@ -426,7 +424,7 @@ async def test_query_rejected(client: Client, worker: ExternalWorker):
 
 
 async def test_signal(client: Client, worker: ExternalWorker):
-    handle = await client.start_workflow(
+    handle: WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(action_signal="some signal"),
         id=str(uuid.uuid4()),
@@ -441,7 +439,7 @@ async def test_signal(client: Client, worker: ExternalWorker):
 
 async def test_retry_policy(client: Client, worker: ExternalWorker):
     # Make the workflow retry 3 times w/ no real backoff
-    handle = await client.start_workflow(
+    handle: WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(actions=[KSAction(error=KSErrorAction(attempt=True))]),
         id=str(uuid.uuid4()),
@@ -459,7 +457,7 @@ async def test_retry_policy(client: Client, worker: ExternalWorker):
 
 async def test_single_client_config_change(client: Client, worker: ExternalWorker):
     # Make sure normal query works on completed workflow
-    handle = await client.start_workflow(
+    handle: WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(
             actions=[KSAction(query_handler=KSQueryHandlerAction(name="some query"))]
@@ -532,7 +530,7 @@ async def test_interceptor(client: Client, worker: ExternalWorker):
     config["interceptors"] = [interceptor]
     client = Client(**config)
     # Do things that would trigger the interceptors
-    handle = await client.start_workflow(
+    handle: WorkflowHandle[Any, Any] = await client.start_workflow(
         "kitchen_sink",
         KSWorkflowParams(
             actions=[

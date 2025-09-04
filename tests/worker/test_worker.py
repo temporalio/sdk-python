@@ -42,7 +42,6 @@ from temporalio.worker import (
     SlotReleaseContext,
     SlotReserveContext,
     Worker,
-    WorkerConfig,
     WorkerDeploymentConfig,
     WorkerDeploymentVersion,
     WorkerTuner,
@@ -841,7 +840,7 @@ async def _test_worker_deployment_dynamic_workflow(
             client, describe_resp.conflict_token, worker_v1
         )
 
-        wf = await client.start_workflow(
+        wf: temporalio.client.WorkflowHandle[Any, Any] = await client.start_workflow(
             "cooldynamicworkflow",
             id=f"dynamic-workflow-versioning-{uuid.uuid4()}",
             task_queue=w.task_queue,

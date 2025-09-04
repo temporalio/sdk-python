@@ -3699,7 +3699,7 @@ async def test_manual_result_type(client: Client):
         client, ManualResultTypeWorkflow, activities=[manual_result_type_activity]
     ) as worker:
         # Workflow without result type and with
-        res1 = await client.execute_workflow(
+        res1: dict[str, str] = await client.execute_workflow(
             "ManualResultTypeWorkflow",
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
@@ -7605,7 +7605,9 @@ class WorkflowDynamicConfigFnFailure:
 
 async def test_workflow_dynamic_config_failure(client: Client):
     async with new_worker(client, WorkflowDynamicConfigFnFailure) as worker:
-        handle = await client.start_workflow(
+        handle: temporalio.client.WorkflowHandle[
+            Any, Any
+        ] = await client.start_workflow(
             "verycooldynamicworkflow",
             id=f"dynamic-config-failure-{uuid.uuid4()}",
             task_queue=worker.task_queue,
