@@ -1064,9 +1064,7 @@ def get_current_details() -> str:
 
 
 def has_last_completion_result() -> bool:
-    """Get the last completion result of the workflow. This be None if there was
-    no previous completion or the result was None
-    """
+    """Gets whether there is a last completion result of the workflow."""
     return _Runtime.current().workflow_has_last_completion_result()
 
 
@@ -1079,7 +1077,7 @@ def get_last_completion_result(type_hint: Type[ParamType]) -> Optional[ParamType
 
 
 def get_last_completion_result(type_hint: Optional[Type] = None) -> Optional[Any]:
-    """Get the last completion result of the workflow. This be None if there was
+    """Get the result of the last run of the workflow. This will be None if there was
     no previous completion or the result was None. has_last_completion_result()
     can be used to differentiate.
     """
@@ -1087,7 +1085,7 @@ def get_last_completion_result(type_hint: Optional[Type] = None) -> Optional[Any
 
 
 def get_last_failure() -> Optional[BaseException]:
-    """Get the last failure of the workflow."""
+    """Get the last failure of the workflow if it has run previously."""
     return _Runtime.current().workflow_last_failure()
 
 

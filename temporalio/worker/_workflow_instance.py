@@ -145,7 +145,7 @@ class WorkflowInstanceDetails:
     disable_eager_activity_execution: bool
     worker_level_failure_exception_types: Sequence[Type[BaseException]]
     last_completion_result: temporalio.api.common.v1.Payloads
-    previous_run_failure: Optional[Failure]
+    last_failure: Optional[Failure]
 
 
 class WorkflowInstance(ABC):
@@ -324,7 +324,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._current_details = ""
 
         self._last_completion_result = det.last_completion_result
-        self._previous_run_failure = det.previous_run_failure
+        self._last_failure = det.last_failure
 
         # The versioning behavior of this workflow, as established by annotation or by the dynamic
         # config function. Is only set once upon initialization.
@@ -1733,9 +1733,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
 
     def workflow_last_failure(self) -> Optional[BaseException]:
-        if self._previous_run_failure:
+        if self._last_failure:
             return self._failure_converter.from_failure(
-                self._previous_run_failure, self._payload_converter
+                self._last_failure, self._payload_converter
             )
 
         return None

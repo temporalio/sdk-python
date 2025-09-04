@@ -88,7 +88,7 @@ class SandboxedWorkflowRunner(WorkflowRunner):
                 disable_eager_activity_execution=False,
                 worker_level_failure_exception_types=self._worker_level_failure_exception_types,
                 last_completion_result=Payloads(),
-                previous_run_failure=Failure(),
+                last_failure=Failure(),
             ),
         )
 
