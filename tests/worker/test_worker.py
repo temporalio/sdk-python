@@ -35,6 +35,7 @@ from temporalio.worker import (
     CustomSlotSupplier,
     FixedSizeSlotSupplier,
     LocalActivitySlotInfo,
+    NexusSlotInfo,
     PollerBehaviorAutoscaling,
     ResourceBasedSlotConfig,
     ResourceBasedSlotSupplier,
@@ -56,6 +57,7 @@ from tests.helpers import (
     new_worker,
     worker_versioning_enabled,
 )
+from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 # Passing through because Python 3.9 has an import bug at
 # https://github.com/python/cpython/issues/91351
@@ -404,6 +406,44 @@ async def test_warns_when_workers_too_low(client: Client, env: WorkflowEnvironme
                 pass
 
 
+@nexusrpc.handler.service_handler
+class SayHelloService:
+    @nexusrpc.handler.sync_operation
+    async def say_hello(
+        self, _ctx: nexusrpc.handler.StartOperationContext, name: str
+    ) -> str:
+        return f"Hello, {name}!"
+
+
+@workflow.defn
+class CustomSlotSupplierWorkflow:
+    def __init__(self) -> None:
+        self._last_signal = "<none>"
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: self._last_signal == "finish")
+        await workflow.execute_activity(
+            say_hello,
+            "hi",
+            versioning_intent=VersioningIntent.DEFAULT,
+            start_to_close_timeout=timedelta(seconds=5),
+        )
+        nexus_client = workflow.create_nexus_client(
+            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+            service=SayHelloService,
+        )
+        await nexus_client.execute_operation(
+            SayHelloService.say_hello,
+            "hi",
+        )
+
+    @workflow.signal
+    def my_signal(self, value: str) -> None:
+        self._last_signal = value
+        workflow.logger.info(f"Signal: {value}")
+
+
 async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
     class MyPermit(SlotPermit):
         def __init__(self, pnum: int):
@@ -443,6 +483,8 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
                 self.seen_used_slot_kinds.add("a")
             elif isinstance(ctx.slot_info, LocalActivitySlotInfo):
                 self.seen_used_slot_kinds.add("la")
+            elif isinstance(ctx.slot_info, NexusSlotInfo):
+                self.seen_used_slot_kinds.add("nx")
             self.used += 1
 
         def release_slot(self, ctx: SlotReleaseContext) -> None:
@@ -476,17 +518,19 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
     )
     async with new_worker(
         client,
-        WaitOnSignalWorkflow,
+        CustomSlotSupplierWorkflow,
         activities=[say_hello],
+        nexus_service_handlers=[SayHelloService()],
         tuner=tuner,
         identity="myworker",
     ) as w:
+        await create_nexus_endpoint(w.task_queue, client)
         wf1 = await client.start_workflow(
-            WaitOnSignalWorkflow.run,
+            CustomSlotSupplierWorkflow.run,
             id=f"custom-slot-supplier-{uuid.uuid4()}",
             task_queue=w.task_queue,
         )
-        await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
+        await wf1.signal(CustomSlotSupplierWorkflow.my_signal, "finish")
         await wf1.result()
 
     # We can't use reserve number directly because there is a technically possible race
@@ -495,7 +539,7 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
     # that the permits passed to release line up.
     assert ss.highest_seen_reserve_on_release == ss.releases
     # Two workflow tasks, one activity
-    assert ss.used == 3
+    assert ss.used == 4
     assert ss.seen_sticky_kinds == {True, False}
     assert ss.seen_slot_kinds == {"workflow", "activity", "local-activity"}
     assert ss.seen_used_slot_kinds == {"wf", "a"}
