@@ -147,6 +147,7 @@ pub struct TunerHolder {
     workflow_slot_supplier: SlotSupplier,
     activity_slot_supplier: SlotSupplier,
     local_activity_slot_supplier: SlotSupplier,
+    nexus_slot_supplier: SlotSupplier,
 }
 
 #[derive(FromPyObject)]
@@ -745,10 +746,17 @@ fn convert_tuner_holder(
         } else {
             None
         };
+    let maybe_nexus_resource_opts =
+        if let SlotSupplier::ResourceBased(ref ss) = holder.nexus_slot_supplier {
+            Some(&ss.tuner_config)
+        } else {
+            None
+        };
     let all_resource_opts = [
         maybe_wf_resource_opts,
         maybe_act_resource_opts,
         maybe_local_act_resource_opts,
+        maybe_nexus_resource_opts,
     ];
     let mut set_resource_opts = all_resource_opts.iter().flatten();
     let first = set_resource_opts.next();
@@ -784,6 +792,10 @@ fn convert_tuner_holder(
         )?)
         .local_activity_slot_options(convert_slot_supplier(
             holder.local_activity_slot_supplier,
+            task_locals.clone(),
+        )?)
+        .nexus_slot_options(convert_slot_supplier(
+            holder.nexus_slot_supplier,
             task_locals,
         )?);
     Ok(options

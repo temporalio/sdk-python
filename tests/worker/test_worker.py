@@ -57,7 +57,11 @@ from tests.helpers import (
     new_worker,
     worker_versioning_enabled,
 )
-from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+from tests.helpers.nexus import (
+    ServiceClient,
+    create_nexus_endpoint,
+    dataclass_as_dict,
+)
 
 # Passing through because Python 3.9 has an import bug at
 # https://github.com/python/cpython/issues/91351
@@ -406,13 +410,21 @@ async def test_warns_when_workers_too_low(client: Client, env: WorkflowEnvironme
                 pass
 
 
+from dataclasses import dataclass
+
+
+@dataclass
+class NexusInput:
+    name: str
+
+
 @nexusrpc.handler.service_handler
 class SayHelloService:
     @nexusrpc.handler.sync_operation
     async def say_hello(
-        self, _ctx: nexusrpc.handler.StartOperationContext, name: str
+        self, _ctx: nexusrpc.handler.StartOperationContext, input: NexusInput
     ) -> str:
-        return f"Hello, {name}!"
+        return f"Hello, {input.name}!"
 
 
 @workflow.defn
@@ -428,14 +440,6 @@ class CustomSlotSupplierWorkflow:
             "hi",
             versioning_intent=VersioningIntent.DEFAULT,
             start_to_close_timeout=timedelta(seconds=5),
-        )
-        nexus_client = workflow.create_nexus_client(
-            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
-            service=SayHelloService,
-        )
-        await nexus_client.execute_operation(
-            SayHelloService.say_hello,
-            "hi",
         )
 
     @workflow.signal
@@ -524,7 +528,9 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
         tuner=tuner,
         identity="myworker",
     ) as w:
-        await create_nexus_endpoint(w.task_queue, client)
+        endpoint_resp = await create_nexus_endpoint(w.task_queue, client)
+
+        # Start workflow and let it run through activity
         wf1 = await client.start_workflow(
             CustomSlotSupplierWorkflow.run,
             id=f"custom-slot-supplier-{uuid.uuid4()}",
@@ -533,16 +539,29 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
         await wf1.signal(CustomSlotSupplierWorkflow.my_signal, "finish")
         await wf1.result()
 
+        # Now make a direct nexus call to trigger nexus slot usage
+        service_client = ServiceClient(
+            server_address=ServiceClient.default_server_address(env),
+            endpoint=endpoint_resp.endpoint.id,
+            service=SayHelloService.__name__,
+        )
+        nexus_response = await service_client.start_operation(
+            "say_hello",
+            dataclass_as_dict(NexusInput(name="test")),
+        )
+        assert nexus_response.is_success
+
     # We can't use reserve number directly because there is a technically possible race
     # where the python reserve function appears to complete, but Rust doesn't see that.
     # This isn't solvable without redoing a chunk of pyo3-asyncio. So we only check
     # that the permits passed to release line up.
     assert ss.highest_seen_reserve_on_release == ss.releases
-    # Two workflow tasks, one activity
+    # Two workflow tasks that use slots, one activity, one nexus task
+    # (The first WFT might be cached/sticky and not need a new slot)
     assert ss.used == 4
     assert ss.seen_sticky_kinds == {True, False}
-    assert ss.seen_slot_kinds == {"workflow", "activity", "local-activity"}
-    assert ss.seen_used_slot_kinds == {"wf", "a"}
+    assert ss.seen_slot_kinds == {"workflow", "activity", "local-activity", "nexus"}
+    assert ss.seen_used_slot_kinds == {"wf", "a", "nx"}
     assert ss.seen_release_info_empty
     assert ss.seen_release_info_nonempty
 
