@@ -18,6 +18,9 @@ import temporalio.converter
 import temporalio.worker._workflow_instance
 import temporalio.workflow
 
+from ...api.common.v1.message_pb2 import Payloads
+from ...api.failure.v1.message_pb2 import Failure
+
 # Workflow instance has to be relative import
 from .._workflow_instance import (
     UnsandboxedWorkflowRunner,
@@ -84,6 +87,8 @@ class SandboxedWorkflowRunner(WorkflowRunner):
                 extern_functions={},
                 disable_eager_activity_execution=False,
                 worker_level_failure_exception_types=self._worker_level_failure_exception_types,
+                last_completion_result=Payloads(),
+                last_failure=Failure(),
             ),
         )
 
