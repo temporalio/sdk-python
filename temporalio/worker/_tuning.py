@@ -438,11 +438,20 @@ class WorkerTuner(ABC):
         )
 
     def _get_activities_max(self) -> Optional[int]:
-        ss = self._get_activity_task_slot_supplier()
-        if isinstance(ss, FixedSizeSlotSupplier):
-            return ss.num_slots
-        elif isinstance(ss, ResourceBasedSlotSupplier):
-            return ss.slot_config.maximum_slots or _DEFAULT_RESOURCE_ACTIVITY_MAX
+        return self._get_slot_supplier_max(self._get_activity_task_slot_supplier())
+
+    def _get_nexus_tasks_max(self) -> Optional[int]:
+        return self._get_slot_supplier_max(self._get_nexus_slot_supplier())
+
+    @staticmethod
+    def _get_slot_supplier_max(slot_supplier: SlotSupplier) -> Optional[int]:
+        if isinstance(slot_supplier, FixedSizeSlotSupplier):
+            return slot_supplier.num_slots
+        elif isinstance(slot_supplier, ResourceBasedSlotSupplier):
+            return (
+                slot_supplier.slot_config.maximum_slots
+                or _DEFAULT_RESOURCE_ACTIVITY_MAX
+            )
         return None
 
 

@@ -434,22 +434,7 @@ class Worker:
             bridge_client.config.runtime or temporalio.runtime.Runtime.default()
         )
         if config["activities"]:
-            # Issue warning here if executor max_workers is lower than max
-            # concurrent activities. We do this here instead of in
-            # _ActivityWorker so the stack level is predictable.
-            max_workers = getattr(config["activity_executor"], "_max_workers", None)
-            concurrent_activities = config["max_concurrent_activities"]
-            if config["tuner"] and config["tuner"]._get_activities_max():
-                concurrent_activities = config["tuner"]._get_activities_max()
-            if isinstance(max_workers, int) and max_workers < (
-                concurrent_activities or 0
-            ):
-                warnings.warn(
-                    f"Worker max_concurrent_activities is {concurrent_activities} "
-                    + f"but activity_executor's max_workers is only {max_workers}",
-                    stacklevel=2,
-                )
-
+            _warn_if_activity_executor_max_workers_is_inconsistent(config)
             self._activity_worker = _ActivityWorker(
                 bridge_worker=lambda: self._bridge_worker,
                 task_queue=config["task_queue"],
@@ -466,7 +451,7 @@ class Worker:
             )
         self._nexus_worker: Optional[_NexusWorker] = None
         if config["nexus_service_handlers"]:
-            # TODO(nexus-GA) analogous calculations to those done for activity?
+            _warn_if_nexus_task_executor_max_workers_is_inconsistent(config)
             self._nexus_worker = _NexusWorker(
                 bridge_worker=lambda: self._bridge_worker,
                 client=config["client"],
@@ -914,6 +899,36 @@ class WorkerConfig(TypedDict, total=False):
     workflow_task_poller_behavior: PollerBehavior
     activity_task_poller_behavior: PollerBehavior
     nexus_task_poller_behavior: PollerBehavior
+
+
+def _warn_if_activity_executor_max_workers_is_inconsistent(
+    config: WorkerConfig,
+) -> None:
+    max_workers = getattr(config["activity_executor"], "_max_workers", None)
+    concurrent_activities = config["max_concurrent_activities"]
+    if config["tuner"] and config["tuner"]._get_activities_max():
+        concurrent_activities = config["tuner"]._get_activities_max()
+    if isinstance(max_workers, int) and max_workers < (concurrent_activities or 0):
+        warnings.warn(
+            f"Worker max_concurrent_activities is {concurrent_activities} "
+            + f"but activity_executor's max_workers is only {max_workers}",
+            stacklevel=3,
+        )
+
+
+def _warn_if_nexus_task_executor_max_workers_is_inconsistent(
+    config: WorkerConfig,
+) -> None:
+    max_workers = getattr(config["nexus_task_executor"], "_max_workers", None)
+    concurrent_nexus_tasks = config["max_concurrent_nexus_tasks"]
+    if config["tuner"] and config["tuner"]._get_nexus_tasks_max():
+        concurrent_nexus_tasks = config["tuner"]._get_nexus_tasks_max()
+    if isinstance(max_workers, int) and max_workers < (concurrent_nexus_tasks or 0):
+        warnings.warn(
+            f"Worker max_concurrent_nexus_tasks is {concurrent_nexus_tasks} "
+            + f"but nexus_task_executor's max_workers is only {max_workers}",
+            stacklevel=3,
+        )
 
 
 @dataclass

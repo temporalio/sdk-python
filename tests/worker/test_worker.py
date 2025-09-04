@@ -389,6 +389,19 @@ async def test_warns_when_workers_too_low(client: Client, env: WorkflowEnvironme
                 activity_executor=executor,
             ):
                 pass
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        with pytest.warns(
+            UserWarning,
+            match="Worker max_concurrent_nexus_tasks is 500 but nexus_task_executor's max_workers is only",
+        ):
+            async with new_worker(
+                client,
+                WaitOnSignalWorkflow,
+                nexus_service_handlers=[NeverRunService()],
+                tuner=tuner,
+                nexus_task_executor=executor,
+            ):
+                pass
 
 
 async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
