@@ -64,6 +64,7 @@ import temporalio.exceptions
 import temporalio.workflow
 from temporalio.service import __version__
 
+from ..api.failure.v1.message_pb2 import Failure
 from ._interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
@@ -143,6 +144,8 @@ class WorkflowInstanceDetails:
     extern_functions: Mapping[str, Callable]
     disable_eager_activity_execution: bool
     worker_level_failure_exception_types: Sequence[Type[BaseException]]
+    last_completion_result: temporalio.api.common.v1.Payloads
+    last_failure: Optional[Failure]
 
 
 class WorkflowInstance(ABC):
@@ -319,6 +322,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # The current details (as opposed to static details on workflow start), returned in the
         # metadata query
         self._current_details = ""
+
+        self._last_completion_result = det.last_completion_result
+        self._last_failure = det.last_failure
 
         # The versioning behavior of this workflow, as established by annotation or by the dynamic
         # config function. Is only set once upon initialization.
@@ -1704,6 +1710,37 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 for typ in self._worker_level_failure_exception_types
             )
         )
+
+    def workflow_has_last_completion_result(self) -> bool:
+        return len(self._last_completion_result.payloads) > 0
+
+    def workflow_last_completion_result(
+        self, type_hint: Optional[Type]
+    ) -> Optional[Any]:
+        if len(self._last_completion_result.payloads) == 0:
+            return None
+        elif len(self._last_completion_result.payloads) > 1:
+            warnings.warn(
+                f"Expected single last completion result, got {len(self._last_completion_result.payloads)}"
+            )
+            return None
+
+        if type_hint is None:
+            return self._payload_converter.from_payload(
+                self._last_completion_result.payloads[0]
+            )
+        else:
+            return self._payload_converter.from_payload(
+                self._last_completion_result.payloads[0], type_hint
+            )
+
+    def workflow_last_failure(self) -> Optional[BaseException]:
+        if self._last_failure:
+            return self._failure_converter.from_failure(
+                self._last_failure, self._payload_converter
+            )
+
+        return None
 
     #### Calls from outbound impl ####
     # These are in alphabetical order and all start with "_outbound_".

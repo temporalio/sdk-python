@@ -8341,3 +8341,29 @@ async def test_workflow_headers_with_codec(
             assert headers["foo"].data == b"bar"
         else:
             assert headers["foo"].data != b"bar"
+
+
+@workflow.defn
+class PreviousRunFailureWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        if workflow.info().attempt != 1:
+            previous_failure = workflow.get_last_failure()
+            assert isinstance(previous_failure, ApplicationError)
+            assert previous_failure.message == "Intentional Failure"
+            return "Done"
+        raise ApplicationError("Intentional Failure")
+
+
+async def test_previous_run_failure(client: Client):
+    async with new_worker(client, PreviousRunFailureWorkflow) as worker:
+        handle = await client.start_workflow(
+            PreviousRunFailureWorkflow.run,
+            id=f"previous-run-failure-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            retry_policy=RetryPolicy(
+                initial_interval=timedelta(milliseconds=10),
+            ),
+        )
+        result = await handle.result()
+        assert result == "Done"

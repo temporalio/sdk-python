@@ -61,6 +61,7 @@ import temporalio.nexus
 import temporalio.workflow
 from temporalio.nexus._util import ServiceHandlerT
 
+from .api.failure.v1.message_pb2 import Failure
 from .types import (
     AnyType,
     CallableAsyncNoParam,
@@ -901,6 +902,17 @@ class _Runtime(ABC):
     @abstractmethod
     def workflow_is_failure_exception(self, err: BaseException) -> bool: ...
 
+    @abstractmethod
+    def workflow_has_last_completion_result(self) -> bool: ...
+
+    @abstractmethod
+    def workflow_last_completion_result(
+        self, type_hint: Optional[Type]
+    ) -> Optional[Any]: ...
+
+    @abstractmethod
+    def workflow_last_failure(self) -> Optional[BaseException]: ...
+
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
     "__temporal_current_update_info"
@@ -1050,6 +1062,32 @@ def get_current_details() -> str:
     This can be in Temporal markdown format and can span multiple lines.
     """
     return _Runtime.current().workflow_get_current_details()
+
+
+def has_last_completion_result() -> bool:
+    """Gets whether there is a last completion result of the workflow."""
+    return _Runtime.current().workflow_has_last_completion_result()
+
+
+@overload
+def get_last_completion_result() -> Optional[Any]: ...
+
+
+@overload
+def get_last_completion_result(type_hint: Type[ParamType]) -> Optional[ParamType]: ...
+
+
+def get_last_completion_result(type_hint: Optional[Type] = None) -> Optional[Any]:
+    """Get the result of the last run of the workflow. This will be None if there was
+    no previous completion or the result was None. has_last_completion_result()
+    can be used to differentiate.
+    """
+    return _Runtime.current().workflow_last_completion_result(type_hint)
+
+
+def get_last_failure() -> Optional[BaseException]:
+    """Get the last failure of the workflow if it has run previously."""
+    return _Runtime.current().workflow_last_failure()
 
 
 def set_current_details(description: str) -> None:
