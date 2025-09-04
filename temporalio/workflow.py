@@ -4975,7 +4975,7 @@ async def wait(
     *,
     timeout: Optional[float] = None,
     return_when: str = asyncio.ALL_COMPLETED,
-) -> Tuple[List[asyncio.Task[AnyType]], set[asyncio.Task[AnyType]]]: ...
+) -> Tuple[List[asyncio.Task[AnyType]], List[asyncio.Task[AnyType]]]: ...
 
 
 async def wait(
@@ -4994,9 +4994,9 @@ async def wait(
     # but the "set" is changed out for a "list" and fixed up some typing/format
 
     if asyncio.isfuture(fs) or asyncio.iscoroutine(fs):
-        raise TypeError(f"expect a list of futures, not {type(fs).__name__}")
+        raise TypeError(f"Expect an iterable of Tasks/Futures, not {type(fs).__name__}")
     if not fs:
-        raise ValueError("Set of Tasks/Futures is empty.")
+        raise ValueError("Sequence of Tasks/Futures must not be empty.")
     if return_when not in (
         asyncio.FIRST_COMPLETED,
         asyncio.FIRST_EXCEPTION,
@@ -5023,7 +5023,7 @@ async def _wait(
     # https://github.com/python/cpython/blob/v3.12.3/Lib/asyncio/tasks.py#L522
     # but the "set" is changed out for a "list" and fixed up some typing/format
 
-    assert fs, "Set of Futures is empty."
+    assert fs, "Sequence of Tasks/Futures must not be empty."
     waiter = loop.create_future()
     timeout_handle = None
     if timeout is not None:
