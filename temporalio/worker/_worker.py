@@ -119,6 +119,7 @@ class Worker:
         max_concurrent_workflow_tasks: Optional[int] = None,
         max_concurrent_activities: Optional[int] = None,
         max_concurrent_local_activities: Optional[int] = None,
+        max_concurrent_nexus_tasks: Optional[int] = None,
         tuner: Optional[WorkerTuner] = None,
         max_concurrent_workflow_task_polls: Optional[int] = None,
         nonsticky_to_sticky_poll_ratio: float = 0.2,
@@ -214,13 +215,16 @@ class Worker:
             max_concurrent_workflow_tasks: Maximum allowed number of workflow
                 tasks that will ever be given to this worker at one time. Mutually exclusive with
                 ``tuner``. Must be set to at least two if ``max_cached_workflows`` is nonzero.
-            max_concurrent_activities: Maximum number of activity tasks that
-                will ever be given to the activity worker concurrently. Mutually exclusive with ``tuner``.
+            max_concurrent_activities: Maximum number of activity tasks that will ever be given to
+                the activity worker concurrently. Mutually exclusive with ``tuner``.
             max_concurrent_local_activities: Maximum number of local activity
-                tasks that will ever be given to the activity worker concurrently. Mutually exclusive with ``tuner``.
+                tasks that will ever be given to the activity worker concurrently. Mutually
+                exclusive with ``tuner``.
+            max_concurrent_nexus_tasks: Maximum number of Nexus tasks that will ever be given to
+                the Nexus worker concurrently. Mutually exclusive with ``tuner``.
             tuner:  Provide a custom :py:class:`WorkerTuner`. Mutually exclusive with the
-                ``max_concurrent_workflow_tasks``, ``max_concurrent_activities``, and
-                ``max_concurrent_local_activities`` arguments.
+                ``max_concurrent_workflow_tasks``, ``max_concurrent_activities``,
+                ``max_concurrent_local_activities``, and ``max_concurrent_nexus_tasks`` arguments.
 
                 Defaults to fixed-size 100 slots for each slot kind if unset and none of the
                 max_* arguments are provided.
@@ -337,6 +341,7 @@ class Worker:
             max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
             max_concurrent_activities=max_concurrent_activities,
             max_concurrent_local_activities=max_concurrent_local_activities,
+            max_concurrent_nexus_tasks=max_concurrent_nexus_tasks,
             tuner=tuner,
             max_concurrent_workflow_task_polls=max_concurrent_workflow_task_polls,
             nonsticky_to_sticky_poll_ratio=nonsticky_to_sticky_poll_ratio,
@@ -387,7 +392,6 @@ class Worker:
         """
         self._config = config
 
-        # TODO(nexus-preview): max_concurrent_nexus_tasks / tuner support
         if not (
             config["activities"]
             or config["nexus_service_handlers"]
@@ -462,6 +466,7 @@ class Worker:
             )
         self._nexus_worker: Optional[_NexusWorker] = None
         if config["nexus_service_handlers"]:
+            # TODO(nexus-GA) analogous calculations to those done for activity?
             self._nexus_worker = _NexusWorker(
                 bridge_worker=lambda: self._bridge_worker,
                 client=config["client"],
@@ -522,10 +527,12 @@ class Worker:
                 config["max_concurrent_workflow_tasks"]
                 or config["max_concurrent_activities"]
                 or config["max_concurrent_local_activities"]
+                or config["max_concurrent_nexus_tasks"]
             ):
                 raise ValueError(
                     "Cannot specify max_concurrent_workflow_tasks, max_concurrent_activities, "
-                    "or max_concurrent_local_activities when also specifying tuner"
+                    "max_concurrent_local_activities, or max_concurrent_nexus_tasks when also "
+                    "specifying tuner"
                 )
         else:
             tuner = WorkerTuner.create_fixed(
@@ -884,6 +891,7 @@ class WorkerConfig(TypedDict, total=False):
     max_concurrent_workflow_tasks: Optional[int]
     max_concurrent_activities: Optional[int]
     max_concurrent_local_activities: Optional[int]
+    max_concurrent_nexus_tasks: Optional[int]
     tuner: Optional[WorkerTuner]
     max_concurrent_workflow_task_polls: Optional[int]
     nonsticky_to_sticky_poll_ratio: float
