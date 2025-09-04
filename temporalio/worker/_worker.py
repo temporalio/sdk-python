@@ -532,6 +532,7 @@ class Worker:
                 workflow_slots=config["max_concurrent_workflow_tasks"],
                 activity_slots=config["max_concurrent_activities"],
                 local_activity_slots=config["max_concurrent_local_activities"],
+                nexus_slots=config["max_concurrent_nexus_tasks"],
             )
 
         bridge_tuner = tuner._to_bridge_tuner()
