@@ -303,7 +303,8 @@ class _BridgeSlotSupplierWrapper:
 
 
 def _to_bridge_slot_supplier(
-    slot_supplier: SlotSupplier, kind: Literal["workflow", "activity", "local_activity"]
+    slot_supplier: SlotSupplier,
+    kind: Literal["workflow", "activity", "local_activity", "nexus"],
 ) -> temporalio.bridge.worker.SlotSupplier:
     if isinstance(slot_supplier, FixedSizeSlotSupplier):
         return temporalio.bridge.worker.FixedSizeSlotSupplier(slot_supplier.num_slots)
@@ -418,6 +419,7 @@ class WorkerTuner(ABC):
             _to_bridge_slot_supplier(
                 self._get_local_activity_task_slot_supplier(), "local_activity"
             ),
+            _to_bridge_slot_supplier(self._get_nexus_slot_supplier(), "nexus"),
         )
 
     def _get_activities_max(self) -> Optional[int]:
