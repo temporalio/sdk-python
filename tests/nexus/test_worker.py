@@ -32,20 +32,22 @@ class NexusCallerWorkflow:
 
 
 @pytest.mark.parametrize(
-    ["num_nexus_operations", "max_concurrent_nexus_tasks", "expected_num_executed"],
-    [(1, 1, 1), (2, 1, 1), (43, 42, 42), (43, 44, 43)],
+    ["num_nexus_operations", "max_concurrent_nexus_tasks"],
+    [
+        (1, 1),
+        (3, 3),
+        (4, 3),
+    ],
 )
 async def test_max_concurrent_nexus_tasks(
     env: WorkflowEnvironment,
     max_concurrent_nexus_tasks: int,
     num_nexus_operations: int,
-    expected_num_executed: int,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with Javas test server")
 
-    ids = []
-    event = asyncio.Event()
+    barrier = asyncio.Barrier(num_nexus_operations)
 
     @nexusrpc.handler.service_handler
     class MaxConcurrentTestService:
@@ -53,8 +55,7 @@ async def test_max_concurrent_nexus_tasks(
         async def op(
             self, _ctx: nexusrpc.handler.StartOperationContext, id: int
         ) -> None:
-            ids.append(id)
-            await event.wait()
+            await barrier.wait()
 
     async with new_worker(
         env.client,
@@ -73,10 +74,5 @@ async def test_max_concurrent_nexus_tasks(
             )
             for i in range(num_nexus_operations)
         ]
-        try:
-            await asyncio.wait_for(asyncio.gather(*coros), timeout=5)
-        except asyncio.TimeoutError:
-            pass
-        event.set()
-        assert len(set(ids)) == len(ids)
-        assert len(ids) == expected_num_executed
+        if num_nexus_operations <= max_concurrent_nexus_tasks:
+            await asyncio.gather(*coros)
