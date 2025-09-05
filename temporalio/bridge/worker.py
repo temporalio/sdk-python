@@ -165,6 +165,7 @@ class TunerHolder:
     workflow_slot_supplier: SlotSupplier
     activity_slot_supplier: SlotSupplier
     local_activity_slot_supplier: SlotSupplier
+    nexus_slot_supplier: SlotSupplier
 
 
 class Worker:

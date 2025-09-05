@@ -264,6 +264,9 @@ class Replayer:
                         local_activity_slot_supplier=temporalio.bridge.worker.FixedSizeSlotSupplier(
                             1
                         ),
+                        nexus_slot_supplier=temporalio.bridge.worker.FixedSizeSlotSupplier(
+                            1
+                        ),
                     ),
                     nonsticky_to_sticky_poll_ratio=1,
                     no_remote_activities=True,
