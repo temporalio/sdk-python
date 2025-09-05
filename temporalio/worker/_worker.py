@@ -783,8 +783,6 @@ class Worker:
         if self._nexus_worker:
             await self._nexus_worker.wait_all_completed()
 
-        # TODO(nexus-preview): check that we do all appropriate things for nexus worker that we do for activity worker
-
         # Do final shutdown
         try:
             await self._bridge_worker.finalize_shutdown()
