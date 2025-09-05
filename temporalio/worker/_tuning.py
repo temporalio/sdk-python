@@ -12,7 +12,7 @@ from typing_extensions import TypeAlias
 import temporalio.bridge.worker
 from temporalio.common import WorkerDeploymentVersion
 
-_DEFAULT_RESOURCE_ACTIVITY_MAX = 500
+_DEFAULT_RESOURCE_SLOTS_MAX = 500
 
 logger = logging.getLogger(__name__)
 
@@ -327,7 +327,7 @@ def _to_bridge_slot_supplier(
         return temporalio.bridge.worker.FixedSizeSlotSupplier(slot_supplier.num_slots)
     elif isinstance(slot_supplier, ResourceBasedSlotSupplier):
         min_slots = 5 if kind == "workflow" else 1
-        max_slots = _DEFAULT_RESOURCE_ACTIVITY_MAX
+        max_slots = _DEFAULT_RESOURCE_SLOTS_MAX
         ramp_throttle = (
             timedelta(seconds=0) if kind == "workflow" else timedelta(milliseconds=50)
         )
@@ -464,8 +464,7 @@ class WorkerTuner(ABC):
             return slot_supplier.num_slots
         elif isinstance(slot_supplier, ResourceBasedSlotSupplier):
             return (
-                slot_supplier.slot_config.maximum_slots
-                or _DEFAULT_RESOURCE_ACTIVITY_MAX
+                slot_supplier.slot_config.maximum_slots or _DEFAULT_RESOURCE_SLOTS_MAX
             )
         return None
 
