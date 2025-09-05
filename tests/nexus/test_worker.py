@@ -33,7 +33,7 @@ class NexusCallerWorkflow:
 
 @pytest.mark.parametrize(
     ["num_nexus_operations", "max_concurrent_nexus_tasks", "expected_num_executed"],
-    [(1, 1, 1), (2, 1, 1), (43, 42, 42), (43, 44, 43)],
+    [(1, 1, 1), (2, 1, 1), (18, 17, 17), (18, 19, 18)],
 )
 async def test_max_concurrent_nexus_tasks(
     client: Client,
@@ -61,19 +61,29 @@ async def test_max_concurrent_nexus_tasks(
     ) as worker:
         await create_nexus_endpoint(worker.task_queue, client)
 
-        coros = [
-            client.execute_workflow(
-                NexusCallerWorkflow.run,
-                i,
-                id=str(uuid.uuid4()),
-                task_queue=worker.task_queue,
+        tasks = [
+            asyncio.create_task(
+                client.execute_workflow(
+                    NexusCallerWorkflow.run,
+                    i,
+                    id=str(uuid.uuid4()),
+                    task_queue=worker.task_queue,
+                )
             )
             for i in range(num_nexus_operations)
         ]
-        try:
-            await asyncio.wait_for(asyncio.gather(*coros), timeout=5)
-        except asyncio.TimeoutError:
-            pass
-        event.set()
-        assert len(set(ids)) == len(ids)
+
+        for _ in range(50):  # 5 seconds max
+            if len(ids) >= expected_num_executed:
+                break
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.1)
         assert len(ids) == expected_num_executed
+        assert len(set(ids)) == len(ids)
+
+        event.set()
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
