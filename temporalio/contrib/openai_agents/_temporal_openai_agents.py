@@ -313,7 +313,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         config["data_converter"] = DataConverter(
             payload_converter_class=_OpenAIPayloadConverter
         )
-        return config
+        return self.next_worker_plugin.configure_replayer(config)
 
     @asynccontextmanager
     async def run_replayer(
