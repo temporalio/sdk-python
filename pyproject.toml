@@ -12,7 +12,7 @@ keywords = [
 ]
 dependencies = [
     "nexus-rpc==1.1.0",
-    "protobuf>=3.20,<6",
+    "protobuf>=6.31.1,<7.0.0",
     "python-dateutil>=2.8.2,<3 ; python_version < '3.11'",
     "types-protobuf>=3.20",
     "typing-extensions>=4.2.0,<5",
