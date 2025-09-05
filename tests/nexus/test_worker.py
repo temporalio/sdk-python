@@ -71,7 +71,7 @@ async def test_max_concurrent_nexus_tasks(
             for i in range(num_nexus_operations)
         ]
         try:
-            await asyncio.wait_for(asyncio.gather(*coros), timeout=3)
+            await asyncio.wait_for(asyncio.gather(*coros), timeout=5)
         except asyncio.TimeoutError:
             pass
         event.set()
