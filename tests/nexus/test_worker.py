@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import timedelta
+from typing import Any
 
 import nexusrpc.handler
 import pytest
@@ -24,7 +25,7 @@ class NexusCallerWorkflow:
             service="MaxConcurrentTestService",
         )
 
-        coros = [
+        coros: list[Any] = [
             nexus_client.execute_operation(
                 "op",
                 i,
@@ -51,7 +52,7 @@ async def test_max_concurrent_nexus_tasks(
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with Javas test server")
 
-    barrier = asyncio.Barrier(num_nexus_operations)
+    barrier = asyncio.Barrier(num_nexus_operations)  # type: ignore
 
     @nexusrpc.handler.service_handler
     class MaxConcurrentTestService:
