@@ -538,8 +538,6 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
     # This isn't solvable without redoing a chunk of pyo3-asyncio. So we only check
     # that the permits passed to release line up.
     assert ss.highest_seen_reserve_on_release == ss.releases
-    # Two workflow tasks that use slots, one activity, one nexus task
-    # (The first WFT might be cached/sticky and not need a new slot)
     assert ss.used == 5
     assert ss.seen_sticky_kinds == {True, False}
     assert ss.seen_slot_kinds == {"workflow", "activity", "local-activity", "nexus"}
