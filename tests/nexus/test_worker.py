@@ -18,17 +18,21 @@ class NexusCallerWorkflow:
     """Workflow that calls a Nexus operation."""
 
     @workflow.run
-    async def run(self, id: int) -> None:
+    async def run(self, n: int) -> None:
         nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
             service="MaxConcurrentTestService",
         )
 
-        await nexus_client.execute_operation(
-            "op",
-            id,
-            schedule_to_close_timeout=timedelta(seconds=60),
-        )
+        coros = [
+            nexus_client.execute_operation(
+                "op",
+                i,
+                schedule_to_close_timeout=timedelta(seconds=60),
+            )
+            for i in range(n)
+        ]
+        await asyncio.gather(*coros)
 
 
 @pytest.mark.parametrize(
@@ -65,14 +69,10 @@ async def test_max_concurrent_nexus_tasks(
     ) as worker:
         await create_nexus_endpoint(worker.task_queue, env.client)
 
-        coros = [
-            env.client.execute_workflow(
+        if num_nexus_operations <= max_concurrent_nexus_tasks:
+            await env.client.execute_workflow(
                 NexusCallerWorkflow.run,
-                i,
+                num_nexus_operations,
                 id=str(uuid.uuid4()),
                 task_queue=worker.task_queue,
             )
-            for i in range(num_nexus_operations)
-        ]
-        if num_nexus_operations <= max_concurrent_nexus_tasks:
-            await asyncio.gather(*coros)
