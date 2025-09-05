@@ -8,7 +8,7 @@ import nexusrpc.handler
 import pytest
 
 from temporalio import workflow
-from temporalio.client import Client
+from temporalio.testing import WorkflowEnvironment
 from tests.helpers import new_worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
@@ -36,11 +36,14 @@ class NexusCallerWorkflow:
     [(1, 1, 1), (2, 1, 1), (18, 17, 17), (18, 19, 18)],
 )
 async def test_max_concurrent_nexus_tasks(
-    client: Client,
+    env: WorkflowEnvironment,
     max_concurrent_nexus_tasks: int,
     num_nexus_operations: int,
     expected_num_executed: int,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with Javas test server")
+
     ids = []
     event = asyncio.Event()
 
@@ -54,16 +57,16 @@ async def test_max_concurrent_nexus_tasks(
             await event.wait()
 
     async with new_worker(
-        client,
+        env.client,
         NexusCallerWorkflow,
         nexus_service_handlers=[MaxConcurrentTestService()],
         max_concurrent_nexus_tasks=max_concurrent_nexus_tasks,
     ) as worker:
-        await create_nexus_endpoint(worker.task_queue, client)
+        await create_nexus_endpoint(worker.task_queue, env.client)
 
         tasks = [
             asyncio.create_task(
-                client.execute_workflow(
+                env.client.execute_workflow(
                     NexusCallerWorkflow.run,
                     i,
                     id=str(uuid.uuid4()),
