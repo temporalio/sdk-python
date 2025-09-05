@@ -69,10 +69,22 @@ async def test_max_concurrent_nexus_tasks(
     ) as worker:
         await create_nexus_endpoint(worker.task_queue, env.client)
 
+        execute_operations_concurrently = env.client.execute_workflow(
+            NexusCallerWorkflow.run,
+            num_nexus_operations,
+            id=str(uuid.uuid4()),
+            task_queue=worker.task_queue,
+        )
         if num_nexus_operations <= max_concurrent_nexus_tasks:
-            await env.client.execute_workflow(
-                NexusCallerWorkflow.run,
-                num_nexus_operations,
-                id=str(uuid.uuid4()),
-                task_queue=worker.task_queue,
-            )
+            await execute_operations_concurrently
+        else:
+            try:
+                await asyncio.wait_for(execute_operations_concurrently, timeout=10)
+            except TimeoutError:
+                pass
+            else:
+                pytest.fail(
+                    f"Expected timeout: "
+                    f"max_concurrent_nexus_tasks={max_concurrent_nexus_tasks}, "
+                    f"num_nexus_operations={num_nexus_operations}"
+                )
