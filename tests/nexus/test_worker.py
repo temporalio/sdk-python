@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 import uuid
 from datetime import timedelta
 from typing import Any
@@ -10,6 +9,7 @@ import nexusrpc.handler
 import pytest
 
 from temporalio import workflow
+from temporalio._asyncio_compat import Barrier
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import new_worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
@@ -53,10 +53,7 @@ async def test_max_concurrent_nexus_tasks(
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with Javas test server")
 
-    if sys.version_info < (3, 11):
-        pytest.skip("Test requires Python 3.11+")
-
-    barrier = asyncio.Barrier(num_nexus_operations)  # type: ignore
+    barrier = Barrier(num_nexus_operations)
 
     @nexusrpc.handler.service_handler
     class MaxConcurrentTestService:
