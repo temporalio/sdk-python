@@ -453,10 +453,12 @@ class WorkerTuner(ABC):
         )
 
     def _get_activities_max(self) -> Optional[int]:
-        return self._get_slot_supplier_max(self._get_activity_task_slot_supplier())
+        return WorkerTuner._get_slot_supplier_max(
+            self._get_activity_task_slot_supplier()
+        )
 
     def _get_nexus_tasks_max(self) -> Optional[int]:
-        return self._get_slot_supplier_max(self._get_nexus_slot_supplier())
+        return WorkerTuner._get_slot_supplier_max(self._get_nexus_slot_supplier())
 
     @staticmethod
     def _get_slot_supplier_max(slot_supplier: SlotSupplier) -> Optional[int]:
