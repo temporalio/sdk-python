@@ -324,7 +324,7 @@ async def test_rpc_already_exists_error_is_raised(client: Client):
             req: temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
             *,
             retry: bool = False,
-            metadata: Mapping[str, str] = {},
+            metadata: Mapping[str, str | bytes] = {},
             timeout: Optional[timedelta] = None,
         ) -> temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse:
             raise self.already_exists_err
