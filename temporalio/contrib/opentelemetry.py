@@ -26,7 +26,7 @@ import opentelemetry.trace
 import opentelemetry.trace.propagation.tracecontext
 import opentelemetry.util.types
 from opentelemetry.context import Context
-from opentelemetry.trace import SpanKind, _Links, Span, StatusCode, Status
+from opentelemetry.trace import Span, SpanKind, Status, StatusCode, _Links
 from opentelemetry.util import types
 from typing_extensions import Protocol, TypeAlias, TypedDict
 
@@ -173,7 +173,13 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         kind: opentelemetry.trace.SpanKind,
         context: Optional[Context] = None,
     ) -> Iterator[None]:
-        with self.tracer.start_as_current_span(name, attributes=attributes, kind=kind, context=context, set_status_on_exception=False) as span:
+        with self.tracer.start_as_current_span(
+            name,
+            attributes=attributes,
+            kind=kind,
+            context=context,
+            set_status_on_exception=False,
+        ) as span:
             if input:
                 input.headers = self._context_to_headers(input.headers)
             try:

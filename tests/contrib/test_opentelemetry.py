@@ -11,7 +11,7 @@ from typing import Iterable, List, Optional
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import get_tracer, StatusCode
+from opentelemetry.trace import StatusCode, get_tracer
 
 from temporalio import activity, workflow
 from temporalio.client import Client
@@ -389,19 +389,27 @@ async def test_opentelemetry_always_create_workflow_spans(client: Client):
 
 
 attempted = False
+
+
 @activity.defn
 def benign_activity() -> str:
     global attempted
     if attempted:
         return "done"
     attempted = True
-    raise ApplicationError(category=ApplicationErrorCategory.BENIGN, message="Benign Error")
+    raise ApplicationError(
+        category=ApplicationErrorCategory.BENIGN, message="Benign Error"
+    )
+
 
 @workflow.defn
 class BenignWorkflow:
     @workflow.run
     async def run(self) -> str:
-       return await workflow.execute_activity(benign_activity, schedule_to_close_timeout=timedelta(seconds=1))
+        return await workflow.execute_activity(
+            benign_activity, schedule_to_close_timeout=timedelta(seconds=1)
+        )
+
 
 async def test_opentelemetry_benign_exception(client: Client):
     # Create a tracer that has an in-memory exporter
@@ -426,12 +434,15 @@ async def test_opentelemetry_benign_exception(client: Client):
             BenignWorkflow.run,
             id=f"workflow_{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            retry_policy=RetryPolicy(maximum_attempts=2, initial_interval=timedelta(milliseconds=10)),
+            retry_policy=RetryPolicy(
+                maximum_attempts=2, initial_interval=timedelta(milliseconds=10)
+            ),
         )
     spans = exporter.get_finished_spans()
     for span in spans:
         print(f"{span.name}: {span.status.status_code}")
     assert all(span.status.status_code == StatusCode.UNSET for span in spans)
+
 
 # TODO(cretz): Additional tests to write
 # * query without interceptor (no headers)
