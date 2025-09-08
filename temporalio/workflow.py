@@ -61,6 +61,7 @@ import temporalio.nexus
 import temporalio.workflow
 from temporalio.nexus._util import ServiceHandlerT
 
+from .api.failure.v1.message_pb2 import Failure
 from .types import (
     AnyType,
     CallableAsyncNoParam,
@@ -850,6 +851,7 @@ class _Runtime(ABC):
         local_retry_threshold: Optional[timedelta],
         cancellation_type: ActivityCancellationType,
         activity_id: Optional[str],
+        summary: Optional[str],
     ) -> ActivityHandle[Any]: ...
 
     @abstractmethod
@@ -899,6 +901,17 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_is_failure_exception(self, err: BaseException) -> bool: ...
+
+    @abstractmethod
+    def workflow_has_last_completion_result(self) -> bool: ...
+
+    @abstractmethod
+    def workflow_last_completion_result(
+        self, type_hint: Optional[Type]
+    ) -> Optional[Any]: ...
+
+    @abstractmethod
+    def workflow_last_failure(self) -> Optional[BaseException]: ...
 
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
@@ -1049,6 +1062,32 @@ def get_current_details() -> str:
     This can be in Temporal markdown format and can span multiple lines.
     """
     return _Runtime.current().workflow_get_current_details()
+
+
+def has_last_completion_result() -> bool:
+    """Gets whether there is a last completion result of the workflow."""
+    return _Runtime.current().workflow_has_last_completion_result()
+
+
+@overload
+def get_last_completion_result() -> Optional[Any]: ...
+
+
+@overload
+def get_last_completion_result(type_hint: Type[ParamType]) -> Optional[ParamType]: ...
+
+
+def get_last_completion_result(type_hint: Optional[Type] = None) -> Optional[Any]:
+    """Get the result of the last run of the workflow. This will be None if there was
+    no previous completion or the result was None. has_last_completion_result()
+    can be used to differentiate.
+    """
+    return _Runtime.current().workflow_last_completion_result(type_hint)
+
+
+def get_last_failure() -> Optional[BaseException]:
+    """Get the last failure of the workflow if it has run previously."""
+    return _Runtime.current().workflow_last_failure()
 
 
 def set_current_details(description: str) -> None:
@@ -3085,6 +3124,7 @@ class LocalActivityConfig(TypedDict, total=False):
     local_retry_threshold: Optional[timedelta]
     cancellation_type: ActivityCancellationType
     activity_id: Optional[str]
+    summary: Optional[str]
 
 
 # Overload for async no-param activity
@@ -3099,6 +3139,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3114,6 +3155,7 @@ def start_local_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3130,6 +3172,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3146,6 +3189,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3162,6 +3206,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3178,6 +3223,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3196,6 +3242,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]: ...
 
 
@@ -3212,6 +3259,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start a local activity and return its handle.
 
@@ -3239,6 +3287,7 @@ def start_local_activity(
         activity_id: Optional unique identifier for the activity. This is an
             advanced setting that should not be set unless users are sure they
             need to. Contact Temporal before setting this value.
+        summary: Optional summary for the activity.
 
     Returns:
         An activity handle to the activity which is an async task.
@@ -3254,6 +3303,7 @@ def start_local_activity(
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        summary=summary,
     )
 
 
@@ -3269,6 +3319,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3284,6 +3335,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3300,6 +3352,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3316,6 +3369,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3332,6 +3386,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3348,6 +3403,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3366,6 +3422,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> Any: ...
 
 
@@ -3382,6 +3439,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start a local activity and wait for completion.
 
@@ -3400,6 +3458,7 @@ async def execute_local_activity(
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        summary=summary,
     )
 
 
@@ -3509,6 +3568,7 @@ def start_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start a local activity from a callable class.
 
@@ -3525,6 +3585,7 @@ def start_local_activity_class(
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        summary=summary,
     )
 
 
@@ -3540,6 +3601,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3555,6 +3617,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3571,6 +3634,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3587,6 +3651,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3603,6 +3668,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3619,6 +3685,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3634,6 +3701,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start a local activity from a callable class and wait for completion.
 
@@ -3652,6 +3720,7 @@ async def execute_local_activity_class(
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        summary=summary,
     )
 
 
@@ -3667,6 +3736,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3682,6 +3752,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3698,6 +3769,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3714,6 +3786,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3730,6 +3803,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3746,6 +3820,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3761,6 +3836,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start a local activity from a method.
 
@@ -3777,6 +3853,7 @@ def start_local_activity_method(
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        summary=summary,
     )
 
 
@@ -3792,6 +3869,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3807,6 +3885,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3823,6 +3902,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3839,6 +3919,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3855,6 +3936,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3871,6 +3953,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3886,6 +3969,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start a local activity from a method and wait for completion.
 
@@ -3904,6 +3988,7 @@ async def execute_local_activity_method(
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        summary=summary,
     )
 
 
