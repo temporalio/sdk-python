@@ -171,11 +171,30 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         attributes: opentelemetry.util.types.Attributes,
         input: Optional[_InputWithHeaders] = None,
         kind: opentelemetry.trace.SpanKind,
+        context: Optional[Context] = None,
     ) -> Iterator[None]:
-        with self.tracer.start_as_current_span(name, attributes=attributes, kind=kind):
+        with self.tracer.start_as_current_span(name, attributes=attributes, kind=kind, context=context, set_status_on_exception=False) as span:
             if input:
                 input.headers = self._context_to_headers(input.headers)
-            yield None
+            try:
+                yield None
+            except ApplicationError as exc:
+                if exc.category != ApplicationErrorCategory.BENIGN:
+                    span.set_status(
+                        Status(
+                            status_code=StatusCode.ERROR,
+                            description=f"{type(exc).__name__}: {exc}",
+                        )
+                    )
+                raise
+            except Exception as exc:
+                span.set_status(
+                    Status(
+                        status_code=StatusCode.ERROR,
+                        description=f"{type(exc).__name__}: {exc}",
+                    )
+                )
+                raise
 
     def _completed_workflow_span(
         self, params: _CompletedWorkflowSpanParams
@@ -286,7 +305,7 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
         self, input: temporalio.worker.ExecuteActivityInput
     ) -> Any:
         info = temporalio.activity.info()
-        with self.root.tracer.start_as_current_span(
+        with self.root._start_as_current_span(
             f"RunActivity:{info.activity_type}",
             context=self.root._context_from_headers(input.headers),
             attributes={
@@ -663,50 +682,6 @@ class _TracingWorkflowOutboundInterceptor(
             kind=opentelemetry.trace.SpanKind.CLIENT,
         )
         return super().start_local_activity(input)
-
-
-class TemporalTracer(opentelemetry.trace.Tracer):
-    def __init__(self, tracer: opentelemetry.trace.Tracer):
-        self._tracer = tracer
-        super().__init__()
-
-    def start_span(self, name: str, context: Optional[Context] = None, kind: SpanKind = SpanKind.INTERNAL,
-                   attributes: types.Attributes = None, links: _Links = None, start_time: Optional[int] = None,
-                   record_exception: bool = True, set_status_on_exception: bool = True) -> Span:
-        return self._tracer.start_span(name, context, kind, attributes, links, start_time, record_exception, set_status_on_exception)
-
-    @staticmethod
-    def handle_exception(exc: Exception, span: Span, record_exception: bool, set_status_on_exception: bool) -> None:
-        if record_exception:
-            span.record_exception(exc)
-
-        # Set status in case exception was raised
-        if set_status_on_exception:
-            span.set_status(
-                Status(
-                    status_code=StatusCode.ERROR,
-                    description=f"{type(exc).__name__}: {exc}",
-                )
-            )
-
-    @contextmanager
-    def start_as_current_span(self, name: str, context: Optional[Context] = None, kind: SpanKind = SpanKind.INTERNAL,
-                              attributes: types.Attributes = None, links: _Links = None,
-                              start_time: Optional[int] = None, record_exception: bool = True,
-                              set_status_on_exception: bool = True, end_on_exit: bool = True) -> Iterator[Span]:
-
-        with self._tracer.start_as_current_span(name, context, kind, attributes, links, start_time, False, False, end_on_exit) as span:
-            try:
-                yield span
-
-            # TODO: Catch base exception and handle cancellation errors
-            except ApplicationError as exc:
-                if exc.category != ApplicationErrorCategory.BENIGN:
-                    self.handle_exception(exc, span, record_exception, set_status_on_exception)
-                raise
-            except Exception as exc:
-                self.handle_exception(exc, span, record_exception, set_status_on_exception)
-                raise
 
 
 class workflow:

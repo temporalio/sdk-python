@@ -16,7 +16,7 @@ from opentelemetry.trace import get_tracer, StatusCode
 from temporalio import activity, workflow
 from temporalio.client import Client
 from temporalio.common import RetryPolicy
-from temporalio.contrib.opentelemetry import TracingInterceptor, TemporalTracer
+from temporalio.contrib.opentelemetry import TracingInterceptor
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
 from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 from temporalio.testing import WorkflowEnvironment
@@ -394,7 +394,6 @@ def benign_activity() -> str:
     global attempted
     if attempted:
         return "done"
-    print("Raising")
     attempted = True
     raise ApplicationError(category=ApplicationErrorCategory.BENIGN, message="Benign Error")
 
@@ -404,12 +403,13 @@ class BenignWorkflow:
     async def run(self) -> str:
        return await workflow.execute_activity(benign_activity, schedule_to_close_timeout=timedelta(seconds=1))
 
-async def test_opentelemetry_exception_tracing(client: Client):
+async def test_opentelemetry_benign_exception(client: Client):
     # Create a tracer that has an in-memory exporter
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    tracer = TemporalTracer(get_tracer(__name__, tracer_provider=provider))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+
     # Create new client with tracer interceptor
     client_config = client.config()
     client_config["interceptors"] = [TracingInterceptor(tracer)]
@@ -429,6 +429,8 @@ async def test_opentelemetry_exception_tracing(client: Client):
             retry_policy=RetryPolicy(maximum_attempts=2, initial_interval=timedelta(milliseconds=10)),
         )
     spans = exporter.get_finished_spans()
+    for span in spans:
+        print(f"{span.name}: {span.status.status_code}")
     assert all(span.status.status_code == StatusCode.UNSET for span in spans)
 
 # TODO(cretz): Additional tests to write
