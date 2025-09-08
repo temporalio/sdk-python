@@ -439,8 +439,6 @@ async def test_opentelemetry_benign_exception(client: Client):
             ),
         )
     spans = exporter.get_finished_spans()
-    for span in spans:
-        print(f"{span.name}: {span.status.status_code}")
     assert all(span.status.status_code == StatusCode.UNSET for span in spans)
 
 
