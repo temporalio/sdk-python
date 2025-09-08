@@ -259,7 +259,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     def _data_converter(converter: Optional[DataConverter]) -> DataConverter:
         if converter is None:
             return DataConverter(payload_converter_class=OpenAIPayloadConverter)
-        elif isinstance(converter.payload_converter, DefaultPayloadConverter):
+        elif converter.payload_converter_class is DefaultPayloadConverter:
             return dataclasses.replace(
                 converter, payload_converter_class=OpenAIPayloadConverter
             )
