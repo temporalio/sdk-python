@@ -184,15 +184,6 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
                 input.headers = self._context_to_headers(input.headers)
             try:
                 yield None
-            except ApplicationError as exc:
-                if exc.category != ApplicationErrorCategory.BENIGN:
-                    span.set_status(
-                        Status(
-                            status_code=StatusCode.ERROR,
-                            description=f"{type(exc).__name__}: {exc}",
-                        )
-                    )
-                raise
             except Exception as exc:
                 if (
                     not isinstance(exc, ApplicationError)
