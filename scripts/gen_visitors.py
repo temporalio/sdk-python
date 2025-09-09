@@ -116,11 +116,11 @@ class VisitorGenerator:
         # Group fields by oneof to generate if/elif chains
         oneof_fields: dict[int, list[FieldDescriptor]] = {}
         regular_fields: list[FieldDescriptor] = []
-        
+
         for field in desc.fields:
             if field.type != FieldDescriptor.TYPE_MESSAGE:
                 continue
-            
+
             # Skip synthetic oneofs (proto3 optional fields)
             if field.containing_oneof is not None:
                 oneof_idx = field.containing_oneof.index

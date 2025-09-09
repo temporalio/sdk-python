@@ -24,3 +24,5 @@ subprocess.run(
     check=True,
 )
 subprocess.run(["uv", "run", "poe", "format"], check=True)
+
+subprocess.run(["uv", "run", f"{os.getcwd()}/scripts/gen_visitors.py"], check=True)
