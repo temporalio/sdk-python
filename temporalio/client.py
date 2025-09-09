@@ -62,6 +62,11 @@ import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
 from temporalio.activity import ActivityCancellationDetails
+from temporalio.converter import (
+    ActivitySerializationContext,
+    DataConverter,
+    WorkflowSerializationContext,
+)
 from temporalio.service import (
     HttpConnectProxyConfig,
     KeepAliveConfig,
@@ -1592,6 +1597,11 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     ) -> None:
         """Create workflow handle."""
         self._client = client
+        self._data_converter = client.data_converter._with_context(
+            temporalio.converter.WorkflowSerializationContext(
+                namespace=client.namespace, workflow_id=id
+            )
+        )
         self._id = id
         self._run_id = run_id
         self._result_run_id = result_run_id
@@ -1701,7 +1711,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                         break
                     # Ignoring anything after the first response like TypeScript
                     type_hints = [self._result_type] if self._result_type else None
-                    results = await self._client.data_converter.decode_wrapper(
+                    results = await self._data_converter.decode_wrapper(
                         complete_attr.result,
                         type_hints,
                     )
@@ -1717,7 +1727,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                         hist_run_id = fail_attr.new_execution_run_id
                         break
                     raise WorkflowFailureError(
-                        cause=await self._client.data_converter.decode_failure(
+                        cause=await self._data_converter.decode_failure(
                             fail_attr.failure
                         ),
                     )
@@ -1727,7 +1737,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                         cause=temporalio.exceptions.CancelledError(
                             "Workflow cancelled",
                             *(
-                                await self._client.data_converter.decode_wrapper(
+                                await self._data_converter.decode_wrapper(
                                     cancel_attr.details
                                 )
                             ),
@@ -1739,7 +1749,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                         cause=temporalio.exceptions.TerminatedError(
                             term_attr.reason or "Workflow terminated",
                             *(
-                                await self._client.data_converter.decode_wrapper(
+                                await self._data_converter.decode_wrapper(
                                     term_attr.details
                                 )
                             ),
@@ -3190,7 +3200,15 @@ class WorkflowExecutionAsyncIterator:
             timeout=self._input.rpc_timeout,
         )
         self._current_page = [
-            WorkflowExecution._from_raw_info(v, self._client.data_converter)
+            WorkflowExecution._from_raw_info(
+                v,
+                self._client.data_converter._with_context(
+                    WorkflowSerializationContext(
+                        namespace=self._client.namespace,
+                        workflow_id=v.execution.workflow_id,
+                    )
+                ),
+            )
             for v in resp.executions
         ]
         self._current_page_index = 0
@@ -4148,37 +4166,47 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         priority: Optional[temporalio.api.common.v1.Priority] = None
         if self.priority:
             priority = self.priority._to_proto()
+        data_converter = client.data_converter._with_context(
+            WorkflowSerializationContext(
+                namespace=client.namespace,
+                workflow_id=self.id,
+            )
+        )
         action = temporalio.api.schedule.v1.ScheduleAction(
             start_workflow=temporalio.api.workflow.v1.NewWorkflowExecutionInfo(
                 workflow_id=self.id,
                 workflow_type=temporalio.api.common.v1.WorkflowType(name=self.workflow),
                 task_queue=temporalio.api.taskqueue.v1.TaskQueue(name=self.task_queue),
-                input=None
-                if not self.args
-                else temporalio.api.common.v1.Payloads(
-                    payloads=[
-                        a
-                        if isinstance(a, temporalio.api.common.v1.Payload)
-                        else (await client.data_converter.encode([a]))[0]
-                        for a in self.args
-                    ]
+                input=(
+                    temporalio.api.common.v1.Payloads(
+                        payloads=[
+                            a
+                            if isinstance(a, temporalio.api.common.v1.Payload)
+                            else (await data_converter.encode([a]))[0]
+                            for a in self.args
+                        ]
+                    )
+                    if self.args
+                    else None
                 ),
                 workflow_execution_timeout=execution_timeout,
                 workflow_run_timeout=run_timeout,
                 workflow_task_timeout=task_timeout,
                 retry_policy=retry_policy,
-                memo=None
-                if not self.memo
-                else temporalio.api.common.v1.Memo(
-                    fields={
-                        k: v
-                        if isinstance(v, temporalio.api.common.v1.Payload)
-                        else (await client.data_converter.encode([v]))[0]
-                        for k, v in self.memo.items()
-                    },
+                memo=(
+                    temporalio.api.common.v1.Memo(
+                        fields={
+                            k: v
+                            if isinstance(v, temporalio.api.common.v1.Payload)
+                            else (await data_converter.encode([v]))[0]
+                            for k, v in self.memo.items()
+                        },
+                    )
+                    if self.memo
+                    else None
                 ),
                 user_metadata=await _encode_user_metadata(
-                    client.data_converter, self.static_summary, self.static_details
+                    data_converter, self.static_summary, self.static_details
                 ),
                 priority=priority,
             ),
@@ -4994,6 +5022,12 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
         self._workflow_run_id = workflow_run_id
         self._result_type = result_type
         self._known_outcome = known_outcome
+        self._data_converter = self._client.data_converter._with_context(
+            WorkflowSerializationContext(
+                namespace=self._client.namespace,
+                workflow_id=self.workflow_id,
+            )
+        )
 
     @property
     def id(self) -> str:
@@ -5041,14 +5075,12 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
         assert self._known_outcome
         if self._known_outcome.HasField("failure"):
             raise WorkflowUpdateFailedError(
-                await self._client.data_converter.decode_failure(
-                    self._known_outcome.failure
-                ),
+                await self._data_converter.decode_failure(self._known_outcome.failure),
             )
         if not self._known_outcome.success.payloads:
             return None  # type: ignore
         type_hints = [self._result_type] if self._result_type else None
-        results = await self._client.data_converter.decode(
+        results = await self._data_converter.decode(
             self._known_outcome.success.payloads, type_hints
         )
         if not results:
@@ -5900,12 +5932,18 @@ class _ClientImpl(OutboundInterceptor):
         self, input: StartWorkflowInput
     ) -> temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest:
         assert input.start_signal
+        data_converter = self._client.data_converter._with_context(
+            WorkflowSerializationContext(
+                namespace=self._client.namespace,
+                workflow_id=input.id,
+            )
+        )
         req = temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest(
             signal_name=input.start_signal
         )
         if input.start_signal_args:
             req.signal_input.payloads.extend(
-                await self._client.data_converter.encode(input.start_signal_args)
+                await data_converter.encode(input.start_signal_args)
             )
         await self._populate_start_workflow_execution_request(req, input)
         return req
@@ -5925,14 +5963,18 @@ class _ClientImpl(OutboundInterceptor):
         ],
         input: Union[StartWorkflowInput, UpdateWithStartStartWorkflowInput],
     ) -> None:
+        data_converter = self._client.data_converter._with_context(
+            WorkflowSerializationContext(
+                namespace=self._client.namespace,
+                workflow_id=input.id,
+            )
+        )
         req.namespace = self._client.namespace
         req.workflow_id = input.id
         req.workflow_type.name = input.workflow
         req.task_queue.name = input.task_queue
         if input.args:
-            req.input.payloads.extend(
-                await self._client.data_converter.encode(input.args)
-            )
+            req.input.payloads.extend(await data_converter.encode(input.args))
         if input.execution_timeout is not None:
             req.workflow_execution_timeout.FromTimedelta(input.execution_timeout)
         if input.run_timeout is not None:
@@ -5955,15 +5997,13 @@ class _ClientImpl(OutboundInterceptor):
         req.cron_schedule = input.cron_schedule
         if input.memo is not None:
             for k, v in input.memo.items():
-                req.memo.fields[k].CopyFrom(
-                    (await self._client.data_converter.encode([v]))[0]
-                )
+                req.memo.fields[k].CopyFrom((await data_converter.encode([v]))[0])
         if input.search_attributes is not None:
             temporalio.converter.encode_search_attributes(
                 input.search_attributes, req.search_attributes
             )
         metadata = await _encode_user_metadata(
-            self._client.data_converter, input.static_summary, input.static_details
+            data_converter, input.static_summary, input.static_details
         )
         if metadata is not None:
             req.user_metadata.CopyFrom(metadata)
@@ -6009,7 +6049,12 @@ class _ClientImpl(OutboundInterceptor):
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             ),
-            self._client.data_converter,
+            self._client.data_converter._with_context(
+                WorkflowSerializationContext(
+                    namespace=self._client.namespace,
+                    workflow_id=input.id,
+                )
+            ),
         )
 
     def fetch_workflow_history_events(
@@ -6038,6 +6083,12 @@ class _ClientImpl(OutboundInterceptor):
         )
 
     async def query_workflow(self, input: QueryWorkflowInput) -> Any:
+        data_converter = self._client.data_converter._with_context(
+            WorkflowSerializationContext(
+                namespace=self._client.namespace,
+                workflow_id=input.id,
+            )
+        )
         req = temporalio.api.workflowservice.v1.QueryWorkflowRequest(
             namespace=self._client.namespace,
             execution=temporalio.api.common.v1.WorkflowExecution(
@@ -6053,7 +6104,7 @@ class _ClientImpl(OutboundInterceptor):
         req.query.query_type = input.query
         if input.args:
             req.query.query_args.payloads.extend(
-                await self._client.data_converter.encode(input.args)
+                await data_converter.encode(input.args)
             )
         if input.headers is not None:
             await self._apply_headers(input.headers, req.query.header.fields)
@@ -6077,9 +6128,7 @@ class _ClientImpl(OutboundInterceptor):
         if not resp.query_result.payloads:
             return None
         type_hints = [input.ret_type] if input.ret_type else None
-        results = await self._client.data_converter.decode(
-            resp.query_result.payloads, type_hints
-        )
+        results = await data_converter.decode(resp.query_result.payloads, type_hints)
         if not results:
             return None
         elif len(results) > 1:
@@ -6087,6 +6136,12 @@ class _ClientImpl(OutboundInterceptor):
         return results[0]
 
     async def signal_workflow(self, input: SignalWorkflowInput) -> None:
+        data_converter = self._client.data_converter._with_context(
+            WorkflowSerializationContext(
+                namespace=self._client.namespace,
+                workflow_id=input.id,
+            )
+        )
         req = temporalio.api.workflowservice.v1.SignalWorkflowExecutionRequest(
             namespace=self._client.namespace,
             workflow_execution=temporalio.api.common.v1.WorkflowExecution(
@@ -6098,9 +6153,7 @@ class _ClientImpl(OutboundInterceptor):
             request_id=str(uuid.uuid4()),
         )
         if input.args:
-            req.input.payloads.extend(
-                await self._client.data_converter.encode(input.args)
-            )
+            req.input.payloads.extend(await data_converter.encode(input.args))
         if input.headers is not None:
             await self._apply_headers(input.headers, req.header.fields)
         await self._client.workflow_service.signal_workflow_execution(
@@ -6108,6 +6161,12 @@ class _ClientImpl(OutboundInterceptor):
         )
 
     async def terminate_workflow(self, input: TerminateWorkflowInput) -> None:
+        data_converter = self._client.data_converter._with_context(
+            WorkflowSerializationContext(
+                namespace=self._client.namespace,
+                workflow_id=input.id,
+            )
+        )
         req = temporalio.api.workflowservice.v1.TerminateWorkflowExecutionRequest(
             namespace=self._client.namespace,
             workflow_execution=temporalio.api.common.v1.WorkflowExecution(
@@ -6119,9 +6178,7 @@ class _ClientImpl(OutboundInterceptor):
             first_execution_run_id=input.first_execution_run_id or "",
         )
         if input.args:
-            req.details.payloads.extend(
-                await self._client.data_converter.encode(input.args)
-            )
+            req.details.payloads.extend(await data_converter.encode(input.args))
         await self._client.workflow_service.terminate_workflow_execution(
             req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
         )
@@ -6178,6 +6235,12 @@ class _ClientImpl(OutboundInterceptor):
         input: Union[StartWorkflowUpdateInput, UpdateWithStartUpdateWorkflowInput],
         workflow_id: str,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkflowExecutionRequest:
+        data_converter = self._client.data_converter._with_context(
+            WorkflowSerializationContext(
+                namespace=self._client.namespace,
+                workflow_id=workflow_id,
+            )
+        )
         run_id, first_execution_run_id = (
             (
                 input.run_id,
@@ -6210,7 +6273,7 @@ class _ClientImpl(OutboundInterceptor):
         )
         if input.args:
             req.request.input.args.payloads.extend(
-                await self._client.data_converter.encode(input.args)
+                await data_converter.encode(input.args)
             )
         if input.headers is not None:
             await self._apply_headers(input.headers, req.request.input.header.fields)
@@ -6354,10 +6417,11 @@ class _ClientImpl(OutboundInterceptor):
     async def heartbeat_async_activity(
         self, input: HeartbeatAsyncActivityInput
     ) -> None:
+        data_converter = self._async_activity_data_converter(input.id_or_token)
         details = (
             None
             if not input.details
-            else await self._client.data_converter.encode_wrapper(input.details)
+            else await data_converter.encode_wrapper(input.details)
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
             resp_by_id = await self._client.workflow_service.record_activity_task_heartbeat_by_id(
@@ -6408,10 +6472,11 @@ class _ClientImpl(OutboundInterceptor):
                 )
 
     async def complete_async_activity(self, input: CompleteAsyncActivityInput) -> None:
+        data_converter = self._async_activity_data_converter(input.id_or_token)
         result = (
             None
             if input.result is temporalio.common._arg_unset
-            else await self._client.data_converter.encode_wrapper([input.result])
+            else await data_converter.encode_wrapper([input.result])
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
             await self._client.workflow_service.respond_activity_task_completed_by_id(
@@ -6441,14 +6506,14 @@ class _ClientImpl(OutboundInterceptor):
             )
 
     async def fail_async_activity(self, input: FailAsyncActivityInput) -> None:
+        data_converter = self._async_activity_data_converter(input.id_or_token)
+
         failure = temporalio.api.failure.v1.Failure()
-        await self._client.data_converter.encode_failure(input.error, failure)
+        await data_converter.encode_failure(input.error, failure)
         last_heartbeat_details = (
-            None
-            if not input.last_heartbeat_details
-            else await self._client.data_converter.encode_wrapper(
-                input.last_heartbeat_details
-            )
+            await data_converter.encode_wrapper(input.last_heartbeat_details)
+            if input.last_heartbeat_details
+            else None
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
             await self._client.workflow_service.respond_activity_task_failed_by_id(
@@ -6482,10 +6547,11 @@ class _ClientImpl(OutboundInterceptor):
     async def report_cancellation_async_activity(
         self, input: ReportCancellationAsyncActivityInput
     ) -> None:
+        data_converter = self._async_activity_data_converter(input.id_or_token)
         details = (
             None
             if not input.details
-            else await self._client.data_converter.encode_wrapper(input.details)
+            else await data_converter.encode_wrapper(input.details)
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
             await self._client.workflow_service.respond_activity_task_canceled_by_id(
@@ -6513,6 +6579,24 @@ class _ClientImpl(OutboundInterceptor):
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             )
+
+    def _async_activity_data_converter(
+        self, id_or_token: Union[AsyncActivityIDReference, bytes]
+    ) -> DataConverter:
+        return self._client.data_converter._with_context(
+            ActivitySerializationContext(
+                namespace=self._client.namespace,
+                workflow_id=(
+                    id_or_token.workflow_id
+                    if isinstance(id_or_token, AsyncActivityIDReference)
+                    else ""
+                ),
+                workflow_type="",
+                activity_type="",
+                activity_task_queue="",
+                is_local=False,
+            )
+        )
 
     ### Schedule calls
 

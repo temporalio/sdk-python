@@ -252,6 +252,18 @@ class _ActivityWorker:
         if details is None:
             return
 
+        data_converter = self._data_converter
+        if activity.info:
+            context = temporalio.converter.ActivitySerializationContext(
+                namespace=activity.info.workflow_namespace,
+                workflow_id=activity.info.workflow_id,
+                workflow_type=activity.info.workflow_type,
+                activity_type=activity.info.activity_type,
+                activity_task_queue=self._task_queue,
+                is_local=activity.info.is_local,
+            )
+            data_converter = data_converter._with_context(context)
+
         # Perform the heartbeat
         try:
             heartbeat = temporalio.bridge.proto.ActivityHeartbeat(  # type: ignore[reportAttributeAccessIssue]
@@ -259,7 +271,7 @@ class _ActivityWorker:
             )
             if details:
                 # Convert to core payloads
-                heartbeat.details.extend(await self._data_converter.encode(details))
+                heartbeat.details.extend(await data_converter.encode(details))
             logger.debug("Recording heartbeat with details %s", details)
             self._bridge_worker().record_activity_heartbeat(heartbeat)
         except Exception as err:
@@ -293,9 +305,21 @@ class _ActivityWorker:
         completion = temporalio.bridge.proto.ActivityTaskCompletion(  # type: ignore[reportAttributeAccessIssue]
             task_token=task_token
         )
+        # Create serialization context for the activity
+        context = temporalio.converter.ActivitySerializationContext(
+            namespace=start.workflow_namespace,
+            workflow_id=start.workflow_execution.workflow_id,
+            workflow_type=start.workflow_type,
+            activity_type=start.activity_type,
+            activity_task_queue=self._task_queue,
+            is_local=start.is_local,
+        )
+        data_converter = self._data_converter._with_context(context)
         try:
-            result = await self._execute_activity(start, running_activity, task_token)
-            [payload] = await self._data_converter.encode([result])
+            result = await self._execute_activity(
+                start, running_activity, task_token, data_converter
+            )
+            [payload] = await data_converter.encode([result])
             completion.result.completed.result.CopyFrom(payload)
         except BaseException as err:
             try:
@@ -313,7 +337,7 @@ class _ActivityWorker:
                     temporalio.activity.logger.warning(
                         f"Completing as failure during heartbeat with error of type {type(err)}: {err}",
                     )
-                    await self._data_converter.encode_failure(
+                    await data_converter.encode_failure(
                         err, completion.result.failed.failure
                     )
                 elif (
@@ -327,7 +351,7 @@ class _ActivityWorker:
                     temporalio.activity.logger.warning(
                         "Completing as failure due to unhandled cancel error produced by activity pause",
                     )
-                    await self._data_converter.encode_failure(
+                    await data_converter.encode_failure(
                         temporalio.exceptions.ApplicationError(
                             type="ActivityPause",
                             message="Unhandled activity cancel error produced by activity pause",
@@ -345,7 +369,7 @@ class _ActivityWorker:
                     temporalio.activity.logger.warning(
                         "Completing as failure due to unhandled cancel error produced by activity reset",
                     )
-                    await self._data_converter.encode_failure(
+                    await data_converter.encode_failure(
                         temporalio.exceptions.ApplicationError(
                             type="ActivityReset",
                             message="Unhandled activity cancel error produced by activity reset",
@@ -360,7 +384,7 @@ class _ActivityWorker:
                     and running_activity.cancelled_by_request
                 ):
                     temporalio.activity.logger.debug("Completing as cancelled")
-                    await self._data_converter.encode_failure(
+                    await data_converter.encode_failure(
                         # TODO(cretz): Should use some other message?
                         temporalio.exceptions.CancelledError("Cancelled"),
                         completion.result.cancelled.failure,
@@ -386,7 +410,7 @@ class _ActivityWorker:
                             exc_info=True,
                             extra={"__temporal_error_identifier": "ActivityFailure"},
                         )
-                    await self._data_converter.encode_failure(
+                    await data_converter.encode_failure(
                         err, completion.result.failed.failure
                     )
                     # For broken executors, we have to fail the entire worker
@@ -428,6 +452,7 @@ class _ActivityWorker:
         start: temporalio.bridge.proto.activity_task.Start,  # type: ignore[reportAttributeAccessIssue]
         running_activity: _RunningActivity,
         task_token: bytes,
+        data_converter: temporalio.converter.DataConverter,
     ) -> Any:
         """Invoke the user's activity function.
 
@@ -501,9 +526,7 @@ class _ActivityWorker:
             args = (
                 []
                 if not start.input
-                else await self._data_converter.decode(
-                    start.input, type_hints=arg_types
-                )
+                else await data_converter.decode(start.input, type_hints=arg_types)
             )
         except Exception as err:
             raise temporalio.exceptions.ApplicationError(
@@ -519,7 +542,7 @@ class _ActivityWorker:
             heartbeat_details = (
                 []
                 if not start.heartbeat_details
-                else await self._data_converter.decode(start.heartbeat_details)
+                else await data_converter.decode(start.heartbeat_details)
             )
         except Exception as err:
             raise temporalio.exceptions.ApplicationError(
@@ -563,11 +586,9 @@ class _ActivityWorker:
             else None,
         )
 
-        if self._encode_headers and self._data_converter.payload_codec is not None:
+        if self._encode_headers and data_converter.payload_codec is not None:
             for payload in start.header_fields.values():
-                new_payload = (
-                    await self._data_converter.payload_codec.decode([payload])
-                )[0]
+                new_payload = (await data_converter.payload_codec.decode([payload]))[0]
                 payload.CopyFrom(new_payload)
 
         running_activity.info = info
@@ -591,7 +612,7 @@ class _ActivityWorker:
                     if not running_activity.cancel_thread_raiser
                     else running_activity.cancel_thread_raiser.shielded
                 ),
-                payload_converter_class_or_instance=self._data_converter.payload_converter,
+                payload_converter_class_or_instance=data_converter.payload_converter,
                 runtime_metric_meter=None if sync_non_threaded else self._metric_meter,
                 client=self._client if not running_activity.sync else None,
                 cancellation_details=running_activity.cancellation_details,
