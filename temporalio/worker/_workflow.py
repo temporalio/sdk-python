@@ -248,20 +248,13 @@ class _WorkflowWorker:
             await self._handle_cache_eviction(act, cache_remove_job)
             return
 
+        data_converter = self._data_converter
         # Build default success completion (e.g. remove-job-only activations)
         completion = (
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
         )
         completion.successful.SetInParent()
         try:
-            # Decode the activation if there's a codec and not cache remove job
-            if self._data_converter.payload_codec:
-                await temporalio.bridge.worker.decode_activation(
-                    act,
-                    self._data_converter.payload_codec,
-                    decode_headers=self._encode_headers,
-                )
-
             if LOG_PROTOS:
                 logger.debug("Received workflow activation:\n%s", act)
 
@@ -273,14 +266,26 @@ class _WorkflowWorker:
                     raise RuntimeError(
                         "Missing initialize workflow, workflow could have unexpectedly been removed from cache"
                     )
-                workflow = _RunningWorkflow(
-                    self._create_workflow_instance(act, init_job)
-                )
+                workflow_instance, det = self._create_workflow_instance(act, init_job)
+                workflow = _RunningWorkflow(workflow_instance, det.info.workflow_id)
                 self._running_workflows[act.run_id] = workflow
             elif init_job:
                 # This should never happen
                 logger.warning(
                     "Cache already exists for activation with initialize job"
+                )
+
+            data_converter = self._data_converter._with_context(
+                temporalio.converter.WorkflowSerializationContext(
+                    namespace=self._namespace,
+                    workflow_id=workflow.workflow_id,
+                )
+            )
+            if data_converter.payload_codec:
+                await temporalio.bridge.worker.decode_activation(
+                    act,
+                    data_converter.payload_codec,
+                    decode_headers=self._encode_headers,
                 )
 
             # Run activation in separate thread so we can check if it's
@@ -324,9 +329,9 @@ class _WorkflowWorker:
             # Set completion failure
             completion.failed.failure.SetInParent()
             try:
-                self._data_converter.failure_converter.to_failure(
+                data_converter.failure_converter.to_failure(
                     err,
-                    self._data_converter.payload_converter,
+                    data_converter.payload_converter,
                     completion.failed.failure,
                 )
             except Exception as inner_err:
@@ -342,11 +347,11 @@ class _WorkflowWorker:
         completion.run_id = act.run_id
 
         # Encode the completion if there's a codec and not cache remove job
-        if self._data_converter.payload_codec:
+        if data_converter.payload_codec:
             try:
                 await temporalio.bridge.worker.encode_completion(
                     completion,
-                    self._data_converter.payload_codec,
+                    data_converter.payload_codec,
                     encode_headers=self._encode_headers,
                 )
             except Exception as err:
@@ -490,7 +495,7 @@ class _WorkflowWorker:
         self,
         act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
         init: temporalio.bridge.proto.workflow_activation.InitializeWorkflow,
-    ) -> WorkflowInstance:
+    ) -> tuple[WorkflowInstance, WorkflowInstanceDetails]:
         # Get the definition
         defn = self._workflows.get(init.workflow_type, self._dynamic_workflow)
         if not defn:
@@ -570,9 +575,9 @@ class _WorkflowWorker:
             last_failure=last_failure,
         )
         if defn.sandboxed:
-            return self._workflow_runner.create_instance(det)
+            return self._workflow_runner.create_instance(det), det
         else:
-            return self._unsandboxed_workflow_runner.create_instance(det)
+            return self._unsandboxed_workflow_runner.create_instance(det), det
 
     def nondeterminism_as_workflow_fail(self) -> bool:
         return any(
@@ -666,8 +671,9 @@ class _DeadlockError(Exception):
 
 
 class _RunningWorkflow:
-    def __init__(self, instance: WorkflowInstance):
+    def __init__(self, instance: WorkflowInstance, workflow_id: str):
         self.instance = instance
+        self.workflow_id = workflow_id
         self.deadlocked_activation_task: Optional[Awaitable] = None
         self._deadlock_can_be_interrupted_lock = threading.Lock()
         self._deadlock_can_be_interrupted = False
