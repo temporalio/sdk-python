@@ -194,12 +194,13 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
                     )
                 raise
             except Exception as exc:
-                span.set_status(
-                    Status(
-                        status_code=StatusCode.ERROR,
-                        description=f"{type(exc).__name__}: {exc}",
+                if not isinstance(exc, ApplicationError) or exc.category != ApplicationErrorCategory.BENIGN:
+                    span.set_status(
+                        Status(
+                            status_code=StatusCode.ERROR,
+                            description=f"{type(exc).__name__}: {exc}",
+                        )
                     )
-                )
                 raise
 
     def _completed_workflow_span(
