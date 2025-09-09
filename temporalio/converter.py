@@ -12,6 +12,7 @@ import traceback
 import uuid
 import warnings
 from abc import ABC, abstractmethod
+from copy import copy
 from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
@@ -28,11 +29,14 @@ from typing import (
     Mapping,
     NewType,
     Optional,
+    Protocol,
+    Self,
     Sequence,
     Tuple,
     Type,
     TypeVar,
     Union,
+    cast,
     get_type_hints,
     overload,
 )
@@ -63,6 +67,74 @@ if sys.version_info >= (3, 10):
     from types import UnionType
 
 logger = getLogger(__name__)
+
+
+class SerializationContext(ABC):
+    """Base serialization context.
+
+    This provides contextual information during serialization and deserialization
+    operations. Different contexts (activity, workflow, etc.) can provide
+    specialized information.
+    """
+
+    pass
+
+
+@dataclass(frozen=True)
+class ActivitySerializationContext(SerializationContext):
+    """Serialization context for activities.
+
+    Attributes:
+        activity_id: The ID of the activity.
+        activity_type: The type/name of the activity.
+        attempt: The current attempt number (starting from 1).
+        is_local: Whether this is a local activity.
+    """
+
+    namespace: str
+    workflow_id: str
+    workflow_type: str
+    activity_type: str
+    activity_task_queue: Optional[str]
+    is_local: bool
+
+
+@dataclass(frozen=True)
+class WorkflowSerializationContext(SerializationContext):
+    """Serialization context for workflows.
+
+    Attributes:
+        workflow_id: The workflow ID.
+        run_id: The workflow run ID.
+        workflow_type: The type/name of the workflow.
+        task_queue: The task queue the workflow is running on.
+        namespace: The namespace the workflow is running in.
+        attempt: The current workflow task attempt number (starting from 1).
+    """
+
+    namespace: str
+    workflow_id: str
+
+
+class WithSerializationContext(ABC):
+    """Protocol for objects that can use serialization context.
+
+    This is similar to the .NET IWithSerializationContext<T> interface.
+    Objects implementing this protocol can receive contextual information
+    during serialization and deserialization.
+    """
+
+    @abstractmethod
+    def with_context(self, context: Optional[SerializationContext]) -> Self:
+        """Return a copy of this object configured to use the given context.
+
+        Args:
+            context: The serialization context to use, or None for no context.
+
+        Returns:
+            A new instance configured with the context.
+        """
+        raise NotImplementedError()
 
 
 class PayloadConverter(ABC):
@@ -1205,6 +1277,32 @@ class DataConverter:
         if self.payload_codec:
             await self.payload_codec.decode_failure(failure)
         return self.failure_converter.from_failure(failure, self.payload_converter)
+
+    def _with_context(self, context: Optional[SerializationContext]) -> Self:
+        new_self = type(self).__new__(type(self))
+        setattr(
+            new_self,
+            "payload_converter",
+            self.payload_converter.with_context(context)
+            if isinstance(self.payload_converter, WithSerializationContext)
+            else self.payload_converter,
+        )
+        codec = self.payload_codec
+        setattr(
+            new_self,
+            "payload_codec",
+            cast(WithSerializationContext, codec).with_context(context)
+            if isinstance(codec, WithSerializationContext)
+            else codec,
+        )
+        setattr(
+            new_self,
+            "failure_converter",
+            self.failure_converter.with_context(context)
+            if isinstance(self.failure_converter, WithSerializationContext)
+            else self.failure_converter,
+        )
+        return new_self
 
 
 DefaultPayloadConverter.default_encoding_payload_converters = (

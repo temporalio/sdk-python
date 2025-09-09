@@ -65,6 +65,11 @@ import temporalio.workflow
 from temporalio.service import __version__
 
 from ..api.failure.v1.message_pb2 import Failure
+from ..converter import (
+    ActivitySerializationContext,
+    WithSerializationContext,
+    WorkflowSerializationContext,
+)
 from ._interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
@@ -208,6 +213,19 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         WorkflowInstance.__init__(self)
         temporalio.workflow._Runtime.__init__(self)
         self._payload_converter = det.payload_converter_class()
+
+        # Apply serialization context to payload converter
+        self._payload_converter = (
+            self._payload_converter.with_context(
+                WorkflowSerializationContext(
+                    namespace=det.info.namespace,
+                    workflow_id=det.info.workflow_id,
+                )
+            )
+            if isinstance(self._payload_converter, WithSerializationContext)
+            else self._payload_converter
+        )
+
         self._failure_converter = det.failure_converter_class()
         self._defn = det.defn
         self._workflow_input: Optional[ExecuteWorkflowInput] = None
@@ -1017,6 +1035,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     def _make_workflow_input(
         self, init_job: temporalio.bridge.proto.workflow_activation.InitializeWorkflow
     ) -> ExecuteWorkflowInput:
+        print("Making workflow input")
         # Set arg types, using raw values for dynamic
         arg_types = self._defn.arg_types
         if not self._defn.name:
@@ -1987,6 +2006,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if types and len(types) != len(payloads):
             types = None
         try:
+            print(f"Converting payloads with {self._payload_converter}.")
             return self._payload_converter.from_payloads(
                 payloads,
                 type_hints=types,
@@ -2769,9 +2789,27 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             temporalio.bridge.proto.activity_result.DoBackoff
         ] = None,
     ) -> None:
+        # Set up serialization context
+        payload_converter = (
+            self._instance._payload_converter.with_context(
+                ActivitySerializationContext(
+                    namespace=self._instance.workflow_info().namespace,
+                    workflow_id=self._instance.workflow_info().workflow_id,
+                    workflow_type=self._instance.workflow_info().workflow_type,
+                    activity_type=self._input.activity,
+                    activity_task_queue=self._input.task_queue
+                    if isinstance(self._input, StartActivityInput)
+                    else None,
+                    is_local=isinstance(self._input, StartLocalActivityInput),
+                )
+            )
+            if isinstance(self._instance._payload_converter, WithSerializationContext)
+            else self._instance._payload_converter
+        )
+
         # Convert arguments before creating command in case it raises error
         payloads = (
-            self._instance._payload_converter.to_payloads(self._input.args)
+            payload_converter.to_payloads(self._input.args)
             if self._input.args
             else None
         )
@@ -2807,7 +2845,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             self._input.retry_policy.apply_to_proto(v.retry_policy)
         if self._input.summary:
             command.user_metadata.summary.CopyFrom(
-                self._instance._payload_converter.to_payload(self._input.summary)
+                payload_converter.to_payload(self._input.summary)
             )
         v.cancellation_type = cast(
             temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType,
@@ -2919,9 +2957,21 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
             self._result_fut.set_result(None)
 
     def _apply_start_command(self) -> None:
+        # Set up serialization context
+        payload_converter = (
+            self._instance._payload_converter.with_context(
+                WorkflowSerializationContext(
+                    namespace=self._instance.workflow_info().namespace,
+                    workflow_id=self._instance.workflow_info().workflow_id,
+                )
+            )
+            if isinstance(self._instance._payload_converter, WithSerializationContext)
+            else self._instance._payload_converter
+        )
+
         # Convert arguments before creating command in case it raises error
         payloads = (
-            self._instance._payload_converter.to_payloads(self._input.args)
+            payload_converter.to_payloads(self._input.args)
             if self._input.args
             else None
         )
@@ -2956,9 +3006,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
             temporalio.common._apply_headers(self._input.headers, v.headers)
         if self._input.memo:
             for k, val in self._input.memo.items():
-                v.memo[k].CopyFrom(
-                    self._instance._payload_converter.to_payloads([val])[0]
-                )
+                v.memo[k].CopyFrom(payload_converter.to_payloads([val])[0])
         if self._input.search_attributes:
             _encode_search_attributes(
                 self._input.search_attributes, v.search_attributes
@@ -3126,15 +3174,27 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
         self._input = input
 
     def _apply_command(self) -> None:
+        # Set up serialization context
+        payload_converter = (
+            self._instance._payload_converter.with_context(
+                WorkflowSerializationContext(
+                    namespace=self._instance.workflow_info().namespace,
+                    workflow_id=self._instance.workflow_info().workflow_id,
+                )
+            )
+            if isinstance(self._instance._payload_converter, WithSerializationContext)
+            else self._instance._payload_converter
+        )
+
         # Convert arguments before creating command in case it raises error
         payloads = (
-            self._instance._payload_converter.to_payloads(self._input.args)
+            payload_converter.to_payloads(self._input.args)
             if self._input.args
             else None
         )
         memo_payloads = (
             {
-                k: self._instance._payload_converter.to_payloads([val])[0]
+                k: payload_converter.to_payloads([val])[0]
                 for k, val in self._input.memo.items()
             }
             if self._input.memo

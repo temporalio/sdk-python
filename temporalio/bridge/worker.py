@@ -384,6 +384,7 @@ async def decode_activation(
     codec: temporalio.converter.PayloadCodec,
     decode_headers: bool,
 ) -> None:
+    print("Decoding activation")
     """Decode the given activation with the codec."""
     for job in act.jobs:
         if job.HasField("query_workflow"):
@@ -462,6 +463,7 @@ async def encode_completion(
     codec: temporalio.converter.PayloadCodec,
     encode_headers: bool,
 ) -> None:
+    print("Encoding completion")
     """Recursively encode the given completion with the codec."""
     if comp.HasField("failed"):
         await codec.encode_failure(comp.failed.failure)

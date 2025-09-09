@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import concurrent.futures
 import dataclasses
 import json
@@ -95,6 +96,8 @@ from temporalio.converter import (
     DefaultPayloadConverter,
     PayloadCodec,
     PayloadConverter,
+    SerializationContext,
+    WithSerializationContext, JSONPlainPayloadConverter,CompositePayloadConverter
 )
 from temporalio.exceptions import (
     ActivityError,
@@ -8367,3 +8370,334 @@ async def test_previous_run_failure(client: Client):
         )
         result = await handle.result()
         assert result == "Done"
+
+
+@dataclass
+class ContextInfo:
+    """Information extracted from serialization context."""
+    activity: bool = False
+    workflow: bool = False
+    workflow_id: str = "<unknown>"
+    
+    @classmethod
+    def create(cls, context: Optional[SerializationContext]) -> ContextInfo:
+        """Create ContextInfo from a serialization context."""
+        if context is None:
+            return cls()
+        
+        from temporalio.converter import (
+            ActivitySerializationContext,
+            WorkflowSerializationContext,
+        )
+        
+        if isinstance(context, ActivitySerializationContext):
+            return cls(
+                activity=True,
+                workflow=False,
+                workflow_id=context.workflow_id,
+            )
+        elif isinstance(context, WorkflowSerializationContext):
+            return cls(
+                activity=False,
+                workflow=True,
+                workflow_id=context.workflow_id,
+            )
+        else:
+            return cls()
+
+
+@dataclass
+class ContextEvent:
+    """Records when context was used during serialization/deserialization."""
+    outbound: bool  # True for serialization, False for deserialization
+    info: ContextInfo
+
+
+@dataclass
+class ContextValue:
+    """Test value that tracks context events during serialization."""
+    name: str
+    events: List[ContextEvent] = dataclasses.field(default_factory=list)
+
+    def assert_workflow_equal(
+        self,
+        expected_name: str,
+        workflow_id: str,
+        activity: bool = False
+    ):
+        """Assert this value has the expected events for workflow context."""
+        assert self.name == expected_name, f"Expected name {expected_name}, got {self.name}"
+
+        # Should have outbound (serialization) and inbound (deserialization) events
+        outbound_events = [e for e in self.events if e.outbound]
+        inbound_events = [e for e in self.events if not e.outbound]
+
+        assert len(outbound_events) >= 1, "Should have at least one outbound event"
+        assert len(inbound_events) >= 1, "Should have at least one inbound event"
+
+        # Check the context info matches expectations
+        for event in outbound_events + inbound_events:
+            assert event.info.workflow_id == workflow_id
+            assert event.info.activity == activity
+
+
+class ContextJsonConverter(JSONPlainPayloadConverter):
+    """Test JSON converter that tracks context usage."""
+    
+    def __init__(self, context_info: Optional[ContextInfo] = None):
+        super().__init__()
+        self.context_info = context_info or ContextInfo()
+    
+    def to_payload(self, value: Any) -> Optional[Payload]:
+        print("To Payload:", value)
+        # Track context usage during serialization
+        if isinstance(value, ContextValue):
+            value.events.append(
+                ContextEvent(outbound=True, info=self.context_info)
+            )
+        return super().to_payload(value)
+    
+    def from_payload(
+        self, payload: Payload, type_hint: Optional[Type] = None
+    ) -> Any:
+        print("From Payload:", payload)
+        value = super().from_payload(payload, type_hint)
+        # Track context usage during deserialization
+        if isinstance(value, ContextValue):
+            value.events.append(
+                ContextEvent(outbound=False, info=self.context_info)
+            )
+        return value
+
+
+class ContextPayloadConverter(CompositePayloadConverter):
+    def __init__(self, context_info: Optional[ContextInfo] = None):
+        super().__init__(ContextJsonConverter(context_info))
+
+    def with_context(self, context: Optional[SerializationContext]) -> ContextPayloadConverter:
+        print("With context:", context)
+        """Return a copy configured with the given context."""
+        return ContextPayloadConverter(ContextInfo.create(context))
+
+
+class ContextFailureConverter(DefaultFailureConverter, WithSerializationContext):
+    """Test failure converter that adds context information to failure messages."""
+    
+    def __init__(self, context_info: Optional[ContextInfo] = None):
+        super().__init__()
+        self.context_info = context_info or ContextInfo()
+    
+    def to_failure(self, exception: BaseException, payload_converter: PayloadConverter, failure: Failure):
+        super().to_failure(exception, payload_converter, failure)
+        
+        # Add context info to application failure messages
+        if (failure.application_failure_info is not None and 
+            "[activity:" not in failure.message):
+            activity_str = "true" if self.context_info.activity else "false"
+            failure.message += f" [activity: {activity_str}, workflow-id: {self.context_info.workflow_id}]"
+        
+
+    def with_context(self, context: Optional[SerializationContext]) -> "ContextFailureConverter":
+        """Return a copy configured with the given context."""
+        return ContextFailureConverter(ContextInfo.create(context))
+
+
+class ContextPayloadCodec(PayloadCodec, WithSerializationContext):
+    """Test codec that validates context during encode/decode."""
+    
+    ENCODING_NAME = "context-encoding"
+    
+    def __init__(self, context_info: Optional[ContextInfo] = None):
+        self.context_info = context_info or ContextInfo()
+    
+    async def encode(self, payloads: Sequence[Payload]) -> List[Payload]:
+        """Encode payloads and add context metadata."""
+        encoded_payloads = []
+        
+        for payload in payloads:
+            # Encode the original payload as base64
+            encoded_data = base64.b64encode(payload.SerializeToString())
+            
+            # Create new payload with context metadata
+            new_payload = Payload(
+                data=encoded_data,
+                metadata={
+                    "encoding": self.ENCODING_NAME.encode(),
+                    "activity": str(self.context_info.activity).lower().encode(),
+                    "workflow-id": self.context_info.workflow_id.encode(),
+                },
+            )
+            encoded_payloads.append(new_payload)
+        
+        return encoded_payloads
+    
+    async def decode(self, payloads: Sequence[Payload]) -> List[Payload]:
+        """Decode payloads and validate context metadata."""
+        decoded_payloads = []
+        
+        for payload in payloads:
+            # Validate context metadata matches current context
+            assert payload.metadata.get("encoding", b"").decode() == self.ENCODING_NAME
+            assert payload.metadata.get("activity", b"").decode() == str(self.context_info.activity).lower()
+            assert payload.metadata.get("workflow-id", b"").decode() == self.context_info.workflow_id
+            
+            # Decode the original payload
+            original_payload = Payload()
+            original_payload.ParseFromString(base64.b64decode(payload.data))
+            decoded_payloads.append(original_payload)
+        
+        return decoded_payloads
+    
+    def with_context(self, context: Optional[SerializationContext]) -> "ContextPayloadCodec":
+        """Return a copy configured with the given context."""
+        return ContextPayloadCodec(ContextInfo.create(context))
+
+
+@workflow.defn
+class ConverterContextWorkflow:
+    """Test workflow that exercises serialization context."""
+    
+    def __init__(self):
+        self._complete = False
+    
+    @workflow.run
+    async def run(self, value: ContextValue) -> ContextValue:
+        value.assert_workflow_equal("workflow-input", workflow.info().workflow_id)
+        await workflow.wait_condition(lambda: self._complete)
+        return ContextValue("workflow-result")
+    
+    @workflow.signal
+    async def complete(self):
+        self._complete = True
+    
+    @workflow.signal  
+    async def some_signal(self, value: ContextValue):
+        value.assert_workflow_equal("signal-input", workflow.info().workflow_id)
+    
+    @workflow.query
+    def some_query(self, value: ContextValue) -> ContextValue:
+        value.assert_workflow_equal("query-input", workflow.info().workflow_id)
+        return ContextValue("query-result")
+    
+    @workflow.update
+    async def some_update(self, value: ContextValue) -> ContextValue:
+        value.assert_workflow_equal("update-input", workflow.info().workflow_id)
+        return ContextValue("update-result")
+    
+    @workflow.update
+    async def signal_external(self, workflow_id: str):
+        handle = workflow.get_external_workflow_handle(workflow_id)
+        await handle.signal(ConverterContextWorkflow.some_signal, ContextValue("signal-input"))
+    
+    @workflow.update
+    async def do_child(self):
+        # Start child
+        handle = await workflow.start_child_workflow(
+            ConverterContextWorkflow.run,
+            ContextValue("workflow-input"),
+            id=f"child-{uuid.uuid4()}"
+        )
+        await handle.signal(ConverterContextWorkflow.some_signal, ContextValue("signal-input"))
+        await handle.signal(ConverterContextWorkflow.complete)
+        res = await handle
+        res.assert_workflow_equal("workflow-result", handle.id)
+    
+    @workflow.update
+    async def do_activity(self):
+        # Regular activity
+        res = await workflow.execute_activity(
+            some_activity,
+            ContextValue("activity-input"),
+            start_to_close_timeout=timedelta(seconds=30)
+        )
+        res.assert_workflow_equal("activity-result", workflow.info().workflow_id, activity=True)
+        
+        # Local activity
+        res = await workflow.execute_local_activity(
+            some_activity,
+            ContextValue("activity-input"),
+            start_to_close_timeout=timedelta(seconds=30)
+        )
+        res.assert_workflow_equal("activity-result", workflow.info().workflow_id, activity=True)
+    
+    @workflow.update
+    async def do_update_and_activity_failure(self):
+        try:
+            await workflow.execute_activity(
+                some_failing_activity,
+                start_to_close_timeout=timedelta(seconds=10)
+            )
+            raise RuntimeError("Expected failure")
+        except ActivityError as e:
+            if e.cause and "Intentional activity failure" in str(e.cause):
+                raise ApplicationError(
+                    "Intentional update failure",
+                    ContextValue("update-failure"),
+                    cause=e
+                )
+            raise
+    
+    @workflow.update
+    async def do_async_activity_completion(self):
+        res = await workflow.execute_activity(
+            some_async_completing_activity,
+            start_to_close_timeout=timedelta(seconds=30)
+        )
+        res.assert_workflow_equal("activity-async-result", workflow.info().workflow_id, activity=True)
+
+
+@activity.defn
+async def some_activity(value: ContextValue) -> ContextValue:
+    """Test activity that validates serialization context."""
+    value.assert_workflow_equal(
+        "activity-input",
+        activity.info().workflow_id,
+        activity=True
+    )
+    return ContextValue("activity-result")
+
+
+@activity.defn
+async def some_failing_activity():
+    """Test activity that intentionally fails."""
+    raise ApplicationError(
+        "Intentional activity failure",
+        ContextValue("activity-failure"),
+        non_retryable=True
+    )
+
+
+@activity.defn
+async def some_async_completing_activity() -> ContextValue:
+    """Test activity that completes asynchronously."""
+    # Get async completion handle
+    handle = activity.async_completion_handle()
+    
+    # Schedule completion in background
+    async def complete_later():
+        await asyncio.sleep(0.3)
+        await handle.complete(ContextValue("activity-async-result"))
+    
+    asyncio.create_task(complete_later())
+    activity.raise_complete_async()
+
+async def test_serialization_context(client: Client):
+    config = client.config()
+    config["data_converter"] = DataConverter(
+        payload_converter_class=ContextJsonConverter, payload_codec=ContextPayloadCodec(), failure_converter_class=ContextFailureConverter
+    )
+    client = Client(**config)
+
+    async with new_worker(
+        client, ConverterContextWorkflow, activities=[some_activity, some_failing_activity, some_async_completing_activity]
+    ) as worker:
+        handle = await client.start_workflow(
+            ConverterContextWorkflow.run,
+            ContextValue("workflow-input"),
+            id=f"serialization-context-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        result = await handle.result()
+        #assert any(event.HasField("workflow_execution_started_event_attributes") and event.workflow_execution_started_event_attributes.input.payloads[0].metadata.get("") async for event in handle.fetch_history_events())
+        assert result == "Hello, Temporal!"
+    assert False
