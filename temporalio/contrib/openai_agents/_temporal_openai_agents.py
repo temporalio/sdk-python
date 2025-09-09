@@ -24,16 +24,19 @@ from openai.types.responses import ResponsePromptParam
 
 import temporalio.client
 import temporalio.worker
-from temporalio.client import ClientConfig, Plugin
+from temporalio.client import ClientConfig
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
-from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
+from temporalio.contrib.openai_agents._openai_runner import (
+    TemporalOpenAIRunner,
+)
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
     TemporalTraceProvider,
 )
 from temporalio.contrib.openai_agents._trace_interceptor import (
     OpenAIAgentsTracingInterceptor,
 )
+from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 from temporalio.contrib.pydantic import (
     PydanticPayloadConverter,
     ToJsonOptions,
@@ -284,6 +287,9 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         config["activities"] = list(config.get("activities") or []) + [
             ModelActivity(self._model_provider).invoke_model_activity
         ]
+        config["workflow_failure_exception_types"] = list(
+            config.get("workflow_failure_exception_types") or []
+        ) + [AgentsWorkflowError]
         return self.next_worker_plugin.configure_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
@@ -307,7 +313,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         config["data_converter"] = DataConverter(
             payload_converter_class=_OpenAIPayloadConverter
         )
-        return config
+        return self.next_worker_plugin.configure_replayer(config)
 
     @asynccontextmanager
     async def run_replayer(
