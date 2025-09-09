@@ -113,10 +113,25 @@ class VisitorGenerator:
             lines.append("        if self.skip_search_attributes:")
             lines.append("            return")
 
+        # Group fields by oneof to generate if/elif chains
+        oneof_fields: dict[int, list[FieldDescriptor]] = {}
+        regular_fields: list[FieldDescriptor] = []
+        
         for field in desc.fields:
             if field.type != FieldDescriptor.TYPE_MESSAGE:
                 continue
+            
+            # Skip synthetic oneofs (proto3 optional fields)
+            if field.containing_oneof is not None:
+                oneof_idx = field.containing_oneof.index
+                if oneof_idx not in oneof_fields:
+                    oneof_fields[oneof_idx] = []
+                oneof_fields[oneof_idx].append(field)
+            else:
+                regular_fields.append(field)
 
+        # Process regular fields first
+        for field in regular_fields:
             # Repeated fields (including maps which are represented as repeated messages)
             if field.label == FieldDescriptor.LABEL_REPEATED:
                 if (
@@ -173,6 +188,24 @@ class VisitorGenerator:
                             field.name, f"o.{field.name}", name_for(child_desc), True
                         )
                     )
+
+        # Process oneof fields as if/elif chains
+        for oneof_idx, fields in oneof_fields.items():
+            oneof_lines = []
+            first = True
+            for field in fields:
+                child_desc = field.message_type
+                child_needed = self.walk(child_desc)
+                needed |= child_needed
+                if child_needed:
+                    if_word = "if" if first else "elif"
+                    first = False
+                    line = emit_singular(
+                        field.name, f"o.{field.name}", name_for(child_desc), True
+                    ).replace("        if", f"        {if_word}", 1)
+                    oneof_lines.append(line)
+            if oneof_lines:
+                lines.extend(oneof_lines)
 
         self.generated[key] = needed
         self.in_progress.discard(key)
