@@ -1,6 +1,6 @@
 [project]
 name = "temporalio"
-version = "1.16.0"
+version = "1.17.0"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.9"
@@ -64,8 +64,9 @@ dev = [
 build-develop = "uv run maturin develop --uv"
 build-develop-with-release = { cmd = "uv run maturin develop --release --uv" }
 format = [{cmd = "uv run ruff check --select I --fix"}, {cmd = "uv run ruff format"}, ]
-gen-docs = "uv run python scripts/gen_docs.py"
-gen-protos = "uv run python scripts/gen_protos.py"
+gen-docs = "uv run scripts/gen_docs.py"
+gen-protos = "uv run scripts/gen_protos.py"
+gen-protos-docker = "uv run scripts/gen_protos_docker.py"
 lint = [
   {cmd = "uv run ruff check --select I"},
   {cmd = "uv run ruff format --check"},
