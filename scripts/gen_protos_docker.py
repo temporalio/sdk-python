@@ -33,5 +33,6 @@ subprocess.run(
 subprocess.run(["uv", "run", "poe", "format"], check=True)
 
 subprocess.run(
-    ["uv", "run", os.path.join(os.getcwd(), "scripts", "gen_visitors.py")], check=True
+    ["uv", "run", os.path.join(os.getcwd(), "scripts", "gen_payload_visitor.py")],
+    check=True,
 )
