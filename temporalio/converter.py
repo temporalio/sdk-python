@@ -400,6 +400,9 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
             A new CompositePayloadConverter with context-aware converters, or self if no converters
             support context.
         """
+        print(
+            f"🌈 CompositePayloadConverter.with_context({context}) {self._any_converters_with_context}"
+        )
         if not self._any_converters_with_context:
             return self
         new_converters = []

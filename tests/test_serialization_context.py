@@ -45,6 +45,9 @@ class SerializationContextTestEncodingPayloadConverter(
     def with_context(
         self, context: Optional[SerializationContext]
     ) -> SerializationContextTestEncodingPayloadConverter:
+        print(
+            f"🌈 SerializationContextTestEncodingPayloadConverter.with_context({context})"
+        )
         return SerializationContextTestEncodingPayloadConverter(context)
 
     def to_payload(self, value: Any) -> Optional[Payload]:
