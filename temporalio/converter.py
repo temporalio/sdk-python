@@ -301,7 +301,7 @@ class EncodingPayloadConverter(ABC):
         raise NotImplementedError
 
 
-class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
+class CompositePayloadConverter(PayloadConverter):
     """Composite payload converter that delegates to a list of encoding payload converters.
 
     Encoding/decoding are attempted on each payload converter successively until
@@ -321,9 +321,6 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
         """
         # Insertion order preserved here since Python 3.7
         self.converters = {c.encoding.encode(): c for c in converters}
-        self._any_converters_with_context = any(
-            isinstance(c, WithSerializationContext) for c in converters
-        )
 
     def to_payloads(
         self, values: Sequence[Any]
@@ -386,32 +383,6 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
                     f"Payload at index {index} with encoding {encoding.decode()} could not be converted"
                 ) from err
         return values
-
-    def with_context(self, context: Optional[SerializationContext]) -> Self:
-        """Return a copy of this converter with context-aware child converters.
-
-        Returns a new instance with the same set of converters, using with_context() on the child
-        converters for those that support it.
-
-        Args:
-            context: The serialization context to use, or None for no context.
-
-        Returns:
-            A new CompositePayloadConverter with context-aware converters, or self if no converters
-            support context.
-        """
-        print(
-            f"🌈 CompositePayloadConverter.with_context({context}) {self._any_converters_with_context}"
-        )
-        if not self._any_converters_with_context:
-            return self
-        new_converters = []
-        for converter in self.converters.values():
-            if isinstance(converter, WithSerializationContext):
-                new_converters.append(converter.with_context(context))
-            else:
-                new_converters.append(converter)
-        return type(self)(*new_converters)
 
 
 class DefaultPayloadConverter(CompositePayloadConverter):
