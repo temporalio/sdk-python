@@ -68,6 +68,7 @@ class _TemporalModelStub(Model):
         tracing: ModelTracing,
         *,
         previous_response_id: Optional[str],
+        conversation_id: Optional[str],
         prompt: Optional[ResponsePromptParam],
     ) -> ModelResponse:
         def make_tool_info(tool: Tool) -> ToolInput:
@@ -134,6 +135,7 @@ class _TemporalModelStub(Model):
             handoffs=handoff_infos,
             tracing=ModelTracingInput(tracing.value),
             previous_response_id=previous_response_id,
+            conversation_id=conversation_id,
             prompt=prompt,
         )
 
@@ -178,6 +180,7 @@ class _TemporalModelStub(Model):
         tracing: ModelTracing,
         *,
         previous_response_id: Optional[str],
+        conversation_id: Optional[str],
         prompt: ResponsePromptParam | None,
     ) -> AsyncIterator[TResponseStreamEvent]:
         raise NotImplementedError("Temporal model doesn't support streams yet")

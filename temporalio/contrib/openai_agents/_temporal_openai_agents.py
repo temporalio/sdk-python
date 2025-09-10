@@ -126,9 +126,7 @@ class TestModel(Model):
         output_schema: Union[AgentOutputSchemaBase, None],
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        *,
-        previous_response_id: Union[str, None],
-        prompt: Union[ResponsePromptParam, None] = None,
+        **kwargs,
     ) -> ModelResponse:
         """Get a response from the model."""
         return self.fn()
@@ -142,9 +140,7 @@ class TestModel(Model):
         output_schema: Optional[AgentOutputSchemaBase],
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        *,
-        previous_response_id: Optional[str],
-        prompt: Optional[ResponsePromptParam],
+        **kwargs,
     ) -> AsyncIterator[TResponseStreamEvent]:
         """Get a streamed response from the model. Unimplemented."""
         raise NotImplementedError()

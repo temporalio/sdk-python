@@ -1164,8 +1164,9 @@ class InputGuardrailModel(OpenAIResponsesModel):
         output_schema: Union[AgentOutputSchemaBase, None],
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        previous_response_id: Union[str, None],
-        prompt: Union[ResponsePromptParam, None] = None,
+        previous_response_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        prompt: Optional[ResponsePromptParam] = None,
     ) -> ModelResponse:
         if (
             system_instructions
@@ -1553,9 +1554,7 @@ class WaitModel(Model):
         output_schema: Union[AgentOutputSchemaBase, None],
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        *,
-        previous_response_id: Union[str, None],
-        prompt: Union[ResponsePromptParam, None] = None,
+        **kwargs,
     ) -> ModelResponse:
         activity.logger.info("Waiting")
         await asyncio.sleep(1.0)
@@ -1571,9 +1570,7 @@ class WaitModel(Model):
         output_schema: Optional[AgentOutputSchemaBase],
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        *,
-        previous_response_id: Optional[str],
-        prompt: Optional[ResponsePromptParam],
+        **kwargs,
     ) -> AsyncIterator[TResponseStreamEvent]:
         raise NotImplementedError()
 
