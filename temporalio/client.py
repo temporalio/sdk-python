@@ -5930,8 +5930,13 @@ class _ClientImpl(OutboundInterceptor):
         req.workflow_type.name = input.workflow
         req.task_queue.name = input.task_queue
         if input.args:
+            context = temporalio.converter.WorkflowSerializationContext(
+                namespace=self._client.namespace, workflow_id=input.id
+            )
             req.input.payloads.extend(
-                await self._client.data_converter.encode(input.args)
+                await self._client.data_converter._with_context(context).encode(
+                    input.args
+                )
             )
         if input.execution_timeout is not None:
             req.workflow_execution_timeout.FromTimedelta(input.execution_timeout)

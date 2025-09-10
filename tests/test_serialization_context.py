@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional, Type
 
 from temporalio import workflow
@@ -21,14 +21,22 @@ from temporalio.worker import Worker
 
 
 @dataclass
-class WorkflowData:
-    workflow_context: Optional[WorkflowSerializationContext] = None
+class PayloadConverterTraceData:
+    to_payload: Optional[WorkflowSerializationContext] = None
+    from_payload: Optional[WorkflowSerializationContext] = None
+
+
+@dataclass
+class TraceData:
+    workflow_context: PayloadConverterTraceData = field(
+        default_factory=PayloadConverterTraceData
+    )
 
 
 @workflow.defn
 class SerializationContextTestWorkflow:
     @workflow.run
-    async def run(self, input: WorkflowData) -> WorkflowData:
+    async def run(self, input: TraceData) -> TraceData:
         return input
 
 
@@ -51,9 +59,7 @@ class SerializationContextTestEncodingPayloadConverter(
         return SerializationContextTestEncodingPayloadConverter(context)
 
     def to_payload(self, value: Any) -> Optional[Payload]:
-        assert isinstance(value, WorkflowData)
-        assert isinstance(self.context, WorkflowSerializationContext)
-        value.workflow_context = self.context
+        value.workflow_context.to_payload = self.context
         return None
 
     def from_payload(self, payload: Payload, type_hint: Optional[Type] = None) -> Any:
@@ -62,11 +68,14 @@ class SerializationContextTestEncodingPayloadConverter(
 
 
 class SerializationContextTestPayloadConverter(CompositePayloadConverter):
-    def __init__(self):
-        super().__init__(
-            SerializationContextTestEncodingPayloadConverter(None),
-            *DefaultPayloadConverter.default_encoding_payload_converters,
-        )
+    def __init__(self, *converters):
+        # TODO: we cannot expect users to do this
+        if not converters:
+            converters = (
+                SerializationContextTestEncodingPayloadConverter(None),
+                *DefaultPayloadConverter.default_encoding_payload_converters,
+            )
+        super().__init__(*converters)
 
 
 data_converter = dataclasses.replace(
@@ -81,6 +90,10 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
     workflow_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
 
+    config = client.config()
+    config["data_converter"] = data_converter
+    client = Client(**config)
+
     async with Worker(
         client,
         task_queue=task_queue,
@@ -89,12 +102,12 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
     ):
         result = await client.execute_workflow(
             SerializationContextTestWorkflow.run,
-            WorkflowData(),
+            TraceData(),
             id=workflow_id,
             task_queue=task_queue,
         )
 
-        assert result.workflow_context == WorkflowSerializationContext(
+        assert result.workflow_context.to_payload == WorkflowSerializationContext(
             namespace="default",
             workflow_id=workflow_id,
         )

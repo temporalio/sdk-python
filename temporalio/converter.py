@@ -1311,35 +1311,26 @@ class DataConverter:
         return self.failure_converter.from_failure(failure, self.payload_converter)
 
     def _with_context(self, context: Optional[SerializationContext]) -> Self:
-        new_self = type(self).__new__(type(self))
-        setattr(
-            new_self,
-            "payload_converter",
-            (
-                self.payload_converter.with_context(context)
-                if isinstance(self.payload_converter, WithSerializationContext)
-                else self.payload_converter
-            ),
+        payload_converter = (
+            self.payload_converter.with_context(context)
+            if isinstance(self.payload_converter, WithSerializationContext)
+            else self.payload_converter
         )
-        setattr(
-            new_self,
-            "payload_codec",
-            (
-                self.payload_codec.with_context(context)
-                if isinstance(self.payload_codec, WithSerializationContext)
-                else self.payload_codec
-            ),
+        payload_codec = (
+            self.payload_codec.with_context(context)
+            if isinstance(self.payload_codec, WithSerializationContext)
+            else self.payload_codec
         )
-        setattr(
-            new_self,
-            "failure_converter",
-            (
-                self.failure_converter.with_context(context)
-                if isinstance(self.failure_converter, WithSerializationContext)
-                else self.failure_converter
-            ),
+        failure_converter = (
+            self.failure_converter.with_context(context)
+            if isinstance(self.failure_converter, WithSerializationContext)
+            else self.failure_converter
         )
-        return new_self
+        cloned = dataclasses.replace(self)
+        object.__setattr__(cloned, "payload_converter", payload_converter)
+        object.__setattr__(cloned, "payload_codec", payload_codec)
+        object.__setattr__(cloned, "failure_converter", failure_converter)
+        return cloned
 
 
 DefaultPayloadConverter.default_encoding_payload_converters = (

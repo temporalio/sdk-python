@@ -984,7 +984,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         async def run_workflow(input: ExecuteWorkflowInput) -> None:
             try:
                 result = await self._inbound.execute_workflow(input)
-                result_payloads = self._payload_converter.to_payloads([result])
+                converter = self._payload_converter
+                if isinstance(converter, temporalio.converter.WithSerializationContext):
+                    context = temporalio.converter.WorkflowSerializationContext(
+                        namespace=self._info.namespace,
+                        workflow_id=self._info.workflow_id,
+                    )
+                    converter = converter.with_context(context)
+                result_payloads = converter.to_payloads([result])
                 if len(result_payloads) != 1:
                     raise ValueError(
                         f"Expected 1 result payload, got {len(result_payloads)}"
