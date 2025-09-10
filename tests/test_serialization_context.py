@@ -5,6 +5,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional, Type
 
+from typing_extensions import Self
+
 from temporalio import workflow
 from temporalio.api.common.v1 import Payload
 from temporalio.client import Client
@@ -43,8 +45,8 @@ class SerializationContextTestWorkflow:
 class SerializationContextTestEncodingPayloadConverter(
     EncodingPayloadConverter, WithSerializationContext
 ):
-    def __init__(self, context: Optional[SerializationContext]):
-        self.context = context
+    def __init__(self):
+        self.context: Optional[SerializationContext] = None
 
     @property
     def encoding(self) -> str:
@@ -56,7 +58,9 @@ class SerializationContextTestEncodingPayloadConverter(
         print(
             f"🌈 SerializationContextTestEncodingPayloadConverter.with_context({context})"
         )
-        return SerializationContextTestEncodingPayloadConverter(context)
+        converter = SerializationContextTestEncodingPayloadConverter()
+        converter.context = context
+        return converter
 
     def to_payload(self, value: Any) -> Optional[Payload]:
         value.workflow_context.to_payload = self.context
@@ -67,15 +71,23 @@ class SerializationContextTestEncodingPayloadConverter(
         # return payload.data.decode()
 
 
-class SerializationContextTestPayloadConverter(CompositePayloadConverter):
-    def __init__(self, *converters):
-        # TODO: we cannot expect users to do this
-        if not converters:
-            converters = (
-                SerializationContextTestEncodingPayloadConverter(None),
-                *DefaultPayloadConverter.default_encoding_payload_converters,
-            )
-        super().__init__(*converters)
+class SerializationContextTestPayloadConverter(
+    CompositePayloadConverter, WithSerializationContext
+):
+    def __init__(self):
+        super().__init__(
+            SerializationContextTestEncodingPayloadConverter(),
+            *DefaultPayloadConverter.default_encoding_payload_converters,
+        )
+
+    def with_context(self, context: Optional[SerializationContext]) -> Self:
+        instance = type(self).__new__(type(self))
+        converters = [
+            c.with_context(context) if isinstance(c, WithSerializationContext) else c
+            for c in self.converters.values()
+        ]
+        CompositePayloadConverter.__init__(instance, *converters)
+        return instance
 
 
 data_converter = dataclasses.replace(
