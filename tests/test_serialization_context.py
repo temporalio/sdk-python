@@ -13,6 +13,7 @@ from temporalio.converter import (
     DataConverter,
     DefaultPayloadConverter,
     EncodingPayloadConverter,
+    JSONPlainPayloadConverter,
     SerializationContext,
     WithSerializationContext,
     WorkflowSerializationContext,
@@ -22,8 +23,8 @@ from temporalio.worker import Worker
 
 @dataclass
 class PayloadConverterTraceData:
-    to_payload: Optional[WorkflowSerializationContext] = None
-    from_payload: Optional[WorkflowSerializationContext] = None
+    to_payload: list[WorkflowSerializationContext] = field(default_factory=list)
+    from_payload: list[WorkflowSerializationContext] = field(default_factory=list)
 
 
 @dataclass
@@ -33,7 +34,7 @@ class TraceData:
     )
 
 
-@workflow.defn
+@workflow.defn(sandboxed=False)  # we want to use isinstance
 class SerializationContextTestWorkflow:
     @workflow.run
     async def run(self, input: TraceData) -> TraceData:
@@ -61,12 +62,17 @@ class SerializationContextTestEncodingPayloadConverter(
         return converter
 
     def to_payload(self, value: Any) -> Optional[Payload]:
-        value.workflow_context.to_payload = self.context
+        assert isinstance(value, TraceData)
+        assert isinstance(self.context, WorkflowSerializationContext)
+        value.workflow_context.to_payload.append(self.context)
         return None
 
     def from_payload(self, payload: Payload, type_hint: Optional[Type] = None) -> Any:
-        raise RuntimeError("Not implemented")
-        # return payload.data.decode()
+        value = JSONPlainPayloadConverter().from_payload(payload, type_hint)
+        assert isinstance(value, TraceData)
+        assert isinstance(self.context, WorkflowSerializationContext)
+        value.workflow_context.from_payload.append(self.context)
+        return value
 
 
 class SerializationContextTestPayloadConverter(
@@ -108,7 +114,9 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
             task_queue=task_queue,
         )
 
-        assert result.workflow_context.to_payload == WorkflowSerializationContext(
+        workflow_context = WorkflowSerializationContext(
             namespace="default",
             workflow_id=workflow_id,
         )
+        assert result.workflow_context.to_payload == [workflow_context] * 2
+        # assert result.workflow_context.from_payload == [workflow_context] * 2
