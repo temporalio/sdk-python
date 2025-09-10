@@ -5,8 +5,6 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional, Type
 
-from typing_extensions import Self
-
 from temporalio import workflow
 from temporalio.api.common.v1 import Payload
 from temporalio.client import Client
@@ -79,15 +77,6 @@ class SerializationContextTestPayloadConverter(
             SerializationContextTestEncodingPayloadConverter(),
             *DefaultPayloadConverter.default_encoding_payload_converters,
         )
-
-    def with_context(self, context: Optional[SerializationContext]) -> Self:
-        instance = type(self).__new__(type(self))
-        converters = [
-            c.with_context(context) if isinstance(c, WithSerializationContext) else c
-            for c in self.converters.values()
-        ]
-        CompositePayloadConverter.__init__(instance, *converters)
-        return instance
 
 
 data_converter = dataclasses.replace(

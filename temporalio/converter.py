@@ -384,6 +384,15 @@ class CompositePayloadConverter(PayloadConverter):
                 ) from err
         return values
 
+    def with_context(self, context: Optional[SerializationContext]) -> Self:
+        instance = type(self).__new__(type(self))
+        converters = [
+            c.with_context(context) if isinstance(c, WithSerializationContext) else c
+            for c in self.converters.values()
+        ]
+        CompositePayloadConverter.__init__(instance, *converters)
+        return instance
+
 
 class DefaultPayloadConverter(CompositePayloadConverter):
     """Default payload converter compatible with other Temporal SDKs.
