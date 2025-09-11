@@ -81,13 +81,13 @@ class SerializationContext(ABC):
 class WorkflowSerializationContext(SerializationContext):
     """Serialization context for workflows.
 
+    Matches .NET SDK's ISerializationContext.Workflow.
+
     Attributes:
-        workflow_id: The workflow ID.
-        run_id: The workflow run ID.
-        workflow_type: The type/name of the workflow.
-        task_queue: The task queue the workflow is running on.
         namespace: The namespace the workflow is running in.
-        attempt: The current workflow task attempt number (starting from 1).
+        workflow_id: The workflow ID. Note, when creating/describing schedules,
+            this may be the workflow ID prefix as configured, not the final
+            workflow ID when the workflow is created by the schedule.
     """
 
     namespace: str
@@ -98,18 +98,24 @@ class WorkflowSerializationContext(SerializationContext):
 class ActivitySerializationContext(SerializationContext):
     """Serialization context for activities.
 
+    Matches .NET SDK's ISerializationContext.Activity.
+
     Attributes:
-        activity_id: The ID of the activity.
-        activity_type: The type/name of the activity.
-        attempt: The current attempt number (starting from 1).
-        is_local: Whether this is a local activity.
+        namespace: Workflow/activity namespace.
+        workflow_id: Workflow ID. Note, when creating/describing schedules,
+            this may be the workflow ID prefix as configured, not the final
+            workflow ID when the workflow is created by the schedule.
+        workflow_type: Workflow Type.
+        activity_type: Activity Type.
+        activity_task_queue: Activity task queue.
+        is_local: Whether the activity is a local activity.
     """
 
     namespace: str
     workflow_id: str
     workflow_type: str
     activity_type: str
-    activity_task_queue: Optional[str]
+    activity_task_queue: str
     is_local: bool
 
 
@@ -126,16 +132,6 @@ class WithSerializationContext(ABC):
     Objects implementing this interface can receive contextual information
     during serialization and deserialization.
     """
-
-    operation: str
-    service: str
-    endpoint: str
-    request_id: str
-    workflow_task_completed_event_id: int
-    endpoint_id: str
-    schedule_to_close_timeout: timedelta
-    cancellation_type: temporalio.workflow.NexusOperationCancellationType
-    headers: Mapping[str, str]
 
     def with_context(self, context: Optional[SerializationContext]) -> Self:
         """Return a copy of this object configured to use the given context.
