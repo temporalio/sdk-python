@@ -4,9 +4,10 @@ import dataclasses
 import inspect
 import uuid
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Any, Literal, Optional, Type
 
-from temporalio import workflow
+from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload
 from temporalio.client import Client
 from temporalio.converter import (
@@ -47,11 +48,20 @@ class TraceData:
     items: list[TraceItem] = field(default_factory=list)
 
 
+@activity.defn
+async def passthrough_activity(input: TraceData) -> TraceData:
+    return input
+
+
 @workflow.defn(sandboxed=False)  # we want to use isinstance
 class SerializationContextTestWorkflow:
     @workflow.run
     async def run(self, input: TraceData) -> TraceData:
-        return input
+        return await workflow.execute_activity(
+            passthrough_activity,
+            input,
+            start_to_close_timeout=timedelta(seconds=10),
+        )
 
 
 def get_caller_location() -> list[str]:
@@ -170,7 +180,7 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
         client,
         task_queue=task_queue,
         workflows=[SerializationContextTestWorkflow],
-        activities=[],
+        activities=[passthrough_activity],
     ):
         result = await client.execute_workflow(
             SerializationContextTestWorkflow.run,
