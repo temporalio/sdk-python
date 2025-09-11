@@ -30,7 +30,7 @@ from temporalio.worker import Worker
 class TraceItem:
     context_type: Literal["workflow", "activity"]
     method: Literal["to_payload", "from_payload"]
-    context: WorkflowSerializationContext | ActivitySerializationContext
+    context: dict[str, Any]
     in_workflow: bool
     caller_location: list[str] = field(default_factory=list)
 
@@ -93,7 +93,7 @@ class SerializationContextTestEncodingPayloadConverter(
                     context_type="workflow",
                     in_workflow=workflow.in_workflow(),
                     method="to_payload",
-                    context=self.context,
+                    context=dataclasses.asdict(self.context),
                     caller_location=get_caller_location(),
                 )
             )
@@ -103,7 +103,7 @@ class SerializationContextTestEncodingPayloadConverter(
                     context_type="activity",
                     in_workflow=workflow.in_workflow(),
                     method="to_payload",
-                    context=self.context,
+                    context=dataclasses.asdict(self.context),
                     caller_location=get_caller_location(),
                 )
             )
@@ -125,7 +125,7 @@ class SerializationContextTestEncodingPayloadConverter(
                     context_type="workflow",
                     in_workflow=workflow.in_workflow(),
                     method="from_payload",
-                    context=self.context,
+                    context=dataclasses.asdict(self.context),
                     caller_location=get_caller_location(),
                 )
             )
@@ -135,7 +135,7 @@ class SerializationContextTestEncodingPayloadConverter(
                     context_type="activity",
                     in_workflow=workflow.in_workflow(),
                     method="from_payload",
-                    context=self.context,
+                    context=dataclasses.asdict(self.context),
                     caller_location=get_caller_location(),
                 )
             )
@@ -183,17 +183,21 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
             task_queue=task_queue,
         )
 
-        workflow_context = WorkflowSerializationContext(
-            namespace="default",
-            workflow_id=workflow_id,
+        workflow_context = dataclasses.asdict(
+            WorkflowSerializationContext(
+                namespace="default",
+                workflow_id=workflow_id,
+            )
         )
-        activity_context = ActivitySerializationContext(
-            namespace="default",
-            workflow_id=workflow_id,
-            workflow_type="SerializationContextTestWorkflow",
-            activity_type="passthrough_activity",
-            activity_task_queue=task_queue,
-            is_local=False,
+        activity_context = dataclasses.asdict(
+            ActivitySerializationContext(
+                namespace="default",
+                workflow_id=workflow_id,
+                workflow_type="SerializationContextTestWorkflow",
+                activity_type="passthrough_activity",
+                activity_task_queue=task_queue,
+                is_local=False,
+            )
         )
         if True:
             assert_trace(
@@ -230,10 +234,10 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
                         context=activity_context,
                     ),
                     TraceItem(
-                        context_type="workflow",
+                        context_type="activity",
                         in_workflow=False,
                         method="from_payload",
-                        context=workflow_context,
+                        context=activity_context,
                     ),
                     TraceItem(
                         context_type="workflow",
