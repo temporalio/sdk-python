@@ -62,6 +62,9 @@ class SerializationContextTestEncodingPayloadConverter(
         return converter
 
     def to_payload(self, value: Any) -> Optional[Payload]:
+        print(
+            f"🌈 SerializationContextTestEncodingPayloadConverter.to_payload({value})"
+        )
         assert isinstance(value, TraceData)
         assert isinstance(self.context, WorkflowSerializationContext)
         value.items.append(
@@ -69,9 +72,15 @@ class SerializationContextTestEncodingPayloadConverter(
                 context_type="workflow", method="to_payload", context=self.context
             )
         )
-        return None
+        payload = JSONPlainPayloadConverter().to_payload(value)
+        assert payload
+        payload.metadata["encoding"] = self.encoding.encode()
+        return payload
 
     def from_payload(self, payload: Payload, type_hint: Optional[Type] = None) -> Any:
+        print(
+            f"🌈 SerializationContextTestEncodingPayloadConverter.from_payload({payload}, {type_hint})"
+        )
         value = JSONPlainPayloadConverter().from_payload(payload, type_hint)
         assert isinstance(value, TraceData)
         assert isinstance(self.context, WorkflowSerializationContext)
@@ -102,6 +111,7 @@ data_converter = dataclasses.replace(
 async def test_workflow_payload_conversion_can_be_given_access_to_serialization_context(
     client: Client,
 ):
+    print()
     workflow_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
 
