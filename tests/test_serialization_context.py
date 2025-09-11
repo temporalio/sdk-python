@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
 from itertools import zip_longest
-from pprint import pprint
+from pprint import pformat, pprint
 from typing import Any, Literal, Optional, Type
 
 from temporalio import activity, workflow
@@ -262,7 +262,7 @@ def assert_trace(trace: list[TraceItem], expected: list[TraceItem]):
             raise AssertionError("More items in trace than expected")
         if item != expected_item:
             raise AssertionError(
-                f"Item {item}\n\ndoes not match expected:\n\n {expected_item}.\n\n History:\n{'\n'.join(history)}"
+                f"Item:\n{pformat(item)}\n\ndoes not match expected:\n\n {pformat(expected_item)}.\n\n History:\n{'\n'.join(history)}"
             )
         history.append(f"{item.context_type} {item.method}")
 
