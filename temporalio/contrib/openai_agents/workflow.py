@@ -44,6 +44,7 @@ def activity_as_tool(
     versioning_intent: Optional[VersioningIntent] = None,
     summary: Optional[str] = None,
     priority: Priority = Priority.default,
+    strict_json_schema: bool = True,
 ) -> Tool:
     """Convert a single Temporal activity function to an OpenAI agent tool.
 
@@ -59,6 +60,7 @@ def activity_as_tool(
 
     Args:
         fn: A Temporal activity function to convert to a tool.
+        strict_json_schema: Whether the tool should follow a strict schema
         For other arguments, refer to :py:mod:`workflow` :py:meth:`start_activity`
 
     Returns:
@@ -149,7 +151,7 @@ def activity_as_tool(
         description=schema.description or "",
         params_json_schema=schema.params_json_schema,
         on_invoke_tool=run_activity,
-        strict_json_schema=True,
+        strict_json_schema=strict_json_schema,
     )
 
 
