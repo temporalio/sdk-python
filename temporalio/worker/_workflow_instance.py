@@ -764,9 +764,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     workflow_type=self._info.workflow_type,
                     activity_type=handle._input.activity,
                     activity_task_queue=(
-                        handle._input.task_queue or ""
+                        handle._input.task_queue or self._info.task_queue
                         if isinstance(handle._input, StartActivityInput)
-                        else ""
+                        else self._info.task_queue
                     ),
                     is_local=isinstance(handle._input, StartLocalActivityInput),
                 )
@@ -2803,9 +2803,11 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
                 workflow_id=self._instance._info.workflow_id,
                 workflow_type=self._instance._info.workflow_type,
                 activity_type=self._input.activity,
-                activity_task_queue=self._input.task_queue or ""
-                if isinstance(self._input, StartActivityInput)
-                else "",
+                activity_task_queue=(
+                    self._input.task_queue or self._instance._info.task_queue
+                    if isinstance(self._input, StartActivityInput)
+                    else self._instance._info.task_queue
+                ),
                 is_local=isinstance(self._input, StartLocalActivityInput),
             )
             payload_converter = payload_converter.with_context(context)
