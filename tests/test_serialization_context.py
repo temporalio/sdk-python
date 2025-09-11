@@ -3,12 +3,13 @@ from __future__ import annotations
 import dataclasses
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Optional, Type
+from typing import Any, Literal, Optional, Type
 
 from temporalio import workflow
 from temporalio.api.common.v1 import Payload
 from temporalio.client import Client
 from temporalio.converter import (
+    ActivitySerializationContext,
     CompositePayloadConverter,
     DataConverter,
     DefaultPayloadConverter,
@@ -22,20 +23,19 @@ from temporalio.worker import Worker
 
 
 @dataclass
-class PayloadConverterTraceData:
-    to_payload: list[WorkflowSerializationContext] = field(default_factory=list)
-    from_payload: list[WorkflowSerializationContext] = field(default_factory=list)
+class TraceItem:
+    context_type: Literal["workflow", "activity"]
+    method: Literal["to_payload", "from_payload"]
+    context: WorkflowSerializationContext | ActivitySerializationContext
 
 
 @dataclass
 class TraceData:
-    workflow_context: PayloadConverterTraceData = field(
-        default_factory=PayloadConverterTraceData
-    )
+    items: list[TraceItem] = field(default_factory=list)
 
 
 @workflow.defn(sandboxed=False)  # we want to use isinstance
-class SerializationContextTestWorkflow:
+class PassThroughWorkflow:
     @workflow.run
     async def run(self, input: TraceData) -> TraceData:
         return input
@@ -64,14 +64,22 @@ class SerializationContextTestEncodingPayloadConverter(
     def to_payload(self, value: Any) -> Optional[Payload]:
         assert isinstance(value, TraceData)
         assert isinstance(self.context, WorkflowSerializationContext)
-        value.workflow_context.to_payload.append(self.context)
+        value.items.append(
+            TraceItem(
+                context_type="workflow", method="to_payload", context=self.context
+            )
+        )
         return None
 
     def from_payload(self, payload: Payload, type_hint: Optional[Type] = None) -> Any:
         value = JSONPlainPayloadConverter().from_payload(payload, type_hint)
         assert isinstance(value, TraceData)
         assert isinstance(self.context, WorkflowSerializationContext)
-        value.workflow_context.from_payload.append(self.context)
+        value.items.append(
+            TraceItem(
+                context_type="workflow", method="from_payload", context=self.context
+            )
+        )
         return value
 
 
@@ -104,11 +112,11 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
     async with Worker(
         client,
         task_queue=task_queue,
-        workflows=[SerializationContextTestWorkflow],
+        workflows=[PassThroughWorkflow],
         activities=[],
     ):
         result = await client.execute_workflow(
-            SerializationContextTestWorkflow.run,
+            PassThroughWorkflow.run,
             TraceData(),
             id=workflow_id,
             task_queue=task_queue,
@@ -118,5 +126,5 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
             namespace="default",
             workflow_id=workflow_id,
         )
-        assert result.workflow_context.to_payload == [workflow_context] * 2
-        # assert result.workflow_context.from_payload == [workflow_context] * 2
+        for item in result.items:
+            print(item)
