@@ -161,6 +161,7 @@ def nexus_operation_as_tool(
     service: Type[Any],
     endpoint: str,
     schedule_to_close_timeout: Optional[timedelta] = None,
+    strict_json_schema: bool = True,
 ) -> Tool:
     """Convert a Nexus operation into an OpenAI agent tool.
 
@@ -177,6 +178,7 @@ def nexus_operation_as_tool(
         fn: A Nexus operation to convert into a tool.
         service: The Nexus service class that contains the operation.
         endpoint: The Nexus endpoint to use for the operation.
+        strict_json_schema: Whether the tool should follow a strict schema
 
     Returns:
         An OpenAI agent tool that wraps the provided operation.
@@ -237,7 +239,7 @@ def nexus_operation_as_tool(
         description=schema.description or "",
         params_json_schema=schema.params_json_schema,
         on_invoke_tool=run_operation,
-        strict_json_schema=True,
+        strict_json_schema=strict_json_schema,
     )
 
 
