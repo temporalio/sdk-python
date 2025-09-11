@@ -1029,7 +1029,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if not self._defn.name:
             # Dynamic is just the raw value for each input value
             arg_types = [temporalio.common.RawValue] * len(init_job.arguments)
-        args = self._convert_payloads(init_job.arguments, arg_types)
+
+        context = temporalio.converter.WorkflowSerializationContext(
+            namespace=self._info.namespace,
+            workflow_id=self._info.workflow_id,
+        )
+        args = self._convert_payloads(init_job.arguments, arg_types, context)
         # Put args in a list if dynamic
         if not self._defn.name:
             args = [args]
@@ -1987,6 +1992,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self,
         payloads: Sequence[temporalio.api.common.v1.Payload],
         types: Optional[List[Type]],
+        context: temporalio.converter.SerializationContext,
     ) -> List[Any]:
         if not payloads:
             return []
@@ -1994,10 +2000,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if types and len(types) != len(payloads):
             types = None
         try:
-            return self._payload_converter.from_payloads(
-                payloads,
-                type_hints=types,
-            )
+            converter = self._payload_converter
+            if isinstance(converter, temporalio.converter.WithSerializationContext):
+                converter = converter.with_context(context)
+            return converter.from_payloads(payloads, type_hints=types)
         except temporalio.exceptions.FailureError:
             # Don't wrap payload conversion errors that would fail the workflow
             raise
