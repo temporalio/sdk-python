@@ -312,7 +312,7 @@ class EncodingPayloadConverter(ABC):
         raise NotImplementedError
 
 
-class CompositePayloadConverter(PayloadConverter):
+class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
     """Composite payload converter that delegates to a list of encoding payload converters.
 
     Encoding/decoding are attempted on each payload converter successively until
