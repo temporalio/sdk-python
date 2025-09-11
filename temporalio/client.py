@@ -1592,6 +1592,11 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     ) -> None:
         """Create workflow handle."""
         self._client = client
+        self._data_converter = client.data_converter._with_context(
+            temporalio.converter.WorkflowSerializationContext(
+                namespace=client.namespace, workflow_id=id
+            )
+        )
         self._id = id
         self._run_id = run_id
         self._result_run_id = result_run_id
@@ -1701,7 +1706,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                         break
                     # Ignoring anything after the first response like TypeScript
                     type_hints = [self._result_type] if self._result_type else None
-                    results = await self._client.data_converter.decode_wrapper(
+                    results = await self._data_converter.decode_wrapper(
                         complete_attr.result,
                         type_hints,
                     )
@@ -1717,7 +1722,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                         hist_run_id = fail_attr.new_execution_run_id
                         break
                     raise WorkflowFailureError(
-                        cause=await self._client.data_converter.decode_failure(
+                        cause=await self._data_converter.decode_failure(
                             fail_attr.failure
                         ),
                     )
@@ -1727,7 +1732,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                         cause=temporalio.exceptions.CancelledError(
                             "Workflow cancelled",
                             *(
-                                await self._client.data_converter.decode_wrapper(
+                                await self._data_converter.decode_wrapper(
                                     cancel_attr.details
                                 )
                             ),
@@ -1739,7 +1744,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                         cause=temporalio.exceptions.TerminatedError(
                             term_attr.reason or "Workflow terminated",
                             *(
-                                await self._client.data_converter.decode_wrapper(
+                                await self._data_converter.decode_wrapper(
                                     term_attr.details
                                 )
                             ),
