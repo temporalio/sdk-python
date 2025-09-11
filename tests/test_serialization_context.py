@@ -5,6 +5,7 @@ import inspect
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
+from itertools import zip_longest
 from pprint import pprint
 from typing import Any, Literal, Optional, Type
 
@@ -186,35 +187,84 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
             namespace="default",
             workflow_id=workflow_id,
         )
-        if False:
-            assert result.items == [
-                TraceItem(
-                    context_type="workflow",
-                    in_workflow=False,
-                    method="to_payload",
-                    context=workflow_context,
-                ),
-                TraceItem(
-                    context_type="workflow",
-                    in_workflow=False,
-                    method="from_payload",
-                    context=workflow_context,
-                ),
-                TraceItem(
-                    context_type="workflow",
-                    in_workflow=True,
-                    method="to_payload",
-                    context=workflow_context,
-                ),
-                TraceItem(
-                    context_type="workflow",
-                    in_workflow=False,
-                    method="from_payload",
-                    context=workflow_context,
-                ),
-            ]
+        activity_context = ActivitySerializationContext(
+            namespace="default",
+            workflow_id=workflow_id,
+            workflow_type="SerializationContextTestWorkflow",
+            activity_type="passthrough_activity",
+            activity_task_queue=task_queue,
+            is_local=False,
+        )
+        if True:
+            assert_trace(
+                result.items,
+                [
+                    TraceItem(
+                        context_type="workflow",
+                        in_workflow=False,
+                        method="to_payload",
+                        context=workflow_context,
+                    ),
+                    TraceItem(
+                        context_type="workflow",
+                        in_workflow=False,
+                        method="from_payload",
+                        context=workflow_context,
+                    ),
+                    TraceItem(
+                        context_type="activity",
+                        in_workflow=True,
+                        method="to_payload",
+                        context=activity_context,
+                    ),
+                    TraceItem(
+                        context_type="activity",
+                        in_workflow=False,
+                        method="from_payload",
+                        context=activity_context,
+                    ),
+                    TraceItem(
+                        context_type="activity",
+                        in_workflow=False,
+                        method="to_payload",
+                        context=activity_context,
+                    ),
+                    TraceItem(
+                        context_type="workflow",
+                        in_workflow=False,
+                        method="from_payload",
+                        context=workflow_context,
+                    ),
+                    TraceItem(
+                        context_type="workflow",
+                        in_workflow=True,
+                        method="to_payload",
+                        context=workflow_context,
+                    ),
+                    TraceItem(
+                        context_type="workflow",
+                        in_workflow=False,
+                        method="from_payload",
+                        context=workflow_context,
+                    ),
+                ],
+            )
         else:
             pprint(result.items)
+
+
+def assert_trace(trace: list[TraceItem], expected: list[TraceItem]):
+    history = []
+    for item, expected_item in zip_longest(trace, expected):
+        if item is None:
+            raise AssertionError("Fewer items in trace than expected")
+        if expected_item is None:
+            raise AssertionError("More items in trace than expected")
+        if item != expected_item:
+            raise AssertionError(
+                f"Item {item}\n\ndoes not match expected:\n\n {expected_item}.\n\n History:\n{'\n'.join(history)}"
+            )
+        history.append(f"{item.context_type} {item.method}")
 
 
 def get_caller_location() -> list[str]:
