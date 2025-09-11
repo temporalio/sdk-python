@@ -78,6 +78,23 @@ class SerializationContext(ABC):
 
 
 @dataclass(frozen=True)
+class WorkflowSerializationContext(SerializationContext):
+    """Serialization context for workflows.
+
+    Attributes:
+        workflow_id: The workflow ID.
+        run_id: The workflow run ID.
+        workflow_type: The type/name of the workflow.
+        task_queue: The task queue the workflow is running on.
+        namespace: The namespace the workflow is running in.
+        attempt: The current workflow task attempt number (starting from 1).
+    """
+
+    namespace: str
+    workflow_id: str
+
+
+@dataclass(frozen=True)
 class ActivitySerializationContext(SerializationContext):
     """Serialization context for activities.
 
@@ -97,20 +114,9 @@ class ActivitySerializationContext(SerializationContext):
 
 
 @dataclass(frozen=True)
-class WorkflowSerializationContext(SerializationContext):
-    """Serialization context for workflows.
-
-    Attributes:
-        workflow_id: The workflow ID.
-        run_id: The workflow run ID.
-        workflow_type: The type/name of the workflow.
-        task_queue: The task queue the workflow is running on.
-        namespace: The namespace the workflow is running in.
-        attempt: The current workflow task attempt number (starting from 1).
-    """
-
-    namespace: str
-    workflow_id: str
+class NexusOperationSerializationContext(SerializationContext):
+    service: str
+    operation: str
 
 
 class WithSerializationContext(ABC):
@@ -121,7 +127,16 @@ class WithSerializationContext(ABC):
     during serialization and deserialization.
     """
 
-    @abstractmethod
+    operation: str
+    service: str
+    endpoint: str
+    request_id: str
+    workflow_task_completed_event_id: int
+    endpoint_id: str
+    schedule_to_close_timeout: timedelta
+    cancellation_type: temporalio.workflow.NexusOperationCancellationType
+    headers: Mapping[str, str]
+
     def with_context(self, context: Optional[SerializationContext]) -> Self:
         """Return a copy of this object configured to use the given context.
 
