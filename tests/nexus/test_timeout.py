@@ -7,6 +7,7 @@ from datetime import timedelta
 import nexusrpc.handler
 import pytest
 
+import temporalio.exceptions
 from temporalio import workflow
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import new_worker
@@ -38,7 +39,7 @@ class NexusCallerWorkflow:
         await nexus_client.execute_operation(
             Service.op_that_never_returns,
             None,
-            schedule_to_close_timeout=timedelta(seconds=10),
+            schedule_to_close_timeout=timedelta(seconds=1),
         )
 
 
@@ -53,15 +54,11 @@ async def test_nexus_timeout(env: WorkflowEnvironment):
     ) as worker:
         await create_nexus_endpoint(worker.task_queue, env.client)
 
-        execute_workflow = env.client.execute_workflow(
-            NexusCallerWorkflow.run,
-            id=str(uuid.uuid4()),
-            task_queue=worker.task_queue,
-        )
         try:
-            await asyncio.wait_for(execute_workflow, timeout=3)
-        except TimeoutError:
-            print("Saw expected timeout")
-            pass
-        else:
-            pytest.fail("Expected timeout")
+            await env.client.execute_workflow(
+                NexusCallerWorkflow.run,
+                id=str(uuid.uuid4()),
+                task_queue=worker.task_queue,
+            )
+        except Exception as err:
+            assert err.cause.cause.__class__ == temporalio.exceptions.TimeoutError  # type: ignore
