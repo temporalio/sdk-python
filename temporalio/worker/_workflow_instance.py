@@ -2796,8 +2796,21 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         ] = None,
     ) -> None:
         # Convert arguments before creating command in case it raises error
+        payload_converter = self._instance._payload_converter
+        if isinstance(payload_converter, temporalio.converter.WithSerializationContext):
+            context = temporalio.converter.ActivitySerializationContext(
+                namespace=self._instance._info.namespace,
+                workflow_id=self._instance._info.workflow_id,
+                workflow_type=self._instance._info.workflow_type,
+                activity_type=self._input.activity,
+                activity_task_queue=self._input.task_queue or ""
+                if isinstance(self._input, StartActivityInput)
+                else "",
+                is_local=isinstance(self._input, StartLocalActivityInput),
+            )
+            payload_converter = payload_converter.with_context(context)
         payloads = (
-            self._instance._payload_converter.to_payloads(self._input.args)
+            payload_converter.to_payloads(self._input.args)
             if self._input.args
             else None
         )
