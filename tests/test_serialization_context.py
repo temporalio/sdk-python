@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import inspect
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Literal, Optional, Type
@@ -27,6 +28,18 @@ class TraceItem:
     context_type: Literal["workflow", "activity"]
     method: Literal["to_payload", "from_payload"]
     context: WorkflowSerializationContext | ActivitySerializationContext
+    in_workflow: bool
+    caller_location: list[str] = field(default_factory=list)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, TraceItem):
+            return False
+        return (
+            self.context_type == other.context_type
+            and self.method == other.method
+            and self.context == other.context
+            and self.in_workflow == other.in_workflow
+        )
 
 
 @dataclass
@@ -35,10 +48,46 @@ class TraceData:
 
 
 @workflow.defn(sandboxed=False)  # we want to use isinstance
-class PassThroughWorkflow:
+class SerializationContextTestWorkflow:
     @workflow.run
     async def run(self, input: TraceData) -> TraceData:
         return input
+
+
+def get_caller_location() -> list[str]:
+    """Get 3 stack frames starting from the first that's not in test_serialization_context.py or temporalio/converter.py."""
+    frame = inspect.currentframe()
+    result = []
+    found_first = False
+
+    # Walk up the stack
+    while frame and len(result) < 3:
+        frame = frame.f_back
+        if not frame:
+            break
+
+        file_path = frame.f_code.co_filename
+
+        # Skip frames from test file and converter.py until we find the first one
+        if not found_first:
+            if "test_serialization_context.py" in file_path:
+                continue
+            if file_path.endswith("temporalio/converter.py"):
+                continue
+            found_first = True
+
+        # Format and add this frame
+        line_number = frame.f_lineno
+        display_path = file_path
+        if "/sdk-python/" in display_path:
+            display_path = display_path.split("/sdk-python/")[-1]
+        result.append(f"{display_path}:{line_number}")
+
+    # Pad with "unknown:0" if we didn't get 3 frames
+    while len(result) < 3:
+        result.append("unknown:0")
+
+    return result
 
 
 class SerializationContextTestEncodingPayloadConverter(
@@ -69,7 +118,11 @@ class SerializationContextTestEncodingPayloadConverter(
         assert isinstance(self.context, WorkflowSerializationContext)
         value.items.append(
             TraceItem(
-                context_type="workflow", method="to_payload", context=self.context
+                context_type="workflow",
+                in_workflow=workflow.in_workflow(),
+                method="to_payload",
+                context=self.context,
+                caller_location=get_caller_location(),
             )
         )
         payload = JSONPlainPayloadConverter().to_payload(value)
@@ -86,7 +139,11 @@ class SerializationContextTestEncodingPayloadConverter(
         assert isinstance(self.context, WorkflowSerializationContext)
         value.items.append(
             TraceItem(
-                context_type="workflow", method="from_payload", context=self.context
+                context_type="workflow",
+                in_workflow=workflow.in_workflow(),
+                method="from_payload",
+                context=self.context,
+                caller_location=get_caller_location(),
             )
         )
         return value
@@ -122,11 +179,11 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
     async with Worker(
         client,
         task_queue=task_queue,
-        workflows=[PassThroughWorkflow],
+        workflows=[SerializationContextTestWorkflow],
         activities=[],
     ):
         result = await client.execute_workflow(
-            PassThroughWorkflow.run,
+            SerializationContextTestWorkflow.run,
             TraceData(),
             id=workflow_id,
             task_queue=task_queue,
@@ -136,5 +193,29 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
             namespace="default",
             workflow_id=workflow_id,
         )
-        for item in result.items:
-            print(item)
+        assert result.items == [
+            TraceItem(
+                context_type="workflow",
+                in_workflow=False,
+                method="to_payload",
+                context=workflow_context,
+            ),
+            TraceItem(
+                context_type="workflow",
+                in_workflow=False,
+                method="from_payload",
+                context=workflow_context,
+            ),
+            TraceItem(
+                context_type="workflow",
+                in_workflow=True,
+                method="to_payload",
+                context=workflow_context,
+            ),
+            TraceItem(
+                context_type="workflow",
+                in_workflow=False,
+                method="from_payload",
+                context=workflow_context,
+            ),
+        ]
