@@ -1,5 +1,7 @@
 ![Temporal Python SDK](https://assets.temporal.io/w/py-banner.svg)
 
+Testing
+
 [![Python 3.9+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![MIT](https://img.shields.io/pypi/l/temporalio.svg?style=for-the-badge)](LICENSE)
