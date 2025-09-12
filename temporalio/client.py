@@ -310,6 +310,14 @@ class Client:
 
         Do not mutate this mapping after set. Rather, set an entirely new
         mapping if changes are needed.
+
+        Raises:
+            TypeError: the key/value pair is not a valid gRPC ASCII or binary metadata.
+                All binary metadata must be supplied as bytes, and the key must end in '-bin'.
+
+        .. warning::
+            Attempting to set an invalid binary RPC metadata value may leave the client
+            in an inconsistent state (as well as raise a :py:class:`TypeError`).
         """
         # Update config and perform update
         # This may raise if the metadata is invalid:
