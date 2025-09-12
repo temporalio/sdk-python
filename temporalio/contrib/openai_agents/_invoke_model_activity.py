@@ -173,11 +173,6 @@ class ModelActivity:
         ) -> Any:
             return None
 
-        # workaround for https://github.com/pydantic/pydantic/issues/9541
-        # ValidatorIterator returned
-        input_json = to_json(input["input"])
-        input_input = json.loads(input_json)
-
         def make_tool(tool: ToolInput) -> Tool:
             if isinstance(
                 tool,
@@ -220,7 +215,7 @@ class ModelActivity:
         try:
             return await model.get_response(
                 system_instructions=input.get("system_instructions"),
-                input=input_input,
+                input=input["input"],
                 model_settings=input["model_settings"],
                 tools=tools,
                 output_schema=input.get("output_schema"),
