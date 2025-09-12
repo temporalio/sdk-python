@@ -4,7 +4,7 @@ import json
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Mapping, Optional, Tuple, cast, Union
+from typing import Any, List, Mapping, Optional, Tuple, Union, cast
 from unittest import mock
 
 import google.protobuf.any_pb2
