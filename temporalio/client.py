@@ -62,7 +62,11 @@ import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
 from temporalio.activity import ActivityCancellationDetails
-from temporalio.converter import WorkflowSerializationContext
+from temporalio.converter import (
+    ActivitySerializationContext,
+    DataConverter,
+    WorkflowSerializationContext,
+)
 from temporalio.service import (
     HttpConnectProxyConfig,
     KeepAliveConfig,
@@ -6391,10 +6395,11 @@ class _ClientImpl(OutboundInterceptor):
     async def heartbeat_async_activity(
         self, input: HeartbeatAsyncActivityInput
     ) -> None:
+        data_converter = self._async_activity_data_converter(input.id_or_token)
         details = (
             None
             if not input.details
-            else await self._client.data_converter.encode_wrapper(input.details)
+            else await data_converter.encode_wrapper(input.details)
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
             resp_by_id = await self._client.workflow_service.record_activity_task_heartbeat_by_id(
@@ -6445,10 +6450,11 @@ class _ClientImpl(OutboundInterceptor):
                 )
 
     async def complete_async_activity(self, input: CompleteAsyncActivityInput) -> None:
+        data_converter = self._async_activity_data_converter(input.id_or_token)
         result = (
             None
             if input.result is temporalio.common._arg_unset
-            else await self._client.data_converter.encode_wrapper([input.result])
+            else await data_converter.encode_wrapper([input.result])
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
             await self._client.workflow_service.respond_activity_task_completed_by_id(
@@ -6478,14 +6484,14 @@ class _ClientImpl(OutboundInterceptor):
             )
 
     async def fail_async_activity(self, input: FailAsyncActivityInput) -> None:
+        data_converter = self._async_activity_data_converter(input.id_or_token)
+
         failure = temporalio.api.failure.v1.Failure()
-        await self._client.data_converter.encode_failure(input.error, failure)
+        await data_converter.encode_failure(input.error, failure)
         last_heartbeat_details = (
             None
             if not input.last_heartbeat_details
-            else await self._client.data_converter.encode_wrapper(
-                input.last_heartbeat_details
-            )
+            else await data_converter.encode_wrapper(input.last_heartbeat_details)
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
             await self._client.workflow_service.respond_activity_task_failed_by_id(
@@ -6519,10 +6525,11 @@ class _ClientImpl(OutboundInterceptor):
     async def report_cancellation_async_activity(
         self, input: ReportCancellationAsyncActivityInput
     ) -> None:
+        data_converter = self._async_activity_data_converter(input.id_or_token)
         details = (
             None
             if not input.details
-            else await self._client.data_converter.encode_wrapper(input.details)
+            else await data_converter.encode_wrapper(input.details)
         )
         if isinstance(input.id_or_token, AsyncActivityIDReference):
             await self._client.workflow_service.respond_activity_task_canceled_by_id(
@@ -6550,6 +6557,23 @@ class _ClientImpl(OutboundInterceptor):
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             )
+
+    def _async_activity_data_converter(
+        self, id_or_token: Union[AsyncActivityIDReference, bytes]
+    ) -> DataConverter:
+        context = ActivitySerializationContext(
+            namespace=self._client.namespace,
+            workflow_id=(
+                id_or_token.workflow_id
+                if isinstance(id_or_token, AsyncActivityIDReference)
+                else ""
+            ),
+            workflow_type="",
+            activity_type="",
+            activity_task_queue="",
+            is_local=False,
+        )
+        return self._client.data_converter._with_context(context)
 
     ### Schedule calls
 

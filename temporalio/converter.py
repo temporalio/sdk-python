@@ -28,7 +28,6 @@ from typing import (
     Mapping,
     NewType,
     Optional,
-    Self,
     Sequence,
     Tuple,
     Type,
@@ -44,6 +43,7 @@ import google.protobuf.message
 import google.protobuf.symbol_database
 import nexusrpc
 import typing_extensions
+from typing_extensions import Self
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1

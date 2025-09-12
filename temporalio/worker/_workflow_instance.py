@@ -3187,7 +3187,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
             self._result_fut.set_result(None)
 
     def _apply_schedule_command(self) -> None:
-        payload = self._payload_converter.to_payload(self._input.input)
+        payload = self._payload_converter.to_payload(self._input.input)  # type: ignore TODO
         command = self._instance._add_command()
         v = command.schedule_nexus_operation
         v.seq = self._seq
