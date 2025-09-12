@@ -126,10 +126,19 @@ macro_rules! rpc_call_on_trait {
 
 #[pymethods]
 impl ClientRef {
-    fn update_metadata(&self, headers: HashMap<String, RpcMetadataValue>) {
+    fn update_metadata(&self, headers: HashMap<String, RpcMetadataValue>) -> PyResult<()> {
         let (ascii_headers, binary_headers) = partition_headers(headers);
-        self.retry_client.get_client().set_headers(ascii_headers);
-        self.retry_client.get_client().set_binary_headers(binary_headers);
+
+        self.retry_client
+            .get_client()
+            .set_headers(ascii_headers)
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
+        self.retry_client
+            .get_client()
+            .set_binary_headers(binary_headers)
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
+
+        Ok(())
     }
 
     fn update_api_key(&self, api_key: Option<String>) {
