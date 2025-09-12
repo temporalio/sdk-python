@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import inspect
+import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -318,7 +319,7 @@ def assert_trace(trace: list[TraceItem], expected: list[TraceItem]):
             raise AssertionError("More items in trace than expected")
         if item != expected_item:
             raise AssertionError(
-                f"Item:\n{pformat(item)}\n\ndoes not match expected:\n\n {pformat(expected_item)}.\n\n History:\n{'\n'.join(history)}"
+                f"Item:\n{pformat(item)}\n\ndoes not match expected:\n\n {pformat(expected_item)}.\n\n History:\n{chr(10).join(history)}"
             )
         history.append(f"{item.context_type} {item.method}")
 
@@ -357,3 +358,145 @@ def get_caller_location() -> list[str]:
         result.append("unknown:0")
 
     return result
+
+
+# Signal test
+
+
+@dataclass
+class SignalData:
+    signal_context: Optional[WorkflowSerializationContext] = None
+    value: str = ""
+
+
+@workflow.defn
+class SignalSerializationContextTestWorkflow:
+    def __init__(self) -> None:
+        self.signal_received = None
+
+    @workflow.run
+    async def run(self) -> SignalData:
+        await workflow.wait_condition(lambda: self.signal_received is not None)
+        assert self.signal_received is not None
+        return self.signal_received
+
+    @workflow.signal
+    async def my_signal(self, data: SignalData) -> None:
+        self.signal_received = data
+
+
+class SignalSerializationContextTestEncodingPayloadConverter(
+    EncodingPayloadConverter, WithSerializationContext
+):
+    def __init__(self, context: Optional[SerializationContext] = None):
+        self.context = context
+
+    @property
+    def encoding(self) -> str:
+        return "test-signal-serialization-context"
+
+    def with_context(
+        self, context: Optional[SerializationContext]
+    ) -> SignalSerializationContextTestEncodingPayloadConverter:
+        return SignalSerializationContextTestEncodingPayloadConverter(context)
+
+    def to_payload(self, value: Any) -> Optional[Payload]:
+        # Only handle SignalData objects
+        if not isinstance(value, SignalData):
+            return None
+
+        # Inject the context if it's a workflow context
+        if isinstance(self.context, WorkflowSerializationContext):
+            value.signal_context = self.context
+
+        # Serialize as JSON
+        data = {
+            "signal_context": (
+                {
+                    "namespace": value.signal_context.namespace,
+                    "workflow_id": value.signal_context.workflow_id,
+                }
+                if value.signal_context
+                else None
+            ),
+            "value": value.value,
+        }
+        return Payload(
+            metadata={"encoding": self.encoding.encode()},
+            data=json.dumps(data).encode(),
+        )
+
+    def from_payload(self, payload: Payload, type_hint: Optional[Type] = None) -> Any:
+        data = json.loads(payload.data.decode())
+        ctx_data = data.get("signal_context")
+        return SignalData(
+            signal_context=(
+                WorkflowSerializationContext(**ctx_data) if ctx_data else None
+            ),
+            value=data.get("value", ""),
+        )
+
+
+class SignalSerializationContextTestPayloadConverter(
+    CompositePayloadConverter, WithSerializationContext
+):
+    def __init__(self, context: Optional[SerializationContext] = None):
+        # Create converters with context
+        converters = [
+            SignalSerializationContextTestEncodingPayloadConverter(context),
+            *DefaultPayloadConverter.default_encoding_payload_converters,
+        ]
+        super().__init__(*converters)
+        self.context = context
+
+    def with_context(
+        self, context: Optional[SerializationContext]
+    ) -> SignalSerializationContextTestPayloadConverter:
+        return SignalSerializationContextTestPayloadConverter(context)
+
+
+async def test_signal_payload_conversion_can_be_given_access_to_serialization_context(
+    client: Client,
+):
+    workflow_id = str(uuid.uuid4())
+    task_queue = str(uuid.uuid4())
+
+    # Create client with our custom data converter
+    data_converter = dataclasses.replace(
+        DataConverter.default,
+        payload_converter_class=SignalSerializationContextTestPayloadConverter,
+    )
+
+    # Create a new client with the custom data converter
+    config = client.config()
+    config["data_converter"] = data_converter
+    custom_client = Client(**config)
+
+    async with Worker(
+        custom_client,
+        task_queue=task_queue,
+        workflows=[SignalSerializationContextTestWorkflow],
+        activities=[],
+    ):
+        # Start the workflow
+        handle = await custom_client.start_workflow(
+            SignalSerializationContextTestWorkflow.run,
+            id=workflow_id,
+            task_queue=task_queue,
+        )
+
+        # Send a signal
+        await handle.signal(
+            SignalSerializationContextTestWorkflow.my_signal,
+            SignalData(value="test-signal"),
+        )
+
+        # Get the result
+        result = await handle.result()
+
+        # Verify the signal context was injected
+        assert result.signal_context == WorkflowSerializationContext(
+            namespace="default",
+            workflow_id=workflow_id,
+        )
+        assert result.value == "test-signal"
