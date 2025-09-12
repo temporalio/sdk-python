@@ -9,6 +9,7 @@ from datetime import timedelta
 from itertools import zip_longest
 from pprint import pformat, pprint
 from typing import Any, Literal, Optional, Type
+from warnings import warn
 
 import pytest
 
@@ -316,6 +317,98 @@ async def test_workflow_payload_conversion(
             pprint(result.items)
 
 
+async_activity_started = asyncio.Event()
+
+
+# Async activity completion test
+@activity.defn
+async def async_activity() -> TraceData:
+    async_activity_started.set()
+    activity.raise_complete_async()
+
+
+@workflow.defn
+class AsyncActivityCompletionSerializationContextTestWorkflow:
+    @workflow.run
+    async def run(self) -> TraceData:
+        return await workflow.execute_activity(
+            async_activity,
+            start_to_close_timeout=timedelta(seconds=10),
+            activity_id="async-activity-id",
+        )
+
+
+async def test_async_activity_completion_payload_conversion(
+    client: Client,
+):
+    workflow_id = str(uuid.uuid4())
+    task_queue = str(uuid.uuid4())
+
+    config = client.config()
+    config["data_converter"] = data_converter
+    client = Client(**config)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[AsyncActivityCompletionSerializationContextTestWorkflow],
+        activities=[async_activity],
+        workflow_runner=UnsandboxedWorkflowRunner(),  # so that we can use isinstance
+    ):
+        wf_handle = await client.start_workflow(
+            AsyncActivityCompletionSerializationContextTestWorkflow.run,
+            id=workflow_id,
+            task_queue=task_queue,
+        )
+        activity_handle = client.get_async_activity_handle(
+            workflow_id=workflow_id,
+            run_id=wf_handle.first_execution_run_id,
+            activity_id="async-activity-id",
+        )
+        await async_activity_started.wait()
+        data = TraceData()
+        await activity_handle.heartbeat(data)
+        await activity_handle.complete(data)
+        result = await wf_handle.result()
+
+        # project down since activity completion by a client does not have access to most activity
+        # context fields
+        def project(trace_item: TraceItem) -> tuple[str, bool, str]:
+            return (
+                trace_item.context_type,
+                trace_item.in_workflow,
+                trace_item.method,
+            )
+
+        assert [project(item) for item in result.items] == [
+            (
+                "activity",
+                False,
+                "to_payload",  # Outbound activity input
+            ),
+            (
+                "activity",
+                False,
+                "to_payload",  # Outbound activity heartbeat data
+            ),
+            (
+                "activity",
+                False,
+                "from_payload",  # Inbound activity result
+            ),
+            (
+                "workflow",
+                True,
+                "to_payload",  # Outbound workflow result
+            ),
+            (
+                "workflow",
+                False,
+                "from_payload",  # Inbound workflow result
+            ),
+        ]
+
+
 # Signal test
 
 
@@ -596,9 +689,7 @@ async def test_update_payload_conversion(
 
 def assert_trace(trace: list[TraceItem], expected: list[TraceItem]):
     if len(trace) != len(expected):
-        raise AssertionError(
-            f"expected {len(expected)} trace items but received {len(trace)}"
-        )
+        warn(f"expected {len(expected)} trace items but received {len(trace)}")
     history = []
     for item, expected_item in zip_longest(trace, expected):
         if item is None:
