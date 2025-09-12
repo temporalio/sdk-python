@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Mapping, Optional, Tuple, Type, TypeVar
+from typing import Mapping, Optional, Tuple, Type, TypeVar, Union
 
 import google.protobuf.message
 
@@ -59,7 +59,7 @@ class ClientConfig:
     """Python representation of the Rust struct for configuring the client."""
 
     target_url: str
-    metadata: Mapping[str, str | bytes]
+    metadata: Mapping[str, Union[str, bytes]]
     api_key: Optional[str]
     identity: str
     tls_config: Optional[ClientTlsConfig]
@@ -77,7 +77,7 @@ class RpcCall:
     rpc: str
     req: bytes
     retry: bool
-    metadata: Mapping[str, str | bytes]
+    metadata: Mapping[str, Union[str, bytes]]
     timeout_millis: Optional[int]
 
 
@@ -108,7 +108,7 @@ class Client:
         self._runtime = runtime
         self._ref = ref
 
-    def update_metadata(self, metadata: Mapping[str, str | bytes]) -> None:
+    def update_metadata(self, metadata: Mapping[str, Union[str, bytes]]) -> None:
         """Update underlying metadata on Core client."""
         self._ref.update_metadata(metadata)
 
@@ -124,7 +124,7 @@ class Client:
         req: google.protobuf.message.Message,
         resp_type: Type[ProtoMessage],
         retry: bool,
-        metadata: Mapping[str, str | bytes],
+        metadata: Mapping[str, Union[str, bytes]],
         timeout: Optional[timedelta],
     ) -> ProtoMessage:
         """Make RPC call using SDK Core."""

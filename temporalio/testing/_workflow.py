@@ -84,7 +84,7 @@ class WorkflowEnvironment:
             temporalio.common.QueryRejectCondition
         ] = None,
         retry_config: Optional[temporalio.client.RetryConfig] = None,
-        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
         identity: Optional[str] = None,
         tls: bool | temporalio.client.TLSConfig = False,
         ip: str = "127.0.0.1",
@@ -244,7 +244,7 @@ class WorkflowEnvironment:
             temporalio.common.QueryRejectCondition
         ] = None,
         retry_config: Optional[temporalio.client.RetryConfig] = None,
-        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
         identity: Optional[str] = None,
         port: Optional[int] = None,
         download_dest_dir: Optional[str] = None,
@@ -573,7 +573,7 @@ class _TimeSkippingWorkflowHandle(temporalio.client.WorkflowHandle):
         self,
         *,
         follow_runs: bool = True,
-        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> Any:
         async with self.env.time_skipping_unlocked():

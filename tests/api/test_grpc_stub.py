@@ -1,5 +1,5 @@
 from datetime import timedelta
-from typing import Mapping, Any, cast
+from typing import Mapping, Any, cast, Union
 import pytest
 import re
 
@@ -38,9 +38,9 @@ def assert_time_remaining(context: ServicerContext, expected: int) -> None:
 class SimpleWorkflowServer(WorkflowServiceServicer):
     def __init__(self) -> None:
         super().__init__()
-        self.last_metadata: Mapping[str, str | bytes] = {}
+        self.last_metadata: Mapping[str, Union[str, bytes]] = {}
 
-    def assert_last_metadata(self, expected: Mapping[str, str | bytes]) -> None:
+    def assert_last_metadata(self, expected: Mapping[str, Union[str, bytes]]) -> None:
         for k, v in expected.items():
             assert self.last_metadata.get(k) == v
 
