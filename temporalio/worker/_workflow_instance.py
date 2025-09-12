@@ -702,6 +702,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         namespace=self._info.namespace,
                         workflow_id=self._info.workflow_id,
                     )
+                    # TODO: why do we deserialize query input in workflow but not signal?
                     args = self._process_handler_args(
                         job.query_type,
                         job.arguments,
