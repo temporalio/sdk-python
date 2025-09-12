@@ -375,6 +375,9 @@ async def test_warns_when_workers_too_lot(client: Client, env: WorkflowEnvironme
 
 
 async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work under Java test server")
+
     class MyPermit(SlotPermit):
         def __init__(self, pnum: int):
             super().__init__()
