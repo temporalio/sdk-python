@@ -10,9 +10,11 @@ from itertools import zip_longest
 from pprint import pformat, pprint
 from typing import Any, Literal, Optional, Type
 
+import pytest
+
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowUpdateFailedError
 from temporalio.converter import (
     ActivitySerializationContext,
     CompositePayloadConverter,
@@ -475,6 +477,115 @@ async def test_query_payload_conversion(
                     in_workflow=False,
                     method="from_payload",
                     context=workflow_context,  # Inbound query result
+                ),
+            ],
+        )
+
+
+# Update test
+
+
+@workflow.defn
+class UpdateSerializationContextTestWorkflow:
+    @workflow.init
+    def __init__(self, pass_validation: bool) -> None:
+        self.pass_validation = pass_validation
+        self.input = None
+
+    @workflow.run
+    async def run(self, pass_validation: bool) -> TraceData:
+        await workflow.wait_condition(lambda: self.input is not None)
+        assert self.input
+        return self.input
+
+    @workflow.update
+    def my_update(self, input: TraceData) -> TraceData:
+        return input
+
+    @my_update.validator
+    def my_update_validator(self, input: TraceData) -> None:
+        self.input = input  # for test purposes; update validators should not mutate workflow state
+        if not self.pass_validation:
+            raise ValueError("Rejected")
+
+
+@pytest.mark.parametrize("pass_validation", [True, False])
+async def test_update_payload_conversion(
+    client: Client,
+    pass_validation: bool,
+):
+    workflow_id = str(uuid.uuid4())
+    task_queue = str(uuid.uuid4())
+
+    data_converter = dataclasses.replace(
+        DataConverter.default,
+        payload_converter_class=SerializationContextTestPayloadConverter,
+    )
+
+    config = client.config()
+    config["data_converter"] = data_converter
+    custom_client = Client(**config)
+
+    async with Worker(
+        custom_client,
+        task_queue=task_queue,
+        workflows=[UpdateSerializationContextTestWorkflow],
+        activities=[],
+        workflow_runner=UnsandboxedWorkflowRunner(),  # so that we can use isinstance
+    ):
+        wf_handle = await custom_client.start_workflow(
+            UpdateSerializationContextTestWorkflow.run,
+            pass_validation,
+            id=workflow_id,
+            task_queue=task_queue,
+        )
+        if pass_validation:
+            result = await wf_handle.execute_update(
+                UpdateSerializationContextTestWorkflow.my_update, TraceData()
+            )
+        else:
+            try:
+                await wf_handle.execute_update(
+                    UpdateSerializationContextTestWorkflow.my_update, TraceData()
+                )
+                raise AssertionError("Expected WorkflowUpdateFailedError")
+            except WorkflowUpdateFailedError:
+                pass
+
+            result = await wf_handle.result()
+
+        workflow_context = dataclasses.asdict(
+            WorkflowSerializationContext(
+                namespace="default",
+                workflow_id=workflow_id,
+            )
+        )
+        assert_trace(
+            result.items,
+            [
+                TraceItem(
+                    context_type="workflow",
+                    in_workflow=False,
+                    method="to_payload",
+                    context=workflow_context,  # Outbound update input
+                ),
+                TraceItem(
+                    context_type="workflow",
+                    in_workflow=True,
+                    method="from_payload",
+                    context=workflow_context,  # Inbound update input
+                ),
+                TraceItem(
+                    context_type="workflow",
+                    in_workflow=True,
+                    method="to_payload",
+                    context=workflow_context,  # Outbound update/workflow result
+                ),
+                TraceItem(
+                    context_type="workflow",
+                    in_workflow=False,
+                    method="from_payload",
+                    context=workflow_context,  # Inbound update/workflow result
                 ),
             ],
         )
