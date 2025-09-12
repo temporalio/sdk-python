@@ -59,6 +59,13 @@ async def passthrough_activity(input: TraceData) -> TraceData:
     return input
 
 
+@workflow.defn(sandboxed=False)
+class EchoWorkflow:
+    @workflow.run
+    async def run(self, data: TraceData) -> TraceData:
+        return data
+
+
 @workflow.defn(sandboxed=False)  # we want to use isinstance
 class SerializationContextTestWorkflow:
     @workflow.run
@@ -68,6 +75,9 @@ class SerializationContextTestWorkflow:
             data,
             start_to_close_timeout=timedelta(seconds=10),
             heartbeat_timeout=timedelta(seconds=2),
+        )
+        data = await workflow.execute_child_workflow(
+            EchoWorkflow.run, data, id=f"{workflow.info().workflow_id}_child"
         )
         return data
 
@@ -179,7 +189,7 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
     async with Worker(
         client,
         task_queue=task_queue,
-        workflows=[SerializationContextTestWorkflow],
+        workflows=[SerializationContextTestWorkflow, EchoWorkflow],
         activities=[passthrough_activity],
     ):
         result = await client.execute_workflow(
@@ -193,6 +203,12 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
             WorkflowSerializationContext(
                 namespace="default",
                 workflow_id=workflow_id,
+            )
+        )
+        child_workflow_context = dataclasses.asdict(
+            WorkflowSerializationContext(
+                namespace="default",
+                workflow_id=f"{workflow_id}_child",
             )
         )
         activity_context = dataclasses.asdict(
@@ -250,6 +266,30 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
                         in_workflow=False,
                         method="from_payload",
                         context=activity_context,  # Inbound activity result
+                    ),
+                    TraceItem(
+                        context_type="workflow",
+                        in_workflow=True,
+                        method="to_payload",
+                        context=child_workflow_context,  # Outbound child workflow input
+                    ),
+                    TraceItem(
+                        context_type="workflow",
+                        in_workflow=False,
+                        method="from_payload",
+                        context=child_workflow_context,  # Inbound child workflow input
+                    ),
+                    TraceItem(
+                        context_type="workflow",
+                        in_workflow=True,
+                        method="to_payload",
+                        context=child_workflow_context,  # Outbound child workflow result
+                    ),
+                    TraceItem(
+                        context_type="workflow",
+                        in_workflow=False,
+                        method="from_payload",
+                        context=child_workflow_context,  # Inbound child workflow result
                     ),
                     TraceItem(
                         context_type="workflow",
