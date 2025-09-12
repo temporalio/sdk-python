@@ -102,7 +102,9 @@ class SerializationContextTestEncodingPayloadConverter(
         return converter
 
     def to_payload(self, value: Any) -> Optional[Payload]:
-        assert isinstance(value, TraceData)
+        print(f"🌈 to_payload({isinstance(value, TraceData)}): {value}")
+        if not isinstance(value, TraceData):
+            return None
         if not self.context:
             raise Exception("Context is None")
         if isinstance(self.context, WorkflowSerializationContext):
@@ -134,6 +136,7 @@ class SerializationContextTestEncodingPayloadConverter(
 
     def from_payload(self, payload: Payload, type_hint: Optional[Type] = None) -> Any:
         value = JSONPlainPayloadConverter().from_payload(payload, type_hint)
+        print(f"🌈 from_payload({isinstance(value, TraceData)}): {value}")
         assert isinstance(value, TraceData)
         if not self.context:
             raise Exception("Context is None")
@@ -315,96 +318,20 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
 # Signal test
 
 
-@dataclass
-class SignalData:
-    signal_context: Optional[WorkflowSerializationContext] = None
-    value: str = ""
-
-
-@workflow.defn
+@workflow.defn(sandboxed=False)  # so that we can use isinstance
 class SignalSerializationContextTestWorkflow:
     def __init__(self) -> None:
         self.signal_received = None
 
     @workflow.run
-    async def run(self) -> SignalData:
+    async def run(self) -> TraceData:
         await workflow.wait_condition(lambda: self.signal_received is not None)
         assert self.signal_received is not None
         return self.signal_received
 
     @workflow.signal
-    async def my_signal(self, data: SignalData) -> None:
+    async def my_signal(self, data: TraceData) -> None:
         self.signal_received = data
-
-
-class SignalSerializationContextTestEncodingPayloadConverter(
-    EncodingPayloadConverter, WithSerializationContext
-):
-    def __init__(self, context: Optional[SerializationContext] = None):
-        self.context = context
-
-    @property
-    def encoding(self) -> str:
-        return "test-signal-serialization-context"
-
-    def with_context(
-        self, context: Optional[SerializationContext]
-    ) -> SignalSerializationContextTestEncodingPayloadConverter:
-        return SignalSerializationContextTestEncodingPayloadConverter(context)
-
-    def to_payload(self, value: Any) -> Optional[Payload]:
-        # Only handle SignalData objects
-        if not isinstance(value, SignalData):
-            return None
-
-        # Inject the context if it's a workflow context
-        if isinstance(self.context, WorkflowSerializationContext):
-            value.signal_context = self.context
-
-        # Serialize as JSON
-        data = {
-            "signal_context": (
-                {
-                    "namespace": value.signal_context.namespace,
-                    "workflow_id": value.signal_context.workflow_id,
-                }
-                if value.signal_context
-                else None
-            ),
-            "value": value.value,
-        }
-        return Payload(
-            metadata={"encoding": self.encoding.encode()},
-            data=json.dumps(data).encode(),
-        )
-
-    def from_payload(self, payload: Payload, type_hint: Optional[Type] = None) -> Any:
-        data = json.loads(payload.data.decode())
-        ctx_data = data.get("signal_context")
-        return SignalData(
-            signal_context=(
-                WorkflowSerializationContext(**ctx_data) if ctx_data else None
-            ),
-            value=data.get("value", ""),
-        )
-
-
-class SignalSerializationContextTestPayloadConverter(
-    CompositePayloadConverter, WithSerializationContext
-):
-    def __init__(self, context: Optional[SerializationContext] = None):
-        # Create converters with context
-        converters = [
-            SignalSerializationContextTestEncodingPayloadConverter(context),
-            *DefaultPayloadConverter.default_encoding_payload_converters,
-        ]
-        super().__init__(*converters)
-        self.context = context
-
-    def with_context(
-        self, context: Optional[SerializationContext]
-    ) -> SignalSerializationContextTestPayloadConverter:
-        return SignalSerializationContextTestPayloadConverter(context)
 
 
 async def test_signal_payload_conversion_can_be_given_access_to_serialization_context(
@@ -413,13 +340,6 @@ async def test_signal_payload_conversion_can_be_given_access_to_serialization_co
     workflow_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
 
-    # Create client with our custom data converter
-    data_converter = dataclasses.replace(
-        DataConverter.default,
-        payload_converter_class=SignalSerializationContextTestPayloadConverter,
-    )
-
-    # Create a new client with the custom data converter
     config = client.config()
     config["data_converter"] = data_converter
     custom_client = Client(**config)
@@ -429,29 +349,54 @@ async def test_signal_payload_conversion_can_be_given_access_to_serialization_co
         task_queue=task_queue,
         workflows=[SignalSerializationContextTestWorkflow],
         activities=[],
+        workflow_runner=UnsandboxedWorkflowRunner(),  # so that we can use isinstance
     ):
-        # Start the workflow
         handle = await custom_client.start_workflow(
             SignalSerializationContextTestWorkflow.run,
             id=workflow_id,
             task_queue=task_queue,
         )
-
-        # Send a signal
         await handle.signal(
             SignalSerializationContextTestWorkflow.my_signal,
-            SignalData(value="test-signal"),
+            TraceData(),
         )
-
-        # Get the result
         result = await handle.result()
 
-        # Verify the signal context was injected
-        assert result.signal_context == WorkflowSerializationContext(
-            namespace="default",
-            workflow_id=workflow_id,
+        workflow_context = dataclasses.asdict(
+            WorkflowSerializationContext(
+                namespace="default",
+                workflow_id=workflow_id,
+            )
         )
-        assert result.value == "test-signal"
+        assert_trace(
+            result.items,
+            [
+                TraceItem(
+                    context_type="workflow",
+                    in_workflow=False,
+                    method="to_payload",
+                    context=workflow_context,  # Outbound signal input
+                ),
+                TraceItem(
+                    context_type="workflow",
+                    in_workflow=False,
+                    method="from_payload",
+                    context=workflow_context,  # Inbound signal input
+                ),
+                TraceItem(
+                    context_type="workflow",
+                    in_workflow=True,
+                    method="to_payload",
+                    context=workflow_context,  # Outbound workflow result
+                ),
+                TraceItem(
+                    context_type="workflow",
+                    in_workflow=False,
+                    method="from_payload",
+                    context=workflow_context,  # Inbound workflow result
+                ),
+            ],
+        )
 
 
 # Query test
