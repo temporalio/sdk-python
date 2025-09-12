@@ -26,6 +26,7 @@ from temporalio.converter import (
     WorkflowSerializationContext,
 )
 from temporalio.worker import Worker
+from temporalio.worker._workflow_instance import UnsandboxedWorkflowRunner
 
 
 @dataclass
@@ -60,14 +61,14 @@ async def passthrough_activity(input: TraceData) -> TraceData:
     return input
 
 
-@workflow.defn(sandboxed=False)
+@workflow.defn
 class EchoWorkflow:
     @workflow.run
     async def run(self, data: TraceData) -> TraceData:
         return data
 
 
-@workflow.defn(sandboxed=False)  # we want to use isinstance
+@workflow.defn
 class SerializationContextTestWorkflow:
     @workflow.run
     async def run(self, data: TraceData) -> TraceData:
@@ -192,6 +193,7 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
         task_queue=task_queue,
         workflows=[SerializationContextTestWorkflow, EchoWorkflow],
         activities=[passthrough_activity],
+        workflow_runner=UnsandboxedWorkflowRunner(),  # so that we can use isinstance
     ):
         result = await client.execute_workflow(
             SerializationContextTestWorkflow.run,
@@ -308,56 +310,6 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
             )
         else:
             pprint(result.items)
-
-
-def assert_trace(trace: list[TraceItem], expected: list[TraceItem]):
-    history = []
-    for item, expected_item in zip_longest(trace, expected):
-        if item is None:
-            raise AssertionError("Fewer items in trace than expected")
-        if expected_item is None:
-            raise AssertionError("More items in trace than expected")
-        if item != expected_item:
-            raise AssertionError(
-                f"Item:\n{pformat(item)}\n\ndoes not match expected:\n\n {pformat(expected_item)}.\n\n History:\n{chr(10).join(history)}"
-            )
-        history.append(f"{item.context_type} {item.method}")
-
-
-def get_caller_location() -> list[str]:
-    """Get 3 stack frames starting from the first that's not in test_serialization_context.py or temporalio/converter.py."""
-    frame = inspect.currentframe()
-    result = []
-    found_first = False
-
-    # Walk up the stack
-    while frame and len(result) < 3:
-        frame = frame.f_back
-        if not frame:
-            break
-
-        file_path = frame.f_code.co_filename
-
-        # Skip frames from test file and converter.py until we find the first one
-        if not found_first:
-            if "test_serialization_context.py" in file_path:
-                continue
-            if file_path.endswith("temporalio/converter.py"):
-                continue
-            found_first = True
-
-        # Format and add this frame
-        line_number = frame.f_lineno
-        display_path = file_path
-        if "/sdk-python/" in display_path:
-            display_path = display_path.split("/sdk-python/")[-1]
-        result.append(f"{display_path}:{line_number}")
-
-    # Pad with "unknown:0" if we didn't get 3 frames
-    while len(result) < 3:
-        result.append("unknown:0")
-
-    return result
 
 
 # Signal test
@@ -642,3 +594,55 @@ async def test_query_payload_conversion_can_be_given_access_to_serialization_con
 
         # Cancel the workflow to clean up
         await handle.cancel()
+
+
+# Utilities
+
+
+def assert_trace(trace: list[TraceItem], expected: list[TraceItem]):
+    if len(trace) != len(expected):
+        raise AssertionError(
+            f"expected {len(expected)} trace items but received {len(trace)}"
+        )
+    history = []
+    for item, expected_item in zip_longest(trace, expected):
+        if item is None:
+            raise AssertionError("Fewer items in trace than expected")
+        if expected_item is None:
+            raise AssertionError("More items in trace than expected")
+        if item != expected_item:
+            raise AssertionError(
+                f"Item:\n{pformat(item)}\n\ndoes not match expected:\n\n {pformat(expected_item)}.\n\n History:\n{chr(10).join(history)}"
+            )
+        history.append(f"{item.context_type} {item.method}")
+
+
+def get_caller_location() -> list[str]:
+    """Get 3 stack frames starting from the first that's not in test_serialization_context.py or temporalio/converter.py."""
+    frame = inspect.currentframe()
+    result = []
+    found_first = False
+
+    # Walk up the stack
+    while frame and len(result) < 3:
+        frame = frame.f_back
+        if not frame:
+            break
+
+        file_path = frame.f_code.co_filename
+
+        # Skip frames from test file and converter.py until we find the first one
+        if not found_first:
+            if "test_serialization_context.py" in file_path:
+                continue
+            if file_path.endswith("temporalio/converter.py"):
+                continue
+            found_first = True
+
+        result.append(f"{file_path}:{frame.f_lineno}")
+
+    # Pad with "unknown:0" if we didn't get 3 frames
+    while len(result) < 3:
+        result.append("unknown:0")
+
+    return result
