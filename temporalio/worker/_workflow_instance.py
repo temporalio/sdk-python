@@ -207,11 +207,23 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # No init for AbstractEventLoop
         WorkflowInstance.__init__(self)
         temporalio.workflow._Runtime.__init__(self)
-        self._payload_converter = det.payload_converter_class()
         self._failure_converter = det.failure_converter_class()
         self._defn = det.defn
         self._workflow_input: Optional[ExecuteWorkflowInput] = None
         self._info = det.info
+
+        self._payload_converter = det.payload_converter_class()
+        if isinstance(
+            self._payload_converter, temporalio.converter.WithSerializationContext
+        ):
+            serialization_context = temporalio.converter.WorkflowSerializationContext(
+                namespace=self._info.namespace,
+                workflow_id=self._info.workflow_id,
+            )
+            self._payload_converter = self._payload_converter.with_context(
+                serialization_context
+            )
+
         self._extern_functions = det.extern_functions
         self._disable_eager_activity_execution = det.disable_eager_activity_execution
         self._worker_level_failure_exception_types = (

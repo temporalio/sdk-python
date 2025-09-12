@@ -5000,6 +5000,12 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
         self._workflow_run_id = workflow_run_id
         self._result_type = result_type
         self._known_outcome = known_outcome
+        self._data_converter = self._client.data_converter._with_context(
+            WorkflowSerializationContext(
+                namespace=self._client.namespace,
+                workflow_id=self.workflow_id,
+            )
+        )
 
     @property
     def id(self) -> str:
@@ -5047,14 +5053,12 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
         assert self._known_outcome
         if self._known_outcome.HasField("failure"):
             raise WorkflowUpdateFailedError(
-                await self._client.data_converter.decode_failure(
-                    self._known_outcome.failure
-                ),
+                await self._data_converter.decode_failure(self._known_outcome.failure),
             )
         if not self._known_outcome.success.payloads:
             return None  # type: ignore
         type_hints = [self._result_type] if self._result_type else None
-        results = await self._client.data_converter.decode(
+        results = await self._data_converter.decode(
             self._known_outcome.success.payloads, type_hints
         )
         if not results:
@@ -6236,8 +6240,14 @@ class _ClientImpl(OutboundInterceptor):
             ),
         )
         if input.args:
+            context = temporalio.converter.WorkflowSerializationContext(
+                namespace=self._client.namespace,
+                workflow_id=workflow_id,
+            )
             req.request.input.args.payloads.extend(
-                await self._client.data_converter.encode(input.args)
+                await self._client.data_converter._with_context(context).encode(
+                    input.args
+                )
             )
         if input.headers is not None:
             await self._apply_headers(input.headers, req.request.input.header.fields)
