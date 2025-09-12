@@ -312,8 +312,9 @@ class Client:
         mapping if changes are needed.
         """
         # Update config and perform update
-        self.service_client.config.rpc_metadata = value
+        # This may raise if the metadata is invalid:
         self.service_client.update_rpc_metadata(value)
+        self.service_client.config.rpc_metadata = value
 
     @property
     def api_key(self) -> Optional[str]:
