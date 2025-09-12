@@ -11,7 +11,6 @@ import pytest
 import temporalio.nexus._operation_handlers
 from temporalio import exceptions, nexus, workflow
 from temporalio.api.enums.v1 import EventType
-from temporalio.api.history.v1 import HistoryEvent
 from temporalio.client import (
     WithStartWorkflowOperation,
     WorkflowExecutionStatus,
@@ -28,9 +27,7 @@ from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 class TestContext:
     __test__ = False
     cancellation_type: workflow.NexusOperationCancellationType
-    caller_op_future_resolved: asyncio.Future[datetime] = field(
-        default_factory=asyncio.Future
-    )
+    caller_workflow_id: str
     cancel_handler_released: asyncio.Future[datetime] = field(
         default_factory=asyncio.Future
     )
@@ -96,7 +93,15 @@ class WorkflowOpHandler(
             # by the caller server. At that point, the caller server will write
             # NexusOperationCancelRequestCompleted. For TRY_CANCEL we want to prove that the nexus
             # op handle future can be resolved as cancelled before any of that.
-            await test_context.caller_op_future_resolved
+            caller_wf: WorkflowHandle[Any, CancellationResult] = (
+                nexus.client().get_workflow_handle_for(
+                    CallerWorkflow.run,
+                    workflow_id=test_context.caller_workflow_id,
+                )
+            )
+            await caller_wf.execute_update(
+                CallerWorkflow.wait_caller_op_future_resolved
+            )
         test_context.cancel_handler_released.set_result(datetime.now(timezone.utc))
         await super().cancel(ctx, token)
 
@@ -117,6 +122,7 @@ class Input:
 @dataclass
 class CancellationResult:
     operation_token: str
+    caller_op_future_resolved: datetime
 
 
 @workflow.defn(sandboxed=False)
@@ -129,6 +135,7 @@ class CallerWorkflow:
         )
         self.released = False
         self.operation_token: Optional[str] = None
+        self.caller_op_future_resolved: asyncio.Future[datetime] = asyncio.Future()
 
     @workflow.signal
     def release(self):
@@ -139,6 +146,10 @@ class CallerWorkflow:
         await workflow.wait_condition(lambda: self.operation_token is not None)
         assert self.operation_token
         return self.operation_token
+
+    @workflow.update
+    async def wait_caller_op_future_resolved(self) -> None:
+        await self.caller_op_future_resolved
 
     @workflow.run
     async def run(self, input: Input) -> CancellationResult:
@@ -188,9 +199,7 @@ class CallerWorkflow:
         try:
             await op_handle
         except exceptions.NexusOperationError:
-            test_context.caller_op_future_resolved.set_result(
-                datetime.now(timezone.utc)
-            )
+            self.caller_op_future_resolved.set_result(workflow.now())
             assert op_handle.operation_token
             if input.cancellation_type in [
                 workflow.NexusOperationCancellationType.TRY_CANCEL,
@@ -210,6 +219,7 @@ class CallerWorkflow:
             await workflow.wait_condition(lambda: self.released)
             return CancellationResult(
                 operation_token=op_handle.operation_token,
+                caller_op_future_resolved=self.caller_op_future_resolved.result(),
             )
         else:
             pytest.fail("Expected NexusOperationError")
@@ -233,7 +243,10 @@ async def test_cancellation_type(
 
     cancellation_type = workflow.NexusOperationCancellationType[cancellation_type_name]
     global test_context
-    test_context = TestContext(cancellation_type=cancellation_type)
+    test_context = TestContext(
+        cancellation_type=cancellation_type,
+        caller_workflow_id="caller-wf-" + str(uuid.uuid4()),
+    )
 
     client = env.client
 
@@ -253,7 +266,7 @@ async def test_cancellation_type(
                 endpoint=make_nexus_endpoint_name(worker.task_queue),
                 cancellation_type=cancellation_type,
             ),
-            id="caller-wf-" + str(uuid.uuid4()),
+            id=test_context.caller_workflow_id,
             task_queue=worker.task_queue,
             id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
         )
@@ -297,10 +310,11 @@ async def check_behavior_for_abandon(
     await caller_wf.signal(CallerWorkflow.release)
     await caller_wf.result()
     await assert_event_subsequence(
+        caller_wf,
         [
-            (caller_wf, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED),
-            (caller_wf, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED),
-        ]
+            EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED,
+            EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED,
+        ],
     )
     assert not await has_event(
         caller_wf,
@@ -314,8 +328,12 @@ async def check_behavior_for_try_cancel(
 ) -> None:
     """
     Check that a cancellation request is sent and the caller workflow nexus op future is unblocked
-    as cancelled before the cancel handler returns (i.e. before the
-    NexusOperationCancelRequestCompleted in the caller workflow history).
+    as cancelled before the caller server writes CANCEL_REQUESTED.
+
+    There is a race between (a) the caller server writing CANCEL_REQUEST_COMPLETED in response to
+    the cancel handler returning, and (b) the caller server writing CANCELED in response to the
+    handler workflow exiting as canceled. If (b) happens first then (a) may never happen, therefore
+    we do not make any assertions regarding CANCEL_REQUEST_COMPLETED.
     """
     try:
         await handler_wf.result()
@@ -324,31 +342,22 @@ async def check_behavior_for_try_cancel(
     else:
         pytest.fail("Expected WorkflowFailureError")
     await caller_wf.signal(CallerWorkflow.release)
-    await caller_wf.result()
+    result = await caller_wf.result()
 
     handler_status = (await handler_wf.describe()).status
     assert handler_status == WorkflowExecutionStatus.CANCELED
-    caller_op_future_resolved = test_context.caller_op_future_resolved.result()
     await assert_event_subsequence(
+        caller_wf,
         [
-            (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED),
-            (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_COMPLETED),
-            (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCELED),
-        ]
+            EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED,
+            EventType.EVENT_TYPE_NEXUS_OPERATION_CANCELED,
+        ],
     )
     op_cancel_requested_event = await get_event_time(
         caller_wf,
         EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED,
     )
-    op_cancel_request_completed_event = await get_event_time(
-        caller_wf,
-        EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_COMPLETED,
-    )
-    assert (
-        caller_op_future_resolved
-        < op_cancel_requested_event
-        < op_cancel_request_completed_event
-    )
+    assert result.caller_op_future_resolved <= op_cancel_requested_event
 
 
 async def check_behavior_for_wait_cancellation_requested(
@@ -369,18 +378,18 @@ async def check_behavior_for_wait_cancellation_requested(
         pytest.fail("Expected WorkflowFailureError")
 
     await caller_wf.signal(CallerWorkflow.release)
-    await caller_wf.result()
+    result = await caller_wf.result()
 
     handler_status = (await handler_wf.describe()).status
     assert handler_status == WorkflowExecutionStatus.CANCELED
     await assert_event_subsequence(
+        caller_wf,
         [
-            (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED),
-            (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_COMPLETED),
-            (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCELED),
-        ]
+            EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED,
+            EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_COMPLETED,
+            EventType.EVENT_TYPE_NEXUS_OPERATION_CANCELED,
+        ],
     )
-    caller_op_future_resolved = test_context.caller_op_future_resolved.result()
     op_cancel_request_completed = await get_event_time(
         caller_wf,
         EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_COMPLETED,
@@ -389,7 +398,7 @@ async def check_behavior_for_wait_cancellation_requested(
         handler_wf,
         EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED,
     )
-    assert op_cancel_request_completed < caller_op_future_resolved < op_canceled
+    assert op_cancel_request_completed <= result.caller_op_future_resolved < op_canceled
 
 
 async def check_behavior_for_wait_cancellation_completed(
@@ -411,27 +420,25 @@ async def check_behavior_for_wait_cancellation_completed(
     assert handler_status == WorkflowExecutionStatus.CANCELED
 
     await caller_wf.signal(CallerWorkflow.release)
-    await caller_wf.result()
+    result = await caller_wf.result()
 
     await assert_event_subsequence(
+        caller_wf,
         [
-            (caller_wf, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED),
-            (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED),
-            (
-                handler_wf,
-                EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED,
-            ),
-            (handler_wf, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED),
-            (caller_wf, EventType.EVENT_TYPE_NEXUS_OPERATION_CANCELED),
-            (caller_wf, EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED),
-        ]
+            EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED,
+            EventType.EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUESTED,
+            EventType.EVENT_TYPE_NEXUS_OPERATION_CANCELED,
+            EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED,
+        ],
     )
-    caller_op_future_resolved = test_context.caller_op_future_resolved.result()
-    handler_wf_canceled_event_time = await get_event_time(
+    handler_wf_canceled_event = await get_event_time(
         handler_wf,
         EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED,
     )
-    assert caller_op_future_resolved > handler_wf_canceled_event_time
+    assert handler_wf_canceled_event <= result.caller_op_future_resolved, (
+        "expected caller op future resolved after handler workflow canceled, but got "
+        f"{result.caller_op_future_resolved} before {handler_wf_canceled_event}"
+    )
 
 
 async def has_event(wf_handle: WorkflowHandle, event_type: EventType.ValueType):
@@ -453,46 +460,35 @@ async def get_event_time(
 
 
 async def assert_event_subsequence(
-    expected_events: list[tuple[WorkflowHandle, EventType.ValueType]],
+    wf_handle: WorkflowHandle,
+    expected_events: list[EventType.ValueType],
 ) -> None:
     """
-    Given a sequence of (WorkflowHandle, EventType) pairs, assert that the sorted sequence of events
-    from both workflows contains that subsequence.
+    Given a workflow handle and a sequence of event types, assert that the workflow's history
+    contains that subsequence of events in the order specified.
     """
-
-    def _event_time(
-        item: tuple[WorkflowHandle, HistoryEvent],
-    ) -> datetime:
-        return item[1].event_time.ToDatetime()
-
     all_events = []
-    handles = {h for h, _ in expected_events}
-    for h in handles:
-        async for e in h.fetch_history_events():
-            all_events.append((h, e))
-    _all_events = iter(sorted(all_events, key=_event_time))
+    async for e in wf_handle.fetch_history_events():
+        all_events.append(e)
+
+    _all_events = iter(all_events)
     _expected_events = iter(expected_events)
 
-    previous_expected_handle, previous_expected_event_type_name = None, None
-    for expected_handle, expected_event_type in _expected_events:
+    previous_expected_event_type_name = None
+    for expected_event_type in _expected_events:
         expected_event_type_name = EventType.Name(expected_event_type).removeprefix(
             "EVENT_TYPE_"
         )
         has_expected = next(
-            (
-                (h, e)
-                for h, e in _all_events
-                if h == expected_handle and e.event_type == expected_event_type
-            ),
+            (e for e in _all_events if e.event_type == expected_event_type),
             None,
         )
         if not has_expected:
-            if previous_expected_handle is not None:
-                prefix = f"After {previous_expected_event_type_name} in {previous_expected_handle.id}, "
+            if previous_expected_event_type_name is not None:
+                prefix = f"After {previous_expected_event_type_name}, "
             else:
                 prefix = ""
             pytest.fail(
-                f"{prefix}expected {expected_event_type_name} in {expected_handle.id}"
+                f"{prefix}expected {expected_event_type_name} in workflow {wf_handle.id}"
             )
         previous_expected_event_type_name = expected_event_type_name
-        previous_expected_handle = expected_handle

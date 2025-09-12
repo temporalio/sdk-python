@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Iterable, List, Optional
@@ -10,13 +11,14 @@ from typing import Iterable, List, Optional
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import get_tracer
+from opentelemetry.trace import StatusCode, get_tracer
 
 from temporalio import activity, workflow
 from temporalio.client import Client
 from temporalio.common import RetryPolicy
 from temporalio.contrib.opentelemetry import TracingInterceptor
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
+from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
@@ -384,6 +386,60 @@ async def test_opentelemetry_always_create_workflow_spans(client: Client):
     logging.debug("Spans:\n%s", "\n".join(dump_spans(spans, with_attributes=False)))
     assert len(spans) > 0
     assert spans[0].name == "RunWorkflow:SimpleWorkflow"
+
+
+attempted = False
+
+
+@activity.defn
+def benign_activity() -> str:
+    global attempted
+    if attempted:
+        return "done"
+    attempted = True
+    raise ApplicationError(
+        category=ApplicationErrorCategory.BENIGN, message="Benign Error"
+    )
+
+
+@workflow.defn
+class BenignWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return await workflow.execute_activity(
+            benign_activity, schedule_to_close_timeout=timedelta(seconds=1)
+        )
+
+
+async def test_opentelemetry_benign_exception(client: Client):
+    # Create a tracer that has an in-memory exporter
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+
+    # Create new client with tracer interceptor
+    client_config = client.config()
+    client_config["interceptors"] = [TracingInterceptor(tracer)]
+    client = Client(**client_config)
+
+    async with Worker(
+        client,
+        task_queue=f"task_queue_{uuid.uuid4()}",
+        workflows=[BenignWorkflow],
+        activities=[benign_activity],
+        activity_executor=ThreadPoolExecutor(max_workers=1),
+    ) as worker:
+        assert "done" == await client.execute_workflow(
+            BenignWorkflow.run,
+            id=f"workflow_{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            retry_policy=RetryPolicy(
+                maximum_attempts=2, initial_interval=timedelta(milliseconds=10)
+            ),
+        )
+    spans = exporter.get_finished_spans()
+    assert all(span.status.status_code == StatusCode.UNSET for span in spans)
 
 
 # TODO(cretz): Additional tests to write

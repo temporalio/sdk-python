@@ -1,5 +1,6 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
+import dataclasses
 from contextlib import asynccontextmanager, contextmanager
 from datetime import timedelta
 from typing import AsyncIterator, Callable, Optional, Union
@@ -24,22 +25,26 @@ from openai.types.responses import ResponsePromptParam
 
 import temporalio.client
 import temporalio.worker
-from temporalio.client import ClientConfig, Plugin
+from temporalio.client import ClientConfig
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
-from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
+from temporalio.contrib.openai_agents._openai_runner import (
+    TemporalOpenAIRunner,
+)
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
     TemporalTraceProvider,
 )
 from temporalio.contrib.openai_agents._trace_interceptor import (
     OpenAIAgentsTracingInterceptor,
 )
+from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 from temporalio.contrib.pydantic import (
     PydanticPayloadConverter,
     ToJsonOptions,
 )
 from temporalio.converter import (
     DataConverter,
+    DefaultPayloadConverter,
 )
 from temporalio.worker import (
     Replayer,
@@ -121,9 +126,7 @@ class TestModel(Model):
         output_schema: Union[AgentOutputSchemaBase, None],
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        *,
-        previous_response_id: Union[str, None],
-        prompt: Union[ResponsePromptParam, None] = None,
+        **kwargs,
     ) -> ModelResponse:
         """Get a response from the model."""
         return self.fn()
@@ -137,16 +140,17 @@ class TestModel(Model):
         output_schema: Optional[AgentOutputSchemaBase],
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        *,
-        previous_response_id: Optional[str],
-        prompt: Optional[ResponsePromptParam],
+        **kwargs,
     ) -> AsyncIterator[TResponseStreamEvent]:
         """Get a streamed response from the model. Unimplemented."""
         raise NotImplementedError()
 
 
-class _OpenAIPayloadConverter(PydanticPayloadConverter):
+class OpenAIPayloadConverter(PydanticPayloadConverter):
+    """PayloadConverter for OpenAI agents."""
+
     def __init__(self) -> None:
+        """Initialize a payload converter."""
         super().__init__(ToJsonOptions(exclude_unset=True))
 
 
@@ -247,6 +251,20 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         """Set the next worker plugin"""
         self.next_worker_plugin = next
 
+    @staticmethod
+    def _data_converter(converter: Optional[DataConverter]) -> DataConverter:
+        if converter is None:
+            return DataConverter(payload_converter_class=OpenAIPayloadConverter)
+        elif converter.payload_converter_class is DefaultPayloadConverter:
+            return dataclasses.replace(
+                converter, payload_converter_class=OpenAIPayloadConverter
+            )
+        elif not isinstance(converter.payload_converter, OpenAIPayloadConverter):
+            raise ValueError(
+                "The payload converter must be of type OpenAIPayloadConverter."
+            )
+        return converter
+
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         """Configure the Temporal client for OpenAI agents integration.
 
@@ -259,9 +277,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         Returns:
             The modified client configuration.
         """
-        config["data_converter"] = DataConverter(
-            payload_converter_class=_OpenAIPayloadConverter
-        )
+        config["data_converter"] = self._data_converter(config["data_converter"])
         return self.next_client_plugin.configure_client(config)
 
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
@@ -284,6 +300,9 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         config["activities"] = list(config.get("activities") or []) + [
             ModelActivity(self._model_provider).invoke_model_activity
         ]
+        config["workflow_failure_exception_types"] = list(
+            config.get("workflow_failure_exception_types") or []
+        ) + [AgentsWorkflowError]
         return self.next_worker_plugin.configure_worker(config)
 
     async def run_worker(self, worker: Worker) -> None:
@@ -304,10 +323,8 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         config["interceptors"] = list(config.get("interceptors") or []) + [
             OpenAIAgentsTracingInterceptor()
         ]
-        config["data_converter"] = DataConverter(
-            payload_converter_class=_OpenAIPayloadConverter
-        )
-        return config
+        config["data_converter"] = self._data_converter(config.get("data_converter"))
+        return self.next_worker_plugin.configure_replayer(config)
 
     @asynccontextmanager
     async def run_replayer(

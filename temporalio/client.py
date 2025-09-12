@@ -57,6 +57,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.nexus
+import temporalio.nexus._operation_context
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
@@ -1652,8 +1653,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
         Args:
             follow_runs: If true (default), workflow runs will be continually
-                fetched, until the most recent one is found. If false, the first
-                result is used.
+                fetched, until the most recent one is found. If false, return
+                the result from the first run targeted by the request if that run
+                ends in a result, otherwise raise an exception.
             rpc_metadata: Headers used on the RPC call. Keys here override
                 client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for each RPC call. Note,
@@ -2000,7 +2002,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         """Query the workflow.
 
         This will query for :py:attr:`run_id` if present. To use a different
-        run ID, create a new handle with via
+        run ID, create a new handle with
         :py:meth:`Client.get_workflow_handle`.
 
         .. warning::
@@ -5877,6 +5879,12 @@ class _ClientImpl(OutboundInterceptor):
         )
         # Links are duplicated on request for compatibility with older server versions.
         req.links.extend(links)
+
+        if temporalio.nexus._operation_context._in_nexus_backing_workflow_start_context():
+            req.on_conflict_options.attach_request_id = True
+            req.on_conflict_options.attach_completion_callbacks = True
+            req.on_conflict_options.attach_links = True
+
         return req
 
     async def _build_signal_with_start_workflow_execution_request(
@@ -5932,6 +5940,7 @@ class _ClientImpl(OutboundInterceptor):
             "temporalio.api.enums.v1.WorkflowIdConflictPolicy.ValueType",
             int(input.id_conflict_policy),
         )
+
         if input.retry_policy is not None:
             input.retry_policy.apply_to_proto(req.retry_policy)
         req.cron_schedule = input.cron_schedule
@@ -6355,11 +6364,16 @@ class _ClientImpl(OutboundInterceptor):
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             )
-            if resp_by_id.cancel_requested or resp_by_id.activity_paused:
+            if (
+                resp_by_id.cancel_requested
+                or resp_by_id.activity_paused
+                or resp_by_id.activity_reset
+            ):
                 raise AsyncActivityCancelledError(
                     details=ActivityCancellationDetails(
                         cancel_requested=resp_by_id.cancel_requested,
                         paused=resp_by_id.activity_paused,
+                        reset=resp_by_id.activity_reset,
                     )
                 )
 
@@ -6380,6 +6394,7 @@ class _ClientImpl(OutboundInterceptor):
                     details=ActivityCancellationDetails(
                         cancel_requested=resp.cancel_requested,
                         paused=resp.activity_paused,
+                        reset=resp.activity_reset,
                     )
                 )
 

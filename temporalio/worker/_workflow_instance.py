@@ -64,6 +64,7 @@ import temporalio.exceptions
 import temporalio.workflow
 from temporalio.service import __version__
 
+from ..api.failure.v1.message_pb2 import Failure
 from ._interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
@@ -143,6 +144,8 @@ class WorkflowInstanceDetails:
     extern_functions: Mapping[str, Callable]
     disable_eager_activity_execution: bool
     worker_level_failure_exception_types: Sequence[Type[BaseException]]
+    last_completion_result: temporalio.api.common.v1.Payloads
+    last_failure: Optional[Failure]
 
 
 class WorkflowInstance(ABC):
@@ -320,6 +323,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # metadata query
         self._current_details = ""
 
+        self._last_completion_result = det.last_completion_result
+        self._last_failure = det.last_failure
+
         # The versioning behavior of this workflow, as established by annotation or by the dynamic
         # config function. Is only set once upon initialization.
         self._versioning_behavior: Optional[temporalio.common.VersioningBehavior] = None
@@ -414,7 +420,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # We want some errors during activation, like those that can happen
             # during payload conversion, to be able to fail the workflow not the
             # task
-            if self._is_workflow_failure_exception(err):
+            if self.workflow_is_failure_exception(err):
                 try:
                     self._set_workflow_failure(err)
                 except Exception as inner_err:
@@ -629,7 +635,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 # Validation failures are always update failures. We reuse
                 # workflow failure logic to decide task failure vs update
                 # failure after validation.
-                if not past_validation or self._is_workflow_failure_exception(err):
+                if not past_validation or self.workflow_is_failure_exception(err):
                     if command is None:
                         command = self._add_command()
                         command.update_response.protocol_instance_id = (
@@ -1464,6 +1470,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         local_retry_threshold: Optional[timedelta],
         cancellation_type: temporalio.workflow.ActivityCancellationType,
         activity_id: Optional[str],
+        summary: Optional[str],
     ) -> temporalio.workflow.ActivityHandle[Any]:
         # Get activity definition if it's callable
         name: str
@@ -1496,6 +1503,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 retry_policy=retry_policy,
                 local_retry_threshold=local_retry_threshold,
                 cancellation_type=cancellation_type,
+                summary=summary,
                 headers={},
                 arg_types=arg_types,
                 ret_type=ret_type,
@@ -1685,6 +1693,54 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     def workflow_set_current_details(self, details: str):
         self._assert_not_read_only("set current details")
         self._current_details = details
+
+    def workflow_is_failure_exception(self, err: BaseException) -> bool:
+        # An exception is a failure instead of a task fail if it's already a
+        # failure error or if it is a timeout error or if it is an instance of
+        # any of the failure types in the worker or workflow-level setting
+        wf_failure_exception_types = self._defn.failure_exception_types
+        if self._dynamic_failure_exception_types is not None:
+            wf_failure_exception_types = self._dynamic_failure_exception_types
+        return (
+            isinstance(err, temporalio.exceptions.FailureError)
+            or isinstance(err, asyncio.TimeoutError)
+            or any(isinstance(err, typ) for typ in wf_failure_exception_types)
+            or any(
+                isinstance(err, typ)
+                for typ in self._worker_level_failure_exception_types
+            )
+        )
+
+    def workflow_has_last_completion_result(self) -> bool:
+        return len(self._last_completion_result.payloads) > 0
+
+    def workflow_last_completion_result(
+        self, type_hint: Optional[Type]
+    ) -> Optional[Any]:
+        if len(self._last_completion_result.payloads) == 0:
+            return None
+        elif len(self._last_completion_result.payloads) > 1:
+            warnings.warn(
+                f"Expected single last completion result, got {len(self._last_completion_result.payloads)}"
+            )
+            return None
+
+        if type_hint is None:
+            return self._payload_converter.from_payload(
+                self._last_completion_result.payloads[0]
+            )
+        else:
+            return self._payload_converter.from_payload(
+                self._last_completion_result.payloads[0], type_hint
+            )
+
+    def workflow_last_failure(self) -> Optional[BaseException]:
+        if self._last_failure:
+            return self._failure_converter.from_failure(
+                self._last_failure, self._payload_converter
+            )
+
+        return None
 
     #### Calls from outbound impl ####
     # These are in alphabetical order and all start with "_outbound_".
@@ -1939,7 +1995,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # Don't wrap payload conversion errors that would fail the workflow
             raise
         except Exception as err:
-            if self._is_workflow_failure_exception(err):
+            if self.workflow_is_failure_exception(err):
                 raise
             raise RuntimeError("Failed decoding arguments") from err
 
@@ -1981,23 +2037,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     self._versioning_behavior = dynamic_config.versioning_behavior
 
         return workflow_instance
-
-    def _is_workflow_failure_exception(self, err: BaseException) -> bool:
-        # An exception is a failure instead of a task fail if it's already a
-        # failure error or if it is a timeout error or if it is an instance of
-        # any of the failure types in the worker or workflow-level setting
-        wf_failure_exception_types = self._defn.failure_exception_types
-        if self._dynamic_failure_exception_types is not None:
-            wf_failure_exception_types = self._dynamic_failure_exception_types
-        return (
-            isinstance(err, temporalio.exceptions.FailureError)
-            or isinstance(err, asyncio.TimeoutError)
-            or any(isinstance(err, typ) for typ in wf_failure_exception_types)
-            or any(
-                isinstance(err, typ)
-                for typ in self._worker_level_failure_exception_types
-            )
-        )
 
     def _warn_if_unfinished_handlers(self) -> None:
         def warnable(handler_executions: Iterable[HandlerExecution]):
@@ -2192,7 +2231,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 err
             ):
                 self._add_command().cancel_workflow_execution.SetInParent()
-            elif self._is_workflow_failure_exception(err):
+            elif self.workflow_is_failure_exception(err):
                 # All other failure errors fail the workflow
                 self._set_workflow_failure(err)
             else:
@@ -2766,6 +2805,10 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             v.start_to_close_timeout.FromTimedelta(self._input.start_to_close_timeout)
         if self._input.retry_policy:
             self._input.retry_policy.apply_to_proto(v.retry_policy)
+        if self._input.summary:
+            command.user_metadata.summary.CopyFrom(
+                self._instance._payload_converter.to_payload(self._input.summary)
+            )
         v.cancellation_type = cast(
             temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType,
             int(self._input.cancellation_type),
@@ -2786,10 +2829,6 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             if self._input.versioning_intent:
                 command.schedule_activity.versioning_intent = (
                     self._input.versioning_intent._to_proto()
-                )
-            if self._input.summary:
-                command.user_metadata.summary.CopyFrom(
-                    self._instance._payload_converter.to_payload(self._input.summary)
                 )
             if self._input.priority:
                 command.schedule_activity.priority.CopyFrom(
@@ -3028,13 +3067,6 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
 
     def __await__(self) -> Generator[Any, Any, OutputT]:
         return self._task.__await__()
-
-    def __repr__(self) -> str:
-        return (
-            f"{self._start_fut} "
-            f"{self._result_fut} "
-            f"Task[{self._task._state}] fut_waiter = {self._task._fut_waiter}) ({self._task._must_cancel})"  # type: ignore
-        )
 
     def cancel(self) -> bool:
         return self._task.cancel()

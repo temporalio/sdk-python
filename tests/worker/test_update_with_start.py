@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum, IntEnum
-from typing import Any, Iterator, Mapping, Optional
+from typing import Any, Mapping, Optional
 from unittest.mock import patch
 
 import temporalio.api.common.v1
@@ -327,19 +326,6 @@ class TestUpdateWithStart:
                 start_workflow_operation=start_op,
             )
             assert await update_handle.result() == "update-result-1"
-
-    @contextmanager
-    def assert_network_call(
-        self,
-        expect_network_call: bool,
-    ) -> Iterator[None]:
-        with patch.object(
-            self.client.workflow_service,
-            "poll_workflow_execution_update",
-            wraps=self.client.workflow_service.poll_workflow_execution_update,
-        ) as _wrapped_poll:
-            yield
-            assert _wrapped_poll.called == expect_network_call
 
 
 async def test_update_with_start_sets_first_execution_run_id(
