@@ -807,9 +807,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             ret: Optional[Any] = None
             if job.result.completed.HasField("result"):
                 ret_types = [handle._input.ret_type] if handle._input.ret_type else None
+                context = temporalio.converter.WorkflowSerializationContext(
+                    namespace=self._info.namespace,
+                    workflow_id=handle._input.id,
+                )
                 ret_vals = self._convert_payloads(
                     [job.result.completed.result],
                     ret_types,
+                    context,
                 )
                 ret = ret_vals[0]
             handle._resolve_success(ret)
@@ -2961,8 +2966,15 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
 
     def _apply_start_command(self) -> None:
         # Convert arguments before creating command in case it raises error
+        context = temporalio.converter.WorkflowSerializationContext(
+            namespace=self._instance._info.namespace,
+            workflow_id=self._input.id,
+        )
+        payload_converter = self._instance._payload_converter
+        if isinstance(payload_converter, temporalio.converter.WithSerializationContext):
+            payload_converter = payload_converter.with_context(context)
         payloads = (
-            self._instance._payload_converter.to_payloads(self._input.args)
+            payload_converter.to_payloads(self._input.args)
             if self._input.args
             else None
         )
@@ -2997,9 +3009,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
             temporalio.common._apply_headers(self._input.headers, v.headers)
         if self._input.memo:
             for k, val in self._input.memo.items():
-                v.memo[k].CopyFrom(
-                    self._instance._payload_converter.to_payloads([val])[0]
-                )
+                v.memo[k].CopyFrom(payload_converter.to_payloads([val])[0])
         if self._input.search_attributes:
             _encode_search_attributes(
                 self._input.search_attributes, v.search_attributes
@@ -3012,11 +3022,11 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
             v.versioning_intent = self._input.versioning_intent._to_proto()
         if self._input.static_summary:
             command.user_metadata.summary.CopyFrom(
-                self._instance._payload_converter.to_payload(self._input.static_summary)
+                payload_converter.to_payload(self._input.static_summary)
             )
         if self._input.static_details:
             command.user_metadata.details.CopyFrom(
-                self._instance._payload_converter.to_payload(self._input.static_details)
+                payload_converter.to_payload(self._input.static_details)
             )
         if self._input.priority:
             v.priority.CopyFrom(self._input.priority._to_proto())
