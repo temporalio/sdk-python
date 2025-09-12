@@ -144,6 +144,7 @@ class ActivityModelInput(TypedDict, total=False):
     handoffs: list[HandoffInput]
     tracing: Required[ModelTracingInput]
     previous_response_id: Optional[str]
+    conversation_id: Optional[str]
     prompt: Optional[Any]
 
 
@@ -171,11 +172,6 @@ class ModelActivity:
             ctx: RunContextWrapper[Any], input: str
         ) -> Any:
             return None
-
-        # workaround for https://github.com/pydantic/pydantic/issues/9541
-        # ValidatorIterator returned
-        input_json = to_json(input["input"])
-        input_input = json.loads(input_json)
 
         def make_tool(tool: ToolInput) -> Tool:
             if isinstance(
@@ -219,13 +215,14 @@ class ModelActivity:
         try:
             return await model.get_response(
                 system_instructions=input.get("system_instructions"),
-                input=input_input,
+                input=input["input"],
                 model_settings=input["model_settings"],
                 tools=tools,
                 output_schema=input.get("output_schema"),
                 handoffs=handoffs,
                 tracing=ModelTracing(input["tracing"]),
                 previous_response_id=input.get("previous_response_id"),
+                conversation_id=input.get("conversation_id"),
                 prompt=input.get("prompt"),
             )
         except APIStatusError as e:

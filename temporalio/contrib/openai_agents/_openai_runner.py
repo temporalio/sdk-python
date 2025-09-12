@@ -63,11 +63,6 @@ class TemporalOpenAIRunner(AgentRunner):
                 "Temporal OpenAI agent does not support on demand MCP servers."
             )
 
-        # workaround for https://github.com/pydantic/pydantic/issues/9541
-        # ValidatorIterator returned
-        input_json = to_json(input)
-        input = json.loads(input_json)
-
         context = kwargs.get("context")
         max_turns = kwargs.get("max_turns", DEFAULT_MAX_TURNS)
         hooks = kwargs.get("hooks")

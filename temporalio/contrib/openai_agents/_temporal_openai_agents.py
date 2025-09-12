@@ -1,5 +1,6 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
+import dataclasses
 from contextlib import asynccontextmanager, contextmanager
 from datetime import timedelta
 from typing import AsyncIterator, Callable, Optional, Union
@@ -43,6 +44,7 @@ from temporalio.contrib.pydantic import (
 )
 from temporalio.converter import (
     DataConverter,
+    DefaultPayloadConverter,
 )
 from temporalio.worker import (
     Replayer,
@@ -124,9 +126,7 @@ class TestModel(Model):
         output_schema: Union[AgentOutputSchemaBase, None],
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        *,
-        previous_response_id: Union[str, None],
-        prompt: Union[ResponsePromptParam, None] = None,
+        **kwargs,
     ) -> ModelResponse:
         """Get a response from the model."""
         return self.fn()
@@ -140,16 +140,17 @@ class TestModel(Model):
         output_schema: Optional[AgentOutputSchemaBase],
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        *,
-        previous_response_id: Optional[str],
-        prompt: Optional[ResponsePromptParam],
+        **kwargs,
     ) -> AsyncIterator[TResponseStreamEvent]:
         """Get a streamed response from the model. Unimplemented."""
         raise NotImplementedError()
 
 
-class _OpenAIPayloadConverter(PydanticPayloadConverter):
+class OpenAIPayloadConverter(PydanticPayloadConverter):
+    """PayloadConverter for OpenAI agents."""
+
     def __init__(self) -> None:
+        """Initialize a payload converter."""
         super().__init__(ToJsonOptions(exclude_unset=True))
 
 
@@ -250,6 +251,20 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         """Set the next worker plugin"""
         self.next_worker_plugin = next
 
+    @staticmethod
+    def _data_converter(converter: Optional[DataConverter]) -> DataConverter:
+        if converter is None:
+            return DataConverter(payload_converter_class=OpenAIPayloadConverter)
+        elif converter.payload_converter_class is DefaultPayloadConverter:
+            return dataclasses.replace(
+                converter, payload_converter_class=OpenAIPayloadConverter
+            )
+        elif not isinstance(converter.payload_converter, OpenAIPayloadConverter):
+            raise ValueError(
+                "The payload converter must be of type OpenAIPayloadConverter."
+            )
+        return converter
+
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         """Configure the Temporal client for OpenAI agents integration.
 
@@ -262,9 +277,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         Returns:
             The modified client configuration.
         """
-        config["data_converter"] = DataConverter(
-            payload_converter_class=_OpenAIPayloadConverter
-        )
+        config["data_converter"] = self._data_converter(config["data_converter"])
         return self.next_client_plugin.configure_client(config)
 
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
@@ -310,10 +323,8 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         config["interceptors"] = list(config.get("interceptors") or []) + [
             OpenAIAgentsTracingInterceptor()
         ]
-        config["data_converter"] = DataConverter(
-            payload_converter_class=_OpenAIPayloadConverter
-        )
-        return config
+        config["data_converter"] = self._data_converter(config.get("data_converter"))
+        return self.next_worker_plugin.configure_replayer(config)
 
     @asynccontextmanager
     async def run_replayer(
