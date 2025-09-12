@@ -180,7 +180,7 @@ data_converter = dataclasses.replace(
 )
 
 
-async def test_workflow_payload_conversion_can_be_given_access_to_serialization_context(
+async def test_workflow_payload_conversion(
     client: Client,
 ):
     workflow_id = str(uuid.uuid4())
@@ -333,7 +333,7 @@ class SignalSerializationContextTestWorkflow:
         self.signal_received = data
 
 
-async def test_signal_payload_conversion_can_be_given_access_to_serialization_context(
+async def test_signal_payload_conversion(
     client: Client,
 ):
     workflow_id = str(uuid.uuid4())
@@ -412,7 +412,7 @@ class QuerySerializationContextTestWorkflow:
         return input
 
 
-async def test_query_payload_conversion_can_be_given_access_to_serialization_context(
+async def test_query_payload_conversion(
     client: Client,
 ):
     workflow_id = str(uuid.uuid4())
