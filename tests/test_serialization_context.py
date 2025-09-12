@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import inspect
 import uuid
@@ -52,18 +53,23 @@ class TraceData:
 
 @activity.defn
 async def passthrough_activity(input: TraceData) -> TraceData:
+    activity.heartbeat(input)
+    # Wait for the heartbeat to be processed so that it modifies the data before the activity returns
+    await asyncio.sleep(0.2)
     return input
 
 
 @workflow.defn(sandboxed=False)  # we want to use isinstance
 class SerializationContextTestWorkflow:
     @workflow.run
-    async def run(self, input: TraceData) -> TraceData:
-        return await workflow.execute_activity(
+    async def run(self, data: TraceData) -> TraceData:
+        data = await workflow.execute_activity(
             passthrough_activity,
-            input,
+            data,
             start_to_close_timeout=timedelta(seconds=10),
+            heartbeat_timeout=timedelta(seconds=2),
         )
+        return data
 
 
 class SerializationContextTestEncodingPayloadConverter(
@@ -207,49 +213,55 @@ async def test_workflow_payload_conversion_can_be_given_access_to_serialization_
                         context_type="workflow",
                         in_workflow=False,
                         method="to_payload",
-                        context=workflow_context,
+                        context=workflow_context,  # Outbound workflow input
                     ),
                     TraceItem(
                         context_type="workflow",
                         in_workflow=False,
                         method="from_payload",
-                        context=workflow_context,
+                        context=workflow_context,  # Inbound workflow input
                     ),
                     TraceItem(
                         context_type="activity",
                         in_workflow=True,
                         method="to_payload",
-                        context=activity_context,
+                        context=activity_context,  # Outbound activity input
                     ),
                     TraceItem(
                         context_type="activity",
                         in_workflow=False,
                         method="from_payload",
-                        context=activity_context,
+                        context=activity_context,  # Inbound activity input
                     ),
                     TraceItem(
                         context_type="activity",
                         in_workflow=False,
                         method="to_payload",
-                        context=activity_context,
+                        context=activity_context,  # Outbound heartbeat
+                    ),
+                    TraceItem(
+                        context_type="activity",
+                        in_workflow=False,
+                        method="to_payload",
+                        context=activity_context,  # Outbound activity result
                     ),
                     TraceItem(
                         context_type="activity",
                         in_workflow=False,
                         method="from_payload",
-                        context=activity_context,
+                        context=activity_context,  # Inbound activity result
                     ),
                     TraceItem(
                         context_type="workflow",
                         in_workflow=True,
                         method="to_payload",
-                        context=workflow_context,
+                        context=workflow_context,  # Outbound workflow result
                     ),
                     TraceItem(
                         context_type="workflow",
                         in_workflow=False,
                         method="from_payload",
-                        context=workflow_context,
+                        context=workflow_context,  # Inbound workflow result
                     ),
                 ],
             )

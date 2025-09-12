@@ -252,6 +252,9 @@ class _ActivityWorker:
         if details is None:
             return
 
+        assert len(details) == 1
+        print(f"🌈 Heartbeat: details(id={id(details[0])})={details[0]}")
+
         data_converter = self._data_converter
         if activity.info:
             context = temporalio.converter.ActivitySerializationContext(
