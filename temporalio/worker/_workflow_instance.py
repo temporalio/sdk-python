@@ -576,12 +576,17 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 self._in_progress_updates[job.id] = HandlerExecution(
                     job.name, defn.unfinished_policy, job.id
                 )
+                context = temporalio.converter.WorkflowSerializationContext(
+                    namespace=self._info.namespace,
+                    workflow_id=self._info.workflow_id,
+                )
                 args = self._process_handler_args(
                     job.name,
                     job.input,
                     defn.name,
                     defn.arg_types,
                     defn.dynamic_vararg,
+                    context,
                 )
                 handler_input = HandleUpdateInput(
                     id=job.id,
@@ -600,6 +605,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                             defn.name,
                             defn.arg_types,
                             defn.dynamic_vararg,
+                            context,
                         )
                         handler_input.args = args
 
@@ -692,12 +698,17 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         )
 
                     # Create input
+                    context = temporalio.converter.WorkflowSerializationContext(
+                        namespace=self._info.namespace,
+                        workflow_id=self._info.workflow_id,
+                    )
                     args = self._process_handler_args(
                         job.query_type,
                         job.arguments,
                         defn.name,
                         defn.arg_types,
                         defn.dynamic_vararg,
+                        context,
                     )
                     input = HandleQueryInput(
                         id=job.query_id,
@@ -706,7 +717,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         headers=job.headers,
                     )
                     success = await self._inbound.handle_query(input)
-                    result_payloads = self._payload_converter.to_payloads([success])
+                    converter = self._payload_converter
+                    if isinstance(
+                        converter, temporalio.converter.WithSerializationContext
+                    ):
+                        converter = converter.with_context(context)
+                    result_payloads = converter.to_payloads([success])
                     if len(result_payloads) != 1:
                         raise ValueError(
                             f"Expected 1 result payload, got {len(result_payloads)}"
@@ -716,11 +732,20 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 command.respond_to_query.succeeded.response.CopyFrom(result_payloads[0])
             except Exception as err:
                 try:
+                    context = temporalio.converter.WorkflowSerializationContext(
+                        namespace=self._info.namespace,
+                        workflow_id=self._info.workflow_id,
+                    )
+                    converter = self._payload_converter
+                    if isinstance(
+                        converter, temporalio.converter.WithSerializationContext
+                    ):
+                        converter = converter.with_context(context)
                     command = self._add_command()
                     command.respond_to_query.query_id = job.query_id
                     self._failure_converter.to_failure(
                         err,
-                        self._payload_converter,
+                        converter,
                         command.respond_to_query.failed,
                     )
                 except Exception as inner_err:
@@ -2106,6 +2131,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         defn_name: Optional[str],
         defn_arg_types: Optional[List[Type]],
         defn_dynamic_vararg: bool,
+        context: temporalio.converter.SerializationContext,
     ) -> List[Any]:
         # If dynamic old-style vararg, args become name + varargs of given arg
         # types. If dynamic new-style raw value sequence, args become name +
@@ -2113,15 +2139,15 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if not defn_name and defn_dynamic_vararg:
             # Take off the string type hint for conversion
             arg_types = defn_arg_types[1:] if defn_arg_types else None
-            return [job_name] + self._convert_payloads(job_input, arg_types)
+            return [job_name] + self._convert_payloads(job_input, arg_types, context)
         if not defn_name:
             return [
                 job_name,
                 self._convert_payloads(
-                    job_input, [temporalio.common.RawValue] * len(job_input)
+                    job_input, [temporalio.common.RawValue] * len(job_input), context
                 ),
             ]
-        return self._convert_payloads(job_input, defn_arg_types)
+        return self._convert_payloads(job_input, defn_arg_types, context)
 
     def _process_signal_job(
         self,
@@ -2129,12 +2155,17 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         job: temporalio.bridge.proto.workflow_activation.SignalWorkflow,
     ) -> None:
         try:
+            context = temporalio.converter.WorkflowSerializationContext(
+                namespace=self._info.namespace,
+                workflow_id=self._info.workflow_id,
+            )
             args = self._process_handler_args(
                 job.signal_name,
                 job.input,
                 defn.name,
                 defn.arg_types,
                 defn.dynamic_vararg,
+                context,
             )
         except Exception:
             logger.exception(

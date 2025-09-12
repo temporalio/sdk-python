@@ -62,6 +62,7 @@ import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
 from temporalio.activity import ActivityCancellationDetails
+from temporalio.converter import WorkflowSerializationContext
 from temporalio.service import (
     HttpConnectProxyConfig,
     KeepAliveConfig,
@@ -6062,8 +6063,14 @@ class _ClientImpl(OutboundInterceptor):
             )
         req.query.query_type = input.query
         if input.args:
+            context = WorkflowSerializationContext(
+                namespace=self._client.namespace,
+                workflow_id=input.id,
+            )
             req.query.query_args.payloads.extend(
-                await self._client.data_converter.encode(input.args)
+                await self._client.data_converter._with_context(context).encode(
+                    input.args
+                )
             )
         if input.headers is not None:
             await self._apply_headers(input.headers, req.query.header.fields)
@@ -6087,7 +6094,11 @@ class _ClientImpl(OutboundInterceptor):
         if not resp.query_result.payloads:
             return None
         type_hints = [input.ret_type] if input.ret_type else None
-        results = await self._client.data_converter.decode(
+        context = WorkflowSerializationContext(
+            namespace=self._client.namespace,
+            workflow_id=input.id,
+        )
+        results = await self._client.data_converter._with_context(context).decode(
             resp.query_result.payloads, type_hints
         )
         if not results:
@@ -6108,8 +6119,14 @@ class _ClientImpl(OutboundInterceptor):
             request_id=str(uuid.uuid4()),
         )
         if input.args:
+            context = temporalio.converter.WorkflowSerializationContext(
+                namespace=self._client.namespace,
+                workflow_id=input.id,
+            )
             req.input.payloads.extend(
-                await self._client.data_converter.encode(input.args)
+                await self._client.data_converter._with_context(context).encode(
+                    input.args
+                )
             )
         if input.headers is not None:
             await self._apply_headers(input.headers, req.header.fields)
