@@ -33,6 +33,7 @@ from ._tuning import (
     CustomSlotSupplier,
     FixedSizeSlotSupplier,
     LocalActivitySlotInfo,
+    NexusSlotInfo,
     ResourceBasedSlotConfig,
     ResourceBasedSlotSupplier,
     ResourceBasedTunerConfig,
@@ -117,4 +118,5 @@ __all__ = [
     "SlotReleaseContext",
     "SlotReserveContext",
     "WorkflowSlotInfo",
+    "NexusSlotInfo",
 ]
