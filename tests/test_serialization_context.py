@@ -684,6 +684,152 @@ async def test_update_payload_conversion(
         )
 
 
+# External workflow test
+
+
+@workflow.defn
+class ExternalWorkflowTarget:
+    def __init__(self) -> None:
+        self.signal_received = None
+
+    @workflow.run
+    async def run(self) -> TraceData:
+        try:
+            # Wait for signal
+            await workflow.wait_condition(lambda: self.signal_received is not None)
+            return self.signal_received or TraceData()
+        except asyncio.CancelledError:
+            # Return empty data on cancellation
+            return TraceData()
+
+    @workflow.signal
+    async def external_signal(self, data: TraceData) -> None:
+        self.signal_received = data
+
+
+@workflow.defn
+class ExternalWorkflowSignaler:
+    @workflow.run
+    async def run(self, target_id: str, data: TraceData) -> TraceData:
+        # Signal external workflow
+        handle = workflow.get_external_workflow_handle(target_id)
+        await handle.signal(ExternalWorkflowTarget.external_signal, data)
+        return data
+
+
+@workflow.defn
+class ExternalWorkflowCanceller:
+    @workflow.run
+    async def run(self, target_id: str) -> TraceData:
+        # Cancel external workflow
+        handle = workflow.get_external_workflow_handle(target_id)
+        await handle.cancel()
+        return TraceData()
+
+
+@pytest.mark.timeout(10)
+async def test_external_workflow_signal_and_cancel_payload_conversion(
+    client: Client,
+):
+    target_workflow_id = str(uuid.uuid4())
+    signaler_workflow_id = str(uuid.uuid4())
+    canceller_workflow_id = str(uuid.uuid4())
+    task_queue = str(uuid.uuid4())
+
+    data_converter = dataclasses.replace(
+        DataConverter.default,
+        payload_converter_class=SerializationContextTestPayloadConverter,
+    )
+
+    config = client.config()
+    config["data_converter"] = data_converter
+    custom_client = Client(**config)
+
+    async with Worker(
+        custom_client,
+        task_queue=task_queue,
+        workflows=[
+            ExternalWorkflowTarget,
+            ExternalWorkflowSignaler,
+            ExternalWorkflowCanceller,
+        ],
+        activities=[],
+        workflow_runner=UnsandboxedWorkflowRunner(),  # so that we can use isinstance
+    ):
+        # Test external signal
+        target_handle = await custom_client.start_workflow(
+            ExternalWorkflowTarget.run,
+            id=target_workflow_id,
+            task_queue=task_queue,
+        )
+
+        signaler_handle = await custom_client.start_workflow(
+            ExternalWorkflowSignaler.run,
+            args=[target_workflow_id, TraceData()],
+            id=signaler_workflow_id,
+            task_queue=task_queue,
+        )
+
+        # Wait for both to complete
+        signaler_result = await signaler_handle.result()
+        target_result = await target_handle.result()
+
+        # Verify signal trace
+        signaler_context = dataclasses.asdict(
+            WorkflowSerializationContext(
+                namespace="default",
+                workflow_id=signaler_workflow_id,
+            )
+        )
+        target_context = dataclasses.asdict(
+            WorkflowSerializationContext(
+                namespace="default",
+                workflow_id=target_workflow_id,
+            )
+        )
+
+        # This test verifies that external signals SHOULD use the target workflow's context
+        # This is the DESIRED behavior to match .NET
+        assert_trace(
+            signaler_result.items,
+            [
+                TraceItem(
+                    context_type="workflow",
+                    in_workflow=False,
+                    method="to_payload",
+                    context=signaler_context,  # Outbound signaler workflow input
+                ),
+                TraceItem(
+                    context_type="workflow",
+                    in_workflow=False,
+                    method="from_payload",
+                    context=signaler_context,  # Inbound signaler workflow input
+                ),
+                TraceItem(
+                    context_type="workflow",
+                    in_workflow=True,
+                    method="to_payload",
+                    context=target_context,  # Should use target workflow's context for external signal
+                ),
+                TraceItem(
+                    context_type="workflow",
+                    in_workflow=True,
+                    method="to_payload",
+                    context=signaler_context,  # Outbound signaler workflow result
+                ),
+                TraceItem(
+                    context_type="workflow",
+                    in_workflow=False,
+                    method="from_payload",
+                    context=signaler_context,  # Inbound signaler workflow result
+                ),
+            ],
+        )
+
+        # Note: External cancel doesn't send payloads, so we don't test it here
+        # The cancel context would only be used for failure deserialization
+
+
 # Utilities
 
 
