@@ -833,7 +833,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             ret: Optional[Any] = None
             if job.result.completed.HasField("result"):
                 ret_types = [handle._input.ret_type] if handle._input.ret_type else None
-                # TODO: should the workflow ID in serialization context be that of the parent or the child workflow?
                 context = temporalio.converter.WorkflowSerializationContext(
                     namespace=self._info.namespace,
                     workflow_id=handle._input.id,
@@ -846,14 +845,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 ret = ret_vals[0]
             handle._resolve_success(ret)
         elif job.result.HasField("failed"):
-            # TODO: should the workflow ID in serialization context be that of the parent or the child workflow?
             handle._resolve_failure(
                 self._failure_converter.from_failure(
                     job.result.failed.failure, self._payload_converter
                 )
             )
         elif job.result.HasField("cancelled"):
-            # TODO: should the workflow ID in serialization context be that of the parent or the child workflow?
             handle._resolve_failure(
                 self._failure_converter.from_failure(
                     job.result.cancelled.failure, self._payload_converter
@@ -891,7 +888,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     RuntimeError(f"Unknown child start fail cause: {job.failed.cause}")
                 )
         elif job.HasField("cancelled"):
-            # TODO: should the workflow ID in serialization context be that of the parent or the child workflow?
             self._pending_child_workflows.pop(job.seq)
             handle._resolve_failure(
                 self._failure_converter.from_failure(
