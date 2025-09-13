@@ -255,8 +255,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._pending_activities: Dict[int, _ActivityHandle] = {}
         self._pending_child_workflows: Dict[int, _ChildWorkflowHandle] = {}
         self._pending_nexus_operations: Dict[int, _NexusOperationHandle] = {}
-        self._pending_external_signals: Dict[int, asyncio.Future] = {}
-        self._pending_external_cancels: Dict[int, asyncio.Future] = {}
+        self._pending_external_signals: Dict[int, Tuple[asyncio.Future, str]] = {}
+        self._pending_external_cancels: Dict[int, Tuple[asyncio.Future, str]] = {}
         # Keyed by type
         self._curr_seqs: Dict[str, int] = {}
         # TODO(cretz): Any concerns about not sharing this? Maybe the types I
@@ -991,18 +991,31 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self,
         job: temporalio.bridge.proto.workflow_activation.ResolveRequestCancelExternalWorkflow,
     ) -> None:
-        fut = self._pending_external_cancels.pop(job.seq, None)
-        if not fut:
+        pending = self._pending_external_cancels.pop(job.seq, None)
+        if not pending:
             raise RuntimeError(
                 f"Failed finding pending external cancel for sequence {job.seq}"
             )
+        fut, target_workflow_id = pending
         # We intentionally let this error if future is already done
         if job.HasField("failure"):
-            # TODO: which workflow ID should be in serialization context?
+            # Use the target workflow's context when deserializing failures
+            context = temporalio.converter.WorkflowSerializationContext(
+                namespace=self._info.namespace,
+                workflow_id=target_workflow_id,
+            )
+            failure_converter = self._failure_converter
+            payload_converter = self._payload_converter
+            if isinstance(
+                failure_converter, temporalio.converter.WithSerializationContext
+            ):
+                failure_converter = failure_converter.with_context(context)
+            if isinstance(
+                payload_converter, temporalio.converter.WithSerializationContext
+            ):
+                payload_converter = payload_converter.with_context(context)
             fut.set_exception(
-                self._failure_converter.from_failure(
-                    job.failure, self._payload_converter
-                )
+                failure_converter.from_failure(job.failure, payload_converter)
             )
         else:
             fut.set_result(None)
@@ -1011,18 +1024,31 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self,
         job: temporalio.bridge.proto.workflow_activation.ResolveSignalExternalWorkflow,
     ) -> None:
-        fut = self._pending_external_signals.pop(job.seq, None)
-        if not fut:
+        pending = self._pending_external_signals.pop(job.seq, None)
+        if not pending:
             raise RuntimeError(
                 f"Failed finding pending external signal for sequence {job.seq}"
             )
+        fut, target_workflow_id = pending
         # We intentionally let this error if future is already done
         if job.HasField("failure"):
-            # TODO: which workflow ID should be in serialization context?
+            # Use the target workflow's context when deserializing failures
+            context = temporalio.converter.WorkflowSerializationContext(
+                namespace=self._info.namespace,
+                workflow_id=target_workflow_id,
+            )
+            failure_converter = self._failure_converter
+            payload_converter = self._payload_converter
+            if isinstance(
+                failure_converter, temporalio.converter.WithSerializationContext
+            ):
+                failure_converter = failure_converter.with_context(context)
+            if isinstance(
+                payload_converter, temporalio.converter.WithSerializationContext
+            ):
+                payload_converter = payload_converter.with_context(context)
             fut.set_exception(
-                self._failure_converter.from_failure(
-                    job.failure, self._payload_converter
-                )
+                failure_converter.from_failure(job.failure, payload_converter)
             )
         else:
             fut.set_result(None)
@@ -1870,10 +1896,15 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     async def _outbound_signal_child_workflow(
         self, input: SignalChildWorkflowInput
     ) -> None:
-        # TODO: which workflow ID in serialization context?
-        payloads = (
-            self._payload_converter.to_payloads(input.args) if input.args else None
+        # Use the child workflow's context for serialization
+        context = temporalio.converter.WorkflowSerializationContext(
+            namespace=self._info.namespace,
+            workflow_id=input.child_workflow_id,
         )
+        payload_converter = self._payload_converter
+        if isinstance(payload_converter, temporalio.converter.WithSerializationContext):
+            payload_converter = payload_converter.with_context(context)
+        payloads = payload_converter.to_payloads(input.args) if input.args else None
         command = self._add_command()
         v = command.signal_external_workflow_execution
         v.child_workflow_id = input.child_workflow_id
@@ -1887,10 +1918,15 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     async def _outbound_signal_external_workflow(
         self, input: SignalExternalWorkflowInput
     ) -> None:
-        # TODO: which workflow ID in serialization context?
-        payloads = (
-            self._payload_converter.to_payloads(input.args) if input.args else None
+        # Use the target workflow's context for serialization
+        context = temporalio.converter.WorkflowSerializationContext(
+            namespace=input.namespace,
+            workflow_id=input.workflow_id,
         )
+        payload_converter = self._payload_converter
+        if isinstance(payload_converter, temporalio.converter.WithSerializationContext):
+            payload_converter = payload_converter.with_context(context)
+        payloads = payload_converter.to_payloads(input.args) if input.args else None
         command = self._add_command()
         v = command.signal_external_workflow_execution
         v.workflow_execution.namespace = input.namespace
@@ -1924,7 +1960,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 # TODO(cretz): Nothing waits on this future, so how
                 # if at all should we report child-workflow cancel
                 # request failure?
-                self._pending_external_cancels[cancel_seq] = self.create_future()
+                self._pending_external_cancels[cancel_seq] = (
+                    self.create_future(),
+                    input.id,
+                )
 
         # Function that runs in the handle
         async def run_child() -> Any:
@@ -2030,8 +2069,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         done_fut = self.create_future()
         command.request_cancel_external_workflow_execution.seq = seq
 
-        # Set as pending
-        self._pending_external_cancels[seq] = done_fut
+        # Set as pending with the target workflow ID for later context use
+        target_workflow_id = command.request_cancel_external_workflow_execution.workflow_execution.workflow_id
+        self._pending_external_cancels[seq] = (done_fut, target_workflow_id)
 
         # Wait until done (there is no cancelling a cancel request)
         await done_fut
@@ -2329,8 +2369,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         done_fut = self.create_future()
         command.signal_external_workflow_execution.seq = seq
 
-        # Set as pending
-        self._pending_external_signals[seq] = done_fut
+        # Set as pending with the target workflow ID for later context use
+        # Extract the workflow ID from the command
+        target_workflow_id = (
+            command.signal_external_workflow_execution.child_workflow_id
+            or command.signal_external_workflow_execution.workflow_execution.workflow_id
+        )
+        self._pending_external_signals[seq] = (done_fut, target_workflow_id)
 
         # Wait until completed or cancelled
         while True:
