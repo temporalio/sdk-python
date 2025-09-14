@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import concurrent.futures
+import dataclasses
+import functools
+import inspect
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import (
@@ -316,7 +320,53 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
             },
             kind=opentelemetry.trace.SpanKind.SERVER,
         ):
+            # Propagate trace_context into synchronous activities running in
+            # ProcessPoolExecutor
+            is_async = inspect.iscoroutinefunction(
+                input.fn
+            ) or inspect.iscoroutinefunction(
+                input.fn.__call__  # type: ignore
+            )
+            is_threadpool_executor = isinstance(
+                input.executor, concurrent.futures.ThreadPoolExecutor
+            )
+            if not (is_async or is_threadpool_executor):
+                carrier: _CarrierDict = {}
+                default_text_map_propagator.inject(carrier)
+                input.fn = ActivityFnWithTraceContext(input.fn, carrier)
+
             return await super().execute_activity(input)
+
+
+@dataclasses.dataclass
+class ActivityFnWithTraceContext:
+    """Wraps an activity function to inject trace context from a carrier.
+
+    This wrapper is intended for sync activities executed in a process pool executor
+    to ensure tracing features like child spans, trace events, and log-correlation
+    works properly in the user's activity implementation.
+    """
+
+    fn: Callable[..., Any]
+    carrier: _CarrierDict
+
+    def __post_init__(self):
+        """Post-initialization to ensure the function is wrapped correctly.
+
+        Ensures the original function's metadata is preserved for reflection.
+        Downstream interceptors that may inspect the function's attributes,
+        like `__module__`, `__name__`, etc. (e.g. the `SentryInterceptor`
+        in the Python Samples.)
+        """
+        functools.wraps(self.fn)(self)
+
+    def __call__(self, *args: Any, **kwargs: Any):  # noqa: D102
+        trace_context = default_text_map_propagator.extract(self.carrier)
+        token = opentelemetry.context.attach(trace_context)
+        try:
+            return self.fn(*args, **kwargs)
+        finally:
+            opentelemetry.context.detach(token)
 
 
 class _InputWithHeaders(Protocol):
