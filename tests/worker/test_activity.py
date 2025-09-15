@@ -47,6 +47,7 @@ from tests.helpers.worker import (
     KSAction,
     KSExecuteActivityAction,
     KSWorkflowParams,
+    kitchen_sink_retry_policy,
 )
 
 # Passing through because Python 3.9 has an import bug at
@@ -186,6 +187,7 @@ async def test_activity_info(
     assert info.workflow_namespace == client.namespace
     assert info.workflow_run_id == result.handle.first_execution_run_id
     assert info.workflow_type == "kitchen_sink"
+    assert info.retry_policy == kitchen_sink_retry_policy()
 
 
 async def test_sync_activity_thread(client: Client, worker: ExternalWorker):

@@ -1720,7 +1720,7 @@ wheels = [
 
 [[package]]
 name = "openai"
-version = "1.103.0"
+version = "1.107.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -1732,14 +1732,14 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cb/0b/4cacc14f976601edf35b74f7c5c2d6305f7402257cb13b9956b4eaabf94d/openai-1.103.0.tar.gz", hash = "sha256:f84f8741536f01adfdae1acfe31ec1874fc0985d33f53344f9edca773f150a36", size = 556049, upload-time = "2025-09-02T14:03:11.533Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/e0/a62daa7ff769df969cc1b782852cace79615039630b297005356f5fb46fb/openai-1.107.1.tar.gz", hash = "sha256:7c51b6b8adadfcf5cada08a613423575258b180af5ad4bc2954b36ebc0d3ad48", size = 563671, upload-time = "2025-09-10T15:04:40.288Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/c0/f5d440153d96c6be42e5d05c39adf33e0c324c9f035daf0e537a71fe2d11/openai-1.103.0-py3-none-any.whl", hash = "sha256:60a69224f0d210a720e7364947d3b712fe0036373f25dc1cb801fc25abb3f864", size = 926169, upload-time = "2025-09-02T14:03:09.666Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/12/32c19999a58eec4a695e8ce334442b6135df949f0bb61b2ceaa4fa60d3a9/openai-1.107.1-py3-none-any.whl", hash = "sha256:168f9885b1b70d13ada0868a0d0adfd538c16a02f7fd9fe063851a2c9a025e72", size = 945177, upload-time = "2025-09-10T15:04:37.782Z" },
 ]
 
 [[package]]
 name = "openai-agents"
-version = "0.2.9"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "griffe" },
@@ -1750,9 +1750,9 @@ dependencies = [
     { name = "types-requests" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c3/03/45a1022ae6daa7f0223a3cae8975c5a524858edcad2355f8e1adcd4f000e/openai_agents-0.2.9.tar.gz", hash = "sha256:619c51c8ce49f841474a9e619573d6f7f96a46432900752145ad04309ab70ae9", size = 1664869, upload-time = "2025-08-22T02:03:39.196Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a3/49/78c902865ceb0432dae52f4a3feee8bcb57ce5be724c52e0119754fd421b/openai_agents-0.3.0.tar.gz", hash = "sha256:4d5d1a4f43cdc35b55c41ae4f31157cf5ff2e2c89563cde58616f8a77fde932d", size = 1700443, upload-time = "2025-09-11T19:20:09.742Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/dc/bf/8a8dd24206763214f364b272371486247744a64ef554e952d92444e6ce14/openai_agents-0.2.9-py3-none-any.whl", hash = "sha256:cca016c28e39b24b17cae232c2bc16769e48dbfc7cbe006775d10822c441f6e4", size = 175106, upload-time = "2025-08-22T02:03:37.738Z" },
+    { url = "https://files.pythonhosted.org/packages/46/3b/58ee42582716645aa1a5c30c1e337dc9a7433f7f0b5ed84ef02a35368abb/openai_agents-0.3.0-py3-none-any.whl", hash = "sha256:16de8a28729ae9e27faad7ce146a4b74acf05c9eeca3fe23299f6e621a3893ed", size = 185007, upload-time = "2025-09-11T19:20:08.304Z" },
 ]
 
 [package.optional-dependencies]
@@ -2847,7 +2847,7 @@ requires-dist = [
     { name = "eval-type-backport", marker = "python_full_version < '3.10' and extra == 'openai-agents'", specifier = ">=0.2.2" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.48.2,<2" },
     { name = "nexus-rpc", specifier = "==1.1.0" },
-    { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.2.3,<=0.2.9" },
+    { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.3,<0.4" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
     { name = "protobuf", specifier = ">=6.31.1,<7.0.0" },
@@ -2866,7 +2866,7 @@ dev = [
     { name = "maturin", specifier = ">=1.8.2" },
     { name = "mypy", specifier = "==1.4.1" },
     { name = "mypy-protobuf", specifier = ">=3.3.0,<4" },
-    { name = "openai-agents", extras = ["litellm"], specifier = ">=0.2.3,<=0.2.9" },
+    { name = "openai-agents", extras = ["litellm"], specifier = ">=0.3,<0.4" },
     { name = "psutil", specifier = ">=5.9.3,<6" },
     { name = "pydocstyle", specifier = ">=6.3.0,<7" },
     { name = "pydoctor", specifier = ">=24.11.1,<25" },

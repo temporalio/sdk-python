@@ -143,7 +143,7 @@ class ConnectConfig:
     tls: Union[bool, TLSConfig] = False
     retry_config: Optional[RetryConfig] = None
     keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default
-    rpc_metadata: Mapping[str, str] = field(default_factory=dict)
+    rpc_metadata: Mapping[str, Union[str, bytes]] = field(default_factory=dict)
     identity: str = ""
     lazy: bool = False
     runtime: Optional[temporalio.runtime.Runtime] = None
@@ -232,7 +232,7 @@ class ServiceClient(ABC):
         *,
         service: str = "temporal.api.workflowservice.v1.WorkflowService",
         retry: bool = False,
-        metadata: Mapping[str, str] = {},
+        metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> bool:
         """Check whether the WorkflowService is up.
@@ -264,7 +264,7 @@ class ServiceClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def update_rpc_metadata(self, metadata: Mapping[str, str]) -> None:
+    def update_rpc_metadata(self, metadata: Mapping[str, Union[str, bytes]]) -> None:
         """Update service client's RPC metadata."""
         raise NotImplementedError
 
@@ -282,7 +282,7 @@ class ServiceClient(ABC):
         *,
         service: str,
         retry: bool,
-        metadata: Mapping[str, str],
+        metadata: Mapping[str, Union[str, bytes]],
         timeout: Optional[timedelta],
     ) -> ServiceResponse:
         raise NotImplementedError
@@ -1257,7 +1257,7 @@ class ServiceCall(Generic[ServiceRequest, ServiceResponse]):
         req: ServiceRequest,
         *,
         retry: bool = False,
-        metadata: Mapping[str, str] = {},
+        metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> ServiceResponse:
         """Invoke underlying client with the given request.
@@ -1316,7 +1316,7 @@ class _BridgeServiceClient(ServiceClient):
         """Underlying service client."""
         return self
 
-    def update_rpc_metadata(self, metadata: Mapping[str, str]) -> None:
+    def update_rpc_metadata(self, metadata: Mapping[str, Union[str, bytes]]) -> None:
         """Update Core client metadata."""
         # Mutate the bridge config and then only mutate the running client
         # metadata if already connected
@@ -1340,7 +1340,7 @@ class _BridgeServiceClient(ServiceClient):
         *,
         service: str,
         retry: bool,
-        metadata: Mapping[str, str],
+        metadata: Mapping[str, Union[str, bytes]],
         timeout: Optional[timedelta],
     ) -> ServiceResponse:
         global LOG_PROTOS
