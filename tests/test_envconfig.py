@@ -699,15 +699,13 @@ def test_tls_conflict_across_sources_path_in_toml_data_in_env():
         """
     )
 
-    env = {
-        "TEMPORAL_TLS_CLIENT_CERT_DATA": "cert-data-from-env"
-    }
+    env = {"TEMPORAL_TLS_CLIENT_CERT_DATA": "cert-data-from-env"}
 
-    with pytest.raises(RuntimeError, match="Cannot specify cert data via TEMPORAL_TLS_CLIENT_CERT_DATA when cert path is already specified"):
-        ClientConfigProfile.load(
-            config_source=toml_config,
-            override_env_vars=env
-        )
+    with pytest.raises(
+        RuntimeError,
+        match="Cannot specify cert data via TEMPORAL_TLS_CLIENT_CERT_DATA when cert path is already specified",
+    ):
+        ClientConfigProfile.load(config_source=toml_config, override_env_vars=env)
 
 
 def test_tls_conflict_across_sources_data_in_toml_path_in_env():
@@ -721,15 +719,13 @@ def test_tls_conflict_across_sources_data_in_toml_path_in_env():
         """
     )
 
-    env = {
-        "TEMPORAL_TLS_CLIENT_CERT_PATH": "/path/from/env"
-    }
+    env = {"TEMPORAL_TLS_CLIENT_CERT_PATH": "/path/from/env"}
 
-    with pytest.raises(RuntimeError, match="Cannot specify cert path via TEMPORAL_TLS_CLIENT_CERT_PATH when cert data is already specified"):
-        ClientConfigProfile.load(
-            config_source=toml_config,
-            override_env_vars=env
-        )
+    with pytest.raises(
+        RuntimeError,
+        match="Cannot specify cert path via TEMPORAL_TLS_CLIENT_CERT_PATH when cert data is already specified",
+    ):
+        ClientConfigProfile.load(config_source=toml_config, override_env_vars=env)
 
 
 def test_load_client_connect_options_convenience_api(base_config_file: Path):
@@ -777,21 +773,21 @@ def test_load_client_connect_options_e2e_validation():
 
     env_overrides = {
         "TEMPORAL_GRPC_META_X_ENVIRONMENT": "production",
-        "TEMPORAL_TLS_SERVER_NAME": "override.temporal.com"
+        "TEMPORAL_TLS_SERVER_NAME": "override.temporal.com",
     }
 
     config = ClientConfig.load_client_connect_config(
         profile="production",
         config_file=None,  # Use config_source directly
         override_env_vars=env_overrides,
-        disable_file=True  # Load from config_source instead
+        disable_file=True,  # Load from config_source instead
     )
 
     # First load the profile to get the raw config, then convert
     profile = ClientConfigProfile.load(
         profile="production",
         config_source=toml_content,
-        override_env_vars=env_overrides
+        override_env_vars=env_overrides,
     )
     config = profile.to_client_connect_config()
 
@@ -834,8 +830,7 @@ async def test_e2e_basic_development_profile_client_connection(client: Client):
     )
 
     profile = ClientConfigProfile.load(
-        profile="development",
-        config_source=toml_content
+        profile="development", config_source=toml_content
     )
 
     config = profile.to_client_connect_config()
@@ -847,7 +842,10 @@ async def test_e2e_basic_development_profile_client_connection(client: Client):
     assert new_client.service_client.config.target_host == target_host
     assert new_client.namespace == namespace
     if new_client.service_client.config.rpc_metadata:
-        assert new_client.service_client.config.rpc_metadata["x-test-source"] == "envconfig-python-dev"
+        assert (
+            new_client.service_client.config.rpc_metadata["x-test-source"]
+            == "envconfig-python-dev"
+        )
 
 
 async def test_e2e_production_tls_api_key_client_connection(client: Client):
@@ -871,10 +869,7 @@ async def test_e2e_production_tls_api_key_client_connection(client: Client):
         """
     )
 
-    profile = ClientConfigProfile.load(
-        profile="production",
-        config_source=toml_content
-    )
+    profile = ClientConfigProfile.load(profile="production", config_source=toml_content)
 
     config = profile.to_client_connect_config()
 
@@ -886,8 +881,14 @@ async def test_e2e_production_tls_api_key_client_connection(client: Client):
     assert new_client.namespace == "production-namespace"
     assert new_client.service_client.config.api_key == "prod-api-key-123"
     if new_client.service_client.config.rpc_metadata:
-        assert new_client.service_client.config.rpc_metadata["authorization"] == "Bearer prod-token"
-        assert new_client.service_client.config.rpc_metadata["x-environment"] == "production"
+        assert (
+            new_client.service_client.config.rpc_metadata["authorization"]
+            == "Bearer prod-token"
+        )
+        assert (
+            new_client.service_client.config.rpc_metadata["x-environment"]
+            == "production"
+        )
 
 
 async def test_e2e_environment_overrides_client_connection(client: Client):
@@ -911,13 +912,11 @@ async def test_e2e_environment_overrides_client_connection(client: Client):
         "TEMPORAL_ADDRESS": target_host,
         "TEMPORAL_NAMESPACE": "override-namespace",
         "TEMPORAL_GRPC_META_X_DEPLOYMENT": "canary",
-        "TEMPORAL_GRPC_META_AUTHORIZATION": "Bearer override-token"
+        "TEMPORAL_GRPC_META_AUTHORIZATION": "Bearer override-token",
     }
 
     profile = ClientConfigProfile.load(
-        profile="staging",
-        config_source=toml_content,
-        override_env_vars=env_overrides
+        profile="staging", config_source=toml_content, override_env_vars=env_overrides
     )
 
     config = profile.to_client_connect_config()
@@ -930,7 +929,10 @@ async def test_e2e_environment_overrides_client_connection(client: Client):
     assert new_client.namespace == "override-namespace"
     if new_client.service_client.config.rpc_metadata:
         assert new_client.service_client.config.rpc_metadata["x-deployment"] == "canary"
-        assert new_client.service_client.config.rpc_metadata["authorization"] == "Bearer override-token"
+        assert (
+            new_client.service_client.config.rpc_metadata["authorization"]
+            == "Bearer override-token"
+        )
 
 
 async def test_e2e_multi_profile_different_client_connections(client: Client):
@@ -956,8 +958,7 @@ async def test_e2e_multi_profile_different_client_connections(client: Client):
 
     # Load and create development client
     dev_profile = ClientConfigProfile.load(
-        profile="development",
-        config_source=toml_content
+        profile="development", config_source=toml_content
     )
 
     dev_config = dev_profile.to_client_connect_config()
@@ -965,8 +966,7 @@ async def test_e2e_multi_profile_different_client_connections(client: Client):
 
     # Load and create production client
     prod_profile = ClientConfigProfile.load(
-        profile="production",
-        config_source=toml_content
+        profile="production", config_source=toml_content
     )
 
     prod_config = prod_profile.to_client_connect_config()
