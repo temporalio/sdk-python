@@ -255,19 +255,36 @@ class _WorkflowWorker:
         )
         completion.successful.SetInParent()
         try:
+            # Decode the activation if there's a codec and not cache remove job
+
             if LOG_PROTOS:
                 logger.debug("Received workflow activation:\n%s", act)
 
             # If the workflow is not running yet, create it
             workflow = self._running_workflows.get(act.run_id)
+
+            if data_converter.payload_codec:
+                await temporalio.bridge.worker.decode_activation(
+                    act,
+                    data_converter.payload_codec,
+                    decode_headers=self._encode_headers,
+                )
             if not workflow:
                 # Must have a initialize job to create instance
                 if not init_job:
                     raise RuntimeError(
                         "Missing initialize workflow, workflow could have unexpectedly been removed from cache"
                     )
-                workflow_instance, det = self._create_workflow_instance(act, init_job)
-                workflow = _RunningWorkflow(workflow_instance, det.info.workflow_id)
+                data_converter = self._data_converter._with_context(
+                    temporalio.converter.WorkflowSerializationContext(
+                        namespace=self._namespace,
+                        workflow_id=init_job.workflow_id,
+                    )
+                )
+                workflow = _RunningWorkflow(
+                    self._create_workflow_instance(act, init_job),
+                    init_job.workflow_id,
+                )
                 self._running_workflows[act.run_id] = workflow
             elif init_job:
                 # This should never happen
@@ -281,12 +298,6 @@ class _WorkflowWorker:
                     workflow_id=workflow.workflow_id,
                 )
             )
-            if data_converter.payload_codec:
-                await temporalio.bridge.worker.decode_activation(
-                    act,
-                    data_converter.payload_codec,
-                    decode_headers=self._encode_headers,
-                )
 
             # Run activation in separate thread so we can check if it's
             # deadlocked
@@ -495,7 +506,7 @@ class _WorkflowWorker:
         self,
         act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
         init: temporalio.bridge.proto.workflow_activation.InitializeWorkflow,
-    ) -> tuple[WorkflowInstance, WorkflowInstanceDetails]:
+    ) -> WorkflowInstance:
         # Get the definition
         defn = self._workflows.get(init.workflow_type, self._dynamic_workflow)
         if not defn:
@@ -575,9 +586,9 @@ class _WorkflowWorker:
             last_failure=last_failure,
         )
         if defn.sandboxed:
-            return self._workflow_runner.create_instance(det), det
+            return self._workflow_runner.create_instance(det)
         else:
-            return self._unsandboxed_workflow_runner.create_instance(det), det
+            return self._unsandboxed_workflow_runner.create_instance(det)
 
     def nondeterminism_as_workflow_fail(self) -> bool:
         return any(
