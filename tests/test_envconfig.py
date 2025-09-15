@@ -935,6 +935,58 @@ async def test_e2e_environment_overrides_client_connection(client: Client):
         )
 
 
+def test_tls_disabled_tri_state_behavior():
+    """Test TLS disabled tri-state behavior: null (unset), false (enabled), true (disabled)."""
+    # Test 1: disabled=null (unset) with API key -> TLS enabled
+    toml_null = textwrap.dedent(
+        """
+        [profile.default]
+        address = "my-address"
+        api_key = "my-api-key"
+        [profile.default.tls]
+        server_name = "my-server"
+        """
+    )
+    profile_null = ClientConfigProfile.load(config_source=toml_null)
+    assert profile_null.tls is not None
+    assert profile_null.tls.disabled is None  # disabled is null (unset)
+    config_null = profile_null.to_client_connect_config()
+    assert config_null.get("tls") is not None  # TLS enabled
+
+    # Test 2: disabled=false (explicitly enabled) -> TLS enabled
+    toml_false = textwrap.dedent(
+        """
+        [profile.default]
+        address = "my-address"
+        [profile.default.tls]
+        disabled = false
+        server_name = "my-server"
+        """
+    )
+    profile_false = ClientConfigProfile.load(config_source=toml_false)
+    assert profile_false.tls is not None
+    assert profile_false.tls.disabled is False  # explicitly disabled=false
+    config_false = profile_false.to_client_connect_config()
+    assert config_false.get("tls") is not None  # TLS enabled
+
+    # Test 3: disabled=true (explicitly disabled) -> TLS disabled even with API key
+    toml_true = textwrap.dedent(
+        """
+        [profile.default]
+        address = "my-address"
+        api_key = "my-api-key"
+        [profile.default.tls]
+        disabled = true
+        server_name = "should-be-ignored"
+        """
+    )
+    profile_true = ClientConfigProfile.load(config_source=toml_true)
+    assert profile_true.tls is not None
+    assert profile_true.tls.disabled is True  # explicitly disabled=true
+    config_true = profile_true.to_client_connect_config()
+    assert config_true.get("tls") is False  # TLS disabled even with API key
+
+
 async def test_e2e_multi_profile_different_client_connections(client: Client):
     """Test multiple profiles creating different client connections."""
     # Get connection details from the fixture client
