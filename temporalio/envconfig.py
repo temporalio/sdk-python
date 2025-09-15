@@ -24,7 +24,7 @@ DataSource: TypeAlias = Union[
 class ClientConfigTLSDict(TypedDict, total=False):
     """Dictionary representation of TLS config for TOML."""
 
-    disabled: bool
+    disabled: Optional[bool]
     server_name: str
     server_ca_cert: Mapping[str, str]
     client_cert: Mapping[str, str]
@@ -105,8 +105,8 @@ class ClientConfigTLS:
         Experimental API.
     """
 
-    disabled: bool = False
-    """If true, TLS is explicitly disabled."""
+    disabled: Optional[bool] = None
+    """If True, TLS is explicitly disabled. If False, TLS is explicitly enabled. If None, TLS behavior was not configured."""
     server_name: Optional[str] = None
     """SNI override."""
     server_root_ca_cert: Optional[DataSource] = None
@@ -119,7 +119,7 @@ class ClientConfigTLS:
     def to_dict(self) -> ClientConfigTLSDict:
         """Convert to a dictionary that can be used for TOML serialization."""
         d: ClientConfigTLSDict = {}
-        if self.disabled:
+        if self.disabled is not None:
             d["disabled"] = self.disabled
         if self.server_name is not None:
             d["server_name"] = self.server_name
@@ -138,7 +138,7 @@ class ClientConfigTLS:
 
     def to_connect_tls_config(self) -> Union[bool, temporalio.service.TLSConfig]:
         """Create a `temporalio.service.TLSConfig` from this profile."""
-        if self.disabled:
+        if self.disabled is True:
             return False
 
         return temporalio.service.TLSConfig(
@@ -154,7 +154,7 @@ class ClientConfigTLS:
         if not d:
             return None
         return ClientConfigTLS(
-            disabled=d.get("disabled", False),
+            disabled=d.get("disabled"),
             server_name=d.get("server_name"),
             # Note: Bridge uses snake_case, but TOML uses kebab-case which is
             # converted to snake_case. Core has server_ca_cert, client_key.

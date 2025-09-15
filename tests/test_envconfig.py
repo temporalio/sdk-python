@@ -519,7 +519,6 @@ def test_client_config_profile_to_from_dict():
         namespace="some-namespace",
         api_key="some-api-key",
         tls=ClientConfigTLS(
-            disabled=False,
             server_name="some-server-name",
             server_root_ca_cert=b"ca-cert-data",
             client_cert=Path("/path/to/client.crt"),
@@ -530,7 +529,7 @@ def test_client_config_profile_to_from_dict():
 
     profile_dict = profile.to_dict()
 
-    # Check dict representation. Note that disabled=False is not in the dict.
+    # Check dict representation. Note that disabled=None is not in the dict.
     expected_dict = {
         "address": "some-address",
         "namespace": "some-namespace",
@@ -557,7 +556,6 @@ def test_client_config_profile_to_from_dict():
         namespace="some-namespace",
         api_key="some-api-key",
         tls=ClientConfigTLS(
-            disabled=False,
             server_name="some-server-name",
             server_root_ca_cert="ca-cert-data",  # Was bytes, now str
             client_cert=Path("/path/to/client.crt"),
