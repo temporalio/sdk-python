@@ -285,13 +285,6 @@ def test_load_profiles_discovery(tmp_path: Path, monkeypatch):  # type: ignore[r
     assert "default" in client_config.profiles
 
 
-def test_load_profiles_disable_file():
-    """Test load_profiles with file loading disabled."""
-    # With no env vars, should be empty
-    client_config = ClientConfig.load(disable_file=True, override_env_vars={})
-    assert not client_config.profiles
-
-
 def test_load_profiles_strict_mode_fail(tmp_path: Path):
     """Test that strict mode fails on unrecognized keys."""
     config_file = tmp_path / "config.toml"

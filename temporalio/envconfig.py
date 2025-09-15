@@ -333,7 +333,6 @@ class ClientConfig:
     def load(
         *,
         config_source: Optional[DataSource] = None,
-        disable_file: bool = False,
         config_file_strict: bool = False,
         override_env_vars: Optional[Mapping[str, str]] = None,
     ) -> ClientConfig:
@@ -348,8 +347,6 @@ class ClientConfig:
             config_source: If present, this is used as the configuration source
                 instead of default file locations. This can be a path to the file
                 or the string/byte contents of the file.
-            disable_file: If true, file loading is disabled. This is only used
-                when ``config_source`` is not present.
             config_file_strict: If true, will TOML file parsing will error on
                 unrecognized keys.
             override_env_vars: The environment variables to use for locating the
@@ -364,7 +361,6 @@ class ClientConfig:
         loaded_profiles = _bridge_envconfig.load_client_config(
             path=path,
             data=data,
-            disable_file=disable_file,
             config_file_strict=config_file_strict,
             env_vars=override_env_vars,
         )
