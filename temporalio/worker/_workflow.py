@@ -255,14 +255,30 @@ class _WorkflowWorker:
         )
         completion.successful.SetInParent()
         try:
-            # Decode the activation if there's a codec and not cache remove job
-
             if LOG_PROTOS:
                 logger.debug("Received workflow activation:\n%s", act)
 
-            # If the workflow is not running yet, create it
             workflow = self._running_workflows.get(act.run_id)
+            if not workflow:
+                if not init_job:
+                    raise RuntimeError(
+                        "Missing initialize workflow, workflow could have unexpectedly been removed from cache"
+                    )
+                workflow_id = init_job.workflow_id
+            else:
+                workflow_id = workflow.workflow_id
+                if init_job:
+                    # Should never happen
+                    logger.warning(
+                        "Cache already exists for activation with initialize job"
+                    )
 
+            data_converter = self._data_converter._with_context(
+                temporalio.converter.WorkflowSerializationContext(
+                    namespace=self._namespace,
+                    workflow_id=workflow_id,
+                )
+            )
             if data_converter.payload_codec:
                 await temporalio.bridge.worker.decode_activation(
                     act,
@@ -270,34 +286,12 @@ class _WorkflowWorker:
                     decode_headers=self._encode_headers,
                 )
             if not workflow:
-                # Must have a initialize job to create instance
-                if not init_job:
-                    raise RuntimeError(
-                        "Missing initialize workflow, workflow could have unexpectedly been removed from cache"
-                    )
-                data_converter = self._data_converter._with_context(
-                    temporalio.converter.WorkflowSerializationContext(
-                        namespace=self._namespace,
-                        workflow_id=init_job.workflow_id,
-                    )
-                )
+                assert init_job
                 workflow = _RunningWorkflow(
                     self._create_workflow_instance(act, init_job),
-                    init_job.workflow_id,
+                    workflow_id,
                 )
                 self._running_workflows[act.run_id] = workflow
-            elif init_job:
-                # This should never happen
-                logger.warning(
-                    "Cache already exists for activation with initialize job"
-                )
-
-            data_converter = self._data_converter._with_context(
-                temporalio.converter.WorkflowSerializationContext(
-                    namespace=self._namespace,
-                    workflow_id=workflow.workflow_id,
-                )
-            )
 
             # Run activation in separate thread so we can check if it's
             # deadlocked
@@ -337,7 +331,6 @@ class _WorkflowWorker:
                 "Failed handling activation on workflow with run ID %s", act.run_id
             )
 
-            # Set completion failure
             completion.failed.failure.SetInParent()
             try:
                 data_converter.failure_converter.to_failure(
@@ -354,10 +347,9 @@ class _WorkflowWorker:
                     f"Failed converting activation exception: {inner_err}"
                 )
 
-        # Always set the run ID on the completion
         completion.run_id = act.run_id
 
-        # Encode the completion if there's a codec and not cache remove job
+        # Encode completion
         if data_converter.payload_codec:
             try:
                 await temporalio.bridge.worker.encode_completion(
