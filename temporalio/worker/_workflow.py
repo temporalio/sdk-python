@@ -285,34 +285,33 @@ class _WorkflowWorker:
 
             # Run activation in separate thread so we can check if it's
             # deadlocked
-            if workflow:
-                activate_task = asyncio.get_running_loop().run_in_executor(
-                    self._workflow_task_executor,
-                    workflow.activate,
-                    act,
-                )
+            activate_task = asyncio.get_running_loop().run_in_executor(
+                self._workflow_task_executor,
+                workflow.activate,
+                act,
+            )
 
-                # Run activation task with deadlock timeout
-                try:
-                    completion = await asyncio.wait_for(
-                        activate_task, self._deadlock_timeout_seconds
-                    )
-                except asyncio.TimeoutError:
-                    # Need to create the deadlock exception up here so it
-                    # captures the trace now instead of later after we may have
-                    # interrupted it
-                    deadlock_exc = _DeadlockError.from_deadlocked_workflow(
-                        workflow.instance, self._deadlock_timeout_seconds
-                    )
-                    # When we deadlock, we will raise an exception to fail
-                    # the task. But before we do that, we want to try to
-                    # interrupt the thread and put this activation task on
-                    # the workflow so that the successive eviction can wait
-                    # on it before trying to evict.
-                    workflow.attempt_deadlock_interruption()
-                    # Set the task and raise
-                    workflow.deadlocked_activation_task = activate_task
-                    raise deadlock_exc from None
+            # Run activation task with deadlock timeout
+            try:
+                completion = await asyncio.wait_for(
+                    activate_task, self._deadlock_timeout_seconds
+                )
+            except asyncio.TimeoutError:
+                # Need to create the deadlock exception up here so it
+                # captures the trace now instead of later after we may have
+                # interrupted it
+                deadlock_exc = _DeadlockError.from_deadlocked_workflow(
+                    workflow.instance, self._deadlock_timeout_seconds
+                )
+                # When we deadlock, we will raise an exception to fail
+                # the task. But before we do that, we want to try to
+                # interrupt the thread and put this activation task on
+                # the workflow so that the successive eviction can wait
+                # on it before trying to evict.
+                workflow.attempt_deadlock_interruption()
+                # Set the task and raise
+                workflow.deadlocked_activation_task = activate_task
+                raise deadlock_exc from None
 
         except Exception as err:
             if isinstance(err, _DeadlockError):
