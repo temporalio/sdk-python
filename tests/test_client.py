@@ -4,7 +4,7 @@ import json
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Mapping, Optional, Tuple, cast
+from typing import Any, List, Mapping, Optional, Tuple, Union, cast
 from unittest import mock
 
 import google.protobuf.any_pb2
@@ -324,7 +324,7 @@ async def test_rpc_already_exists_error_is_raised(client: Client):
             req: temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
             *,
             retry: bool = False,
-            metadata: Mapping[str, str] = {},
+            metadata: Mapping[str, Union[str, bytes]] = {},
             timeout: Optional[timedelta] = None,
         ) -> temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse:
             raise self.already_exists_err
