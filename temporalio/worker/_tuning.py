@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 from abc import ABC, abstractmethod
@@ -10,7 +12,7 @@ from typing_extensions import TypeAlias
 import temporalio.bridge.worker
 from temporalio.common import WorkerDeploymentVersion
 
-_DEFAULT_RESOURCE_ACTIVITY_MAX = 500
+_DEFAULT_RESOURCE_SLOTS_MAX = 500
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +152,22 @@ class LocalActivitySlotInfo(Protocol):
     activity_type: str
 
 
-SlotInfo: TypeAlias = Union[WorkflowSlotInfo, ActivitySlotInfo, LocalActivitySlotInfo]
+# WARNING: This must match Rust worker::NexusSlotInfo
+@runtime_checkable
+class NexusSlotInfo(Protocol):
+    """Info about a nexus task slot usage.
+
+    .. warning::
+        Custom slot suppliers are currently experimental.
+    """
+
+    service: str
+    operation: str
+
+
+SlotInfo: TypeAlias = Union[
+    WorkflowSlotInfo, ActivitySlotInfo, LocalActivitySlotInfo, NexusSlotInfo
+]
 
 
 # WARNING: This must match Rust worker::SlotMarkUsedCtx
@@ -303,13 +320,14 @@ class _BridgeSlotSupplierWrapper:
 
 
 def _to_bridge_slot_supplier(
-    slot_supplier: SlotSupplier, kind: Literal["workflow", "activity", "local_activity"]
+    slot_supplier: SlotSupplier,
+    kind: Literal["workflow", "activity", "local_activity", "nexus"],
 ) -> temporalio.bridge.worker.SlotSupplier:
     if isinstance(slot_supplier, FixedSizeSlotSupplier):
         return temporalio.bridge.worker.FixedSizeSlotSupplier(slot_supplier.num_slots)
     elif isinstance(slot_supplier, ResourceBasedSlotSupplier):
         min_slots = 5 if kind == "workflow" else 1
-        max_slots = _DEFAULT_RESOURCE_ACTIVITY_MAX
+        max_slots = _DEFAULT_RESOURCE_SLOTS_MAX
         ramp_throttle = (
             timedelta(seconds=0) if kind == "workflow" else timedelta(milliseconds=50)
         )
@@ -347,7 +365,8 @@ class WorkerTuner(ABC):
         workflow_config: Optional[ResourceBasedSlotConfig] = None,
         activity_config: Optional[ResourceBasedSlotConfig] = None,
         local_activity_config: Optional[ResourceBasedSlotConfig] = None,
-    ) -> "WorkerTuner":
+        nexus_config: Optional[ResourceBasedSlotConfig] = None,
+    ) -> WorkerTuner:
         """Create a resource-based tuner with the provided options."""
         resource_cfg = ResourceBasedTunerConfig(target_memory_usage, target_cpu_usage)
         wf = ResourceBasedSlotSupplier(
@@ -359,26 +378,35 @@ class WorkerTuner(ABC):
         local_act = ResourceBasedSlotSupplier(
             local_activity_config or ResourceBasedSlotConfig(), resource_cfg
         )
+        nexus = ResourceBasedSlotSupplier(
+            nexus_config or ResourceBasedSlotConfig(), resource_cfg
+        )
         return _CompositeTuner(
             wf,
             act,
             local_act,
+            nexus,
         )
 
     @staticmethod
     def create_fixed(
         *,
-        workflow_slots: Optional[int],
-        activity_slots: Optional[int],
-        local_activity_slots: Optional[int],
-    ) -> "WorkerTuner":
-        """Create a fixed-size tuner with the provided number of slots. Any unspecified slots will default to 100."""
+        workflow_slots: Optional[int] = None,
+        activity_slots: Optional[int] = None,
+        local_activity_slots: Optional[int] = None,
+        nexus_slots: Optional[int] = None,
+    ) -> WorkerTuner:
+        """Create a fixed-size tuner with the provided number of slots.
+
+        Any unspecified slot numbers will default to 100.
+        """
         return _CompositeTuner(
             FixedSizeSlotSupplier(workflow_slots if workflow_slots else 100),
             FixedSizeSlotSupplier(activity_slots if activity_slots else 100),
             FixedSizeSlotSupplier(
                 local_activity_slots if local_activity_slots else 100
             ),
+            FixedSizeSlotSupplier(nexus_slots if nexus_slots else 100),
         )
 
     @staticmethod
@@ -387,12 +415,14 @@ class WorkerTuner(ABC):
         workflow_supplier: SlotSupplier,
         activity_supplier: SlotSupplier,
         local_activity_supplier: SlotSupplier,
-    ) -> "WorkerTuner":
+        nexus_supplier: SlotSupplier,
+    ) -> WorkerTuner:
         """Create a tuner composed of the provided slot suppliers."""
         return _CompositeTuner(
             workflow_supplier,
             activity_supplier,
             local_activity_supplier,
+            nexus_supplier,
         )
 
     @abstractmethod
@@ -405,6 +435,10 @@ class WorkerTuner(ABC):
 
     @abstractmethod
     def _get_local_activity_task_slot_supplier(self) -> SlotSupplier:
+        raise NotImplementedError
+
+    @abstractmethod
+    def _get_nexus_slot_supplier(self) -> SlotSupplier:
         raise NotImplementedError
 
     def _to_bridge_tuner(self) -> temporalio.bridge.worker.TunerHolder:
@@ -418,14 +452,25 @@ class WorkerTuner(ABC):
             _to_bridge_slot_supplier(
                 self._get_local_activity_task_slot_supplier(), "local_activity"
             ),
+            _to_bridge_slot_supplier(self._get_nexus_slot_supplier(), "nexus"),
         )
 
     def _get_activities_max(self) -> Optional[int]:
-        ss = self._get_activity_task_slot_supplier()
-        if isinstance(ss, FixedSizeSlotSupplier):
-            return ss.num_slots
-        elif isinstance(ss, ResourceBasedSlotSupplier):
-            return ss.slot_config.maximum_slots or _DEFAULT_RESOURCE_ACTIVITY_MAX
+        return WorkerTuner._get_slot_supplier_max(
+            self._get_activity_task_slot_supplier()
+        )
+
+    def _get_nexus_tasks_max(self) -> Optional[int]:
+        return WorkerTuner._get_slot_supplier_max(self._get_nexus_slot_supplier())
+
+    @staticmethod
+    def _get_slot_supplier_max(slot_supplier: SlotSupplier) -> Optional[int]:
+        if isinstance(slot_supplier, FixedSizeSlotSupplier):
+            return slot_supplier.num_slots
+        elif isinstance(slot_supplier, ResourceBasedSlotSupplier):
+            return (
+                slot_supplier.slot_config.maximum_slots or _DEFAULT_RESOURCE_SLOTS_MAX
+            )
         return None
 
 
@@ -436,6 +481,7 @@ class _CompositeTuner(WorkerTuner):
     workflow_slot_supplier: SlotSupplier
     activity_slot_supplier: SlotSupplier
     local_activity_slot_supplier: SlotSupplier
+    nexus_slot_supplier: SlotSupplier
 
     def _get_workflow_task_slot_supplier(self) -> SlotSupplier:
         return self.workflow_slot_supplier
@@ -445,3 +491,6 @@ class _CompositeTuner(WorkerTuner):
 
     def _get_local_activity_task_slot_supplier(self) -> SlotSupplier:
         return self.local_activity_slot_supplier
+
+    def _get_nexus_slot_supplier(self) -> SlotSupplier:
+        return self.nexus_slot_supplier

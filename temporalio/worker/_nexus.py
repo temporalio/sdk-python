@@ -32,7 +32,7 @@ import temporalio.client
 import temporalio.common
 import temporalio.converter
 import temporalio.nexus
-from temporalio.exceptions import ApplicationError
+from temporalio.exceptions import ApplicationError, WorkflowAlreadyStartedError
 from temporalio.nexus import Info, logger
 from temporalio.service import RPCError, RPCStatusCode
 
@@ -444,6 +444,12 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
             err.message,
             type=nexusrpc.HandlerErrorType.INTERNAL,
             retryable_override=not err.non_retryable,
+        )
+    elif isinstance(err, WorkflowAlreadyStartedError):
+        handler_err = nexusrpc.HandlerError(
+            err.message,
+            type=nexusrpc.HandlerErrorType.INTERNAL,
+            retryable_override=False,
         )
     elif isinstance(err, RPCError):
         if err.status == RPCStatusCode.INVALID_ARGUMENT:

@@ -31,9 +31,11 @@ if os.getenv("TEMPORAL_TEST_PROTO3"):
         "3."
     ), f"Expected protobuf 3.x, got {protobuf_version}"
 else:
-    assert protobuf_version.startswith("4.") or protobuf_version.startswith(
-        "5."
-    ), f"Expected protobuf 4.x/5.x, got {protobuf_version}"
+    assert (
+        protobuf_version.startswith("4.")
+        or protobuf_version.startswith("5.")
+        or protobuf_version.startswith("6.")
+    ), f"Expected protobuf 4.x/5.x/6.x, got {protobuf_version}"
 
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment

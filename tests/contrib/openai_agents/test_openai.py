@@ -16,6 +16,7 @@ from typing import (
 )
 
 import nexusrpc
+import pydantic
 import pytest
 from agents import (
     Agent,
@@ -326,6 +327,10 @@ class ToolsWorkflow:
                     ActivityWeatherService.get_weather_method,
                     start_to_close_timeout=timedelta(seconds=10),
                 ),
+                openai_agents.workflow.activity_as_tool(
+                    get_weather_failure,
+                    start_to_close_timeout=timedelta(seconds=10),
+                ),
             ],
         )
         result = await Runner.run(
@@ -468,6 +473,53 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
                 .activity_task_completed_event_attributes.result.payloads[0]
                 .data.decode()
             )
+
+
+@activity.defn
+async def get_weather_failure(city: str) -> Weather:
+    """
+    Get the weather for a given city.
+    """
+    raise ApplicationError("No weather", non_retryable=True)
+
+
+class TestWeatherFailureModel(StaticTestModel):
+    responses = [
+        ResponseBuilders.tool_call('{"city":"Tokyo"}', "get_weather_failure"),
+    ]
+
+
+async def test_tool_failure_workflow(client: Client):
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(TestWeatherFailureModel()),
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        ToolsWorkflow,
+        activities=[
+            get_weather_failure,
+        ],
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            ToolsWorkflow.run,
+            "What is the weather in Tokio?",
+            id=f"tools-failure-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=2),
+        )
+        with pytest.raises(WorkflowFailureError) as e:
+            result = await workflow_handle.result()
+        cause = e.value.cause
+        assert isinstance(cause, ApplicationError)
+        assert "Workflow failure exception in Agents Framework" in cause.message
 
 
 @pytest.mark.parametrize("use_local_model", [True, False])
@@ -1120,8 +1172,9 @@ class InputGuardrailModel(OpenAIResponsesModel):
         output_schema: Union[AgentOutputSchemaBase, None],
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        previous_response_id: Union[str, None],
-        prompt: Union[ResponsePromptParam, None] = None,
+        previous_response_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        prompt: Optional[ResponsePromptParam] = None,
     ) -> ModelResponse:
         if (
             system_instructions
@@ -1509,9 +1562,7 @@ class WaitModel(Model):
         output_schema: Union[AgentOutputSchemaBase, None],
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        *,
-        previous_response_id: Union[str, None],
-        prompt: Union[ResponsePromptParam, None] = None,
+        **kwargs,
     ) -> ModelResponse:
         activity.logger.info("Waiting")
         await asyncio.sleep(1.0)
@@ -1527,9 +1578,7 @@ class WaitModel(Model):
         output_schema: Optional[AgentOutputSchemaBase],
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        *,
-        previous_response_id: Optional[str],
-        prompt: Optional[ResponsePromptParam],
+        **kwargs,
     ) -> AsyncIterator[TResponseStreamEvent]:
         raise NotImplementedError()
 
@@ -1917,20 +1966,14 @@ class CodeInterpreterWorkflow:
         return result.final_output
 
 
-@pytest.mark.parametrize("use_local_model", [True, False])
-async def test_code_interpreter_tool(client: Client, use_local_model):
-    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
-        pytest.skip("No openai API key")
-
+async def test_code_interpreter_tool(client: Client):
     new_config = client.config()
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=60)
             ),
-            model_provider=TestModelProvider(CodeInterpreterModel())
-            if use_local_model
-            else None,
+            model_provider=TestModelProvider(CodeInterpreterModel()),
         )
     ]
     client = Client(**new_config)
@@ -1947,8 +1990,7 @@ async def test_code_interpreter_tool(client: Client, use_local_model):
             execution_timeout=timedelta(seconds=60),
         )
         result = await workflow_handle.result()
-        if use_local_model:
-            assert result == "Over 9000"
+        assert result == "Over 9000"
 
 
 class HostedMCPModel(StaticTestModel):
@@ -2019,20 +2061,14 @@ class HostedMCPWorkflow:
         return result.final_output
 
 
-@pytest.mark.parametrize("use_local_model", [True, False])
-async def test_hosted_mcp_tool(client: Client, use_local_model):
-    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
-        pytest.skip("No openai API key")
-
+async def test_hosted_mcp_tool(client: Client):
     new_config = client.config()
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=120)
             ),
-            model_provider=TestModelProvider(HostedMCPModel())
-            if use_local_model
-            else None,
+            model_provider=TestModelProvider(HostedMCPModel()),
         )
     ]
     client = Client(**new_config)
@@ -2049,8 +2085,7 @@ async def test_hosted_mcp_tool(client: Client, use_local_model):
             execution_timeout=timedelta(seconds=120),
         )
         result = await workflow_handle.result()
-        if use_local_model:
-            assert result == "Some language"
+        assert result == "Some language"
 
 
 class AssertDifferentModelProvider(ModelProvider):
@@ -2192,6 +2227,62 @@ async def test_summary_provider(client: Client):
         async for e in workflow_handle.fetch_history_events():
             if e.HasField("activity_task_scheduled_event_attributes"):
                 assert e.user_metadata.summary.data == b'"My summary"'
+
+
+class OutputType(pydantic.BaseModel):
+    answer: str
+    model_config = ConfigDict(extra="forbid")  # Forbid additional properties
+
+
+@workflow.defn
+class OutputTypeWorkflow:
+    @workflow.run
+    async def run(self) -> OutputType:
+        agent: Agent = Agent(
+            name="Assistant",
+            instructions="You are a helpful assistant, adhere to the json schema output",
+            output_type=OutputType,
+        )
+        result = await Runner.run(
+            starting_agent=agent,
+            input="Hello!",
+        )
+        return result.final_output
+
+
+class OutputTypeModel(StaticTestModel):
+    responses = [
+        ResponseBuilders.output_message(
+            '{"answer": "My answer"}',
+        ),
+    ]
+
+
+async def test_output_type(client: Client):
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=120),
+            ),
+            model_provider=TestModelProvider(OutputTypeModel()),
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(
+        client,
+        OutputTypeWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            OutputTypeWorkflow.run,
+            id=f"output-type-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+        result = await workflow_handle.result()
+        assert isinstance(result, OutputType)
+        assert result.answer == "My answer"
 
 
 @workflow.defn

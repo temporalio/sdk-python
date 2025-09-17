@@ -21,7 +21,7 @@ from nexusrpc.handler import (
     sync_operation,
 )
 
-from temporalio import workflow
+from temporalio import nexus, workflow
 from temporalio.client import (
     Client,
     WorkflowFailureError,
@@ -45,6 +45,13 @@ class ErrorTestInput:
     operation_name: str
     task_queue: str
     id: str
+
+
+@workflow.defn
+class NonTerminatingWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await asyncio.Event().wait()
 
 
 @nexusrpc.handler.service_handler
@@ -86,6 +93,18 @@ class ErrorTestService:
             "handler-error-message",
             type=nexusrpc.HandlerErrorType.INTERNAL,
         )
+
+    @nexusrpc.handler.sync_operation
+    async def fails_due_to_workflow_already_started(
+        self, ctx: nexusrpc.handler.StartOperationContext, input: ErrorTestInput
+    ) -> None:
+        operation_invocation_counts[input.id] += 1
+        for _ in range(2):
+            await nexus.client().start_workflow(
+                NonTerminatingWorkflow.run,
+                id="second-start-request-will-fail",
+                task_queue=nexus.info().task_queue,
+            )
 
 
 @workflow.defn(sandboxed=False)
@@ -155,6 +174,11 @@ async def test_nexus_operation_is_retried(
             "fails_due_to_nonexistent_service",
             nexusrpc.HandlerErrorType.NOT_FOUND,
             "No handler for service",
+        ),
+        (
+            "fails_due_to_workflow_already_started",
+            nexusrpc.HandlerErrorType.INTERNAL,
+            "already started",
         ),
     ],
 )
