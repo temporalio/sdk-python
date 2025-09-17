@@ -238,7 +238,10 @@ class ClientConfigProfile:
             config["namespace"] = self.namespace
         if self.api_key is not None:
             config["api_key"] = self.api_key
+            # Enable TLS with default TLS options
+            config["tls"] = True
         if self.tls is not None:
+            # Use specified TLS options
             config["tls"] = self.tls.to_connect_tls_config()
         if self.grpc_meta:
             config["rpc_metadata"] = self.grpc_meta

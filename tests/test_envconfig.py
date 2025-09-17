@@ -223,10 +223,13 @@ def test_load_profile_api_key_enables_tls(tmp_path: Path):
     config_file.write_text(config_toml)
     profile = ClientConfigProfile.load(config_source=config_file)
     assert profile.api_key == "my-key"
-    assert profile.tls is not None
+    # No TLS object should have been created
+    assert profile.tls is None
 
     config = profile.to_client_connect_config()
-    assert config.get("tls")
+    # Expect to_client_connect_config call to set TLS to True
+    # due to presence of api key.
+    assert config.get("tls") is True
     assert config.get("api_key") == "my-key"
 
 
