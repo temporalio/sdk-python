@@ -227,6 +227,8 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
         run_context: Optional[RunContextWrapper[Any]] = None,
         agent: Optional[AgentBase] = None,
     ) -> list[MCPTool]:
+        if not self._connect_handle:
+            raise ApplicationError("Stateful MCP Server not connected. Call connect first.")
         return await workflow.execute_activity(
             self.name + "-list-tools",
             args=[],
@@ -238,6 +240,8 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
     async def call_tool(
         self, tool_name: str, arguments: Optional[dict[str, Any]]
     ) -> CallToolResult:
+        if not self._connect_handle:
+            raise ApplicationError("Stateful MCP Server not connected. Call connect first.")
         return await workflow.execute_activity(
             self.name + "-call-tool",
             args=[tool_name, arguments],
@@ -247,6 +251,8 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
 
     @_handle_worker_failure
     async def list_prompts(self) -> ListPromptsResult:
+        if not self._connect_handle:
+            raise ApplicationError("Stateful MCP Server not connected. Call connect first.")
         return await workflow.execute_activity(
             self.name + "-list-prompts",
             args=[],
@@ -258,6 +264,8 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
     async def get_prompt(
         self, name: str, arguments: Optional[dict[str, Any]] = None
     ) -> GetPromptResult:
+        if not self._connect_handle:
+            raise ApplicationError("Stateful MCP Server not connected. Call connect first.")
         return await workflow.execute_activity(
             self.name + "-get-prompt",
             args=[name, arguments],
