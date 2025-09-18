@@ -203,7 +203,7 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
         return self._name
 
     async def connect(self) -> None:
-        self._config["task_queue"] = workflow.info().workflow_id + "-" + self.name
+        self._config["task_queue"] = self.name + "@" + workflow.info().run_id
         self._connect_handle = workflow.start_activity(
             self.name + "-server-session",
             args=[],
@@ -228,7 +228,9 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
         agent: Optional[AgentBase] = None,
     ) -> list[MCPTool]:
         if not self._connect_handle:
-            raise ApplicationError("Stateful MCP Server not connected. Call connect first.")
+            raise ApplicationError(
+                "Stateful MCP Server not connected. Call connect first."
+            )
         return await workflow.execute_activity(
             self.name + "-list-tools",
             args=[],
@@ -241,7 +243,9 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
         self, tool_name: str, arguments: Optional[dict[str, Any]]
     ) -> CallToolResult:
         if not self._connect_handle:
-            raise ApplicationError("Stateful MCP Server not connected. Call connect first.")
+            raise ApplicationError(
+                "Stateful MCP Server not connected. Call connect first."
+            )
         return await workflow.execute_activity(
             self.name + "-call-tool",
             args=[tool_name, arguments],
@@ -252,7 +256,9 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
     @_handle_worker_failure
     async def list_prompts(self) -> ListPromptsResult:
         if not self._connect_handle:
-            raise ApplicationError("Stateful MCP Server not connected. Call connect first.")
+            raise ApplicationError(
+                "Stateful MCP Server not connected. Call connect first."
+            )
         return await workflow.execute_activity(
             self.name + "-list-prompts",
             args=[],
@@ -265,7 +271,9 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
         self, name: str, arguments: Optional[dict[str, Any]] = None
     ) -> GetPromptResult:
         if not self._connect_handle:
-            raise ApplicationError("Stateful MCP Server not connected. Call connect first.")
+            raise ApplicationError(
+                "Stateful MCP Server not connected. Call connect first."
+            )
         return await workflow.execute_activity(
             self.name + "-get-prompt",
             args=[name, arguments],
@@ -274,10 +282,10 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
         )
 
 
-class StatefulMCPServer:
+class StatefulMCPServerProvider:
     """A stateful MCP server implementation for Temporal workflows.
 
-    This class wraps an MCP server to maintain a persistent connection throughout
+    This class wraps an function to create MCP servers to maintain a persistent connection throughout
     the workflow execution. It creates a dedicated worker that stays connected to
     the MCP server and processes operations on a dedicated task queue.
 
@@ -292,16 +300,18 @@ class StatefulMCPServer:
 
     def __init__(
         self,
-        server: MCPServer,
+        server_factory: Callable[[], MCPServer],
     ):
         """Initialize the stateful temporal MCP server.
 
         Args:
-            server: Either an MCPServer instance or a string name for the server.
+            server_factory: A function which will produce MCPServer instances. It should return a new server each time
+                so that state is not shared between workflow runs
         """
-        self._server = server
-        self._name = self._server.name + "-stateful"
+        self._server_factory = server_factory
+        self._name = server_factory().name + "-stateful"
         self._connect_handle: Optional[ActivityHandle] = None
+        self._servers: dict[str, MCPServer] = {}
         super().__init__()
 
     @property
@@ -310,25 +320,28 @@ class StatefulMCPServer:
         return self._name
 
     def _get_activities(self) -> Sequence[Callable]:
+        def _server_id():
+            return self.name + "@" + activity.info().workflow_run_id
+
         @activity.defn(name=self.name + "-list-tools")
         async def list_tools() -> list[MCPTool]:
-            return await self._server.list_tools()
+            return await self._servers[_server_id()].list_tools()
 
         @activity.defn(name=self.name + "-call-tool")
         async def call_tool(
             tool_name: str, arguments: Optional[dict[str, Any]]
         ) -> CallToolResult:
-            return await self._server.call_tool(tool_name, arguments)
+            return await self._servers[_server_id()].call_tool(tool_name, arguments)
 
         @activity.defn(name=self.name + "-list-prompts")
         async def list_prompts() -> ListPromptsResult:
-            return await self._server.list_prompts()
+            return await self._servers[_server_id()].list_prompts()
 
         @activity.defn(name=self.name + "-get-prompt")
         async def get_prompt(
             name: str, arguments: Optional[dict[str, Any]]
         ) -> GetPromptResult:
-            return await self._server.get_prompt(name, arguments)
+            return await self._servers[_server_id()].get_prompt(name, arguments)
 
         async def heartbeat_every(delay: float, *details: Any) -> None:
             """Heartbeat every so often while not cancelled"""
@@ -339,23 +352,34 @@ class StatefulMCPServer:
         @activity.defn(name=self._name + "-server-session")
         async def connect() -> None:
             heartbeat_task = asyncio.create_task(heartbeat_every(30))
-            try:
-                await self._server.connect()
 
-                worker = Worker(
-                    activity.client(),
-                    task_queue=activity.info().workflow_id + "-" + self.name,
-                    activities=[list_tools, call_tool, list_prompts, get_prompt],
-                    activity_task_poller_behavior=PollerBehaviorSimpleMaximum(1),
+            server_id = self.name + "@" + activity.info().workflow_run_id
+            if server_id in self._servers:
+                raise ApplicationError(
+                    "Cannot connect to an already running server. Use a distinct name if running multiple servers in one workflow."
                 )
-
-                await worker.run()
-            finally:
-                await self._server.cleanup()
-                heartbeat_task.cancel()
+            server = self._server_factory()
+            try:
+                self._servers[server_id] = server
                 try:
-                    await heartbeat_task
-                except asyncio.CancelledError:
-                    pass
+                    await server.connect()
+
+                    worker = Worker(
+                        activity.client(),
+                        task_queue=server_id,
+                        activities=[list_tools, call_tool, list_prompts, get_prompt],
+                        activity_task_poller_behavior=PollerBehaviorSimpleMaximum(1),
+                    )
+
+                    await worker.run()
+                finally:
+                    await server.cleanup()
+                    heartbeat_task.cancel()
+                    try:
+                        await heartbeat_task
+                    except asyncio.CancelledError:
+                        pass
+            finally:
+                del self._servers[server_id]
 
         return (connect,)
