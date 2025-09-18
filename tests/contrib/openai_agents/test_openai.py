@@ -12,6 +12,7 @@ from typing import (
     Optional,
     Sequence,
     Union,
+    cast,
     no_type_check,
 )
 
@@ -2466,6 +2467,7 @@ async def test_mcp_server(client: Client, use_local_model: bool, stateful: bool)
                 "list_tools",
                 "cleanup",
             ]
+            assert len(cast(StatefulMCPServerProvider, server)._servers) == 0
         else:
             assert tracking_server.calls == [
                 "connect",

@@ -17,7 +17,12 @@ from temporalio.api.enums.v1.workflow_pb2 import (
     TIMEOUT_TYPE_HEARTBEAT,
     TIMEOUT_TYPE_SCHEDULE_TO_START,
 )
-from temporalio.exceptions import ActivityError, ApplicationError
+from temporalio.exceptions import (
+    ActivityError,
+    ApplicationError,
+    CancelledError,
+    is_cancelled_exception,
+)
 from temporalio.worker import PollerBehaviorSimpleMaximum, Worker
 from temporalio.workflow import ActivityConfig, ActivityHandle
 
@@ -213,6 +218,13 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
     async def cleanup(self) -> None:
         if self._connect_handle:
             self._connect_handle.cancel()
+            try:
+                await self._connect_handle
+            except Exception as e:
+                if is_cancelled_exception(e):
+                    pass
+                else:
+                    raise
 
     async def __aenter__(self):
         await self.connect()
