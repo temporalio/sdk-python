@@ -242,7 +242,9 @@ def nexus_operation_as_tool(
 
 
 def stateless_mcp_server(
-    name: str, config: Optional[ActivityConfig] = None
+    name: str,
+    config: Optional[ActivityConfig] = None,
+    cache_tools_list: bool = False,
 ) -> "MCPServer":
     """A stateless MCP server implementation for Temporal workflows.
 
@@ -256,18 +258,25 @@ def stateless_mcp_server(
     This approach is suitable for simple use cases where connection overhead is acceptable
     and you don't need to maintain state between operations. It should be preferred to stateful when possible due to its
     superior durability guarantees.
+
+    Args:
+        name: A string name for the server. Should match that provided in the plugin.
+        config: Optional activity configuration for MCP operation activities.
+               Defaults to 1-minute start-to-close timeout.
+        cache_tools_list: If true, the list of tools will be cached for the duration of the server
     """
     from temporalio.contrib.openai_agents._mcp import (
         _StatelessMCPServerReference,
     )
 
-    return _StatelessMCPServerReference(name, config)
+    return _StatelessMCPServerReference(name, config, cache_tools_list)
 
 
 def stateful_mcp_server(
     name: str,
     config: Optional[ActivityConfig] = None,
     server_session_config: Optional[ActivityConfig] = None,
+    cache_tools_list: bool = False,
 ) -> AbstractAsyncContextManager["MCPServer"]:
     """A stateful MCP server implementation for Temporal workflows.
 
@@ -292,12 +301,15 @@ def stateful_mcp_server(
                Defaults to 1-minute start-to-close and 30-second schedule-to-start timeouts.
         server_session_config: Optional activity configuration for the connection activity.
                        Defaults to 1-hour start-to-close timeout.
+        cache_tools_list: If true, the list of tools will be cached for the duration of the server
     """
     from temporalio.contrib.openai_agents._mcp import (
         _StatefulMCPServerReference,
     )
 
-    return _StatefulMCPServerReference(name, config, server_session_config)
+    return _StatefulMCPServerReference(
+        name, config, server_session_config, cache_tools_list
+    )
 
 
 class ToolSerializationError(TemporalError):

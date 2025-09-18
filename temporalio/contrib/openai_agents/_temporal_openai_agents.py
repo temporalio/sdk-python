@@ -65,7 +65,7 @@ except ImportError:
 if typing.TYPE_CHECKING:
     from temporalio.contrib.openai_agents import (
         StatefulMCPServerProvider,
-        StatelessMCPServer,
+        StatelessMCPServerProvider,
     )
 
 
@@ -204,7 +204,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     Example:
         >>> from temporalio.client import Client
         >>> from temporalio.worker import Worker
-        >>> from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters, StatelessMCPServer
+        >>> from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters, StatelessMCPServerProvider
         >>> from agents.mcp import MCPServerStdio
         >>> from datetime import timedelta
         >>>
@@ -215,7 +215,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         ... )
         >>>
         >>> # Create MCP servers
-        >>> filesystem_server = StatelessMCPServer(MCPServerStdio(
+        >>> filesystem_server = StatelessMCPServerProvider(MCPServerStdio(
         ...     name="Filesystem Server",
         ...     params={"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]}
         ... ))
@@ -243,7 +243,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         model_params: Optional[ModelActivityParameters] = None,
         model_provider: Optional[ModelProvider] = None,
         mcp_servers: Sequence[
-            Union["StatelessMCPServer", "StatefulMCPServerProvider"]
+            Union["StatelessMCPServerProvider", "StatefulMCPServerProvider"]
         ] = (),
     ) -> None:
         """Initialize the OpenAI agents plugin.

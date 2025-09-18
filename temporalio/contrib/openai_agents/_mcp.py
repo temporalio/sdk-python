@@ -30,11 +30,18 @@ logger = logging.getLogger(__name__)
 
 
 class _StatelessMCPServerReference(MCPServer):
-    def __init__(self, server: str, config: Optional[ActivityConfig] = None):
+    def __init__(
+        self,
+        server: str,
+        config: Optional[ActivityConfig],
+        cache_tools_list: bool,
+    ):
         self._name = server + "-stateless"
         self._config = config or ActivityConfig(
             start_to_close_timeout=timedelta(minutes=1)
         )
+        self._cache_tools_list = cache_tools_list
+        self._tools = None
         super().__init__()
 
     @property
@@ -52,12 +59,17 @@ class _StatelessMCPServerReference(MCPServer):
         run_context: Optional[RunContextWrapper[Any]] = None,
         agent: Optional[AgentBase] = None,
     ) -> list[MCPTool]:
-        return await workflow.execute_activity(
+        if self._tools:
+            return self._tools
+        tools = await workflow.execute_activity(
             self.name + "-list-tools",
             args=[],
             result_type=list[MCPTool],
             **self._config,
         )
+        if self._cache_tools_list:
+            self._tools = tools
+        return tools
 
     async def call_tool(
         self, tool_name: str, arguments: Optional[dict[str, Any]]
@@ -88,10 +100,10 @@ class _StatelessMCPServerReference(MCPServer):
         )
 
 
-class StatelessMCPServer:
+class StatelessMCPServerProvider:
     """A stateless MCP server implementation for Temporal workflows.
 
-    This class wraps an MCP server to make it stateless by executing each MCP operation
+    This class wraps a function to create MCP servers to make them stateless by executing each MCP operation
     as a separate Temporal activity. Each operation (list_tools, call_tool, etc.) will
     connect to the underlying server, execute the operation, and then clean up the connection.
 
@@ -99,14 +111,15 @@ class StatelessMCPServer:
     function, this cannot be used.
     """
 
-    def __init__(self, server: MCPServer):
+    def __init__(self, server_factory: Callable[[], MCPServer]):
         """Initialize the stateless temporal MCP server.
 
         Args:
-            server: An MCPServer instance
+            server_factory: A function which will produce MCPServer instances. It should return a new server each time
+                so that state is not shared between workflow runs
         """
-        self._server = server
-        self._name = server.name + "-stateless"
+        self._server_factory = server_factory
+        self._name = server_factory().name + "-stateless"
         super().__init__()
 
     @property
@@ -117,39 +130,43 @@ class StatelessMCPServer:
     def _get_activities(self) -> Sequence[Callable]:
         @activity.defn(name=self.name + "-list-tools")
         async def list_tools() -> list[MCPTool]:
+            server = self._server_factory()
             try:
-                await self._server.connect()
-                return await self._server.list_tools()
+                await server.connect()
+                return await server.list_tools()
             finally:
-                await self._server.cleanup()
+                await server.cleanup()
 
         @activity.defn(name=self.name + "-call-tool")
         async def call_tool(
             tool_name: str, arguments: Optional[dict[str, Any]]
         ) -> CallToolResult:
+            server = self._server_factory()
             try:
-                await self._server.connect()
-                return await self._server.call_tool(tool_name, arguments)
+                await server.connect()
+                return await server.call_tool(tool_name, arguments)
             finally:
-                await self._server.cleanup()
+                await server.cleanup()
 
         @activity.defn(name=self.name + "-list-prompts")
         async def list_prompts() -> ListPromptsResult:
+            server = self._server_factory()
             try:
-                await self._server.connect()
-                return await self._server.list_prompts()
+                await server.connect()
+                return await server.list_prompts()
             finally:
-                await self._server.cleanup()
+                await server.cleanup()
 
         @activity.defn(name=self.name + "-get-prompt")
         async def get_prompt(
             name: str, arguments: Optional[dict[str, Any]]
         ) -> GetPromptResult:
+            server = self._server_factory()
             try:
-                await self._server.connect()
-                return await self._server.get_prompt(name, arguments)
+                await server.connect()
+                return await server.get_prompt(name, arguments)
             finally:
-                await self._server.cleanup()
+                await server.cleanup()
 
         return list_tools, call_tool, list_prompts, get_prompt
 
@@ -189,8 +206,9 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
     def __init__(
         self,
         server: str,
-        config: Optional[ActivityConfig] = None,
-        server_session_config: Optional[ActivityConfig] = None,
+        config: Optional[ActivityConfig],
+        server_session_config: Optional[ActivityConfig],
+        cache_tools_list: bool,
     ):
         self._name = server + "-stateful"
         self._config = config or ActivityConfig(
@@ -201,6 +219,8 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
             start_to_close_timeout=timedelta(hours=1),
         )
         self._connect_handle: Optional[ActivityHandle] = None
+        self._cache_tools_list = cache_tools_list
+        self._tools = None
         super().__init__()
 
     @property
@@ -239,16 +259,22 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
         run_context: Optional[RunContextWrapper[Any]] = None,
         agent: Optional[AgentBase] = None,
     ) -> list[MCPTool]:
+        if self._tools:
+            return self._tools
+
         if not self._connect_handle:
             raise ApplicationError(
                 "Stateful MCP Server not connected. Call connect first."
             )
-        return await workflow.execute_activity(
+        tools = await workflow.execute_activity(
             self.name + "-list-tools",
             args=[],
             result_type=list[MCPTool],
             **self._config,
         )
+        if self._cache_tools_list:
+            self._tools = tools
+        return tools
 
     @_handle_worker_failure
     async def call_tool(
@@ -361,7 +387,7 @@ class StatefulMCPServerProvider:
                 await asyncio.sleep(delay)
                 activity.heartbeat(*details)
 
-        @activity.defn(name=self._name + "-server-session")
+        @activity.defn(name=self.name + "-server-session")
         async def connect() -> None:
             heartbeat_task = asyncio.create_task(heartbeat_every(30))
 

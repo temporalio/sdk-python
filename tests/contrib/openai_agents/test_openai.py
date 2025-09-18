@@ -2289,10 +2289,12 @@ async def test_output_type(client: Client):
 @workflow.defn
 class McpServerWorkflow:
     @workflow.run
-    async def run(self, timeout: timedelta) -> str:
+    async def run(self, timeout: timedelta, caching: bool) -> str:
         from agents.mcp import MCPServer
 
-        server: MCPServer = openai_agents.workflow.stateless_mcp_server("HelloServer")
+        server: MCPServer = openai_agents.workflow.stateless_mcp_server(
+            "HelloServer", cache_tools_list=caching
+        )
         agent = Agent[str](
             name="MCP ServerWorkflow",
             instructions="Use the tools to assist the customer.",
@@ -2307,13 +2309,14 @@ class McpServerWorkflow:
 @workflow.defn
 class McpServerStatefulWorkflow:
     @workflow.run
-    async def run(self, timeout: timedelta) -> str:
+    async def run(self, timeout: timedelta, caching: bool) -> str:
         async with openai_agents.workflow.stateful_mcp_server(
             "HelloServer",
             config=ActivityConfig(
                 schedule_to_start_timeout=timeout,
                 start_to_close_timeout=timedelta(seconds=30),
             ),
+            cache_tools_list=caching,
         ) as server:
             agent = Agent[str](
                 name="MCP ServerWorkflow",
@@ -2342,12 +2345,16 @@ class TrackingMCPModel(StaticTestModel):
 
 @pytest.mark.parametrize("use_local_model", [True, False])
 @pytest.mark.parametrize("stateful", [True, False])
-async def test_mcp_server(client: Client, use_local_model: bool, stateful: bool):
+@pytest.mark.parametrize("caching", [True, False])
+async def test_mcp_server(
+    client: Client, use_local_model: bool, stateful: bool, caching: bool
+):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
 
     if sys.version_info < (3, 10):
         pytest.skip("Mcp not supported on Python 3.9")
+
     from agents.mcp import MCPServer
     from mcp import GetPromptResult, ListPromptsResult  # type: ignore
     from mcp import Tool as MCPTool  # type: ignore
@@ -2355,7 +2362,7 @@ async def test_mcp_server(client: Client, use_local_model: bool, stateful: bool)
 
     from temporalio.contrib.openai_agents import (
         StatefulMCPServerProvider,
-        StatelessMCPServer,
+        StatelessMCPServerProvider,
     )
 
     class TrackingMCPServer(MCPServer):
@@ -2414,10 +2421,10 @@ async def test_mcp_server(client: Client, use_local_model: bool, stateful: bool)
             raise NotImplementedError()
 
     tracking_server = TrackingMCPServer(name="HelloServer")
-    server: Union[StatefulMCPServerProvider, StatelessMCPServer] = (
+    server: Union[StatefulMCPServerProvider, StatelessMCPServerProvider] = (
         StatefulMCPServerProvider(lambda: tracking_server)
         if stateful
-        else StatelessMCPServer(tracking_server)
+        else StatelessMCPServerProvider(lambda: tracking_server)
     )
 
     new_config = client.config()
@@ -2440,7 +2447,7 @@ async def test_mcp_server(client: Client, use_local_model: bool, stateful: bool)
         if stateful:
             result = await client.execute_workflow(
                 McpServerStatefulWorkflow.run,
-                timedelta(seconds=30),
+                args=[timedelta(seconds=30), caching],
                 id=f"mcp-server-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=30),
@@ -2448,7 +2455,7 @@ async def test_mcp_server(client: Client, use_local_model: bool, stateful: bool)
         else:
             result = await client.execute_workflow(
                 McpServerWorkflow.run,
-                timedelta(seconds=30),
+                args=[timedelta(seconds=30), caching],
                 id=f"mcp-server-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=30),
@@ -2458,34 +2465,56 @@ async def test_mcp_server(client: Client, use_local_model: bool, stateful: bool)
     if use_local_model:
         print(tracking_server.calls)
         if stateful:
-            assert tracking_server.calls == [
-                "connect",
-                "list_tools",
-                "call_tool",
-                "list_tools",
-                "call_tool",
-                "list_tools",
-                "cleanup",
-            ]
+            if caching:
+                assert tracking_server.calls == [
+                    "connect",
+                    "list_tools",
+                    "call_tool",
+                    "call_tool",
+                    "cleanup",
+                ]
+            else:
+                assert tracking_server.calls == [
+                    "connect",
+                    "list_tools",
+                    "call_tool",
+                    "list_tools",
+                    "call_tool",
+                    "list_tools",
+                    "cleanup",
+                ]
             assert len(cast(StatefulMCPServerProvider, server)._servers) == 0
         else:
-            assert tracking_server.calls == [
-                "connect",
-                "list_tools",
-                "cleanup",
-                "connect",
-                "call_tool",
-                "cleanup",
-                "connect",
-                "list_tools",
-                "cleanup",
-                "connect",
-                "call_tool",
-                "cleanup",
-                "connect",
-                "list_tools",
-                "cleanup",
-            ]
+            if caching:
+                assert tracking_server.calls == [
+                    "connect",
+                    "list_tools",
+                    "cleanup",
+                    "connect",
+                    "call_tool",
+                    "cleanup",
+                    "connect",
+                    "call_tool",
+                    "cleanup",
+                ]
+            else:
+                assert tracking_server.calls == [
+                    "connect",
+                    "list_tools",
+                    "cleanup",
+                    "connect",
+                    "call_tool",
+                    "cleanup",
+                    "connect",
+                    "list_tools",
+                    "cleanup",
+                    "connect",
+                    "call_tool",
+                    "cleanup",
+                    "connect",
+                    "list_tools",
+                    "cleanup",
+                ]
 
 
 async def test_stateful_mcp_server_no_worker(client: Client):
@@ -2537,7 +2566,7 @@ async def test_stateful_mcp_server_no_worker(client: Client):
     ) as worker:
         workflow_handle = await client.start_workflow(
             McpServerStatefulWorkflow.run,
-            timedelta(seconds=1),
+            args=[timedelta(seconds=1), False],
             id=f"mcp-server-{uuid.uuid4()}",
             task_queue=worker.task_queue,
             execution_timeout=timedelta(seconds=30),

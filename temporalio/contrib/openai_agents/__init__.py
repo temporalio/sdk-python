@@ -12,7 +12,7 @@ This module provides compatibility between the
 try:
     from temporalio.contrib.openai_agents._mcp import (
         StatefulMCPServerProvider,
-        StatelessMCPServer,
+        StatelessMCPServerProvider,
     )
 except ImportError:
     pass
@@ -36,7 +36,7 @@ __all__ = [
     "ModelActivityParameters",
     "OpenAIAgentsPlugin",
     "OpenAIPayloadConverter",
-    "StatelessMCPServer",
+    "StatelessMCPServerProvider",
     "StatefulMCPServerProvider",
     "TestModel",
     "TestModelProvider",
