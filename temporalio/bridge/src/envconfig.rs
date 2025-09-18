@@ -89,19 +89,14 @@ fn load_client_config_inner(
     py: Python,
     config_source: Option<DataSource>,
     config_file_strict: bool,
-    disable_file: bool,
     env_vars: Option<HashMap<String, String>>,
 ) -> PyResult<PyObject> {
-    let core_config = if disable_file {
-        CoreClientConfig::default()
-    } else {
-        let options = LoadClientConfigOptions {
-            config_source,
-            config_file_strict,
-        };
-        core_load_client_config(options, env_vars.as_ref())
-            .map_err(|e| ConfigError::new_err(format!("{e}")))?
+    let options = LoadClientConfigOptions {
+        config_source,
+        config_file_strict,
     };
+    let core_config = core_load_client_config(options, env_vars.as_ref())
+        .map_err(|e| ConfigError::new_err(format!("{e}")))?;
 
     core_config_to_dict(py, &core_config)
 }
@@ -130,12 +125,11 @@ fn load_client_connect_config_inner(
 }
 
 #[pyfunction]
-#[pyo3(signature = (path, data, disable_file, config_file_strict, env_vars = None))]
+#[pyo3(signature = (path, data, config_file_strict, env_vars = None))]
 pub fn load_client_config(
     py: Python,
     path: Option<String>,
     data: Option<Vec<u8>>,
-    disable_file: bool,
     config_file_strict: bool,
     env_vars: Option<HashMap<String, String>>,
 ) -> PyResult<PyObject> {
@@ -153,7 +147,6 @@ pub fn load_client_config(
         py,
         config_source,
         config_file_strict,
-        disable_file,
         env_vars,
     )
 }
