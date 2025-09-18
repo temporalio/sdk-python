@@ -196,6 +196,8 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
             start_to_close_timeout=timedelta(hours=1),
         )
         self._connect_handle: Optional[ActivityHandle] = None
+        self._task_queue = f"{workflow.uuid4()}-{self.name}"
+        self._config["task_queue"] = self._task_queue
         super().__init__()
 
     @property
@@ -203,16 +205,16 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
         return self._name
 
     async def connect(self) -> None:
-        self._config["task_queue"] = workflow.info().workflow_id + "-" + self.name
         self._connect_handle = workflow.start_activity(
             self.name + "-server-session",
-            args=[],
+            args=[self._task_queue],
             **self._server_session_config,
         )
 
     async def cleanup(self) -> None:
-        if self._connect_handle:
-            self._connect_handle.cancel()
+        pass
+        # if self._connect_handle:
+        #     self._connect_handle.cancel()
 
     async def __aenter__(self):
         await self.connect()
@@ -329,16 +331,16 @@ class StatefulMCPServer:
                 activity.heartbeat(*details)
 
         @activity.defn(name=self._name + "-server-session")
-        async def connect() -> None:
-            heartbeat_task = asyncio.create_task(heartbeat_every(30))
+        async def connect(task_queue: str) -> None:
+            heartbeat_task = asyncio.create_task(heartbeat_every(300))
             try:
                 await self._server.connect()
 
                 worker = Worker(
                     activity.client(),
-                    task_queue=activity.info().workflow_id + "-" + self.name,
+                    task_queue=task_queue,
                     activities=[list_tools, call_tool, list_prompts, get_prompt],
-                    activity_task_poller_behavior=PollerBehaviorSimpleMaximum(1),
+                    activity_task_poller_behavior=PollerBehaviorSimpleMaximum(100),
                 )
 
                 await worker.run()
