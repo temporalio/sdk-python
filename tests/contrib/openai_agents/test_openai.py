@@ -2289,7 +2289,7 @@ async def test_output_type(client: Client):
 @workflow.defn
 class McpServerWorkflow:
     @workflow.run
-    async def run(self, timeout: timedelta, caching: bool) -> str:
+    async def run(self, caching: bool) -> str:
         from agents.mcp import MCPServer
 
         server: MCPServer = openai_agents.workflow.stateless_mcp_server(
@@ -2309,14 +2309,13 @@ class McpServerWorkflow:
 @workflow.defn
 class McpServerStatefulWorkflow:
     @workflow.run
-    async def run(self, timeout: timedelta, caching: bool) -> str:
+    async def run(self, timeout: timedelta) -> str:
         async with openai_agents.workflow.stateful_mcp_server(
             "HelloServer",
             config=ActivityConfig(
                 schedule_to_start_timeout=timeout,
                 start_to_close_timeout=timedelta(seconds=30),
             ),
-            cache_tools_list=caching,
         ) as server:
             agent = Agent[str](
                 name="MCP ServerWorkflow",
@@ -2354,6 +2353,9 @@ async def test_mcp_server(
 
     if sys.version_info < (3, 10):
         pytest.skip("Mcp not supported on Python 3.9")
+
+    if stateful and caching:
+        pytest.skip("Caching is only supported for stateless MCP servers")
 
     from agents.mcp import MCPServer
     from mcp import GetPromptResult, ListPromptsResult  # type: ignore
@@ -2447,7 +2449,7 @@ async def test_mcp_server(
         if stateful:
             result = await client.execute_workflow(
                 McpServerStatefulWorkflow.run,
-                args=[timedelta(seconds=30), caching],
+                args=[timedelta(seconds=30)],
                 id=f"mcp-server-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=30),
@@ -2455,7 +2457,7 @@ async def test_mcp_server(
         else:
             result = await client.execute_workflow(
                 McpServerWorkflow.run,
-                args=[timedelta(seconds=30), caching],
+                args=[caching],
                 id=f"mcp-server-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=30),
@@ -2465,24 +2467,15 @@ async def test_mcp_server(
     if use_local_model:
         print(tracking_server.calls)
         if stateful:
-            if caching:
-                assert tracking_server.calls == [
-                    "connect",
-                    "list_tools",
-                    "call_tool",
-                    "call_tool",
-                    "cleanup",
-                ]
-            else:
-                assert tracking_server.calls == [
-                    "connect",
-                    "list_tools",
-                    "call_tool",
-                    "list_tools",
-                    "call_tool",
-                    "list_tools",
-                    "cleanup",
-                ]
+            assert tracking_server.calls == [
+                "connect",
+                "list_tools",
+                "call_tool",
+                "list_tools",
+                "call_tool",
+                "list_tools",
+                "cleanup",
+            ]
             assert len(cast(StatefulMCPServerProvider, server)._servers) == 0
         else:
             if caching:

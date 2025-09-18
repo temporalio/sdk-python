@@ -208,7 +208,6 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
         server: str,
         config: Optional[ActivityConfig],
         server_session_config: Optional[ActivityConfig],
-        cache_tools_list: bool,
     ):
         self._name = server + "-stateful"
         self._config = config or ActivityConfig(
@@ -219,8 +218,6 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
             start_to_close_timeout=timedelta(hours=1),
         )
         self._connect_handle: Optional[ActivityHandle] = None
-        self._cache_tools_list = cache_tools_list
-        self._tools = None
         super().__init__()
 
     @property
@@ -259,22 +256,16 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
         run_context: Optional[RunContextWrapper[Any]] = None,
         agent: Optional[AgentBase] = None,
     ) -> list[MCPTool]:
-        if self._tools:
-            return self._tools
-
         if not self._connect_handle:
             raise ApplicationError(
                 "Stateful MCP Server not connected. Call connect first."
             )
-        tools = await workflow.execute_activity(
+        return await workflow.execute_activity(
             self.name + "-list-tools",
             args=[],
             result_type=list[MCPTool],
             **self._config,
         )
-        if self._cache_tools_list:
-            self._tools = tools
-        return tools
 
     @_handle_worker_failure
     async def call_tool(
