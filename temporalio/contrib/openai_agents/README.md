@@ -403,14 +403,17 @@ As described in [Tool Calling](#tool-calling), context propagation is read-only 
 
 ### MCP
 
-Presently, MCP is supported only via `HostedMCPTool`, which uses the OpenAI Responses API and cloud MCP client behind it.
-The OpenAI Agents SDK also supports MCP clients that run in application code, but this integration does not.
+The MCP protocol is stateful, but many MCP servers are stateless.
+We let you choose between two MCP wrappers, one designed for stateless MCP servers and one for stateful MCP servers.
+These wrappers work with all transport varieties.
+
+Note that when using network-accessible MCP servers, you also can also use the tool `HostedMCPTool`, which is part of the OpenAI Responses API and uses an MCP client hosted by OpenAI.
 
 | MCP Class              | Supported |
 |:-----------------------|:---------:|
-| MCPServerStdio         |    No     |
-| MCPServerSse           |    No     |
-| MCPServerStreamableHttp|    No     |
+| MCPServerStdio         |    Yes    |
+| MCPServerSse           |    Yes    |
+| MCPServerStreamableHttp|    Yes    |
 
 ### Guardrails
 
