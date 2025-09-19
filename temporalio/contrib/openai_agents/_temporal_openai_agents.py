@@ -196,7 +196,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
             of model calls. If None, default parameters will be used.
         model_provider: Optional model provider for custom model implementations.
             Useful for testing or custom model integrations.
-        mcp_servers: Sequence of MCP servers to automatically register with the worker.
+        mcp_server_providers: Sequence of MCP servers to automatically register with the worker.
             The plugin will wrap each server in a TemporalMCPServer if needed and
             manage their connection lifecycles tied to the worker lifetime. This is
             the recommended way to use MCP servers with Temporal workflows.
@@ -223,7 +223,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         >>> # Create plugin with MCP servers
         >>> plugin = OpenAIAgentsPlugin(
         ...     model_params=model_params,
-        ...     mcp_servers=[filesystem_server]
+        ...     mcp_server_providers=[filesystem_server]
         ... )
         >>>
         >>> # Use with client and worker
@@ -242,7 +242,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         self,
         model_params: Optional[ModelActivityParameters] = None,
         model_provider: Optional[ModelProvider] = None,
-        mcp_servers: Sequence[
+        mcp_server_providers: Sequence[
             Union["StatelessMCPServerProvider", "StatefulMCPServerProvider"]
         ] = (),
     ) -> None:
@@ -253,7 +253,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
                 of model calls. If None, default parameters will be used.
             model_provider: Optional model provider for custom model implementations.
                 Useful for testing or custom model integrations.
-            mcp_servers: Sequence of MCP servers to automatically register with the worker.
+            mcp_server_providers: Sequence of MCP servers to automatically register with the worker.
                 Each server will be wrapped in a TemporalMCPServer if not already wrapped,
                 and their activities will be automatically registered with the worker.
                 The plugin manages the connection lifecycle of these servers.
@@ -276,7 +276,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
 
         self._model_params = model_params
         self._model_provider = model_provider
-        self._mcp_servers = mcp_servers
+        self._mcp_server_providers = mcp_server_providers
 
     def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
         """Set the next client plugin"""
@@ -340,13 +340,13 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         ]
         new_activities = [ModelActivity(self._model_provider).invoke_model_activity]
 
-        server_names = [server.name for server in self._mcp_servers]
+        server_names = [server.name for server in self._mcp_server_providers]
         if len(server_names) != len(set(server_names)):
             raise ValueError(
                 f"More than one mcp server registered with the same name. Please provide unique names."
             )
 
-        for mcp_server in self._mcp_servers:
+        for mcp_server in self._mcp_server_providers:
             new_activities.extend(mcp_server._get_activities())
         config["activities"] = list(config.get("activities") or []) + new_activities
 

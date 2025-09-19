@@ -2438,7 +2438,7 @@ async def test_mcp_server(
             model_provider=TestModelProvider(TrackingMCPModel())
             if use_local_model
             else None,
-            mcp_servers=[server],
+            mcp_server_providers=[server],
         )
     ]
     client = Client(**new_config)
@@ -2548,7 +2548,7 @@ async def test_stateful_mcp_server_no_worker(client: Client):
                 start_to_close_timeout=timedelta(seconds=120)
             ),
             model_provider=TestModelProvider(TrackingMCPModel()),
-            mcp_servers=[server],
+            mcp_server_providers=[server],
         )
     ]
     client = Client(**new_config)

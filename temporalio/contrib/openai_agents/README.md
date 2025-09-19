@@ -383,6 +383,7 @@ from temporalio.contrib.openai_agents import (
 )
 from temporalio.worker import Worker
 
+
 async def main():
     # Create the MCP server provider
     filesystem_server = StatelessMCPServerProvider(
@@ -403,7 +404,7 @@ async def main():
                 model_params=ModelActivityParameters(
                     start_to_close_timeout=timedelta(seconds=60)
                 ),
-                mcp_servers=[filesystem_server],
+                mcp_server_providers=[filesystem_server],
             ),
         ],
     )
@@ -414,6 +415,7 @@ async def main():
         workflows=[FileSystemWorkflow],
     )
     await worker.run()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
