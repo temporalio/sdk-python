@@ -2559,7 +2559,7 @@ async def test_stateful_mcp_server_no_worker(client: Client):
     ) as worker:
         workflow_handle = await client.start_workflow(
             McpServerStatefulWorkflow.run,
-            args=[timedelta(seconds=1), False],
+            args=[timedelta(seconds=1)],
             id=f"mcp-server-{uuid.uuid4()}",
             task_queue=worker.task_queue,
             execution_timeout=timedelta(seconds=30),
