@@ -3168,7 +3168,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         self._task = asyncio.Task(fn)
         self._start_fut: asyncio.Future[Optional[str]] = instance.create_future()
         self._result_fut: asyncio.Future[Optional[OutputT]] = instance.create_future()
-        self._payload_converter, _ = self._instance._converters_with_context(None)
+        self._payload_converter = self._instance._payload_converter
 
     @property
     def operation_token(self) -> Optional[str]:
