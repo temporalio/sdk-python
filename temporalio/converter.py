@@ -401,15 +401,16 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
                 ) from err
         return values
 
-    def with_context(self, context: SerializationContext) -> Self:
+    def with_context(self, context: SerializationContext) -> CompositePayloadConverter:
         """Return a new instance with the given context."""
-        converters = [
-            c.with_context(context) if isinstance(c, WithSerializationContext) else c
-            for c in self.converters.values()
-        ]
-        instance = type(self).__new__(type(self))
-        CompositePayloadConverter.__init__(instance, *converters)
-        return instance
+        return CompositePayloadConverter(
+            *(
+                c.with_context(context)
+                if isinstance(c, WithSerializationContext)
+                else c
+                for c in self.converters.values()
+            )
+        )
 
 
 class DefaultPayloadConverter(CompositePayloadConverter):
