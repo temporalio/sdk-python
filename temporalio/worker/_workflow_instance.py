@@ -210,8 +210,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._defn = det.defn
         self._workflow_input: Optional[ExecuteWorkflowInput] = None
         self._info = det.info
-        self._context_free_payload_converter = det.payload_converter_class()
-        self._context_free_failure_converter = det.failure_converter_class()
+        self._payload_converter = det.payload_converter_class()
+        self._failure_converter = det.failure_converter_class()
         self._payload_converter, self._failure_converter = self._converters(
             temporalio.converter.WorkflowSerializationContext(
                 namespace=det.info.namespace,
@@ -2063,8 +2063,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         temporalio.converter.FailureConverter,
     ]:
         """Construct workflow payload and failure converters with the given context."""
-        payload_converter = self._context_free_payload_converter
-        failure_converter = self._context_free_failure_converter
+        payload_converter = self._payload_converter
+        failure_converter = self._failure_converter
         if context:
             if isinstance(
                 payload_converter, temporalio.converter.WithSerializationContext
