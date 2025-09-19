@@ -3,31 +3,33 @@
 import functools
 import inspect
 import json
+import typing
+from contextlib import AbstractAsyncContextManager
 from datetime import timedelta
-from typing import Any, Callable, Optional, Type, Union, overload
+from typing import Any, Callable, Optional, Type
 
 import nexusrpc
 from agents import (
-    Agent,
     RunContextWrapper,
     Tool,
 )
-from agents.function_schema import DocstringStyle, function_schema
+from agents.function_schema import function_schema
 from agents.tool import (
     FunctionTool,
-    ToolErrorFunction,
-    ToolFunction,
-    ToolParams,
-    default_tool_error_function,
-    function_tool,
 )
-from agents.util._types import MaybeAwaitable
 
 from temporalio import activity
 from temporalio import workflow as temporal_workflow
 from temporalio.common import Priority, RetryPolicy
 from temporalio.exceptions import ApplicationError, TemporalError
-from temporalio.workflow import ActivityCancellationType, VersioningIntent
+from temporalio.workflow import (
+    ActivityCancellationType,
+    ActivityConfig,
+    VersioningIntent,
+)
+
+if typing.TYPE_CHECKING:
+    from agents.mcp import MCPServer
 
 
 def activity_as_tool(
@@ -237,6 +239,73 @@ def nexus_operation_as_tool(
         on_invoke_tool=run_operation,
         strict_json_schema=True,
     )
+
+
+def stateless_mcp_server(
+    name: str,
+    config: Optional[ActivityConfig] = None,
+    cache_tools_list: bool = False,
+) -> "MCPServer":
+    """A stateless MCP server implementation for Temporal workflows.
+
+    .. warning::
+        This API is experimental and may change in future versions.
+        Use with caution in production environments.
+
+    This uses a TemporalMCPServer of the same name registered with the OpenAIAgents plugin to implement
+    durable MCP operations statelessly.
+
+    This approach is suitable for simple use cases where connection overhead is acceptable
+    and you don't need to maintain state between operations. It should be preferred to stateful when possible due to its
+    superior durability guarantees.
+
+    Args:
+        name: A string name for the server. Should match that provided in the plugin.
+        config: Optional activity configuration for MCP operation activities.
+               Defaults to 1-minute start-to-close timeout.
+        cache_tools_list: If true, the list of tools will be cached for the duration of the server
+    """
+    from temporalio.contrib.openai_agents._mcp import (
+        _StatelessMCPServerReference,
+    )
+
+    return _StatelessMCPServerReference(name, config, cache_tools_list)
+
+
+def stateful_mcp_server(
+    name: str,
+    config: Optional[ActivityConfig] = None,
+    server_session_config: Optional[ActivityConfig] = None,
+) -> AbstractAsyncContextManager["MCPServer"]:
+    """A stateful MCP server implementation for Temporal workflows.
+
+    .. warning::
+        This API is experimental and may change in future versions.
+        Use with caution in production environments.
+
+    This wraps an MCP server to maintain a persistent connection throughout
+    the workflow execution. It creates a dedicated worker that stays connected to
+    the MCP server and processes operations on a dedicated task queue.
+
+    This approach is more efficient for workflows that make multiple MCP calls,
+    as it avoids connection overhead, but requires more resources to maintain
+    the persistent connection and worker.
+
+    The caller will have to handle cases where the dedicated worker fails, as Temporal is
+    unable to seamlessly recreate any lost state in that case.
+
+    Args:
+        name: A string name for the server. Should match that provided in the plugin.
+        config: Optional activity configuration for MCP operation activities.
+               Defaults to 1-minute start-to-close and 30-second schedule-to-start timeouts.
+        server_session_config: Optional activity configuration for the connection activity.
+                       Defaults to 1-hour start-to-close timeout.
+    """
+    from temporalio.contrib.openai_agents._mcp import (
+        _StatefulMCPServerReference,
+    )
+
+    return _StatefulMCPServerReference(name, config, server_session_config)
 
 
 class ToolSerializationError(TemporalError):

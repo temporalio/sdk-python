@@ -351,6 +351,111 @@ Of course, code running in the workflow can invoke a Temporal activity at any ti
 Tools that run in the workflow can also update OpenAI Agents context, which is read-only for tools run as Temporal activities.
 
 
+## MCP Support
+
+This integration provides support for Model Context Protocol (MCP) servers through two wrapper approaches designed to handle different implications of failures.
+
+While Temporal provides durable execution for your workflows, this durability does not extend to MCP servers, which operate independently of the workflow and must provide their own durability. The integration handles this by offering stateless and stateful wrappers that you can choose based on your MCP server's design.
+
+### Stateless vs Stateful MCP Servers
+
+You need to understand your MCP server's behavior to choose the correct wrapper:
+
+**Stateless MCP servers** treat each operation independently. For example, a weather server with a `get_weather(location)` tool is stateless because each call is self-contained and includes all necessary information. These servers can be safely restarted or reconnected to without changing their behavior.
+
+**Stateful MCP servers** maintain session state between calls. For example, a weather server that requires calling `set_location(location)` followed by `get_weather()` is stateful because it remembers the configured location and uses it for subsequent calls. If the session or the server is restarted, state crucial for operation is lost. Temporal identifies such failures and raises an `ApplicationError` to signal the need for application-level failure handling.
+
+### Usage Example (Stateless MCP)
+
+The code below gives an example of using a stateless MCP server.
+
+#### Worker Configuration
+
+```python
+import asyncio
+from datetime import timedelta
+from agents.mcp import MCPServerStdio
+from temporalio.client import Client
+from temporalio.contrib.openai_agents import (
+    ModelActivityParameters,
+    OpenAIAgentsPlugin,
+    StatelessMCPServerProvider,
+)
+from temporalio.worker import Worker
+
+async def main():
+    # Create the MCP server provider
+    filesystem_server = StatelessMCPServerProvider(
+        lambda: MCPServerStdio(
+            name="FileSystemServer",
+            params={
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"],
+            },
+        )
+    )
+
+    # Register the MCP server with the OpenAI Agents plugin
+    client = await Client.connect(
+        "localhost:7233",
+        plugins=[
+            OpenAIAgentsPlugin(
+                model_params=ModelActivityParameters(
+                    start_to_close_timeout=timedelta(seconds=60)
+                ),
+                mcp_servers=[filesystem_server],
+            ),
+        ],
+    )
+
+    worker = Worker(
+        client,
+        task_queue="my-task-queue",
+        workflows=[FileSystemWorkflow],
+    )
+    await worker.run()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+#### Workflow Implementation
+
+```python
+from temporalio import workflow
+from temporalio.contrib import openai_agents
+from agents import Agent, Runner
+
+@workflow.defn
+class FileSystemWorkflow:
+    @workflow.run
+    async def run(self, query: str) -> str:
+        # Reference the MCP server by name (matches name in worker configuration)
+        server = openai_agents.workflow.stateless_mcp_server("FileSystemServer")
+        
+        agent = Agent(
+            name="File Assistant",
+            instructions="Use the filesystem tools to read files and answer questions.",
+            mcp_servers=[server],
+        )
+        
+        result = await Runner.run(agent, input=query)
+        return result.final_output
+```
+
+The `StatelessMCPServerProvider` takes a factory function that creates new MCP server instances. The server name used in `stateless_mcp_server()` must match the name configured in the MCP server instance. In this example, the name is `FileSystemServer`.
+
+### Stateful MCP Servers
+
+For implementation details and examples, see the [samples repository](https://github.com/temporalio/samples-python/tree/main/openai_agents/mcp).
+
+When using stateful servers, the dedicated worker maintaining the connection may fail due to network issues or server problems. When this happens, Temporal raises an `ApplicationError` and cannot automatically recover because it cannot restore the lost server state.
+To recover from such failures, you need to implement your own application-level retry logic.
+
+### Hosted MCP Tool
+
+For network-accessible MCP servers, you can also use `HostedMCPTool` from the OpenAI Agents SDK, which uses an MCP client hosted by OpenAI.
+
 ## Feature Support
 
 This integration is presently subject to certain limitations.
@@ -403,14 +508,17 @@ As described in [Tool Calling](#tool-calling), context propagation is read-only 
 
 ### MCP
 
-Presently, MCP is supported only via `HostedMCPTool`, which uses the OpenAI Responses API and cloud MCP client behind it.
-The OpenAI Agents SDK also supports MCP clients that run in application code, but this integration does not.
+The MCP protocol is stateful, but many MCP servers are stateless.
+We let you choose between two MCP wrappers, one designed for stateless MCP servers and one for stateful MCP servers.
+These wrappers work with all transport varieties.
+
+Note that when using network-accessible MCP servers, you also can also use the tool `HostedMCPTool`, which is part of the OpenAI Responses API and uses an MCP client hosted by OpenAI.
 
 | MCP Class              | Supported |
 |:-----------------------|:---------:|
-| MCPServerStdio         |    No     |
-| MCPServerSse           |    No     |
-| MCPServerStreamableHttp|    No     |
+| MCPServerStdio         |    Yes    |
+| MCPServerSse           |    Yes    |
+| MCPServerStreamableHttp|    Yes    |
 
 ### Guardrails
 

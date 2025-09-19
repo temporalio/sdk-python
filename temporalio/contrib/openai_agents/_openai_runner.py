@@ -59,9 +59,22 @@ class TemporalOpenAIRunner(AgentRunner):
                 )
 
         if starting_agent.mcp_servers:
-            raise ValueError(
-                "Temporal OpenAI agent does not support on demand MCP servers."
+            from temporalio.contrib.openai_agents._mcp import (
+                _StatefulMCPServerReference,
+                _StatelessMCPServerReference,
             )
+
+            for s in starting_agent.mcp_servers:
+                if not isinstance(
+                    s,
+                    (
+                        _StatelessMCPServerReference,
+                        _StatefulMCPServerReference,
+                    ),
+                ):
+                    raise ValueError(
+                        f"Unknown mcp_server type {type(s)} may not work durably."
+                    )
 
         context = kwargs.get("context")
         max_turns = kwargs.get("max_turns", DEFAULT_MAX_TURNS)

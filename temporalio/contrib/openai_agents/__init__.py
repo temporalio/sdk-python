@@ -8,6 +8,15 @@ This module provides compatibility between the
     Use with caution in production environments.
 """
 
+# Best Effort mcp, as it is not supported on Python 3.9
+try:
+    from temporalio.contrib.openai_agents._mcp import (
+        StatefulMCPServerProvider,
+        StatelessMCPServerProvider,
+    )
+except ImportError:
+    pass
+
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._temporal_openai_agents import (
     OpenAIAgentsPlugin,
@@ -27,6 +36,8 @@ __all__ = [
     "ModelActivityParameters",
     "OpenAIAgentsPlugin",
     "OpenAIPayloadConverter",
+    "StatelessMCPServerProvider",
+    "StatefulMCPServerProvider",
     "TestModel",
     "TestModelProvider",
     "workflow",
