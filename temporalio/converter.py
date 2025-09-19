@@ -1309,18 +1309,17 @@ class DataConverter:
             await self.payload_codec.decode_failure(failure)
         return self.failure_converter.from_failure(failure, self.payload_converter)
 
-    def _with_context(self, context: Optional[SerializationContext]) -> Self:
+    def _with_context(self, context: SerializationContext) -> Self:
         cloned = dataclasses.replace(self)
         payload_converter = self.payload_converter
         payload_codec = self.payload_codec
         failure_converter = self.failure_converter
-        if context:
-            if isinstance(payload_converter, WithSerializationContext):
-                payload_converter = payload_converter.with_context(context)
-            if isinstance(payload_codec, WithSerializationContext):
-                payload_codec = payload_codec.with_context(context)
-            if isinstance(failure_converter, WithSerializationContext):
-                failure_converter = failure_converter.with_context(context)
+        if isinstance(payload_converter, WithSerializationContext):
+            payload_converter = payload_converter.with_context(context)
+        if isinstance(payload_codec, WithSerializationContext):
+            payload_codec = payload_codec.with_context(context)
+        if isinstance(failure_converter, WithSerializationContext):
+            failure_converter = failure_converter.with_context(context)
         object.__setattr__(cloned, "payload_converter", payload_converter)
         object.__setattr__(cloned, "payload_codec", payload_codec)
         object.__setattr__(cloned, "failure_converter", failure_converter)
