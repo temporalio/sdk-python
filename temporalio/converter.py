@@ -139,7 +139,7 @@ class WithSerializationContext(ABC):
     during serialization and deserialization.
     """
 
-    def with_context(self, context: Optional[SerializationContext]) -> Self:
+    def with_context(self, context: SerializationContext) -> Self:
         """Return a copy of this object configured to use the given context.
 
         Args:
@@ -401,7 +401,7 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
                 ) from err
         return values
 
-    def with_context(self, context: Optional[SerializationContext]) -> Self:
+    def with_context(self, context: SerializationContext) -> Self:
         """Return a new instance with the given context."""
         converters = [
             c.with_context(context) if isinstance(c, WithSerializationContext) else c
@@ -1313,12 +1313,13 @@ class DataConverter:
         payload_converter = self.payload_converter
         payload_codec = self.payload_codec
         failure_converter = self.failure_converter
-        if isinstance(payload_converter, WithSerializationContext):
-            payload_converter = payload_converter.with_context(context)
-        if isinstance(payload_codec, WithSerializationContext):
-            payload_codec = payload_codec.with_context(context)
-        if isinstance(failure_converter, WithSerializationContext):
-            failure_converter = failure_converter.with_context(context)
+        if context:
+            if isinstance(payload_converter, WithSerializationContext):
+                payload_converter = payload_converter.with_context(context)
+            if isinstance(payload_codec, WithSerializationContext):
+                payload_codec = payload_codec.with_context(context)
+            if isinstance(failure_converter, WithSerializationContext):
+                failure_converter = failure_converter.with_context(context)
         object.__setattr__(cloned, "payload_converter", payload_converter)
         object.__setattr__(cloned, "payload_codec", payload_codec)
         object.__setattr__(cloned, "failure_converter", failure_converter)

@@ -2065,10 +2065,15 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         """Construct workflow payload and failure converters with the given context."""
         payload_converter = self._payload_converter_class()
         failure_converter = self._failure_converter_class()
-        if isinstance(payload_converter, temporalio.converter.WithSerializationContext):
-            payload_converter = payload_converter.with_context(context)
-        if isinstance(failure_converter, temporalio.converter.WithSerializationContext):
-            failure_converter = failure_converter.with_context(context)
+        if context:
+            if isinstance(
+                payload_converter, temporalio.converter.WithSerializationContext
+            ):
+                payload_converter = payload_converter.with_context(context)
+            if isinstance(
+                failure_converter, temporalio.converter.WithSerializationContext
+            ):
+                failure_converter = failure_converter.with_context(context)
         return payload_converter, failure_converter
 
     def _instantiate_workflow_object(self) -> Any:
