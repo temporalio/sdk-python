@@ -77,8 +77,7 @@ class SandboxedWorkflowRunner(WorkflowRunner):
         # Just create with fake info which validates
         self.create_instance(
             WorkflowInstanceDetails(
-                payload_converter_class=temporalio.converter.DataConverter.default.payload_converter_class,
-                failure_converter_class=temporalio.converter.DataConverter.default.failure_converter_class,
+                data_converter=temporalio.converter.DataConverter.default,
                 interceptor_classes=[],
                 defn=defn,
                 # Just use fake info during validation
@@ -185,3 +184,19 @@ class _Instance(WorkflowInstance):
 
     def get_thread_id(self) -> Optional[int]:
         return self._current_thread_id
+
+    def get_payload_codec(
+        self, command_seq: Optional[int]
+    ) -> Optional[temporalio.converter.PayloadCodec]:
+        # Forward call to the sandboxed instance
+        self.importer.restriction_context.is_runtime = True
+        try:
+            self._run_code(
+                "with __temporal_importer.applied():\n"
+                "  __temporal_codec = __temporal_in_sandbox.get_payload_codec(__temporal_command_seq)\n",
+                __temporal_importer=self.importer,
+                __temporal_command_seq=command_seq,
+            )
+            return self.globals_and_locals.pop("__temporal_codec", None)  # type: ignore
+        finally:
+            self.importer.restriction_context.is_runtime = False

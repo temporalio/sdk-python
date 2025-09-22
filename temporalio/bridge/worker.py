@@ -7,11 +7,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import (
-    TYPE_CHECKING,
     Awaitable,
     Callable,
     List,
-    Mapping,
     MutableSequence,
     Optional,
     Sequence,
@@ -20,7 +18,6 @@ from typing import (
     Union,
 )
 
-import google.protobuf.internal.containers
 from typing_extensions import TypeAlias
 
 import temporalio.api.common.v1
@@ -35,7 +32,7 @@ import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 import temporalio.exceptions
-from temporalio.api.common.v1.message_pb2 import Payload, Payloads
+from temporalio.api.common.v1.message_pb2 import Payload
 from temporalio.bridge._visitor import PayloadVisitor, VisitorFunctions
 from temporalio.bridge.temporal_sdk_bridge import (
     CustomSlotSupplier as BridgeCustomSlotSupplier,
@@ -299,22 +296,22 @@ class _Visitor(VisitorFunctions):
 
 
 async def decode_activation(
-    act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
-    codec: temporalio.converter.PayloadCodec,
+    activation: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
+    decode: Callable[[Sequence[Payload]], Awaitable[List[Payload]]],
     decode_headers: bool,
 ) -> None:
-    """Decode the given activation with the codec."""
+    """Decode all payloads in the activation."""
     await PayloadVisitor(
         skip_search_attributes=True, skip_headers=not decode_headers
-    ).visit(_Visitor(codec.decode), act)
+    ).visit(_Visitor(decode), activation)
 
 
 async def encode_completion(
-    comp: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
-    codec: temporalio.converter.PayloadCodec,
+    completion: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
+    encode: Callable[[Sequence[Payload]], Awaitable[List[Payload]]],
     encode_headers: bool,
 ) -> None:
-    """Recursively encode the given completion with the codec."""
+    """Encode all payloads in the completion."""
     await PayloadVisitor(
         skip_search_attributes=True, skip_headers=not encode_headers
-    ).visit(_Visitor(codec.encode), comp)
+    ).visit(_Visitor(encode), completion)

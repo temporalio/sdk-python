@@ -44,6 +44,7 @@ from typing_extensions import Literal, Protocol, runtime_checkable
 import temporalio.activity
 import temporalio.api.sdk.v1
 import temporalio.client
+import temporalio.converter
 import temporalio.worker
 import temporalio.workflow
 from temporalio import activity, workflow
@@ -1608,6 +1609,11 @@ class CustomWorkflowInstance(WorkflowInstance):
         comp = self._unsandboxed.activate(act)
         self._runner._pairs.append((act, comp))
         return comp
+
+    def get_payload_codec(
+        self, command_seq: Optional[int]
+    ) -> Optional[temporalio.converter.PayloadCodec]:
+        return self._unsandboxed.get_payload_codec(command_seq)
 
 
 async def test_workflow_with_custom_runner(client: Client):

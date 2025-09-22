@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import json
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any, List, Literal, Optional, Sequence, Type
 
+import nexusrpc
 import pytest
 from pydantic import BaseModel
 from typing_extensions import Never
@@ -42,6 +44,7 @@ from temporalio.converter import (
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import Worker
 from temporalio.worker._workflow_instance import UnsandboxedWorkflowRunner
+from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 
 @dataclass
@@ -422,43 +425,40 @@ async def test_local_activity_payload_conversion(client: Client):
             )
         )
 
-        assert (
-            result.items
-            == [
-                TraceItem(
-                    method="to_payload",
-                    context=workflow_context,  # Outbound workflow input
-                ),
-                TraceItem(
-                    method="from_payload",
-                    context=workflow_context,  # Inbound workflow input
-                ),
-                TraceItem(
-                    method="to_payload",
-                    context=local_activity_context,  # Outbound local activity input (is_local=True)
-                ),
-                TraceItem(
-                    method="from_payload",
-                    context=local_activity_context,  # Inbound local activity input (is_local=True)
-                ),
-                TraceItem(
-                    method="to_payload",
-                    context=local_activity_context,  # Outbound local activity result (is_local=True)
-                ),
-                TraceItem(
-                    method="from_payload",
-                    context=local_activity_context,  # Inbound local activity result (is_local=True)
-                ),
-                TraceItem(
-                    method="to_payload",
-                    context=workflow_context,  # Outbound workflow result
-                ),
-                TraceItem(
-                    method="from_payload",
-                    context=workflow_context,  # Inbound workflow result
-                ),
-            ]
-        )
+        assert result.items == [
+            TraceItem(
+                method="to_payload",
+                context=workflow_context,  # Outbound workflow input
+            ),
+            TraceItem(
+                method="from_payload",
+                context=workflow_context,  # Inbound workflow input
+            ),
+            TraceItem(
+                method="to_payload",
+                context=local_activity_context,  # Outbound local activity input
+            ),
+            TraceItem(
+                method="from_payload",
+                context=local_activity_context,  # Inbound local activity input
+            ),
+            TraceItem(
+                method="to_payload",
+                context=local_activity_context,  # Outbound local activity result
+            ),
+            TraceItem(
+                method="from_payload",
+                context=local_activity_context,  # Inbound local activity result
+            ),
+            TraceItem(
+                method="to_payload",
+                context=workflow_context,  # Outbound workflow result
+            ),
+            TraceItem(
+                method="from_payload",
+                context=workflow_context,  # Inbound workflow result
+            ),
+        ]
 
 
 # Async activity completion test
@@ -1046,6 +1046,9 @@ async def test_failure_converter_with_context(client: Client):
         del test_traces[workflow_id]
 
 
+## Test payload codec
+
+
 class PayloadCodecWithContext(PayloadCodec, WithSerializationContext):
     def __init__(self):
         self.context: Optional[SerializationContext] = None
@@ -1204,54 +1207,389 @@ async def test_local_activity_codec_with_context(client: Client):
             workflow_type=LocalActivityCodecTestWorkflow.__name__,
             activity_type=codec_test_local_activity.__name__,
             activity_task_queue=task_queue,
-            is_local=True,  # Should be True for local activities
+            is_local=True,
         )
     )
 
-    # Note: Local activities have partial activity context support through codec
-    # The input encode uses workflow context, but the decode uses activity context
-    # The result encode uses activity context, but the decode uses workflow context
     assert test_traces[workflow_id] == [
-        # Workflow input
         TraceItem(
             context=workflow_context,
-            method="encode",
+            method="encode",  # outbound workflow input
         ),
         TraceItem(
             context=workflow_context,
-            method="decode",
+            method="decode",  # inbound workflow input
         ),
-        # Local activity input - encode uses workflow context
-        TraceItem(
-            context=workflow_context,
-            method="encode",
-        ),
-        # Local activity input - decode uses activity context with is_local=True
         TraceItem(
             context=local_activity_context,
-            method="decode",
+            method="encode",  # outbound local activity input
         ),
-        # Local activity result - encode uses activity context with is_local=True
         TraceItem(
             context=local_activity_context,
-            method="encode",
+            method="decode",  # inbound local activity input
         ),
-        # Local activity result - decode uses workflow context
+        TraceItem(
+            context=local_activity_context,
+            method="encode",  # outbound local activity result
+        ),
+        TraceItem(
+            context=local_activity_context,
+            method="decode",  # inbound local activity result
+        ),
         TraceItem(
             context=workflow_context,
+            method="encode",  # outbound workflow result
+        ),
+        TraceItem(
+            context=workflow_context,
+            method="decode",  # inbound workflow result
+        ),
+    ]
+    del test_traces[workflow_id]
+
+
+# Child workflow codec test
+
+
+@workflow.defn
+class ChildWorkflowCodecTestWorkflow:
+    @workflow.run
+    async def run(self, data: TraceData) -> TraceData:
+        return await workflow.execute_child_workflow(
+            EchoWorkflow.run,
+            data,
+            id=f"{workflow.info().workflow_id}-child",
+        )
+
+
+async def test_child_workflow_codec_with_context(client: Client):
+    workflow_id = str(uuid.uuid4())
+    task_queue = str(uuid.uuid4())
+
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        DataConverter.default,
+        payload_codec=PayloadCodecWithContext(),
+    )
+    client = Client(**config)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[ChildWorkflowCodecTestWorkflow, EchoWorkflow],
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ):
+        await client.execute_workflow(
+            ChildWorkflowCodecTestWorkflow.run,
+            TraceData(),
+            id=workflow_id,
+            task_queue=task_queue,
+        )
+
+    parent_workflow_context = dataclasses.asdict(
+        WorkflowSerializationContext(
+            namespace=client.namespace,
+            workflow_id=workflow_id,
+        )
+    )
+
+    child_workflow_context = dataclasses.asdict(
+        WorkflowSerializationContext(
+            namespace=client.namespace,
+            workflow_id=f"{workflow_id}-child",
+        )
+    )
+
+    # The expectation is that child workflows should use their own context for encoding/decoding,
+    # similar to how .NET and Java handle it
+    # Traces are stored under both parent and child workflow IDs
+    child_workflow_id = f"{workflow_id}-child"
+
+    # Combine traces from parent and child workflows
+    all_traces = (
+        test_traces[workflow_id][:2]  # Parent workflow input
+        + test_traces[child_workflow_id]  # All child workflow operations
+        + test_traces[workflow_id][2:]  # Parent workflow result
+    )
+
+    assert all_traces == [
+        # Parent workflow input
+        TraceItem(
+            context=parent_workflow_context,
+            method="encode",
+        ),
+        TraceItem(
+            context=parent_workflow_context,
             method="decode",
         ),
-        # Workflow result
+        # Child workflow input - should use child's context
         TraceItem(
-            context=workflow_context,
+            context=child_workflow_context,
             method="encode",
         ),
         TraceItem(
-            context=workflow_context,
+            context=child_workflow_context,
+            method="decode",
+        ),
+        # Child workflow result - should use child's context
+        TraceItem(
+            context=child_workflow_context,
+            method="encode",
+        ),
+        TraceItem(
+            context=child_workflow_context,
+            method="decode",
+        ),
+        # Parent workflow result
+        TraceItem(
+            context=parent_workflow_context,
+            method="encode",
+        ),
+        TraceItem(
+            context=parent_workflow_context,
             method="decode",
         ),
     ]
     del test_traces[workflow_id]
+
+
+# Payload encryption test
+
+
+class PayloadEncryptionCodec(PayloadCodec, WithSerializationContext):
+    """
+    The outbound data for encoding must always be the string "outbound". "Encrypt" it by replacing
+    it with a key that is derived from the context available during encoding. On decryption, assert
+    that the same key can be derived from the context available during decoding, and return the
+    string "inbound".
+    """
+
+    def __init__(self):
+        self.context: Optional[SerializationContext] = None
+
+    def with_context(
+        self, context: Optional[SerializationContext]
+    ) -> PayloadEncryptionCodec:
+        codec = PayloadEncryptionCodec()
+        codec.context = context
+        return codec
+
+    async def encode(self, payloads: Sequence[Payload]) -> List[Payload]:
+        [payload] = payloads
+        return [
+            Payload(
+                metadata=payload.metadata,
+                data=json.dumps(self._get_encryption_key()).encode(),
+            )
+        ]
+
+    async def decode(self, payloads: Sequence[Payload]) -> List[Payload]:
+        [payload] = payloads
+        assert json.loads(payload.data.decode()) == self._get_encryption_key()
+        metadata = dict(payload.metadata)
+        return [Payload(metadata=metadata, data=b'"inbound"')]
+
+    def _get_encryption_key(self) -> str:
+        context = (
+            dataclasses.asdict(self.context)
+            if isinstance(
+                self.context,
+                (WorkflowSerializationContext, ActivitySerializationContext),
+            )
+            else {}
+        )
+        return json.dumps({k: v for k, v in sorted(context.items())})
+
+
+@activity.defn
+async def payload_encryption_activity(data: str) -> str:
+    assert data == "inbound"
+    return "outbound"
+
+
+@workflow.defn
+class PayloadEncryptionChildWorkflow:
+    @workflow.run
+    async def run(self, data: str) -> str:
+        assert data == "inbound"
+        return "outbound"
+
+
+@nexusrpc.service
+class PayloadEncryptionService:
+    payload_encryption_operation: nexusrpc.Operation[str, str]
+
+
+@nexusrpc.handler.service_handler
+class PayloadEncryptionServiceHandler:
+    @nexusrpc.handler.sync_operation
+    async def payload_encryption_operation(
+        self, _: nexusrpc.handler.StartOperationContext, data: str
+    ) -> str:
+        assert data == "inbound"
+        return "outbound"
+
+
+@workflow.defn
+class PayloadEncryptionWorkflow:
+    def __init__(self):
+        self.received_signal = False
+        self.received_update = False
+
+    @workflow.run
+    async def run(self, data: str) -> str:
+        await workflow.wait_condition(
+            lambda: (self.received_signal and self.received_update)
+        )
+        assert "inbound" == await workflow.execute_activity(
+            payload_encryption_activity,
+            "outbound",
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+        assert "inbound" == await workflow.execute_child_workflow(
+            PayloadEncryptionChildWorkflow.run,
+            "outbound",
+            id=f"{workflow.info().workflow_id}_child",
+        )
+        return "outbound"
+
+    @workflow.query
+    def query(self, data: str) -> str:
+        assert data == "inbound"
+        return "outbound"
+
+    @workflow.signal
+    def signal(self, data: str) -> None:
+        assert data == "inbound"
+        self.received_signal = True
+
+    @workflow.update
+    def update(self, data: str) -> str:
+        assert data == "inbound"
+        self.received_update = True
+        return "outbound"
+
+    @update.validator
+    def update_validator(self, data: str) -> None:
+        assert data == "inbound"
+
+
+async def test_payload_encryption_with_context(
+    client: Client,
+):
+    """
+    "Encrypt" outbound payloads with a key using all available context fields, in order to demonstrate
+    that the same context is available to decrypt inbound payloads.
+    """
+    workflow_id = str(uuid.uuid4())
+    task_queue = str(uuid.uuid4())
+
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        DataConverter.default,
+        payload_codec=PayloadEncryptionCodec(),
+    )
+    client = Client(**config)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[PayloadEncryptionWorkflow, PayloadEncryptionChildWorkflow],
+        activities=[payload_encryption_activity],
+        nexus_service_handlers=[PayloadEncryptionServiceHandler()],
+    ):
+        wf_handle = await client.start_workflow(
+            PayloadEncryptionWorkflow.run,
+            "outbound",
+            id=workflow_id,
+            task_queue=task_queue,
+        )
+        assert "inbound" == await wf_handle.query(
+            PayloadEncryptionWorkflow.query, "outbound"
+        )
+        await wf_handle.signal(PayloadEncryptionWorkflow.signal, "outbound")
+        assert "inbound" == await wf_handle.execute_update(
+            PayloadEncryptionWorkflow.update, "outbound"
+        )
+        assert "inbound" == await wf_handle.result()
+
+
+# Test outbound Nexus operations do not have any context set
+
+
+class AssertNexusLacksContextPayloadCodec(PayloadCodec, WithSerializationContext):
+    def __init__(self):
+        self.context = None
+
+    def with_context(
+        self, context: SerializationContext
+    ) -> AssertNexusLacksContextPayloadCodec:
+        codec = AssertNexusLacksContextPayloadCodec()
+        codec.context = context
+        return codec
+
+    async def encode(self, payloads: Sequence[Payload]) -> List[Payload]:
+        [payload] = payloads
+        assert bool(self.context) == (payload.data.decode() != '"nexus-data"')
+        return list(payloads)
+
+    async def decode(self, payloads: Sequence[Payload]) -> List[Payload]:
+        [payload] = payloads
+        assert bool(self.context) == (payload.data.decode() != '"nexus-data"')
+        return list(payloads)
+
+
+@nexusrpc.handler.service_handler
+class NexusOperationTestServiceHandler:
+    @nexusrpc.handler.sync_operation
+    async def operation(
+        self, _: nexusrpc.handler.StartOperationContext, data: str
+    ) -> str:
+        return data
+
+
+@workflow.defn
+class NexusOperationTestWorkflow:
+    @workflow.run
+    async def run(self, data: str) -> None:
+        nexus_client = workflow.create_nexus_client(
+            service=NexusOperationTestServiceHandler,
+            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+        )
+        await nexus_client.start_operation(
+            NexusOperationTestServiceHandler.operation, input="nexus-data"
+        )
+
+
+async def test_nexus_payload_codec_operations_lack_context(
+    client: Client,
+):
+    """
+    encode() and decode() on nexus payloads should not have any context set.
+    """
+    workflow_id = str(uuid.uuid4())
+    task_queue = str(uuid.uuid4())
+
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        DataConverter.default,
+        payload_codec=AssertNexusLacksContextPayloadCodec(),
+    )
+    client = Client(**config)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[NexusOperationTestWorkflow],
+        nexus_service_handlers=[NexusOperationTestServiceHandler()],
+    ):
+        await create_nexus_endpoint(task_queue, client)
+        await client.execute_workflow(
+            NexusOperationTestWorkflow.run,
+            "workflow-data",
+            id=workflow_id,
+            task_queue=task_queue,
+        )
 
 
 # Pydantic
