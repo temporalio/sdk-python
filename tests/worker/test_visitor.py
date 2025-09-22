@@ -236,7 +236,7 @@ async def test_bridge_encoding():
         ),
     )
 
-    await temporalio.bridge.worker.encode_completion(comp, SimpleCodec(), True)
+    await temporalio.bridge.worker.encode_completion(comp, SimpleCodec().encode, True)
 
     cmd = comp.successful.commands[0]
     sa = cmd.schedule_activity
