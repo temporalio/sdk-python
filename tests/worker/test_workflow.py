@@ -6181,7 +6181,7 @@ async def _do_first_completion_command_is_honored_test(
         except WorkflowFailureError as err:
             if main_workflow_returns_before_signal_completions:
                 raise RuntimeError(
-                    "Expected no error due to main workflow coroutine returning first"
+                    f"Expected no error due to main workflow coroutine returning first, but got error:\n{err.__class__}\n{err.__cause__.__class__}\n{err.__cause__}"
                 )
             else:
                 assert str(err.cause).startswith("Client should see this error")
