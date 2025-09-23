@@ -6094,12 +6094,14 @@ class FirstCompletionCommandIsHonoredWorkflow:
         self.ping_pong_val = 1
         self.ping_pong_counter = 0
         self.ping_pong_max_count = 4
+        self.run_finished = False
 
     @workflow.run
     async def run(self) -> str:
         await workflow.wait_condition(
             lambda: self.seen_first_signal and self.seen_second_signal
         )
+        self.run_finished = True
         return "workflow-result"
 
     @workflow.signal
@@ -6107,8 +6109,7 @@ class FirstCompletionCommandIsHonoredWorkflow:
         self.seen_first_signal = True
         workflow.logger.info("First signal true")
         if self.main_workflow_returns_before_signal_completions:
-            workflow.logger.info("Ping pong positive")
-            await self.ping_pong(lambda: self.ping_pong_val > 0)
+            await workflow.wait_condition(lambda: self.run_finished)
         workflow.logger.info("First signal raise")
         raise ApplicationError(
             "Client should see this error unless doing ping-pong "
@@ -6122,8 +6123,7 @@ class FirstCompletionCommandIsHonoredWorkflow:
         workflow.logger.info("Second signal true")
         self.seen_second_signal = True
         if self.main_workflow_returns_before_signal_completions:
-            workflow.logger.info("Ping pong negative")
-            await self.ping_pong(lambda: self.ping_pong_val < 0)
+            await workflow.wait_condition(lambda: self.run_finished)
         workflow.logger.info("Second signal raise")
         raise ApplicationError("Client should never see this error!")
 
