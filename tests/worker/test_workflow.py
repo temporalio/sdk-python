@@ -6091,9 +6091,6 @@ class FirstCompletionCommandIsHonoredWorkflow:
         self.main_workflow_returns_before_signal_completions = (
             main_workflow_returns_before_signal_completions
         )
-        self.ping_pong_val = 1
-        self.ping_pong_counter = 0
-        self.ping_pong_max_count = 4
         self.run_finished = False
 
     @workflow.run
@@ -6107,10 +6104,8 @@ class FirstCompletionCommandIsHonoredWorkflow:
     @workflow.signal
     async def this_signal_executes_first(self):
         self.seen_first_signal = True
-        workflow.logger.info("First signal true")
         if self.main_workflow_returns_before_signal_completions:
             await workflow.wait_condition(lambda: self.run_finished)
-        workflow.logger.info("First signal raise")
         raise ApplicationError(
             "Client should see this error unless doing ping-pong "
             "(in which case main coroutine returns first)"
@@ -6118,29 +6113,15 @@ class FirstCompletionCommandIsHonoredWorkflow:
 
     @workflow.signal
     async def this_signal_executes_second(self):
-        workflow.logger.info("Second signal wait")
         await workflow.wait_condition(lambda: self.seen_first_signal)
-        workflow.logger.info("Second signal true")
         self.seen_second_signal = True
         if self.main_workflow_returns_before_signal_completions:
             await workflow.wait_condition(lambda: self.run_finished)
-        workflow.logger.info("Second signal raise")
         raise ApplicationError("Client should never see this error!")
-
-    async def ping_pong(self, cond: Callable[[], bool]):
-        workflow.logger.info(
-            "Ping pong: %d of %d", self.ping_pong_counter, self.ping_pong_max_count
-        )
-        while self.ping_pong_counter < self.ping_pong_max_count:
-            workflow.logger.info("Ping pong wait: %d", self.ping_pong_counter)
-            await workflow.wait_condition(cond)
-            self.ping_pong_val = -self.ping_pong_val
-            self.ping_pong_counter += 1
-            workflow.logger.info("Ping pong set: %d", self.ping_pong_counter)
 
 
 @workflow.defn
-class FirstCompletionCommandIsHonoredPingPongWorkflow(
+class FirstCompletionCommandIsHonoredSignalWaitWorkflow(
     FirstCompletionCommandIsHonoredWorkflow
 ):
     def __init__(self) -> None:
@@ -6169,10 +6150,10 @@ async def _do_first_completion_command_is_honored_test(
     client: Client, main_workflow_returns_before_signal_completions: bool
 ):
     workflow_cls: Union[
-        Type[FirstCompletionCommandIsHonoredPingPongWorkflow],
+        Type[FirstCompletionCommandIsHonoredSignalWaitWorkflow],
         Type[FirstCompletionCommandIsHonoredWorkflow],
     ] = (
-        FirstCompletionCommandIsHonoredPingPongWorkflow
+        FirstCompletionCommandIsHonoredSignalWaitWorkflow
         if main_workflow_returns_before_signal_completions
         else FirstCompletionCommandIsHonoredWorkflow
     )
