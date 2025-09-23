@@ -2958,7 +2958,7 @@ async def test_workflow_patch_memoized(client: Client):
 
         # Confirm expected values
         assert ["some-value"] == await pre_patch_handle.result()
-        
+
         print("Prepatch complete")
 
         assert [
