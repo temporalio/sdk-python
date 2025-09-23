@@ -6103,21 +6103,19 @@ class FirstCompletionCommandIsHonoredWorkflow:
         self.ping_pong_val = 1
         self.ping_pong_counter = 0
         self.ping_pong_max_count = 4
-        self.run_finished = False
 
     @workflow.run
     async def run(self) -> str:
         await workflow.wait_condition(
             lambda: self.seen_first_signal and self.seen_second_signal
         )
-        self.run_finished = True
         return "workflow-result"
 
     @workflow.signal
     async def this_signal_executes_first(self):
         self.seen_first_signal = True
         if self.main_workflow_returns_before_signal_completions:
-            await workflow.wait_condition(lambda: self.run_finished)
+            await self.ping_pong(lambda: self.ping_pong_val > 0)
         raise ApplicationError(
             "Client should see this error unless doing ping-pong "
             "(in which case main coroutine returns first)"
@@ -6128,7 +6126,7 @@ class FirstCompletionCommandIsHonoredWorkflow:
         await workflow.wait_condition(lambda: self.seen_first_signal)
         self.seen_second_signal = True
         if self.main_workflow_returns_before_signal_completions:
-            await workflow.wait_condition(lambda: self.run_finished)
+            await self.ping_pong(lambda: self.ping_pong_val < 0)
         raise ApplicationError("Client should never see this error!")
 
     async def ping_pong(self, cond: Callable[[], bool]):
