@@ -85,8 +85,6 @@ class SerializationContextPayloadConverter(
     def to_payload(self, value: Any) -> Optional[Payload]:
         if not isinstance(value, TraceData):
             return None
-        if not self.context:
-            raise Exception("Context is None")
         if isinstance(self.context, WorkflowSerializationContext):
             value.items.append(
                 TraceItem(
@@ -109,11 +107,8 @@ class SerializationContextPayloadConverter(
         return payload
 
     def from_payload(self, payload: Payload, type_hint: Optional[Type] = None) -> Any:
-        # Always deserialize as TraceData since that's what this converter handles
         value = JSONPlainPayloadConverter().from_payload(payload, TraceData)
         assert isinstance(value, TraceData)
-        if not self.context:
-            raise Exception("Context is None")
         if isinstance(self.context, WorkflowSerializationContext):
             value.items.append(
                 TraceItem(
@@ -143,7 +138,9 @@ class SerializationContextCompositePayloadConverter(
         )
 
 
-# Test payload conversion
+# Payload conversion tests
+
+# Test misc payload conversion calls
 
 
 @activity.defn
@@ -177,7 +174,7 @@ class PayloadConversionWorkflow:
         return data
 
 
-async def test_workflow_payload_conversion(
+async def test_payload_conversion_calls_follow_expected_sequence_and_contexts(
     client: Client,
 ):
     workflow_id = str(uuid.uuid4())
@@ -520,12 +517,7 @@ async def test_async_activity_completion_payload_conversion(
         await activity_handle.complete(data)
         result = await wf_handle.result()
 
-        # project down since activity completion by a client does not have access to most activity
-        # context fields
-        def project(trace_item: TraceItem) -> str:
-            return trace_item.method
-
-        assert [project(item) for item in result.items] == [
+        assert [item.method for item in result.items] == [
             "to_payload",  # Outbound activity input
             "to_payload",  # Outbound activity heartbeat data
             "from_payload",  # Inbound activity result
@@ -1046,7 +1038,7 @@ async def test_failure_converter_with_context(client: Client):
         del test_traces[workflow_id]
 
 
-## Test payload codec
+# Test payload codec
 
 
 class PayloadCodecWithContext(PayloadCodec, WithSerializationContext):
@@ -1153,6 +1145,9 @@ async def test_codec_with_context(client: Client):
         ),
     ]
     del test_traces[workflow_id]
+
+
+# Local activity codec test
 
 
 @activity.defn
@@ -1265,6 +1260,7 @@ class ChildWorkflowCodecTestWorkflow:
 async def test_child_workflow_codec_with_context(client: Client):
     workflow_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
+    child_workflow_id = f"{workflow_id}-child"
 
     config = client.config()
     config["data_converter"] = dataclasses.replace(
@@ -1292,68 +1288,54 @@ async def test_child_workflow_codec_with_context(client: Client):
             workflow_id=workflow_id,
         )
     )
-
     child_workflow_context = dataclasses.asdict(
         WorkflowSerializationContext(
             namespace=client.namespace,
-            workflow_id=f"{workflow_id}-child",
+            workflow_id=child_workflow_id,
         )
     )
 
-    # The expectation is that child workflows should use their own context for encoding/decoding,
-    # similar to how .NET and Java handle it
-    # Traces are stored under both parent and child workflow IDs
-    child_workflow_id = f"{workflow_id}-child"
-
-    # Combine traces from parent and child workflows
-    all_traces = (
-        test_traces[workflow_id][:2]  # Parent workflow input
-        + test_traces[child_workflow_id]  # All child workflow operations
-        + test_traces[workflow_id][2:]  # Parent workflow result
-    )
-
-    assert all_traces == [
-        # Parent workflow input
+    assert test_traces[workflow_id] == [
         TraceItem(
             context=parent_workflow_context,
-            method="encode",
+            method="encode",  # outbound workflow input
         ),
         TraceItem(
             context=parent_workflow_context,
-            method="decode",
-        ),
-        # Child workflow input - should use child's context
-        TraceItem(
-            context=child_workflow_context,
-            method="encode",
-        ),
-        TraceItem(
-            context=child_workflow_context,
-            method="decode",
-        ),
-        # Child workflow result - should use child's context
-        TraceItem(
-            context=child_workflow_context,
-            method="encode",
-        ),
-        TraceItem(
-            context=child_workflow_context,
-            method="decode",
-        ),
-        # Parent workflow result
-        TraceItem(
-            context=parent_workflow_context,
-            method="encode",
+            method="decode",  # inbound workflow input
         ),
         TraceItem(
             context=parent_workflow_context,
-            method="decode",
+            method="encode",  # outbound workflow result
+        ),
+        TraceItem(
+            context=parent_workflow_context,
+            method="decode",  # inbound workflow result
+        ),
+    ]
+    assert test_traces[child_workflow_id] == [
+        TraceItem(
+            context=child_workflow_context,
+            method="encode",  # outbound child workflow input
+        ),
+        TraceItem(
+            context=child_workflow_context,
+            method="decode",  # inbound child workflow input
+        ),
+        TraceItem(
+            context=child_workflow_context,
+            method="encode",  # outbound child workflow result
+        ),
+        TraceItem(
+            context=child_workflow_context,
+            method="decode",  # inbound child workflow result
         ),
     ]
     del test_traces[workflow_id]
+    del test_traces[child_workflow_id]
 
 
-# Payload encryption test
+# Payload codec: test decode context matches encode context
 
 
 class PayloadEncryptionCodec(PayloadCodec, WithSerializationContext):
@@ -1474,12 +1456,12 @@ class PayloadEncryptionWorkflow:
         assert data == "inbound"
 
 
-async def test_payload_encryption_with_context(
+async def test_decode_context_matches_encode_context(
     client: Client,
 ):
     """
-    "Encrypt" outbound payloads with a key using all available context fields, in order to demonstrate
-    that the same context is available to decrypt inbound payloads.
+    Encode outbound payloads with a key using all available context fields, in order to demonstrate
+    that the same context is available to decode inbound payloads.
     """
     workflow_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
@@ -1514,7 +1496,7 @@ async def test_payload_encryption_with_context(
         assert "inbound" == await wf_handle.result()
 
 
-# Test outbound Nexus operations do not have any context set
+# Test nexus payload codec
 
 
 class AssertNexusLacksContextPayloadCodec(PayloadCodec, WithSerializationContext):
@@ -1528,15 +1510,14 @@ class AssertNexusLacksContextPayloadCodec(PayloadCodec, WithSerializationContext
         codec.context = context
         return codec
 
-    async def encode(self, payloads: Sequence[Payload]) -> List[Payload]:
+    async def _assert_context_iff_not_nexus(
+        self, payloads: Sequence[Payload]
+    ) -> List[Payload]:
         [payload] = payloads
         assert bool(self.context) == (payload.data.decode() != '"nexus-data"')
         return list(payloads)
 
-    async def decode(self, payloads: Sequence[Payload]) -> List[Payload]:
-        [payload] = payloads
-        assert bool(self.context) == (payload.data.decode() != '"nexus-data"')
-        return list(payloads)
+    encode = decode = _assert_context_iff_not_nexus
 
 
 @nexusrpc.handler.service_handler
@@ -1567,9 +1548,6 @@ async def test_nexus_payload_codec_operations_lack_context(
     """
     encode() and decode() on nexus payloads should not have any context set.
     """
-    workflow_id = str(uuid.uuid4())
-    task_queue = str(uuid.uuid4())
-
     config = client.config()
     config["data_converter"] = dataclasses.replace(
         DataConverter.default,
@@ -1579,20 +1557,20 @@ async def test_nexus_payload_codec_operations_lack_context(
 
     async with Worker(
         client,
-        task_queue=task_queue,
+        task_queue=str(uuid.uuid4()),
         workflows=[NexusOperationTestWorkflow],
         nexus_service_handlers=[NexusOperationTestServiceHandler()],
-    ):
-        await create_nexus_endpoint(task_queue, client)
+    ) as worker:
+        await create_nexus_endpoint(worker.task_queue, client)
         await client.execute_workflow(
             NexusOperationTestWorkflow.run,
             "workflow-data",
-            id=workflow_id,
-            task_queue=task_queue,
+            id=str(uuid.uuid4()),
+            task_queue=worker.task_queue,
         )
 
 
-# Pydantic
+# Test pydantic converter with context
 
 
 class PydanticData(BaseModel):
