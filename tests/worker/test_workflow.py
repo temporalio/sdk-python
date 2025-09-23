@@ -2950,6 +2950,16 @@ async def test_workflow_patch_memoized(client: Client):
 
         print("Signalling")
 
+        # Need to wait until it has gotten halfway through, otherwise the post_patch workflow may never complete
+        async def waiting_signal() -> bool:
+            return await post_patch_handle.query(
+                PatchMemoizedWorkflowPatched.waiting_signal
+            )
+
+        print("Waiting for post patch waiting signal")
+        await assert_eq_eventually(True, waiting_signal)
+        print("Waited for post patch waiting signal")
+
         # Send signal to both and check results
         await pre_patch_handle.signal(PatchMemoizedWorkflowUnpatched.signal)
         await post_patch_handle.signal(PatchMemoizedWorkflowPatched.signal)
