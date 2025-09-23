@@ -2967,6 +2967,9 @@ async def test_workflow_patch_memoized(client: Client):
             "post-patch",
         ] == await post_patch_handle.result()
 
+        print("Postpatch complete")
+    print("End test")
+
 
 @workflow.defn
 class UUIDWorkflow:
