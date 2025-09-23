@@ -1,9 +1,10 @@
 """Initialize Temporal OpenAI Agents overrides."""
 
 import dataclasses
+import typing
 from contextlib import asynccontextmanager, contextmanager
 from datetime import timedelta
-from typing import AsyncIterator, Callable, Optional, Union
+from typing import AsyncIterator, Callable, Optional, Sequence, Union
 
 from agents import (
     AgentOutputSchemaBase,
@@ -53,6 +54,19 @@ from temporalio.worker import (
     WorkerConfig,
     WorkflowReplayResult,
 )
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
+
+# Unsupported on python 3.9
+try:
+    from agents.mcp import MCPServer
+except ImportError:
+    pass
+
+if typing.TYPE_CHECKING:
+    from temporalio.contrib.openai_agents import (
+        StatefulMCPServerProvider,
+        StatelessMCPServerProvider,
+    )
 
 
 @contextmanager
@@ -101,6 +115,8 @@ def set_open_ai_agent_temporal_overrides(
 class TestModelProvider(ModelProvider):
     """Test model provider which simply returns the given module."""
 
+    __test__ = False
+
     def __init__(self, model: Model):
         """Initialize a test model provider with a model."""
         self._model = model
@@ -112,6 +128,8 @@ class TestModelProvider(ModelProvider):
 
 class TestModel(Model):
     """Test model for use mocking model responses."""
+
+    __test__ = False
 
     def __init__(self, fn: Callable[[], ModelResponse]) -> None:
         """Initialize a test model with a callable."""
@@ -170,18 +188,24 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     1. Configures the Pydantic data converter for type-safe serialization
     2. Sets up tracing interceptors for OpenAI agent interactions
     3. Registers model execution activities
-    4. Manages the OpenAI agent runtime overrides during worker execution
+    4. Automatically registers MCP server activities and manages their lifecycles
+    5. Manages the OpenAI agent runtime overrides during worker execution
 
     Args:
         model_params: Configuration parameters for Temporal activity execution
             of model calls. If None, default parameters will be used.
         model_provider: Optional model provider for custom model implementations.
             Useful for testing or custom model integrations.
+        mcp_server_providers: Sequence of MCP servers to automatically register with the worker.
+            The plugin will wrap each server in a TemporalMCPServer if needed and
+            manage their connection lifecycles tied to the worker lifetime. This is
+            the recommended way to use MCP servers with Temporal workflows.
 
     Example:
         >>> from temporalio.client import Client
         >>> from temporalio.worker import Worker
-        >>> from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
+        >>> from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters, StatelessMCPServerProvider
+        >>> from agents.mcp import MCPServerStdio
         >>> from datetime import timedelta
         >>>
         >>> # Configure model parameters
@@ -190,8 +214,17 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         ...     retry_policy=RetryPolicy(maximum_attempts=3)
         ... )
         >>>
-        >>> # Create plugin
-        >>> plugin = OpenAIAgentsPlugin(model_params=model_params)
+        >>> # Create MCP servers
+        >>> filesystem_server = StatelessMCPServerProvider(MCPServerStdio(
+        ...     name="Filesystem Server",
+        ...     params={"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]}
+        ... ))
+        >>>
+        >>> # Create plugin with MCP servers
+        >>> plugin = OpenAIAgentsPlugin(
+        ...     model_params=model_params,
+        ...     mcp_server_providers=[filesystem_server]
+        ... )
         >>>
         >>> # Use with client and worker
         >>> client = await Client.connect(
@@ -209,6 +242,9 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         self,
         model_params: Optional[ModelActivityParameters] = None,
         model_provider: Optional[ModelProvider] = None,
+        mcp_server_providers: Sequence[
+            Union["StatelessMCPServerProvider", "StatefulMCPServerProvider"]
+        ] = (),
     ) -> None:
         """Initialize the OpenAI agents plugin.
 
@@ -217,6 +253,10 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
                 of model calls. If None, default parameters will be used.
             model_provider: Optional model provider for custom model implementations.
                 Useful for testing or custom model integrations.
+            mcp_server_providers: Sequence of MCP servers to automatically register with the worker.
+                Each server will be wrapped in a TemporalMCPServer if not already wrapped,
+                and their activities will be automatically registered with the worker.
+                The plugin manages the connection lifecycle of these servers.
         """
         if model_params is None:
             model_params = ModelActivityParameters()
@@ -236,6 +276,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
 
         self._model_params = model_params
         self._model_provider = model_provider
+        self._mcp_server_providers = mcp_server_providers
 
     def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
         """Set the next client plugin"""
@@ -297,9 +338,25 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         config["interceptors"] = list(config.get("interceptors") or []) + [
             OpenAIAgentsTracingInterceptor()
         ]
-        config["activities"] = list(config.get("activities") or []) + [
-            ModelActivity(self._model_provider).invoke_model_activity
-        ]
+        new_activities = [ModelActivity(self._model_provider).invoke_model_activity]
+
+        server_names = [server.name for server in self._mcp_server_providers]
+        if len(server_names) != len(set(server_names)):
+            raise ValueError(
+                f"More than one mcp server registered with the same name. Please provide unique names."
+            )
+
+        for mcp_server in self._mcp_server_providers:
+            new_activities.extend(mcp_server._get_activities())
+        config["activities"] = list(config.get("activities") or []) + new_activities
+
+        runner = config.get("workflow_runner")
+        if isinstance(runner, SandboxedWorkflowRunner):
+            config["workflow_runner"] = dataclasses.replace(
+                runner,
+                restrictions=runner.restrictions.with_passthrough_modules("mcp"),
+            )
+
         config["workflow_failure_exception_types"] = list(
             config.get("workflow_failure_exception_types") or []
         ) + [AgentsWorkflowError]

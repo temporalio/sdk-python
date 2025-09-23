@@ -223,10 +223,13 @@ def test_load_profile_api_key_enables_tls(tmp_path: Path):
     config_file.write_text(config_toml)
     profile = ClientConfigProfile.load(config_source=config_file)
     assert profile.api_key == "my-key"
-    assert profile.tls is not None
+    # No TLS object should have been created
+    assert profile.tls is None
 
     config = profile.to_client_connect_config()
-    assert config.get("tls")
+    # Expect to_client_connect_config call to set TLS to True
+    # due to presence of api key.
+    assert config.get("tls") is True
     assert config.get("api_key") == "my-key"
 
 
@@ -283,13 +286,6 @@ def test_load_profiles_discovery(tmp_path: Path, monkeypatch):  # type: ignore[r
     env = {"TEMPORAL_CONFIG_FILE": str(config_file)}
     client_config = ClientConfig.load(override_env_vars=env)
     assert "default" in client_config.profiles
-
-
-def test_load_profiles_disable_file():
-    """Test load_profiles with file loading disabled."""
-    # With no env vars, should be empty
-    client_config = ClientConfig.load(disable_file=True, override_env_vars={})
-    assert not client_config.profiles
 
 
 def test_load_profiles_strict_mode_fail(tmp_path: Path):
@@ -519,7 +515,6 @@ def test_client_config_profile_to_from_dict():
         namespace="some-namespace",
         api_key="some-api-key",
         tls=ClientConfigTLS(
-            disabled=False,
             server_name="some-server-name",
             server_root_ca_cert=b"ca-cert-data",
             client_cert=Path("/path/to/client.crt"),
@@ -530,7 +525,7 @@ def test_client_config_profile_to_from_dict():
 
     profile_dict = profile.to_dict()
 
-    # Check dict representation. Note that disabled=False is not in the dict.
+    # Check dict representation. Note that disabled=None is not in the dict.
     expected_dict = {
         "address": "some-address",
         "namespace": "some-namespace",
@@ -557,7 +552,6 @@ def test_client_config_profile_to_from_dict():
         namespace="some-namespace",
         api_key="some-api-key",
         tls=ClientConfigTLS(
-            disabled=False,
             server_name="some-server-name",
             server_root_ca_cert="ca-cert-data",  # Was bytes, now str
             client_cert=Path("/path/to/client.crt"),
@@ -614,3 +608,424 @@ def test_client_config_to_from_dict():
     assert empty_config_dict == {}
     new_empty_config = ClientConfig.from_dict(empty_config_dict)
     assert empty_config == new_empty_config
+
+
+def test_grpc_metadata_normalization_from_toml():
+    """Test that gRPC metadata keys get normalized from TOML."""
+    toml_config = textwrap.dedent(
+        """
+        [profile.default]
+        address = "localhost:7233"
+        namespace = "default"
+
+        [profile.default.grpc_meta]
+        "Custom-Header" = "custom-value"
+        "ANOTHER_HEADER_KEY" = "another-value"
+        "mixed_Case-header" = "mixed-value"
+        """
+    )
+
+    profile = ClientConfigProfile.load(config_source=toml_config)
+
+    # Keys should be normalized: uppercase -> lowercase, underscores -> hyphens
+    assert profile.grpc_meta["custom-header"] == "custom-value"
+    assert profile.grpc_meta["another-header-key"] == "another-value"
+    assert profile.grpc_meta["mixed-case-header"] == "mixed-value"
+
+    # Original case variations should not exist
+    assert "Custom-Header" not in profile.grpc_meta
+    assert "ANOTHER_HEADER_KEY" not in profile.grpc_meta
+    assert "mixed_Case-header" not in profile.grpc_meta
+
+    config = profile.to_client_connect_config()
+    rpc_metadata = config.get("rpc_metadata")
+    assert rpc_metadata is not None
+    assert rpc_metadata["custom-header"] == "custom-value"
+    assert rpc_metadata["another-header-key"] == "another-value"
+
+
+def test_grpc_metadata_deletion_via_empty_env_value(base_config_file: Path):
+    """Test that empty environment variable values delete existing gRPC metadata."""
+    env = {
+        # Empty value should remove the header
+        "TEMPORAL_GRPC_META_CUSTOM_HEADER": "",
+        # Non-empty value should set the header
+        "TEMPORAL_GRPC_META_NEW_HEADER": "new-value",
+    }
+    profile = ClientConfigProfile.load(
+        config_source=base_config_file, profile="custom", override_env_vars=env
+    )
+
+    # custom-header should be removed by empty env value
+    assert "custom-header" not in profile.grpc_meta
+    # new-header should be added
+    assert profile.grpc_meta["new-header"] == "new-value"
+
+    config = profile.to_client_connect_config()
+    rpc_metadata = config.get("rpc_metadata")
+    if rpc_metadata:
+        assert "custom-header" not in rpc_metadata
+        assert rpc_metadata["new-header"] == "new-value"
+
+
+def test_default_profile_not_found_returns_empty_profile():
+    """Test that requesting missing 'default' profile returns empty profile instead of error."""
+    toml_config = textwrap.dedent(
+        """
+        [profile.existing]
+        address = "my-address"
+        """
+    )
+    profile = ClientConfigProfile.load(config_source=toml_config)
+    assert profile.address is None
+    assert profile.namespace is None
+    assert profile.api_key is None
+    assert not profile.grpc_meta
+    assert profile.tls is None
+
+
+def test_tls_conflict_across_sources_path_in_toml_data_in_env():
+    """Test error when cert path in TOML conflicts with cert data in env var."""
+    toml_config = textwrap.dedent(
+        """
+        [profile.default]
+        address = "localhost:7233"
+        [profile.default.tls]
+        client_cert_path = "/path/to/cert"
+        """
+    )
+
+    env = {"TEMPORAL_TLS_CLIENT_CERT_DATA": "cert-data-from-env"}
+
+    with pytest.raises(
+        RuntimeError,
+        match="Cannot specify cert data via TEMPORAL_TLS_CLIENT_CERT_DATA when cert path is already specified",
+    ):
+        ClientConfigProfile.load(config_source=toml_config, override_env_vars=env)
+
+
+def test_tls_conflict_across_sources_data_in_toml_path_in_env():
+    """Test error when cert data in TOML conflicts with cert path in env var."""
+    toml_config = textwrap.dedent(
+        """
+        [profile.default]
+        address = "localhost:7233"
+        [profile.default.tls]
+        client_cert_data = "cert-data-from-toml"
+        """
+    )
+
+    env = {"TEMPORAL_TLS_CLIENT_CERT_PATH": "/path/from/env"}
+
+    with pytest.raises(
+        RuntimeError,
+        match="Cannot specify cert path via TEMPORAL_TLS_CLIENT_CERT_PATH when cert data is already specified",
+    ):
+        ClientConfigProfile.load(config_source=toml_config, override_env_vars=env)
+
+
+def test_load_client_connect_options_convenience_api(base_config_file: Path):
+    """Test the convenience API for loading client connect configuration."""
+    # Test default profile with file
+    config = ClientConfig.load_client_connect_config(config_file=str(base_config_file))
+    assert config.get("target_host") == "default-address"
+    assert config.get("namespace") == "default-namespace"
+
+    # Test with environment overrides
+    env = {"TEMPORAL_NAMESPACE": "env-override-namespace"}
+    config_with_env = ClientConfig.load_client_connect_config(
+        config_file=str(base_config_file), override_env_vars=env
+    )
+    assert config_with_env.get("target_host") == "default-address"
+    assert config_with_env.get("namespace") == "env-override-namespace"
+
+    # Test with specific profile
+    config_custom = ClientConfig.load_client_connect_config(
+        profile="custom", config_file=str(base_config_file)
+    )
+    assert config_custom.get("target_host") == "custom-address"
+    assert config_custom.get("namespace") == "custom-namespace"
+    assert config_custom.get("api_key") == "custom-api-key"
+
+
+def test_load_client_connect_options_e2e_validation():
+    """Test comprehensive end-to-end configuration loading with all features."""
+    toml_content = textwrap.dedent(
+        """
+        [profile.production]
+        address = "prod.temporal.com:443"
+        namespace = "production-ns"
+        api_key = "prod-api-key"
+
+        [profile.production.tls]
+        server_name = "prod.temporal.com"
+        server_ca_cert_data = "prod-ca-cert"
+
+        [profile.production.grpc_meta]
+        authorization = "Bearer prod-token"
+        "x-custom-header" = "prod-value"
+        """
+    )
+
+    env_overrides = {
+        "TEMPORAL_GRPC_META_X_ENVIRONMENT": "production",
+        "TEMPORAL_TLS_SERVER_NAME": "override.temporal.com",
+    }
+
+    config = ClientConfig.load_client_connect_config(
+        profile="production",
+        config_file=None,  # Use config_source directly
+        override_env_vars=env_overrides,
+        disable_file=True,  # Load from config_source instead
+    )
+
+    # First load the profile to get the raw config, then convert
+    profile = ClientConfigProfile.load(
+        profile="production",
+        config_source=toml_content,
+        override_env_vars=env_overrides,
+    )
+    config = profile.to_client_connect_config()
+
+    # Validate all configuration aspects
+    assert config.get("target_host") == "prod.temporal.com:443"
+    assert config.get("namespace") == "production-ns"
+    assert config.get("api_key") == "prod-api-key"
+
+    # TLS configuration (API key should auto-enable TLS)
+    assert config.get("tls") is not None
+    tls_config = config.get("tls")
+    assert isinstance(tls_config, TLSConfig)
+    assert tls_config.domain == "override.temporal.com"  # Env override
+    assert tls_config.server_root_ca_cert == b"prod-ca-cert"
+
+    # gRPC metadata with normalization and env overrides
+    assert config.get("rpc_metadata") is not None
+    rpc_metadata = config.get("rpc_metadata")
+    assert rpc_metadata is not None
+    assert rpc_metadata["authorization"] == "Bearer prod-token"
+    assert rpc_metadata["x-custom-header"] == "prod-value"
+    assert rpc_metadata["x-environment"] == "production"  # From env
+
+
+async def test_e2e_basic_development_profile_client_connection(client: Client):
+    """Test basic development profile with actual client connection."""
+    # Get connection details from the fixture client
+    target_host = client.service_client.config.target_host
+    namespace = client.namespace
+
+    toml_content = textwrap.dedent(
+        f"""
+        [profile.development]
+        address = "{target_host}"
+        namespace = "{namespace}"
+
+        [profile.development.grpc_meta]
+        "x-test-source" = "envconfig-python-dev"
+        """
+    )
+
+    profile = ClientConfigProfile.load(
+        profile="development", config_source=toml_content
+    )
+
+    config = profile.to_client_connect_config()
+
+    # Create actual Temporal client using envconfig
+    new_client = await Client.connect(**config)
+
+    # Verify client configuration matches envconfig
+    assert new_client.service_client.config.target_host == target_host
+    assert new_client.namespace == namespace
+    if new_client.service_client.config.rpc_metadata:
+        assert (
+            new_client.service_client.config.rpc_metadata["x-test-source"]
+            == "envconfig-python-dev"
+        )
+
+
+async def test_e2e_production_tls_api_key_client_connection(client: Client):
+    """Test production profile with TLS and API key with actual client connection."""
+    # Get connection details from the fixture client
+    target_host = client.service_client.config.target_host
+
+    toml_content = textwrap.dedent(
+        f"""
+        [profile.production]
+        address = "{target_host}"
+        namespace = "production-namespace"
+        api_key = "prod-api-key-123"
+
+        [profile.production.tls]
+        disabled = true
+
+        [profile.production.grpc_meta]
+        authorization = "Bearer prod-token"
+        "x-environment" = "production"
+        """
+    )
+
+    profile = ClientConfigProfile.load(profile="production", config_source=toml_content)
+
+    config = profile.to_client_connect_config()
+
+    # Create TLS-enabled client with API key
+    new_client = await Client.connect(**config)
+
+    # Verify production configuration
+    assert new_client.service_client.config.target_host == target_host
+    assert new_client.namespace == "production-namespace"
+    assert new_client.service_client.config.api_key == "prod-api-key-123"
+    if new_client.service_client.config.rpc_metadata:
+        assert (
+            new_client.service_client.config.rpc_metadata["authorization"]
+            == "Bearer prod-token"
+        )
+        assert (
+            new_client.service_client.config.rpc_metadata["x-environment"]
+            == "production"
+        )
+
+
+async def test_e2e_environment_overrides_client_connection(client: Client):
+    """Test environment overrides with actual client connection."""
+    # Get connection details from the fixture client
+    target_host = client.service_client.config.target_host
+
+    toml_content = textwrap.dedent(
+        """
+        [profile.staging]
+        address = "staging.temporal.com:443"
+        namespace = "staging-namespace"
+
+        [profile.staging.grpc_meta]
+        "x-deployment" = "staging"
+        authorization = "Bearer staging-token"
+        """
+    )
+
+    env_overrides = {
+        "TEMPORAL_ADDRESS": target_host,
+        "TEMPORAL_NAMESPACE": "override-namespace",
+        "TEMPORAL_GRPC_META_X_DEPLOYMENT": "canary",
+        "TEMPORAL_GRPC_META_AUTHORIZATION": "Bearer override-token",
+    }
+
+    profile = ClientConfigProfile.load(
+        profile="staging", config_source=toml_content, override_env_vars=env_overrides
+    )
+
+    config = profile.to_client_connect_config()
+
+    # Create client with environment overrides
+    new_client = await Client.connect(**config)
+
+    # Verify environment overrides took effect
+    assert new_client.service_client.config.target_host == target_host
+    assert new_client.namespace == "override-namespace"
+    if new_client.service_client.config.rpc_metadata:
+        assert new_client.service_client.config.rpc_metadata["x-deployment"] == "canary"
+        assert (
+            new_client.service_client.config.rpc_metadata["authorization"]
+            == "Bearer override-token"
+        )
+
+
+def test_tls_disabled_tri_state_behavior():
+    """Test TLS disabled tri-state behavior: null (unset), false (enabled), true (disabled)."""
+    # Test 1: disabled=null (unset) with API key -> TLS enabled
+    toml_null = textwrap.dedent(
+        """
+        [profile.default]
+        address = "my-address"
+        api_key = "my-api-key"
+        [profile.default.tls]
+        server_name = "my-server"
+        """
+    )
+    profile_null = ClientConfigProfile.load(config_source=toml_null)
+    assert profile_null.tls is not None
+    assert profile_null.tls.disabled is None  # disabled is null (unset)
+    config_null = profile_null.to_client_connect_config()
+    assert config_null.get("tls") is not None  # TLS enabled
+
+    # Test 2: disabled=false (explicitly enabled) -> TLS enabled
+    toml_false = textwrap.dedent(
+        """
+        [profile.default]
+        address = "my-address"
+        [profile.default.tls]
+        disabled = false
+        server_name = "my-server"
+        """
+    )
+    profile_false = ClientConfigProfile.load(config_source=toml_false)
+    assert profile_false.tls is not None
+    assert profile_false.tls.disabled is False  # explicitly disabled=false
+    config_false = profile_false.to_client_connect_config()
+    assert config_false.get("tls") is not None  # TLS enabled
+
+    # Test 3: disabled=true (explicitly disabled) -> TLS disabled even with API key
+    toml_true = textwrap.dedent(
+        """
+        [profile.default]
+        address = "my-address"
+        api_key = "my-api-key"
+        [profile.default.tls]
+        disabled = true
+        server_name = "should-be-ignored"
+        """
+    )
+    profile_true = ClientConfigProfile.load(config_source=toml_true)
+    assert profile_true.tls is not None
+    assert profile_true.tls.disabled is True  # explicitly disabled=true
+    config_true = profile_true.to_client_connect_config()
+    assert config_true.get("tls") is False  # TLS disabled even with API key
+
+
+async def test_e2e_multi_profile_different_client_connections(client: Client):
+    """Test multiple profiles creating different client connections."""
+    # Get connection details from the fixture client
+    target_host = client.service_client.config.target_host
+
+    toml_content = textwrap.dedent(
+        f"""
+        [profile.development]
+        address = "{target_host}"
+        namespace = "dev"
+
+        [profile.production]
+        address = "{target_host}"
+        namespace = "prod"
+        api_key = "prod-key"
+
+        [profile.production.tls]
+        disabled = true
+        """
+    )
+
+    # Load and create development client
+    dev_profile = ClientConfigProfile.load(
+        profile="development", config_source=toml_content
+    )
+
+    dev_config = dev_profile.to_client_connect_config()
+    dev_client = await Client.connect(**dev_config)
+
+    # Load and create production client
+    prod_profile = ClientConfigProfile.load(
+        profile="production", config_source=toml_content
+    )
+
+    prod_config = prod_profile.to_client_connect_config()
+    prod_client = await Client.connect(**prod_config)
+
+    # Verify different configurations for each client
+    assert dev_client.service_client.config.target_host == target_host
+    assert dev_client.namespace == "dev"
+    assert dev_client.service_client.config.api_key is None
+    assert dev_client.service_client.config.tls is False
+
+    assert prod_client.service_client.config.target_host == target_host
+    assert prod_client.namespace == "prod"
+    assert prod_client.service_client.config.api_key == "prod-key"
