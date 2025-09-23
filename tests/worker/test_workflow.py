@@ -2930,9 +2930,7 @@ async def test_workflow_patch_memoized(client: Client):
                 PatchMemoizedWorkflowUnpatched.waiting_signal
             )
 
-        print("Waiting for waiting signal")
         await assert_eq_eventually(True, waiting_signal)
-        print("Waited for waiting signal")
 
     # Now start the worker again, but this time with a patched workflow
     async with Worker(
@@ -2948,19 +2946,12 @@ async def test_workflow_patch_memoized(client: Client):
             task_queue=task_queue,
         )
 
-        print("Signalling")
-
         # Send signal to both and check results
         await pre_patch_handle.signal(PatchMemoizedWorkflowUnpatched.signal)
         await post_patch_handle.signal(PatchMemoizedWorkflowPatched.signal)
 
-        print("Signalled")
-
         # Confirm expected values
         assert ["some-value"] == await pre_patch_handle.result()
-        
-        print("Prepatch complete")
-
         assert [
             "pre-patch",
             "some-value",
@@ -6114,8 +6105,11 @@ class FirstCompletionCommandIsHonoredWorkflow:
     @workflow.signal
     async def this_signal_executes_first(self):
         self.seen_first_signal = True
+        workflow.logger.info("First signal true")
         if self.main_workflow_returns_before_signal_completions:
+            workflow.logger.info("Ping pong positive")
             await self.ping_pong(lambda: self.ping_pong_val > 0)
+        workflow.logger.info("First signal raise")
         raise ApplicationError(
             "Client should see this error unless doing ping-pong "
             "(in which case main coroutine returns first)"
@@ -6123,10 +6117,14 @@ class FirstCompletionCommandIsHonoredWorkflow:
 
     @workflow.signal
     async def this_signal_executes_second(self):
+        workflow.logger.info("Second signal wait")
         await workflow.wait_condition(lambda: self.seen_first_signal)
+        workflow.logger.info("Second signal true")
         self.seen_second_signal = True
         if self.main_workflow_returns_before_signal_completions:
+            workflow.logger.info("Ping pong negative")
             await self.ping_pong(lambda: self.ping_pong_val < 0)
+        workflow.logger.info("Second signal raise")
         raise ApplicationError("Client should never see this error!")
 
     async def ping_pong(self, cond: Callable[[], bool]):
