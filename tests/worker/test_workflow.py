@@ -2930,7 +2930,9 @@ async def test_workflow_patch_memoized(client: Client):
                 PatchMemoizedWorkflowUnpatched.waiting_signal
             )
 
+        print("Waiting for waiting signal")
         await assert_eq_eventually(True, waiting_signal)
+        print("Waited for waiting signal")
 
     # Now start the worker again, but this time with a patched workflow
     async with Worker(
@@ -2946,12 +2948,19 @@ async def test_workflow_patch_memoized(client: Client):
             task_queue=task_queue,
         )
 
+        print("Signalling")
+
         # Send signal to both and check results
         await pre_patch_handle.signal(PatchMemoizedWorkflowUnpatched.signal)
         await post_patch_handle.signal(PatchMemoizedWorkflowPatched.signal)
 
+        print("Signalled")
+
         # Confirm expected values
         assert ["some-value"] == await pre_patch_handle.result()
+        
+        print("Prepatch complete")
+
         assert [
             "pre-patch",
             "some-value",
