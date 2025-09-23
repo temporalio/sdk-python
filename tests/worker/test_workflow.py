@@ -6128,10 +6128,13 @@ class FirstCompletionCommandIsHonoredWorkflow:
         raise ApplicationError("Client should never see this error!")
 
     async def ping_pong(self, cond: Callable[[], bool]):
+        workflow.logger.info("Ping pong: %d of %d", self.ping_pong_counter, self.ping_pong_max_count)
         while self.ping_pong_counter < self.ping_pong_max_count:
+            workflow.logger.info("Ping pong wait: %d", self.ping_pong_counter)
             await workflow.wait_condition(cond)
             self.ping_pong_val = -self.ping_pong_val
             self.ping_pong_counter += 1
+            workflow.logger.info("Ping pong set: %d", self.ping_pong_counter)
 
 
 @workflow.defn
