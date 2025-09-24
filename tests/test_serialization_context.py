@@ -140,7 +140,7 @@ class SerializationContextCompositePayloadConverter(
 
 # Payload conversion tests
 
-# Test misc payload conversion calls
+## Misc payload conversion
 
 
 @activity.defn
@@ -279,7 +279,7 @@ async def test_payload_conversion_calls_follow_expected_sequence_and_contexts(
         ]
 
 
-# Activity with heartbeat details test
+## Activity heartbeat payload conversion
 
 
 @activity.defn
@@ -383,7 +383,7 @@ async def test_heartbeat_details_payload_conversion(client: Client):
         ]
 
 
-# Local activity test
+## Local activity payload conversion
 
 
 @activity.defn
@@ -480,13 +480,32 @@ async def test_local_activity_payload_conversion(client: Client):
         ]
 
 
-# Async activity completion test
+## Async activity completion payload conversion
+
+
+@workflow.defn
+class EventWorkflow:
+    # Like a global asyncio.Event()
+
+    def __init__(self) -> None:
+        self.signal_received = asyncio.Event()
+
+    @workflow.run
+    async def run(self) -> None:
+        await self.signal_received.wait()
+
+    @workflow.signal
+    def signal(self) -> None:
+        self.signal_received.set()
 
 
 @activity.defn
 async def async_activity() -> TraceData:
-    # Signal that activity has started via heartbeat
-    activity.heartbeat("started")
+    await (
+        activity.client()
+        .get_workflow_handle("activity-started-wf-id")
+        .signal(EventWorkflow.signal)
+    )
     activity.raise_complete_async()
 
 
@@ -512,16 +531,23 @@ async def test_async_activity_completion_payload_conversion(
         DataConverter.default,
         payload_converter_class=SerializationContextCompositePayloadConverter,
     )
-
     client = Client(**config)
 
     async with Worker(
         client,
         task_queue=task_queue,
-        workflows=[AsyncActivityCompletionSerializationContextTestWorkflow],
+        workflows=[
+            AsyncActivityCompletionSerializationContextTestWorkflow,
+            EventWorkflow,
+        ],
         activities=[async_activity],
         workflow_runner=UnsandboxedWorkflowRunner(),  # so that we can use isinstance
     ):
+        act_started_wf_handle = await client.start_workflow(
+            EventWorkflow.run,
+            id="activity-started-wf-id",
+            task_queue=task_queue,
+        )
         wf_handle = await client.start_workflow(
             AsyncActivityCompletionSerializationContextTestWorkflow.run,
             id=workflow_id,
@@ -532,8 +558,7 @@ async def test_async_activity_completion_payload_conversion(
             run_id=wf_handle.first_execution_run_id,
             activity_id="async-activity-id",
         )
-        # Wait a bit for the activity to start
-        await asyncio.sleep(0.5)
+        await act_started_wf_handle.result()
         data = TraceData()
         await activity_handle.heartbeat(data)
         await activity_handle.complete(data)
