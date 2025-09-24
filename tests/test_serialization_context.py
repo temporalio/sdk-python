@@ -543,6 +543,19 @@ async def test_async_activity_completion_payload_conversion(
         activities=[async_activity],
         workflow_runner=UnsandboxedWorkflowRunner(),  # so that we can use isinstance
     ):
+        workflow_context = WorkflowSerializationContext(
+            namespace="default",
+            workflow_id=workflow_id,
+        )
+        activity_context = ActivitySerializationContext(
+            namespace="default",
+            workflow_id=workflow_id,
+            workflow_type=AsyncActivityCompletionSerializationContextTestWorkflow.__name__,
+            activity_type=async_activity.__name__,
+            activity_task_queue=task_queue,
+            is_local=False,
+        )
+
         act_started_wf_handle = await client.start_workflow(
             EventWorkflow.run,
             id="activity-started-wf-id",
@@ -557,19 +570,42 @@ async def test_async_activity_completion_payload_conversion(
             workflow_id=workflow_id,
             run_id=wf_handle.first_execution_run_id,
             activity_id="async-activity-id",
-        )
+        ).with_context(activity_context)
+
         await act_started_wf_handle.result()
         data = TraceData()
         await activity_handle.heartbeat(data)
         await activity_handle.complete(data)
         result = await wf_handle.result()
 
-        assert [item.method for item in result.items] == [
-            "to_payload",  # Outbound activity input
-            "to_payload",  # Outbound activity heartbeat data
-            "from_payload",  # Inbound activity result
-            "to_payload",  # Outbound workflow result
-            "from_payload",  # Inbound workflow result
+        print()
+        for item in result.items:
+            print(item)
+
+        activity_context_dict = dataclasses.asdict(activity_context)
+        workflow_context_dict = dataclasses.asdict(workflow_context)
+
+        assert result.items == [
+            TraceItem(
+                method="to_payload",
+                context=activity_context_dict,  # Outbound activity heartbeat
+            ),
+            TraceItem(
+                method="to_payload",
+                context=activity_context_dict,  # Outbound activity completion
+            ),
+            TraceItem(
+                method="from_payload",
+                context=activity_context_dict,  # Inbound activity result
+            ),
+            TraceItem(
+                method="to_payload",
+                context=workflow_context_dict,  # Outbound workflow result
+            ),
+            TraceItem(
+                method="from_payload",
+                context=workflow_context_dict,  # Inbound workflow result
+            ),
         ]
 
 
