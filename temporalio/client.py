@@ -3226,15 +3226,24 @@ class WorkflowExecutionAsyncIterator:
             metadata=self._input.rpc_metadata,
             timeout=self._input.rpc_timeout,
         )
+
+        data_converter_cache = {}
+
+        def get_data_converter(workflow_id: str) -> temporalio.converter.DataConverter:
+            if workflow_id not in data_converter_cache:
+                data_converter_cache[workflow_id] = (
+                    self._client.data_converter._with_context(
+                        WorkflowSerializationContext(
+                            namespace=self._client.namespace,
+                            workflow_id=workflow_id,
+                        )
+                    )
+                )
+            return data_converter_cache[workflow_id]
+
         self._current_page = [
             WorkflowExecution._from_raw_info(
-                v,
-                self._client.data_converter._with_context(
-                    WorkflowSerializationContext(
-                        namespace=self._client.namespace,
-                        workflow_id=v.execution.workflow_id,
-                    )
-                ),
+                v, get_data_converter(v.execution.workflow_id)
             )
             for v in resp.executions
         ]
