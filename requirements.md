@@ -127,6 +127,36 @@
 | **Java** | Not directly exposed | N/A | Activity code cannot access data converter |
 | **Python** | `activity.payload_converter()` | ActivitySerializationContext | [activity.py:470](https://github.com/temporalio/sdk-python/blob/main/temporalio/activity.py#L470) |
 
+## Async Activity Completion
+
+**Rule:** Async activity completion uses `ActivitySerializationContext` with available activity information.
+
+| Operation | Context Type | .NET | Java | Python |
+|-----------|--------------|------|------|--------|
+| **Complete** | ActivitySerializationContext | [AsyncActivityHandle.cs:42](https://github.com/temporalio/sdk-dotnet/blob/main/src/Temporalio/Client/AsyncActivityHandle.cs#L42) | [ActivityCompletionClientImpl.java:51-56](https://github.com/temporalio/sdk-java/blob/master/temporal-sdk/src/main/java/io/temporal/client/ActivityCompletionClientImpl.java#L51-L56) | [client.py:6477-6481](https://github.com/temporalio/sdk-python/blob/main/temporalio/client.py#L6477-L6481) |
+| **Fail** | ActivitySerializationContext | [AsyncActivityHandle.cs:51](https://github.com/temporalio/sdk-dotnet/blob/main/src/Temporalio/Client/AsyncActivityHandle.cs#L51) | [ActivityCompletionClientImpl.java:63-65](https://github.com/temporalio/sdk-java/blob/master/temporal-sdk/src/main/java/io/temporal/client/ActivityCompletionClientImpl.java#L63-L65) | [client.py:6511-6514](https://github.com/temporalio/sdk-python/blob/main/temporalio/client.py#L6511-L6514) |
+| **Report Cancellation** | ActivitySerializationContext | [AsyncActivityHandle.cs:62](https://github.com/temporalio/sdk-dotnet/blob/main/src/Temporalio/Client/AsyncActivityHandle.cs#L62) | [ActivityCompletionClientImpl.java:74](https://github.com/temporalio/sdk-java/blob/master/temporal-sdk/src/main/java/io/temporal/client/ActivityCompletionClientImpl.java#L74) | [client.py:6588-6600](https://github.com/temporalio/sdk-python/blob/main/temporalio/client.py#L6588-L6600) |
+| **WithContext Method** | Creates context-aware handle | [AsyncActivityHandle.cs:71-73](https://github.com/temporalio/sdk-dotnet/blob/main/src/Temporalio/Client/AsyncActivityHandle.cs#L71-L73) | [ActivityCompletionClient.java:107-108](https://github.com/temporalio/sdk-java/blob/master/temporal-sdk/src/main/java/io/temporal/client/ActivityCompletionClientImpl.java#L107-L108) | N/A (context applied internally) |
+
+### Notes
+- Python applies partial context internally in `_async_activity_data_converter()` with workflow ID when available
+- .NET and Java allow explicit context application via `WithSerializationContext()`/`withContext()` methods
+- Context may be incomplete for async completion (e.g., missing activity type) when using task token
+
+## Activity Heartbeating
+
+**Rule:** Heartbeating uses `ActivitySerializationContext` with full activity information when available.
+
+| Operation | Context Source | .NET | Java | Python |
+|-----------|---------------|------|------|--------|
+| **During Execution** | From running activity info | Same as async completion | [HeartbeatContextImpl.java:67-75](https://github.com/temporalio/sdk-java/blob/master/temporal-sdk/src/main/java/io/temporal/internal/activity/HeartbeatContextImpl.java#L67-L75) | [_activity.py:257-265](https://github.com/temporalio/sdk-python/blob/main/temporalio/worker/_activity.py#L257-L265) |
+| **Async Heartbeat** | From task token or activity ID | [AsyncActivityHandle.cs:30-32](https://github.com/temporalio/sdk-dotnet/blob/main/src/Temporalio/Client/AsyncActivityHandle.cs#L30-L32) | [ActivityCompletionClientImpl.java:94-102](https://github.com/temporalio/sdk-java/blob/master/temporal-sdk/src/main/java/io/temporal/client/ActivityCompletionClientImpl.java#L94-L102) | [client.py:6422-6426](https://github.com/temporalio/sdk-python/blob/main/temporalio/client.py#L6422-L6426) |
+
+### Notes
+- Heartbeating during activity execution has full context information
+- Async heartbeating (outside activity execution) may have partial context
+- All SDKs apply context to ensure proper data conversion for heartbeat details
+
 ## Summary of Context Rules
 
 1. **Workflow operations**: Always use `WorkflowSerializationContext` with the target workflow's ID
@@ -136,3 +166,5 @@
 5. **Memos**: Always use workflow context
 6. **Search attributes**: Never use context (indexing-specific conversion)
 7. **User-exposed converters**: Have appropriate context pre-applied
+8. **Async activity completion**: Use activity context with available information
+9. **Heartbeating**: Use activity context with full info during execution, partial for async
