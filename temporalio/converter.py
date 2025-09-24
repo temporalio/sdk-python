@@ -435,6 +435,21 @@ class DefaultPayloadConverter(CompositePayloadConverter):
         """Create a default payload converter."""
         super().__init__(*DefaultPayloadConverter.default_encoding_payload_converters)
 
+    def with_context(self, context: SerializationContext) -> Self:
+        """Return a new instance with the given context, preserving the class type."""
+        # Create a new instance of the same class (works for subclasses too)
+        instance = self.__class__()
+        # Update the converters with context
+        instance.converters = {
+            encoding: (
+                converter.with_context(context)
+                if isinstance(converter, WithSerializationContext)
+                else converter
+            )
+            for encoding, converter in self.converters.items()
+        }
+        return instance
+
 
 class BinaryNullPayloadConverter(EncodingPayloadConverter):
     """Converter for 'binary/null' payloads supporting None values."""

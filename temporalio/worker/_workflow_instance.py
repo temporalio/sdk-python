@@ -225,12 +225,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._workflow_input: Optional[ExecuteWorkflowInput] = None
         self._info = det.info
         self._context_free_payload_codec = det.data_converter.payload_codec
-        self._context_free_payload_converter = (
-            det.data_converter.payload_converter_class()
-        )
-        self._context_free_failure_converter = (
-            det.data_converter.failure_converter_class()
-        )
+        self._context_free_payload_converter = det.data_converter.payload_converter
+        self._context_free_failure_converter = det.data_converter.failure_converter
         self._payload_converter, self._failure_converter = (
             self._converters_with_context(
                 temporalio.converter.WorkflowSerializationContext(
