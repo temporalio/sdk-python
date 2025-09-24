@@ -45,6 +45,7 @@ from temporalio.bridge.temporal_sdk_bridge import PollShutdownError  # type: ign
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class WorkerConfig:
     """Python representation of the Rust struct for configuring a worker."""
