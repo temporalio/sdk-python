@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import socket
 import time
 import uuid
@@ -31,6 +32,8 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 from temporalio.workflow import (
     UpdateMethodMultiParam,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def new_worker(
@@ -153,6 +156,7 @@ async def workflow_update_exists(
     client: Client, workflow_id: str, update_id: str
 ) -> bool:
     try:
+        logger.info("Checking workflow update status: %s", update_id)
         await client.workflow_service.poll_workflow_execution_update(
             PollWorkflowExecutionUpdateRequest(
                 namespace=client.namespace,

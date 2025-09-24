@@ -1361,6 +1361,9 @@ class _BridgeServiceClient(ServiceClient):
                 logger.debug("Service %s response from %s: %s", service, rpc, resp)
             return resp
         except temporalio.bridge.client.RPCError as err:
+            logger.info(
+                "Service %s failed to call %s: %s", service, rpc, err, exc_info=True
+            )
             # Intentionally swallowing the cause instead of using "from"
             status, message, details = err.args
             raise RPCError(message, RPCStatusCode(status), details)
