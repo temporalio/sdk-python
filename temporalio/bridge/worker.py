@@ -247,6 +247,7 @@ class Worker:
         self, comp: temporalio.bridge.proto.ActivityTaskCompletion
     ) -> None:
         """Complete an activity task."""
+        logger.info("Completing activity task: %s", comp.task_token)
         await self._ref.complete_activity_task(comp.SerializeToString())
 
     async def complete_nexus_task(
