@@ -169,10 +169,13 @@ class _ActivityWorker:
                 else:
                     raise RuntimeError(f"Unrecognized activity task: {task}")
             except temporalio.bridge.worker.PollShutdownError:  # type: ignore[reportPrivateLocalImportUsage]
+                logger.info("Activity worker finished1")
                 exception_task.cancel()
+                logger.info("Activity worker finished2")
                 return
             except Exception as err:
                 exception_task.cancel()
+                logger.info("Activity worker failed: %s", err)
                 raise RuntimeError("Activity worker failed") from err
 
     def notify_shutdown(self) -> None:

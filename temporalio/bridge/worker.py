@@ -5,6 +5,7 @@ Nothing in this module should be considered stable. The API may change.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
@@ -42,6 +43,7 @@ from temporalio.bridge.temporal_sdk_bridge import (
 )
 from temporalio.bridge.temporal_sdk_bridge import PollShutdownError  # type: ignore
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class WorkerConfig:
@@ -219,6 +221,8 @@ class Worker:
         self,
     ) -> temporalio.bridge.proto.activity_task.ActivityTask:
         """Poll for an activity task."""
+        logger.info("Polling for activity task")
+
         return temporalio.bridge.proto.activity_task.ActivityTask.FromString(
             await self._ref.poll_activity_task()
         )
