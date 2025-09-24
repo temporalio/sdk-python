@@ -2102,12 +2102,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     def get_payload_codec(
         self, command_seq: Optional[int]
     ) -> Optional[temporalio.converter.PayloadCodec]:
-        # This function is only called when the user's payload codec supports serialization context.
+        payload_codec = self._context_free_payload_codec
         if not isinstance(
-            self._context_free_payload_codec,
+            payload_codec,
             temporalio.converter.WithSerializationContext,
         ):
-            return self._context_free_payload_codec
+            return payload_codec
 
         workflow_context = temporalio.converter.WorkflowSerializationContext(
             namespace=self._info.namespace,
@@ -2117,7 +2117,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if command_seq is None:
             # Use payload codec with workflow context by default (i.e. for payloads not associated
             # with a pending command)
-            return self._context_free_payload_codec.with_context(workflow_context)
+            return payload_codec.with_context(workflow_context)
 
         if command_seq in self._pending_activities:
             handle = self._pending_activities[command_seq]
@@ -2134,7 +2134,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 ),
                 is_local=isinstance(handle._input, StartLocalActivityInput),
             )
-            return self._context_free_payload_codec.with_context(context)
+            return payload_codec.with_context(context)
 
         elif command_seq in self._pending_child_workflows:
             handle = self._pending_child_workflows[command_seq]
@@ -2142,7 +2142,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 namespace=self._info.namespace,
                 workflow_id=handle._input.id,
             )
-            return self._context_free_payload_codec.with_context(context)
+            return payload_codec.with_context(context)
 
         elif command_seq in self._pending_external_signals:
             # Use the target workflow's context for external signals
@@ -2151,17 +2151,17 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 namespace=self._info.namespace,
                 workflow_id=workflow_id,
             )
-            return self._context_free_payload_codec.with_context(context)
+            return payload_codec.with_context(context)
 
         elif command_seq in self._pending_nexus_operations:
             # Use empty context for nexus operations: users will never want to encrypt using a
             # key derived from caller workflow context because the caller workflow context is
             # not available on the handler side for decryption.
-            return self._context_free_payload_codec
+            return payload_codec
 
         else:
             # Use payload codec with workflow context for all other payloads
-            return self._context_free_payload_codec.with_context(workflow_context)
+            return payload_codec.with_context(workflow_context)
 
     def _instantiate_workflow_object(self) -> Any:
         if not self._workflow_input:
