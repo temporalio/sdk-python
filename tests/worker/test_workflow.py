@@ -152,6 +152,8 @@ from tests.helpers.external_stack_trace import (
 with workflow.unsafe.imports_passed_through():
     import pytest
 
+logger = logging.getLogger(__name__)
+
 
 @workflow.defn
 class HelloWorkflow:
@@ -888,7 +890,9 @@ class ActivityWaitCancelNotify:
         except asyncio.CancelledError:
             return "Got cancelled error, cancelled? " + str(activity.is_cancelled())
         finally:
+            logger.info("ActivityWaitCancelNotify setting event")
             self.wait_cancel_complete.set()
+            logger.info("ActivityWaitCancelNotify set event")
 
 
 @dataclass
@@ -949,7 +953,7 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
     async with new_worker(
         client, CancelActivityWorkflow, activities=[activity_inst.wait_cancel]
     ) as worker:
-        print("Start first workflow")
+        logger.info("Start first workflow")
 
         # Try cancel - confirm error and activity was sent the cancel
         handle = await client.start_workflow(
@@ -966,18 +970,18 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
         async def activity_result() -> str:
             return await handle.query(CancelActivityWorkflow.activity_result)
 
-        print("Wait for cancelled")
+        logger.info("Wait for cancelled")
         await assert_eq_eventually(
             "Error: CancelledError", activity_result, timeout=assert_timeout
         )
 
-        print("Wait for activity complete")
+        logger.info("Wait for activity complete")
         await activity_inst.wait_cancel_complete.wait()
 
-        print("Wait for workflow cancel")
+        logger.info("Wait for workflow cancel")
         await handle.cancel()
 
-        print("Start second workflow")
+        logger.info("Start second workflow")
         # Wait cancel - confirm no error due to graceful cancel handling
         handle = await client.start_workflow(
             CancelActivityWorkflow.run,
@@ -989,18 +993,18 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
             task_queue=worker.task_queue,
             task_timeout=task_timeout,
         )
-        print("Wait for cancelled")
+        logger.info("Wait for cancelled")
         await assert_eq_eventually(
             "Got cancelled error, cancelled? True",
             activity_result,
             timeout=assert_timeout,
         )
-        print("Wait for activity complete")
+        logger.info("Wait for activity complete")
         await activity_inst.wait_cancel_complete.wait()
-        print("Wait for workflow cancel")
+        logger.info("Wait for workflow cancel")
         await handle.cancel()
 
-        print("Start third workflow")
+        logger.info("Start third workflow")
         # Abandon - confirm error and that activity stays running
         handle = await client.start_workflow(
             CancelActivityWorkflow.run,
@@ -1012,16 +1016,16 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
             task_queue=worker.task_queue,
             task_timeout=task_timeout,
         )
-        print("Wait for cancelled")
+        logger.info("Wait for cancelled")
         await assert_eq_eventually(
             "Error: CancelledError", activity_result, timeout=assert_timeout
         )
-        print("sleep")
+        logger.info("sleep")
         await asyncio.sleep(0.5)
         assert not activity_inst.wait_cancel_complete.is_set()
-        print("Wait for workflow cancel")
+        logger.info("Wait for workflow cancel")
         await handle.cancel()
-        print("Wait for activity complete")
+        logger.info("Wait for activity complete")
         await activity_inst.wait_cancel_complete.wait()
 
 
