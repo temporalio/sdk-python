@@ -254,7 +254,8 @@ class _WorkflowWorker:
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
         )
         completion.successful.SetInParent()
-        workflow = workflow_id = None
+        workflow = None
+        data_converter = self._data_converter
         try:
             if LOG_PROTOS:
                 logger.debug("Received workflow activation:\n%s", act)
@@ -274,9 +275,16 @@ class _WorkflowWorker:
                         "Cache already exists for activation with initialize job"
                     )
 
+            data_converter = self._data_converter._with_context(
+                temporalio.converter.WorkflowSerializationContext(
+                    namespace=self._namespace,
+                    workflow_id=workflow_id,
+                )
+            )
             if self._data_converter.payload_codec:
+                assert data_converter.payload_codec
                 if not workflow:
-                    payload_codec = self._data_converter.payload_codec
+                    payload_codec = data_converter.payload_codec
                 else:
                     payload_codec = _CommandAwarePayloadCodec(
                         workflow.instance,
@@ -335,14 +343,6 @@ class _WorkflowWorker:
 
             completion.failed.failure.SetInParent()
             try:
-                data_converter = self._data_converter
-                if workflow_id:
-                    data_converter = data_converter._with_context(
-                        temporalio.converter.WorkflowSerializationContext(
-                            namespace=self._namespace,
-                            workflow_id=workflow_id,
-                        )
-                    )
                 data_converter.failure_converter.to_failure(
                     err,
                     data_converter.payload_converter,
