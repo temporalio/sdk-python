@@ -89,7 +89,15 @@ class SerializationContext(ABC):
 
 
 @dataclass(frozen=True)
-class WorkflowSerializationContext(SerializationContext):
+class BaseWorkflowSerializationContext(SerializationContext):
+    """Base serialization context shared by workflow and activity serialization contexts."""
+
+    namespace: str
+    workflow_id: str
+
+
+@dataclass(frozen=True)
+class WorkflowSerializationContext(BaseWorkflowSerializationContext):
     """Serialization context for workflows.
 
     See :py:class:`SerializationContext` for more details.
@@ -102,12 +110,11 @@ class WorkflowSerializationContext(SerializationContext):
             when the workflow is created by the schedule.
     """
 
-    namespace: str
-    workflow_id: str
+    pass
 
 
 @dataclass(frozen=True)
-class ActivitySerializationContext(SerializationContext):
+class ActivitySerializationContext(BaseWorkflowSerializationContext):
     """Serialization context for activities.
 
     See :py:class:`SerializationContext` for more details.
@@ -115,16 +122,14 @@ class ActivitySerializationContext(SerializationContext):
     Attributes:
         namespace: Workflow/activity namespace.
         workflow_id: Workflow ID. Note, when creating/describing schedules,
-            this may be the workflow ID prefix as configured, not the final
-            workflow ID when the workflow is created by the schedule.
+            this may be the workflow ID prefix as configured, not the final workflow ID when the
+            workflow is created by the schedule.
         workflow_type: Workflow Type.
         activity_type: Activity Type.
         activity_task_queue: Activity task queue.
         is_local: Whether the activity is a local activity.
     """
 
-    namespace: str
-    workflow_id: str
     workflow_type: str
     activity_type: str
     activity_task_queue: str
