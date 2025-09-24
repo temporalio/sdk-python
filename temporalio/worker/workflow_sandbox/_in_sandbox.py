@@ -81,8 +81,10 @@ class InSandbox:
         """Send activation to this instance."""
         return self.instance.activate(act)
 
-    def get_payload_codec(
-        self, command_seq: Optional[int]
-    ) -> Optional[temporalio.converter.PayloadCodec]:
-        """Get payload codec."""
-        return self.instance.get_payload_codec(command_seq)
+    def get_payload_codec_with_context(
+        self,
+        payload_codec: temporalio.converter.PayloadCodec,
+        command_seq: Optional[int],
+    ) -> temporalio.converter.PayloadCodec:
+        """Get payload codec with context."""
+        return self.instance.get_payload_codec_with_context(payload_codec, command_seq)

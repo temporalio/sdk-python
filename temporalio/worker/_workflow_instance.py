@@ -135,7 +135,8 @@ class WorkflowRunner(ABC):
 class WorkflowInstanceDetails:
     """Immutable details for creating a workflow instance."""
 
-    data_converter: temporalio.converter.DataConverter
+    payload_converter_class: Type[temporalio.converter.PayloadConverter]
+    failure_converter_class: Type[temporalio.converter.FailureConverter]
     interceptor_classes: Sequence[Type[WorkflowInboundInterceptor]]
     defn: temporalio.workflow._Definition
     info: temporalio.workflow.Info
@@ -168,9 +169,11 @@ class WorkflowInstance(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_payload_codec(
-        self, command_seq: Optional[int]
-    ) -> Optional[temporalio.converter.PayloadCodec]:
+    def get_payload_codec_with_context(
+        self,
+        payload_codec: temporalio.converter.PayloadCodec,
+        command_seq: Optional[int],
+    ) -> temporalio.converter.PayloadCodec:
         """Return a payload codec with appropriate serialization context.
 
         Args:
@@ -224,13 +227,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._defn = det.defn
         self._workflow_input: Optional[ExecuteWorkflowInput] = None
         self._info = det.info
-        self._context_free_payload_codec = det.data_converter.payload_codec
-        self._context_free_payload_converter = (
-            det.data_converter.payload_converter_class()
-        )
-        self._context_free_failure_converter = (
-            det.data_converter.failure_converter_class()
-        )
+        self._context_free_payload_converter = det.payload_converter_class()
+        self._context_free_failure_converter = det.failure_converter_class()
         self._payload_converter, self._failure_converter = (
             self._converters_with_context(
                 temporalio.converter.WorkflowSerializationContext(
@@ -2099,10 +2097,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         return payload_converter, failure_converter
 
     # _WorkflowInstanceImpl.get_pending_command_serialization_context
-    def get_payload_codec(
-        self, command_seq: Optional[int]
-    ) -> Optional[temporalio.converter.PayloadCodec]:
-        payload_codec = self._context_free_payload_codec
+    def get_payload_codec_with_context(
+        self,
+        payload_codec: temporalio.converter.PayloadCodec,
+        command_seq: Optional[int],
+    ) -> temporalio.converter.PayloadCodec:
         if not isinstance(
             payload_codec,
             temporalio.converter.WithSerializationContext,
