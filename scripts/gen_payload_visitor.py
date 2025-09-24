@@ -274,27 +274,27 @@ class PayloadVisitor:
                     )
 
         commands_with_seq = {
-            "start_timer",
+            "cancel_signal_workflow",
             "cancel_timer",
+            "request_cancel_activity",
+            "request_cancel_external_workflow_execution",
+            "request_cancel_local_activity",
+            "request_cancel_nexus_operation",
             "schedule_activity",
             "schedule_local_activity",
-            "request_cancel_activity",
-            "request_cancel_local_activity",
-            "start_child_workflow_execution",
-            "request_cancel_external_workflow_execution",
-            "signal_external_workflow_execution",
-            "cancel_signal_workflow",
             "schedule_nexus_operation",
-            "request_cancel_nexus_operation",
+            "signal_external_workflow_execution",
+            "start_child_workflow_execution",
+            "start_timer",
         }
         activation_jobs_with_seq = {
             "resolve_activity",
-            "resolve_child_workflow_execution",
             "resolve_child_workflow_execution_start",
+            "resolve_child_workflow_execution",
+            "resolve_nexus_operation_start",
+            "resolve_nexus_operation",
             "resolve_request_cancel_external_workflow",
             "resolve_signal_external_workflow",
-            "resolve_nexus_operation",
-            "resolve_nexus_operation_start",
         }
         # Process oneof fields as if/elif chains
         for oneof_idx, fields in oneof_fields.items():
