@@ -762,11 +762,14 @@ class Worker:
             if worker and task.done() and task.exception():
                 tasks[worker] = asyncio.create_task(worker.drain_poll_queue())
 
+        logger.info("Task drain done")
+
         # Notify shutdown occurring
         if self._activity_worker:
             self._activity_worker.notify_shutdown()
         if self._workflow_worker:
             self._workflow_worker.notify_shutdown()
+        logger.info("workers notified")
 
         # Wait for all tasks to complete (i.e. for poller loops to stop)
         await asyncio.wait(tasks.values())
