@@ -760,6 +760,7 @@ class Worker:
         # If any worker task had an exception, replace that task with a queue drain
         for worker, task in tasks.items():
             if worker and task.done() and task.exception():
+                logger.info("Adding a drain task")
                 tasks[worker] = asyncio.create_task(worker.drain_poll_queue())
 
         logger.info("Task drain done")
