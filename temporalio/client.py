@@ -63,8 +63,9 @@ import temporalio.service
 import temporalio.workflow
 from temporalio.activity import ActivityCancellationDetails
 from temporalio.converter import (
-    ActivitySerializationContext,
     DataConverter,
+    SerializationContext,
+    WithSerializationContext,
     WorkflowSerializationContext,
 )
 from temporalio.service import (
@@ -2732,15 +2733,19 @@ class AsyncActivityIDReference:
     activity_id: str
 
 
-class AsyncActivityHandle:
+class AsyncActivityHandle(WithSerializationContext):
     """Handle representing an external activity for completion and heartbeat."""
 
     def __init__(
-        self, client: Client, id_or_token: Union[AsyncActivityIDReference, bytes]
+        self,
+        client: Client,
+        id_or_token: Union[AsyncActivityIDReference, bytes],
+        data_converter_override: Optional[DataConverter] = None,
     ) -> None:
         """Create an async activity handle."""
         self._client = client
         self._id_or_token = id_or_token
+        self._data_converter_override = data_converter_override
 
     async def heartbeat(
         self,
@@ -2762,6 +2767,7 @@ class AsyncActivityHandle:
                 details=details,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
+                data_converter_override=self._data_converter_override,
             ),
         )
 
@@ -2786,6 +2792,7 @@ class AsyncActivityHandle:
                 result=result,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
+                data_converter_override=self._data_converter_override,
             ),
         )
 
@@ -2813,6 +2820,7 @@ class AsyncActivityHandle:
                 last_heartbeat_details=last_heartbeat_details,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
+                data_converter_override=self._data_converter_override,
             ),
         )
 
@@ -2836,7 +2844,22 @@ class AsyncActivityHandle:
                 details=details,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
+                data_converter_override=self._data_converter_override,
             ),
+        )
+
+    def with_context(self, context: SerializationContext) -> AsyncActivityHandle:
+        """Create a new AsyncActivityHandle with a different serialization context.
+
+        Payloads received by the activity will be decoded and deserialized using a data converter
+        with :py:class:`ActivitySerializationContext` set as context. If you are using a custom data
+        converter that makes use of this context then you can use this method to supply matching
+        context data to the data converter used to serialize and encode the outbound payloads.
+        """
+        return AsyncActivityHandle(
+            self._client,
+            self._id_or_token,
+            self._client.data_converter._with_context(context),
         )
 
 
@@ -5486,6 +5509,7 @@ class HeartbeatAsyncActivityInput:
     details: Sequence[Any]
     rpc_metadata: Mapping[str, Union[str, bytes]]
     rpc_timeout: Optional[timedelta]
+    data_converter_override: Optional[DataConverter] = None
 
 
 @dataclass
@@ -5496,6 +5520,7 @@ class CompleteAsyncActivityInput:
     result: Optional[Any]
     rpc_metadata: Mapping[str, Union[str, bytes]]
     rpc_timeout: Optional[timedelta]
+    data_converter_override: Optional[DataConverter] = None
 
 
 @dataclass
@@ -5507,6 +5532,7 @@ class FailAsyncActivityInput:
     last_heartbeat_details: Sequence[Any]
     rpc_metadata: Mapping[str, Union[str, bytes]]
     rpc_timeout: Optional[timedelta]
+    data_converter_override: Optional[DataConverter] = None
 
 
 @dataclass
@@ -5517,6 +5543,7 @@ class ReportCancellationAsyncActivityInput:
     details: Sequence[Any]
     rpc_metadata: Mapping[str, Union[str, bytes]]
     rpc_timeout: Optional[timedelta]
+    data_converter_override: Optional[DataConverter] = None
 
 
 @dataclass
@@ -6418,7 +6445,7 @@ class _ClientImpl(OutboundInterceptor):
     async def heartbeat_async_activity(
         self, input: HeartbeatAsyncActivityInput
     ) -> None:
-        data_converter = self._async_activity_data_converter(input.id_or_token)
+        data_converter = input.data_converter_override or self._client.data_converter
         details = (
             None
             if not input.details
@@ -6473,7 +6500,7 @@ class _ClientImpl(OutboundInterceptor):
                 )
 
     async def complete_async_activity(self, input: CompleteAsyncActivityInput) -> None:
-        data_converter = self._async_activity_data_converter(input.id_or_token)
+        data_converter = input.data_converter_override or self._client.data_converter
         result = (
             None
             if input.result is temporalio.common._arg_unset
@@ -6507,7 +6534,7 @@ class _ClientImpl(OutboundInterceptor):
             )
 
     async def fail_async_activity(self, input: FailAsyncActivityInput) -> None:
-        data_converter = self._async_activity_data_converter(input.id_or_token)
+        data_converter = input.data_converter_override or self._client.data_converter
 
         failure = temporalio.api.failure.v1.Failure()
         await data_converter.encode_failure(input.error, failure)
@@ -6548,7 +6575,7 @@ class _ClientImpl(OutboundInterceptor):
     async def report_cancellation_async_activity(
         self, input: ReportCancellationAsyncActivityInput
     ) -> None:
-        data_converter = self._async_activity_data_converter(input.id_or_token)
+        data_converter = input.data_converter_override or self._client.data_converter
         details = (
             None
             if not input.details
@@ -6580,24 +6607,6 @@ class _ClientImpl(OutboundInterceptor):
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             )
-
-    def _async_activity_data_converter(
-        self, id_or_token: Union[AsyncActivityIDReference, bytes]
-    ) -> DataConverter:
-        return self._client.data_converter._with_context(
-            ActivitySerializationContext(
-                namespace=self._client.namespace,
-                workflow_id=(
-                    id_or_token.workflow_id
-                    if isinstance(id_or_token, AsyncActivityIDReference)
-                    else ""
-                ),
-                workflow_type="",
-                activity_type="",
-                activity_task_queue="",
-                is_local=False,
-            )
-        )
 
     ### Schedule calls
 
