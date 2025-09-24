@@ -84,9 +84,55 @@
 | Decode | PayloadCodec | None | [WorkflowCodecHelper.cs:112-113](https://github.com/temporalio/sdk-dotnet/blob/main/src/Temporalio/Worker/WorkflowCodecHelper.cs#L112-L113) | N/A (codec not applied) |
 | Deserialize | DataConverter | None | [WorkflowInstance.cs:2954](https://github.com/temporalio/sdk-dotnet/blob/main/src/Temporalio/Worker/WorkflowInstance.cs#L2954) | [SyncWorkflowContext.java:855-856](https://github.com/temporalio/sdk-java/blob/master/temporal-sdk/src/main/java/io/temporal/internal/sync/SyncWorkflowContext.java#L855-L856) |
 
+## Memo and Search Attribute Context
+
+### Memos
+
+**Rule:** Memos always use `WorkflowSerializationContext` with the workflow's ID when set or accessed.
+
+| Operation | Context Type | .NET | Java |
+|-----------|--------------|------|------|
+| **Client sets memo on start** | WorkflowSerializationContext | [TemporalClient.Workflow.cs:827](https://github.com/temporalio/sdk-dotnet/blob/main/src/Temporalio/Client/TemporalClient.Workflow.cs#L827) | [RootWorkflowClientInvoker.java:292-294](https://github.com/temporalio/sdk-java/blob/master/temporal-sdk/src/main/java/io/temporal/internal/client/RootWorkflowClientInvoker.java#L292-L294) |
+| **Workflow upserts memo** | WorkflowSerializationContext | [WorkflowInstance.cs:472](https://github.com/temporalio/sdk-dotnet/blob/main/src/Temporalio/Worker/WorkflowInstance.cs#L472) | [SyncWorkflowContext.java:1416](https://github.com/temporalio/sdk-java/blob/master/temporal-sdk/src/main/java/io/temporal/internal/sync/SyncWorkflowContext.java#L1416) |
+| **Child workflow memo** | WorkflowSerializationContext (child ID) | [WorkflowInstance.cs:2359-2360](https://github.com/temporalio/sdk-dotnet/blob/main/src/Temporalio/Worker/WorkflowInstance.cs#L2359-L2360) | [SyncWorkflowContext.java:693-700](https://github.com/temporalio/sdk-java/blob/master/temporal-sdk/src/main/java/io/temporal/internal/sync/SyncWorkflowContext.java#L693-L700) |
+| **Schedule sets memo** | WorkflowSerializationContext | [ScheduleActionStartWorkflow.cs:199](https://github.com/temporalio/sdk-dotnet/blob/main/src/Temporalio/Client/Schedules/ScheduleActionStartWorkflow.cs#L199) | [ScheduleProtoUtil.java:134](https://github.com/temporalio/sdk-java/blob/master/temporal-sdk/src/main/java/io/temporal/internal/client/ScheduleProtoUtil.java#L134) |
+
+### Search Attributes
+
+**Rule:** Search attributes do NOT use serialization context - they use specialized converters for indexing.
+
+| Operation | Context Type | .NET | Java |
+|-----------|--------------|------|------|
+| **All operations** | None (direct proto conversion) | Uses `ToProto()` | Uses `toSearchAttributes()` |
+
+## User-Accessible Data Converter
+
+### Workflow Context
+
+**Rule:** Data converters exposed to workflow code have `WorkflowSerializationContext` applied.
+
+| SDK | API | Context | Reference |
+|-----|-----|---------|-----------|
+| **.NET** | `Workflow.PayloadConverter` | WorkflowSerializationContext | [Workflow.cs:185](https://github.com/temporalio/sdk-dotnet/blob/main/src/Temporalio/Workflows/Workflow.cs#L185) |
+| **Java** | Not directly exposed | N/A | Workflow code cannot access data converter |
+| **Python** | `workflow.payload_converter()` | WorkflowSerializationContext | [workflow.py:1148](https://github.com/temporalio/sdk-python/blob/main/temporalio/workflow.py#L1148) |
+
+### Activity Context
+
+**Rule:** Data converters exposed to activity code have `ActivitySerializationContext` applied.
+
+| SDK | API | Context | Reference |
+|-----|-----|---------|-----------|
+| **.NET** | `ActivityExecutionContext.PayloadConverter` | ActivitySerializationContext | [ActivityExecutionContext.cs:49](https://github.com/temporalio/sdk-dotnet/blob/main/src/Temporalio/Activities/ActivityExecutionContext.cs#L49) |
+| **Java** | Not directly exposed | N/A | Activity code cannot access data converter |
+| **Python** | `activity.payload_converter()` | ActivitySerializationContext | [activity.py:470](https://github.com/temporalio/sdk-python/blob/main/temporalio/activity.py#L470) |
+
 ## Summary of Context Rules
 
 1. **Workflow operations**: Always use `WorkflowSerializationContext` with the target workflow's ID
 2. **Activity operations**: Use `ActivitySerializationContext` with activity details and `is_local` flag
 3. **Child workflow operations**: Use `WorkflowSerializationContext` with the child's workflow ID
 4. **Nexus operations**: No serialization context (null/none)
+5. **Memos**: Always use workflow context
+6. **Search attributes**: Never use context (indexing-specific conversion)
+7. **User-exposed converters**: Have appropriate context pre-applied
