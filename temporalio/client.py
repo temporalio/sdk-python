@@ -6,6 +6,7 @@ import abc
 import asyncio
 import copy
 import dataclasses
+import functools
 import inspect
 import json
 import re
@@ -1598,11 +1599,6 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     ) -> None:
         """Create workflow handle."""
         self._client = client
-        self._data_converter = client.data_converter._with_context(
-            temporalio.converter.WorkflowSerializationContext(
-                namespace=client.namespace, workflow_id=id
-            )
-        )
         self._id = id
         self._run_id = run_id
         self._result_run_id = result_run_id
@@ -1610,6 +1606,14 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self._result_type = result_type
         self._start_workflow_response = start_workflow_response
         self.__temporal_eagerly_started = False
+
+    @functools.cached_property
+    def _data_converter(self) -> temporalio.converter.DataConverter:
+        return self._client.data_converter._with_context(
+            temporalio.converter.WorkflowSerializationContext(
+                namespace=self._client.namespace, workflow_id=self._id
+            )
+        )
 
     @property
     def id(self) -> str:
