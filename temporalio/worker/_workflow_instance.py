@@ -236,9 +236,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 temporalio.converter.WorkflowSerializationContext(
                     namespace=det.info.namespace,
                     workflow_id=det.info.workflow_id,
-                ),
-                self._context_free_payload_converter,
-                self._context_free_failure_converter,
+                )
             )
         )
 
@@ -918,9 +916,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             raise RuntimeError(
                 f"Failed to find nexus operation handle for job sequence number {job.seq}"
             )
-        # We not set a serialization context for nexus operations on the caller side because it is
-        # not possible to do so on the handler side.
-        payload_converter, failure_converter = self._converters_with_context(None)
+        # We don't set a serialization context for nexus operations on the caller side because it's
+        # not possible to set a matching context on the handler side.
+        payload_converter, failure_converter = (
+            self._context_free_payload_converter,
+            self._context_free_failure_converter,
+        )
 
         if job.HasField("operation_token"):
             # The nexus operation started asynchronously. A `ResolveNexusOperation` job
@@ -957,7 +958,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             #    completed / failed, but it has already been resolved.
             return
 
-        # We not set a serialization context for nexus operations on the caller side because it is
+        # We don't set a serialization context for nexus operations on the caller side because it is
         # not possible to do so on the handler side.
         payload_converter, failure_converter = (
             self._context_free_payload_converter,
@@ -2083,25 +2084,18 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
     def _converters_with_context(
         self,
-        context: Optional[temporalio.converter.SerializationContext],
-        base_payload_converter: Optional[temporalio.converter.PayloadConverter] = None,
-        base_failure_converter: Optional[temporalio.converter.FailureConverter] = None,
+        context: temporalio.converter.SerializationContext,
     ) -> Tuple[
         temporalio.converter.PayloadConverter,
         temporalio.converter.FailureConverter,
     ]:
         """Construct workflow payload and failure converters with the given context."""
-        payload_converter = base_payload_converter or self._payload_converter
-        failure_converter = base_failure_converter or self._failure_converter
-        if context:
-            if isinstance(
-                payload_converter, temporalio.converter.WithSerializationContext
-            ):
-                payload_converter = payload_converter.with_context(context)
-            if isinstance(
-                failure_converter, temporalio.converter.WithSerializationContext
-            ):
-                failure_converter = failure_converter.with_context(context)
+        payload_converter = self._context_free_payload_converter
+        failure_converter = self._context_free_failure_converter
+        if isinstance(payload_converter, temporalio.converter.WithSerializationContext):
+            payload_converter = payload_converter.with_context(context)
+        if isinstance(failure_converter, temporalio.converter.WithSerializationContext):
+            failure_converter = failure_converter.with_context(context)
         return payload_converter, failure_converter
 
     # _WorkflowInstanceImpl.get_pending_command_serialization_context
