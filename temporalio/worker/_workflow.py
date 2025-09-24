@@ -249,13 +249,12 @@ class _WorkflowWorker:
             await self._handle_cache_eviction(act, cache_remove_job)
             return
 
-        data_converter = self._data_converter
         # Build default success completion (e.g. remove-job-only activations)
         completion = (
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
         )
         completion.successful.SetInParent()
-        workflow = None
+        workflow = workflow_id = None
         try:
             if LOG_PROTOS:
                 logger.debug("Received workflow activation:\n%s", act)
@@ -275,17 +274,14 @@ class _WorkflowWorker:
                         "Cache already exists for activation with initialize job"
                     )
 
-            data_converter = self._data_converter._with_context(
-                temporalio.converter.WorkflowSerializationContext(
-                    namespace=self._namespace,
-                    workflow_id=workflow_id,
-                )
-            )
-            if data_converter.payload_codec:
+            if self._data_converter.payload_codec:
                 if not workflow:
-                    payload_codec = data_converter.payload_codec
+                    payload_codec = self._data_converter.payload_codec
                 else:
-                    payload_codec = _CommandAwarePayloadCodec(workflow.instance)
+                    payload_codec = _CommandAwarePayloadCodec(
+                        workflow.instance,
+                        self._data_converter.payload_codec,
+                    )
                 await temporalio.bridge.worker.decode_activation(
                     act,
                     payload_codec.decode,
@@ -339,6 +335,14 @@ class _WorkflowWorker:
 
             completion.failed.failure.SetInParent()
             try:
+                data_converter = self._data_converter
+                if workflow_id:
+                    data_converter = data_converter._with_context(
+                        temporalio.converter.WorkflowSerializationContext(
+                            namespace=self._namespace,
+                            workflow_id=workflow_id,
+                        )
+                    )
                 data_converter.failure_converter.to_failure(
                     err,
                     data_converter.payload_converter,
@@ -356,8 +360,11 @@ class _WorkflowWorker:
         completion.run_id = act.run_id
 
         # Encode completion
-        if data_converter.payload_codec and workflow:
-            payload_codec = _CommandAwarePayloadCodec(workflow.instance)
+        if self._data_converter.payload_codec and workflow:
+            payload_codec = _CommandAwarePayloadCodec(
+                workflow.instance,
+                self._data_converter.payload_codec,
+            )
             try:
                 await temporalio.bridge.worker.encode_completion(
                     completion,
@@ -572,7 +579,8 @@ class _WorkflowWorker:
 
         # Create instance from details
         det = WorkflowInstanceDetails(
-            data_converter=self._data_converter,
+            payload_converter_class=self._data_converter.payload_converter_class,
+            failure_converter_class=self._data_converter.failure_converter_class,
             interceptor_classes=self._interceptor_classes,
             defn=defn,
             info=info,
@@ -722,8 +730,10 @@ class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
     def __init__(
         self,
         instance: WorkflowInstance,
+        context_free_payload_codec: temporalio.converter.PayloadCodec,
     ):
         self.instance = instance
+        self.context_free_payload_codec = context_free_payload_codec
 
     async def encode(
         self,
@@ -738,10 +748,10 @@ class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
         return await self._get_current_command_codec().decode(payloads)
 
     def _get_current_command_codec(self) -> temporalio.converter.PayloadCodec:
-        seq = temporalio.bridge._visitor.current_command_seq.get()
-        codec = self.instance.get_payload_codec(seq)
-        assert codec, "Payload codec must be set on the data converter"
-        return codec
+        return self.instance.get_payload_codec_with_context(
+            self.context_free_payload_codec,
+            temporalio.bridge._visitor.current_command_seq.get(),
+        )
 
 
 class _InterruptDeadlockError(BaseException):

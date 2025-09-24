@@ -1610,10 +1610,14 @@ class CustomWorkflowInstance(WorkflowInstance):
         self._runner._pairs.append((act, comp))
         return comp
 
-    def get_payload_codec(
-        self, command_seq: Optional[int]
-    ) -> Optional[temporalio.converter.PayloadCodec]:
-        return self._unsandboxed.get_payload_codec(command_seq)
+    def get_payload_codec_with_context(
+        self,
+        payload_codec: temporalio.converter.PayloadCodec,
+        command_seq: Optional[int],
+    ) -> temporalio.converter.PayloadCodec:
+        return self._unsandboxed.get_payload_codec_with_context(
+            payload_codec, command_seq
+        )
 
 
 async def test_workflow_with_custom_runner(client: Client):
