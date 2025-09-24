@@ -354,10 +354,9 @@ class _WorkflowWorker:
                 )
 
         completion.run_id = act.run_id
-        assert workflow
 
         # Encode completion
-        if data_converter.payload_codec:
+        if data_converter.payload_codec and workflow:
             payload_codec = _CommandAwarePayloadCodec(workflow.instance)
             try:
                 await temporalio.bridge.worker.encode_completion(
