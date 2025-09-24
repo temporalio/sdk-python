@@ -499,7 +499,11 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
             assert isinstance(ctx.permit, MyPermit)
             assert ctx.permit.pnum is not None
 
-            logger.info("Release slot %d, %d", ctx.permit.pnum, self.highest_seen_reserve_on_release)
+            logger.info(
+                "Release slot %d, %d",
+                ctx.permit.pnum,
+                self.highest_seen_reserve_on_release,
+            )
             self.highest_seen_reserve_on_release = max(
                 ctx.permit.pnum, self.highest_seen_reserve_on_release
             )
