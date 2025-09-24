@@ -284,19 +284,17 @@ async def test_payload_conversion_calls_follow_expected_sequence_and_contexts(
 
 @activity.defn
 async def activity_with_heartbeat_details() -> TraceData:
-    """Activity that checks heartbeat details are decoded with proper context."""
     info = activity.info()
-
-    if info.heartbeat_details:
-        assert len(info.heartbeat_details) == 1
-        heartbeat_data = info.heartbeat_details[0]
+    if info.attempt == 1:
+        data = TraceData()
+        activity.heartbeat(data)
+        raise Exception("Intentional error to force retry")
+    elif info.attempt == 2:
+        [heartbeat_data] = info.heartbeat_details
         assert isinstance(heartbeat_data, TraceData)
         return heartbeat_data
-
-    data = TraceData()
-    activity.heartbeat(data)
-    await asyncio.sleep(0.1)
-    raise Exception("Intentional failure to test heartbeat details")
+    else:
+        raise AssertionError(f"Unexpected attempt number: {info.attempt}")
 
 
 @workflow.defn
@@ -339,6 +337,13 @@ async def test_heartbeat_details_payload_conversion(client: Client):
             task_queue=task_queue,
         )
 
+        workflow_context = dataclasses.asdict(
+            WorkflowSerializationContext(
+                namespace="default",
+                workflow_id=workflow_id,
+            )
+        )
+
         activity_context = dataclasses.asdict(
             ActivitySerializationContext(
                 namespace="default",
@@ -350,15 +355,32 @@ async def test_heartbeat_details_payload_conversion(client: Client):
             )
         )
 
-        found_heartbeat_decode = False
-        for item in result.items:
-            if item.method == "from_payload" and item.context == activity_context:
-                found_heartbeat_decode = True
-                break
-
-        assert (
-            found_heartbeat_decode
-        ), "Heartbeat details should be decoded with activity context"
+        assert result.items == [
+            TraceItem(
+                method="to_payload",
+                context=activity_context,  # Outbound heartbeat
+            ),
+            TraceItem(
+                method="from_payload",
+                context=activity_context,  # Inbound heartbeart detail
+            ),
+            TraceItem(
+                method="to_payload",
+                context=activity_context,  # Outbound activity result
+            ),
+            TraceItem(
+                method="from_payload",
+                context=activity_context,  # Inbound activity result
+            ),
+            TraceItem(
+                method="to_payload",
+                context=workflow_context,  # Outbound workflow result
+            ),
+            TraceItem(
+                method="from_payload",
+                context=workflow_context,  # Inbound workflow result
+            ),
+        ]
 
 
 # Local activity test
