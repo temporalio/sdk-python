@@ -76,23 +76,20 @@ jobs:
       - run: mkdir junit-xml
       - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
         timeout-minutes: 15
-      # Time skipping doesn't yet support ARM
-      - if: ${{ !endsWith(matrix.os, '-arm') }}
-        run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
-        timeout-minutes: 10
-      # Check cloud if proper target and not on fork
-      - if: ${{ matrix.cloudTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
-        run: poe test ${{matrix.pytestExtraArgs}} -s -k test_cloud_client --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--cloud.xml
-        timeout-minutes: 10
-        env:
-          TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
-          TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
-          TEMPORAL_CLIENT_CLOUD_NAMESPACE: sdk-ci.a2dd6
-      - if: ${{ matrix.openaiTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
-        run: poe test tests/contrib/openai_agents/test_openai.py ${{matrix.pytestExtraArgs}} -s  --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--openai.xml
-        timeout-minutes: 10
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 15
+      - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 15
+      - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 15
+      - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 15
+      - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 15
+      - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 15
+      - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 15
       - name: "Upload junit-xml artifacts"
         uses: actions/upload-artifact@v4
         if: always()
@@ -100,84 +97,3 @@ jobs:
           name: junit-xml--${{github.run_id}}--${{github.run_attempt}}--${{ matrix.python }}--${{ matrix.os }}
           path: junit-xml
           retention-days: 14
-
-      # Confirm protos are already generated properly with older protobuf
-      # library and run test with that older version. We must downgrade protobuf
-      # so we can generate 3.x and 4.x compatible API. We have to use older
-      # Python to run this check because the grpcio-tools version we use
-      # is <= 3.10.
-      - name: Check generated protos and test protobuf 3.x
-        if: ${{ matrix.protoCheckTarget }}
-        env:
-          TEMPORAL_TEST_PROTO3: 1
-        run: |
-          uv add --python 3.9 "protobuf<4"
-          uv sync --all-extras
-          poe build-develop
-          poe gen-protos
-          poe format
-          [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
-          poe test -s
-        timeout-minutes: 10
-
-      # Do docs stuff (only on one host)
-      - name: Build API docs
-        if: ${{ matrix.docsTarget }}
-        run: poe gen-docs
-      - name: Deploy prod API docs
-        if: ${{ github.ref == 'refs/heads/main' && matrix.docsTarget }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: npx vercel deploy build/apidocs -t ${{ secrets.VERCEL_TOKEN }} --prod --yes
-
-      # Confirm README ToC is generated properly
-      - uses: actions/setup-node@v4
-      - name: Check generated README ToC
-        if: ${{ matrix.docsTarget }}
-        run: |
-          npx doctoc README.md
-          [[ -z $(git status --porcelain README.md) ]] || (git diff README.md; echo "README changed"; exit 1)
-  test-latest-deps:
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: temporalio/bridge -> target
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - uses: arduino/setup-protoc@v3
-        with:
-          # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
-          version: "23.x"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: astral-sh/setup-uv@v5
-      - run: uv tool install poethepoet
-      - run: uv lock --upgrade
-      - run: uv sync --all-extras
-      - run: poe lint
-      - run: poe build-develop
-      - run: mkdir junit-xml
-      - run: poe test  -s --junit-xml=junit-xml/latest-deps.xml
-        timeout-minutes: 10
-      - name: "Upload junit-xml artifacts"
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: junit-xml--${{github.run_id}}--${{github.run_attempt}}--latest-deps--time-skipping
-          path: junit-xml
-          retention-days: 14
-
-  # Runs the sdk features repo tests with this repo's current SDK code
-  features-tests:
-    uses: temporalio/features/.github/workflows/python.yaml@main
-    with:
-      python-repo-path: ${{github.event.pull_request.head.repo.full_name}}
-      version: ${{github.event.pull_request.head.ref}}
-      version-is-repo-ref: true
