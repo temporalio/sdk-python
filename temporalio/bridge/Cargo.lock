@@ -2075,7 +2075,6 @@ checksum = "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
 [[package]]
 name = "rustfsm"
 version = "0.1.0"
-source = "git+https://github.com/temporalio/sdk-core?branch=shutdown_notify#b1209841d6d1d8ed380a6f2641217e4d0f7409fa"
 dependencies = [
  "rustfsm_procmacro",
  "rustfsm_trait",
@@ -2084,7 +2083,6 @@ dependencies = [
 [[package]]
 name = "rustfsm_procmacro"
 version = "0.1.0"
-source = "git+https://github.com/temporalio/sdk-core?branch=shutdown_notify#b1209841d6d1d8ed380a6f2641217e4d0f7409fa"
 dependencies = [
  "derive_more",
  "proc-macro2",
@@ -2096,7 +2094,6 @@ dependencies = [
 [[package]]
 name = "rustfsm_trait"
 version = "0.1.0"
-source = "git+https://github.com/temporalio/sdk-core?branch=shutdown_notify#b1209841d6d1d8ed380a6f2641217e4d0f7409fa"
 
 [[package]]
 name = "rustix"
@@ -2444,7 +2441,6 @@ dependencies = [
 [[package]]
 name = "temporal-client"
 version = "0.1.0"
-source = "git+https://github.com/temporalio/sdk-core?branch=shutdown_notify#b1209841d6d1d8ed380a6f2641217e4d0f7409fa"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2497,7 +2493,6 @@ dependencies = [
 [[package]]
 name = "temporal-sdk-core"
 version = "0.1.0"
-source = "git+https://github.com/temporalio/sdk-core?branch=shutdown_notify#b1209841d6d1d8ed380a6f2641217e4d0f7409fa"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2557,7 +2552,6 @@ dependencies = [
 [[package]]
 name = "temporal-sdk-core-api"
 version = "0.1.0"
-source = "git+https://github.com/temporalio/sdk-core?branch=shutdown_notify#b1209841d6d1d8ed380a6f2641217e4d0f7409fa"
 dependencies = [
  "async-trait",
  "derive_builder",
@@ -2579,7 +2573,6 @@ dependencies = [
 [[package]]
 name = "temporal-sdk-core-protos"
 version = "0.1.0"
-source = "git+https://github.com/temporalio/sdk-core?branch=shutdown_notify#b1209841d6d1d8ed380a6f2641217e4d0f7409fa"
 dependencies = [
  "anyhow",
  "base64",

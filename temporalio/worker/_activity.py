@@ -169,13 +169,10 @@ class _ActivityWorker:
                 else:
                     raise RuntimeError(f"Unrecognized activity task: {task}")
             except temporalio.bridge.worker.PollShutdownError:  # type: ignore[reportPrivateLocalImportUsage]
-                logger.info("Activity worker finished1")
                 exception_task.cancel()
-                logger.info("Activity worker finished2")
                 return
             except Exception as err:
                 exception_task.cancel()
-                logger.info("Activity worker failed: %s", err)
                 raise RuntimeError("Activity worker failed") from err
 
     def notify_shutdown(self) -> None:
@@ -186,18 +183,14 @@ class _ActivityWorker:
     async def drain_poll_queue(self) -> None:
         while True:
             try:
-                logger.info("Poll activity tasks")
-
                 # Just take all tasks and say we can't handle them
                 task = await self._bridge_worker().poll_activity_task()
                 completion = temporalio.bridge.proto.ActivityTaskCompletion(  # type: ignore[reportAttributeAccessIssue]
                     task_token=task.task_token
                 )
                 completion.result.failed.failure.message = "Worker shutting down"
-                logger.info("Complete activity task")
                 await self._bridge_worker().complete_activity_task(completion)
             except temporalio.bridge.worker.PollShutdownError:  # type: ignore[reportPrivateLocalImportUsage]
-                logger.info("Return from drain")
                 return
 
     # Only call this after run()/drain_poll_queue() have returned. This will not

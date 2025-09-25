@@ -755,34 +755,25 @@ class Worker:
         # Initiate core worker shutdown
         self._bridge_worker.initiate_shutdown()
 
-        logger.info("Bridge shut down")
-
         # If any worker task had an exception, replace that task with a queue drain
         for worker, task in tasks.items():
             if worker and task.done() and task.exception():
-                logger.info("Adding a drain task")
                 tasks[worker] = asyncio.create_task(worker.drain_poll_queue())
-
-        logger.info("Task drain done")
 
         # Notify shutdown occurring
         if self._activity_worker:
             self._activity_worker.notify_shutdown()
         if self._workflow_worker:
             self._workflow_worker.notify_shutdown()
-        logger.info("workers notified")
 
         # Wait for all tasks to complete (i.e. for poller loops to stop)
         await asyncio.wait(tasks.values())
-        logger.info("tasks waited")
-
         # Sometimes both workers throw an exception and since we only take the
         # first, Python may complain with "Task exception was never retrieved"
         # if we don't get the others. Therefore we call cancel on each task
         # which suppresses this.
         for task in tasks.values():
             task.cancel()
-        logger.info("tasks cancelled")
 
         # Let all activity / nexus operations completions finish. We cannot guarantee that
         # because poll shutdown completed (which means activities/operations completed)
@@ -791,7 +782,6 @@ class Worker:
             await self._activity_worker.wait_all_completed()
         if self._nexus_worker:
             await self._nexus_worker.wait_all_completed()
-        logger.info("Waited for workers")
 
         # Do final shutdown
         try:
@@ -800,7 +790,6 @@ class Worker:
             # Ignore errors here that can arise in some tests where the bridge
             # worker still has a reference
             pass
-        logger.info("Set shutdown complete")
 
         # Mark as shutdown complete and re-raise exception if present
         self._shutdown_complete_event.set()
@@ -858,8 +847,6 @@ class Worker:
         if not self._async_context_run_task:
             raise RuntimeError("Never started")
         await self.shutdown()
-        logger.info("Shutdown complete")
-
         # Cancel our run task
         self._async_context_run_task.cancel()
         # Only re-raise our exception if present and exc_type is cancel
