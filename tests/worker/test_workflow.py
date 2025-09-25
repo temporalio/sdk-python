@@ -2946,12 +2946,21 @@ async def test_workflow_patch_memoized(client: Client):
             task_queue=task_queue,
         )
 
+        # Need to wait until it has gotten halfway through, otherwise the post_patch workflow may never complete
+        async def waiting_signal() -> bool:
+            return await post_patch_handle.query(
+                PatchMemoizedWorkflowPatched.waiting_signal
+            )
+
+        await assert_eq_eventually(True, waiting_signal)
+
         # Send signal to both and check results
         await pre_patch_handle.signal(PatchMemoizedWorkflowUnpatched.signal)
         await post_patch_handle.signal(PatchMemoizedWorkflowPatched.signal)
 
         # Confirm expected values
         assert ["some-value"] == await pre_patch_handle.result()
+
         assert [
             "pre-patch",
             "some-value",
@@ -6091,22 +6100,21 @@ class FirstCompletionCommandIsHonoredWorkflow:
         self.main_workflow_returns_before_signal_completions = (
             main_workflow_returns_before_signal_completions
         )
-        self.ping_pong_val = 1
-        self.ping_pong_counter = 0
-        self.ping_pong_max_count = 4
+        self.run_finished = False
 
     @workflow.run
     async def run(self) -> str:
         await workflow.wait_condition(
             lambda: self.seen_first_signal and self.seen_second_signal
         )
+        self.run_finished = True
         return "workflow-result"
 
     @workflow.signal
     async def this_signal_executes_first(self):
         self.seen_first_signal = True
         if self.main_workflow_returns_before_signal_completions:
-            await self.ping_pong(lambda: self.ping_pong_val > 0)
+            await workflow.wait_condition(lambda: self.run_finished)
         raise ApplicationError(
             "Client should see this error unless doing ping-pong "
             "(in which case main coroutine returns first)"
@@ -6117,18 +6125,12 @@ class FirstCompletionCommandIsHonoredWorkflow:
         await workflow.wait_condition(lambda: self.seen_first_signal)
         self.seen_second_signal = True
         if self.main_workflow_returns_before_signal_completions:
-            await self.ping_pong(lambda: self.ping_pong_val < 0)
+            await workflow.wait_condition(lambda: self.run_finished)
         raise ApplicationError("Client should never see this error!")
-
-    async def ping_pong(self, cond: Callable[[], bool]):
-        while self.ping_pong_counter < self.ping_pong_max_count:
-            await workflow.wait_condition(cond)
-            self.ping_pong_val = -self.ping_pong_val
-            self.ping_pong_counter += 1
 
 
 @workflow.defn
-class FirstCompletionCommandIsHonoredPingPongWorkflow(
+class FirstCompletionCommandIsHonoredSignalWaitWorkflow(
     FirstCompletionCommandIsHonoredWorkflow
 ):
     def __init__(self) -> None:
@@ -6157,10 +6159,10 @@ async def _do_first_completion_command_is_honored_test(
     client: Client, main_workflow_returns_before_signal_completions: bool
 ):
     workflow_cls: Union[
-        Type[FirstCompletionCommandIsHonoredPingPongWorkflow],
+        Type[FirstCompletionCommandIsHonoredSignalWaitWorkflow],
         Type[FirstCompletionCommandIsHonoredWorkflow],
     ] = (
-        FirstCompletionCommandIsHonoredPingPongWorkflow
+        FirstCompletionCommandIsHonoredSignalWaitWorkflow
         if main_workflow_returns_before_signal_completions
         else FirstCompletionCommandIsHonoredWorkflow
     )
