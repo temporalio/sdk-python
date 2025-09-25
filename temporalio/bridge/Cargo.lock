@@ -1713,6 +1713,7 @@ checksum = "8970a78afe0628a3e3430376fc5fd76b6b45c4d43360ffd6cdd40bdde72b682a"
 dependencies = [
  "anyhow",
  "indoc",
+ "inventory",
  "libc",
  "memoffset",
  "once_cell",
