@@ -132,8 +132,6 @@ class Client:
         timeout_millis = round(timeout.total_seconds() * 1000) if timeout else None
         call = RpcCall(rpc, req.SerializeToString(), retry, metadata, timeout_millis)
 
-        print(f"calling rpc '{rpc}'")
-
         # Do call (this throws an RPCError on failure)
         if service == "workflow":
             resp_fut = self._ref.call_workflow_service(call)
