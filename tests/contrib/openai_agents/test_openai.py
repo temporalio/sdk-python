@@ -998,8 +998,7 @@ class CustomerServiceWorkflow:
     @workflow.run
     async def run(self, input_items: list[TResponseInputItem] = []):
         await workflow.wait_condition(
-            lambda: workflow.info().is_continue_as_new_suggested()
-            and workflow.all_handlers_finished()
+            lambda: False
         )
         workflow.continue_as_new(self.input_items)
 
