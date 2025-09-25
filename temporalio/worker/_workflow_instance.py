@@ -2087,7 +2087,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         temporalio.converter.PayloadConverter,
         temporalio.converter.FailureConverter,
     ]:
-        """Construct workflow payload and failure converters with the given context."""
+        """Construct workflow payload and failure converters with the given context.
+
+        This plays a similar role to DataConverter._with_context, but operates on PayloadConverter
+        and FailureConverter only (since payload encoding/decoding is done by the worker, outside
+        the workflowsandbox).
+        """
         payload_converter = self._context_free_payload_converter
         failure_converter = self._context_free_failure_converter
         if isinstance(payload_converter, temporalio.converter.WithSerializationContext):
