@@ -27,14 +27,14 @@ pyo3 = { version = "0.25", features = [
 ] }
 pyo3-async-runtimes = { version = "0.25", features = ["tokio-runtime"] }
 pythonize = "0.25"
-temporal-client = { git = "https://github.com/temporalio/sdk-core", branch = "debug_shutdown" }
-temporal-sdk-core = { git = "https://github.com/temporalio/sdk-core", branch = "debug_shutdown", features = [
+temporal-client = { git = "https://github.com/temporalio/sdk-core", branch = "shutdown_notify" }
+temporal-sdk-core = { git = "https://github.com/temporalio/sdk-core", branch = "shutdown_notify", features = [
     "ephemeral-server",
 ] }
-temporal-sdk-core-api = { git = "https://github.com/temporalio/sdk-core", branch = "debug_shutdown",  features = [
+temporal-sdk-core-api = { git = "https://github.com/temporalio/sdk-core", branch = "shutdown_notify",  features = [
     "envconfig",
 ] }
-temporal-sdk-core-protos = { git = "https://github.com/temporalio/sdk-core", branch = "debug_shutdown" }
+temporal-sdk-core-protos = { git = "https://github.com/temporalio/sdk-core", branch = "shutdown_notify" }
 tokio = "1.26"
 tokio-stream = "0.1"
 tonic = "0.13"
