@@ -61,7 +61,7 @@ def _convert_agent(
                 dataclasses.replace(handoff, on_invoke_handoff=on_invoke)
             )
         else:
-            raise ValueError(f"Unknown handoff type: {type(handoff)}")
+            raise TypeError(f"Unknown handoff type: {type(handoff)}")
 
     new_agent.model = _TemporalModelStub(
         model_name=name,

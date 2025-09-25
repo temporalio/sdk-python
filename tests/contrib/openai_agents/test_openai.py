@@ -997,9 +997,7 @@ class CustomerServiceWorkflow:
 
     @workflow.run
     async def run(self, input_items: list[TResponseInputItem] = []):
-        await workflow.wait_condition(
-            lambda: False
-        )
+        await workflow.wait_condition(lambda: False)
         workflow.continue_as_new(self.input_items)
 
     @workflow.query
