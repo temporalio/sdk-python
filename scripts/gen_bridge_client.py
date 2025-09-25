@@ -14,15 +14,37 @@ import temporalio.api.workflowservice.v1.service_pb2 as workflow_service
 import temporalio.bridge.proto.health.v1.health_pb2 as health_service
 
 
-def generate_match_arm(trait_name: str, method: MethodDescriptor) -> str:
-    match_template = Template("""\
-          "$method_name" => { 
-            rpc_call!(retry_client, call, $trait_name, $method_name)
-          }""")
+def generate_client_impl(
+    file_descriptors: list[FileDescriptor],
+    output_file: str = "temporalio/bridge/src/client_rpc_generated.rs",
+):
+    print("generating bridge rpc calls")
 
-    return match_template.substitute(
-        method_name=pascal_to_snake(method.name), trait_name=trait_name
-    )
+    service_calls = [
+        generate_service_call(service_descriptor)
+        for file_descriptor in file_descriptors
+        for service_descriptor in file_descriptor.services_by_name.values()
+    ]
+
+    impl_template = Template("""// Generated file. DO NOT EDIT
+
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+
+use super::{
+    client::{rpc_req, rpc_resp, ClientRef, RpcCall},
+    rpc_call,
+};
+
+#[pymethods]
+impl ClientRef {
+$service_calls
+}""")
+
+    with open(output_file, "w") as f:
+        f.write(impl_template.substitute(service_calls="\n".join(service_calls)))
+
+    print(f"successfully generated client at {output_file}")
 
 
 def generate_service_call(service_descriptor: ServiceDescriptor) -> str:
@@ -75,37 +97,15 @@ $match_arms
     )
 
 
-def generate_client_impl(
-    file_descriptors: list[FileDescriptor],
-    output_file: str = "temporalio/bridge/src/client_rpc_generated.rs",
-):
-    print("generating bridge rpc calls")
+def generate_match_arm(trait_name: str, method: MethodDescriptor) -> str:
+    match_template = Template("""\
+          "$method_name" => { 
+            rpc_call!(retry_client, call, $trait_name, $method_name)
+          }""")
 
-    service_calls = [
-        generate_service_call(service_descriptor)
-        for file_descriptor in file_descriptors
-        for service_descriptor in file_descriptor.services_by_name.values()
-    ]
-
-    impl_template = Template("""// Generated file. DO NOT EDIT
-
-use pyo3::exceptions::PyValueError;
-use pyo3::prelude::*;
-
-use super::{
-    client::{rpc_req, rpc_resp, ClientRef, RpcCall},
-    rpc_call,
-};
-
-#[pymethods]
-impl ClientRef {
-$service_calls
-}""")
-
-    with open(output_file, "w") as f:
-        f.write(impl_template.substitute(service_calls="\n".join(service_calls)))
-
-    print(f"successfully generated client at {output_file}")
+    return match_template.substitute(
+        method_name=pascal_to_snake(method.name), trait_name=trait_name
+    )
 
 
 def pascal_to_snake(input: str) -> str:
