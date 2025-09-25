@@ -21,9 +21,9 @@ import pytest
 from pydantic import BaseModel
 from typing_extensions import Never
 
+import temporalio.api.common.v1
+import temporalio.api.failure.v1
 from temporalio import activity, workflow
-from temporalio.api.common.v1 import Payload
-from temporalio.api.failure.v1 import Failure
 from temporalio.client import Client, WorkflowFailureError, WorkflowUpdateFailedError
 from temporalio.common import RetryPolicy
 from temporalio.contrib.pydantic import PydanticJSONPlainPayloadConverter
@@ -82,7 +82,7 @@ class SerializationContextPayloadConverter(
         converter.context = context
         return converter
 
-    def to_payload(self, value: Any) -> Optional[Payload]:
+    def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         if not isinstance(value, TraceData):
             return None
         if isinstance(self.context, WorkflowSerializationContext):
@@ -106,7 +106,11 @@ class SerializationContextPayloadConverter(
         payload.metadata["encoding"] = self.encoding.encode()
         return payload
 
-    def from_payload(self, payload: Payload, type_hint: Optional[Type] = None) -> Any:
+    def from_payload(
+        self,
+        payload: temporalio.api.common.v1.Payload,
+        type_hint: Optional[Type] = None,
+    ) -> Any:
         value = JSONPlainPayloadConverter().from_payload(payload, TraceData)
         assert isinstance(value, TraceData)
         if isinstance(self.context, WorkflowSerializationContext):
@@ -1002,7 +1006,7 @@ class FailureConverterWithContext(DefaultFailureConverter, WithSerializationCont
 
     def with_context(
         self, context: Optional[SerializationContext]
-    ) -> "FailureConverterWithContext":
+    ) -> FailureConverterWithContext:
         converter = FailureConverterWithContext()
         converter.context = context
         return converter
@@ -1011,7 +1015,7 @@ class FailureConverterWithContext(DefaultFailureConverter, WithSerializationCont
         self,
         exception: BaseException,
         payload_converter: PayloadConverter,
-        failure: Failure,
+        failure: temporalio.api.failure.v1.Failure,
     ) -> None:
         assert isinstance(
             self.context, (WorkflowSerializationContext, ActivitySerializationContext)
@@ -1025,7 +1029,9 @@ class FailureConverterWithContext(DefaultFailureConverter, WithSerializationCont
         super().to_failure(exception, payload_converter, failure)
 
     def from_failure(
-        self, failure: Failure, payload_converter: PayloadConverter
+        self,
+        failure: temporalio.api.failure.v1.Failure,
+        payload_converter: PayloadConverter,
     ) -> BaseException:
         assert isinstance(
             self.context, (WorkflowSerializationContext, ActivitySerializationContext)
@@ -1132,12 +1138,14 @@ class PayloadCodecWithContext(PayloadCodec, WithSerializationContext):
 
     def with_context(
         self, context: Optional[SerializationContext]
-    ) -> "PayloadCodecWithContext":
+    ) -> PayloadCodecWithContext:
         codec = PayloadCodecWithContext()
         codec.context = context
         return codec
 
-    async def encode(self, payloads: Sequence[Payload]) -> List[Payload]:
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> List[temporalio.api.common.v1.Payload]:
         assert self.context
         if isinstance(self.context, ActivitySerializationContext):
             test_traces[self.context.workflow_id].append(
@@ -1156,7 +1164,9 @@ class PayloadCodecWithContext(PayloadCodec, WithSerializationContext):
             )
         return list(payloads)
 
-    async def decode(self, payloads: Sequence[Payload]) -> List[Payload]:
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> List[temporalio.api.common.v1.Payload]:
         assert self.context
         if isinstance(self.context, ActivitySerializationContext):
             test_traces[self.context.workflow_id].append(
@@ -1439,20 +1449,24 @@ class PayloadEncryptionCodec(PayloadCodec, WithSerializationContext):
         codec.context = context
         return codec
 
-    async def encode(self, payloads: Sequence[Payload]) -> List[Payload]:
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> List[temporalio.api.common.v1.Payload]:
         [payload] = payloads
         return [
-            Payload(
+            temporalio.api.common.v1.Payload(
                 metadata=payload.metadata,
                 data=json.dumps(self._get_encryption_key()).encode(),
             )
         ]
 
-    async def decode(self, payloads: Sequence[Payload]) -> List[Payload]:
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> List[temporalio.api.common.v1.Payload]:
         [payload] = payloads
         assert json.loads(payload.data.decode()) == self._get_encryption_key()
         metadata = dict(payload.metadata)
-        return [Payload(metadata=metadata, data=b'"inbound"')]
+        return [temporalio.api.common.v1.Payload(metadata=metadata, data=b'"inbound"')]
 
     def _get_encryption_key(self) -> str:
         context = (
@@ -1594,8 +1608,8 @@ class AssertNexusLacksContextPayloadCodec(PayloadCodec, WithSerializationContext
         return codec
 
     async def _assert_context_iff_not_nexus(
-        self, payloads: Sequence[Payload]
-    ) -> List[Payload]:
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> List[temporalio.api.common.v1.Payload]:
         [payload] = payloads
         assert bool(self.context) == (payload.data.decode() != '"nexus-data"')
         return list(payloads)
@@ -1670,12 +1684,12 @@ class PydanticJSONConverterWithContext(
 
     def with_context(
         self, context: Optional[SerializationContext]
-    ) -> "PydanticJSONConverterWithContext":
+    ) -> PydanticJSONConverterWithContext:
         converter = PydanticJSONConverterWithContext()
         converter.context = context
         return converter
 
-    def to_payload(self, value: Any) -> Optional[Payload]:
+    def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
         if isinstance(value, PydanticData) and self.context:
             if isinstance(self.context, WorkflowSerializationContext):
                 value.trace.append(f"wf_{self.context.workflow_id}")

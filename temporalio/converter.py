@@ -136,6 +136,7 @@ class ActivitySerializationContext(BaseWorkflowSerializationContext):
     is_local: bool
 
 
+# TODO: duck typing or nominal typing?
 class WithSerializationContext(ABC):
     """Interface for objects that can use serialization context.
 
@@ -341,7 +342,6 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
         Args:
             converters: Payload converters to delegate to, in order.
         """
-        # Insertion order preserved here since Python 3.7
         self.converters = {c.encoding.encode(): c for c in converters}
 
     def to_payloads(
@@ -407,7 +407,7 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
         return values
 
     def with_context(self, context: SerializationContext) -> CompositePayloadConverter:
-        """Return a new instance with the given context."""
+        """Return a new instance with context set on the component converters"""
         return CompositePayloadConverter(
             *(
                 c.with_context(context)
