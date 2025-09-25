@@ -62,7 +62,8 @@ def activity_as_tool(
 
     Args:
         fn: A Temporal activity function to convert to a tool.
-        strict_json_schema: Whether the tool should follow a strict schema
+        strict_json_schema: Whether the tool should follow a strict schema.
+            See https://openai.github.io/openai-agents-python/ref/tool/#agents.tool.FunctionTool.strict_json_schema
         For other arguments, refer to :py:mod:`workflow` :py:meth:`start_activity`
 
     Returns:
