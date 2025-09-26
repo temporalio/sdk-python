@@ -1252,33 +1252,25 @@ class DataConverter:
     failure_converter: FailureConverter = dataclasses.field(init=False)
     """Failure converter created from the :py:attr:`failure_converter_class`."""
 
-    payload_codec_class: Optional[Type[PayloadCodec]] = None
-
     default: ClassVar[DataConverter]
     """Singleton default data converter."""
 
     def __post_init__(self) -> None:  # noqa: D105
         object.__setattr__(self, "payload_converter", self.payload_converter_class())
         object.__setattr__(self, "failure_converter", self.failure_converter_class())
-        if self.payload_codec:
-            object.__setattr__(self, "payload_codec_class", type(self.payload_codec))
 
-    def _hydrate(self) -> None:
-        if not hasattr(self, "payload_converter"):
-            object.__setattr__(
-                self, "payload_converter", self.payload_converter_class()
-            )
-        if not hasattr(self, "failure_converter"):
-            object.__setattr__(
-                self, "failure_converter", self.failure_converter_class()
-            )
-        if self.payload_codec_class and not self.payload_codec:
-            object.__setattr__(self, "payload_codec", self.payload_codec_class())
-
-    def _dehydrate(self) -> None:
-        object.__delattr__(self, "payload_converter")
-        object.__delattr__(self, "failure_converter")
-        object.__setattr__(self, "payload_codec", None)
+    @classmethod
+    def from_info(cls, info: DataConverterInfo) -> Self:
+        instance = cls(
+            payload_converter_class=info.payload_converter_class,
+            failure_converter_class=info.failure_converter_class,
+            payload_codec=(
+                info.payload_codec_class() if info.payload_codec_class else None
+            ),
+        )
+        if info.context:
+            instance = instance._with_context(info.context)
+        return instance
 
     async def encode(
         self, values: Sequence[Any]
@@ -1379,6 +1371,23 @@ class DataConverter:
         object.__setattr__(cloned, "payload_codec", payload_codec)
         object.__setattr__(cloned, "failure_converter", failure_converter)
         return cloned
+
+
+@dataclass(frozen=True)
+class DataConverterInfo:
+    """Information needed to instantiate a data converter."""
+
+    payload_converter_class: Type[PayloadConverter]
+    """Payload converter class."""
+
+    failure_converter_class: Type[FailureConverter]
+    """Failure converter class."""
+
+    payload_codec_class: Optional[Type[PayloadCodec]]
+    """Payload codec class."""
+
+    context: Optional[SerializationContext]
+    """Serialization context for data conversion operations."""
 
 
 DefaultPayloadConverter.default_encoding_payload_converters = (

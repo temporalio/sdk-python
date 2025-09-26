@@ -776,16 +776,28 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
             data_converter = self._running_activity.data_converter
             assert data_converter
 
-            # TODO: eliminate `payload_converter_class_or_instance`
             if isinstance(input.executor, concurrent.futures.ThreadPoolExecutor):
-                payload_converter_class_or_instance = data_converter.payload_converter
+                data_converter_info_or_instance = data_converter
             else:
-                payload_converter_class_or_instance = (
-                    data_converter.payload_converter_class
+                data_converter_info_or_instance = (
+                    temporalio.converter.DataConverterInfo(
+                        payload_converter_class=data_converter.payload_converter_class,
+                        failure_converter_class=data_converter.failure_converter_class,
+                        payload_codec_class=(
+                            type(data_converter.payload_codec)
+                            if data_converter.payload_codec
+                            else None
+                        ),
+                        context=temporalio.converter.ActivitySerializationContext(
+                            namespace=info.workflow_namespace,
+                            workflow_id=info.workflow_id,
+                            workflow_type=info.workflow_type,
+                            activity_type=info.activity_type,
+                            activity_task_queue=self._worker._task_queue,
+                            is_local=info.is_local,
+                        ),
+                    )
                 )
-
-                data_converter._dehydrate()
-
             try:
                 # Cancel and shutdown event always present here
                 cancelled_event = self._running_activity.cancelled_event
@@ -800,8 +812,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                     # Only thread event, this may cross a process boundary
                     cancelled_event.thread_event,
                     worker_shutdown_event.thread_event,
-                    data_converter,
-                    payload_converter_class_or_instance,
+                    data_converter_info_or_instance,
                     ctx.runtime_metric_meter,
                     cancellation_details,
                     input.fn,
@@ -844,17 +855,27 @@ def _execute_sync_activity(
     cancel_thread_raiser: Optional[_ThreadExceptionRaiser],
     cancelled_event: threading.Event,
     worker_shutdown_event: threading.Event,
-    data_converter: temporalio.converter.DataConverter,
-    payload_converter_class_or_instance: Union[
-        type[temporalio.converter.PayloadConverter],
-        temporalio.converter.PayloadConverter,
+    data_converter_info_or_instance: Union[
+        temporalio.converter.DataConverter,
+        temporalio.converter.DataConverterInfo,
     ],
     runtime_metric_meter: Optional[temporalio.common.MetricMeter],
     cancellation_details: temporalio.activity._ActivityCancellationDetailsHolder,
     fn: Callable[..., Any],
     *args: Any,
 ) -> Any:
-    data_converter._hydrate()
+    # Reconstruct data converter if we received classes and context (process executor case)
+    if isinstance(
+        data_converter_info_or_instance, temporalio.converter.DataConverterInfo
+    ):
+        data_converter = temporalio.converter.DataConverter.from_info(
+            data_converter_info_or_instance
+        )
+        payload_converter_class_or_instance = data_converter.payload_converter_class
+    else:
+        data_converter = data_converter_info_or_instance
+        payload_converter_class_or_instance = data_converter.payload_converter
+
     if cancel_thread_raiser:
         thread_id = threading.current_thread().ident
         if thread_id is not None:
