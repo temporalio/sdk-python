@@ -471,13 +471,13 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
             self.reserve_asserts(ctx)
             # Verify an async call doesn't bungle things
             await asyncio.sleep(0.01)
+            self.reserves += 1
             logger.info(
                 "Reserve slot %d - %s - %s",
                 self.reserves,
                 ctx.slot_type,
                 ctx.task_queue,
             )
-            self.reserves += 1
             return MyPermit(self.reserves)
 
         def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
