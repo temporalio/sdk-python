@@ -84,7 +84,8 @@ class SerializationContext(ABC):
       not of the currently executing (i.e. parent) workflow.
     - In workflow code, when operating on a payload to be sent/received to/from an activity, the
       context type is :py:class:`ActivitySerializationContext` and the workflow ID is that of the
-      currently-executing workflow. ActivitySerializationContext is also set on operations
+      currently-executing workflow. ActivitySerializationContext is also set on data converter
+      operations in the activity context.
     """
 
     pass
@@ -438,6 +439,8 @@ class CompositePayloadConverter(PayloadConverter):
         if not any_with_context:
             return self
 
+        # A user who has created a subclass with a non-nullary constructor must override this
+        # method.
         new_instance = type(self)()
         new_instance._set_converters(*converters)
         return new_instance
