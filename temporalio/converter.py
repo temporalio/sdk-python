@@ -28,6 +28,7 @@ from typing import (
     Mapping,
     NewType,
     Optional,
+    Protocol,
     Sequence,
     Tuple,
     Type,
@@ -35,6 +36,7 @@ from typing import (
     Union,
     get_type_hints,
     overload,
+    runtime_checkable,
 )
 
 import google.protobuf.duration_pb2
@@ -136,9 +138,12 @@ class ActivitySerializationContext(BaseWorkflowSerializationContext):
     is_local: bool
 
 
-# TODO: duck typing or nominal typing?
-class WithSerializationContext(ABC):
+@runtime_checkable
+class WithSerializationContext(Protocol):
     """Interface for classes that can use serialization context.
+
+    To use serialization context in your class, implementing this interface is sufficient; you do
+    not need to inherit from this class.
 
     The following classes may implement this interface:
     - :py:class:`PayloadConverter`
@@ -331,7 +336,7 @@ class EncodingPayloadConverter(ABC):
         raise NotImplementedError
 
 
-class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
+class CompositePayloadConverter(PayloadConverter):
     """Composite payload converter that delegates to a list of encoding payload converters.
 
     Encoding/decoding are attempted on each payload converter successively until
