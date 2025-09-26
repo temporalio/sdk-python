@@ -42,6 +42,7 @@ from temporalio.converter import (
     WorkflowSerializationContext,
 )
 from temporalio.exceptions import ApplicationError
+from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from temporalio.worker._workflow_instance import UnsandboxedWorkflowRunner
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
@@ -1640,12 +1641,15 @@ class NexusOperationTestWorkflow:
 
 
 async def test_nexus_payload_codec_operations_lack_context(
-    client: Client,
+    env: WorkflowEnvironment,
 ):
     """
     encode() and decode() on nexus payloads should not have any context set.
     """
-    config = client.config()
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    config = env.client.config()
     config["data_converter"] = dataclasses.replace(
         DataConverter.default,
         payload_codec=AssertNexusLacksContextPayloadCodec(),
