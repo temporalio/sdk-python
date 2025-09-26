@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import logging
 import uuid
 from datetime import timedelta
 from typing import Any, Awaitable, Callable, Optional, Sequence
@@ -63,6 +64,8 @@ from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 # https://github.com/python/cpython/issues/91351
 with workflow.unsafe.imports_passed_through():
     import pytest
+
+logger = logging.getLogger(__name__)
 
 
 def test_load_default_worker_binary_id():
@@ -469,6 +472,12 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
             # Verify an async call doesn't bungle things
             await asyncio.sleep(0.01)
             self.reserves += 1
+            logger.info(
+                "Reserve slot %d - %s - %s",
+                self.reserves,
+                ctx.slot_type,
+                ctx.task_queue,
+            )
             return MyPermit(self.reserves)
 
         def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
@@ -494,6 +503,12 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
             assert ctx.permit is not None
             assert isinstance(ctx.permit, MyPermit)
             assert ctx.permit.pnum is not None
+
+            logger.info(
+                "Release slot %d, %d",
+                ctx.permit.pnum,
+                self.highest_seen_reserve_on_release,
+            )
             self.highest_seen_reserve_on_release = max(
                 ctx.permit.pnum, self.highest_seen_reserve_on_release
             )
