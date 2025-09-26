@@ -957,7 +957,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             return
 
         # We don't set a serialization context for nexus operations on the caller side because it is
-        # not possible to do so on the handler side.
+        # not possible to set the same context on the handler side.
         payload_converter, failure_converter = (
             self._context_free_payload_converter,
             self._context_free_failure_converter,
@@ -2091,7 +2091,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
         This plays a similar role to DataConverter._with_context, but operates on PayloadConverter
         and FailureConverter only (since payload encoding/decoding is done by the worker, outside
-        the workflowsandbox).
+        the workflow sandbox).
         """
         payload_converter = self._context_free_payload_converter
         failure_converter = self._context_free_failure_converter
@@ -2101,7 +2101,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             failure_converter = failure_converter.with_context(context)
         return payload_converter, failure_converter
 
-    # _WorkflowInstanceImpl.get_pending_command_serialization_context
     def get_payload_codec_with_context(
         self,
         payload_codec: temporalio.converter.PayloadCodec,
@@ -2430,8 +2429,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         done_fut = self.create_future()
         command.signal_external_workflow_execution.seq = seq
 
-        # Set as pending with the target workflow ID for later context use
-        # Extract the workflow ID from the command
         target_workflow_id = (
             command.signal_external_workflow_execution.child_workflow_id
             or command.signal_external_workflow_execution.workflow_execution.workflow_id

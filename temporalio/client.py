@@ -2852,7 +2852,7 @@ class AsyncActivityHandle:
         )
 
     # TODO(dan): should this return Self (requiring that the user's subclass has the same
-    # constructor signature)?
+    # constructor signature)? CompositePayloadConverter.with_context does.
     def with_context(self, context: SerializationContext) -> AsyncActivityHandle:
         """Create a new AsyncActivityHandle with a different serialization context.
 
