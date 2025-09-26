@@ -96,9 +96,13 @@ from temporalio.contrib.openai_agents import (
     TestModelProvider,
 )
 from temporalio.contrib.openai_agents._model_parameters import ModelSummaryProvider
-from temporalio.contrib.openai_agents._temporal_model_stub import _extract_summary
+from temporalio.contrib.openai_agents._openai_runner import _convert_agent
+from temporalio.contrib.openai_agents._temporal_model_stub import (
+    _extract_summary,
+    _TemporalModelStub,
+)
 from temporalio.contrib.pydantic import pydantic_data_converter
-from temporalio.exceptions import ApplicationError, CancelledError
+from temporalio.exceptions import ApplicationError, CancelledError, TemporalError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.workflow import ActivityConfig
 from tests.contrib.openai_agents.research_agents.research_manager import (
@@ -897,7 +901,10 @@ async def update_seat(
 async def on_seat_booking_handoff(
     context: RunContextWrapper[AirlineAgentContext],
 ) -> None:
-    flight_number = f"FLT-{workflow.random().randint(100, 999)}"
+    try:
+        flight_number = f"FLT-{workflow.random().randint(100, 999)}"
+    except TemporalError:
+        flight_number = "FLT-100"
     context.context.flight_number = flight_number
 
 
@@ -975,6 +982,8 @@ class CustomerServiceModel(StaticTestModel):
         ResponseBuilders.output_message(
             "Your seat has been updated to a window seat. If there's anything else you need, feel free to let me know!"
         ),
+        ResponseBuilders.tool_call("{}", "transfer_to_triage_agent"),
+        ResponseBuilders.output_message("You're welcome!"),
     ]
 
 
@@ -988,10 +997,7 @@ class CustomerServiceWorkflow:
 
     @workflow.run
     async def run(self, input_items: list[TResponseInputItem] = []):
-        await workflow.wait_condition(
-            lambda: workflow.info().is_continue_as_new_suggested()
-            and workflow.all_handlers_finished()
-        )
+        await workflow.wait_condition(lambda: False)
         workflow.continue_as_new(self.input_items)
 
     @workflow.query
@@ -1062,7 +1068,13 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
     ]
     client = Client(**new_config)
 
-    questions = ["Hello", "Book me a flight to PDX", "11111", "Any window seat"]
+    questions = [
+        "Hello",
+        "Book me a flight to PDX",
+        "11111",
+        "Any window seat",
+        "Take me back to the triage agent to say goodbye",
+    ]
 
     async with new_worker(
         client,
@@ -1101,7 +1113,7 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
                 if e.HasField("activity_task_completed_event_attributes"):
                     events.append(e)
 
-            assert len(events) == 6
+            assert len(events) == 8
             assert (
                 "Hi there! How can I assist you today?"
                 in events[0]
@@ -1135,6 +1147,18 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
             assert (
                 "Your seat has been updated to a window seat. If there's anything else you need, feel free to let me know!"
                 in events[5]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "transfer_to_triage_agent"
+                in events[6]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "You're welcome!"
+                in events[7]
                 .activity_task_completed_event_attributes.result.payloads[0]
                 .data.decode()
             )
@@ -2571,3 +2595,17 @@ async def test_stateful_mcp_server_no_worker(client: Client):
             err.value.cause.message
             == "MCP Stateful Server Worker failed to schedule activity."
         )
+
+
+async def test_model_conversion_loops():
+    agent = init_agents()
+    converted = _convert_agent(ModelActivityParameters(), agent, None)
+    seat_booking_handoff = converted.handoffs[1]
+    assert isinstance(seat_booking_handoff, Handoff)
+    context: RunContextWrapper[AirlineAgentContext] = RunContextWrapper(
+        context=AirlineAgentContext()  # type: ignore
+    )
+    seat_booking_agent = await seat_booking_handoff.on_invoke_handoff(context, "")
+    triage_agent = seat_booking_agent.handoffs[0]
+    assert isinstance(triage_agent, Agent)
+    assert isinstance(triage_agent.model, _TemporalModelStub)
