@@ -433,11 +433,9 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
         if not any_with_context:
             return self
 
-        new_instance = (
-            CompositePayloadConverter()
-        )  # FIXME: deliberate temporary wrong class
+        new_instance = type(self)()
         new_instance._set_converters(*converters)
-        return new_instance  # type: ignore
+        return new_instance
 
 
 class DefaultPayloadConverter(CompositePayloadConverter):
