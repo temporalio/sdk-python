@@ -5059,7 +5059,10 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
         self._workflow_run_id = workflow_run_id
         self._result_type = result_type
         self._known_outcome = known_outcome
-        self._data_converter = self._client.data_converter._with_context(
+
+    @functools.cached_property
+    def _data_converter(self) -> temporalio.converter.DataConverter:
+        return self._client.data_converter._with_context(
             WorkflowSerializationContext(
                 namespace=self._client.namespace,
                 workflow_id=self.workflow_id,
