@@ -187,6 +187,7 @@ class _Context:
     cancelled_event: _CompositeEvent
     worker_shutdown_event: _CompositeEvent
     shield_thread_cancel_exception: Optional[Callable[[], AbstractContextManager]]
+    data_converter: temporalio.converter.DataConverter
     payload_converter_class_or_instance: Union[
         Type[temporalio.converter.PayloadConverter],
         temporalio.converter.PayloadConverter,

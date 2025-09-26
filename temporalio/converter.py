@@ -1252,12 +1252,33 @@ class DataConverter:
     failure_converter: FailureConverter = dataclasses.field(init=False)
     """Failure converter created from the :py:attr:`failure_converter_class`."""
 
+    payload_codec_class: Optional[Type[PayloadCodec]] = None
+
     default: ClassVar[DataConverter]
     """Singleton default data converter."""
 
     def __post_init__(self) -> None:  # noqa: D105
         object.__setattr__(self, "payload_converter", self.payload_converter_class())
         object.__setattr__(self, "failure_converter", self.failure_converter_class())
+        if self.payload_codec:
+            object.__setattr__(self, "payload_codec_class", type(self.payload_codec))
+
+    def _hydrate(self) -> None:
+        if not hasattr(self, "payload_converter"):
+            object.__setattr__(
+                self, "payload_converter", self.payload_converter_class()
+            )
+        if not hasattr(self, "failure_converter"):
+            object.__setattr__(
+                self, "failure_converter", self.failure_converter_class()
+            )
+        if self.payload_codec_class and not self.payload_codec:
+            object.__setattr__(self, "payload_codec", self.payload_codec_class())
+
+    def _dehydrate(self) -> None:
+        object.__delattr__(self, "payload_converter")
+        object.__delattr__(self, "failure_converter")
+        object.__setattr__(self, "payload_codec", None)
 
     async def encode(
         self, values: Sequence[Any]

@@ -252,18 +252,6 @@ class _ActivityWorker:
         if details is None:
             return
 
-        data_converter = self._data_converter
-        if activity.info:
-            context = temporalio.converter.ActivitySerializationContext(
-                namespace=activity.info.workflow_namespace,
-                workflow_id=activity.info.workflow_id,
-                workflow_type=activity.info.workflow_type,
-                activity_type=activity.info.activity_type,
-                activity_task_queue=self._task_queue,
-                is_local=activity.info.is_local,
-            )
-            data_converter = data_converter._with_context(context)
-
         # Perform the heartbeat
         try:
             heartbeat = temporalio.bridge.proto.ActivityHeartbeat(  # type: ignore[reportAttributeAccessIssue]
@@ -271,7 +259,8 @@ class _ActivityWorker:
             )
             if details:
                 # Convert to core payloads
-                heartbeat.details.extend(await data_converter.encode(details))
+                assert activity.data_converter
+                heartbeat.details.extend(await activity.data_converter.encode(details))
             logger.debug("Recording heartbeat with details %s", details)
             self._bridge_worker().record_activity_heartbeat(heartbeat)
         except Exception as err:
@@ -592,6 +581,7 @@ class _ActivityWorker:
                 payload.CopyFrom(new_payload)
 
         running_activity.info = info
+        running_activity.data_converter = data_converter
         input = ExecuteActivityInput(
             fn=activity_def.fn,
             args=args,
@@ -612,6 +602,7 @@ class _ActivityWorker:
                     if not running_activity.cancel_thread_raiser
                     else running_activity.cancel_thread_raiser.shielded
                 ),
+                data_converter=data_converter,
                 payload_converter_class_or_instance=data_converter.payload_converter,
                 runtime_metric_meter=None if sync_non_threaded else self._metric_meter,
                 client=self._client if not running_activity.sync else None,
@@ -658,6 +649,7 @@ class _RunningActivity:
     cancellation_details: temporalio.activity._ActivityCancellationDetailsHolder = (
         field(default_factory=temporalio.activity._ActivityCancellationDetailsHolder)
     )
+    data_converter: Optional[temporalio.converter.DataConverter] = None
 
     def cancel(
         self,
@@ -781,13 +773,18 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                     info.task_token, ctx.heartbeat
                 )
 
-            # The payload converter is the already instantiated one for thread
-            # or the picklable class for non-thread
-            payload_converter_class_or_instance = (
-                self._worker._data_converter.payload_converter
-                if isinstance(input.executor, concurrent.futures.ThreadPoolExecutor)
-                else self._worker._data_converter.payload_converter_class
-            )
+            data_converter = self._running_activity.data_converter
+            assert data_converter
+
+            # TODO: eliminate `payload_converter_class_or_instance`
+            if isinstance(input.executor, concurrent.futures.ThreadPoolExecutor):
+                payload_converter_class_or_instance = data_converter.payload_converter
+            else:
+                payload_converter_class_or_instance = (
+                    data_converter.payload_converter_class
+                )
+
+                data_converter._dehydrate()
 
             try:
                 # Cancel and shutdown event always present here
@@ -795,7 +792,6 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                 assert cancelled_event
                 worker_shutdown_event = self._worker._worker_shutdown_event
                 assert worker_shutdown_event
-                # Prepare func and args
                 func: Callable = _execute_sync_activity
                 args = [
                     info,
@@ -804,6 +800,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                     # Only thread event, this may cross a process boundary
                     cancelled_event.thread_event,
                     worker_shutdown_event.thread_event,
+                    data_converter,
                     payload_converter_class_or_instance,
                     ctx.runtime_metric_meter,
                     cancellation_details,
@@ -847,6 +844,7 @@ def _execute_sync_activity(
     cancel_thread_raiser: Optional[_ThreadExceptionRaiser],
     cancelled_event: threading.Event,
     worker_shutdown_event: threading.Event,
+    data_converter: temporalio.converter.DataConverter,
     payload_converter_class_or_instance: Union[
         type[temporalio.converter.PayloadConverter],
         temporalio.converter.PayloadConverter,
@@ -856,6 +854,7 @@ def _execute_sync_activity(
     fn: Callable[..., Any],
     *args: Any,
 ) -> Any:
+    data_converter._hydrate()
     if cancel_thread_raiser:
         thread_id = threading.current_thread().ident
         if thread_id is not None:
@@ -879,6 +878,7 @@ def _execute_sync_activity(
             shield_thread_cancel_exception=(
                 None if not cancel_thread_raiser else cancel_thread_raiser.shielded
             ),
+            data_converter=data_converter,
             payload_converter_class_or_instance=payload_converter_class_or_instance,
             runtime_metric_meter=runtime_metric_meter,
             client=None,

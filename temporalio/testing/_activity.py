@@ -57,9 +57,9 @@ class ActivityEnvironment:
             function.
         on_heartbeat: Function called on each heartbeat invocation by the
             activity.
-        payload_converter: Payload converter set on the activity context. This
-            must be set before :py:meth:`run`. Changes after the activity has
-            started do not take effect.
+        data_converter: Data converter set on the activity context. This must be
+            set before :py:meth:`run`. Changes after the activity has started do
+            not take effect.
         metric_meter: Metric meter set on the activity context. This must be set
             before :py:meth:`run`. Changes after the activity has started do not
             take effect. Default is noop.
@@ -69,9 +69,7 @@ class ActivityEnvironment:
         """Create an ActivityEnvironment for running activity code."""
         self.info = _default_info
         self.on_heartbeat: Callable[..., None] = lambda *args: None
-        self.payload_converter = (
-            temporalio.converter.DataConverter.default.payload_converter
-        )
+        self.data_converter = temporalio.converter.DataConverter.default
         self.metric_meter = temporalio.common.MetricMeter.noop
         self._cancelled = False
         self._worker_shutdown = False
@@ -80,6 +78,10 @@ class ActivityEnvironment:
         self._cancellation_details = (
             temporalio.activity._ActivityCancellationDetailsHolder()
         )
+
+    @property
+    def payload_converter(self) -> temporalio.converter.PayloadConverter:
+        return self.data_converter.payload_converter
 
     def cancel(
         self,
@@ -174,6 +176,7 @@ class _Activity:
                 if not self.cancel_thread_raiser
                 else self.cancel_thread_raiser.shielded
             ),
+            data_converter=env.data_converter,
             payload_converter_class_or_instance=env.payload_converter,
             runtime_metric_meter=env.metric_meter,
             client=client if self.is_async else None,
