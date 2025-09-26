@@ -275,7 +275,7 @@ class _WorkflowWorker:
                         "Cache already exists for activation with initialize job"
                     )
 
-            data_converter = self._data_converter._with_context(
+            data_converter = self._data_converter.with_context(
                 temporalio.converter.WorkflowSerializationContext(
                     namespace=self._namespace,
                     workflow_id=workflow_id,

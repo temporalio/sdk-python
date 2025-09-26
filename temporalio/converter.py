@@ -1233,7 +1233,7 @@ class DefaultFailureConverterWithEncodedAttributes(DefaultFailureConverter):
 
 
 @dataclass(frozen=True)
-class DataConverter:
+class DataConverter(WithSerializationContext):
     """Data converter for converting and encoding payloads to/from Python values.
 
     This combines :py:class:`PayloadConverter` which converts values with
@@ -1337,7 +1337,8 @@ class DataConverter:
             await self.payload_codec.decode_failure(failure)
         return self.failure_converter.from_failure(failure, self.payload_converter)
 
-    def _with_context(self, context: SerializationContext) -> Self:
+    def with_context(self, context: SerializationContext) -> Self:
+        """Return an instance with context set on the component converters."""
         payload_converter = self.payload_converter
         payload_codec = self.payload_codec
         failure_converter = self.failure_converter

@@ -262,7 +262,7 @@ class _ActivityWorker:
                 activity_task_queue=self._task_queue,
                 is_local=activity.info.is_local,
             )
-            data_converter = data_converter._with_context(context)
+            data_converter = data_converter.with_context(context)
 
         # Perform the heartbeat
         try:
@@ -314,7 +314,7 @@ class _ActivityWorker:
             activity_task_queue=self._task_queue,
             is_local=start.is_local,
         )
-        data_converter = self._data_converter._with_context(context)
+        data_converter = self._data_converter.with_context(context)
         try:
             result = await self._execute_activity(
                 start, running_activity, task_token, data_converter
