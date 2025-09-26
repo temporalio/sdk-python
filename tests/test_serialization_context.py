@@ -38,6 +38,7 @@ from temporalio.converter import (
     PayloadCodec,
     PayloadConverter,
     SerializationContext,
+    WithSerializationContext,
     WorkflowSerializationContext,
 )
 from temporalio.exceptions import ApplicationError
@@ -65,7 +66,9 @@ class TraceData:
     items: list[TraceItem] = field(default_factory=list)
 
 
-class SerializationContextPayloadConverter(EncodingPayloadConverter):
+class SerializationContextPayloadConverter(
+    EncodingPayloadConverter, WithSerializationContext
+):
     def __init__(self):
         self.context: Optional[SerializationContext] = None
 
@@ -130,7 +133,9 @@ class SerializationContextPayloadConverter(EncodingPayloadConverter):
         return value
 
 
-class SerializationContextCompositePayloadConverter(CompositePayloadConverter):
+class SerializationContextCompositePayloadConverter(
+    CompositePayloadConverter, WithSerializationContext
+):
     def __init__(self):
         super().__init__(
             SerializationContextPayloadConverter(),
@@ -995,7 +1000,7 @@ class FailureConverterTestWorkflow:
 test_traces: dict[str, list[TraceItem]] = defaultdict(list)
 
 
-class FailureConverterWithContext(DefaultFailureConverter):
+class FailureConverterWithContext(DefaultFailureConverter, WithSerializationContext):
     def __init__(self):
         super().__init__(encode_common_attributes=False)
         self.context: Optional[SerializationContext] = None
@@ -1126,7 +1131,7 @@ async def test_failure_converter_with_context(client: Client):
 # Test payload codec
 
 
-class PayloadCodecWithContext(PayloadCodec):
+class PayloadCodecWithContext(PayloadCodec, WithSerializationContext):
     def __init__(self):
         self.context: Optional[SerializationContext] = None
         self.encode_called_with_context = False
@@ -1427,7 +1432,7 @@ async def test_child_workflow_codec_with_context(client: Client):
 # Payload codec: test decode context matches encode context
 
 
-class PayloadEncryptionCodec(PayloadCodec):
+class PayloadEncryptionCodec(PayloadCodec, WithSerializationContext):
     """
     The outbound data for encoding must always be the string "outbound". "Encrypt" it by replacing
     it with a key that is derived from the context available during encoding. On decryption, assert
@@ -1592,7 +1597,7 @@ async def test_decode_context_matches_encode_context(
 # Test nexus payload codec
 
 
-class AssertNexusLacksContextPayloadCodec(PayloadCodec):
+class AssertNexusLacksContextPayloadCodec(PayloadCodec, WithSerializationContext):
     def __init__(self):
         self.context = None
 
@@ -1674,7 +1679,9 @@ class PydanticData(BaseModel):
     trace: List[str] = []
 
 
-class PydanticJSONConverterWithContext(PydanticJSONPlainPayloadConverter):
+class PydanticJSONConverterWithContext(
+    PydanticJSONPlainPayloadConverter, WithSerializationContext
+):
     def __init__(self):
         super().__init__()
         self.context: Optional[SerializationContext] = None
@@ -1693,7 +1700,7 @@ class PydanticJSONConverterWithContext(PydanticJSONPlainPayloadConverter):
         return super().to_payload(value)
 
 
-class PydanticConverterWithContext(CompositePayloadConverter):
+class PydanticConverterWithContext(CompositePayloadConverter, WithSerializationContext):
     def __init__(self):
         super().__init__(
             *(
@@ -1751,7 +1758,9 @@ class UserMethodCalledError(Exception):
     pass
 
 
-class CustomEncodingPayloadConverter(JSONPlainPayloadConverter):
+class CustomEncodingPayloadConverter(
+    JSONPlainPayloadConverter, WithSerializationContext
+):
     @property
     def encoding(self) -> str:
         return "custom-encoding-that-does-not-clash-with-default-converters"

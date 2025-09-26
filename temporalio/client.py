@@ -66,6 +66,7 @@ from temporalio.activity import ActivityCancellationDetails
 from temporalio.converter import (
     DataConverter,
     SerializationContext,
+    WithSerializationContext,
     WorkflowSerializationContext,
 )
 from temporalio.service import (
@@ -2736,7 +2737,7 @@ class AsyncActivityIDReference:
     activity_id: str
 
 
-class AsyncActivityHandle:
+class AsyncActivityHandle(WithSerializationContext):
     """Handle representing an external activity for completion and heartbeat."""
 
     def __init__(
