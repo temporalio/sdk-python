@@ -422,6 +422,20 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
 
         If none of the component converters returned new instances, return self.
         """
+        converters = self.get_converters_with_context(context)
+        if converters is None:
+            return self
+        new_instance = type(self)()  # Must have a nullary constructor
+        new_instance._set_converters(*converters)
+        return new_instance
+
+    def get_converters_with_context(
+        self, context: SerializationContext
+    ) -> Optional[List[EncodingPayloadConverter]]:
+        """Return converter instances with context set.
+
+        If no converter uses context, return None.
+        """
         converters: list[EncodingPayloadConverter] = []
         any_with_context = False
         for c in self.converters.values():
@@ -431,13 +445,7 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
             else:
                 converters.append(c)
 
-        if not any_with_context:
-            return self
-
-        # Must have a nullary constructor
-        new_instance = type(self)()
-        new_instance._set_converters(*converters)
-        return new_instance
+        return converters if any_with_context else None
 
 
 class DefaultPayloadConverter(CompositePayloadConverter):
