@@ -41,7 +41,7 @@ import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.timestamp_pb2
 from google.protobuf.internal.containers import MessageMap
-from typing_extensions import Concatenate, Required, TypedDict
+from typing_extensions import Concatenate, Required, Self, TypedDict
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -2852,9 +2852,7 @@ class AsyncActivityHandle(WithSerializationContext):
             ),
         )
 
-    # TODO(dan): should this return Self (requiring that the user's subclass has the same
-    # constructor signature)? CompositePayloadConverter.with_context does.
-    def with_context(self, context: SerializationContext) -> AsyncActivityHandle:
+    def with_context(self, context: SerializationContext) -> Self:
         """Create a new AsyncActivityHandle with a different serialization context.
 
         Payloads received by the activity will be decoded and deserialized using a data converter
@@ -2862,7 +2860,16 @@ class AsyncActivityHandle(WithSerializationContext):
         converter that makes use of this context then you can use this method to supply matching
         context data to the data converter used to serialize and encode the outbound payloads.
         """
-        return AsyncActivityHandle(
+        data_converter = self._client.data_converter.with_context(context)
+        if data_converter == self._client.data_converter:
+            return self
+        cls = type(self)
+        if cls.__init__ is not AsyncActivityHandle.__init__:
+            raise TypeError(
+                "If you have subclassed AsyncActivityHandle and overridden the __init__ method "
+                "then you must override with_context to return an instance of your class."
+            )
+        return cls(
             self._client,
             self._id_or_token,
             self._client.data_converter.with_context(context),
