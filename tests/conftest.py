@@ -42,6 +42,12 @@ from temporalio.testing import WorkflowEnvironment
 from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
 
+def pytest_runtest_setup(item):
+    """Print a newline so that custom printed output starts on new line."""
+    if item.config.getoption("-s"):
+        print()
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "-E",

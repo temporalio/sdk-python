@@ -8,7 +8,7 @@ if __name__ == "__main__":
     print("Generating documentation...")
 
     # Run pydoctor
-    subprocess.check_call("pydoctor")
+    subprocess.check_call(["pydoctor", "--quiet"])
 
     # Copy favicon
     shutil.copyfile(
