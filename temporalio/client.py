@@ -2872,7 +2872,7 @@ class AsyncActivityHandle(WithSerializationContext):
         return cls(
             self._client,
             self._id_or_token,
-            self._client.data_converter.with_context(context),
+            data_converter,
         )
 
 
