@@ -6,10 +6,11 @@
 
 import dataclasses
 import logging
-from typing import Any, Type
+from typing import Any, Optional, Type
 
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
+import temporalio.converter
 import temporalio.worker._workflow_instance
 import temporalio.workflow
 
@@ -79,3 +80,11 @@ class InSandbox:
     ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
         """Send activation to this instance."""
         return self.instance.activate(act)
+
+    def get_payload_codec_with_context(
+        self,
+        payload_codec: temporalio.converter.PayloadCodec,
+        command_seq: Optional[int],
+    ) -> temporalio.converter.PayloadCodec:
+        """Get payload codec with context."""
+        return self.instance.get_payload_codec_with_context(payload_codec, command_seq)
