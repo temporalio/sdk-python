@@ -24,7 +24,12 @@ from typing_extensions import Never
 import temporalio.api.common.v1
 import temporalio.api.failure.v1
 from temporalio import activity, workflow
-from temporalio.client import Client, WorkflowFailureError, WorkflowUpdateFailedError
+from temporalio.client import (
+    AsyncActivityHandle,
+    Client,
+    WorkflowFailureError,
+    WorkflowUpdateFailedError,
+)
 from temporalio.common import RetryPolicy
 from temporalio.contrib.pydantic import PydanticJSONPlainPayloadConverter
 from temporalio.converter import (
@@ -608,6 +613,60 @@ async def test_async_activity_completion_payload_conversion(
                 context=workflow_context_dict,  # Inbound workflow result
             ),
         ]
+
+
+class MyAsyncActivityHandle(AsyncActivityHandle):
+    def my_method(self) -> None:
+        pass
+
+
+class MyAsyncActivityHandleWithOverriddenConstructor(AsyncActivityHandle):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+    def my_method(self) -> None:
+        pass
+
+
+def test_subclassed_async_activity_handle(client: Client):
+    activity_context = ActivitySerializationContext(
+        namespace="default",
+        workflow_id="workflow-id",
+        workflow_type="workflow-type",
+        activity_type="activity-type",
+        activity_task_queue="activity-task-queue",
+        is_local=False,
+    )
+    handle = MyAsyncActivityHandle(client=client, id_or_token=b"task-token")
+    # This works because the data converter does not use context so AsyncActivityHandle.with_context
+    # returns self
+    assert isinstance(handle.with_context(activity_context), MyAsyncActivityHandle)
+
+    # This time the data converter uses context so AsyncActivityHandle.with_context attempts to
+    # return a new instance of the user's subclass. It works, because they have not overridden the
+    # constructor.
+    client_config = client.config()
+    client_config["data_converter"] = dataclasses.replace(
+        DataConverter.default,
+        payload_converter_class=SerializationContextCompositePayloadConverter,
+    )
+    client = Client(**client_config)
+    handle = MyAsyncActivityHandle(client=client, id_or_token=b"task-token")
+    assert isinstance(handle.with_context(activity_context), MyAsyncActivityHandle)
+
+    # Finally, a user attempts the same but having overridden the constructor. This fails:
+    # AsyncActivityHandle.with_context refuses to attempt to create an instance of their subclass.
+    handle2 = MyAsyncActivityHandleWithOverriddenConstructor(
+        client=client, id_or_token=b"task-token"
+    )
+    with pytest.raises(
+        TypeError,
+        match="you must override with_context to return an instance of your class",
+    ):
+        assert isinstance(
+            handle2.with_context(activity_context),
+            MyAsyncActivityHandleWithOverriddenConstructor,
+        )
 
 
 # Signal test
