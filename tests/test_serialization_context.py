@@ -583,10 +583,6 @@ async def test_async_activity_completion_payload_conversion(
         await activity_handle.complete(data)
         result = await wf_handle.result()
 
-        print()
-        for item in result.items:
-            print(item)
-
         activity_context_dict = dataclasses.asdict(activity_context)
         workflow_context_dict = dataclasses.asdict(workflow_context)
 

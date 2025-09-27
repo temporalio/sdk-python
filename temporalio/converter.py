@@ -434,8 +434,7 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
         if not any_with_context:
             return self
 
-        # A user who has created a subclass with a non-nullary constructor must override this
-        # method.
+        # Must have a nullary constructor
         new_instance = type(self)()
         new_instance._set_converters(*converters)
         return new_instance
