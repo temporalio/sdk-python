@@ -427,7 +427,7 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
         for c in self.converters.values():
             if isinstance(c, WithSerializationContext):
                 converters.append(c.with_context(context))
-                any_with_context |= converters[-1] != c
+                any_with_context |= converters[-1] is not c
             else:
                 converters.append(c)
 
@@ -1348,7 +1348,7 @@ class DataConverter(WithSerializationContext):
         if isinstance(failure_converter, WithSerializationContext):
             failure_converter = failure_converter.with_context(context)
         if all(
-            new == orig
+            new is orig
             for new, orig in [
                 (payload_converter, self.payload_converter),
                 (payload_codec, self.payload_codec),

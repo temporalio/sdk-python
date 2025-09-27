@@ -2861,7 +2861,7 @@ class AsyncActivityHandle(WithSerializationContext):
         context data to the data converter used to serialize and encode the outbound payloads.
         """
         data_converter = self._client.data_converter.with_context(context)
-        if data_converter == self._client.data_converter:
+        if data_converter is self._client.data_converter:
             return self
         cls = type(self)
         if cls.__init__ is not AsyncActivityHandle.__init__:
