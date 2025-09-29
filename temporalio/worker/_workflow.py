@@ -288,7 +288,7 @@ class _WorkflowWorker:
                 else:
                     payload_codec = _CommandAwarePayloadCodec(
                         workflow.instance,
-                        self._data_converter.payload_codec,
+                        context_free_payload_codec=self._data_converter.payload_codec,
                     )
                 await temporalio.bridge.worker.decode_activation(
                     act,
@@ -363,7 +363,7 @@ class _WorkflowWorker:
         if self._data_converter.payload_codec and workflow:
             payload_codec = _CommandAwarePayloadCodec(
                 workflow.instance,
-                self._data_converter.payload_codec,
+                context_free_payload_codec=self._data_converter.payload_codec,
             )
             try:
                 await temporalio.bridge.worker.encode_completion(

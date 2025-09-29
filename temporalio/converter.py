@@ -353,6 +353,9 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
             converters: Payload converters to delegate to, in order.
         """
         self._set_converters(*converters)
+        self._any_converter_takes_context = any(
+            isinstance(c, WithSerializationContext) for c in converters
+        )
 
     def _set_converters(self, *converters: EncodingPayloadConverter) -> None:
         self.converters = {c.encoding.encode(): c for c in converters}
@@ -433,11 +436,13 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
 
     def get_converters_with_context(
         self, context: SerializationContext
-    ) -> Optional[List[EncodingPayloadConverter]]:
+    ) -> Optional[list[EncodingPayloadConverter]]:
         """Return converter instances with context set.
 
         If no converter uses context, return None.
         """
+        if not self._any_converter_takes_context:
+            return None
         converters: list[EncodingPayloadConverter] = []
         any_with_context = False
         for c in self.converters.values():
