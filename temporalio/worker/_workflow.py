@@ -290,6 +290,7 @@ class _WorkflowWorker:
                     payload_codec = _CommandAwarePayloadCodec(
                         workflow.instance,
                         context_free_payload_codec=self._data_converter.payload_codec,
+                        workflow_context_payload_codec=data_converter.payload_codec,
                     )
                 await temporalio.bridge.worker.decode_activation(
                     act,
@@ -362,9 +363,11 @@ class _WorkflowWorker:
 
         # Encode completion
         if self._data_converter.payload_codec and workflow:
+            assert data_converter.payload_codec
             payload_codec = _CommandAwarePayloadCodec(
                 workflow.instance,
                 context_free_payload_codec=self._data_converter.payload_codec,
+                workflow_context_payload_codec=data_converter.payload_codec,
             )
             try:
                 await temporalio.bridge.worker.encode_completion(
@@ -731,6 +734,7 @@ class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
 
     instance: WorkflowInstance
     context_free_payload_codec: temporalio.converter.PayloadCodec
+    workflow_context_payload_codec: temporalio.converter.PayloadCodec
 
     async def encode(
         self,
@@ -747,6 +751,7 @@ class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
     def _get_current_command_codec(self) -> temporalio.converter.PayloadCodec:
         return self.instance.get_payload_codec_with_context(
             self.context_free_payload_codec,
+            self.workflow_context_payload_codec,
             temporalio.bridge._visitor.current_command_seq.get(),
         )
 

@@ -188,7 +188,8 @@ class _Instance(WorkflowInstance):
 
     def get_payload_codec_with_context(
         self,
-        payload_codec: temporalio.converter.PayloadCodec,
+        base_payload_codec: temporalio.converter.PayloadCodec,
+        workflow_context_payload_codec: temporalio.converter.PayloadCodec,
         command_seq: Optional[int],
     ) -> temporalio.converter.PayloadCodec:
         # Forward call to the sandboxed instance
@@ -196,9 +197,10 @@ class _Instance(WorkflowInstance):
         try:
             self._run_code(
                 "with __temporal_importer.applied():\n"
-                "  __temporal_codec = __temporal_in_sandbox.get_payload_codec_with_context(__temporal_payload_codec, __temporal_command_seq)\n",
+                "  __temporal_codec = __temporal_in_sandbox.get_payload_codec_with_context(__temporal_base_payload_codec, __temporal_workflow_context_payload_codec, __temporal_command_seq)\n",
                 __temporal_importer=self.importer,
-                __temporal_payload_codec=payload_codec,
+                __temporal_base_payload_codec=base_payload_codec,
+                __temporal_workflow_context_payload_codec=workflow_context_payload_codec,
                 __temporal_command_seq=command_seq,
             )
             return self.globals_and_locals.pop("__temporal_codec", None)  # type: ignore

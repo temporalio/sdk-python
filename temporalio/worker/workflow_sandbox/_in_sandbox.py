@@ -83,8 +83,13 @@ class InSandbox:
 
     def get_payload_codec_with_context(
         self,
-        payload_codec: temporalio.converter.PayloadCodec,
+        base_payload_codec: temporalio.converter.PayloadCodec,
+        workflow_context_payload_codec: temporalio.converter.PayloadCodec,
         command_seq: Optional[int],
     ) -> temporalio.converter.PayloadCodec:
         """Get payload codec with context."""
-        return self.instance.get_payload_codec_with_context(payload_codec, command_seq)
+        return self.instance.get_payload_codec_with_context(
+            base_payload_codec,
+            workflow_context_payload_codec,
+            command_seq,
+        )

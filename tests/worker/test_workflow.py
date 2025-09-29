@@ -1612,11 +1612,14 @@ class CustomWorkflowInstance(WorkflowInstance):
 
     def get_payload_codec_with_context(
         self,
-        payload_codec: temporalio.converter.PayloadCodec,
+        base_payload_codec: temporalio.converter.PayloadCodec,
+        workflow_context_payload_codec: temporalio.converter.PayloadCodec,
         command_seq: Optional[int],
     ) -> temporalio.converter.PayloadCodec:
         return self._unsandboxed.get_payload_codec_with_context(
-            payload_codec, command_seq
+            base_payload_codec,
+            workflow_context_payload_codec,
+            command_seq,
         )
 
 
