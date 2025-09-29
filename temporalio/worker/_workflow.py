@@ -293,7 +293,7 @@ class _WorkflowWorker:
                     )
                 await temporalio.bridge.worker.decode_activation(
                     act,
-                    payload_codec.decode,
+                    payload_codec,
                     decode_headers=self._encode_headers,
                 )
             if not workflow:
@@ -369,7 +369,7 @@ class _WorkflowWorker:
             try:
                 await temporalio.bridge.worker.encode_completion(
                     completion,
-                    payload_codec.encode,
+                    payload_codec,
                     encode_headers=self._encode_headers,
                 )
             except Exception as err:

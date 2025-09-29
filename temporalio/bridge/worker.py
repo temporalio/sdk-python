@@ -297,21 +297,21 @@ class _Visitor(VisitorFunctions):
 
 async def decode_activation(
     activation: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
-    decode: Callable[[Sequence[Payload]], Awaitable[List[Payload]]],
+    codec: temporalio.converter.PayloadCodec,
     decode_headers: bool,
 ) -> None:
     """Decode all payloads in the activation."""
     await PayloadVisitor(
         skip_search_attributes=True, skip_headers=not decode_headers
-    ).visit(_Visitor(decode), activation)
+    ).visit(_Visitor(codec.decode), activation)
 
 
 async def encode_completion(
     completion: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
-    encode: Callable[[Sequence[Payload]], Awaitable[List[Payload]]],
+    codec: temporalio.converter.PayloadCodec,
     encode_headers: bool,
 ) -> None:
     """Encode all payloads in the completion."""
     await PayloadVisitor(
         skip_search_attributes=True, skip_headers=not encode_headers
-    ).visit(_Visitor(encode), completion)
+    ).visit(_Visitor(codec.encode), completion)
