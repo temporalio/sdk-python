@@ -2943,27 +2943,37 @@ class WorkflowExecution:
         **additional_fields: Any,
     ) -> WorkflowExecution:
         return cls(
-            close_time=info.close_time.ToDatetime().replace(tzinfo=timezone.utc)
-            if info.HasField("close_time")
-            else None,
+            close_time=(
+                info.close_time.ToDatetime().replace(tzinfo=timezone.utc)
+                if info.HasField("close_time")
+                else None
+            ),
             data_converter=converter,
-            execution_time=info.execution_time.ToDatetime().replace(tzinfo=timezone.utc)
-            if info.HasField("execution_time")
-            else None,
+            execution_time=(
+                info.execution_time.ToDatetime().replace(tzinfo=timezone.utc)
+                if info.HasField("execution_time")
+                else None
+            ),
             history_length=info.history_length,
             id=info.execution.workflow_id,
-            parent_id=info.parent_execution.workflow_id
-            if info.HasField("parent_execution")
-            else None,
-            parent_run_id=info.parent_execution.run_id
-            if info.HasField("parent_execution")
-            else None,
-            root_id=info.root_execution.workflow_id
-            if info.HasField("root_execution")
-            else None,
-            root_run_id=info.root_execution.run_id
-            if info.HasField("root_execution")
-            else None,
+            parent_id=(
+                info.parent_execution.workflow_id
+                if info.HasField("parent_execution")
+                else None
+            ),
+            parent_run_id=(
+                info.parent_execution.run_id
+                if info.HasField("parent_execution")
+                else None
+            ),
+            root_id=(
+                info.root_execution.workflow_id
+                if info.HasField("root_execution")
+                else None
+            ),
+            root_run_id=(
+                info.root_execution.run_id if info.HasField("root_execution") else None
+            ),
             raw_info=info,
             run_id=info.execution.run_id,
             search_attributes=temporalio.converter.decode_search_attributes(
