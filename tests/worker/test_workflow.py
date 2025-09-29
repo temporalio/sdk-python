@@ -8442,7 +8442,7 @@ class SearchAttributeCodecChildWorkflow:
         return f"Hello from child, {name}"
 
 
-async def test_search_attribute_codec(client: Client):
+async def test_search_attribute_codec(client: Client, env_type: str):
     if env_type != "local":
         pytest.skip("Only testing search attributes on local which disables cache")
     await ensure_search_attributes_present(
