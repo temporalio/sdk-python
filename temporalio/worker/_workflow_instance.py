@@ -232,12 +232,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._info = det.info
         self._context_free_payload_converter = det.payload_converter_class()
         self._context_free_failure_converter = det.failure_converter_class()
-        self._payload_converter, self._failure_converter = (
-            self._converters_with_context(
-                temporalio.converter.WorkflowSerializationContext(
-                    namespace=det.info.namespace,
-                    workflow_id=det.info.workflow_id,
-                )
+        (
+            self._workflow_context_payload_converter,
+            self._workflow_context_failure_converter,
+        ) = self._converters_with_context(
+            temporalio.converter.WorkflowSerializationContext(
+                namespace=det.info.namespace,
+                workflow_id=det.info.workflow_id,
             )
         )
 
@@ -495,9 +496,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # Set completion failure
             self._current_completion.failed.failure.SetInParent()
             try:
-                self._failure_converter.to_failure(
+                self._workflow_context_failure_converter.to_failure(
                     activation_err,
-                    self._payload_converter,
+                    self._workflow_context_payload_converter,
                     self._current_completion.failed.failure,
                 )
             except Exception as inner_err:
@@ -639,7 +640,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
                 # Run the handler
                 success = await self._inbound.handle_update_handler(handler_input)
-                result_payloads = self._payload_converter.to_payloads([success])
+                result_payloads = self._workflow_context_payload_converter.to_payloads(
+                    [success]
+                )
                 if len(result_payloads) != 1:
                     raise ValueError(
                         f"Expected 1 result payload, got {len(result_payloads)}"
@@ -671,9 +674,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                             job.protocol_instance_id
                         )
                     command.update_response.rejected.SetInParent()
-                    self._failure_converter.to_failure(
+                    self._workflow_context_failure_converter.to_failure(
                         err,
-                        self._payload_converter,
+                        self._workflow_context_payload_converter,
                         command.update_response.rejected,
                     )
                 else:
@@ -735,7 +738,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         headers=job.headers,
                     )
                     success = await self._inbound.handle_query(input)
-                    result_payloads = self._payload_converter.to_payloads([success])
+                    result_payloads = (
+                        self._workflow_context_payload_converter.to_payloads([success])
+                    )
                     if len(result_payloads) != 1:
                         raise ValueError(
                             f"Expected 1 result payload, got {len(result_payloads)}"
@@ -747,9 +752,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 try:
                     command = self._add_command()
                     command.respond_to_query.query_id = job.query_id
-                    self._failure_converter.to_failure(
+                    self._workflow_context_failure_converter.to_failure(
                         err,
-                        self._payload_converter,
+                        self._workflow_context_payload_converter,
                         command.respond_to_query.failed,
                     )
                 except Exception as inner_err:
@@ -1055,7 +1060,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         async def run_workflow(input: ExecuteWorkflowInput) -> None:
             try:
                 result = await self._inbound.execute_workflow(input)
-                result_payloads = self._payload_converter.to_payloads([result])
+                result_payloads = self._workflow_context_payload_converter.to_payloads(
+                    [result]
+                )
                 if len(result_payloads) != 1:
                     raise ValueError(
                         f"Expected 1 result payload, got {len(result_payloads)}"
@@ -1095,7 +1102,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             arg_types = [temporalio.common.RawValue] * len(init_job.arguments)
 
         args = self._convert_payloads(
-            init_job.arguments, arg_types, self._payload_converter
+            init_job.arguments, arg_types, self._workflow_context_payload_converter
         )
         # Put args in a list if dynamic
         if not self._defn.name:
@@ -1235,7 +1242,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     def workflow_memo(self) -> Mapping[str, Any]:
         if self._untyped_converted_memo is None:
             self._untyped_converted_memo = {
-                k: self._payload_converter.from_payload(v)
+                k: self._workflow_context_payload_converter.from_payload(v)
                 for k, v in self._info.raw_memo.items()
             }
         return self._untyped_converted_memo
@@ -1248,7 +1255,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             if default is temporalio.common._arg_unset:
                 raise KeyError(f"Memo does not have a value for key {key}")
             return default
-        return self._payload_converter.from_payload(
+        return self._workflow_context_payload_converter.from_payload(
             payload,
             type_hint,  # type: ignore[arg-type]
         )
@@ -1262,7 +1269,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 # Intentionally not checking if memo exists, so that no-op removals show up in history too.
                 removals.append(k)
             else:
-                update_payloads[k] = self._payload_converter.to_payload(v)
+                update_payloads[k] = (
+                    self._workflow_context_payload_converter.to_payload(v)
+                )
 
         if not update_payloads and not removals:
             return
@@ -1281,7 +1290,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             mut_raw_memo[k] = v
 
         if removals:
-            null_payload = self._payload_converter.to_payload(None)
+            null_payload = self._workflow_context_payload_converter.to_payload(None)
             for k in removals:
                 fields[k].CopyFrom(null_payload)
                 mut_raw_memo.pop(k, None)
@@ -1289,8 +1298,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # Keeping deserialized memo dict in sync, if exists
         if self._untyped_converted_memo is not None:
             for k, v in update_payloads.items():
-                self._untyped_converted_memo[k] = self._payload_converter.from_payload(
-                    v
+                self._untyped_converted_memo[k] = (
+                    self._workflow_context_payload_converter.from_payload(v)
                 )
             for k in removals:
                 self._untyped_converted_memo.pop(k, None)
@@ -1328,7 +1337,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         return use_patch
 
     def workflow_payload_converter(self) -> temporalio.converter.PayloadConverter:
-        return self._payload_converter
+        return self._workflow_context_payload_converter
 
     def workflow_random(self) -> random.Random:
         self._assert_not_read_only("random")
@@ -1723,7 +1732,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     ) -> None:
         user_metadata = (
             temporalio.api.sdk.v1.UserMetadata(
-                summary=self._payload_converter.to_payload(summary)
+                summary=self._workflow_context_payload_converter.to_payload(summary)
             )
             if summary
             else None
@@ -1748,7 +1757,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._conditions.append((fn, fut))
         user_metadata = (
             temporalio.api.sdk.v1.UserMetadata(
-                summary=self._payload_converter.to_payload(timeout_summary)
+                summary=self._workflow_context_payload_converter.to_payload(
+                    timeout_summary
+                )
             )
             if timeout_summary
             else None
@@ -1800,18 +1811,18 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             return None
 
         if type_hint is None:
-            return self._payload_converter.from_payload(
+            return self._workflow_context_payload_converter.from_payload(
                 self._last_completion_result.payloads[0]
             )
         else:
-            return self._payload_converter.from_payload(
+            return self._workflow_context_payload_converter.from_payload(
                 self._last_completion_result.payloads[0], type_hint
             )
 
     def workflow_last_failure(self) -> Optional[BaseException]:
         if self._last_failure:
-            return self._failure_converter.from_failure(
-                self._last_failure, self._payload_converter
+            return self._workflow_context_failure_converter.from_failure(
+                self._last_failure, self._workflow_context_payload_converter
             )
 
         return None
@@ -2256,7 +2267,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # Take off the string type hint for conversion
             arg_types = defn_arg_types[1:] if defn_arg_types else None
             return [job_name] + self._convert_payloads(
-                job_input, arg_types, self._payload_converter
+                job_input, arg_types, self._workflow_context_payload_converter
             )
         if not defn_name:
             return [
@@ -2264,11 +2275,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 self._convert_payloads(
                     job_input,
                     [temporalio.common.RawValue] * len(job_input),
-                    self._payload_converter,
+                    self._workflow_context_payload_converter,
                 ),
             ]
         return self._convert_payloads(
-            job_input, defn_arg_types, self._payload_converter
+            job_input, defn_arg_types, self._workflow_context_payload_converter
         )
 
     def _process_signal_job(
@@ -2422,7 +2433,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         failure = self._add_command().fail_workflow_execution.failure
         failure.SetInParent()
         try:
-            self._failure_converter.to_failure(err, self._payload_converter, failure)
+            self._workflow_context_failure_converter.to_failure(
+                err, self._workflow_context_payload_converter, failure
+            )
         except Exception as inner_err:
             raise ValueError("Failed converting workflow exception") from inner_err
 
@@ -3329,13 +3342,17 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
     def _apply_command(self) -> None:
         # Convert arguments before creating command in case it raises error
         payloads = (
-            self._instance._payload_converter.to_payloads(self._input.args)
+            self._instance._workflow_context_payload_converter.to_payloads(
+                self._input.args
+            )
             if self._input.args
             else None
         )
         memo_payloads = (
             {
-                k: self._instance._payload_converter.to_payloads([val])[0]
+                k: self._instance._workflow_context_payload_converter.to_payloads(
+                    [val]
+                )[0]
                 for k, val in self._input.memo.items()
             }
             if self._input.memo
