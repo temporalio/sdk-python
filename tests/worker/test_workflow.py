@@ -44,6 +44,7 @@ from typing_extensions import Literal, Protocol, runtime_checkable
 import temporalio.activity
 import temporalio.api.sdk.v1
 import temporalio.client
+import temporalio.converter
 import temporalio.worker
 import temporalio.workflow
 from temporalio import activity, workflow
@@ -8370,12 +8371,17 @@ async def test_previous_run_failure(client: Client):
         result = await handle.result()
         assert result == "Done"
 
+
 class EncryptionCodec(PayloadCodec):
-    def __init__(self, key_id: str = "test-key-id", key: bytes = b"test-key-test-key-test-key-test!") -> None:
+    def __init__(
+        self,
+        key_id: str = "test-key-id",
+        key: bytes = b"test-key-test-key-test-key-test!",
+    ) -> None:
         super().__init__()
         self.key_id = key_id
 
-    async def encode(self, payloads: Iterable[Payload]) -> List[Payload]:
+    async def encode(self, payloads: Sequence[Payload]) -> List[Payload]:
         # We blindly encode all payloads with the key and set the metadata
         # saying which key we used
         return [
@@ -8389,7 +8395,7 @@ class EncryptionCodec(PayloadCodec):
             for p in payloads
         ]
 
-    async def decode(self, payloads: Iterable[Payload]) -> List[Payload]:
+    async def decode(self, payloads: Sequence[Payload]) -> List[Payload]:
         ret: List[Payload] = []
         for p in payloads:
             # Ignore ones w/out our expected encoding
@@ -8399,7 +8405,9 @@ class EncryptionCodec(PayloadCodec):
             # Confirm our key ID is the same
             key_id = p.metadata.get("encryption-key-id", b"").decode()
             if key_id != self.key_id:
-                raise ValueError(f"Unrecognized key ID {key_id}. Current key ID is {self.key_id}.")
+                raise ValueError(
+                    f"Unrecognized key ID {key_id}. Current key ID is {self.key_id}."
+                )
             # Decrypt and append
             ret.append(Payload.FromString(self.decrypt(p.data)))
         return ret
@@ -8435,6 +8443,7 @@ class SearchAttributeCodecChildWorkflow:
     async def run(self, name: str) -> str:
         return f"Hello from child, {name}"
 
+
 async def test_search_attribute_codec(client: Client):
     await ensure_search_attributes_present(
         client,
@@ -8442,13 +8451,16 @@ async def test_search_attribute_codec(client: Client):
     )
 
     config = client.config()
-    config["data_converter"] = dataclasses.replace(temporalio.converter.default(), payload_codec=EncryptionCodec())
+    config["data_converter"] = dataclasses.replace(
+        temporalio.converter.default(), payload_codec=EncryptionCodec()
+    )
     client = Client(**config)
 
     # Run a worker for the workflow
     async with new_worker(
         client,
-        SearchAttributeCodecParentWorkflow, SearchAttributeCodecChildWorkflow,
+        SearchAttributeCodecParentWorkflow,
+        SearchAttributeCodecChildWorkflow,
     ) as worker:
         # Run workflow
         result = await client.execute_workflow(
@@ -8457,6 +8469,10 @@ async def test_search_attribute_codec(client: Client):
             id=f"encryption-workflow-id",
             task_queue=worker.task_queue,
             search_attributes=TypedSearchAttributes(
-                [SearchAttributePair(SearchAttributeCodecParentWorkflow.text_attribute, "test_text")]
+                [
+                    SearchAttributePair(
+                        SearchAttributeCodecParentWorkflow.text_attribute, "test_text"
+                    )
+                ]
             ),
         )
