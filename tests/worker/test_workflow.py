@@ -5272,6 +5272,26 @@ class FailOnBadInputWorkflow:
         pass
 
 
+@workflow.defn
+class PydanticValidationErrorWorkflow:
+    @workflow.run
+    async def run(self, params: Foo) -> None:
+        pass
+
+
+async def test_workflow_pydantic_validation_error_general_handling(client: Client):
+    async with new_worker(client, PydanticValidationErrorWorkflow) as worker:
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                "PydanticValidationErrorWorkflow",
+                {"bar": 123},
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+    assert isinstance(err.value.cause, ApplicationError)
+    assert "Failed decoding arguments" in err.value.cause.message
+
+
 async def test_workflow_fail_on_bad_input(client: Client):
     async with new_worker(client, FailOnBadInputWorkflow) as worker:
         with pytest.raises(WorkflowFailureError) as err:

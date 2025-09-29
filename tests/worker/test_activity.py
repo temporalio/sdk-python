@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, timezone
 from time import sleep
 from typing import Any, Callable, List, NoReturn, Optional, Sequence, Type
 
+import pydantic
 import temporalio.api.workflowservice.v1
 from temporalio import activity, workflow
 from temporalio.client import (
@@ -1593,3 +1594,42 @@ async def test_activity_reset_history(
         e.value.cause.cause.message
         == "Unhandled activity cancel error produced by activity reset"
     )
+
+
+class Foo(pydantic.BaseModel):
+    bar: str
+
+
+@activity.defn
+async def pydantic_validation_activity(params: Foo) -> str:
+    return f"Hello {params.bar}"
+
+
+@workflow.defn
+class PydanticActivityValidationWorkflow:
+    @workflow.run
+    async def run(self, params: dict) -> str:
+        return await workflow.execute_activity(
+            pydantic_validation_activity,
+            args=[params],
+            schedule_to_close_timeout=timedelta(seconds=5)
+        )
+
+
+async def test_activity_pydantic_validation_error_handling(client: Client):
+    from tests.helpers import new_worker
+    
+    async with new_worker(
+        client, 
+        PydanticActivityValidationWorkflow,
+        activities=[pydantic_validation_activity]
+    ) as worker:
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                PydanticActivityValidationWorkflow.run,
+                {"bar": 123},
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+    assert isinstance(err.value.cause, ApplicationError)
+    assert "Failed decoding arguments" in err.value.cause.message

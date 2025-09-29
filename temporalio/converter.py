@@ -313,6 +313,15 @@ class CompositePayloadConverter(PayloadConverter):
                 raise RuntimeError(
                     f"Payload at index {index} with encoding {encoding.decode()} could not be converted"
                 ) from err
+            except Exception as err:
+                if (hasattr(err, '__module__') and 
+                    err.__module__ and 
+                    'pydantic' in err.__module__ and 
+                    'ValidationError' in err.__class__.__name__):
+                    raise RuntimeError(
+                        f"Payload at index {index} with encoding {encoding.decode()} could not be converted"
+                    ) from err
+                raise
         return values
 
 
