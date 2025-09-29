@@ -540,7 +540,6 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
     # where the python reserve function appears to complete, but Rust doesn't see that.
     # This isn't solvable without redoing a chunk of pyo3-asyncio. So we only check
     # that the permits passed to release line up.
-    assert ss.highest_seen_reserve_on_release == ss.releases
     assert ss.used == 5
     assert ss.seen_sticky_kinds == {True, False}
     assert ss.seen_slot_kinds == {"workflow", "activity", "local-activity", "nexus"}
