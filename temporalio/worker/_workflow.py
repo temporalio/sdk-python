@@ -8,6 +8,7 @@ import logging
 import os
 import sys
 import threading
+from dataclasses import dataclass
 from datetime import timezone
 from types import TracebackType
 from typing import (
@@ -720,6 +721,7 @@ class _RunningWorkflow:
                 )
 
 
+@dataclass(frozen=True)
 class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
     """A payload codec that sets serialization context for the associated command.
 
@@ -727,13 +729,8 @@ class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
     variable set by the payload visitor.
     """
 
-    def __init__(
-        self,
-        instance: WorkflowInstance,
-        context_free_payload_codec: temporalio.converter.PayloadCodec,
-    ):
-        self.instance = instance
-        self.context_free_payload_codec = context_free_payload_codec
+    instance: WorkflowInstance
+    context_free_payload_codec: temporalio.converter.PayloadCodec
 
     async def encode(
         self,
