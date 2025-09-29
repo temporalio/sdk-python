@@ -32,6 +32,11 @@ def emit_loop(
         if not self.skip_headers:
             for v in {iter_expr}:
                 await self._visit_{child_method}(fs, v)"""
+    elif field_name == "search_attributes":
+        return f"""\
+        if not self.skip_search_attributes:
+            for v in {iter_expr}:
+                await self._visit_{child_method}(fs, v)"""
     else:
         return f"""\
         for v in {iter_expr}:
@@ -197,7 +202,7 @@ class PayloadVisitor:
         # Process regular fields first
         for field in regular_fields:
             # Repeated fields (including maps which are represented as repeated messages)
-            if field.label == FieldDescriptor.LABEL_REPEATED:
+            if field.is_repeated:
                 if (
                     field.message_type is not None
                     and field.message_type.GetOptions().map_entry
