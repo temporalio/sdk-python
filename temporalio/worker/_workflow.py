@@ -752,7 +752,7 @@ class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
         return self.instance.get_payload_codec_with_context(
             self.context_free_payload_codec,
             self.workflow_context_payload_codec,
-            temporalio.bridge._visitor.current_command_seq.get(),
+            temporalio.bridge._visitor.current_command_info.get(),
         )
 
 

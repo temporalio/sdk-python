@@ -43,6 +43,7 @@ from typing_extensions import Literal, Protocol, runtime_checkable
 
 import temporalio.activity
 import temporalio.api.sdk.v1
+import temporalio.bridge._visitor
 import temporalio.client
 import temporalio.converter
 import temporalio.worker
@@ -1614,12 +1615,12 @@ class CustomWorkflowInstance(WorkflowInstance):
         self,
         base_payload_codec: temporalio.converter.PayloadCodec,
         workflow_context_payload_codec: temporalio.converter.PayloadCodec,
-        command_seq: Optional[int],
+        command_info: Optional[temporalio.bridge._visitor.CommandInfo],
     ) -> temporalio.converter.PayloadCodec:
         return self._unsandboxed.get_payload_codec_with_context(
             base_payload_codec,
             workflow_context_payload_codec,
-            command_seq,
+            command_info,
         )
 
 

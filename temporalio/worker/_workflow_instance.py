@@ -51,6 +51,7 @@ import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.sdk.v1
+import temporalio.bridge._visitor
 import temporalio.bridge.proto.activity_result
 import temporalio.bridge.proto.child_workflow
 import temporalio.bridge.proto.common
@@ -173,14 +174,14 @@ class WorkflowInstance(ABC):
         self,
         base_payload_codec: temporalio.converter.PayloadCodec,
         workflow_context_payload_codec: temporalio.converter.PayloadCodec,
-        command_seq: Optional[int],
+        command_info: Optional[temporalio.bridge._visitor.CommandInfo],
     ) -> temporalio.converter.PayloadCodec:
         """Return a payload codec with appropriate serialization context.
 
         Args:
             base_payload_codec: The base payload codec to apply context to.
             workflow_context_payload_codec: A payload codec that already has workflow context set.
-            command_seq: Optional sequence number of the associated command. If set, the payload
+            command_info: Optional information identifying the associated command. If set, the payload
                          codec will have serialization context set appropriately for that command.
 
         Returns:
@@ -2119,7 +2120,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self,
         base_payload_codec: temporalio.converter.PayloadCodec,
         workflow_context_payload_codec: temporalio.converter.PayloadCodec,
-        command_seq: Optional[int],
+        command_info: Optional[temporalio.bridge._visitor.CommandInfo],
     ) -> temporalio.converter.PayloadCodec:
         if not isinstance(
             base_payload_codec,
@@ -2127,14 +2128,18 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         ):
             return base_payload_codec
 
-        if command_seq is None:
+        if command_info is None:
             # Use payload codec with workflow context by default (i.e. for payloads not associated
             # with a pending command)
             return workflow_context_payload_codec
 
-        if command_seq in self._pending_activities:
+        if (
+            command_info.command_type
+            == temporalio.api.enums.v1.command_type_pb2.CommandType.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK
+            and command_info.command_seq in self._pending_activities
+        ):
             # Use the activity's context
-            activity_handle = self._pending_activities[command_seq]
+            activity_handle = self._pending_activities[command_info.command_seq]
             return base_payload_codec.with_context(
                 temporalio.converter.ActivitySerializationContext(
                     namespace=self._info.namespace,
@@ -2153,9 +2158,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 )
             )
 
-        elif command_seq in self._pending_child_workflows:
+        elif (
+            command_info.command_type
+            == temporalio.api.enums.v1.command_type_pb2.CommandType.COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION
+            and command_info.command_seq in self._pending_child_workflows
+        ):
             # Use the child workflow's context
-            child_wf_handle = self._pending_child_workflows[command_seq]
+            child_wf_handle = self._pending_child_workflows[command_info.command_seq]
             return base_payload_codec.with_context(
                 temporalio.converter.WorkflowSerializationContext(
                     namespace=self._info.namespace,
@@ -2163,9 +2172,15 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 )
             )
 
-        elif command_seq in self._pending_external_signals:
+        elif (
+            command_info.command_type
+            == temporalio.api.enums.v1.command_type_pb2.CommandType.COMMAND_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION
+            and command_info.command_seq in self._pending_external_signals
+        ):
             # Use the target workflow's context
-            _, target_workflow_id = self._pending_external_signals[command_seq]
+            _, target_workflow_id = self._pending_external_signals[
+                command_info.command_seq
+            ]
             return base_payload_codec.with_context(
                 temporalio.converter.WorkflowSerializationContext(
                     namespace=self._info.namespace,
@@ -2173,7 +2188,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 )
             )
 
-        elif command_seq in self._pending_nexus_operations:
+        elif (
+            command_info.command_type
+            == temporalio.api.enums.v1.command_type_pb2.CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION
+            and command_info.command_seq in self._pending_nexus_operations
+        ):
             # Use empty context for nexus operations: users will never want to encrypt using a
             # key derived from caller workflow context because the caller workflow context is
             # not available on the handler side for decryption.

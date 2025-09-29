@@ -8,6 +8,7 @@ import dataclasses
 import logging
 from typing import Any, Optional, Type
 
+import temporalio.bridge._visitor
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.converter
@@ -85,11 +86,11 @@ class InSandbox:
         self,
         base_payload_codec: temporalio.converter.PayloadCodec,
         workflow_context_payload_codec: temporalio.converter.PayloadCodec,
-        command_seq: Optional[int],
+        command_info: Optional[temporalio.bridge._visitor.CommandInfo],
     ) -> temporalio.converter.PayloadCodec:
         """Get payload codec with context."""
         return self.instance.get_payload_codec_with_context(
             base_payload_codec,
             workflow_context_payload_codec,
-            command_seq,
+            command_info,
         )
