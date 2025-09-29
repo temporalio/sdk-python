@@ -836,12 +836,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             raise RuntimeError(
                 f"Failed finding child workflow handle for sequence {job.seq}"
             )
-        payload_converter, failure_converter = self._converters_with_context(
-            temporalio.converter.WorkflowSerializationContext(
-                namespace=self._info.namespace,
-                workflow_id=handle._input.id,
-            )
-        )
+
         if job.result.HasField("completed"):
             ret: Optional[Any] = None
             if job.result.completed.HasField("result"):
@@ -849,20 +844,20 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 ret_vals = self._convert_payloads(
                     [job.result.completed.result],
                     ret_types,
-                    payload_converter,
+                    handle._payload_converter,
                 )
                 ret = ret_vals[0]
             handle._resolve_success(ret)
         elif job.result.HasField("failed"):
             handle._resolve_failure(
-                failure_converter.from_failure(
-                    job.result.failed.failure, payload_converter
+                handle._failure_converter.from_failure(
+                    job.result.failed.failure, handle._payload_converter
                 )
             )
         elif job.result.HasField("cancelled"):
             handle._resolve_failure(
-                failure_converter.from_failure(
-                    job.result.cancelled.failure, payload_converter
+                handle._failure_converter.from_failure(
+                    job.result.cancelled.failure, handle._payload_converter
                 )
             )
         else:
@@ -898,14 +893,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 )
         elif job.HasField("cancelled"):
             self._pending_child_workflows.pop(job.seq)
-            payload_converter, failure_converter = self._converters_with_context(
-                temporalio.converter.WorkflowSerializationContext(
-                    namespace=self._info.namespace,
-                    workflow_id=handle._input.id,
-                )
-            )
             handle._resolve_failure(
-                failure_converter.from_failure(job.cancelled.failure, payload_converter)
+                handle._failure_converter.from_failure(
+                    job.cancelled.failure, handle._payload_converter
+                )
             )
         else:
             raise RuntimeError("Child workflow start did not have a known status")
@@ -919,13 +910,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             raise RuntimeError(
                 f"Failed to find nexus operation handle for job sequence number {job.seq}"
             )
-        # We don't set a serialization context for nexus operations on the caller side because it's
-        # not possible to set a matching context on the handler side.
-        payload_converter, failure_converter = (
-            self._context_free_payload_converter,
-            self._context_free_failure_converter,
-        )
-
         if job.HasField("operation_token"):
             # The nexus operation started asynchronously. A `ResolveNexusOperation` job
             # will follow in a future activation.
@@ -938,7 +922,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # The nexus operation start failed; no ResolveNexusOperation will follow.
             self._pending_nexus_operations.pop(job.seq, None)
             handle._resolve_failure(
-                failure_converter.from_failure(job.failed, payload_converter)
+                handle._failure_converter.from_failure(
+                    job.failed, handle._payload_converter
+                )
             )
         else:
             raise ValueError(f"Unknown Nexus operation start status: {job}")
@@ -961,32 +947,32 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             #    completed / failed, but it has already been resolved.
             return
 
-        # We don't set a serialization context for nexus operations on the caller side because it is
-        # not possible to set the same context on the handler side.
-        payload_converter, failure_converter = (
-            self._context_free_payload_converter,
-            self._context_free_failure_converter,
-        )
         # Handle the four oneof variants of NexusOperationResult
         result = job.result
         if result.HasField("completed"):
             [output] = self._convert_payloads(
                 [result.completed],
                 [handle._input.output_type] if handle._input.output_type else None,
-                payload_converter,
+                handle._payload_converter,
             )
             handle._resolve_success(output)
         elif result.HasField("failed"):
             handle._resolve_failure(
-                failure_converter.from_failure(result.failed, payload_converter)
+                handle._failure_converter.from_failure(
+                    result.failed, handle._payload_converter
+                )
             )
         elif result.HasField("cancelled"):
             handle._resolve_failure(
-                failure_converter.from_failure(result.cancelled, payload_converter)
+                handle._failure_converter.from_failure(
+                    result.cancelled, handle._payload_converter
+                )
             )
         elif result.HasField("timed_out"):
             handle._resolve_failure(
-                failure_converter.from_failure(result.timed_out, payload_converter)
+                handle._failure_converter.from_failure(
+                    result.timed_out, handle._payload_converter
+                )
             )
         else:
             raise RuntimeError("Nexus operation did not have a result")
@@ -3083,10 +3069,12 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         self._result_fut: asyncio.Future[Any] = instance.create_future()
         self._first_execution_run_id = "<unknown>"
         instance._register_task(self, name=f"child: {input.workflow}")
-        self._payload_converter, _ = self._instance._converters_with_context(
-            temporalio.converter.WorkflowSerializationContext(
-                namespace=self._instance._info.namespace,
-                workflow_id=self._input.id,
+        self._payload_converter, self._failure_converter = (
+            self._instance._converters_with_context(
+                temporalio.converter.WorkflowSerializationContext(
+                    namespace=self._instance._info.namespace,
+                    workflow_id=self._input.id,
+                )
             )
         )
 
@@ -3274,6 +3262,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         self._start_fut: asyncio.Future[Optional[str]] = instance.create_future()
         self._result_fut: asyncio.Future[Optional[OutputT]] = instance.create_future()
         self._payload_converter = self._instance._context_free_payload_converter
+        self._failure_converter = self._instance._context_free_failure_converter
 
     @property
     def operation_token(self) -> Optional[str]:
