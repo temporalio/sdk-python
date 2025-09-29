@@ -42,3 +42,9 @@ subprocess.run(
 )
 
 subprocess.run(["uv", "run", "poe", "format"], check=True)
+
+subprocess.run(
+    ["cargo", "fmt"],
+    check=True,
+    cwd=os.path.join(os.getcwd(), "temporalio", "bridge"),
+)

@@ -4838,7 +4838,7 @@ async def test_workflow_update_timeout_or_cancel(client: Client):
         try:
             await called.wait()
         finally:
-            client.workflow_service.poll_workflow_execution_update = unpatched_call
+            client.workflow_service.poll_workflow_execution_update = unpatched_call  # type: ignore
         result_task.cancel()
         with pytest.raises(WorkflowUpdateRPCTimeoutOrCancelledError):
             await result_task

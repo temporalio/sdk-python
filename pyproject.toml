@@ -6,29 +6,23 @@ authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.9"
 readme = "README.md"
 license = { file = "LICENSE" }
-keywords = [
-    "temporal",
-    "workflow",
-]
+keywords = ["temporal", "workflow"]
 dependencies = [
-    "nexus-rpc==1.1.0",
-    "protobuf>=3.20,<7.0.0",
-    "python-dateutil>=2.8.2,<3 ; python_version < '3.11'",
-    "types-protobuf>=3.20",
-    "typing-extensions>=4.2.0,<5",
+  "nexus-rpc==1.1.0",
+  "protobuf>=3.20,<7.0.0",
+  "python-dateutil>=2.8.2,<3 ; python_version < '3.11'",
+  "types-protobuf>=3.20",
+  "typing-extensions>=4.2.0,<5",
 ]
 
 [project.optional-dependencies]
 grpc = ["grpcio>=1.48.2,<2"]
-opentelemetry = [
-    "opentelemetry-api>=1.11.1,<2",
-    "opentelemetry-sdk>=1.11.1,<2",
-]
+opentelemetry = ["opentelemetry-api>=1.11.1,<2", "opentelemetry-sdk>=1.11.1,<2"]
 pydantic = ["pydantic>=2.0.0,<3"]
 openai-agents = [
-    "openai-agents>=0.3,<0.4",
-    "eval-type-backport>=0.2.2; python_version < '3.10'",
-    "mcp>=1.9.4, <2; python_version >= '3.10'",
+  "openai-agents>=0.3,<0.4",
+  "eval-type-backport>=0.2.2; python_version < '3.10'",
+  "mcp>=1.9.4, <2; python_version >= '3.10'",
 ]
 
 [project.urls]
@@ -39,48 +33,50 @@ Documentation = "https://docs.temporal.io/docs/python"
 
 [dependency-groups]
 dev = [
-    "cibuildwheel>=2.22.0,<3",
-    "grpcio-tools>=1.48.2,<2",
-    "mypy==1.4.1",
-    "mypy-protobuf>=3.3.0,<4",
-    "psutil>=5.9.3,<6",
-    "pydocstyle>=6.3.0,<7",
-    "pydoctor>=24.11.1,<25",
-    "pyright==1.1.403",
-    "pytest~=7.4",
-    "pytest-asyncio>=0.21,<0.22",
-    "pytest-timeout~=2.2",
-    "ruff>=0.5.0,<0.6",
-    "toml>=0.10.2,<0.11",
-    "twine>=4.0.1,<5",
-    "ruff>=0.5.0,<0.6",
-    "maturin>=1.8.2",
-    "pytest-cov>=6.1.1",
-    "httpx>=0.28.1",
-    "pytest-pretty>=1.3.0",
-    "openai-agents[litellm]>=0.3,<0.4"
+  "cibuildwheel>=2.22.0,<3",
+  "grpcio-tools>=1.48.2,<2",
+  "mypy==1.4.1",
+  "mypy-protobuf>=3.3.0,<4",
+  "psutil>=5.9.3,<6",
+  "pydocstyle>=6.3.0,<7",
+  "pydoctor>=24.11.1,<25",
+  "pyright==1.1.403",
+  "pytest~=7.4",
+  "pytest-asyncio>=0.21,<0.22",
+  "pytest-timeout~=2.2",
+  "ruff>=0.5.0,<0.6",
+  "toml>=0.10.2,<0.11",
+  "twine>=4.0.1,<5",
+  "maturin>=1.8.2",
+  "pytest-cov>=6.1.1",
+  "httpx>=0.28.1",
+  "pytest-pretty>=1.3.0",
+  "openai-agents[litellm]>=0.3,<0.4",
 ]
 
 [tool.poe.tasks]
 build-develop = "uv run maturin develop --uv"
 build-develop-with-release = { cmd = "uv run maturin develop --release --uv" }
-format = [{cmd = "uv run ruff check --select I --fix"}, {cmd = "uv run ruff format"}, ]
+format = [
+  { cmd = "uv run ruff check --select I --fix" },
+  { cmd = "uv run ruff format" },
+]
 gen-docs = "uv run scripts/gen_docs.py"
 gen-protos = "uv run scripts/gen_protos.py"
 gen-protos-docker = "uv run scripts/gen_protos_docker.py"
 lint = [
-  {cmd = "uv run ruff check --select I"},
-  {cmd = "uv run ruff format --check"},
-  {ref = "lint-types"},
-  {ref = "lint-docs"},
+  { cmd = "uv run ruff check --select I" },
+  { cmd = "uv run ruff format --check" },
+  { ref = "lint-types" },
+  { ref = "lint-docs" },
 ]
 bridge-lint = { cmd = "cargo clippy -- -D warnings", cwd = "temporalio/bridge" }
 # TODO(cretz): Why does pydocstyle complain about @overload missing docs after
 # https://github.com/PyCQA/pydocstyle/pull/511?
 lint-docs = "uv run pydocstyle --ignore-decorators=overload"
 lint-types = [
-  { cmd = "uv run pyright"},
-  { cmd = "uv run mypy --namespace-packages --check-untyped-defs ."},
+  { cmd = "uv run pyright" },
+  { cmd = "uv run mypy --namespace-packages --check-untyped-defs ." },
 ]
 run-bench = "uv run python scripts/run_bench.py"
 test = "uv run pytest"
@@ -120,17 +116,18 @@ ignore_missing_imports = true
 exclude = [
   # Ignore generated code
   'temporalio/api',
-  'temporalio/bridge/proto'
+  'temporalio/bridge/proto',
 ]
 
 [tool.pydocstyle]
 convention = "google"
 # https://github.com/PyCQA/pydocstyle/issues/363#issuecomment-625563088
-match_dir = "^(?!(docs|scripts|tests|api|proto|\\.)).*"
+match_dir = "^(?!(docs|scripts|tests|api|proto|generated|\\.)).*"
 add_ignore = [
   # We like to wrap at a certain number of chars, even long summary sentences.
   # https://github.com/PyCQA/pydocstyle/issues/184
-  "D205", "D415"
+  "D205",
+  "D415",
 ]
 
 [tool.pydoctor]
@@ -226,9 +223,7 @@ manifest-path = "temporalio/bridge/Cargo.toml"
 module-name = "temporalio.bridge.temporal_sdk_bridge"
 python-packages = ["temporalio"]
 include = ["LICENSE"]
-exclude = [
-    "temporalio/bridge/target/**/*",
-]
+exclude = ["temporalio/bridge/target/**/*"]
 
 [tool.uv]
 # Prevent uv commands from building the package by default

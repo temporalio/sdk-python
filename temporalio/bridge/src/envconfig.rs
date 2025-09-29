@@ -7,9 +7,9 @@ use std::collections::HashMap;
 use temporal_sdk_core_api::envconfig::{
     load_client_config as core_load_client_config,
     load_client_config_profile as core_load_client_config_profile,
-    ClientConfig as CoreClientConfig, ClientConfigCodec, ClientConfigProfile as CoreClientConfigProfile,
-    ClientConfigTLS as CoreClientConfigTLS, DataSource, LoadClientConfigOptions,
-    LoadClientConfigProfileOptions,
+    ClientConfig as CoreClientConfig, ClientConfigCodec,
+    ClientConfigProfile as CoreClientConfigProfile, ClientConfigTLS as CoreClientConfigTLS,
+    DataSource, LoadClientConfigOptions, LoadClientConfigProfileOptions,
 };
 
 pyo3::create_exception!(temporal_sdk_bridge, ConfigError, PyRuntimeError);
@@ -143,12 +143,7 @@ pub fn load_client_config(
             ))
         }
     };
-    load_client_config_inner(
-        py,
-        config_source,
-        config_file_strict,
-        env_vars,
-    )
+    load_client_config_inner(py, config_source, config_file_strict, env_vars)
 }
 
 #[pyfunction]

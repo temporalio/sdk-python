@@ -17,7 +17,7 @@ import temporalio.bridge.proto.health.v1.health_pb2 as health_service
 
 def generate_python_services(
     file_descriptors: list[FileDescriptor],
-    output_file: str = "temporalio/bridge/services_generated.py",
+    output_file: str = "temporalio/bridge/generated/services_generated.py",
 ):
     print("generating python services")
 
