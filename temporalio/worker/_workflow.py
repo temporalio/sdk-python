@@ -37,6 +37,7 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow
 
+from . import _command_aware_visitor
 from ._interceptor import (
     Interceptor,
     WorkflowInboundInterceptor,
@@ -724,10 +725,10 @@ class _RunningWorkflow:
 
 @dataclass(frozen=True)
 class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
-    """A payload codec that sets serialization context for the associated command.
+    """A payload codec that sets serialization context for the command associated with each payload.
 
-    This codec responds to the :py:data:`temporalio.bridge._visitor.current_command_seq` context
-    variable set by the payload visitor.
+    This codec responds to the context variable set by
+    :py:class:`_command_aware_visitor.CommandAwarePayloadVisitor`.
     """
 
     instance: WorkflowInstance
@@ -753,7 +754,7 @@ class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
             return self.context_free_payload_codec
 
         if context := self.instance.get_serialization_context(
-            temporalio.bridge._visitor.current_command_info.get(),
+            _command_aware_visitor.current_command_info.get(),
         ):
             return self.context_free_payload_codec.with_context(context)
 

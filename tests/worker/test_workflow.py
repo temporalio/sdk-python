@@ -43,10 +43,10 @@ from typing_extensions import Literal, Protocol, runtime_checkable
 
 import temporalio.activity
 import temporalio.api.sdk.v1
-import temporalio.bridge._visitor
 import temporalio.client
 import temporalio.converter
 import temporalio.worker
+import temporalio.worker._command_aware_visitor
 import temporalio.workflow
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
@@ -1613,7 +1613,7 @@ class CustomWorkflowInstance(WorkflowInstance):
 
     def get_serialization_context(
         self,
-        command_info: Optional[temporalio.bridge._visitor.CommandInfo],
+        command_info: Optional[temporalio.worker._command_aware_visitor.CommandInfo],
     ) -> Optional[temporalio.converter.SerializationContext]:
         return self._unsandboxed.get_serialization_context(command_info)
 

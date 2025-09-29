@@ -11,13 +11,12 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Sequence, Type
 
-import temporalio.bridge._visitor
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.common
 import temporalio.converter
-import temporalio.worker._workflow_instance
 import temporalio.workflow
+from temporalio.worker import _command_aware_visitor
 
 from ...api.common.v1.message_pb2 import Payloads
 from ...api.failure.v1.message_pb2 import Failure
@@ -189,7 +188,7 @@ class _Instance(WorkflowInstance):
 
     def get_serialization_context(
         self,
-        command_info: Optional[temporalio.bridge._visitor.CommandInfo],
+        command_info: Optional[_command_aware_visitor.CommandInfo],
     ) -> Optional[temporalio.converter.SerializationContext]:
         # Forward call to the sandboxed instance
         self.importer.restriction_context.is_runtime = True

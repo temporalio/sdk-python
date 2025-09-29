@@ -51,7 +51,6 @@ import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.sdk.v1
-import temporalio.bridge._visitor
 import temporalio.bridge.proto.activity_result
 import temporalio.bridge.proto.child_workflow
 import temporalio.bridge.proto.common
@@ -66,6 +65,7 @@ import temporalio.workflow
 from temporalio.service import __version__
 
 from ..api.failure.v1.message_pb2 import Failure
+from . import _command_aware_visitor
 from ._interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
@@ -172,7 +172,7 @@ class WorkflowInstance(ABC):
     @abstractmethod
     def get_serialization_context(
         self,
-        command_info: Optional[temporalio.bridge._visitor.CommandInfo],
+        command_info: Optional[_command_aware_visitor.CommandInfo],
     ) -> Optional[temporalio.converter.SerializationContext]:
         """Return appropriate serialization context.
 
@@ -2100,7 +2100,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
     def get_serialization_context(
         self,
-        command_info: Optional[temporalio.bridge._visitor.CommandInfo],
+        command_info: Optional[_command_aware_visitor.CommandInfo],
     ) -> Optional[temporalio.converter.SerializationContext]:
         workflow_context = temporalio.converter.WorkflowSerializationContext(
             namespace=self._info.namespace,

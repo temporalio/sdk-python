@@ -6036,7 +6036,6 @@ class _ClientImpl(OutboundInterceptor):
         req.workflow_type.name = input.workflow
         req.task_queue.name = input.task_queue
         if input.args:
-            # client encode wf input
             req.input.payloads.extend(await data_converter.encode(input.args))
         if input.execution_timeout is not None:
             req.workflow_execution_timeout.FromTimedelta(input.execution_timeout)

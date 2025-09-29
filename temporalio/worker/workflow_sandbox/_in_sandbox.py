@@ -8,12 +8,12 @@ import dataclasses
 import logging
 from typing import Any, Optional, Type
 
-import temporalio.bridge._visitor
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.converter
 import temporalio.worker._workflow_instance
 import temporalio.workflow
+from temporalio.worker import _command_aware_visitor
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class InSandbox:
 
     def get_serialization_context(
         self,
-        command_info: Optional[temporalio.bridge._visitor.CommandInfo],
+        command_info: Optional[_command_aware_visitor.CommandInfo],
     ) -> Optional[temporalio.converter.SerializationContext]:
         """Get serialization context."""
         return self.instance.get_serialization_context(command_info)
