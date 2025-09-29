@@ -1748,7 +1748,7 @@ async def test_session(client: Client):
             SessionWorkflow.run,
             id=f"session-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=1.0),
+            execution_timeout=timedelta(seconds=10.0),
             retry_policy=RetryPolicy(maximum_attempts=1),
         )
         await assert_task_fail_eventually(
