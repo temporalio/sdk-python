@@ -37,7 +37,6 @@ def test_all_grpc_calls_present(client: Client):
         for name, call in inspect.getmembers(service):
             # ignore private methods and non-rpc members "client" and "service"
             if name[0] != "_" and name != "client" and name != "service":
-                print(name)
                 service_calls.add(name)
 
         # Collect gRPC service calls with a fake channel

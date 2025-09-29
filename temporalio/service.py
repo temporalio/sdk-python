@@ -13,17 +13,12 @@ from datetime import timedelta
 from enum import IntEnum
 from typing import ClassVar, Mapping, Optional, Tuple, Type, TypeVar, Union
 
-import google.protobuf.empty_pb2
 import google.protobuf.message
 
-import temporalio.api.cloud.cloudservice.v1
 import temporalio.api.common.v1
-import temporalio.api.operatorservice.v1
-import temporalio.api.testservice.v1
-import temporalio.api.workflowservice.v1
 import temporalio.bridge.client
 import temporalio.bridge.proto.health.v1
-import temporalio.bridge.services_generated as svc_gen
+import temporalio.bridge.services_generated
 import temporalio.exceptions
 import temporalio.runtime
 
@@ -286,23 +281,23 @@ class ServiceClient(ABC):
         raise NotImplementedError
 
 
-class WorkflowService(svc_gen.WorkflowService):
+class WorkflowService(temporalio.bridge.services_generated.WorkflowService):
     """Client to the Temporal server's workflow service."""
 
 
-class OperatorService(svc_gen.OperatorService):
+class OperatorService(temporalio.bridge.services_generated.OperatorService):
     """Client to the Temporal server's operator service."""
 
 
-class CloudService(svc_gen.CloudService):
+class CloudService(temporalio.bridge.services_generated.CloudService):
     """Client to the Temporal server's cloud service."""
 
 
-class TestService(svc_gen.TestService):
+class TestService(temporalio.bridge.services_generated.TestService):
     """Client to the Temporal test server's test service."""
 
 
-class HealthService(svc_gen.HealthService):
+class HealthService(temporalio.bridge.services_generated.HealthService):
     """Client to the Temporal server's health service."""
 
 
