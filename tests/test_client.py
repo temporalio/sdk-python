@@ -88,7 +88,6 @@ from temporalio.common import (
 )
 from temporalio.converter import DataConverter
 from temporalio.exceptions import WorkflowAlreadyStartedError
-
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     assert_eq_eventually,
