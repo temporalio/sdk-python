@@ -8422,8 +8422,6 @@ class EncryptionCodec(PayloadCodec):
 
 @workflow.defn
 class SearchAttributeCodecParentWorkflow:
-    text_attribute = SearchAttributeKey.for_text(f"text_sa")
-
     @workflow.run
     async def run(self, name: str) -> str:
         print(
@@ -8447,7 +8445,7 @@ class SearchAttributeCodecChildWorkflow:
 async def test_search_attribute_codec(client: Client):
     await ensure_search_attributes_present(
         client,
-        SearchAttributeCodecParentWorkflow.text_attribute,
+        SearchAttributeWorkflow.text_attribute,
     )
 
     config = client.config()
@@ -8471,7 +8469,7 @@ async def test_search_attribute_codec(client: Client):
             search_attributes=TypedSearchAttributes(
                 [
                     SearchAttributePair(
-                        SearchAttributeCodecParentWorkflow.text_attribute, "test_text"
+                        SearchAttributeWorkflow.text_attribute, "test_text"
                     )
                 ]
             ),
