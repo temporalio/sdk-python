@@ -1576,16 +1576,25 @@ class PayloadEncryptionWorkflow:
         await workflow.wait_condition(
             lambda: (self.received_signal and self.received_update)
         )
-        assert "inbound" == await workflow.execute_activity(
-            payload_encryption_activity,
-            "outbound",
-            start_to_close_timeout=timedelta(seconds=10),
+        # Run them in parallel to check that data converter operations do not mix up contexts when
+        # there are multiple concurrent payload types.
+        coros = [
+            workflow.execute_activity(
+                payload_encryption_activity,
+                "outbound",
+                start_to_close_timeout=timedelta(seconds=10),
+            ),
+            workflow.execute_child_workflow(
+                PayloadEncryptionChildWorkflow.run,
+                "outbound",
+                id=f"{workflow.info().workflow_id}_child",
+            ),
+        ]
+        [act_result, cw_result], _ = await workflow.wait(
+            [asyncio.create_task(c) for c in coros]
         )
-        assert "inbound" == await workflow.execute_child_workflow(
-            PayloadEncryptionChildWorkflow.run,
-            "outbound",
-            id=f"{workflow.info().workflow_id}_child",
-        )
+        assert await act_result == "inbound"
+        assert await cw_result == "inbound"
         return "outbound"
 
     @workflow.query
