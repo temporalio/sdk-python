@@ -1611,17 +1611,11 @@ class CustomWorkflowInstance(WorkflowInstance):
         self._runner._pairs.append((act, comp))
         return comp
 
-    def get_payload_codec_with_context(
+    def get_serialization_context(
         self,
-        base_payload_codec: temporalio.converter.PayloadCodec,
-        workflow_context_payload_codec: temporalio.converter.PayloadCodec,
         command_info: Optional[temporalio.bridge._visitor.CommandInfo],
-    ) -> temporalio.converter.PayloadCodec:
-        return self._unsandboxed.get_payload_codec_with_context(
-            base_payload_codec,
-            workflow_context_payload_codec,
-            command_info,
-        )
+    ) -> Optional[temporalio.converter.SerializationContext]:
+        return self._unsandboxed.get_serialization_context(command_info)
 
 
 async def test_workflow_with_custom_runner(client: Client):

@@ -170,22 +170,18 @@ class WorkflowInstance(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_payload_codec_with_context(
+    def get_serialization_context(
         self,
-        base_payload_codec: temporalio.converter.PayloadCodec,
-        workflow_context_payload_codec: temporalio.converter.PayloadCodec,
         command_info: Optional[temporalio.bridge._visitor.CommandInfo],
-    ) -> temporalio.converter.PayloadCodec:
-        """Return a payload codec with appropriate serialization context.
+    ) -> Optional[temporalio.converter.SerializationContext]:
+        """Return appropriate serialization context.
 
         Args:
-            base_payload_codec: The base payload codec to apply context to.
-            workflow_context_payload_codec: A payload codec that already has workflow context set.
             command_info: Optional information identifying the associated command. If set, the payload
                          codec will have serialization context set appropriately for that command.
 
         Returns:
-            The payload codec.
+            The serialization context, or None if no context should be set.
         """
         raise NotImplementedError
 
@@ -2116,22 +2112,18 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             failure_converter = failure_converter.with_context(context)
         return payload_converter, failure_converter
 
-    def get_payload_codec_with_context(
+    def get_serialization_context(
         self,
-        base_payload_codec: temporalio.converter.PayloadCodec,
-        workflow_context_payload_codec: temporalio.converter.PayloadCodec,
         command_info: Optional[temporalio.bridge._visitor.CommandInfo],
-    ) -> temporalio.converter.PayloadCodec:
-        if not isinstance(
-            base_payload_codec,
-            temporalio.converter.WithSerializationContext,
-        ):
-            return base_payload_codec
-
+    ) -> Optional[temporalio.converter.SerializationContext]:
+        workflow_context = temporalio.converter.WorkflowSerializationContext(
+            namespace=self._info.namespace,
+            workflow_id=self._info.workflow_id,
+        )
         if command_info is None:
             # Use payload codec with workflow context by default (i.e. for payloads not associated
             # with a pending command)
-            return workflow_context_payload_codec
+            return workflow_context
 
         if (
             command_info.command_type
@@ -2140,22 +2132,18 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         ):
             # Use the activity's context
             activity_handle = self._pending_activities[command_info.command_seq]
-            return base_payload_codec.with_context(
-                temporalio.converter.ActivitySerializationContext(
-                    namespace=self._info.namespace,
-                    workflow_id=self._info.workflow_id,
-                    workflow_type=self._info.workflow_type,
-                    activity_type=activity_handle._input.activity,
-                    activity_task_queue=(
-                        activity_handle._input.task_queue
-                        if isinstance(activity_handle._input, StartActivityInput)
-                        and activity_handle._input.task_queue
-                        else self._info.task_queue
-                    ),
-                    is_local=isinstance(
-                        activity_handle._input, StartLocalActivityInput
-                    ),
-                )
+            return temporalio.converter.ActivitySerializationContext(
+                namespace=self._info.namespace,
+                workflow_id=self._info.workflow_id,
+                workflow_type=self._info.workflow_type,
+                activity_type=activity_handle._input.activity,
+                activity_task_queue=(
+                    activity_handle._input.task_queue
+                    if isinstance(activity_handle._input, StartActivityInput)
+                    and activity_handle._input.task_queue
+                    else self._info.task_queue
+                ),
+                is_local=isinstance(activity_handle._input, StartLocalActivityInput),
             )
 
         elif (
@@ -2165,11 +2153,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         ):
             # Use the child workflow's context
             child_wf_handle = self._pending_child_workflows[command_info.command_seq]
-            return base_payload_codec.with_context(
-                temporalio.converter.WorkflowSerializationContext(
-                    namespace=self._info.namespace,
-                    workflow_id=child_wf_handle._input.id,
-                )
+            return temporalio.converter.WorkflowSerializationContext(
+                namespace=self._info.namespace,
+                workflow_id=child_wf_handle._input.id,
             )
 
         elif (
@@ -2181,11 +2167,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             _, target_workflow_id = self._pending_external_signals[
                 command_info.command_seq
             ]
-            return base_payload_codec.with_context(
-                temporalio.converter.WorkflowSerializationContext(
-                    namespace=self._info.namespace,
-                    workflow_id=target_workflow_id,
-                )
+            return temporalio.converter.WorkflowSerializationContext(
+                namespace=self._info.namespace,
+                workflow_id=target_workflow_id,
             )
 
         elif (
@@ -2196,11 +2180,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # Use empty context for nexus operations: users will never want to encrypt using a
             # key derived from caller workflow context because the caller workflow context is
             # not available on the handler side for decryption.
-            return base_payload_codec
+            return None
 
         else:
             # Use payload codec with workflow context for all other payloads
-            return workflow_context_payload_codec
+            return workflow_context
 
     def _instantiate_workflow_object(self) -> Any:
         if not self._workflow_input:

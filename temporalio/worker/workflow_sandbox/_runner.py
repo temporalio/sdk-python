@@ -187,23 +187,19 @@ class _Instance(WorkflowInstance):
     def get_thread_id(self) -> Optional[int]:
         return self._current_thread_id
 
-    def get_payload_codec_with_context(
+    def get_serialization_context(
         self,
-        base_payload_codec: temporalio.converter.PayloadCodec,
-        workflow_context_payload_codec: temporalio.converter.PayloadCodec,
         command_info: Optional[temporalio.bridge._visitor.CommandInfo],
-    ) -> temporalio.converter.PayloadCodec:
+    ) -> Optional[temporalio.converter.SerializationContext]:
         # Forward call to the sandboxed instance
         self.importer.restriction_context.is_runtime = True
         try:
             self._run_code(
                 "with __temporal_importer.applied():\n"
-                "  __temporal_codec = __temporal_in_sandbox.get_payload_codec_with_context(__temporal_base_payload_codec, __temporal_workflow_context_payload_codec, __temporal_command_info)\n",
+                "  __temporal_context = __temporal_in_sandbox.get_serialization_context(__temporal_command_info)\n",
                 __temporal_importer=self.importer,
-                __temporal_base_payload_codec=base_payload_codec,
-                __temporal_workflow_context_payload_codec=workflow_context_payload_codec,
                 __temporal_command_info=command_info,
             )
-            return self.globals_and_locals.pop("__temporal_codec", None)  # type: ignore
+            return self.globals_and_locals.pop("__temporal_context", None)  # type: ignore
         finally:
             self.importer.restriction_context.is_runtime = False

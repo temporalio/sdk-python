@@ -82,15 +82,9 @@ class InSandbox:
         """Send activation to this instance."""
         return self.instance.activate(act)
 
-    def get_payload_codec_with_context(
+    def get_serialization_context(
         self,
-        base_payload_codec: temporalio.converter.PayloadCodec,
-        workflow_context_payload_codec: temporalio.converter.PayloadCodec,
         command_info: Optional[temporalio.bridge._visitor.CommandInfo],
-    ) -> temporalio.converter.PayloadCodec:
-        """Get payload codec with context."""
-        return self.instance.get_payload_codec_with_context(
-            base_payload_codec,
-            workflow_context_payload_codec,
-            command_info,
-        )
+    ) -> Optional[temporalio.converter.SerializationContext]:
+        """Get serialization context."""
+        return self.instance.get_serialization_context(command_info)

@@ -290,7 +290,6 @@ class _WorkflowWorker:
                     payload_codec = _CommandAwarePayloadCodec(
                         workflow.instance,
                         context_free_payload_codec=self._data_converter.payload_codec,
-                        workflow_context_payload_codec=data_converter.payload_codec,
                     )
                 await temporalio.bridge.worker.decode_activation(
                     act,
@@ -367,7 +366,6 @@ class _WorkflowWorker:
             payload_codec = _CommandAwarePayloadCodec(
                 workflow.instance,
                 context_free_payload_codec=self._data_converter.payload_codec,
-                workflow_context_payload_codec=data_converter.payload_codec,
             )
             try:
                 await temporalio.bridge.worker.encode_completion(
@@ -734,7 +732,6 @@ class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
 
     instance: WorkflowInstance
     context_free_payload_codec: temporalio.converter.PayloadCodec
-    workflow_context_payload_codec: temporalio.converter.PayloadCodec
 
     async def encode(
         self,
@@ -749,11 +746,18 @@ class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
         return await self._get_current_command_codec().decode(payloads)
 
     def _get_current_command_codec(self) -> temporalio.converter.PayloadCodec:
-        return self.instance.get_payload_codec_with_context(
+        if not isinstance(
             self.context_free_payload_codec,
-            self.workflow_context_payload_codec,
+            temporalio.converter.WithSerializationContext,
+        ):
+            return self.context_free_payload_codec
+
+        if context := self.instance.get_serialization_context(
             temporalio.bridge._visitor.current_command_info.get(),
-        )
+        ):
+            return self.context_free_payload_codec.with_context(context)
+
+        return self.context_free_payload_codec
 
 
 class _InterruptDeadlockError(BaseException):
