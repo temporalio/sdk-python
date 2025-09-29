@@ -27,7 +27,7 @@ from temporalio.common import (
     WorkflowIDReusePolicy,
 )
 from temporalio.exceptions import ApplicationError, WorkflowAlreadyStartedError
-from temporalio.service import RPCError, RPCStatusCode, ServiceCall
+from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     new_worker,
@@ -804,12 +804,7 @@ async def test_update_with_start_two_param(client: Client):
 
 # Verify correcting issue #791
 async def test_start_update_with_start_empty_details(client: Client):
-    class execute_multi_operation(
-        ServiceCall[
-            temporalio.api.workflowservice.v1.ExecuteMultiOperationRequest,
-            temporalio.api.workflowservice.v1.ExecuteMultiOperationResponse,
-        ]
-    ):
+    class execute_multi_operation:
         empty_details_err = RPCError("empty details", RPCStatusCode.INTERNAL, b"")
         # Set grpc_status with empty details
         empty_details_err._grpc_status = temporalio.api.common.v1.GrpcStatus(details=[])

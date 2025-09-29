@@ -33,19 +33,21 @@ def test_all_grpc_calls_present(client: Client):
         ] = {},
     ) -> None:
         # Collect service calls
-        service_calls: Dict[str, Tuple[Type, Type]] = {}
-        for _, call in inspect.getmembers(service):
-            if isinstance(call, temporalio.service.ServiceCall):
-                service_calls[call.name] = (call.req_type, call.resp_type)
+        service_calls = set()
+        for name, call in inspect.getmembers(service):
+            # ignore private methods and non-rpc members "client" and "service"
+            if name[0] != "_" and name != "client" and name != "service":
+                print(name)
+                service_calls.add(name)
 
         # Collect gRPC service calls with a fake channel
         channel = CallCollectingChannel(package, custom_req_resp)
         new_stub(channel)
 
         # Confirm they are the same
-        missing = channel.calls.keys() - service_calls.keys()
+        missing = channel.calls.keys() - service_calls
         assert not missing
-        added = service_calls.keys() - channel.calls.keys()
+        added = service_calls - channel.calls.keys()
         assert not added
 
     assert_all_calls_present(
