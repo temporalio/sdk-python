@@ -1,5 +1,5 @@
-from functools import partial
 import re
+from functools import partial
 from string import Template
 
 from google.protobuf.descriptor import (
@@ -110,7 +110,6 @@ def generate_python_method_call(method_descriptor: MethodDescriptor) -> str:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> $response_type:
-        print("sup from $method_name")
         return await self.client._rpc_call(
             rpc="$method_name",
             req=req,

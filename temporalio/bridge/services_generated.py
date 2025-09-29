@@ -29,7 +29,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.CountWorkflowExecutionsResponse:
-        print("sup from count_workflow_executions")
         return await self.client._rpc_call(
             rpc="count_workflow_executions",
             req=req,
@@ -48,7 +47,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.CreateScheduleResponse:
-        print("sup from create_schedule")
         return await self.client._rpc_call(
             rpc="create_schedule",
             req=req,
@@ -67,7 +65,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.CreateWorkflowRuleResponse:
-        print("sup from create_workflow_rule")
         return await self.client._rpc_call(
             rpc="create_workflow_rule",
             req=req,
@@ -86,7 +83,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.DeleteScheduleResponse:
-        print("sup from delete_schedule")
         return await self.client._rpc_call(
             rpc="delete_schedule",
             req=req,
@@ -105,7 +101,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.DeleteWorkerDeploymentResponse:
-        print("sup from delete_worker_deployment")
         return await self.client._rpc_call(
             rpc="delete_worker_deployment",
             req=req,
@@ -124,7 +119,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.DeleteWorkerDeploymentVersionResponse:
-        print("sup from delete_worker_deployment_version")
         return await self.client._rpc_call(
             rpc="delete_worker_deployment_version",
             req=req,
@@ -143,7 +137,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.DeleteWorkflowExecutionResponse:
-        print("sup from delete_workflow_execution")
         return await self.client._rpc_call(
             rpc="delete_workflow_execution",
             req=req,
@@ -162,7 +155,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.DeleteWorkflowRuleResponse:
-        print("sup from delete_workflow_rule")
         return await self.client._rpc_call(
             rpc="delete_workflow_rule",
             req=req,
@@ -181,7 +173,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.DeprecateNamespaceResponse:
-        print("sup from deprecate_namespace")
         return await self.client._rpc_call(
             rpc="deprecate_namespace",
             req=req,
@@ -200,7 +191,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.DescribeBatchOperationResponse:
-        print("sup from describe_batch_operation")
         return await self.client._rpc_call(
             rpc="describe_batch_operation",
             req=req,
@@ -219,7 +209,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.DescribeDeploymentResponse:
-        print("sup from describe_deployment")
         return await self.client._rpc_call(
             rpc="describe_deployment",
             req=req,
@@ -238,7 +227,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.DescribeNamespaceResponse:
-        print("sup from describe_namespace")
         return await self.client._rpc_call(
             rpc="describe_namespace",
             req=req,
@@ -257,7 +245,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.DescribeScheduleResponse:
-        print("sup from describe_schedule")
         return await self.client._rpc_call(
             rpc="describe_schedule",
             req=req,
@@ -276,7 +263,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.DescribeTaskQueueResponse:
-        print("sup from describe_task_queue")
         return await self.client._rpc_call(
             rpc="describe_task_queue",
             req=req,
@@ -295,7 +281,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.DescribeWorkerDeploymentResponse:
-        print("sup from describe_worker_deployment")
         return await self.client._rpc_call(
             rpc="describe_worker_deployment",
             req=req,
@@ -314,7 +299,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.DescribeWorkerDeploymentVersionResponse:
-        print("sup from describe_worker_deployment_version")
         return await self.client._rpc_call(
             rpc="describe_worker_deployment_version",
             req=req,
@@ -333,7 +317,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.DescribeWorkflowExecutionResponse:
-        print("sup from describe_workflow_execution")
         return await self.client._rpc_call(
             rpc="describe_workflow_execution",
             req=req,
@@ -352,7 +335,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.DescribeWorkflowRuleResponse:
-        print("sup from describe_workflow_rule")
         return await self.client._rpc_call(
             rpc="describe_workflow_rule",
             req=req,
@@ -371,7 +353,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ExecuteMultiOperationResponse:
-        print("sup from execute_multi_operation")
         return await self.client._rpc_call(
             rpc="execute_multi_operation",
             req=req,
@@ -390,7 +371,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.FetchWorkerConfigResponse:
-        print("sup from fetch_worker_config")
         return await self.client._rpc_call(
             rpc="fetch_worker_config",
             req=req,
@@ -409,7 +389,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.GetClusterInfoResponse:
-        print("sup from get_cluster_info")
         return await self.client._rpc_call(
             rpc="get_cluster_info",
             req=req,
@@ -428,7 +407,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.GetCurrentDeploymentResponse:
-        print("sup from get_current_deployment")
         return await self.client._rpc_call(
             rpc="get_current_deployment",
             req=req,
@@ -447,7 +425,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.GetDeploymentReachabilityResponse:
-        print("sup from get_deployment_reachability")
         return await self.client._rpc_call(
             rpc="get_deployment_reachability",
             req=req,
@@ -466,7 +443,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.GetSearchAttributesResponse:
-        print("sup from get_search_attributes")
         return await self.client._rpc_call(
             rpc="get_search_attributes",
             req=req,
@@ -485,7 +461,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.GetSystemInfoResponse:
-        print("sup from get_system_info")
         return await self.client._rpc_call(
             rpc="get_system_info",
             req=req,
@@ -504,7 +479,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.GetWorkerBuildIdCompatibilityResponse:
-        print("sup from get_worker_build_id_compatibility")
         return await self.client._rpc_call(
             rpc="get_worker_build_id_compatibility",
             req=req,
@@ -523,7 +497,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.GetWorkerTaskReachabilityResponse:
-        print("sup from get_worker_task_reachability")
         return await self.client._rpc_call(
             rpc="get_worker_task_reachability",
             req=req,
@@ -542,7 +515,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.GetWorkerVersioningRulesResponse:
-        print("sup from get_worker_versioning_rules")
         return await self.client._rpc_call(
             rpc="get_worker_versioning_rules",
             req=req,
@@ -561,7 +533,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.GetWorkflowExecutionHistoryResponse:
-        print("sup from get_workflow_execution_history")
         return await self.client._rpc_call(
             rpc="get_workflow_execution_history",
             req=req,
@@ -580,7 +551,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.GetWorkflowExecutionHistoryReverseResponse:
-        print("sup from get_workflow_execution_history_reverse")
         return await self.client._rpc_call(
             rpc="get_workflow_execution_history_reverse",
             req=req,
@@ -599,7 +569,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ListArchivedWorkflowExecutionsResponse:
-        print("sup from list_archived_workflow_executions")
         return await self.client._rpc_call(
             rpc="list_archived_workflow_executions",
             req=req,
@@ -618,7 +587,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ListBatchOperationsResponse:
-        print("sup from list_batch_operations")
         return await self.client._rpc_call(
             rpc="list_batch_operations",
             req=req,
@@ -637,7 +605,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ListClosedWorkflowExecutionsResponse:
-        print("sup from list_closed_workflow_executions")
         return await self.client._rpc_call(
             rpc="list_closed_workflow_executions",
             req=req,
@@ -656,7 +623,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ListDeploymentsResponse:
-        print("sup from list_deployments")
         return await self.client._rpc_call(
             rpc="list_deployments",
             req=req,
@@ -675,7 +641,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ListNamespacesResponse:
-        print("sup from list_namespaces")
         return await self.client._rpc_call(
             rpc="list_namespaces",
             req=req,
@@ -694,7 +659,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ListOpenWorkflowExecutionsResponse:
-        print("sup from list_open_workflow_executions")
         return await self.client._rpc_call(
             rpc="list_open_workflow_executions",
             req=req,
@@ -713,7 +677,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ListScheduleMatchingTimesResponse:
-        print("sup from list_schedule_matching_times")
         return await self.client._rpc_call(
             rpc="list_schedule_matching_times",
             req=req,
@@ -732,7 +695,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ListSchedulesResponse:
-        print("sup from list_schedules")
         return await self.client._rpc_call(
             rpc="list_schedules",
             req=req,
@@ -751,7 +713,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ListTaskQueuePartitionsResponse:
-        print("sup from list_task_queue_partitions")
         return await self.client._rpc_call(
             rpc="list_task_queue_partitions",
             req=req,
@@ -770,7 +731,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ListWorkerDeploymentsResponse:
-        print("sup from list_worker_deployments")
         return await self.client._rpc_call(
             rpc="list_worker_deployments",
             req=req,
@@ -789,7 +749,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ListWorkersResponse:
-        print("sup from list_workers")
         return await self.client._rpc_call(
             rpc="list_workers",
             req=req,
@@ -808,7 +767,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ListWorkflowExecutionsResponse:
-        print("sup from list_workflow_executions")
         return await self.client._rpc_call(
             rpc="list_workflow_executions",
             req=req,
@@ -827,7 +785,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ListWorkflowRulesResponse:
-        print("sup from list_workflow_rules")
         return await self.client._rpc_call(
             rpc="list_workflow_rules",
             req=req,
@@ -846,7 +803,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.PatchScheduleResponse:
-        print("sup from patch_schedule")
         return await self.client._rpc_call(
             rpc="patch_schedule",
             req=req,
@@ -865,7 +821,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.PauseActivityResponse:
-        print("sup from pause_activity")
         return await self.client._rpc_call(
             rpc="pause_activity",
             req=req,
@@ -884,7 +839,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.PollActivityTaskQueueResponse:
-        print("sup from poll_activity_task_queue")
         return await self.client._rpc_call(
             rpc="poll_activity_task_queue",
             req=req,
@@ -903,7 +857,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.PollNexusTaskQueueResponse:
-        print("sup from poll_nexus_task_queue")
         return await self.client._rpc_call(
             rpc="poll_nexus_task_queue",
             req=req,
@@ -922,7 +875,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.PollWorkflowExecutionUpdateResponse:
-        print("sup from poll_workflow_execution_update")
         return await self.client._rpc_call(
             rpc="poll_workflow_execution_update",
             req=req,
@@ -941,7 +893,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.PollWorkflowTaskQueueResponse:
-        print("sup from poll_workflow_task_queue")
         return await self.client._rpc_call(
             rpc="poll_workflow_task_queue",
             req=req,
@@ -960,7 +911,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.QueryWorkflowResponse:
-        print("sup from query_workflow")
         return await self.client._rpc_call(
             rpc="query_workflow",
             req=req,
@@ -979,7 +929,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RecordActivityTaskHeartbeatResponse:
-        print("sup from record_activity_task_heartbeat")
         return await self.client._rpc_call(
             rpc="record_activity_task_heartbeat",
             req=req,
@@ -998,7 +947,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RecordActivityTaskHeartbeatByIdResponse:
-        print("sup from record_activity_task_heartbeat_by_id")
         return await self.client._rpc_call(
             rpc="record_activity_task_heartbeat_by_id",
             req=req,
@@ -1017,7 +965,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RecordWorkerHeartbeatResponse:
-        print("sup from record_worker_heartbeat")
         return await self.client._rpc_call(
             rpc="record_worker_heartbeat",
             req=req,
@@ -1036,7 +983,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RegisterNamespaceResponse:
-        print("sup from register_namespace")
         return await self.client._rpc_call(
             rpc="register_namespace",
             req=req,
@@ -1055,7 +1001,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RequestCancelWorkflowExecutionResponse:
-        print("sup from request_cancel_workflow_execution")
         return await self.client._rpc_call(
             rpc="request_cancel_workflow_execution",
             req=req,
@@ -1074,7 +1019,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ResetActivityResponse:
-        print("sup from reset_activity")
         return await self.client._rpc_call(
             rpc="reset_activity",
             req=req,
@@ -1093,7 +1037,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ResetStickyTaskQueueResponse:
-        print("sup from reset_sticky_task_queue")
         return await self.client._rpc_call(
             rpc="reset_sticky_task_queue",
             req=req,
@@ -1112,7 +1055,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ResetWorkflowExecutionResponse:
-        print("sup from reset_workflow_execution")
         return await self.client._rpc_call(
             rpc="reset_workflow_execution",
             req=req,
@@ -1131,7 +1073,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RespondActivityTaskCanceledResponse:
-        print("sup from respond_activity_task_canceled")
         return await self.client._rpc_call(
             rpc="respond_activity_task_canceled",
             req=req,
@@ -1150,7 +1091,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RespondActivityTaskCanceledByIdResponse:
-        print("sup from respond_activity_task_canceled_by_id")
         return await self.client._rpc_call(
             rpc="respond_activity_task_canceled_by_id",
             req=req,
@@ -1169,7 +1109,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RespondActivityTaskCompletedResponse:
-        print("sup from respond_activity_task_completed")
         return await self.client._rpc_call(
             rpc="respond_activity_task_completed",
             req=req,
@@ -1188,7 +1127,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RespondActivityTaskCompletedByIdResponse:
-        print("sup from respond_activity_task_completed_by_id")
         return await self.client._rpc_call(
             rpc="respond_activity_task_completed_by_id",
             req=req,
@@ -1207,7 +1145,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RespondActivityTaskFailedResponse:
-        print("sup from respond_activity_task_failed")
         return await self.client._rpc_call(
             rpc="respond_activity_task_failed",
             req=req,
@@ -1226,7 +1163,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RespondActivityTaskFailedByIdResponse:
-        print("sup from respond_activity_task_failed_by_id")
         return await self.client._rpc_call(
             rpc="respond_activity_task_failed_by_id",
             req=req,
@@ -1245,7 +1181,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RespondNexusTaskCompletedResponse:
-        print("sup from respond_nexus_task_completed")
         return await self.client._rpc_call(
             rpc="respond_nexus_task_completed",
             req=req,
@@ -1264,7 +1199,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RespondNexusTaskFailedResponse:
-        print("sup from respond_nexus_task_failed")
         return await self.client._rpc_call(
             rpc="respond_nexus_task_failed",
             req=req,
@@ -1283,7 +1217,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RespondQueryTaskCompletedResponse:
-        print("sup from respond_query_task_completed")
         return await self.client._rpc_call(
             rpc="respond_query_task_completed",
             req=req,
@@ -1302,7 +1235,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RespondWorkflowTaskCompletedResponse:
-        print("sup from respond_workflow_task_completed")
         return await self.client._rpc_call(
             rpc="respond_workflow_task_completed",
             req=req,
@@ -1321,7 +1253,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.RespondWorkflowTaskFailedResponse:
-        print("sup from respond_workflow_task_failed")
         return await self.client._rpc_call(
             rpc="respond_workflow_task_failed",
             req=req,
@@ -1340,7 +1271,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ScanWorkflowExecutionsResponse:
-        print("sup from scan_workflow_executions")
         return await self.client._rpc_call(
             rpc="scan_workflow_executions",
             req=req,
@@ -1359,7 +1289,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.SetCurrentDeploymentResponse:
-        print("sup from set_current_deployment")
         return await self.client._rpc_call(
             rpc="set_current_deployment",
             req=req,
@@ -1378,7 +1307,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.SetWorkerDeploymentCurrentVersionResponse:
-        print("sup from set_worker_deployment_current_version")
         return await self.client._rpc_call(
             rpc="set_worker_deployment_current_version",
             req=req,
@@ -1397,7 +1325,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.SetWorkerDeploymentRampingVersionResponse:
-        print("sup from set_worker_deployment_ramping_version")
         return await self.client._rpc_call(
             rpc="set_worker_deployment_ramping_version",
             req=req,
@@ -1416,7 +1343,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.ShutdownWorkerResponse:
-        print("sup from shutdown_worker")
         return await self.client._rpc_call(
             rpc="shutdown_worker",
             req=req,
@@ -1435,7 +1361,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse:
-        print("sup from signal_with_start_workflow_execution")
         return await self.client._rpc_call(
             rpc="signal_with_start_workflow_execution",
             req=req,
@@ -1454,7 +1379,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.SignalWorkflowExecutionResponse:
-        print("sup from signal_workflow_execution")
         return await self.client._rpc_call(
             rpc="signal_workflow_execution",
             req=req,
@@ -1473,7 +1397,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.StartBatchOperationResponse:
-        print("sup from start_batch_operation")
         return await self.client._rpc_call(
             rpc="start_batch_operation",
             req=req,
@@ -1492,7 +1415,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse:
-        print("sup from start_workflow_execution")
         return await self.client._rpc_call(
             rpc="start_workflow_execution",
             req=req,
@@ -1511,7 +1433,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.StopBatchOperationResponse:
-        print("sup from stop_batch_operation")
         return await self.client._rpc_call(
             rpc="stop_batch_operation",
             req=req,
@@ -1530,7 +1451,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.TerminateWorkflowExecutionResponse:
-        print("sup from terminate_workflow_execution")
         return await self.client._rpc_call(
             rpc="terminate_workflow_execution",
             req=req,
@@ -1549,7 +1469,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.TriggerWorkflowRuleResponse:
-        print("sup from trigger_workflow_rule")
         return await self.client._rpc_call(
             rpc="trigger_workflow_rule",
             req=req,
@@ -1568,7 +1487,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.UnpauseActivityResponse:
-        print("sup from unpause_activity")
         return await self.client._rpc_call(
             rpc="unpause_activity",
             req=req,
@@ -1587,7 +1505,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.UpdateActivityOptionsResponse:
-        print("sup from update_activity_options")
         return await self.client._rpc_call(
             rpc="update_activity_options",
             req=req,
@@ -1606,7 +1523,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.UpdateNamespaceResponse:
-        print("sup from update_namespace")
         return await self.client._rpc_call(
             rpc="update_namespace",
             req=req,
@@ -1625,7 +1541,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.UpdateScheduleResponse:
-        print("sup from update_schedule")
         return await self.client._rpc_call(
             rpc="update_schedule",
             req=req,
@@ -1644,7 +1559,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.UpdateTaskQueueConfigResponse:
-        print("sup from update_task_queue_config")
         return await self.client._rpc_call(
             rpc="update_task_queue_config",
             req=req,
@@ -1663,7 +1577,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityResponse:
-        print("sup from update_worker_build_id_compatibility")
         return await self.client._rpc_call(
             rpc="update_worker_build_id_compatibility",
             req=req,
@@ -1682,7 +1595,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkerConfigResponse:
-        print("sup from update_worker_config")
         return await self.client._rpc_call(
             rpc="update_worker_config",
             req=req,
@@ -1701,7 +1613,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkerDeploymentVersionMetadataResponse:
-        print("sup from update_worker_deployment_version_metadata")
         return await self.client._rpc_call(
             rpc="update_worker_deployment_version_metadata",
             req=req,
@@ -1720,7 +1631,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkerVersioningRulesResponse:
-        print("sup from update_worker_versioning_rules")
         return await self.client._rpc_call(
             rpc="update_worker_versioning_rules",
             req=req,
@@ -1739,7 +1649,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkflowExecutionResponse:
-        print("sup from update_workflow_execution")
         return await self.client._rpc_call(
             rpc="update_workflow_execution",
             req=req,
@@ -1758,7 +1667,6 @@ class WorkflowService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkflowExecutionOptionsResponse:
-        print("sup from update_workflow_execution_options")
         return await self.client._rpc_call(
             rpc="update_workflow_execution_options",
             req=req,
@@ -1783,7 +1691,6 @@ class OperatorService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.operatorservice.v1.AddOrUpdateRemoteClusterResponse:
-        print("sup from add_or_update_remote_cluster")
         return await self.client._rpc_call(
             rpc="add_or_update_remote_cluster",
             req=req,
@@ -1802,7 +1709,6 @@ class OperatorService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.operatorservice.v1.AddSearchAttributesResponse:
-        print("sup from add_search_attributes")
         return await self.client._rpc_call(
             rpc="add_search_attributes",
             req=req,
@@ -1821,7 +1727,6 @@ class OperatorService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.operatorservice.v1.CreateNexusEndpointResponse:
-        print("sup from create_nexus_endpoint")
         return await self.client._rpc_call(
             rpc="create_nexus_endpoint",
             req=req,
@@ -1840,7 +1745,6 @@ class OperatorService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.operatorservice.v1.DeleteNamespaceResponse:
-        print("sup from delete_namespace")
         return await self.client._rpc_call(
             rpc="delete_namespace",
             req=req,
@@ -1859,7 +1763,6 @@ class OperatorService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.operatorservice.v1.DeleteNexusEndpointResponse:
-        print("sup from delete_nexus_endpoint")
         return await self.client._rpc_call(
             rpc="delete_nexus_endpoint",
             req=req,
@@ -1878,7 +1781,6 @@ class OperatorService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.operatorservice.v1.GetNexusEndpointResponse:
-        print("sup from get_nexus_endpoint")
         return await self.client._rpc_call(
             rpc="get_nexus_endpoint",
             req=req,
@@ -1897,7 +1799,6 @@ class OperatorService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.operatorservice.v1.ListClustersResponse:
-        print("sup from list_clusters")
         return await self.client._rpc_call(
             rpc="list_clusters",
             req=req,
@@ -1916,7 +1817,6 @@ class OperatorService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.operatorservice.v1.ListNexusEndpointsResponse:
-        print("sup from list_nexus_endpoints")
         return await self.client._rpc_call(
             rpc="list_nexus_endpoints",
             req=req,
@@ -1935,7 +1835,6 @@ class OperatorService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.operatorservice.v1.ListSearchAttributesResponse:
-        print("sup from list_search_attributes")
         return await self.client._rpc_call(
             rpc="list_search_attributes",
             req=req,
@@ -1954,7 +1853,6 @@ class OperatorService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.operatorservice.v1.RemoveRemoteClusterResponse:
-        print("sup from remove_remote_cluster")
         return await self.client._rpc_call(
             rpc="remove_remote_cluster",
             req=req,
@@ -1973,7 +1871,6 @@ class OperatorService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.operatorservice.v1.RemoveSearchAttributesResponse:
-        print("sup from remove_search_attributes")
         return await self.client._rpc_call(
             rpc="remove_search_attributes",
             req=req,
@@ -1992,7 +1889,6 @@ class OperatorService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.operatorservice.v1.UpdateNexusEndpointResponse:
-        print("sup from update_nexus_endpoint")
         return await self.client._rpc_call(
             rpc="update_nexus_endpoint",
             req=req,
@@ -2017,7 +1913,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.AddNamespaceRegionResponse:
-        print("sup from add_namespace_region")
         return await self.client._rpc_call(
             rpc="add_namespace_region",
             req=req,
@@ -2036,7 +1931,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.AddUserGroupMemberResponse:
-        print("sup from add_user_group_member")
         return await self.client._rpc_call(
             rpc="add_user_group_member",
             req=req,
@@ -2055,7 +1949,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.CreateApiKeyResponse:
-        print("sup from create_api_key")
         return await self.client._rpc_call(
             rpc="create_api_key",
             req=req,
@@ -2074,7 +1967,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.CreateConnectivityRuleResponse:
-        print("sup from create_connectivity_rule")
         return await self.client._rpc_call(
             rpc="create_connectivity_rule",
             req=req,
@@ -2093,7 +1985,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.CreateNamespaceResponse:
-        print("sup from create_namespace")
         return await self.client._rpc_call(
             rpc="create_namespace",
             req=req,
@@ -2112,7 +2003,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.CreateNamespaceExportSinkResponse:
-        print("sup from create_namespace_export_sink")
         return await self.client._rpc_call(
             rpc="create_namespace_export_sink",
             req=req,
@@ -2131,7 +2021,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.CreateNexusEndpointResponse:
-        print("sup from create_nexus_endpoint")
         return await self.client._rpc_call(
             rpc="create_nexus_endpoint",
             req=req,
@@ -2150,7 +2039,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.CreateServiceAccountResponse:
-        print("sup from create_service_account")
         return await self.client._rpc_call(
             rpc="create_service_account",
             req=req,
@@ -2169,7 +2057,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.CreateUserResponse:
-        print("sup from create_user")
         return await self.client._rpc_call(
             rpc="create_user",
             req=req,
@@ -2188,7 +2075,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.CreateUserGroupResponse:
-        print("sup from create_user_group")
         return await self.client._rpc_call(
             rpc="create_user_group",
             req=req,
@@ -2207,7 +2093,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.DeleteApiKeyResponse:
-        print("sup from delete_api_key")
         return await self.client._rpc_call(
             rpc="delete_api_key",
             req=req,
@@ -2226,7 +2111,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.DeleteConnectivityRuleResponse:
-        print("sup from delete_connectivity_rule")
         return await self.client._rpc_call(
             rpc="delete_connectivity_rule",
             req=req,
@@ -2245,7 +2129,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.DeleteNamespaceResponse:
-        print("sup from delete_namespace")
         return await self.client._rpc_call(
             rpc="delete_namespace",
             req=req,
@@ -2264,7 +2147,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.DeleteNamespaceExportSinkResponse:
-        print("sup from delete_namespace_export_sink")
         return await self.client._rpc_call(
             rpc="delete_namespace_export_sink",
             req=req,
@@ -2283,7 +2165,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.DeleteNamespaceRegionResponse:
-        print("sup from delete_namespace_region")
         return await self.client._rpc_call(
             rpc="delete_namespace_region",
             req=req,
@@ -2302,7 +2183,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.DeleteNexusEndpointResponse:
-        print("sup from delete_nexus_endpoint")
         return await self.client._rpc_call(
             rpc="delete_nexus_endpoint",
             req=req,
@@ -2321,7 +2201,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.DeleteServiceAccountResponse:
-        print("sup from delete_service_account")
         return await self.client._rpc_call(
             rpc="delete_service_account",
             req=req,
@@ -2340,7 +2219,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.DeleteUserResponse:
-        print("sup from delete_user")
         return await self.client._rpc_call(
             rpc="delete_user",
             req=req,
@@ -2359,7 +2237,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.DeleteUserGroupResponse:
-        print("sup from delete_user_group")
         return await self.client._rpc_call(
             rpc="delete_user_group",
             req=req,
@@ -2378,7 +2255,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.FailoverNamespaceRegionResponse:
-        print("sup from failover_namespace_region")
         return await self.client._rpc_call(
             rpc="failover_namespace_region",
             req=req,
@@ -2397,7 +2273,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetAccountResponse:
-        print("sup from get_account")
         return await self.client._rpc_call(
             rpc="get_account",
             req=req,
@@ -2416,7 +2291,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetApiKeyResponse:
-        print("sup from get_api_key")
         return await self.client._rpc_call(
             rpc="get_api_key",
             req=req,
@@ -2435,7 +2309,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetApiKeysResponse:
-        print("sup from get_api_keys")
         return await self.client._rpc_call(
             rpc="get_api_keys",
             req=req,
@@ -2454,7 +2327,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetAsyncOperationResponse:
-        print("sup from get_async_operation")
         return await self.client._rpc_call(
             rpc="get_async_operation",
             req=req,
@@ -2473,7 +2345,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetConnectivityRuleResponse:
-        print("sup from get_connectivity_rule")
         return await self.client._rpc_call(
             rpc="get_connectivity_rule",
             req=req,
@@ -2492,7 +2363,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetConnectivityRulesResponse:
-        print("sup from get_connectivity_rules")
         return await self.client._rpc_call(
             rpc="get_connectivity_rules",
             req=req,
@@ -2511,7 +2381,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetNamespaceResponse:
-        print("sup from get_namespace")
         return await self.client._rpc_call(
             rpc="get_namespace",
             req=req,
@@ -2530,7 +2399,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetNamespaceExportSinkResponse:
-        print("sup from get_namespace_export_sink")
         return await self.client._rpc_call(
             rpc="get_namespace_export_sink",
             req=req,
@@ -2549,7 +2417,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetNamespaceExportSinksResponse:
-        print("sup from get_namespace_export_sinks")
         return await self.client._rpc_call(
             rpc="get_namespace_export_sinks",
             req=req,
@@ -2568,7 +2435,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetNamespacesResponse:
-        print("sup from get_namespaces")
         return await self.client._rpc_call(
             rpc="get_namespaces",
             req=req,
@@ -2587,7 +2453,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetNexusEndpointResponse:
-        print("sup from get_nexus_endpoint")
         return await self.client._rpc_call(
             rpc="get_nexus_endpoint",
             req=req,
@@ -2606,7 +2471,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetNexusEndpointsResponse:
-        print("sup from get_nexus_endpoints")
         return await self.client._rpc_call(
             rpc="get_nexus_endpoints",
             req=req,
@@ -2625,7 +2489,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetRegionResponse:
-        print("sup from get_region")
         return await self.client._rpc_call(
             rpc="get_region",
             req=req,
@@ -2644,7 +2507,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetRegionsResponse:
-        print("sup from get_regions")
         return await self.client._rpc_call(
             rpc="get_regions",
             req=req,
@@ -2663,7 +2525,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetServiceAccountResponse:
-        print("sup from get_service_account")
         return await self.client._rpc_call(
             rpc="get_service_account",
             req=req,
@@ -2682,7 +2543,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetServiceAccountsResponse:
-        print("sup from get_service_accounts")
         return await self.client._rpc_call(
             rpc="get_service_accounts",
             req=req,
@@ -2701,7 +2561,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetUsageResponse:
-        print("sup from get_usage")
         return await self.client._rpc_call(
             rpc="get_usage",
             req=req,
@@ -2720,7 +2579,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetUserResponse:
-        print("sup from get_user")
         return await self.client._rpc_call(
             rpc="get_user",
             req=req,
@@ -2739,7 +2597,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetUserGroupResponse:
-        print("sup from get_user_group")
         return await self.client._rpc_call(
             rpc="get_user_group",
             req=req,
@@ -2758,7 +2615,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetUserGroupMembersResponse:
-        print("sup from get_user_group_members")
         return await self.client._rpc_call(
             rpc="get_user_group_members",
             req=req,
@@ -2777,7 +2633,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetUserGroupsResponse:
-        print("sup from get_user_groups")
         return await self.client._rpc_call(
             rpc="get_user_groups",
             req=req,
@@ -2796,7 +2651,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.GetUsersResponse:
-        print("sup from get_users")
         return await self.client._rpc_call(
             rpc="get_users",
             req=req,
@@ -2815,7 +2669,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.RemoveUserGroupMemberResponse:
-        print("sup from remove_user_group_member")
         return await self.client._rpc_call(
             rpc="remove_user_group_member",
             req=req,
@@ -2834,7 +2687,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.RenameCustomSearchAttributeResponse:
-        print("sup from rename_custom_search_attribute")
         return await self.client._rpc_call(
             rpc="rename_custom_search_attribute",
             req=req,
@@ -2853,7 +2705,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.SetUserGroupNamespaceAccessResponse:
-        print("sup from set_user_group_namespace_access")
         return await self.client._rpc_call(
             rpc="set_user_group_namespace_access",
             req=req,
@@ -2872,7 +2723,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.SetUserNamespaceAccessResponse:
-        print("sup from set_user_namespace_access")
         return await self.client._rpc_call(
             rpc="set_user_namespace_access",
             req=req,
@@ -2891,7 +2741,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.UpdateAccountResponse:
-        print("sup from update_account")
         return await self.client._rpc_call(
             rpc="update_account",
             req=req,
@@ -2910,7 +2759,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.UpdateApiKeyResponse:
-        print("sup from update_api_key")
         return await self.client._rpc_call(
             rpc="update_api_key",
             req=req,
@@ -2929,7 +2777,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.UpdateNamespaceResponse:
-        print("sup from update_namespace")
         return await self.client._rpc_call(
             rpc="update_namespace",
             req=req,
@@ -2948,7 +2795,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.UpdateNamespaceExportSinkResponse:
-        print("sup from update_namespace_export_sink")
         return await self.client._rpc_call(
             rpc="update_namespace_export_sink",
             req=req,
@@ -2967,7 +2813,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.UpdateNamespaceTagsResponse:
-        print("sup from update_namespace_tags")
         return await self.client._rpc_call(
             rpc="update_namespace_tags",
             req=req,
@@ -2986,7 +2831,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.UpdateNexusEndpointResponse:
-        print("sup from update_nexus_endpoint")
         return await self.client._rpc_call(
             rpc="update_nexus_endpoint",
             req=req,
@@ -3005,7 +2849,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.UpdateServiceAccountResponse:
-        print("sup from update_service_account")
         return await self.client._rpc_call(
             rpc="update_service_account",
             req=req,
@@ -3024,7 +2867,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.UpdateUserResponse:
-        print("sup from update_user")
         return await self.client._rpc_call(
             rpc="update_user",
             req=req,
@@ -3043,7 +2885,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.UpdateUserGroupResponse:
-        print("sup from update_user_group")
         return await self.client._rpc_call(
             rpc="update_user_group",
             req=req,
@@ -3062,7 +2903,6 @@ class CloudService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.cloud.cloudservice.v1.ValidateNamespaceExportSinkResponse:
-        print("sup from validate_namespace_export_sink")
         return await self.client._rpc_call(
             rpc="validate_namespace_export_sink",
             req=req,
@@ -3087,7 +2927,6 @@ class TestService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.testservice.v1.GetCurrentTimeResponse:
-        print("sup from get_current_time")
         return await self.client._rpc_call(
             rpc="get_current_time",
             req=req,
@@ -3106,7 +2945,6 @@ class TestService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.testservice.v1.LockTimeSkippingResponse:
-        print("sup from lock_time_skipping")
         return await self.client._rpc_call(
             rpc="lock_time_skipping",
             req=req,
@@ -3125,7 +2963,6 @@ class TestService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.testservice.v1.SleepResponse:
-        print("sup from sleep")
         return await self.client._rpc_call(
             rpc="sleep",
             req=req,
@@ -3144,7 +2981,6 @@ class TestService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.testservice.v1.SleepResponse:
-        print("sup from sleep_until")
         return await self.client._rpc_call(
             rpc="sleep_until",
             req=req,
@@ -3163,7 +2999,6 @@ class TestService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.testservice.v1.UnlockTimeSkippingResponse:
-        print("sup from unlock_time_skipping")
         return await self.client._rpc_call(
             rpc="unlock_time_skipping",
             req=req,
@@ -3182,7 +3017,6 @@ class TestService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.api.testservice.v1.SleepResponse:
-        print("sup from unlock_time_skipping_with_sleep")
         return await self.client._rpc_call(
             rpc="unlock_time_skipping_with_sleep",
             req=req,
@@ -3207,7 +3041,6 @@ class HealthService:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> temporalio.bridge.proto.health.v1.HealthCheckResponse:
-        print("sup from check")
         return await self.client._rpc_call(
             rpc="check",
             req=req,
