@@ -277,12 +277,11 @@ class _WorkflowWorker:
                         "Cache already exists for activation with initialize job"
                     )
 
-            data_converter = self._data_converter.with_context(
-                temporalio.converter.WorkflowSerializationContext(
-                    namespace=self._namespace,
-                    workflow_id=workflow_id,
-                )
+            workflow_context = temporalio.converter.WorkflowSerializationContext(
+                namespace=self._namespace,
+                workflow_id=workflow_id,
             )
+            data_converter = self._data_converter.with_context(workflow_context)
             if self._data_converter.payload_codec:
                 assert data_converter.payload_codec
                 if not workflow:
@@ -291,6 +290,8 @@ class _WorkflowWorker:
                     payload_codec = _CommandAwarePayloadCodec(
                         workflow.instance,
                         context_free_payload_codec=self._data_converter.payload_codec,
+                        workflow_context_payload_codec=data_converter.payload_codec,
+                        workflow_context=workflow_context,
                     )
                 await temporalio.bridge.worker.decode_activation(
                     act,
@@ -367,6 +368,11 @@ class _WorkflowWorker:
             payload_codec = _CommandAwarePayloadCodec(
                 workflow.instance,
                 context_free_payload_codec=self._data_converter.payload_codec,
+                workflow_context_payload_codec=data_converter.payload_codec,
+                workflow_context=temporalio.converter.WorkflowSerializationContext(
+                    namespace=self._namespace,
+                    workflow_id=workflow.workflow_id,
+                ),
             )
             try:
                 await temporalio.bridge.worker.encode_completion(
@@ -733,6 +739,8 @@ class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
 
     instance: WorkflowInstance
     context_free_payload_codec: temporalio.converter.PayloadCodec
+    workflow_context_payload_codec: temporalio.converter.PayloadCodec
+    workflow_context: temporalio.converter.WorkflowSerializationContext
 
     async def encode(
         self,
@@ -756,6 +764,8 @@ class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
         if context := self.instance.get_serialization_context(
             _command_aware_visitor.current_command_info.get(),
         ):
+            if context == self.workflow_context:
+                return self.workflow_context_payload_codec
             return self.context_free_payload_codec.with_context(context)
 
         return self.context_free_payload_codec
