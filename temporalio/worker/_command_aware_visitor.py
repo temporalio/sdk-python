@@ -81,6 +81,7 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
     }
 
     def __init__(self, **kwargs: Any) -> None:
+        """Initialize the command-aware payload visitor."""
         super().__init__(**kwargs)
         self._create_override_methods()
 
