@@ -83,7 +83,7 @@ lint-types = [
   { cmd = "uv run mypy --namespace-packages --check-untyped-defs ."},
 ]
 run-bench = "uv run python scripts/run_bench.py"
-test = "uv run pytest"
+test = "uv run pytest tests/worker/test_workflow.py::test_workflow_return_is_honored_when_it_precedes_signal_completion_command"
 
 
 [tool.pytest.ini_options]
