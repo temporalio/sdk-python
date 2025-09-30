@@ -1,7 +1,6 @@
 """Visitor that sets command context during payload traversal."""
 
 import contextvars
-import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Iterator, Optional, Type
@@ -52,103 +51,103 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
     async def _visit_coresdk_workflow_commands_ScheduleActivity(
         self, fs: VisitorFunctions, o: ScheduleActivity
     ) -> None:
-        await self._visit_with_context(
-            CommandType.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK, o.seq, fs, o
-        )
+        with current_command(CommandType.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK, o.seq):
+            await super()._visit_coresdk_workflow_commands_ScheduleActivity(fs, o)
 
     async def _visit_coresdk_workflow_commands_ScheduleLocalActivity(
         self, fs: VisitorFunctions, o: ScheduleLocalActivity
     ) -> None:
-        await self._visit_with_context(
-            CommandType.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK, o.seq, fs, o
-        )
+        with current_command(CommandType.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK, o.seq):
+            await super()._visit_coresdk_workflow_commands_ScheduleLocalActivity(fs, o)
 
     async def _visit_coresdk_workflow_commands_StartChildWorkflowExecution(
         self, fs: VisitorFunctions, o: StartChildWorkflowExecution
     ) -> None:
-        await self._visit_with_context(
-            CommandType.COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION, o.seq, fs, o
-        )
+        with current_command(
+            CommandType.COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION, o.seq
+        ):
+            await super()._visit_coresdk_workflow_commands_StartChildWorkflowExecution(
+                fs, o
+            )
 
     async def _visit_coresdk_workflow_commands_SignalExternalWorkflowExecution(
         self, fs: VisitorFunctions, o: SignalExternalWorkflowExecution
     ) -> None:
-        await self._visit_with_context(
-            CommandType.COMMAND_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION, o.seq, fs, o
-        )
+        with current_command(
+            CommandType.COMMAND_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION, o.seq
+        ):
+            await super()._visit_coresdk_workflow_commands_SignalExternalWorkflowExecution(
+                fs, o
+            )
 
     async def _visit_coresdk_workflow_commands_ScheduleNexusOperation(
         self, fs: VisitorFunctions, o: ScheduleNexusOperation
     ) -> None:
-        await self._visit_with_context(
-            CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION, o.seq, fs, o
-        )
+        with current_command(CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION, o.seq):
+            await super()._visit_coresdk_workflow_commands_ScheduleNexusOperation(fs, o)
 
     # Workflow activation jobs with payloads
     async def _visit_coresdk_workflow_activation_ResolveActivity(
         self, fs: VisitorFunctions, o: ResolveActivity
     ) -> None:
-        await self._visit_with_context(
-            CommandType.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK, o.seq, fs, o
-        )
+        with current_command(CommandType.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK, o.seq):
+            await super()._visit_coresdk_workflow_activation_ResolveActivity(fs, o)
 
     async def _visit_coresdk_workflow_activation_ResolveChildWorkflowExecutionStart(
         self, fs: VisitorFunctions, o: ResolveChildWorkflowExecutionStart
     ) -> None:
-        await self._visit_with_context(
-            CommandType.COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION, o.seq, fs, o
-        )
+        with current_command(
+            CommandType.COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION, o.seq
+        ):
+            await super()._visit_coresdk_workflow_activation_ResolveChildWorkflowExecutionStart(
+                fs, o
+            )
 
     async def _visit_coresdk_workflow_activation_ResolveChildWorkflowExecution(
         self, fs: VisitorFunctions, o: ResolveChildWorkflowExecution
     ) -> None:
-        await self._visit_with_context(
-            CommandType.COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION, o.seq, fs, o
-        )
+        with current_command(
+            CommandType.COMMAND_TYPE_START_CHILD_WORKFLOW_EXECUTION, o.seq
+        ):
+            await super()._visit_coresdk_workflow_activation_ResolveChildWorkflowExecution(
+                fs, o
+            )
 
     async def _visit_coresdk_workflow_activation_ResolveSignalExternalWorkflow(
         self, fs: VisitorFunctions, o: ResolveSignalExternalWorkflow
     ) -> None:
-        await self._visit_with_context(
-            CommandType.COMMAND_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION, o.seq, fs, o
-        )
+        with current_command(
+            CommandType.COMMAND_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION, o.seq
+        ):
+            await super()._visit_coresdk_workflow_activation_ResolveSignalExternalWorkflow(
+                fs, o
+            )
 
     async def _visit_coresdk_workflow_activation_ResolveRequestCancelExternalWorkflow(
         self, fs: VisitorFunctions, o: ResolveRequestCancelExternalWorkflow
     ) -> None:
-        await self._visit_with_context(
-            CommandType.COMMAND_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION,
-            o.seq,
-            fs,
-            o,
-        )
+        with current_command(
+            CommandType.COMMAND_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION, o.seq
+        ):
+            await super()._visit_coresdk_workflow_activation_ResolveRequestCancelExternalWorkflow(
+                fs, o
+            )
 
     async def _visit_coresdk_workflow_activation_ResolveNexusOperationStart(
         self, fs: VisitorFunctions, o: ResolveNexusOperationStart
     ) -> None:
-        await self._visit_with_context(
-            CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION, o.seq, fs, o
-        )
+        with current_command(CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION, o.seq):
+            await super()._visit_coresdk_workflow_activation_ResolveNexusOperationStart(
+                fs, o
+            )
 
     async def _visit_coresdk_workflow_activation_ResolveNexusOperation(
         self, fs: VisitorFunctions, o: ResolveNexusOperation
     ) -> None:
-        await self._visit_with_context(
-            CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION, o.seq, fs, o
-        )
-
-    async def _visit_with_context(
-        self,
-        command_type: CommandType.ValueType,
-        seq: int,
-        fs: VisitorFunctions,
-        o: Any,
-    ) -> None:
-        """Helper to call parent method with command context."""
-        method_name = sys._getframe(1).f_code.co_name
-        parent_method = getattr(super(), method_name)
-        with current_command(command_type, seq):
-            await parent_method(fs, o)
+        with current_command(CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION, o.seq):
+            await super()._visit_coresdk_workflow_activation_ResolveNexusOperation(
+                fs, o
+            )
 
 
 def _get_workflow_command_protos_with_seq() -> Iterator[Type[Any]]:
