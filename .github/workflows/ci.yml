@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         python: ["3.9", "3.13"]
-        os: [ubuntu-latest, ubuntu-arm, macos-intel, macos-arm, windows-latest]
+        os: [ubuntu-latest, ubuntu-arm, macos-intel, macos-arm, windows-2019]
         include:
           # On 3.9 there is a problem with import errors caused by pytests' loader that surface due
           # to a bug in CPython (https://github.com/python/cpython/issues/91351), so we avoid using
@@ -79,8 +79,7 @@ jobs:
       - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
         timeout-minutes: 15
       # Time skipping doesn't yet support ARM
-      - if: ${{ !endsWith(matrix.os, '-arm') }}
-        run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
+      - run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
         timeout-minutes: 10
       # Check cloud if proper target and not on fork
       - if: ${{ matrix.cloudTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
