@@ -2883,9 +2883,6 @@ class WorkflowExecution:
     close_time: Optional[datetime]
     """When the workflow was closed if closed."""
 
-    data_converter: temporalio.converter.DataConverter
-    """Data converter from when this description was created."""
-
     execution_time: Optional[datetime]
     """When this workflow run started or should start."""
 
@@ -2894,6 +2891,9 @@ class WorkflowExecution:
 
     id: str
     """ID for the workflow."""
+
+    namespace: str
+    """Namespace for the workflow."""
 
     parent_id: Optional[str]
     """ID for the parent workflow if this was started as a child."""
@@ -2935,20 +2935,31 @@ class WorkflowExecution:
     workflow_type: str
     """Type name for the workflow."""
 
+    _context_free_data_converter: temporalio.converter.DataConverter
+
+    @property
+    def data_converter(self) -> temporalio.converter.DataConverter:
+        return self._context_free_data_converter.with_context(
+            WorkflowSerializationContext(
+                namespace=self.namespace,
+                workflow_id=self.id,
+            )
+        )
+
     @classmethod
     def _from_raw_info(
         cls,
         info: temporalio.api.workflow.v1.WorkflowExecutionInfo,
+        namespace: str,
         converter: temporalio.converter.DataConverter,
         **additional_fields: Any,
-    ) -> WorkflowExecution:
+    ) -> Self:
         return cls(
             close_time=(
                 info.close_time.ToDatetime().replace(tzinfo=timezone.utc)
                 if info.HasField("close_time")
                 else None
             ),
-            data_converter=converter,
             execution_time=(
                 info.execution_time.ToDatetime().replace(tzinfo=timezone.utc)
                 if info.HasField("execution_time")
@@ -2956,6 +2967,7 @@ class WorkflowExecution:
             ),
             history_length=info.history_length,
             id=info.execution.workflow_id,
+            namespace=namespace,
             parent_id=(
                 info.parent_execution.workflow_id
                 if info.HasField("parent_execution")
@@ -2986,6 +2998,7 @@ class WorkflowExecution:
                 info.search_attributes
             ),
             workflow_type=info.type.name,
+            _context_free_data_converter=converter,
             **additional_fields,
         )
 
@@ -3091,11 +3104,13 @@ class WorkflowExecutionDescription(WorkflowExecution):
     @staticmethod
     async def _from_raw_description(
         description: temporalio.api.workflowservice.v1.DescribeWorkflowExecutionResponse,
+        namespace: str,
         converter: temporalio.converter.DataConverter,
     ) -> WorkflowExecutionDescription:
-        return WorkflowExecutionDescription._from_raw_info(  # type: ignore
+        return WorkflowExecutionDescription._from_raw_info(
             description.workflow_execution_info,
-            converter,
+            namespace=namespace,
+            converter=converter,
             raw_description=description,
         )
 
@@ -3246,23 +3261,9 @@ class WorkflowExecutionAsyncIterator:
             timeout=self._input.rpc_timeout,
         )
 
-        data_converter_cache = {}
-
-        def get_data_converter(workflow_id: str) -> temporalio.converter.DataConverter:
-            if workflow_id not in data_converter_cache:
-                data_converter_cache[workflow_id] = (
-                    self._client.data_converter.with_context(
-                        WorkflowSerializationContext(
-                            namespace=self._client.namespace,
-                            workflow_id=workflow_id,
-                        )
-                    )
-                )
-            return data_converter_cache[workflow_id]
-
         self._current_page = [
             WorkflowExecution._from_raw_info(
-                v, get_data_converter(v.execution.workflow_id)
+                v, self._client.namespace, self._client.data_converter
             )
             for v in resp.executions
         ]
@@ -6111,7 +6112,8 @@ class _ClientImpl(OutboundInterceptor):
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             ),
-            self._client.data_converter.with_context(
+            namespace=self._client.namespace,
+            converter=self._client.data_converter.with_context(
                 WorkflowSerializationContext(
                     namespace=self._client.namespace,
                     workflow_id=input.id,
