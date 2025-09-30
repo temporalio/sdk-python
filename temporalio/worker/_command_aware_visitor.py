@@ -48,11 +48,23 @@ current_command_info: contextvars.ContextVar[Optional[CommandInfo]] = (
 )
 
 
+def _create_override_method(
+    parent_method: Any, command_type: CommandType.ValueType
+) -> Any:
+    """Create an override method that sets command context."""
+
+    async def override_method(self: Any, fs: VisitorFunctions, o: Any) -> None:
+        with current_command(command_type, o.seq):
+            await parent_method(self, fs, o)
+
+    return override_method
+
+
 class CommandAwarePayloadVisitor(PayloadVisitor):
     """Payload visitor that sets command context during traversal.
 
-    Overridden methods are created for all workflow commands and activation jobs that have a 'seq'
-    field.
+    Override methods are created at class definition time for all workflow
+    commands and activation jobs that have a 'seq' field.
     """
 
     _COMMAND_TYPE_MAP: dict[type[Any], Optional[CommandType.ValueType]] = {
@@ -80,41 +92,37 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
         FireTimer: CommandType.COMMAND_TYPE_START_TIMER,
     }
 
-    def __init__(self, **kwargs: Any) -> None:
-        """Initialize the command-aware payload visitor."""
-        super().__init__(**kwargs)
-        self._create_override_methods()
 
-    def _create_override_methods(self) -> None:
-        """Dynamically create override methods for all protos with seq fields."""
-        for proto_class in _get_workflow_command_protos_with_seq():
-            if command_type := self._COMMAND_TYPE_MAP[proto_class]:
-                self._add_override(
-                    proto_class, "coresdk_workflow_commands", command_type
+# Add override methods to CommandAwarePayloadVisitor at class definition time
+def _add_class_overrides() -> None:
+    """Add override methods to CommandAwarePayloadVisitor class."""
+    # Process workflow commands
+    for proto_class in _get_workflow_command_protos_with_seq():
+        if command_type := CommandAwarePayloadVisitor._COMMAND_TYPE_MAP.get(
+            proto_class
+        ):
+            method_name = f"_visit_coresdk_workflow_commands_{proto_class.__name__}"
+            parent_method = getattr(PayloadVisitor, method_name, None)
+            if parent_method:
+                setattr(
+                    CommandAwarePayloadVisitor,
+                    method_name,
+                    _create_override_method(parent_method, command_type),
                 )
-        for proto_class in _get_workflow_activation_job_protos_with_seq():
-            if command_type := self._COMMAND_TYPE_MAP[proto_class]:
-                self._add_override(
-                    proto_class, "coresdk_workflow_activation", command_type
+
+    # Process activation jobs
+    for proto_class in _get_workflow_activation_job_protos_with_seq():
+        if command_type := CommandAwarePayloadVisitor._COMMAND_TYPE_MAP.get(
+            proto_class
+        ):
+            method_name = f"_visit_coresdk_workflow_activation_{proto_class.__name__}"
+            parent_method = getattr(PayloadVisitor, method_name, None)
+            if parent_method:
+                setattr(
+                    CommandAwarePayloadVisitor,
+                    method_name,
+                    _create_override_method(parent_method, command_type),
                 )
-
-    def _add_override(
-        self, proto_class: Type[Any], module: str, command_type: CommandType.ValueType
-    ) -> None:
-        """Add an override method that sets command context."""
-        method_name = f"_visit_{module}_{proto_class.__name__}"
-        parent_method = getattr(PayloadVisitor, method_name, None)
-
-        if not parent_method:
-            # No visitor method means no payload fields to visit
-            return
-
-        async def override_method(fs: VisitorFunctions, o: Any) -> None:
-            with current_command(command_type, o.seq):
-                assert parent_method
-                await parent_method(self, fs, o)
-
-        setattr(self, method_name, override_method)
 
 
 def _get_workflow_command_protos_with_seq() -> Iterator[Type[Any]]:
@@ -144,3 +152,7 @@ def current_command(
     finally:
         if token:
             current_command_info.reset(token)
+
+
+# Create all override methods on the class when the module is imported
+_add_class_overrides()
