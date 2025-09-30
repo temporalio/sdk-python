@@ -2940,7 +2940,6 @@ class WorkflowExecution:
     @property
     def data_converter(self) -> temporalio.converter.DataConverter:
         """Data converter for the workflow."""
-        0 / 0  # type: ignore
         return self._context_free_data_converter.with_context(
             WorkflowSerializationContext(
                 namespace=self.namespace,
