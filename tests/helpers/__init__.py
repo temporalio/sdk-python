@@ -92,13 +92,18 @@ async def assert_task_fail_eventually(
     handle: WorkflowHandle, *, message_contains: Optional[str] = None
 ) -> None:
     async def check() -> None:
+        task_failed = None
         async for evt in handle.fetch_history_events():
-            if evt.HasField("workflow_task_failed_event_attributes") and (
-                not message_contains
-                or message_contains
-                in evt.workflow_task_failed_event_attributes.failure.message
-            ):
-                return
+            if evt.HasField("workflow_task_failed_event_attributes"):
+                task_failed = evt
+                if (
+                    not message_contains
+                    or message_contains
+                    in evt.workflow_task_failed_event_attributes.failure.message
+                ):
+                    return
+        if task_failed:
+            assert False, f"Task failure not correct: {task_failed.workflow_task_failed_event_attributes.failure.message}"
         assert False, "Task failure not present"
 
     await assert_eventually(check)
