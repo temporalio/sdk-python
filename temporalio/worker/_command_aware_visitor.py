@@ -9,7 +9,6 @@ from temporalio.api.enums.v1.command_type_pb2 import CommandType
 from temporalio.bridge._visitor import PayloadVisitor, VisitorFunctions
 from temporalio.bridge.proto.workflow_activation import workflow_activation_pb2
 from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import (
-    FireTimer,
     ResolveActivity,
     ResolveChildWorkflowExecution,
     ResolveChildWorkflowExecutionStart,
@@ -20,18 +19,11 @@ from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import 
 )
 from temporalio.bridge.proto.workflow_commands import workflow_commands_pb2
 from temporalio.bridge.proto.workflow_commands.workflow_commands_pb2 import (
-    CancelSignalWorkflow,
-    CancelTimer,
-    RequestCancelActivity,
-    RequestCancelExternalWorkflowExecution,
-    RequestCancelLocalActivity,
-    RequestCancelNexusOperation,
     ScheduleActivity,
     ScheduleLocalActivity,
     ScheduleNexusOperation,
     SignalExternalWorkflowExecution,
     StartChildWorkflowExecution,
-    StartTimer,
 )
 
 
@@ -51,11 +43,11 @@ current_command_info: contextvars.ContextVar[Optional[CommandInfo]] = (
 class CommandAwarePayloadVisitor(PayloadVisitor):
     """Payload visitor that sets command context during traversal.
 
-    Override methods are explicitly defined for all workflow commands and
-    activation jobs that have a 'seq' field.
+    Override methods are explicitly defined for workflow commands and
+    activation jobs that have both a 'seq' field and payloads to visit.
     """
 
-    # Workflow commands
+    # Workflow commands with payloads
     async def _visit_coresdk_workflow_commands_ScheduleActivity(
         self, fs: VisitorFunctions, o: ScheduleActivity
     ) -> None:
@@ -88,72 +80,13 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
                 fs, o
             )
 
-    async def _visit_coresdk_workflow_commands_RequestCancelExternalWorkflowExecution(
-        self, fs: VisitorFunctions, o: RequestCancelExternalWorkflowExecution
-    ) -> None:
-        with current_command(
-            CommandType.COMMAND_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION, o.seq
-        ):
-            # Note: Base class doesn't have this visitor (no payloads to visit)
-            pass
-
     async def _visit_coresdk_workflow_commands_ScheduleNexusOperation(
         self, fs: VisitorFunctions, o: ScheduleNexusOperation
     ) -> None:
         with current_command(CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION, o.seq):
             await super()._visit_coresdk_workflow_commands_ScheduleNexusOperation(fs, o)
 
-    async def _visit_coresdk_workflow_commands_RequestCancelNexusOperation(
-        self, fs: VisitorFunctions, o: RequestCancelNexusOperation
-    ) -> None:
-        with current_command(
-            CommandType.COMMAND_TYPE_REQUEST_CANCEL_NEXUS_OPERATION, o.seq
-        ):
-            # Note: Base class doesn't have this visitor (no payloads to visit)
-            pass
-
-    async def _visit_coresdk_workflow_commands_StartTimer(
-        self, fs: VisitorFunctions, o: StartTimer
-    ) -> None:
-        with current_command(CommandType.COMMAND_TYPE_START_TIMER, o.seq):
-            # Note: Base class doesn't have this visitor (no payloads to visit)
-            pass
-
-    async def _visit_coresdk_workflow_commands_CancelTimer(
-        self, fs: VisitorFunctions, o: CancelTimer
-    ) -> None:
-        with current_command(CommandType.COMMAND_TYPE_CANCEL_TIMER, o.seq):
-            # Note: Base class doesn't have this visitor (no payloads to visit)
-            pass
-
-    async def _visit_coresdk_workflow_commands_RequestCancelActivity(
-        self, fs: VisitorFunctions, o: RequestCancelActivity
-    ) -> None:
-        with current_command(
-            CommandType.COMMAND_TYPE_REQUEST_CANCEL_ACTIVITY_TASK, o.seq
-        ):
-            # Note: Base class doesn't have this visitor (no payloads to visit)
-            pass
-
-    async def _visit_coresdk_workflow_commands_RequestCancelLocalActivity(
-        self, fs: VisitorFunctions, o: RequestCancelLocalActivity
-    ) -> None:
-        with current_command(
-            CommandType.COMMAND_TYPE_REQUEST_CANCEL_ACTIVITY_TASK, o.seq
-        ):
-            # Note: Base class doesn't have this visitor (no payloads to visit)
-            pass
-
-    async def _visit_coresdk_workflow_commands_CancelSignalWorkflow(
-        self, fs: VisitorFunctions, o: CancelSignalWorkflow
-    ) -> None:
-        # CancelSignalWorkflow has seq but no server command type
-        # (it's an internal SDK command). Set context to None.
-        with current_command(None, o.seq):  # type: ignore
-            # Note: Base class doesn't have this visitor (no payloads to visit)
-            pass
-
-    # Workflow activation jobs
+    # Workflow activation jobs with payloads
     async def _visit_coresdk_workflow_activation_ResolveActivity(
         self, fs: VisitorFunctions, o: ResolveActivity
     ) -> None:
@@ -215,13 +148,6 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
             await super()._visit_coresdk_workflow_activation_ResolveNexusOperation(
                 fs, o
             )
-
-    async def _visit_coresdk_workflow_activation_FireTimer(
-        self, fs: VisitorFunctions, o: FireTimer
-    ) -> None:
-        with current_command(CommandType.COMMAND_TYPE_START_TIMER, o.seq):
-            # Note: Base class doesn't have this visitor (no payloads to visit)
-            pass
 
 
 def _get_workflow_command_protos_with_seq() -> Iterator[Type[Any]]:
