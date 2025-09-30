@@ -1,11 +1,11 @@
 """Test that CommandAwarePayloadVisitor handles all commands with seq fields that have payloads."""
 
+from typing import Any, Iterator, Type
+
 from temporalio.bridge._visitor import PayloadVisitor
-from temporalio.worker._command_aware_visitor import (
-    CommandAwarePayloadVisitor,
-    _get_workflow_activation_job_protos_with_seq,
-    _get_workflow_command_protos_with_seq,
-)
+from temporalio.bridge.proto.workflow_activation import workflow_activation_pb2
+from temporalio.bridge.proto.workflow_commands import workflow_commands_pb2
+from temporalio.worker._command_aware_visitor import CommandAwarePayloadVisitor
 
 
 def test_command_aware_visitor_has_methods_for_all_seq_protos_with_payloads():
@@ -73,3 +73,17 @@ def test_command_aware_visitor_has_methods_for_all_seq_protos_with_payloads():
     assert (
         len(jobs_with_payloads) == len(job_protos) - 1
     ), "Should have exactly one activation job without payloads (FireTimer)"
+
+
+def _get_workflow_command_protos_with_seq() -> Iterator[Type[Any]]:
+    """Get concrete classes of all workflow command protos with a seq field."""
+    for descriptor in workflow_commands_pb2.DESCRIPTOR.message_types_by_name.values():
+        if "seq" in descriptor.fields_by_name:
+            yield descriptor._concrete_class
+
+
+def _get_workflow_activation_job_protos_with_seq() -> Iterator[Type[Any]]:
+    """Get concrete classes of all workflow activation job protos with a seq field."""
+    for descriptor in workflow_activation_pb2.DESCRIPTOR.message_types_by_name.values():
+        if "seq" in descriptor.fields_by_name:
+            yield descriptor._concrete_class

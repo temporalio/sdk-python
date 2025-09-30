@@ -3,11 +3,10 @@
 import contextvars
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Iterator, Optional, Type
+from typing import Iterator, Optional
 
 from temporalio.api.enums.v1.command_type_pb2 import CommandType
 from temporalio.bridge._visitor import PayloadVisitor, VisitorFunctions
-from temporalio.bridge.proto.workflow_activation import workflow_activation_pb2
 from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import (
     ResolveActivity,
     ResolveChildWorkflowExecution,
@@ -17,7 +16,6 @@ from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import 
     ResolveRequestCancelExternalWorkflow,
     ResolveSignalExternalWorkflow,
 )
-from temporalio.bridge.proto.workflow_commands import workflow_commands_pb2
 from temporalio.bridge.proto.workflow_commands.workflow_commands_pb2 import (
     ScheduleActivity,
     ScheduleLocalActivity,
@@ -150,27 +148,13 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
             )
 
 
-def _get_workflow_command_protos_with_seq() -> Iterator[Type[Any]]:
-    """Get concrete classes of all workflow command protos with a seq field."""
-    for descriptor in workflow_commands_pb2.DESCRIPTOR.message_types_by_name.values():
-        if "seq" in descriptor.fields_by_name:
-            yield descriptor._concrete_class
-
-
-def _get_workflow_activation_job_protos_with_seq() -> Iterator[Type[Any]]:
-    """Get concrete classes of all workflow activation job protos with a seq field."""
-    for descriptor in workflow_activation_pb2.DESCRIPTOR.message_types_by_name.values():
-        if "seq" in descriptor.fields_by_name:
-            yield descriptor._concrete_class
-
-
 @contextmanager
 def current_command(
-    command_type: Optional[CommandType.ValueType], command_seq: int
+    command_type: CommandType.ValueType, command_seq: int
 ) -> Iterator[None]:
     """Context manager for setting command info."""
     token = current_command_info.set(
-        CommandInfo(command_type=command_type, command_seq=command_seq)  # type: ignore
+        CommandInfo(command_type=command_type, command_seq=command_seq)
     )
     try:
         yield
