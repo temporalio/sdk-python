@@ -25,32 +25,32 @@ pub struct MetricAttributesRef {
 
 #[pyclass]
 pub struct MetricCounterRef {
-    counter: Arc<dyn metrics::Counter>,
+    counter: metrics::Counter,
 }
 
 #[pyclass]
 pub struct MetricHistogramRef {
-    histogram: Arc<dyn metrics::Histogram>,
+    histogram: metrics::Histogram,
 }
 
 #[pyclass]
 pub struct MetricHistogramFloatRef {
-    histogram: Arc<dyn metrics::HistogramF64>,
+    histogram: metrics::HistogramF64,
 }
 
 #[pyclass]
 pub struct MetricHistogramDurationRef {
-    histogram: Arc<dyn metrics::HistogramDuration>,
+    histogram: metrics::HistogramDuration,
 }
 
 #[pyclass]
 pub struct MetricGaugeRef {
-    gauge: Arc<dyn metrics::Gauge>,
+    gauge: metrics::Gauge,
 }
 
 #[pyclass]
 pub struct MetricGaugeFloatRef {
-    gauge: Arc<dyn metrics::GaugeF64>,
+    gauge: metrics::GaugeF64,
 }
 
 pub fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<MetricMeterRef> {
@@ -107,11 +107,14 @@ impl MetricMeterRef {
         unit: Option<String>,
     ) -> MetricHistogramFloatRef {
         MetricHistogramFloatRef {
-            histogram: self.meter.inner.histogram_f64(build_metric_parameters(
-                name,
-                description,
-                unit,
-            )),
+            histogram: self
+                .meter
+                .inner
+                .histogram_f64(build_metric_parameters(
+                    name,
+                    description,
+                    unit,
+                )),
         }
     }
 
@@ -122,11 +125,14 @@ impl MetricMeterRef {
         unit: Option<String>,
     ) -> MetricHistogramDurationRef {
         MetricHistogramDurationRef {
-            histogram: self.meter.inner.histogram_duration(build_metric_parameters(
-                name,
-                description,
-                unit,
-            )),
+            histogram: self
+                .meter
+                .inner
+                .histogram_duration(build_metric_parameters(
+                    name,
+                    description,
+                    unit,
+                )),
         }
     }
 
@@ -255,8 +261,7 @@ fn metric_key_value_from_py(
         metrics::MetricValue::Float(v)
     } else {
         return Err(PyTypeError::new_err(format!(
-            "Invalid value type for key {}, must be str, int, float, or bool",
-            k
+            "Invalid value type for key {k}, must be str, int, float, or bool"
         )));
     };
     Ok(metrics::MetricKeyValue::new(k, val))

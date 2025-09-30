@@ -312,3 +312,30 @@ APPLICATION_ERROR_CATEGORY_UNSPECIFIED: ApplicationErrorCategory.ValueType  # 0
 APPLICATION_ERROR_CATEGORY_BENIGN: ApplicationErrorCategory.ValueType  # 1
 """Expected application error with little/no severity."""
 global___ApplicationErrorCategory = ApplicationErrorCategory
+
+class _WorkerStatus:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _WorkerStatusEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _WorkerStatus.ValueType
+    ],
+    builtins.type,
+):  # noqa: F821
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    WORKER_STATUS_UNSPECIFIED: _WorkerStatus.ValueType  # 0
+    WORKER_STATUS_RUNNING: _WorkerStatus.ValueType  # 1
+    WORKER_STATUS_SHUTTING_DOWN: _WorkerStatus.ValueType  # 2
+    WORKER_STATUS_SHUTDOWN: _WorkerStatus.ValueType  # 3
+
+class WorkerStatus(_WorkerStatus, metaclass=_WorkerStatusEnumTypeWrapper):
+    """(-- api-linter: core::0216::synonyms=disabled
+    aip.dev/not-precedent: It seems we have both state and status, and status is a better fit for workers. --)
+    """
+
+WORKER_STATUS_UNSPECIFIED: WorkerStatus.ValueType  # 0
+WORKER_STATUS_RUNNING: WorkerStatus.ValueType  # 1
+WORKER_STATUS_SHUTTING_DOWN: WorkerStatus.ValueType  # 2
+WORKER_STATUS_SHUTDOWN: WorkerStatus.ValueType  # 3
+global___WorkerStatus = WorkerStatus

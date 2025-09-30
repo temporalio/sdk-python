@@ -8,11 +8,13 @@ from .common_pb2 import (
     NexusOperationCancellationState,
     PendingNexusOperationState,
     Severity,
+    WorkerStatus,
     WorkflowRuleActionScope,
 )
 from .deployment_pb2 import (
     DeploymentReachability,
     VersionDrainageStatus,
+    WorkerDeploymentVersionStatus,
     WorkerVersioningMode,
 )
 from .event_type_pb2 import EventType
@@ -32,6 +34,7 @@ from .schedule_pb2 import ScheduleOverlapPolicy
 from .task_queue_pb2 import (
     BuildIdTaskReachability,
     DescribeTaskQueueMode,
+    RateLimitSource,
     TaskQueueKind,
     TaskQueueType,
     TaskReachability,
@@ -76,6 +79,7 @@ __all__ = [
     "PendingWorkflowTaskState",
     "QueryRejectCondition",
     "QueryResultType",
+    "RateLimitSource",
     "ReplicationState",
     "ResetReapplyExcludeType",
     "ResetReapplyType",
@@ -95,6 +99,8 @@ __all__ = [
     "UpdateWorkflowExecutionLifecycleStage",
     "VersionDrainageStatus",
     "VersioningBehavior",
+    "WorkerDeploymentVersionStatus",
+    "WorkerStatus",
     "WorkerVersioningMode",
     "WorkflowExecutionStatus",
     "WorkflowIdConflictPolicy",

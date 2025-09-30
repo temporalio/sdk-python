@@ -79,11 +79,12 @@ class WorkflowEnvironment:
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[temporalio.client.Interceptor] = [],
+        plugins: Sequence[temporalio.client.Plugin] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
         retry_config: Optional[temporalio.client.RetryConfig] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
         identity: Optional[str] = None,
         tls: bool | temporalio.client.TLSConfig = False,
         ip: str = "127.0.0.1",
@@ -213,6 +214,7 @@ class WorkflowEnvironment:
                     namespace=namespace,
                     data_converter=data_converter,
                     interceptors=interceptors,
+                    plugins=plugins,
                     default_workflow_query_reject_condition=default_workflow_query_reject_condition,
                     tls=tls,
                     retry_config=retry_config,
@@ -237,11 +239,12 @@ class WorkflowEnvironment:
         *,
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[temporalio.client.Interceptor] = [],
+        plugins: Sequence[temporalio.client.Plugin] = [],
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
         retry_config: Optional[temporalio.client.RetryConfig] = None,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
         identity: Optional[str] = None,
         port: Optional[int] = None,
         download_dest_dir: Optional[str] = None,
@@ -332,6 +335,7 @@ class WorkflowEnvironment:
                     server.target,
                     data_converter=data_converter,
                     interceptors=interceptors,
+                    plugins=plugins,
                     default_workflow_query_reject_condition=default_workflow_query_reject_condition,
                     retry_config=retry_config,
                     rpc_metadata=rpc_metadata,
@@ -534,7 +538,7 @@ class _AssertionErrorWorkflowInboundInterceptor(
 
 
 class _TimeSkippingClientInterceptor(temporalio.client.Interceptor):
-    def __init__(self, env: _EphemeralServerWorkflowEnvironment) -> None:
+    def __init__(self, env: _EphemeralServerWorkflowEnvironment) -> None:  # type: ignore[reportMissingSuperCall]
         self.env = env
 
     def intercept_client(
@@ -563,13 +567,13 @@ class _TimeSkippingClientOutboundInterceptor(temporalio.client.OutboundIntercept
 
 
 class _TimeSkippingWorkflowHandle(temporalio.client.WorkflowHandle):
-    env: _EphemeralServerWorkflowEnvironment
+    env: _EphemeralServerWorkflowEnvironment  # type: ignore[reportUninitializedInstanceAttribute]
 
     async def result(
         self,
         *,
         follow_runs: bool = True,
-        rpc_metadata: Mapping[str, str] = {},
+        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
         rpc_timeout: Optional[timedelta] = None,
     ) -> Any:
         async with self.env.time_skipping_unlocked():

@@ -9,12 +9,15 @@ import signal
 import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from time import sleep
 from typing import Any, Callable, List, NoReturn, Optional, Sequence, Type
 
+import temporalio.api.workflowservice.v1
 from temporalio import activity, workflow
 from temporalio.client import (
     AsyncActivityHandle,
@@ -44,6 +47,7 @@ from tests.helpers.worker import (
     KSAction,
     KSExecuteActivityAction,
     KSWorkflowParams,
+    kitchen_sink_retry_policy,
 )
 
 # Passing through because Python 3.9 has an import bug at
@@ -94,6 +98,49 @@ async def test_activity_custom_name(client: Client, worker: ExternalWorker):
     assert result.result == "Name: my custom activity name!"
 
 
+async def test_client_available_in_async_activities(
+    client: Client, worker: ExternalWorker
+):
+    with pytest.raises(RuntimeError, match="Not in activity context"):
+        activity.client()
+
+    captured_client: Optional[Client] = None
+
+    @activity.defn
+    async def capture_client() -> None:
+        nonlocal captured_client
+        captured_client = activity.client()
+
+    await _execute_workflow_with_activity(client, worker, capture_client)
+    assert captured_client is client
+
+
+async def test_client_not_available_in_sync_activities(
+    client: Client, worker: ExternalWorker
+):
+    saw_error = False
+
+    @activity.defn
+    def some_activity() -> None:
+        with pytest.raises(
+            RuntimeError, match="The client is only available in `async def`"
+        ):
+            activity.client()
+        nonlocal saw_error
+        saw_error = True
+
+    await _execute_workflow_with_activity(
+        client,
+        worker,
+        some_activity,
+        worker_config={
+            "activity_executor": concurrent.futures.ThreadPoolExecutor(1),
+            "max_concurrent_activities": 1,
+        },
+    )
+    assert saw_error
+
+
 async def test_activity_info(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
@@ -140,6 +187,7 @@ async def test_activity_info(
     assert info.workflow_namespace == client.namespace
     assert info.workflow_run_id == result.handle.first_execution_run_id
     assert info.workflow_type == "kitchen_sink"
+    assert info.retry_policy == kitchen_sink_retry_policy()
 
 
 async def test_sync_activity_thread(client: Client, worker: ExternalWorker):
@@ -612,7 +660,7 @@ async def test_activity_type_hints(client: Client, worker: ExternalWorker):
         result.result
         == "param1: <class 'tests.worker.test_activity.SomeClass2'>, param2: <class 'str'>"
     )
-    assert activity_param1 == SomeClass2(foo="str1", bar=SomeClass1(foo=123))
+    assert activity_param1 == SomeClass2(foo="str1", bar=SomeClass1(foo=123))  # type: ignore[reportUnboundVariable] # noqa
 
 
 async def test_activity_heartbeat_details(
@@ -1416,3 +1464,132 @@ async def test_activity_failure_trace_identifier(
 
     finally:
         activity.logger.base_logger.removeHandler(CustomLogHandler())
+
+
+async def test_activity_heartbeat_context(client: Client, worker: ExternalWorker):
+    @activity.defn
+    async def heartbeat():
+        if activity.info().attempt == 1:
+            context: activity._Context = activity._Context.current()
+
+            def heartbeat_task():
+                async def h():
+                    if context.heartbeat is not None:
+                        context.heartbeat("Some detail")
+
+                asyncio.run(h())
+
+            thread = threading.Thread(target=heartbeat_task)
+            thread.start()
+            thread.join()
+            raise RuntimeError("oh no!")
+        else:
+            assert len(activity.info().heartbeat_details) == 1
+            return "details: " + activity.info().heartbeat_details[0]
+
+    result = await _execute_workflow_with_activity(
+        client, worker, heartbeat, retry_max_attempts=2
+    )
+    assert result.result == "details: Some detail"
+
+
+async def test_activity_reset_catch(
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Time skipping server doesn't support activity reset")
+
+    @activity.defn
+    async def wait_cancel() -> str:
+        req = temporalio.api.workflowservice.v1.ResetActivityRequest(
+            namespace=client.namespace,
+            execution=temporalio.api.common.v1.WorkflowExecution(
+                workflow_id=activity.info().workflow_id,
+                run_id=activity.info().workflow_run_id,
+            ),
+            id=activity.info().activity_id,
+        )
+        await client.workflow_service.reset_activity(req)
+        try:
+            while True:
+                await asyncio.sleep(0.3)
+                activity.heartbeat()
+        except asyncio.CancelledError:
+            details = activity.cancellation_details()
+            assert details is not None
+            return "Got cancelled error, reset? " + str(details.reset)
+
+    @activity.defn
+    def sync_wait_cancel() -> str:
+        req = temporalio.api.workflowservice.v1.ResetActivityRequest(
+            namespace=client.namespace,
+            execution=temporalio.api.common.v1.WorkflowExecution(
+                workflow_id=activity.info().workflow_id,
+                run_id=activity.info().workflow_run_id,
+            ),
+            id=activity.info().activity_id,
+        )
+        asyncio.run(client.workflow_service.reset_activity(req))
+        try:
+            while True:
+                sleep(0.3)
+                activity.heartbeat()
+        except temporalio.exceptions.CancelledError:
+            details = activity.cancellation_details()
+            assert details is not None
+            return "Got cancelled error, reset? " + str(details.reset)
+        except Exception as e:
+            return str(type(e)) + str(e)
+
+    result = await _execute_workflow_with_activity(
+        client,
+        worker,
+        wait_cancel,
+    )
+    assert result.result == "Got cancelled error, reset? True"
+
+    config = WorkerConfig(
+        activity_executor=ThreadPoolExecutor(max_workers=1),
+    )
+    result = await _execute_workflow_with_activity(
+        client,
+        worker,
+        sync_wait_cancel,
+        worker_config=config,
+    )
+    assert result.result == "Got cancelled error, reset? True"
+
+
+async def test_activity_reset_history(
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Time skipping server doesn't support activity reset")
+
+    @activity.defn
+    async def wait_cancel() -> str:
+        req = temporalio.api.workflowservice.v1.ResetActivityRequest(
+            namespace=client.namespace,
+            execution=temporalio.api.common.v1.WorkflowExecution(
+                workflow_id=activity.info().workflow_id,
+                run_id=activity.info().workflow_run_id,
+            ),
+            id=activity.info().activity_id,
+        )
+        await client.workflow_service.reset_activity(req)
+        while True:
+            await asyncio.sleep(0.3)
+            activity.heartbeat()
+
+    with pytest.raises(WorkflowFailureError) as e:
+        result = await _execute_workflow_with_activity(
+            client,
+            worker,
+            wait_cancel,
+        )
+    assert isinstance(e.value.cause, ActivityError)
+    assert isinstance(e.value.cause.cause, ApplicationError)
+    assert (
+        e.value.cause.cause.message
+        == "Unhandled activity cancel error produced by activity reset"
+    )

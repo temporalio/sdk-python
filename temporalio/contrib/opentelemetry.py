@@ -25,6 +25,9 @@ import opentelemetry.propagators.textmap
 import opentelemetry.trace
 import opentelemetry.trace.propagation.tracecontext
 import opentelemetry.util.types
+from opentelemetry.context import Context
+from opentelemetry.trace import Span, SpanKind, Status, StatusCode, _Links
+from opentelemetry.util import types
 from typing_extensions import Protocol, TypeAlias, TypedDict
 
 import temporalio.activity
@@ -34,6 +37,7 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.worker
 import temporalio.workflow
+from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 
 # OpenTelemetry dynamically, lazily chooses its context implementation at
 # runtime. When first accessed, they use pkg_resources.iter_entry_points + load.
@@ -71,7 +75,7 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
     custom attributes desired.
     """
 
-    def __init__(
+    def __init__(  # type: ignore[reportMissingSuperCall]
         self,
         tracer: Optional[opentelemetry.trace.Tracer] = None,
         *,
@@ -125,11 +129,10 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         :py:meth:`temporalio.worker.Interceptor.workflow_interceptor_class`.
         """
         # Set the externs needed
-        # TODO(cretz): MyPy works w/ spread kwargs instead of direct passing
         input.unsafe_extern_functions.update(
-            **_WorkflowExternFunctions(
-                __temporal_opentelemetry_completed_span=self._completed_workflow_span,
-            )
+            {
+                "__temporal_opentelemetry_completed_span": self._completed_workflow_span,
+            }
         )
         return TracingWorkflowInboundInterceptor
 
@@ -168,11 +171,31 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         attributes: opentelemetry.util.types.Attributes,
         input: Optional[_InputWithHeaders] = None,
         kind: opentelemetry.trace.SpanKind,
+        context: Optional[Context] = None,
     ) -> Iterator[None]:
-        with self.tracer.start_as_current_span(name, attributes=attributes, kind=kind):
+        with self.tracer.start_as_current_span(
+            name,
+            attributes=attributes,
+            kind=kind,
+            context=context,
+            set_status_on_exception=False,
+        ) as span:
             if input:
                 input.headers = self._context_to_headers(input.headers)
-            yield None
+            try:
+                yield None
+            except Exception as exc:
+                if (
+                    not isinstance(exc, ApplicationError)
+                    or exc.category != ApplicationErrorCategory.BENIGN
+                ):
+                    span.set_status(
+                        Status(
+                            status_code=StatusCode.ERROR,
+                            description=f"{type(exc).__name__}: {exc}",
+                        )
+                    )
+                raise
 
     def _completed_workflow_span(
         self, params: _CompletedWorkflowSpanParams
@@ -283,7 +306,7 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
         self, input: temporalio.worker.ExecuteActivityInput
     ) -> Any:
         info = temporalio.activity.info()
-        with self.root.tracer.start_as_current_span(
+        with self.root._start_as_current_span(
             f"RunActivity:{info.activity_type}",
             context=self.root._context_from_headers(input.headers),
             attributes={

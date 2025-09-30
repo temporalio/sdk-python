@@ -120,6 +120,15 @@ class SandboxRestrictions:
     on invalid calls are not still applied.
     """
 
+    disable_lazy_sys_module_passthrough: bool = False
+    """
+    By default when __contains__ or __getitem__ is called on sys.modules in the
+    sandbox, if it is not present in the sandbox but is outside the sandbox and
+    it is marked passthrough, it is lazily added to the sandboxed sys.modules
+    and returned. This option disables that feature and forces all passthroughs
+    to have been explicitly imported.
+    """
+
     passthrough_modules_minimum: ClassVar[Set[str]]
     """Set of modules that must be passed through at the minimum."""
 
@@ -471,6 +480,7 @@ SandboxRestrictions.passthrough_modules_with_temporal = (
         # https://wrapt.readthedocs.io/en/latest/issues.html#using-issubclass-on-abstract-classes
         "asyncio",
         "abc",
+        "nexusrpc",
         "temporalio",
         # Due to pkg_resources use of base classes caused by the ABC issue
         # above, and Otel's use of pkg_resources, we pass it through
@@ -478,6 +488,10 @@ SandboxRestrictions.passthrough_modules_with_temporal = (
         # Due to how Pydantic is importing lazily inside of some classes, we choose
         # to always pass it through
         "pydantic",
+        # OpenAI and OpenAI agent modules in workflows we always want to pass
+        # through and reference the out-of-sandbox forms
+        "openai",
+        "agents",
     }
 )
 

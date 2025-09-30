@@ -43,6 +43,8 @@ from typing import (
     cast,
 )
 
+import nexusrpc.handler
+from nexusrpc import InputT, OutputT
 from typing_extensions import Self, TypeAlias, TypedDict
 
 import temporalio.activity
@@ -52,6 +54,7 @@ import temporalio.api.sdk.v1
 import temporalio.bridge.proto.activity_result
 import temporalio.bridge.proto.child_workflow
 import temporalio.bridge.proto.common
+import temporalio.bridge.proto.nexus
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_commands
 import temporalio.bridge.proto.workflow_completion
@@ -61,6 +64,7 @@ import temporalio.exceptions
 import temporalio.workflow
 from temporalio.service import __version__
 
+from ..api.failure.v1.message_pb2 import Failure
 from ._interceptor import (
     ContinueAsNewInput,
     ExecuteWorkflowInput,
@@ -72,6 +76,7 @@ from ._interceptor import (
     StartActivityInput,
     StartChildWorkflowInput,
     StartLocalActivityInput,
+    StartNexusOperationInput,
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
 )
@@ -139,6 +144,8 @@ class WorkflowInstanceDetails:
     extern_functions: Mapping[str, Callable]
     disable_eager_activity_execution: bool
     worker_level_failure_exception_types: Sequence[Type[BaseException]]
+    last_completion_result: temporalio.api.common.v1.Payloads
+    last_failure: Optional[Failure]
 
 
 class WorkflowInstance(ABC):
@@ -193,7 +200,7 @@ _Context: TypeAlias = Dict[str, Any]
 _ExceptionHandler: TypeAlias = Callable[[asyncio.AbstractEventLoop, _Context], Any]
 
 
-class _WorkflowInstanceImpl(
+class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     WorkflowInstance, temporalio.workflow._Runtime, asyncio.AbstractEventLoop
 ):
     def __init__(self, det: WorkflowInstanceDetails) -> None:
@@ -228,6 +235,7 @@ class _WorkflowInstanceImpl(
         self._pending_timers: Dict[int, _TimerHandle] = {}
         self._pending_activities: Dict[int, _ActivityHandle] = {}
         self._pending_child_workflows: Dict[int, _ChildWorkflowHandle] = {}
+        self._pending_nexus_operations: Dict[int, _NexusOperationHandle] = {}
         self._pending_external_signals: Dict[int, asyncio.Future] = {}
         self._pending_external_cancels: Dict[int, asyncio.Future] = {}
         # Keyed by type
@@ -314,6 +322,9 @@ class _WorkflowInstanceImpl(
         # The current details (as opposed to static details on workflow start), returned in the
         # metadata query
         self._current_details = ""
+
+        self._last_completion_result = det.last_completion_result
+        self._last_failure = det.last_failure
 
         # The versioning behavior of this workflow, as established by annotation or by the dynamic
         # config function. Is only set once upon initialization.
@@ -409,7 +420,7 @@ class _WorkflowInstanceImpl(
             # We want some errors during activation, like those that can happen
             # during payload conversion, to be able to fail the workflow not the
             # task
-            if self._is_workflow_failure_exception(err):
+            if self.workflow_is_failure_exception(err):
                 try:
                     self._set_workflow_failure(err)
                 except Exception as inner_err:
@@ -507,6 +518,10 @@ class _WorkflowInstanceImpl(
             self._apply_resolve_child_workflow_execution_start(
                 job.resolve_child_workflow_execution_start
             )
+        elif job.HasField("resolve_nexus_operation_start"):
+            self._apply_resolve_nexus_operation_start(job.resolve_nexus_operation_start)
+        elif job.HasField("resolve_nexus_operation"):
+            self._apply_resolve_nexus_operation(job.resolve_nexus_operation)
         elif job.HasField("resolve_request_cancel_external_workflow"):
             self._apply_resolve_request_cancel_external_workflow(
                 job.resolve_request_cancel_external_workflow
@@ -620,7 +635,7 @@ class _WorkflowInstanceImpl(
                 # Validation failures are always update failures. We reuse
                 # workflow failure logic to decide task failure vs update
                 # failure after validation.
-                if not past_validation or self._is_workflow_failure_exception(err):
+                if not past_validation or self.workflow_is_failure_exception(err):
                     if command is None:
                         command = self._add_command()
                         command.update_response.protocol_instance_id = (
@@ -770,7 +785,6 @@ class _WorkflowInstanceImpl(
         self,
         job: temporalio.bridge.proto.workflow_activation.ResolveChildWorkflowExecution,
     ) -> None:
-        # No matter the result, we know we want to pop
         handle = self._pending_child_workflows.pop(job.seq, None)
         if not handle:
             raise RuntimeError(
@@ -838,6 +852,81 @@ class _WorkflowInstanceImpl(
             )
         else:
             raise RuntimeError("Child workflow start did not have a known status")
+
+    def _apply_resolve_nexus_operation_start(
+        self,
+        job: temporalio.bridge.proto.workflow_activation.ResolveNexusOperationStart,
+    ) -> None:
+        handle = self._pending_nexus_operations.get(job.seq)
+        if not handle:
+            raise RuntimeError(
+                f"Failed to find nexus operation handle for job sequence number {job.seq}"
+            )
+        if job.HasField("operation_token"):
+            # The nexus operation started asynchronously. A `ResolveNexusOperation` job
+            # will follow in a future activation.
+            handle._resolve_start_success(job.operation_token)
+        elif job.HasField("started_sync"):
+            # The nexus operation 'started' in the sense that it's already resolved. A
+            # `ResolveNexusOperation` job will be in the same activation.
+            handle._resolve_start_success(None)
+        elif job.HasField("failed"):
+            # The nexus operation start failed; no ResolveNexusOperation will follow.
+            self._pending_nexus_operations.pop(job.seq, None)
+            handle._resolve_failure(
+                self._failure_converter.from_failure(
+                    job.failed, self._payload_converter
+                )
+            )
+        else:
+            raise ValueError(f"Unknown Nexus operation start status: {job}")
+
+    def _apply_resolve_nexus_operation(
+        self,
+        job: temporalio.bridge.proto.workflow_activation.ResolveNexusOperation,
+    ) -> None:
+        handle = self._pending_nexus_operations.pop(job.seq, None)
+        if not handle:
+            # One way this can occur is:
+            # 1. Cancel request issued with cancellation_type=WaitRequested.
+            # 2. Server receives nexus cancel handler task completion and writes
+            #    NexusOperationCancelRequestCompleted / NexusOperationCancelRequestFailed. On
+            #    consuming this event, core sends an activation resolving the handle future as
+            #    completed / failed.
+            # 4. Subsequently, the nexus operation completes as completed/failed, causing the server
+            #    to write NexusOperationCompleted / NexusOperationFailed. On consuming this event,
+            #    core sends an activation which would attempt to resolve the handle future as
+            #    completed / failed, but it has already been resolved.
+            return
+
+        # Handle the four oneof variants of NexusOperationResult
+        result = job.result
+        if result.HasField("completed"):
+            [output] = self._convert_payloads(
+                [result.completed],
+                [handle._input.output_type] if handle._input.output_type else None,
+            )
+            handle._resolve_success(output)
+        elif result.HasField("failed"):
+            handle._resolve_failure(
+                self._failure_converter.from_failure(
+                    result.failed, self._payload_converter
+                )
+            )
+        elif result.HasField("cancelled"):
+            handle._resolve_failure(
+                self._failure_converter.from_failure(
+                    result.cancelled, self._payload_converter
+                )
+            )
+        elif result.HasField("timed_out"):
+            handle._resolve_failure(
+                self._failure_converter.from_failure(
+                    result.timed_out, self._payload_converter
+                )
+            )
+        else:
+            raise RuntimeError("Nexus operation did not have a result")
 
     def _apply_resolve_request_cancel_external_workflow(
         self,
@@ -1299,6 +1388,7 @@ class _WorkflowInstanceImpl(
             )
         )
 
+    # workflow_start_child_workflow ret_type
     async def workflow_start_child_workflow(
         self,
         workflow: Any,
@@ -1333,7 +1423,7 @@ class _WorkflowInstanceImpl(
         if isinstance(workflow, str):
             name = workflow
         elif callable(workflow):
-            defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
+            defn = temporalio.workflow._Definition.must_from_run_fn(workflow)  # pyright: ignore
             if not defn.name:
                 raise TypeError("Cannot invoke dynamic workflow explicitly")
             name = defn.name
@@ -1380,6 +1470,7 @@ class _WorkflowInstanceImpl(
         local_retry_threshold: Optional[timedelta],
         cancellation_type: temporalio.workflow.ActivityCancellationType,
         activity_id: Optional[str],
+        summary: Optional[str],
     ) -> temporalio.workflow.ActivityHandle[Any]:
         # Get activity definition if it's callable
         name: str
@@ -1412,9 +1503,35 @@ class _WorkflowInstanceImpl(
                 retry_policy=retry_policy,
                 local_retry_threshold=local_retry_threshold,
                 cancellation_type=cancellation_type,
+                summary=summary,
                 headers={},
                 arg_types=arg_types,
                 ret_type=ret_type,
+            )
+        )
+
+    async def workflow_start_nexus_operation(
+        self,
+        endpoint: str,
+        service: str,
+        operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
+        input: Any,
+        output_type: Optional[Type[OutputT]],
+        schedule_to_close_timeout: Optional[timedelta],
+        cancellation_type: temporalio.workflow.NexusOperationCancellationType,
+        headers: Optional[Mapping[str, str]],
+    ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
+        # start_nexus_operation
+        return await self._outbound.start_nexus_operation(
+            StartNexusOperationInput(
+                endpoint=endpoint,
+                service=service,
+                operation=operation,
+                input=input,
+                output_type=output_type,
+                schedule_to_close_timeout=schedule_to_close_timeout,
+                cancellation_type=cancellation_type,
+                headers=headers,
             )
         )
 
@@ -1577,6 +1694,54 @@ class _WorkflowInstanceImpl(
         self._assert_not_read_only("set current details")
         self._current_details = details
 
+    def workflow_is_failure_exception(self, err: BaseException) -> bool:
+        # An exception is a failure instead of a task fail if it's already a
+        # failure error or if it is a timeout error or if it is an instance of
+        # any of the failure types in the worker or workflow-level setting
+        wf_failure_exception_types = self._defn.failure_exception_types
+        if self._dynamic_failure_exception_types is not None:
+            wf_failure_exception_types = self._dynamic_failure_exception_types
+        return (
+            isinstance(err, temporalio.exceptions.FailureError)
+            or isinstance(err, asyncio.TimeoutError)
+            or any(isinstance(err, typ) for typ in wf_failure_exception_types)
+            or any(
+                isinstance(err, typ)
+                for typ in self._worker_level_failure_exception_types
+            )
+        )
+
+    def workflow_has_last_completion_result(self) -> bool:
+        return len(self._last_completion_result.payloads) > 0
+
+    def workflow_last_completion_result(
+        self, type_hint: Optional[Type]
+    ) -> Optional[Any]:
+        if len(self._last_completion_result.payloads) == 0:
+            return None
+        elif len(self._last_completion_result.payloads) > 1:
+            warnings.warn(
+                f"Expected single last completion result, got {len(self._last_completion_result.payloads)}"
+            )
+            return None
+
+        if type_hint is None:
+            return self._payload_converter.from_payload(
+                self._last_completion_result.payloads[0]
+            )
+        else:
+            return self._payload_converter.from_payload(
+                self._last_completion_result.payloads[0], type_hint
+            )
+
+    def workflow_last_failure(self) -> Optional[BaseException]:
+        if self._last_failure:
+            return self._failure_converter.from_failure(
+                self._last_failure, self._payload_converter
+            )
+
+        return None
+
     #### Calls from outbound impl ####
     # These are in alphabetical order and all start with "_outbound_".
 
@@ -1620,16 +1785,14 @@ class _WorkflowInstanceImpl(
                     # If an activity future completes at the same time as a cancellation is being processed, the cancellation would be swallowed
                     # _WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY will correctly reraise the exception
                     if handle._result_fut.done():
-                        # TODO in next release, check sdk flag when not replaying instead of global override, remove the override, and set flag use
                         if (
-                            (
-                                not self._is_replaying
-                                and _raise_on_cancelling_completed_activity_override
-                            )
+                            not self._is_replaying
                             or _WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY
                             in self._current_internal_flags
                         ):
-                            # self._current_completion.successful.used_internal_flags.append(WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY)
+                            self._current_completion.successful.used_internal_flags.append(
+                                _WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY
+                            )
                             raise
                     # Send a cancel request to the activity
                     handle._apply_cancel_command(self._add_command())
@@ -1724,6 +1887,46 @@ class _WorkflowInstanceImpl(
             except asyncio.CancelledError:
                 apply_child_cancel_error()
 
+    async def _outbound_start_nexus_operation(
+        self, input: StartNexusOperationInput[Any, OutputT]
+    ) -> _NexusOperationHandle[OutputT]:
+        # A Nexus operation handle contains two futures: self._start_fut is resolved as a result of
+        # the Nexus operation starting (activation job: resolve_nexus_operation_start), and
+        # self._result_fut is resolved as a result of the Nexus operation completing (activation
+        # job: resolve_nexus_operation). The handle itself corresponds to an asyncio.Task which
+        # waits on self.result_fut, handling CancelledError by emitting a
+        # RequestCancelNexusOperation command. We do not return the handle until we receive
+        # resolve_nexus_operation_start, like ChildWorkflowHandle and unlike ActivityHandle. Note
+        # that a Nexus operation may complete synchronously (in which case both jobs will be sent in
+        # the same activation, and start will be resolved without an operation token), or
+        # asynchronously (in which case they may be sent in separate activations, and start will be
+        # resolved with an operation token). See comments in tests/worker/test_nexus.py for worked
+        # examples of the evolution of the resulting handle state machine in the sync and async
+        # Nexus response cases.
+        handle: _NexusOperationHandle[OutputT]
+
+        async def operation_handle_fn() -> OutputT:
+            while True:
+                try:
+                    return cast(OutputT, await asyncio.shield(handle._result_fut))
+                except asyncio.CancelledError:
+                    cancel_command = self._add_command()
+                    handle._apply_cancel_command(cancel_command)
+
+        handle = _NexusOperationHandle(
+            self, self._next_seq("nexus_operation"), input, operation_handle_fn()
+        )
+        handle._apply_schedule_command()
+        self._pending_nexus_operations[handle._seq] = handle
+
+        while True:
+            try:
+                await asyncio.shield(handle._start_fut)
+                return handle
+            except asyncio.CancelledError:
+                cancel_command = self._add_command()
+                handle._apply_cancel_command(cancel_command)
+
     #### Miscellaneous helpers ####
     # These are in alphabetical order.
 
@@ -1792,6 +1995,8 @@ class _WorkflowInstanceImpl(
             # Don't wrap payload conversion errors that would fail the workflow
             raise
         except Exception as err:
+            if self.workflow_is_failure_exception(err):
+                raise
             raise RuntimeError("Failed decoding arguments") from err
 
     def _instantiate_workflow_object(self) -> Any:
@@ -1832,23 +2037,6 @@ class _WorkflowInstanceImpl(
                     self._versioning_behavior = dynamic_config.versioning_behavior
 
         return workflow_instance
-
-    def _is_workflow_failure_exception(self, err: BaseException) -> bool:
-        # An exception is a failure instead of a task fail if it's already a
-        # failure error or if it is a timeout error or if it is an instance of
-        # any of the failure types in the worker or workflow-level setting
-        wf_failure_exception_types = self._defn.failure_exception_types
-        if self._dynamic_failure_exception_types is not None:
-            wf_failure_exception_types = self._dynamic_failure_exception_types
-        return (
-            isinstance(err, temporalio.exceptions.FailureError)
-            or isinstance(err, asyncio.TimeoutError)
-            or any(isinstance(err, typ) for typ in wf_failure_exception_types)
-            or any(
-                isinstance(err, typ)
-                for typ in self._worker_level_failure_exception_types
-            )
-        )
 
     def _warn_if_unfinished_handlers(self) -> None:
         def warnable(handler_executions: Iterable[HandlerExecution]):
@@ -2043,7 +2231,7 @@ class _WorkflowInstanceImpl(
                 err
             ):
                 self._add_command().cancel_workflow_execution.SetInParent()
-            elif self._is_workflow_failure_exception(err):
+            elif self.workflow_is_failure_exception(err):
                 # All other failure errors fail the workflow
                 self._set_workflow_failure(err)
             else:
@@ -2287,6 +2475,9 @@ class _WorkflowInstanceImpl(
     def get_exception_handler(self) -> Optional[_ExceptionHandler]:
         return self._exception_handler
 
+    def get_task_factory(self) -> None:
+        return None
+
     def set_exception_handler(self, handler: Optional[_ExceptionHandler]) -> None:
         self._exception_handler = handler
 
@@ -2372,7 +2563,7 @@ class _WorkflowInstanceImpl(
 
 
 class _WorkflowInboundImpl(WorkflowInboundInterceptor):
-    def __init__(
+    def __init__(  # type: ignore
         self,
         instance: _WorkflowInstanceImpl,
     ) -> None:
@@ -2380,7 +2571,7 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
         self._instance = instance
 
     def init(self, outbound: WorkflowOutboundInterceptor) -> None:
-        self._outbound = outbound
+        self._outbound = outbound  # type: ignore
 
     async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
         args = [self._instance._object] + list(input.args)
@@ -2430,7 +2621,7 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
 
 
 class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
-    def __init__(self, instance: _WorkflowInstanceImpl) -> None:
+    def __init__(self, instance: _WorkflowInstanceImpl) -> None:  # type: ignore
         # We are intentionally not calling the base class's __init__ here
         self._instance = instance
 
@@ -2457,6 +2648,11 @@ class _WorkflowOutboundImpl(WorkflowOutboundInterceptor):
         self, input: StartChildWorkflowInput
     ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         return await self._instance._outbound_start_child_workflow(input)
+
+    async def start_nexus_operation(
+        self, input: StartNexusOperationInput[Any, OutputT]
+    ) -> _NexusOperationHandle[OutputT]:
+        return await self._instance._outbound_start_nexus_operation(input)
 
     def start_local_activity(
         self, input: StartLocalActivityInput
@@ -2609,8 +2805,12 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             v.start_to_close_timeout.FromTimedelta(self._input.start_to_close_timeout)
         if self._input.retry_policy:
             self._input.retry_policy.apply_to_proto(v.retry_policy)
+        if self._input.summary:
+            command.user_metadata.summary.CopyFrom(
+                self._instance._payload_converter.to_payload(self._input.summary)
+            )
         v.cancellation_type = cast(
-            "temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType",
+            temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType,
             int(self._input.cancellation_type),
         )
 
@@ -2629,10 +2829,6 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             if self._input.versioning_intent:
                 command.schedule_activity.versioning_intent = (
                     self._input.versioning_intent._to_proto()
-                )
-            if self._input.summary:
-                command.user_metadata.summary.CopyFrom(
-                    self._instance._payload_converter.to_payload(self._input.summary)
                 )
             if self._input.priority:
                 command.schedule_activity.priority.CopyFrom(
@@ -2746,7 +2942,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         if self._input.task_timeout:
             v.workflow_task_timeout.FromTimedelta(self._input.task_timeout)
         v.parent_close_policy = cast(
-            "temporalio.bridge.proto.child_workflow.ParentClosePolicy.ValueType",
+            temporalio.bridge.proto.child_workflow.ParentClosePolicy.ValueType,
             int(self._input.parent_close_policy),
         )
         v.workflow_id_reuse_policy = cast(
@@ -2768,7 +2964,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
                 self._input.search_attributes, v.search_attributes
             )
         v.cancellation_type = cast(
-            "temporalio.bridge.proto.child_workflow.ChildWorkflowCancellationType.ValueType",
+            temporalio.bridge.proto.child_workflow.ChildWorkflowCancellationType.ValueType,
             int(self._input.cancellation_type),
         )
         if self._input.versioning_intent:
@@ -2842,6 +3038,83 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         if self._run_id:
             v.workflow_execution.run_id = self._run_id
         await self._instance._cancel_external_workflow(command)
+
+
+# TODO(nexus-preview): are we sure we don't want to inherit from asyncio.Task as
+# ActivityHandle and ChildWorkflowHandle do? I worry that we should provide .done(),
+# .result(), .exception() etc for consistency.
+class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
+    def __init__(
+        self,
+        instance: _WorkflowInstanceImpl,
+        seq: int,
+        input: StartNexusOperationInput[Any, OutputT],
+        fn: Coroutine[Any, Any, OutputT],
+    ):
+        self._instance = instance
+        self._seq = seq
+        self._input = input
+        self._task = asyncio.Task(fn)
+        self._start_fut: asyncio.Future[Optional[str]] = instance.create_future()
+        self._result_fut: asyncio.Future[Optional[OutputT]] = instance.create_future()
+
+    @property
+    def operation_token(self) -> Optional[str]:
+        try:
+            return self._start_fut.result()
+        except BaseException:
+            return None
+
+    def __await__(self) -> Generator[Any, Any, OutputT]:
+        return self._task.__await__()
+
+    def cancel(self) -> bool:
+        return self._task.cancel()
+
+    def _resolve_start_success(self, operation_token: Optional[str]) -> None:
+        # We intentionally let this error if already done
+        self._start_fut.set_result(operation_token)
+
+    def _resolve_success(self, result: Any) -> None:
+        # We intentionally let this error if already done
+        self._result_fut.set_result(result)
+
+    def _resolve_failure(self, err: BaseException) -> None:
+        if self._start_fut.done():
+            # We intentionally let this error if already done
+            self._result_fut.set_exception(err)
+        else:
+            self._start_fut.set_exception(err)
+            # Set null result to avoid warning about unhandled future
+            self._result_fut.set_result(None)
+
+    def _apply_schedule_command(self) -> None:
+        payload = self._instance._payload_converter.to_payload(self._input.input)
+        command = self._instance._add_command()
+        v = command.schedule_nexus_operation
+        v.seq = self._seq
+        v.endpoint = self._input.endpoint
+        v.service = self._input.service
+        v.operation = self._input.operation_name
+        v.input.CopyFrom(payload)
+        if self._input.schedule_to_close_timeout is not None:
+            v.schedule_to_close_timeout.FromTimedelta(
+                self._input.schedule_to_close_timeout
+            )
+        v.cancellation_type = cast(
+            temporalio.bridge.proto.nexus.NexusOperationCancellationType.ValueType,
+            int(self._input.cancellation_type),
+        )
+
+        if self._input.headers:
+            for key, val in self._input.headers.items():
+                v.nexus_header[key] = val
+
+    def _apply_cancel_command(
+        self,
+        command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
+    ) -> None:
+        command.request_cancel_nexus_operation.seq = self._seq
 
 
 class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
@@ -3136,7 +3409,3 @@ class _WorkflowLogicFlag(IntEnum):
     """Flags that may be set on task/activation completion to differentiate new from old workflow behavior."""
 
     RAISE_ON_CANCELLING_COMPLETED_ACTIVITY = 1
-
-
-# Used by tests to validate behavior prior to SDK flag becoming default
-_raise_on_cancelling_completed_activity_override = False

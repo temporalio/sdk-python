@@ -24,6 +24,8 @@ jobs:
         with:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: "clippy"
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: temporalio/bridge -> target
@@ -44,7 +46,7 @@ jobs:
       - run: poe build-develop
       - run: mkdir junit-xml
       - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
-        timeout-minutes: 10
+        timeout-minutes: 15
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
         run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
@@ -57,6 +59,11 @@ jobs:
           TEMPORAL_CLIENT_CLOUD_API_KEY: ${{ secrets.TEMPORAL_CLIENT_CLOUD_API_KEY }}
           TEMPORAL_CLIENT_CLOUD_API_VERSION: 2024-05-13-00
           TEMPORAL_CLIENT_CLOUD_NAMESPACE: sdk-ci.a2dd6
+      - if: ${{ matrix.openaiTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
+        run: poe test tests/contrib/openai_agents/test_openai.py ${{matrix.pytestExtraArgs}} -s  --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--openai.xml
+        timeout-minutes: 10
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       - name: "Upload junit-xml artifacts"
         uses: actions/upload-artifact@v4
         if: always()
@@ -102,6 +109,41 @@ jobs:
         run: |
           npx doctoc README.md
           [[ -z $(git status --porcelain README.md) ]] || (git diff README.md; echo "README changed"; exit 1)
+  test-latest-deps:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: temporalio/bridge -> target
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: arduino/setup-protoc@v3
+        with:
+          # TODO(cretz): Can upgrade proto when https://github.com/arduino/setup-protoc/issues/99 fixed
+          version: "23.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: astral-sh/setup-uv@v5
+      - run: uv tool install poethepoet
+      - run: uv lock --upgrade
+      - run: uv sync --all-extras
+      - run: poe lint
+      - run: poe build-develop
+      - run: mkdir junit-xml
+      - run: poe test  -s --junit-xml=junit-xml/latest-deps.xml
+        timeout-minutes: 10
+      - name: "Upload junit-xml artifacts"
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-xml--${{github.run_id}}--${{github.run_attempt}}--latest-deps--time-skipping
+          path: junit-xml
+          retention-days: 14
 
   # Runs the sdk features repo tests with this repo's current SDK code
   features-tests:

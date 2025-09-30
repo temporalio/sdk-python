@@ -79,6 +79,7 @@ class _WorkflowWorker:
         disable_safe_eviction: bool,
         should_enforce_versioning_behavior: bool,
         assert_local_activity_valid: Callable[[str], None],
+        encode_headers: bool,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._namespace = namespace
@@ -105,7 +106,7 @@ class _WorkflowWorker:
             if interceptor_class:
                 self._interceptor_classes.append(interceptor_class)
         self._extern_functions.update(
-            **_WorkflowExternFunctions(
+            **_WorkflowExternFunctions(  # type: ignore
                 __temporal_get_metric_meter=lambda: metric_meter,
                 __temporal_assert_local_activity_valid=assert_local_activity_valid,
             )
@@ -116,6 +117,7 @@ class _WorkflowWorker:
         self._disable_eager_activity_execution = disable_eager_activity_execution
         self._on_eviction_hook = on_eviction_hook
         self._disable_safe_eviction = disable_safe_eviction
+        self._encode_headers = encode_headers
         self._throw_after_activation: Optional[Exception] = None
 
         # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
@@ -255,7 +257,9 @@ class _WorkflowWorker:
             # Decode the activation if there's a codec and not cache remove job
             if self._data_converter.payload_codec:
                 await temporalio.bridge.worker.decode_activation(
-                    act, self._data_converter.payload_codec
+                    act,
+                    self._data_converter.payload_codec,
+                    decode_headers=self._encode_headers,
                 )
 
             if LOG_PROTOS:
@@ -342,7 +346,9 @@ class _WorkflowWorker:
         if self._data_converter.payload_codec:
             try:
                 await temporalio.bridge.worker.encode_completion(
-                    completion, self._data_converter.payload_codec
+                    completion,
+                    self._data_converter.payload_codec,
+                    encode_headers=self._encode_headers,
                 )
             except Exception as err:
                 logger.exception(
@@ -516,6 +522,7 @@ class _WorkflowWorker:
             execution_timeout=init.workflow_execution_timeout.ToTimedelta()
             if init.HasField("workflow_execution_timeout")
             else None,
+            first_execution_run_id=init.first_execution_run_id,
             headers=dict(init.headers),
             namespace=self._namespace,
             parent=parent,
@@ -545,6 +552,10 @@ class _WorkflowWorker:
             priority=temporalio.common.Priority._from_proto(init.priority),
         )
 
+        last_failure = (
+            init.continued_failure if init.HasField("continued_failure") else None
+        )
+
         # Create instance from details
         det = WorkflowInstanceDetails(
             payload_converter_class=self._data_converter.payload_converter_class,
@@ -556,6 +567,8 @@ class _WorkflowWorker:
             extern_functions=self._extern_functions,
             disable_eager_activity_execution=self._disable_eager_activity_execution,
             worker_level_failure_exception_types=self._workflow_failure_exception_types,
+            last_completion_result=init.last_completion_result,
+            last_failure=last_failure,
         )
         if defn.sandboxed:
             return self._workflow_runner.create_instance(det)

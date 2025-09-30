@@ -16,10 +16,12 @@ from ._interceptor import (
     StartActivityInput,
     StartChildWorkflowInput,
     StartLocalActivityInput,
+    StartNexusOperationInput,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
+from ._plugin import Plugin
 from ._replayer import (
     Replayer,
     ReplayerConfig,
@@ -31,6 +33,7 @@ from ._tuning import (
     CustomSlotSupplier,
     FixedSizeSlotSupplier,
     LocalActivitySlotInfo,
+    NexusSlotInfo,
     ResourceBasedSlotConfig,
     ResourceBasedSlotSupplier,
     ResourceBasedTunerConfig,
@@ -77,6 +80,7 @@ __all__ = [
     "ActivityOutboundInterceptor",
     "WorkflowInboundInterceptor",
     "WorkflowOutboundInterceptor",
+    "Plugin",
     # Interceptor input
     "ContinueAsNewInput",
     "ExecuteActivityInput",
@@ -89,6 +93,7 @@ __all__ = [
     "StartActivityInput",
     "StartChildWorkflowInput",
     "StartLocalActivityInput",
+    "StartNexusOperationInput",
     "WorkflowInterceptorClassInput",
     # Advanced activity classes
     "SharedStateManager",
@@ -113,4 +118,5 @@ __all__ = [
     "SlotReleaseContext",
     "SlotReserveContext",
     "WorkflowSlotInfo",
+    "NexusSlotInfo",
 ]

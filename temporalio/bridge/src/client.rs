@@ -8,7 +8,9 @@ use temporal_client::{
     ConfiguredClient, HealthService, HttpConnectProxyOptions, RetryClient, RetryConfig,
     TemporalServiceClientWithMetrics, TestService, TlsConfig, WorkflowService,
 };
-use tonic::metadata::MetadataKey;
+use tonic::metadata::{
+    AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataKey, BinaryMetadataValue,
+};
 use url::Url;
 
 use crate::runtime;
@@ -28,7 +30,7 @@ pub struct ClientConfig {
     target_url: String,
     client_name: String,
     client_version: String,
-    metadata: HashMap<String, String>,
+    metadata: HashMap<String, RpcMetadataValue>,
     api_key: Option<String>,
     identity: String,
     tls_config: Option<ClientTlsConfig>,
@@ -72,8 +74,16 @@ struct RpcCall {
     rpc: String,
     req: Vec<u8>,
     retry: bool,
-    metadata: HashMap<String, String>,
+    metadata: HashMap<String, RpcMetadataValue>,
     timeout_millis: Option<u64>,
+}
+
+#[derive(FromPyObject)]
+enum RpcMetadataValue {
+    #[pyo3(transparent, annotation = "str")]
+    Str(String),
+    #[pyo3(transparent, annotation = "bytes")]
+    Bytes(Vec<u8>),
 }
 
 pub fn connect_client<'a>(
@@ -88,9 +98,7 @@ pub fn connect_client<'a>(
             retry_client: opts
                 .connect_no_namespace(runtime.core.telemetry().get_temporal_metric_meter())
                 .await
-                .map_err(|err| {
-                    PyRuntimeError::new_err(format!("Failed client connect: {}", err))
-                })?,
+                .map_err(|err| PyRuntimeError::new_err(format!("Failed client connect: {err}")))?,
             runtime,
         })
     })
@@ -118,8 +126,19 @@ macro_rules! rpc_call_on_trait {
 
 #[pymethods]
 impl ClientRef {
-    fn update_metadata(&self, headers: HashMap<String, String>) {
-        self.retry_client.get_client().set_headers(headers);
+    fn update_metadata(&self, headers: HashMap<String, RpcMetadataValue>) -> PyResult<()> {
+        let (ascii_headers, binary_headers) = partition_headers(headers);
+
+        self.retry_client
+            .get_client()
+            .set_headers(ascii_headers)
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
+        self.retry_client
+            .get_client()
+            .set_binary_headers(binary_headers)
+            .map_err(|err| PyValueError::new_err(err.to_string()))?;
+
+        Ok(())
     }
 
     fn update_api_key(&self, api_key: Option<String>) {
@@ -181,6 +200,7 @@ impl ClientRef {
                     rpc_call!(retry_client, call, describe_workflow_rule)
                 }
                 "execute_multi_operation" => rpc_call!(retry_client, call, execute_multi_operation),
+                "fetch_worker_config" => rpc_call!(retry_client, call, fetch_worker_config),
                 "get_cluster_info" => rpc_call!(retry_client, call, get_cluster_info),
                 "get_current_deployment" => rpc_call!(retry_client, call, get_current_deployment),
                 "get_deployment_reachability" => {
@@ -263,6 +283,9 @@ impl ClientRef {
                 "request_cancel_workflow_execution" => {
                     rpc_call!(retry_client, call, request_cancel_workflow_execution)
                 }
+                "reset_activity" => {
+                    rpc_call!(retry_client, call, reset_activity)
+                }
                 "reset_sticky_task_queue" => {
                     rpc_call!(retry_client, call, reset_sticky_task_queue)
                 }
@@ -339,6 +362,10 @@ impl ClientRef {
                     rpc_call_on_trait!(retry_client, call, WorkflowService, update_namespace)
                 }
                 "update_schedule" => rpc_call!(retry_client, call, update_schedule),
+                "update_task_queue_config" => {
+                    rpc_call!(retry_client, call, update_task_queue_config)
+                }
+                "update_worker_config" => rpc_call!(retry_client, call, update_worker_config),
                 "update_worker_deployment_version_metadata" => {
                     rpc_call!(
                         retry_client,
@@ -422,11 +449,17 @@ impl ClientRef {
             let bytes = match call.rpc.as_str() {
                 "add_namespace_region" => rpc_call!(retry_client, call, add_namespace_region),
                 "create_api_key" => rpc_call!(retry_client, call, create_api_key),
+                "create_connectivity_rule" => {
+                    rpc_call!(retry_client, call, create_connectivity_rule)
+                }
                 "create_namespace" => rpc_call!(retry_client, call, create_namespace),
                 "create_service_account" => rpc_call!(retry_client, call, create_service_account),
                 "create_user_group" => rpc_call!(retry_client, call, create_user_group),
                 "create_user" => rpc_call!(retry_client, call, create_user),
                 "delete_api_key" => rpc_call!(retry_client, call, delete_api_key),
+                "delete_connectivity_rule" => {
+                    rpc_call!(retry_client, call, delete_connectivity_rule)
+                }
                 "delete_namespace" => {
                     rpc_call_on_trait!(retry_client, call, CloudService, delete_namespace)
                 }
@@ -439,6 +472,8 @@ impl ClientRef {
                 "get_api_key" => rpc_call!(retry_client, call, get_api_key),
                 "get_api_keys" => rpc_call!(retry_client, call, get_api_keys),
                 "get_async_operation" => rpc_call!(retry_client, call, get_async_operation),
+                "get_connectivity_rule" => rpc_call!(retry_client, call, get_connectivity_rule),
+                "get_connectivity_rules" => rpc_call!(retry_client, call, get_connectivity_rules),
                 "get_namespace" => rpc_call!(retry_client, call, get_namespace),
                 "get_namespaces" => rpc_call!(retry_client, call, get_namespaces),
                 "get_region" => rpc_call!(retry_client, call, get_region),
@@ -462,6 +497,7 @@ impl ClientRef {
                 "update_namespace" => {
                     rpc_call_on_trait!(retry_client, call, CloudService, update_namespace)
                 }
+                "update_namespace_tags" => rpc_call!(retry_client, call, update_namespace_tags),
                 "update_service_account" => rpc_call!(retry_client, call, update_service_account),
                 "update_user_group" => rpc_call!(retry_client, call, update_user_group),
                 "update_user" => rpc_call!(retry_client, call, update_user),
@@ -518,15 +554,35 @@ impl ClientRef {
 
 fn rpc_req<P: prost::Message + Default>(call: RpcCall) -> PyResult<tonic::Request<P>> {
     let proto = P::decode(&*call.req)
-        .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
+        .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
     let mut req = tonic::Request::new(proto);
     for (k, v) in call.metadata {
-        req.metadata_mut().insert(
-            MetadataKey::from_str(k.as_str())
-                .map_err(|err| PyValueError::new_err(format!("Invalid metadata key: {}", err)))?,
-            v.parse()
-                .map_err(|err| PyValueError::new_err(format!("Invalid metadata value: {}", err)))?,
-        );
+        if let Ok(binary_key) = BinaryMetadataKey::from_str(&k) {
+            let RpcMetadataValue::Bytes(bytes) = v else {
+                return Err(PyValueError::new_err(format!(
+                    "Invalid metadata value for binary key {k}: expected bytes"
+                )));
+            };
+
+            req.metadata_mut()
+                .insert_bin(binary_key, BinaryMetadataValue::from_bytes(&bytes));
+        } else {
+            let ascii_key = AsciiMetadataKey::from_str(&k)
+                .map_err(|err| PyValueError::new_err(format!("Invalid metadata key: {err}")))?;
+
+            let RpcMetadataValue::Str(string) = v else {
+                return Err(PyValueError::new_err(format!(
+                    "Invalid metadata value for ASCII key {k}: expected str"
+                )));
+            };
+
+            req.metadata_mut().insert(
+                ascii_key,
+                AsciiMetadataValue::from_str(&string).map_err(|err| {
+                    PyValueError::new_err(format!("Invalid metadata value: {err}"))
+                })?,
+            );
+        }
     }
     if let Some(timeout_millis) = call.timeout_millis {
         req.set_timeout(Duration::from_millis(timeout_millis));
@@ -553,15 +609,45 @@ where
     }
 }
 
+fn partition_headers(
+    headers: HashMap<String, RpcMetadataValue>,
+) -> (HashMap<String, String>, HashMap<String, Vec<u8>>) {
+    let (ascii_enum_headers, binary_enum_headers): (HashMap<_, _>, HashMap<_, _>) = headers
+        .into_iter()
+        .partition(|(_, v)| matches!(v, RpcMetadataValue::Str(_)));
+
+    let ascii_headers = ascii_enum_headers
+        .into_iter()
+        .map(|(k, v)| {
+            let RpcMetadataValue::Str(s) = v else {
+                unreachable!();
+            };
+            (k, s)
+        })
+        .collect();
+    let binary_headers = binary_enum_headers
+        .into_iter()
+        .map(|(k, v)| {
+            let RpcMetadataValue::Bytes(b) = v else {
+                unreachable!();
+            };
+            (k, b)
+        })
+        .collect();
+
+    (ascii_headers, binary_headers)
+}
+
 impl TryFrom<ClientConfig> for ClientOptions {
     type Error = PyErr;
 
     fn try_from(opts: ClientConfig) -> PyResult<Self> {
         let mut gateway_opts = ClientOptionsBuilder::default();
+        let (ascii_headers, binary_headers) = partition_headers(opts.metadata);
         gateway_opts
             .target_url(
                 Url::parse(&opts.target_url)
-                    .map_err(|err| PyValueError::new_err(format!("invalid target URL: {}", err)))?,
+                    .map_err(|err| PyValueError::new_err(format!("invalid target URL: {err}")))?,
             )
             .client_name(opts.client_name)
             .client_version(opts.client_version)
@@ -572,7 +658,8 @@ impl TryFrom<ClientConfig> for ClientOptions {
             )
             .keep_alive(opts.keep_alive_config.map(Into::into))
             .http_connect_proxy(opts.http_connect_proxy_config.map(Into::into))
-            .headers(Some(opts.metadata))
+            .headers(Some(ascii_headers))
+            .binary_headers(Some(binary_headers))
             .api_key(opts.api_key);
         // Builder does not allow us to set option here, so we have to make
         // a conditional to even call it
@@ -581,7 +668,7 @@ impl TryFrom<ClientConfig> for ClientOptions {
         }
         gateway_opts
             .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid client config: {}", err)))
+            .map_err(|err| PyValueError::new_err(format!("Invalid client config: {err}")))
     }
 }
 

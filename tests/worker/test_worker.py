@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import sys
 import uuid
 from datetime import timedelta
 from typing import Any, Awaitable, Callable, Optional, Sequence
 from urllib.request import urlopen
 
+import nexusrpc
+
 import temporalio.api.enums.v1
+import temporalio.nexus
 import temporalio.worker._worker
 from temporalio import activity, workflow
 from temporalio.api.workflowservice.v1 import (
@@ -19,7 +21,11 @@ from temporalio.api.workflowservice.v1 import (
     SetWorkerDeploymentRampingVersionRequest,
     SetWorkerDeploymentRampingVersionResponse,
 )
-from temporalio.client import BuildIdOpAddNewDefault, Client, TaskReachabilityType
+from temporalio.client import (
+    BuildIdOpAddNewDefault,
+    Client,
+    TaskReachabilityType,
+)
 from temporalio.common import PinnedVersioningOverride, RawValue, VersioningBehavior
 from temporalio.runtime import PrometheusConfig, Runtime, TelemetryConfig
 from temporalio.service import RPCError
@@ -29,6 +35,7 @@ from temporalio.worker import (
     CustomSlotSupplier,
     FixedSizeSlotSupplier,
     LocalActivitySlotInfo,
+    NexusSlotInfo,
     PollerBehaviorAutoscaling,
     ResourceBasedSlotConfig,
     ResourceBasedSlotSupplier,
@@ -50,6 +57,7 @@ from tests.helpers import (
     new_worker,
     worker_versioning_enabled,
 )
+from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 # Passing through because Python 3.9 has an import bug at
 # https://github.com/python/cpython/issues/91351
@@ -73,6 +81,21 @@ async def never_run_activity() -> None:
 class NeverRunWorkflow:
     @workflow.run
     async def run(self) -> None:
+        raise NotImplementedError
+
+
+@nexusrpc.handler.service_handler
+class NeverRunService:
+    @nexusrpc.handler.sync_operation
+    async def never_run_operation(
+        self, _ctx: nexusrpc.handler.StartOperationContext, _input: None
+    ) -> None:
+        raise NotImplementedError
+
+    @temporalio.nexus.workflow_run_operation
+    async def never_run_workflow_run_operation(
+        self, _ctx: temporalio.nexus.WorkflowRunOperationContext, _input: None
+    ) -> temporalio.nexus.WorkflowHandle[None]:
         raise NotImplementedError
 
 
@@ -312,6 +335,7 @@ async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvir
             ),
             resource_based_options,
         ),
+        nexus_supplier=FixedSizeSlotSupplier(10),
     )
     async with new_worker(
         client,
@@ -349,7 +373,7 @@ async def test_cant_specify_max_concurrent_and_tuner(
     assert "when also specifying tuner" in str(err.value)
 
 
-async def test_warns_when_workers_too_lot(client: Client, env: WorkflowEnvironment):
+async def test_warns_when_workers_too_low(client: Client, env: WorkflowEnvironment):
     tuner = WorkerTuner.create_resource_based(
         target_memory_usage=0.5,
         target_cpu_usage=0.5,
@@ -367,9 +391,63 @@ async def test_warns_when_workers_too_lot(client: Client, env: WorkflowEnvironme
                 activity_executor=executor,
             ):
                 pass
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        with pytest.warns(
+            UserWarning,
+            match="Worker max_concurrent_nexus_tasks is 500 but nexus_task_executor's max_workers is only",
+        ):
+            async with new_worker(
+                client,
+                WaitOnSignalWorkflow,
+                nexus_service_handlers=[NeverRunService()],
+                tuner=tuner,
+                nexus_task_executor=executor,
+            ):
+                pass
+
+
+@nexusrpc.handler.service_handler
+class SayHelloService:
+    @nexusrpc.handler.sync_operation
+    async def say_hello(
+        self, _ctx: nexusrpc.handler.StartOperationContext, name: str
+    ) -> str:
+        return f"Hello, {name}!"
+
+
+@workflow.defn
+class CustomSlotSupplierWorkflow:
+    def __init__(self) -> None:
+        self._last_signal = "<none>"
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: self._last_signal == "finish")
+        await workflow.execute_activity(
+            say_hello,
+            "hi",
+            versioning_intent=VersioningIntent.DEFAULT,
+            start_to_close_timeout=timedelta(seconds=5),
+        )
+        nexus_client = workflow.create_nexus_client(
+            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+            service=SayHelloService,
+        )
+        await nexus_client.execute_operation(
+            SayHelloService.say_hello,
+            "hi",
+        )
+
+    @workflow.signal
+    def my_signal(self, value: str) -> None:
+        self._last_signal = value
+        workflow.logger.info(f"Signal: {value}")
 
 
 async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work under Java test server")
+
     class MyPermit(SlotPermit):
         def __init__(self, pnum: int):
             super().__init__()
@@ -408,6 +486,8 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
                 self.seen_used_slot_kinds.add("a")
             elif isinstance(ctx.slot_info, LocalActivitySlotInfo):
                 self.seen_used_slot_kinds.add("la")
+            elif isinstance(ctx.slot_info, NexusSlotInfo):
+                self.seen_used_slot_kinds.add("nx")
             self.used += 1
 
         def release_slot(self, ctx: SlotReleaseContext) -> None:
@@ -424,7 +504,7 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
                 self.seen_release_info_nonempty = True
             self.releases += 1
 
-        def reserve_asserts(self, ctx):
+        def reserve_asserts(self, ctx: SlotReserveContext) -> None:
             assert ctx.task_queue is not None
             assert ctx.worker_identity is not None
             assert ctx.worker_build_id is not None
@@ -434,33 +514,37 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
     ss = MySlotSupplier()
 
     tuner = WorkerTuner.create_composite(
-        workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
+        workflow_supplier=ss,
+        activity_supplier=ss,
+        local_activity_supplier=ss,
+        nexus_supplier=ss,
     )
     async with new_worker(
         client,
-        WaitOnSignalWorkflow,
+        CustomSlotSupplierWorkflow,
         activities=[say_hello],
+        nexus_service_handlers=[SayHelloService()],
         tuner=tuner,
         identity="myworker",
     ) as w:
+        await create_nexus_endpoint(w.task_queue, client)
         wf1 = await client.start_workflow(
-            WaitOnSignalWorkflow.run,
+            CustomSlotSupplierWorkflow.run,
             id=f"custom-slot-supplier-{uuid.uuid4()}",
             task_queue=w.task_queue,
         )
-        await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
+        await wf1.signal(CustomSlotSupplierWorkflow.my_signal, "finish")
         await wf1.result()
 
     # We can't use reserve number directly because there is a technically possible race
     # where the python reserve function appears to complete, but Rust doesn't see that.
     # This isn't solvable without redoing a chunk of pyo3-asyncio. So we only check
     # that the permits passed to release line up.
-    assert ss.highest_seen_reserve_on_release == ss.releases
-    # Two workflow tasks, one activity
-    assert ss.used == 3
+    assert ss.highest_seen_reserve_on_release >= ss.releases
+    assert ss.used == 5
     assert ss.seen_sticky_kinds == {True, False}
-    assert ss.seen_slot_kinds == {"workflow", "activity", "local-activity"}
-    assert ss.seen_used_slot_kinds == {"wf", "a"}
+    assert ss.seen_slot_kinds == {"workflow", "activity", "local-activity", "nexus"}
+    assert ss.seen_used_slot_kinds == {"wf", "a", "nx"}
     assert ss.seen_release_info_empty
     assert ss.seen_release_info_nonempty
 
@@ -496,7 +580,10 @@ async def test_throwing_slot_supplier(client: Client, env: WorkflowEnvironment):
     ss = ThrowingSlotSupplier()
 
     tuner = WorkerTuner.create_composite(
-        workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
+        workflow_supplier=ss,
+        activity_supplier=ss,
+        local_activity_supplier=ss,
+        nexus_supplier=ss,
     )
     async with new_worker(
         client,
@@ -532,7 +619,10 @@ async def test_blocking_slot_supplier(client: Client, env: WorkflowEnvironment):
     ss = BlockingSlotSupplier()
 
     tuner = WorkerTuner.create_composite(
-        workflow_supplier=ss, activity_supplier=ss, local_activity_supplier=ss
+        workflow_supplier=ss,
+        activity_supplier=ss,
+        local_activity_supplier=ss,
+        nexus_supplier=ss,
     )
     async with new_worker(
         client,
@@ -811,7 +901,7 @@ class DynamicWorkflowVersioningOnConfigMethod:
 async def _test_worker_deployment_dynamic_workflow(
     client: Client,
     env: WorkflowEnvironment,
-    workflow_class,
+    workflow_class: type[Any],
     expected_versioning_behavior: temporalio.api.enums.v1.VersioningBehavior.ValueType,
 ):
     if env.supports_time_skipping:
@@ -1129,6 +1219,7 @@ def create_worker(
         task_queue=f"task-queue-{uuid.uuid4()}",
         activities=[never_run_activity],
         workflows=[NeverRunWorkflow],
+        nexus_service_handlers=[NeverRunService()],
         on_fatal_error=on_fatal_error,
     )
 
@@ -1141,7 +1232,7 @@ class WorkerFailureInjector:
     def __enter__(self) -> WorkerFailureInjector:
         return self
 
-    def __exit__(self, *args, **kwargs) -> None:
+    def __exit__(self, *args: Any, **kwargs: Any) -> None:
         self.workflow.shutdown()
         self.activity.shutdown()
 

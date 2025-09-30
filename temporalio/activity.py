@@ -19,6 +19,7 @@ from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Iterator,
@@ -41,6 +42,9 @@ import temporalio.common
 import temporalio.converter
 
 from .types import CallableType
+
+if TYPE_CHECKING:
+    from temporalio.client import Client
 
 
 @overload
@@ -120,6 +124,13 @@ class Info:
     workflow_run_id: str
     workflow_type: str
     priority: temporalio.common.Priority
+    retry_policy: Optional[temporalio.common.RetryPolicy]
+    """The retry policy of this activity.
+
+    Note that the server may have set a different policy than the one provided when scheduling the activity.
+    If the value is None, it means the server didn't send information about retry policy (e.g. due to old server
+    version), but it may still be defined server-side."""
+
     # TODO(cretz): Consider putting identity on here for "worker_id" for logger?
 
     def _logger_details(self) -> Mapping[str, Any]:
@@ -150,6 +161,7 @@ class ActivityCancellationDetails:
     not_found: bool = False
     cancel_requested: bool = False
     paused: bool = False
+    reset: bool = False
     timed_out: bool = False
     worker_shutdown: bool = False
 
@@ -163,6 +175,7 @@ class ActivityCancellationDetails:
             paused=proto.is_paused,
             timed_out=proto.is_timed_out,
             worker_shutdown=proto.is_worker_shutdown,
+            reset=proto.is_reset,
         )
 
 
@@ -179,6 +192,7 @@ class _Context:
         temporalio.converter.PayloadConverter,
     ]
     runtime_metric_meter: Optional[temporalio.common.MetricMeter]
+    client: Optional[Client]
     cancellation_details: _ActivityCancellationDetailsHolder
     _logger_details: Optional[Mapping[str, Any]] = None
     _payload_converter: Optional[temporalio.converter.PayloadConverter] = None
@@ -271,13 +285,37 @@ class _CompositeEvent:
         self.thread_event.wait(timeout)
 
 
+def client() -> Client:
+    """Return a Temporal Client for use in the current activity.
+
+    The client is only available in `async def` activities.
+
+    In tests it is not available automatically, but you can pass a client when creating a
+    :py:class:`temporalio.testing.ActivityEnvironment`.
+
+    Returns:
+        :py:class:`temporalio.client.Client` for use in the current activity.
+
+    Raises:
+        RuntimeError: When the client is not available.
+    """
+    client = _Context.current().client
+    if not client:
+        raise RuntimeError(
+            "No client available. The client is only available in `async def` "
+            "activities; not in `def` activities. In tests you can pass a "
+            "client when creating ActivityEnvironment."
+        )
+    return client
+
+
 def in_activity() -> bool:
     """Whether the current code is inside an activity.
 
     Returns:
         True if in an activity, False otherwise.
     """
-    return not _current_context.get(None) is None
+    return _current_context.get(None) is not None
 
 
 def info() -> Info:
@@ -574,8 +612,10 @@ class _Definition:
                 fn=fn,
                 # iscoroutinefunction does not return true for async __call__
                 # TODO(cretz): Why can't MyPy handle this?
-                is_async=inspect.iscoroutinefunction(fn)
-                or inspect.iscoroutinefunction(fn.__call__),  # type: ignore
+                is_async=(
+                    inspect.iscoroutinefunction(fn)
+                    or inspect.iscoroutinefunction(fn.__call__)  # type: ignore
+                ),
                 no_thread_cancel_exception=no_thread_cancel_exception,
             ),
         )

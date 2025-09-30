@@ -1,3 +1,4 @@
+import dataclasses
 import sys
 
 import pytest
@@ -111,6 +112,33 @@ def test_workflow_sandbox_importer_invalid_module_members():
         err.value.qualified_name
         == "tests.worker.workflow_sandbox.testmodules.invalid_module_members.invalid_function.__call__"
     )
+
+
+def test_workflow_sandbox_importer_sys_module():
+    # Import outside to make sure this is in sys.modules
+    import tests.worker.workflow_sandbox.testmodules.passthrough_module
+    import tests.worker.workflow_sandbox.testmodules.stateful_module
+
+    with Importer(restrictions, RestrictionContext()).applied():
+        # Passthrough should be there but not non-passthrough
+        assert sys.modules.get(
+            "tests.worker.workflow_sandbox.testmodules.passthrough_module", None
+        )
+        assert not sys.modules.get(
+            "tests.worker.workflow_sandbox.testmodules.stateful_module", None
+        )
+
+    disabled_restrictions = dataclasses.replace(
+        restrictions, disable_lazy_sys_module_passthrough=True
+    )
+    with Importer(disabled_restrictions, RestrictionContext()).applied():
+        # Neither should be there because lazy sys mod is disabled
+        assert not sys.modules.get(
+            "tests.worker.workflow_sandbox.testmodules.passthrough_module", None
+        )
+        assert not sys.modules.get(
+            "tests.worker.workflow_sandbox.testmodules.stateful_module", None
+        )
 
 
 def test_thread_local_sys_module_attrs():

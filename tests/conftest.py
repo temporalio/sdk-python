@@ -31,13 +31,21 @@ if os.getenv("TEMPORAL_TEST_PROTO3"):
         "3."
     ), f"Expected protobuf 3.x, got {protobuf_version}"
 else:
-    assert protobuf_version.startswith("4.") or protobuf_version.startswith(
-        "5."
-    ), f"Expected protobuf 4.x/5.x, got {protobuf_version}"
+    assert (
+        protobuf_version.startswith("4.")
+        or protobuf_version.startswith("5.")
+        or protobuf_version.startswith("6.")
+    ), f"Expected protobuf 4.x/5.x/6.x, got {protobuf_version}"
 
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
+
+
+def pytest_runtest_setup(item):
+    """Print a newline so that custom printed output starts on new line."""
+    if item.config.getoption("-s"):
+        print()
 
 
 def pytest_addoption(parser):
@@ -99,6 +107,7 @@ def env_type(request: pytest.FixtureRequest) -> str:
 @pytest_asyncio.fixture(scope="session")
 async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
     if env_type == "local":
+        http_port = 7243
         env = await WorkflowEnvironment.start_local(
             dev_server_extra_args=[
                 "--dynamic-config-value",
@@ -117,13 +126,20 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "system.enableDeploymentVersions=true",
                 "--dynamic-config-value",
                 "frontend.activityAPIsEnabled=true",
+                "--dynamic-config-value",
+                "component.nexusoperations.recordCancelRequestCompletionEvents=true",
+                "--http-port",
+                str(http_port),
             ],
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )
+        # TODO(nexus-preview): expose this in a more principled way
+        env._http_port = http_port  # type: ignore
     elif env_type == "time-skipping":
         env = await WorkflowEnvironment.start_time_skipping()
     else:
         env = WorkflowEnvironment.from_client(await Client.connect(env_type))
+
     yield env
     await env.shutdown()
 

@@ -46,6 +46,8 @@ class AsyncOperation(google.protobuf.message.Message):
         """The operation was cancelled."""
         STATE_FULFILLED: AsyncOperation._State.ValueType  # 5
         """The operation was fulfilled."""
+        STATE_REJECTED: AsyncOperation._State.ValueType  # 6
+        """The operation was rejected."""
 
     class State(_State, metaclass=_StateEnumTypeWrapper): ...
     STATE_UNSPECIFIED: AsyncOperation.State.ValueType  # 0
@@ -59,6 +61,8 @@ class AsyncOperation(google.protobuf.message.Message):
     """The operation was cancelled."""
     STATE_FULFILLED: AsyncOperation.State.ValueType  # 5
     """The operation was fulfilled."""
+    STATE_REJECTED: AsyncOperation.State.ValueType  # 6
+    """The operation was rejected."""
 
     ID_FIELD_NUMBER: builtins.int
     STATE_DEPRECATED_FIELD_NUMBER: builtins.int
@@ -74,12 +78,12 @@ class AsyncOperation(google.protobuf.message.Message):
     state_deprecated: builtins.str
     """The current state of this operation.
     Possible values are: pending, in_progress, failed, cancelled, fulfilled.
-    Deprecated: Not supported after 2024-10-01-00 api version. Use state instead.
-    temporal:versioning:max_version=2024-10-01-00
+    Deprecated: Not supported after v0.3.0 api version. Use state instead.
+    temporal:versioning:max_version=v0.3.0
     """
     state: global___AsyncOperation.State.ValueType
     """The current state of this operation.
-    temporal:versioning:min_version=2024-10-01-00
+    temporal:versioning:min_version=v0.3.0
     temporal:enums:replaces=state_deprecated
     """
     @property

@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
 from itertools import zip_longest
+from logging import getLogger
 from typing import (
     Any,
     Awaitable,
@@ -40,6 +41,7 @@ import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.message
 import google.protobuf.symbol_database
+import nexusrpc
 import typing_extensions
 
 import temporalio.api.common.v1
@@ -59,6 +61,8 @@ if sys.version_info >= (3, 11):
 
 if sys.version_info >= (3, 10):
     from types import UnionType
+
+logger = getLogger(__name__)
 
 
 class PayloadConverter(ABC):
@@ -504,7 +508,7 @@ class AdvancedJSONEncoder(json.JSONEncoder):
         if isinstance(o, datetime):
             return o.isoformat()
         # Dataclass support
-        if dataclasses.is_dataclass(o):
+        if dataclasses.is_dataclass(o) and not isinstance(o, type):
             return dataclasses.asdict(o)
         # Support for Pydantic v1's dict method
         dict_fn = getattr(o, "dict", None)
@@ -685,11 +689,17 @@ class PayloadCodec(ABC):
         payloads.payloads.extend(new_payloads)
 
     async def encode_failure(self, failure: temporalio.api.failure.v1.Failure) -> None:
-        """Encode payloads of a failure."""
+        """Encode payloads of a failure. Intended as a helper method, not for overriding.
+        It is not guaranteed that all failures will be encoded with this method rather
+        than encoding the underlying payloads.
+        """
         await self._apply_to_failure_payloads(failure, self.encode_wrapper)
 
     async def decode_failure(self, failure: temporalio.api.failure.v1.Failure) -> None:
-        """Decode payloads of a failure."""
+        """Decode payloads of a failure. Intended as a helper method, not for overriding.
+        It is not guaranteed that all failures will be decoded with this method rather
+        than decoding the underlying payloads.
+        """
         await self._apply_to_failure_payloads(failure, self.decode_wrapper)
 
     async def _apply_to_failure_payloads(
@@ -802,6 +812,8 @@ class DefaultFailureConverter(FailureConverter):
         # If already a failure error, use that
         if isinstance(exception, temporalio.exceptions.FailureError):
             self._error_to_failure(exception, payload_converter, failure)
+        elif isinstance(exception, nexusrpc.HandlerError):
+            self._nexus_handler_error_to_failure(exception, payload_converter, failure)
         else:
             # Convert to failure error
             failure_error = temporalio.exceptions.ApplicationError(
@@ -911,6 +923,39 @@ class DefaultFailureConverter(FailureConverter):
             failure.child_workflow_execution_failure_info.retry_state = (
                 temporalio.api.enums.v1.RetryState.ValueType(error.retry_state or 0)
             )
+        # TODO(nexus-preview): missing test coverage
+        elif isinstance(error, temporalio.exceptions.NexusOperationError):
+            failure.nexus_operation_execution_failure_info.SetInParent()
+            failure.nexus_operation_execution_failure_info.scheduled_event_id = (
+                error.scheduled_event_id
+            )
+            failure.nexus_operation_execution_failure_info.endpoint = error.endpoint
+            failure.nexus_operation_execution_failure_info.service = error.service
+            failure.nexus_operation_execution_failure_info.operation = error.operation
+            failure.nexus_operation_execution_failure_info.operation_token = (
+                error.operation_token
+            )
+
+    def _nexus_handler_error_to_failure(
+        self,
+        error: nexusrpc.HandlerError,
+        payload_converter: PayloadConverter,
+        failure: temporalio.api.failure.v1.Failure,
+    ) -> None:
+        failure.message = str(error)
+        if error.__traceback__:
+            failure.stack_trace = "\n".join(traceback.format_tb(error.__traceback__))
+        if error.__cause__:
+            self.to_failure(error.__cause__, payload_converter, failure.cause)
+        failure.nexus_handler_failure_info.SetInParent()
+        failure.nexus_handler_failure_info.type = error.type.name
+        failure.nexus_handler_failure_info.retry_behavior = temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.ValueType(
+            temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+            if error.retryable_override is True
+            else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+            if error.retryable_override is False
+            else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+        )
 
     def from_failure(
         self,
@@ -939,7 +984,7 @@ class DefaultFailureConverter(FailureConverter):
             except:
                 pass
 
-        err: temporalio.exceptions.FailureError
+        err: Union[temporalio.exceptions.FailureError, nexusrpc.HandlerError]
         if failure.HasField("application_failure_info"):
             app_info = failure.application_failure_info
             err = temporalio.exceptions.ApplicationError(
@@ -1006,9 +1051,47 @@ class DefaultFailureConverter(FailureConverter):
                 if child_info.retry_state
                 else None,
             )
+        elif failure.HasField("nexus_handler_failure_info"):
+            nexus_handler_failure_info = failure.nexus_handler_failure_info
+            try:
+                _type = nexusrpc.HandlerErrorType[nexus_handler_failure_info.type]
+            except KeyError:
+                logger.warning(
+                    f"Unknown Nexus HandlerErrorType: {nexus_handler_failure_info.type}"
+                )
+                _type = nexusrpc.HandlerErrorType.INTERNAL
+            retryable_override = (
+                True
+                if (
+                    nexus_handler_failure_info.retry_behavior
+                    == temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+                )
+                else False
+                if (
+                    nexus_handler_failure_info.retry_behavior
+                    == temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+                )
+                else None
+            )
+            err = nexusrpc.HandlerError(
+                failure.message or "Nexus handler error",
+                type=_type,
+                retryable_override=retryable_override,
+            )
+        elif failure.HasField("nexus_operation_execution_failure_info"):
+            nexus_op_failure_info = failure.nexus_operation_execution_failure_info
+            err = temporalio.exceptions.NexusOperationError(
+                failure.message or "Nexus operation error",
+                scheduled_event_id=nexus_op_failure_info.scheduled_event_id,
+                endpoint=nexus_op_failure_info.endpoint,
+                service=nexus_op_failure_info.service,
+                operation=nexus_op_failure_info.operation,
+                operation_token=nexus_op_failure_info.operation_token,
+            )
         else:
             err = temporalio.exceptions.FailureError(failure.message or "Failure error")
-        err._failure = failure
+        if isinstance(err, temporalio.exceptions.FailureError):
+            err._failure = failure
         if failure.HasField("cause"):
             err.__cause__ = self.from_failure(failure.cause, payload_converter)
         return err
@@ -1513,7 +1596,9 @@ def value_to_type(
                         elif key_type is type(None):
                             key = {"null": None}[key]
 
-                    if not isinstance(key, key_type):
+                    # Can't call isinstance if key_type is a newtype
+                    is_newtype = getattr(key_type, "__supertype__", None)
+                    if is_newtype or not isinstance(key, key_type):
                         key = value_to_type(key_type, key, custom_converters)
                 except Exception as err:
                     raise TypeError(
@@ -1624,7 +1709,7 @@ def value_to_type(
                     arg_type = type_args[i]
                 elif type_args[-1] is Ellipsis:
                     # Ellipsis means use the second to last one
-                    arg_type = type_args[-2]
+                    arg_type = type_args[-2]  # type: ignore
                 else:
                     raise TypeError(
                         f"Type {hint} only expecting {len(type_args)} values, got at least {i + 1}"

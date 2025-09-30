@@ -1,9 +1,9 @@
 [project]
 name = "temporalio"
-version = "1.12.0"
+version = "1.18.1"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
-requires-python = "~=3.9"
+requires-python = ">=3.9"
 readme = "README.md"
 license = { file = "LICENSE" }
 keywords = [
@@ -11,7 +11,8 @@ keywords = [
     "workflow",
 ]
 dependencies = [
-    "protobuf>=3.20",
+    "nexus-rpc==1.1.0",
+    "protobuf>=3.20,<7.0.0",
     "python-dateutil>=2.8.2,<3 ; python_version < '3.11'",
     "types-protobuf>=3.20",
     "typing-extensions>=4.2.0,<5",
@@ -24,6 +25,11 @@ opentelemetry = [
     "opentelemetry-sdk>=1.11.1,<2",
 ]
 pydantic = ["pydantic>=2.0.0,<3"]
+openai-agents = [
+    "openai-agents>=0.3,<0.4",
+    "eval-type-backport>=0.2.2; python_version < '3.10'",
+    "mcp>=1.9.4, <2; python_version >= '3.10'",
+]
 
 [project.urls]
 Homepage = "https://github.com/temporalio/sdk-python"
@@ -40,7 +46,7 @@ dev = [
     "psutil>=5.9.3,<6",
     "pydocstyle>=6.3.0,<7",
     "pydoctor>=24.11.1,<25",
-    "pyright==1.1.377",
+    "pyright==1.1.403",
     "pytest~=7.4",
     "pytest-asyncio>=0.21,<0.22",
     "pytest-timeout~=2.2",
@@ -49,27 +55,33 @@ dev = [
     "twine>=4.0.1,<5",
     "ruff>=0.5.0,<0.6",
     "maturin>=1.8.2",
+    "pytest-cov>=6.1.1",
+    "httpx>=0.28.1",
     "pytest-pretty>=1.3.0",
+    "openai-agents[litellm]>=0.3,<0.4"
 ]
 
 [tool.poe.tasks]
 build-develop = "uv run maturin develop --uv"
 build-develop-with-release = { cmd = "uv run maturin develop --release --uv" }
 format = [{cmd = "uv run ruff check --select I --fix"}, {cmd = "uv run ruff format"}, ]
-gen-docs = "uv run python scripts/gen_docs.py"
-gen-protos = "uv run python scripts/gen_protos.py"
+gen-docs = "uv run scripts/gen_docs.py"
+gen-protos = "uv run scripts/gen_protos.py"
+gen-protos-docker = "uv run scripts/gen_protos_docker.py"
 lint = [
   {cmd = "uv run ruff check --select I"},
   {cmd = "uv run ruff format --check"},
   {ref = "lint-types"},
-  {cmd = "uv run pyright"},
   {ref = "lint-docs"},
 ]
 bridge-lint = { cmd = "cargo clippy -- -D warnings", cwd = "temporalio/bridge" }
 # TODO(cretz): Why does pydocstyle complain about @overload missing docs after
 # https://github.com/PyCQA/pydocstyle/pull/511?
 lint-docs = "uv run pydocstyle --ignore-decorators=overload"
-lint-types = "uv run mypy --namespace-packages --check-untyped-defs ."
+lint-types = [
+  { cmd = "uv run pyright"},
+  { cmd = "uv run mypy --namespace-packages --check-untyped-defs ."},
+]
 run-bench = "uv run python scripts/run_bench.py"
 test = "uv run pytest"
 
@@ -93,7 +105,7 @@ filterwarnings = [
 [tool.cibuildwheel]
 before-all = "pip install protoc-wheel-0"
 build = "cp39-win_amd64 cp39-manylinux_x86_64 cp39-manylinux_aarch64 cp39-macosx_x86_64 cp39-macosx_arm64"
-build-verbosity = "1"
+build-verbosity = 1
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "10.12" }
@@ -151,16 +163,31 @@ project-name = "Temporal Python"
 sidebar-expand-depth = 2
 
 [tool.pyright]
+enableTypeIgnoreComments = true
+reportAny = "none"
+reportCallInDefaultInitializer = "none"
+reportExplicitAny = "none"
+reportIgnoreCommentWithoutRule = "none"
+reportImplicitAbstractClass = "none"
+reportImplicitOverride = "none"
+reportImplicitStringConcatenation = "none"
+reportImportCycles = "none"
+reportMissingTypeArgument = "none"
+reportPrivateUsage = "none"
+reportUnannotatedClassAttribute = "none"
+reportUnknownArgumentType = "none"
+reportUnknownMemberType = "none"
+reportUnknownParameterType = "none"
+reportUnknownVariableType = "none"
+reportUnnecessaryIsInstance = "none"
+reportUnnecessaryTypeIgnoreComment = "none"
+reportUnusedCallResult = "none"
 include = ["temporalio", "tests"]
 exclude = [
   "temporalio/api",
   "temporalio/bridge/proto",
   "tests/worker/workflow_sandbox/testmodules/proto",
   "temporalio/bridge/worker.py",
-  "temporalio/contrib/opentelemetry.py",
-  "temporalio/converter.py",
-  "temporalio/testing/_workflow.py",
-  "temporalio/worker/_activity.py",
   "temporalio/worker/_replayer.py",
   "temporalio/worker/_worker.py",
   "temporalio/worker/workflow_sandbox/_importer.py",
@@ -169,11 +196,13 @@ exclude = [
   "tests/api/test_grpc_stub.py",
   "tests/conftest.py",
   "tests/contrib/test_opentelemetry.py",
+  "tests/contrib/pydantic/models.py",
+  "tests/contrib/pydantic/models_2.py",
+  "tests/contrib/pydantic/test_pydantic.py",
+  "tests/contrib/pydantic/workflows.py",
   "tests/test_converter.py",
   "tests/test_service.py",
-  "tests/test_workflow.py",
   "tests/worker/test_activity.py",
-  "tests/worker/test_workflow.py",
   "tests/worker/workflow_sandbox/test_importer.py",
   "tests/worker/workflow_sandbox/test_restrictions.py",
   # TODO: these pass locally but fail in CI with
@@ -182,6 +211,7 @@ exclude = [
   "temporalio/bridge/metric.py",
   "temporalio/bridge/runtime.py",
   "temporalio/bridge/testing.py",
+  "temporalio/envconfig.py",
 ]
 
 [tool.ruff]

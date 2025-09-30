@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
-import dataclasses
 import inspect
 import logging
 import threading
@@ -23,6 +22,7 @@ from typing import (
     Awaitable,
     Callable,
     Dict,
+    Generator,
     Generic,
     Iterable,
     Iterator,
@@ -40,6 +40,9 @@ from typing import (
     overload,
 )
 
+import nexusrpc
+import nexusrpc.handler
+from nexusrpc import InputT, OutputT
 from typing_extensions import (
     Concatenate,
     Literal,
@@ -54,8 +57,11 @@ import temporalio.bridge.proto.workflow_commands
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.nexus
 import temporalio.workflow
+from temporalio.nexus._util import ServiceHandlerT
 
+from .api.failure.v1.message_pb2 import Failure
 from .types import (
     AnyType,
     CallableAsyncNoParam,
@@ -488,6 +494,7 @@ class Info:
     continued_run_id: Optional[str]
     cron_schedule: Optional[str]
     execution_timeout: Optional[timedelta]
+    first_execution_run_id: str
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     namespace: str
     parent: Optional[ParentInfo]
@@ -844,7 +851,21 @@ class _Runtime(ABC):
         local_retry_threshold: Optional[timedelta],
         cancellation_type: ActivityCancellationType,
         activity_id: Optional[str],
+        summary: Optional[str],
     ) -> ActivityHandle[Any]: ...
+
+    @abstractmethod
+    async def workflow_start_nexus_operation(
+        self,
+        endpoint: str,
+        service: str,
+        operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
+        input: Any,
+        output_type: Optional[Type[OutputT]],
+        schedule_to_close_timeout: Optional[timedelta],
+        cancellation_type: temporalio.workflow.NexusOperationCancellationType,
+        headers: Optional[Mapping[str, str]],
+    ) -> NexusOperationHandle[OutputT]: ...
 
     @abstractmethod
     def workflow_time_ns(self) -> int: ...
@@ -877,6 +898,20 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_set_current_details(self, details: str): ...
+
+    @abstractmethod
+    def workflow_is_failure_exception(self, err: BaseException) -> bool: ...
+
+    @abstractmethod
+    def workflow_has_last_completion_result(self) -> bool: ...
+
+    @abstractmethod
+    def workflow_last_completion_result(
+        self, type_hint: Optional[Type]
+    ) -> Optional[Any]: ...
+
+    @abstractmethod
+    def workflow_last_failure(self) -> Optional[BaseException]: ...
 
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
@@ -962,6 +997,15 @@ def memo() -> Mapping[str, Any]:
     return _Runtime.current().workflow_memo()
 
 
+def is_failure_exception(err: BaseException) -> bool:
+    """Checks if the given exception is a workflow failure in the current workflow.
+
+    Returns:
+        True if the given exception is a workflow failure in the current workflow.
+    """
+    return _Runtime.current().workflow_is_failure_exception(err)
+
+
 @overload
 def memo_value(key: str, default: Any = temporalio.common._arg_unset) -> Any: ...
 
@@ -1018,6 +1062,32 @@ def get_current_details() -> str:
     This can be in Temporal markdown format and can span multiple lines.
     """
     return _Runtime.current().workflow_get_current_details()
+
+
+def has_last_completion_result() -> bool:
+    """Gets whether there is a last completion result of the workflow."""
+    return _Runtime.current().workflow_has_last_completion_result()
+
+
+@overload
+def get_last_completion_result() -> Optional[Any]: ...
+
+
+@overload
+def get_last_completion_result(type_hint: Type[ParamType]) -> Optional[ParamType]: ...
+
+
+def get_last_completion_result(type_hint: Optional[Type] = None) -> Optional[Any]:
+    """Get the result of the last run of the workflow. This will be None if there was
+    no previous completion or the result was None. has_last_completion_result()
+    can be used to differentiate.
+    """
+    return _Runtime.current().workflow_last_completion_result(type_hint)
+
+
+def get_last_failure() -> Optional[BaseException]:
+    """Get the last failure of the workflow if it has run previously."""
+    return _Runtime.current().workflow_last_failure()
 
 
 def set_current_details(description: str) -> None:
@@ -1304,9 +1374,9 @@ async def sleep(
             This can be in single-line Temporal markdown format.
     """
     await _Runtime.current().workflow_sleep(
-        duration=duration.total_seconds()
-        if isinstance(duration, timedelta)
-        else duration,
+        duration=(
+            duration.total_seconds() if isinstance(duration, timedelta) else duration
+        ),
         summary=summary,
     )
 
@@ -1466,13 +1536,14 @@ class LoggerAdapter(logging.LoggerAdapter):
         self, msg: Any, kwargs: MutableMapping[str, Any]
     ) -> Tuple[Any, MutableMapping[str, Any]]:
         """Override to add workflow details."""
+        extra: Dict[str, Any] = {}
+        msg_extra: Dict[str, Any] = {}
+
         if (
             self.workflow_info_on_message
             or self.workflow_info_on_extra
             or self.full_workflow_info_on_extra
         ):
-            extra: Dict[str, Any] = {}
-            msg_extra: Dict[str, Any] = {}
             runtime = _Runtime.maybe_current()
             if runtime:
                 workflow_details = runtime.logger_details
@@ -1966,7 +2037,7 @@ if TYPE_CHECKING:
         pass
 
 else:
-
+    # TODO: inherited classes should be other way around?
     class _AsyncioTask(Generic[AnyType], asyncio.Task):
         pass
 
@@ -2009,6 +2080,8 @@ class ActivityConfig(TypedDict, total=False):
     cancellation_type: ActivityCancellationType
     activity_id: Optional[str]
     versioning_intent: Optional[VersioningIntent]
+    summary: Optional[str]
+    priority: temporalio.common.Priority
 
 
 # Overload for async no-param activity
@@ -2025,6 +2098,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2043,6 +2117,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2062,6 +2137,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2081,6 +2157,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2100,6 +2177,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2119,6 +2197,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -2140,6 +2219,7 @@ def start_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     versioning_intent: Optional[VersioningIntent] = None,
+    summary: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[Any]: ...
 
@@ -2194,6 +2274,7 @@ def start_activity(
             need to. Contact Temporal before setting this value.
         versioning_intent: When using the Worker Versioning feature, specifies whether this Activity
             should run on a worker with a compatible Build Id or not.
+            Deprecated: Use Worker Deployment versioning instead.
         summary: A single-line fixed summary for this activity that may appear in UI/CLI.
             This can be in single-line Temporal markdown format.
         priority: Priority of the activity.
@@ -2215,6 +2296,7 @@ def start_activity(
         activity_id=activity_id,
         versioning_intent=versioning_intent,
         summary=summary,
+        priority=priority,
     )
 
 
@@ -3042,6 +3124,7 @@ class LocalActivityConfig(TypedDict, total=False):
     local_retry_threshold: Optional[timedelta]
     cancellation_type: ActivityCancellationType
     activity_id: Optional[str]
+    summary: Optional[str]
 
 
 # Overload for async no-param activity
@@ -3056,6 +3139,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3071,6 +3155,7 @@ def start_local_activity(
     retry_policy: Optional[temporalio.common.RetryPolicy] = None,
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3087,6 +3172,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3103,6 +3189,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3119,6 +3206,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3135,6 +3223,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3153,6 +3242,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]: ...
 
 
@@ -3169,6 +3259,7 @@ def start_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start a local activity and return its handle.
 
@@ -3196,6 +3287,7 @@ def start_local_activity(
         activity_id: Optional unique identifier for the activity. This is an
             advanced setting that should not be set unless users are sure they
             need to. Contact Temporal before setting this value.
+        summary: Optional summary for the activity.
 
     Returns:
         An activity handle to the activity which is an async task.
@@ -3211,6 +3303,7 @@ def start_local_activity(
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        summary=summary,
     )
 
 
@@ -3226,6 +3319,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3241,6 +3335,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3257,6 +3352,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3273,6 +3369,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3289,6 +3386,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3305,6 +3403,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3323,6 +3422,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> Any: ...
 
 
@@ -3339,6 +3439,7 @@ async def execute_local_activity(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start a local activity and wait for completion.
 
@@ -3357,6 +3458,7 @@ async def execute_local_activity(
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        summary=summary,
     )
 
 
@@ -3466,6 +3568,7 @@ def start_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start a local activity from a callable class.
 
@@ -3482,6 +3585,7 @@ def start_local_activity_class(
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        summary=summary,
     )
 
 
@@ -3497,6 +3601,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3512,6 +3617,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3528,6 +3634,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3544,6 +3651,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3560,6 +3668,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3576,6 +3685,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3591,6 +3701,7 @@ async def execute_local_activity_class(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start a local activity from a callable class and wait for completion.
 
@@ -3609,6 +3720,7 @@ async def execute_local_activity_class(
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        summary=summary,
     )
 
 
@@ -3624,6 +3736,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3639,6 +3752,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3655,6 +3769,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3671,6 +3786,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3687,6 +3803,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3703,6 +3820,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -3718,6 +3836,7 @@ def start_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ActivityHandle[Any]:
     """Start a local activity from a method.
 
@@ -3734,6 +3853,7 @@ def start_local_activity_method(
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        summary=summary,
     )
 
 
@@ -3749,6 +3869,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3764,6 +3885,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3780,6 +3902,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3796,6 +3919,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3812,6 +3936,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3828,6 +3953,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> ReturnType: ...
 
 
@@ -3843,6 +3969,7 @@ async def execute_local_activity_method(
     local_retry_threshold: Optional[timedelta] = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
+    summary: Optional[str] = None,
 ) -> Any:
     """Start a local activity from a method and wait for completion.
 
@@ -3861,6 +3988,7 @@ async def execute_local_activity_method(
         local_retry_threshold=local_retry_threshold,
         cancellation_type=cancellation_type,
         activity_id=activity_id,
+        summary=summary,
     )
 
 
@@ -3987,6 +4115,10 @@ class ChildWorkflowConfig(TypedDict, total=False):
             temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
         ]
     ]
+    versioning_intent: Optional[VersioningIntent]
+    static_summary: Optional[str]
+    static_details: Optional[str]
+    priority: temporalio.common.Priority
 
 
 # Overload for no-param workflow
@@ -4161,6 +4293,7 @@ async def start_child_workflow(
             form of this is DEPRECATED.
         versioning_intent:  When using the Worker Versioning feature, specifies whether this Child
             Workflow should run on a worker with a compatible Build Id or not.
+            Deprecated: Use Worker Deployment versioning instead.
         static_summary: A single-line fixed summary for this child workflow execution that may appear
             in the UI/CLI. This can be in single-line Temporal markdown format.
         static_details: General fixed details for this child workflow execution that may appear in
@@ -4218,7 +4351,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -4246,7 +4380,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -4274,7 +4409,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -4304,7 +4440,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> Any: ...
 
@@ -4332,7 +4469,8 @@ async def execute_child_workflow(
         ]
     ] = None,
     versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    static_summary: Optional[str] = None,
+    static_details: Optional[str] = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> Any:
     """Start a child workflow and wait for completion.
@@ -4359,10 +4497,34 @@ async def execute_child_workflow(
         memo=memo,
         search_attributes=search_attributes,
         versioning_intent=versioning_intent,
-        static_summary=summary,
+        static_summary=static_summary,
+        static_details=static_details,
         priority=priority,
     )
     return await handle
+
+
+class NexusOperationHandle(Generic[OutputT]):
+    """Handle for interacting with a Nexus operation.
+
+    .. warning::
+        This API is experimental and unstable.
+    """
+
+    # TODO(nexus-preview): should attempts to instantiate directly throw?
+
+    def cancel(self) -> bool:
+        """Request cancellation of the operation."""
+        raise NotImplementedError
+
+    def __await__(self) -> Generator[Any, Any, OutputT]:
+        """Support await."""
+        raise NotImplementedError
+
+    @property
+    def operation_token(self) -> Optional[str]:
+        """The operation token for this handle."""
+        raise NotImplementedError
 
 
 class ExternalWorkflowHandle(Generic[SelfType]):
@@ -4624,6 +4786,7 @@ def continue_as_new(
             DEPRECATED.
         versioning_intent: When using the Worker Versioning feature, specifies whether this Workflow
             should Continue-as-New onto a worker with a compatible Build Id or not.
+            Deprecated: Use Worker Deployment versioning instead.
 
     Returns:
         Never returns, always raises a :py:class:`ContinueAsNewError`.
@@ -4897,7 +5060,7 @@ async def wait(
     *,
     timeout: Optional[float] = None,
     return_when: str = asyncio.ALL_COMPLETED,
-) -> Tuple[List[asyncio.Task[AnyType]], set[asyncio.Task[AnyType]]]: ...
+) -> Tuple[List[asyncio.Task[AnyType]], List[asyncio.Task[AnyType]]]: ...
 
 
 async def wait(
@@ -4916,9 +5079,9 @@ async def wait(
     # but the "set" is changed out for a "list" and fixed up some typing/format
 
     if asyncio.isfuture(fs) or asyncio.iscoroutine(fs):
-        raise TypeError(f"expect a list of futures, not {type(fs).__name__}")
+        raise TypeError(f"Expect an iterable of Tasks/Futures, not {type(fs).__name__}")
     if not fs:
-        raise ValueError("Set of Tasks/Futures is empty.")
+        raise ValueError("Sequence of Tasks/Futures must not be empty.")
     if return_when not in (
         asyncio.FIRST_COMPLETED,
         asyncio.FIRST_EXCEPTION,
@@ -4945,7 +5108,7 @@ async def _wait(
     # https://github.com/python/cpython/blob/v3.12.3/Lib/asyncio/tasks.py#L522
     # but the "set" is changed out for a "list" and fixed up some typing/format
 
-    assert fs, "Set of Futures is empty."
+    assert fs, "Sequence of Tasks/Futures must not be empty."
     waiter = loop.create_future()
     timeout_handle = None
     if timeout is not None:
@@ -5056,6 +5219,9 @@ class VersioningIntent(Enum):
     Where this type is accepted optionally, an unset value indicates that the SDK should choose the
     most sensible default behavior for the type of command, accounting for whether the command will
     be run on the same task queue as the current worker.
+
+    .. deprecated::
+        Use Worker Deployment versioning instead.
     """
 
     COMPATIBLE = 1
@@ -5067,3 +5233,382 @@ class VersioningIntent(Enum):
         elif self == VersioningIntent.DEFAULT:
             return temporalio.bridge.proto.common.VersioningIntent.DEFAULT
         return temporalio.bridge.proto.common.VersioningIntent.UNSPECIFIED
+
+
+ServiceT = TypeVar("ServiceT")
+
+
+class NexusOperationCancellationType(IntEnum):
+    """Defines behavior of a Nexus operation when the caller workflow initiates cancellation.
+
+    Pass one of these values to :py:meth:`NexusClient.start_operation` to define cancellation
+    behavior.
+
+    To initiate cancellation, use :py:meth:`NexusOperationHandle.cancel` and then `await` the
+    operation handle. This will result in a :py:class:`exceptions.NexusOperationError`. The values
+    of this enum define what is guaranteed to have happened by that point.
+    """
+
+    ABANDON = int(temporalio.bridge.proto.nexus.NexusOperationCancellationType.ABANDON)
+    """Do not send any cancellation request to the operation handler; just report cancellation to the caller"""
+
+    TRY_CANCEL = int(
+        temporalio.bridge.proto.nexus.NexusOperationCancellationType.TRY_CANCEL
+    )
+    """Send a cancellation request but immediately report cancellation to the caller. Note that this
+    does not guarantee that cancellation is delivered to the operation handler if the caller exits
+    before the delivery is done.
+    """
+
+    WAIT_REQUESTED = int(
+        temporalio.bridge.proto.nexus.NexusOperationCancellationType.WAIT_CANCELLATION_REQUESTED
+    )
+    """Send a cancellation request and wait for confirmation that the request was received.
+    Does not wait for the operation to complete.
+    """
+
+    WAIT_COMPLETED = int(
+        temporalio.bridge.proto.nexus.NexusOperationCancellationType.WAIT_CANCELLATION_COMPLETED
+    )
+    """Send a cancellation request and wait for the operation to complete.
+    Note that the operation may not complete as cancelled (for example, if it catches the
+    :py:exc:`asyncio.CancelledError` resulting from the cancellation request)."""
+
+
+class NexusClient(ABC, Generic[ServiceT]):
+    """A client for invoking Nexus operations.
+
+    .. warning::
+        This API is experimental and unstable.
+
+    Example::
+
+        nexus_client = workflow.create_nexus_client(
+            endpoint=my_nexus_endpoint,
+            service=MyService,
+        )
+        handle = await nexus_client.start_operation(
+            operation=MyService.my_operation,
+            input=MyOperationInput(value="hello"),
+            schedule_to_close_timeout=timedelta(seconds=10),
+        )
+        result = await handle.result()
+    """
+
+    # Overload for nexusrpc.Operation
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: nexusrpc.Operation[InputT, OutputT],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
+    # Overload for string operation name
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: str,
+        input: Any,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
+    # Overload for workflow_run_operation methods
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: Callable[
+            [ServiceHandlerT, temporalio.nexus.WorkflowRunOperationContext, InputT],
+            Awaitable[temporalio.nexus.WorkflowHandle[OutputT]],
+        ],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
+    # Overload for sync_operation methods (async def)
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: Callable[
+            [ServiceHandlerT, nexusrpc.handler.StartOperationContext, InputT],
+            Awaitable[OutputT],
+        ],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
+    # Overload for sync_operation methods (def)
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: Callable[
+            [ServiceHandlerT, nexusrpc.handler.StartOperationContext, InputT],
+            OutputT,
+        ],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: Any,
+        input: Any,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> Any:
+        """Start a Nexus operation and return its handle.
+
+        Args:
+            operation: The Nexus operation.
+            input: The Nexus operation input.
+            output_type: The Nexus operation output type.
+            schedule_to_close_timeout: Timeout for the entire operation attempt.
+            headers: Headers to send with the Nexus HTTP request.
+
+        Returns:
+            A handle to the Nexus operation. The result can be obtained as
+            ```python
+            await handle.result()
+            ```
+        """
+        ...
+
+    # Overload for nexusrpc.Operation
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: nexusrpc.Operation[InputT, OutputT],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> OutputT: ...
+
+    # Overload for string operation name
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: str,
+        input: Any,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> OutputT: ...
+
+    # Overload for workflow_run_operation methods
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: Callable[
+            [ServiceHandlerT, temporalio.nexus.WorkflowRunOperationContext, InputT],
+            Awaitable[temporalio.nexus.WorkflowHandle[OutputT]],
+        ],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> OutputT: ...
+
+    # TODO(nexus-preview): in practice, both these overloads match an async def sync
+    # operation (i.e. either can be deleted without causing a type error).
+
+    # Overload for sync_operation methods (async def)
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: Callable[
+            [ServiceT, nexusrpc.handler.StartOperationContext, InputT],
+            Awaitable[OutputT],
+        ],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> OutputT: ...
+
+    # Overload for sync_operation methods (def)
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: Callable[
+            [ServiceT, nexusrpc.handler.StartOperationContext, InputT],
+            OutputT,
+        ],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> OutputT: ...
+
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: Any,
+        input: Any,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> Any:
+        """Execute a Nexus operation and return its result.
+
+        Args:
+            operation: The Nexus operation.
+            input: The Nexus operation input.
+            output_type: The Nexus operation output type.
+            schedule_to_close_timeout: Timeout for the entire operation attempt.
+            headers: Headers to send with the Nexus HTTP request.
+
+        Returns:
+            The operation result.
+        """
+        ...
+
+
+class _NexusClient(NexusClient[ServiceT]):
+    def __init__(
+        self,
+        *,
+        endpoint: str,
+        service: Union[Type[ServiceT], str],
+    ) -> None:
+        """Create a Nexus client.
+
+        Args:
+            service: The Nexus service.
+            endpoint: The Nexus endpoint.
+        """
+        # If service is not a str, then it must be a service interface or implementation
+        # class.
+        if isinstance(service, str):
+            self.service_name = service
+        elif service_defn := nexusrpc.get_service_definition(service):
+            self.service_name = service_defn.name
+        else:
+            raise ValueError(
+                f"`service` may be a name (str), or a class decorated with either "
+                f"@nexusrpc.handler.service_handler or @nexusrpc.service. "
+                f"Invalid service type: {type(service)}"
+            )
+        self.endpoint = endpoint
+
+    async def start_operation(
+        self,
+        operation: Any,
+        input: Any,
+        *,
+        output_type: Optional[Type] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> Any:
+        return (
+            await temporalio.workflow._Runtime.current().workflow_start_nexus_operation(
+                endpoint=self.endpoint,
+                service=self.service_name,
+                operation=operation,
+                input=input,
+                output_type=output_type,
+                schedule_to_close_timeout=schedule_to_close_timeout,
+                cancellation_type=cancellation_type,
+                headers=headers,
+            )
+        )
+
+    async def execute_operation(
+        self,
+        operation: Any,
+        input: Any,
+        *,
+        output_type: Optional[Type] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> Any:
+        handle = await self.start_operation(
+            operation,
+            input,
+            output_type=output_type,
+            schedule_to_close_timeout=schedule_to_close_timeout,
+            cancellation_type=cancellation_type,
+            headers=headers,
+        )
+        return await handle
+
+
+@overload
+def create_nexus_client(
+    *,
+    service: Type[ServiceT],
+    endpoint: str,
+) -> NexusClient[ServiceT]: ...
+
+
+@overload
+def create_nexus_client(
+    *,
+    service: str,
+    endpoint: str,
+) -> NexusClient[Any]: ...
+
+
+def create_nexus_client(
+    *,
+    service: Union[Type[ServiceT], str],
+    endpoint: str,
+) -> NexusClient[ServiceT]:
+    """Create a Nexus client.
+
+    .. warning::
+        This API is experimental and unstable.
+
+    Args:
+        service: The Nexus service.
+        endpoint: The Nexus endpoint.
+    """
+    return _NexusClient(endpoint=endpoint, service=service)

@@ -24,23 +24,21 @@ from typing import (
 
 from typing_extensions import TypeAlias, TypedDict
 
-import temporalio.activity
-import temporalio.api.common.v1
-import temporalio.bridge.client
-import temporalio.bridge.proto
-import temporalio.bridge.proto.activity_result
-import temporalio.bridge.proto.activity_task
-import temporalio.bridge.proto.common
 import temporalio.bridge.worker
 import temporalio.client
-import temporalio.converter
-import temporalio.exceptions
+import temporalio.common
 import temporalio.runtime
 import temporalio.service
-from temporalio.common import VersioningBehavior, WorkerDeploymentVersion
+from temporalio.common import (
+    HeaderCodecBehavior,
+    VersioningBehavior,
+    WorkerDeploymentVersion,
+)
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
+from ._nexus import _NexusWorker
+from ._plugin import Plugin, _RootPlugin
 from ._tuning import WorkerTuner
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
@@ -106,11 +104,14 @@ class Worker:
         *,
         task_queue: str,
         activities: Sequence[Callable] = [],
+        nexus_service_handlers: Sequence[Any] = [],
         workflows: Sequence[Type] = [],
         activity_executor: Optional[concurrent.futures.Executor] = None,
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
+        nexus_task_executor: Optional[concurrent.futures.Executor] = None,
         workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
         unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
+        plugins: Sequence[Plugin] = [],
         interceptors: Sequence[Interceptor] = [],
         build_id: Optional[str] = None,
         identity: Optional[str] = None,
@@ -118,6 +119,7 @@ class Worker:
         max_concurrent_workflow_tasks: Optional[int] = None,
         max_concurrent_activities: Optional[int] = None,
         max_concurrent_local_activities: Optional[int] = None,
+        max_concurrent_nexus_tasks: Optional[int] = None,
         tuner: Optional[WorkerTuner] = None,
         max_concurrent_workflow_task_polls: Optional[int] = None,
         nonsticky_to_sticky_poll_ratio: float = 0.2,
@@ -143,6 +145,9 @@ class Worker:
         activity_task_poller_behavior: PollerBehavior = PollerBehaviorSimpleMaximum(
             maximum=5
         ),
+        nexus_task_poller_behavior: PollerBehavior = PollerBehaviorSimpleMaximum(
+            maximum=5
+        ),
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -153,10 +158,15 @@ class Worker:
                 client's underlying service client. This client cannot be
                 "lazy".
             task_queue: Required task queue for this worker.
-            activities: Set of activity callables decorated with
+            activities: Activity callables decorated with
                 :py:func:`@activity.defn<temporalio.activity.defn>`. Activities
                 may be async functions or non-async functions.
-            workflows: Set of workflow classes decorated with
+            nexus_service_handlers: Instances of Nexus service handler classes
+                decorated with :py:func:`@nexusrpc.handler.service_handler`.
+
+                .. warning::
+                    This parameter is experimental and unstable.
+            workflows: Workflow classes decorated with
                 :py:func:`@workflow.defn<temporalio.workflow.defn>`.
             activity_executor: Concurrent executor to use for non-async
                 activities. This is required if any activities are non-async.
@@ -175,9 +185,20 @@ class Worker:
                 otherwise. The default one will be properly shutdown, but if one
                 is provided, the caller is responsible for shutting it down after
                 the worker is shut down.
+            nexus_task_executor: Executor to use for non-async
+                Nexus operations. This is required if any operation start methods
+                are non-`async def`. :py:class:`concurrent.futures.ThreadPoolExecutor`
+                is recommended.
+
+                .. warning::
+                    This parameter is experimental and unstable.
             workflow_runner: Runner for workflows.
             unsandboxed_workflow_runner: Runner for workflows that opt-out of
                 sandboxing.
+            plugins: Collection of plugins for this worker. Any plugins already
+                on the client that also implement :py:class:`temporalio.worker.Plugin` are
+                prepended to this list and should not be explicitly given here
+                to avoid running the plugin twice.
             interceptors: Collection of interceptors for this worker. Any
                 interceptors already on the client that also implement
                 :py:class:`Interceptor` are prepended to this list and should
@@ -194,13 +215,16 @@ class Worker:
             max_concurrent_workflow_tasks: Maximum allowed number of workflow
                 tasks that will ever be given to this worker at one time. Mutually exclusive with
                 ``tuner``. Must be set to at least two if ``max_cached_workflows`` is nonzero.
-            max_concurrent_activities: Maximum number of activity tasks that
-                will ever be given to this worker concurrently. Mutually exclusive with ``tuner``.
+            max_concurrent_activities: Maximum number of activity tasks that will ever be given to
+                the activity worker concurrently. Mutually exclusive with ``tuner``.
             max_concurrent_local_activities: Maximum number of local activity
-                tasks that will ever be given to this worker concurrently. Mutually exclusive with ``tuner``.
+                tasks that will ever be given to the activity worker concurrently. Mutually
+                exclusive with ``tuner``.
+            max_concurrent_nexus_tasks: Maximum number of Nexus tasks that will ever be given to
+                the Nexus worker concurrently. Mutually exclusive with ``tuner``.
             tuner:  Provide a custom :py:class:`WorkerTuner`. Mutually exclusive with the
-                ``max_concurrent_workflow_tasks``, ``max_concurrent_activities``, and
-                ``max_concurrent_local_activities`` arguments.
+                ``max_concurrent_workflow_tasks``, ``max_concurrent_activities``,
+                ``max_concurrent_local_activities``, and ``max_concurrent_nexus_tasks`` arguments.
 
                 Defaults to fixed-size 100 slots for each slot kind if unset and none of the
                 max_* arguments are provided.
@@ -296,37 +320,18 @@ class Worker:
                 Defaults to a 5-poller maximum.
             activity_task_poller_behavior: Specify the behavior of activity task polling.
                 Defaults to a 5-poller maximum.
+            nexus_task_poller_behavior: Specify the behavior of Nexus task polling.
+                Defaults to a 5-poller maximum.
         """
-        if not activities and not workflows:
-            raise ValueError("At least one activity or workflow must be specified")
-        if use_worker_versioning and not build_id:
-            raise ValueError(
-                "build_id must be specified when use_worker_versioning is True"
-            )
-        if deployment_config and (build_id or use_worker_versioning):
-            raise ValueError(
-                "deployment_config cannot be used with build_id or use_worker_versioning"
-            )
-
-        # Prepend applicable client interceptors to the given ones
-        client_config = client.config()
-        interceptors_from_client = cast(
-            List[Interceptor],
-            [i for i in client_config["interceptors"] if isinstance(i, Interceptor)],
-        )
-        interceptors = interceptors_from_client + list(interceptors)
-
-        # Extract the bridge service client
-        bridge_client = _extract_bridge_client_for_worker(client)
-
-        # Store the config for tracking
-        self._config = WorkerConfig(
+        config = WorkerConfig(
             client=client,
             task_queue=task_queue,
             activities=activities,
+            nexus_service_handlers=nexus_service_handlers,
             workflows=workflows,
             activity_executor=activity_executor,
             workflow_task_executor=workflow_task_executor,
+            nexus_task_executor=nexus_task_executor,
             workflow_runner=workflow_runner,
             unsandboxed_workflow_runner=unsandboxed_workflow_runner,
             interceptors=interceptors,
@@ -336,6 +341,8 @@ class Worker:
             max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
             max_concurrent_activities=max_concurrent_activities,
             max_concurrent_local_activities=max_concurrent_local_activities,
+            max_concurrent_nexus_tasks=max_concurrent_nexus_tasks,
+            tuner=tuner,
             max_concurrent_workflow_task_polls=max_concurrent_workflow_task_polls,
             nonsticky_to_sticky_poll_ratio=nonsticky_to_sticky_poll_ratio,
             max_concurrent_activity_task_polls=max_concurrent_activity_task_polls,
@@ -353,7 +360,68 @@ class Worker:
             on_fatal_error=on_fatal_error,
             use_worker_versioning=use_worker_versioning,
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
+            deployment_config=deployment_config,
+            workflow_task_poller_behavior=workflow_task_poller_behavior,
+            activity_task_poller_behavior=activity_task_poller_behavior,
+            nexus_task_poller_behavior=nexus_task_poller_behavior,
         )
+
+        plugins_from_client = cast(
+            List[Plugin],
+            [p for p in client.config()["plugins"] if isinstance(p, Plugin)],
+        )
+        for client_plugin in plugins_from_client:
+            if type(client_plugin) in [type(p) for p in plugins]:
+                warnings.warn(
+                    f"The same plugin type {type(client_plugin)} is present from both client and worker. It may run twice and may not be the intended behavior."
+                )
+        plugins = plugins_from_client + list(plugins)
+
+        root_plugin: Plugin = _RootPlugin()
+        for plugin in reversed(plugins):
+            plugin.init_worker_plugin(root_plugin)
+            root_plugin = plugin
+        config = root_plugin.configure_worker(config)
+        self._plugin = root_plugin
+
+        self._init_from_config(client, config)
+
+    def _init_from_config(self, client: temporalio.client.Client, config: WorkerConfig):
+        """Handles post plugin initialization to ensure original arguments are not used.
+        Client is safe to take separately since it can't be modified by worker plugins.
+        """
+        self._config = config
+
+        if not (
+            config["activities"]
+            or config["nexus_service_handlers"]
+            or config["workflows"]
+        ):
+            raise ValueError(
+                "At least one activity, Nexus service, or workflow must be specified"
+            )
+        if config["use_worker_versioning"] and not config["build_id"]:
+            raise ValueError(
+                "build_id must be specified when use_worker_versioning is True"
+            )
+        if config["deployment_config"] and (
+            config["build_id"] or config["use_worker_versioning"]
+        ):
+            raise ValueError(
+                "deployment_config cannot be used with build_id or use_worker_versioning"
+            )
+
+        # Prepend applicable client interceptors to the given ones
+        client_config = config["client"].config()
+        interceptors_from_client = cast(
+            List[Interceptor],
+            [i for i in client_config["interceptors"] if isinstance(i, Interceptor)],
+        )
+        interceptors = interceptors_from_client + list(config["interceptors"])
+
+        # Extract the bridge service client
+        bridge_client = _extract_bridge_client_for_worker(config["client"])
+
         self._started = False
         self._shutdown_event = asyncio.Event()
         self._shutdown_complete_event = asyncio.Event()
@@ -361,44 +429,45 @@ class Worker:
         self._async_context_run_task: Optional[asyncio.Task] = None
         self._async_context_run_exception: Optional[BaseException] = None
 
-        # Create activity and workflow worker
         self._activity_worker: Optional[_ActivityWorker] = None
         self._runtime = (
             bridge_client.config.runtime or temporalio.runtime.Runtime.default()
         )
-        if activities:
-            # Issue warning here if executor max_workers is lower than max
-            # concurrent activities. We do this here instead of in
-            # _ActivityWorker so the stack level is predictable.
-            max_workers = getattr(activity_executor, "_max_workers", None)
-            concurrent_activities = max_concurrent_activities
-            if tuner and tuner._get_activities_max():
-                concurrent_activities = tuner._get_activities_max()
-            if isinstance(max_workers, int) and max_workers < (
-                concurrent_activities or 0
-            ):
-                warnings.warn(
-                    f"Worker max_concurrent_activities is {concurrent_activities} "
-                    + f"but activity_executor's max_workers is only {max_workers}",
-                    stacklevel=2,
-                )
-
+        if config["activities"]:
+            _warn_if_activity_executor_max_workers_is_inconsistent(config)
             self._activity_worker = _ActivityWorker(
                 bridge_worker=lambda: self._bridge_worker,
-                task_queue=task_queue,
-                activities=activities,
-                activity_executor=activity_executor,
-                shared_state_manager=shared_state_manager,
+                task_queue=config["task_queue"],
+                activities=config["activities"],
+                activity_executor=config["activity_executor"],
+                shared_state_manager=config["shared_state_manager"],
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
                 metric_meter=self._runtime.metric_meter,
+                client=client,
+                encode_headers=(
+                    client_config["header_codec_behavior"] == HeaderCodecBehavior.CODEC
+                ),
+            )
+        self._nexus_worker: Optional[_NexusWorker] = None
+        if config["nexus_service_handlers"]:
+            _warn_if_nexus_task_executor_max_workers_is_inconsistent(config)
+            self._nexus_worker = _NexusWorker(
+                bridge_worker=lambda: self._bridge_worker,
+                client=config["client"],
+                task_queue=config["task_queue"],
+                service_handlers=config["nexus_service_handlers"],
+                data_converter=client_config["data_converter"],
+                interceptors=interceptors,
+                metric_meter=self._runtime.metric_meter,
+                executor=config["nexus_task_executor"],
             )
         self._workflow_worker: Optional[_WorkflowWorker] = None
-        if workflows:
+        if config["workflows"]:
             should_enforce_versioning_behavior = (
-                deployment_config is not None
-                and deployment_config.use_worker_versioning
-                and deployment_config.default_versioning_behavior
+                config["deployment_config"] is not None
+                and config["deployment_config"].use_worker_versioning
+                and config["deployment_config"].default_versioning_behavior
                 == temporalio.common.VersioningBehavior.UNSPECIFIED
             )
 
@@ -412,69 +481,81 @@ class Worker:
 
             self._workflow_worker = _WorkflowWorker(
                 bridge_worker=lambda: self._bridge_worker,
-                namespace=client.namespace,
-                task_queue=task_queue,
-                workflows=workflows,
-                workflow_task_executor=workflow_task_executor,
-                max_concurrent_workflow_tasks=max_concurrent_workflow_tasks,
-                workflow_runner=workflow_runner,
-                unsandboxed_workflow_runner=unsandboxed_workflow_runner,
+                namespace=config["client"].namespace,
+                task_queue=config["task_queue"],
+                workflows=config["workflows"],
+                workflow_task_executor=config["workflow_task_executor"],
+                max_concurrent_workflow_tasks=config["max_concurrent_workflow_tasks"],
+                workflow_runner=config["workflow_runner"],
+                unsandboxed_workflow_runner=config["unsandboxed_workflow_runner"],
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
-                workflow_failure_exception_types=workflow_failure_exception_types,
-                debug_mode=debug_mode,
-                disable_eager_activity_execution=disable_eager_activity_execution,
+                workflow_failure_exception_types=config[
+                    "workflow_failure_exception_types"
+                ],
+                debug_mode=config["debug_mode"],
+                disable_eager_activity_execution=config[
+                    "disable_eager_activity_execution"
+                ],
                 metric_meter=self._runtime.metric_meter,
                 on_eviction_hook=None,
-                disable_safe_eviction=disable_safe_workflow_eviction,
+                disable_safe_eviction=config["disable_safe_workflow_eviction"],
                 should_enforce_versioning_behavior=should_enforce_versioning_behavior,
                 assert_local_activity_valid=check_activity,
+                encode_headers=client_config["header_codec_behavior"]
+                != HeaderCodecBehavior.NO_CODEC,
             )
 
+        tuner = config["tuner"]
         if tuner is not None:
             if (
-                max_concurrent_workflow_tasks
-                or max_concurrent_activities
-                or max_concurrent_local_activities
+                config["max_concurrent_workflow_tasks"]
+                or config["max_concurrent_activities"]
+                or config["max_concurrent_local_activities"]
+                or config["max_concurrent_nexus_tasks"]
             ):
                 raise ValueError(
                     "Cannot specify max_concurrent_workflow_tasks, max_concurrent_activities, "
-                    "or max_concurrent_local_activities when also specifying tuner"
+                    "max_concurrent_local_activities, or max_concurrent_nexus_tasks when also "
+                    "specifying tuner"
                 )
         else:
             tuner = WorkerTuner.create_fixed(
-                workflow_slots=max_concurrent_workflow_tasks,
-                activity_slots=max_concurrent_activities,
-                local_activity_slots=max_concurrent_local_activities,
+                workflow_slots=config["max_concurrent_workflow_tasks"],
+                activity_slots=config["max_concurrent_activities"],
+                local_activity_slots=config["max_concurrent_local_activities"],
+                nexus_slots=config["max_concurrent_nexus_tasks"],
             )
 
         bridge_tuner = tuner._to_bridge_tuner()
 
         versioning_strategy: temporalio.bridge.worker.WorkerVersioningStrategy
-        if deployment_config:
-            versioning_strategy = (
-                deployment_config._to_bridge_worker_deployment_options()
-            )
-        elif use_worker_versioning:
-            build_id = build_id or load_default_build_id()
+        if config["deployment_config"]:
+            versioning_strategy = config[
+                "deployment_config"
+            ]._to_bridge_worker_deployment_options()
+        elif config["use_worker_versioning"]:
+            build_id = config["build_id"] or load_default_build_id()
             versioning_strategy = (
                 temporalio.bridge.worker.WorkerVersioningStrategyLegacyBuildIdBased(
                     build_id_with_versioning=build_id
                 )
             )
         else:
-            build_id = build_id or load_default_build_id()
+            build_id = config["build_id"] or load_default_build_id()
             versioning_strategy = temporalio.bridge.worker.WorkerVersioningStrategyNone(
                 build_id_no_versioning=build_id
             )
 
-        if max_concurrent_workflow_task_polls:
+        workflow_task_poller_behavior = config["workflow_task_poller_behavior"]
+        if config["max_concurrent_workflow_task_polls"]:
             workflow_task_poller_behavior = PollerBehaviorSimpleMaximum(
-                maximum=max_concurrent_workflow_task_polls
+                maximum=config["max_concurrent_workflow_task_polls"]
             )
-        if max_concurrent_activity_task_polls:
+        activity_task_poller_behavior = config["activity_task_poller_behavior"]
+        if config["max_concurrent_activity_task_polls"]:
             activity_task_poller_behavior = PollerBehaviorSimpleMaximum(
-                maximum=max_concurrent_activity_task_polls
+                maximum=config["max_concurrent_activity_task_polls"]
             )
 
         # Create bridge worker last. We have empirically observed that if it is
@@ -487,29 +568,33 @@ class Worker:
         self._bridge_worker = temporalio.bridge.worker.Worker.create(
             bridge_client._bridge_client,
             temporalio.bridge.worker.WorkerConfig(
-                namespace=client.namespace,
-                task_queue=task_queue,
-                identity_override=identity,
-                max_cached_workflows=max_cached_workflows,
+                namespace=config["client"].namespace,
+                task_queue=config["task_queue"],
+                identity_override=config["identity"],
+                max_cached_workflows=config["max_cached_workflows"],
                 tuner=bridge_tuner,
-                nonsticky_to_sticky_poll_ratio=nonsticky_to_sticky_poll_ratio,
+                nonsticky_to_sticky_poll_ratio=config["nonsticky_to_sticky_poll_ratio"],
                 # We have to disable remote activities if a user asks _or_ if we
                 # are not running an activity worker at all. Otherwise shutdown
                 # will not proceed properly.
-                no_remote_activities=no_remote_activities or not activities,
+                no_remote_activities=config["no_remote_activities"]
+                or not config["activities"],
                 sticky_queue_schedule_to_start_timeout_millis=int(
-                    1000 * sticky_queue_schedule_to_start_timeout.total_seconds()
+                    1000
+                    * config["sticky_queue_schedule_to_start_timeout"].total_seconds()
                 ),
                 max_heartbeat_throttle_interval_millis=int(
-                    1000 * max_heartbeat_throttle_interval.total_seconds()
+                    1000 * config["max_heartbeat_throttle_interval"].total_seconds()
                 ),
                 default_heartbeat_throttle_interval_millis=int(
-                    1000 * default_heartbeat_throttle_interval.total_seconds()
+                    1000 * config["default_heartbeat_throttle_interval"].total_seconds()
                 ),
-                max_activities_per_second=max_activities_per_second,
-                max_task_queue_activities_per_second=max_task_queue_activities_per_second,
+                max_activities_per_second=config["max_activities_per_second"],
+                max_task_queue_activities_per_second=config[
+                    "max_task_queue_activities_per_second"
+                ],
                 graceful_shutdown_period_millis=int(
-                    1000 * graceful_shutdown_timeout.total_seconds()
+                    1000 * config["graceful_shutdown_timeout"].total_seconds()
                 ),
                 # Need to tell core whether we want to consider all
                 # non-determinism exceptions as workflow fail, and whether we do
@@ -524,6 +609,9 @@ class Worker:
                 versioning_strategy=versioning_strategy,
                 workflow_task_poller_behavior=workflow_task_poller_behavior._to_bridge(),
                 activity_task_poller_behavior=activity_task_poller_behavior._to_bridge(),
+                nexus_task_poller_behavior=config[
+                    "nexus_task_poller_behavior"
+                ]._to_bridge(),
             ),
         )
 
@@ -534,19 +622,19 @@ class Worker:
             Configuration, shallow-copied.
         """
         config = self._config.copy()
-        config["activities"] = list(config["activities"])
-        config["workflows"] = list(config["workflows"])
+        config["activities"] = list(config.get("activities", []))
+        config["workflows"] = list(config.get("workflows", []))
         return config
 
     @property
     def task_queue(self) -> str:
         """Task queue this worker is on."""
-        return self._config["task_queue"]
+        return self._config["task_queue"]  # type: ignore[reportTypedDictNotRequiredAccess]
 
     @property
     def client(self) -> temporalio.client.Client:
         """Client currently set on the worker."""
-        return self._config["client"]
+        return self._config["client"]  # type: ignore[reportTypedDictNotRequiredAccess]
 
     @client.setter
     def client(self, value: temporalio.client.Client) -> None:
@@ -602,6 +690,9 @@ class Worker:
         also cancel the shutdown process. Therefore users are encouraged to use
         explicit shutdown instead.
         """
+        await self._plugin.run_worker(self)
+
+    async def _run(self):
         # Eagerly validate which will do a namespace check in Core
         await self._bridge_worker.validate()
 
@@ -617,26 +708,35 @@ class Worker:
             except asyncio.CancelledError:
                 pass
 
-        tasks: List[asyncio.Task] = [asyncio.create_task(raise_on_shutdown())]
+        tasks: dict[
+            Union[None, _ActivityWorker, _WorkflowWorker, _NexusWorker], asyncio.Task
+        ] = {None: asyncio.create_task(raise_on_shutdown())}
         # Create tasks for workers
         if self._activity_worker:
-            tasks.append(asyncio.create_task(self._activity_worker.run()))
+            tasks[self._activity_worker] = asyncio.create_task(
+                self._activity_worker.run()
+            )
         if self._workflow_worker:
-            tasks.append(asyncio.create_task(self._workflow_worker.run()))
+            tasks[self._workflow_worker] = asyncio.create_task(
+                self._workflow_worker.run()
+            )
+        if self._nexus_worker:
+            tasks[self._nexus_worker] = asyncio.create_task(self._nexus_worker.run())
 
         # Wait for either worker or shutdown requested
-        wait_task = asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+        wait_task = asyncio.wait(tasks.values(), return_when=asyncio.FIRST_EXCEPTION)
         try:
             await asyncio.shield(wait_task)
 
-            # If any of the last two tasks failed, we want to re-raise that as
-            # the exception
-            exception = next((t.exception() for t in tasks[1:] if t.done()), None)
+            # If any of the worker tasks failed, re-raise that as the exception
+            exception = next(
+                (t.exception() for w, t in tasks.items() if w and t.done()), None
+            )
             if exception:
                 logger.error("Worker failed, shutting down", exc_info=exception)
-                if self._config["on_fatal_error"]:
+                if self._config["on_fatal_error"]:  # type: ignore[reportTypedDictNotRequiredAccess]
                     try:
-                        await self._config["on_fatal_error"](exception)
+                        await self._config["on_fatal_error"](exception)  # type: ignore[reportTypedDictNotRequiredAccess]
                     except:
                         logger.warning("Fatal error handler failed")
 
@@ -646,8 +746,8 @@ class Worker:
             exception = user_cancel_err
 
         # Cancel the shutdown task (safe if already done)
-        tasks[0].cancel()
-        graceful_timeout = self._config["graceful_shutdown_timeout"]
+        tasks[None].cancel()
+        graceful_timeout = self._config["graceful_shutdown_timeout"]  # type: ignore[reportTypedDictNotRequiredAccess]
         logger.info(
             f"Beginning worker shutdown, will wait {graceful_timeout} before cancelling activities"
         )
@@ -655,18 +755,10 @@ class Worker:
         # Initiate core worker shutdown
         self._bridge_worker.initiate_shutdown()
 
-        # If any worker task had an exception, replace that task with a queue
-        # drain (task at index 1 can be activity or workflow worker, task at
-        # index 2 must be workflow worker if present)
-        if tasks[1].done() and tasks[1].exception():
-            if self._activity_worker:
-                tasks[1] = asyncio.create_task(self._activity_worker.drain_poll_queue())
-            else:
-                assert self._workflow_worker
-                tasks[1] = asyncio.create_task(self._workflow_worker.drain_poll_queue())
-        if len(tasks) > 2 and tasks[2].done() and tasks[2].exception():
-            assert self._workflow_worker
-            tasks[2] = asyncio.create_task(self._workflow_worker.drain_poll_queue())
+        # If any worker task had an exception, replace that task with a queue drain
+        for worker, task in tasks.items():
+            if worker and task.done() and task.exception():
+                tasks[worker] = asyncio.create_task(worker.drain_poll_queue())
 
         # Notify shutdown occurring
         if self._activity_worker:
@@ -675,20 +767,21 @@ class Worker:
             self._workflow_worker.notify_shutdown()
 
         # Wait for all tasks to complete (i.e. for poller loops to stop)
-        await asyncio.wait(tasks)
+        await asyncio.wait(tasks.values())
         # Sometimes both workers throw an exception and since we only take the
         # first, Python may complain with "Task exception was never retrieved"
         # if we don't get the others. Therefore we call cancel on each task
         # which suppresses this.
-        for task in tasks:
+        for task in tasks.values():
             task.cancel()
 
-        # If there's an activity worker, we have to let all activity completions
-        # finish. We cannot guarantee that because poll shutdown completed
-        # (which means activities completed) that they got flushed to the
-        # server.
+        # Let all activity / nexus operations completions finish. We cannot guarantee that
+        # because poll shutdown completed (which means activities/operations completed)
+        # that they got flushed to the server.
         if self._activity_worker:
             await self._activity_worker.wait_all_completed()
+        if self._nexus_worker:
+            await self._nexus_worker.wait_all_completed()
 
         # Do final shutdown
         try:
@@ -767,9 +860,11 @@ class WorkerConfig(TypedDict, total=False):
     client: temporalio.client.Client
     task_queue: str
     activities: Sequence[Callable]
+    nexus_service_handlers: Sequence[Any]
     workflows: Sequence[Type]
     activity_executor: Optional[concurrent.futures.Executor]
     workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
+    nexus_task_executor: Optional[concurrent.futures.Executor]
     workflow_runner: WorkflowRunner
     unsandboxed_workflow_runner: WorkflowRunner
     interceptors: Sequence[Interceptor]
@@ -779,6 +874,7 @@ class WorkerConfig(TypedDict, total=False):
     max_concurrent_workflow_tasks: Optional[int]
     max_concurrent_activities: Optional[int]
     max_concurrent_local_activities: Optional[int]
+    max_concurrent_nexus_tasks: Optional[int]
     tuner: Optional[WorkerTuner]
     max_concurrent_workflow_task_polls: Optional[int]
     nonsticky_to_sticky_poll_ratio: float
@@ -800,6 +896,37 @@ class WorkerConfig(TypedDict, total=False):
     deployment_config: Optional[WorkerDeploymentConfig]
     workflow_task_poller_behavior: PollerBehavior
     activity_task_poller_behavior: PollerBehavior
+    nexus_task_poller_behavior: PollerBehavior
+
+
+def _warn_if_activity_executor_max_workers_is_inconsistent(
+    config: WorkerConfig,
+) -> None:
+    max_workers = getattr(config["activity_executor"], "_max_workers", None)
+    concurrent_activities = config["max_concurrent_activities"]
+    if config["tuner"] and config["tuner"]._get_activities_max():
+        concurrent_activities = config["tuner"]._get_activities_max()
+    if isinstance(max_workers, int) and max_workers < (concurrent_activities or 0):
+        warnings.warn(
+            f"Worker max_concurrent_activities is {concurrent_activities} "
+            + f"but activity_executor's max_workers is only {max_workers}",
+            stacklevel=3,
+        )
+
+
+def _warn_if_nexus_task_executor_max_workers_is_inconsistent(
+    config: WorkerConfig,
+) -> None:
+    max_workers = getattr(config["nexus_task_executor"], "_max_workers", None)
+    concurrent_nexus_tasks = config["max_concurrent_nexus_tasks"]
+    if config["tuner"] and config["tuner"]._get_nexus_tasks_max():
+        concurrent_nexus_tasks = config["tuner"]._get_nexus_tasks_max()
+    if isinstance(max_workers, int) and max_workers < (concurrent_nexus_tasks or 0):
+        warnings.warn(
+            f"Worker max_concurrent_nexus_tasks is {concurrent_nexus_tasks} "
+            + f"but nexus_task_executor's max_workers is only {max_workers}",
+            stacklevel=3,
+        )
 
 
 @dataclass

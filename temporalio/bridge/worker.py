@@ -11,6 +11,8 @@ from typing import (
     Awaitable,
     Callable,
     List,
+    Mapping,
+    MutableSequence,
     Optional,
     Sequence,
     Set,
@@ -26,16 +28,19 @@ import temporalio.api.history.v1
 import temporalio.bridge.client
 import temporalio.bridge.proto
 import temporalio.bridge.proto.activity_task
+import temporalio.bridge.proto.nexus
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 import temporalio.exceptions
+from temporalio.api.common.v1.message_pb2 import Payload, Payloads
+from temporalio.bridge._visitor import PayloadVisitor, VisitorFunctions
 from temporalio.bridge.temporal_sdk_bridge import (
     CustomSlotSupplier as BridgeCustomSlotSupplier,
 )
-from temporalio.bridge.temporal_sdk_bridge import PollShutdownError
+from temporalio.bridge.temporal_sdk_bridge import PollShutdownError  # type: ignore
 
 
 @dataclass
@@ -60,6 +65,7 @@ class WorkerConfig:
     graceful_shutdown_period_millis: int
     nondeterminism_as_workflow_fail: bool
     nondeterminism_as_workflow_fail_for_types: Set[str]
+    nexus_task_poller_behavior: PollerBehavior
 
 
 @dataclass
@@ -162,6 +168,7 @@ class TunerHolder:
     workflow_slot_supplier: SlotSupplier
     activity_slot_supplier: SlotSupplier
     local_activity_slot_supplier: SlotSupplier
+    nexus_slot_supplier: SlotSupplier
 
 
 class Worker:
@@ -216,6 +223,14 @@ class Worker:
             await self._ref.poll_activity_task()
         )
 
+    async def poll_nexus_task(
+        self,
+    ) -> temporalio.bridge.proto.nexus.NexusTask:
+        """Poll for a nexus task."""
+        return temporalio.bridge.proto.nexus.NexusTask.FromString(
+            await self._ref.poll_nexus_task()
+        )
+
     async def complete_workflow_activation(
         self,
         comp: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
@@ -228,6 +243,12 @@ class Worker:
     ) -> None:
         """Complete an activity task."""
         await self._ref.complete_activity_task(comp.SerializeToString())
+
+    async def complete_nexus_task(
+        self, comp: temporalio.bridge.proto.nexus.NexusTaskCompletion
+    ) -> None:
+        """Complete a nexus task."""
+        await self._ref.complete_nexus_task(comp.SerializeToString())
 
     def record_activity_heartbeat(
         self, comp: temporalio.bridge.proto.ActivityHeartbeat
@@ -258,194 +279,42 @@ class Worker:
         await ref.finalize_shutdown()
 
 
-# See https://mypy.readthedocs.io/en/stable/runtime_troubles.html#using-classes-that-are-generic-in-stubs-but-not-at-runtime
-if TYPE_CHECKING:
-    PayloadContainer: TypeAlias = (
-        google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-            temporalio.api.common.v1.Payload
-        ]
-    )
-else:
-    PayloadContainer: TypeAlias = (
-        google.protobuf.internal.containers.RepeatedCompositeFieldContainer
-    )
+class _Visitor(VisitorFunctions):
+    def __init__(self, f: Callable[[Sequence[Payload]], Awaitable[List[Payload]]]):
+        self._f = f
 
+    async def visit_payload(self, payload: Payload) -> None:
+        new_payload = (await self._f([payload]))[0]
+        if new_payload is not payload:
+            payload.CopyFrom(new_payload)
 
-async def _apply_to_payloads(
-    payloads: PayloadContainer,
-    cb: Callable[
-        [Sequence[temporalio.api.common.v1.Payload]],
-        Awaitable[List[temporalio.api.common.v1.Payload]],
-    ],
-) -> None:
-    """Apply API payload callback to payloads."""
-    if len(payloads) == 0:
-        return
-    new_payloads = await cb(payloads)
-    if new_payloads is payloads:
-        return
-    del payloads[:]
-    # TODO(cretz): Copy too expensive?
-    payloads.extend(new_payloads)
-
-
-async def _apply_to_payload(
-    payload: temporalio.api.common.v1.Payload,
-    cb: Callable[
-        [Sequence[temporalio.api.common.v1.Payload]],
-        Awaitable[List[temporalio.api.common.v1.Payload]],
-    ],
-) -> None:
-    """Apply API payload callback to payload."""
-    new_payload = (await cb([payload]))[0]
-    payload.CopyFrom(new_payload)
-
-
-async def _decode_payloads(
-    payloads: PayloadContainer,
-    codec: temporalio.converter.PayloadCodec,
-) -> None:
-    """Decode payloads with the given codec."""
-    return await _apply_to_payloads(payloads, codec.decode)
-
-
-async def _decode_payload(
-    payload: temporalio.api.common.v1.Payload,
-    codec: temporalio.converter.PayloadCodec,
-) -> None:
-    """Decode a payload with the given codec."""
-    return await _apply_to_payload(payload, codec.decode)
-
-
-async def _encode_payloads(
-    payloads: PayloadContainer,
-    codec: temporalio.converter.PayloadCodec,
-) -> None:
-    """Encode payloads with the given codec."""
-    return await _apply_to_payloads(payloads, codec.encode)
-
-
-async def _encode_payload(
-    payload: temporalio.api.common.v1.Payload,
-    codec: temporalio.converter.PayloadCodec,
-) -> None:
-    """Decode a payload with the given codec."""
-    return await _apply_to_payload(payload, codec.encode)
+    async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+        if len(payloads) == 0:
+            return
+        new_payloads = await self._f(payloads)
+        if new_payloads is payloads:
+            return
+        del payloads[:]
+        payloads.extend(new_payloads)
 
 
 async def decode_activation(
     act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
     codec: temporalio.converter.PayloadCodec,
+    decode_headers: bool,
 ) -> None:
     """Decode the given activation with the codec."""
-    for job in act.jobs:
-        if job.HasField("query_workflow"):
-            await _decode_payloads(job.query_workflow.arguments, codec)
-        elif job.HasField("resolve_activity"):
-            if job.resolve_activity.result.HasField("cancelled"):
-                await codec.decode_failure(
-                    job.resolve_activity.result.cancelled.failure
-                )
-            elif job.resolve_activity.result.HasField("completed"):
-                if job.resolve_activity.result.completed.HasField("result"):
-                    await _decode_payload(
-                        job.resolve_activity.result.completed.result, codec
-                    )
-            elif job.resolve_activity.result.HasField("failed"):
-                await codec.decode_failure(job.resolve_activity.result.failed.failure)
-        elif job.HasField("resolve_child_workflow_execution"):
-            if job.resolve_child_workflow_execution.result.HasField("cancelled"):
-                await codec.decode_failure(
-                    job.resolve_child_workflow_execution.result.cancelled.failure
-                )
-            elif job.resolve_child_workflow_execution.result.HasField(
-                "completed"
-            ) and job.resolve_child_workflow_execution.result.completed.HasField(
-                "result"
-            ):
-                await _decode_payload(
-                    job.resolve_child_workflow_execution.result.completed.result, codec
-                )
-            elif job.resolve_child_workflow_execution.result.HasField("failed"):
-                await codec.decode_failure(
-                    job.resolve_child_workflow_execution.result.failed.failure
-                )
-        elif job.HasField("resolve_child_workflow_execution_start"):
-            if job.resolve_child_workflow_execution_start.HasField("cancelled"):
-                await codec.decode_failure(
-                    job.resolve_child_workflow_execution_start.cancelled.failure
-                )
-        elif job.HasField("resolve_request_cancel_external_workflow"):
-            if job.resolve_request_cancel_external_workflow.HasField("failure"):
-                await codec.decode_failure(
-                    job.resolve_request_cancel_external_workflow.failure
-                )
-        elif job.HasField("resolve_signal_external_workflow"):
-            if job.resolve_signal_external_workflow.HasField("failure"):
-                await codec.decode_failure(job.resolve_signal_external_workflow.failure)
-        elif job.HasField("signal_workflow"):
-            await _decode_payloads(job.signal_workflow.input, codec)
-        elif job.HasField("initialize_workflow"):
-            await _decode_payloads(job.initialize_workflow.arguments, codec)
-            if job.initialize_workflow.HasField("continued_failure"):
-                await codec.decode_failure(job.initialize_workflow.continued_failure)
-            for val in job.initialize_workflow.memo.fields.values():
-                # This uses API payload not bridge payload
-                new_payload = (await codec.decode([val]))[0]
-                val.metadata.clear()
-                val.metadata.update(new_payload.metadata)
-                val.data = new_payload.data
-        elif job.HasField("do_update"):
-            await _decode_payloads(job.do_update.input, codec)
+    await PayloadVisitor(
+        skip_search_attributes=True, skip_headers=not decode_headers
+    ).visit(_Visitor(codec.decode), act)
 
 
 async def encode_completion(
     comp: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
     codec: temporalio.converter.PayloadCodec,
+    encode_headers: bool,
 ) -> None:
     """Recursively encode the given completion with the codec."""
-    if comp.HasField("failed"):
-        await codec.encode_failure(comp.failed.failure)
-    elif comp.HasField("successful"):
-        for command in comp.successful.commands:
-            if command.HasField("complete_workflow_execution"):
-                if command.complete_workflow_execution.HasField("result"):
-                    await _encode_payload(
-                        command.complete_workflow_execution.result, codec
-                    )
-            elif command.HasField("continue_as_new_workflow_execution"):
-                await _encode_payloads(
-                    command.continue_as_new_workflow_execution.arguments, codec
-                )
-                for val in command.continue_as_new_workflow_execution.memo.values():
-                    await _encode_payload(val, codec)
-            elif command.HasField("fail_workflow_execution"):
-                await codec.encode_failure(command.fail_workflow_execution.failure)
-            elif command.HasField("respond_to_query"):
-                if command.respond_to_query.HasField("failed"):
-                    await codec.encode_failure(command.respond_to_query.failed)
-                elif command.respond_to_query.HasField(
-                    "succeeded"
-                ) and command.respond_to_query.succeeded.HasField("response"):
-                    await _encode_payload(
-                        command.respond_to_query.succeeded.response, codec
-                    )
-            elif command.HasField("schedule_activity"):
-                await _encode_payloads(command.schedule_activity.arguments, codec)
-            elif command.HasField("schedule_local_activity"):
-                await _encode_payloads(command.schedule_local_activity.arguments, codec)
-            elif command.HasField("signal_external_workflow_execution"):
-                await _encode_payloads(
-                    command.signal_external_workflow_execution.args, codec
-                )
-            elif command.HasField("start_child_workflow_execution"):
-                await _encode_payloads(
-                    command.start_child_workflow_execution.input, codec
-                )
-                for val in command.start_child_workflow_execution.memo.values():
-                    await _encode_payload(val, codec)
-            elif command.HasField("update_response"):
-                if command.update_response.HasField("completed"):
-                    await _encode_payload(command.update_response.completed, codec)
-                elif command.update_response.HasField("rejected"):
-                    await codec.encode_failure(command.update_response.rejected)
+    await PayloadVisitor(
+        skip_search_attributes=True, skip_headers=not encode_headers
+    ).visit(_Visitor(codec.encode), comp)

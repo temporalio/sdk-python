@@ -26,7 +26,7 @@ import temporalio.bridge.proto.health.v1
 import temporalio.exceptions
 import temporalio.runtime
 
-__version__ = "1.12.0"
+__version__ = "1.18.1"
 
 ServiceRequest = TypeVar("ServiceRequest", bound=google.protobuf.message.Message)
 ServiceResponse = TypeVar("ServiceResponse", bound=google.protobuf.message.Message)
@@ -143,7 +143,7 @@ class ConnectConfig:
     tls: Union[bool, TLSConfig] = False
     retry_config: Optional[RetryConfig] = None
     keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default
-    rpc_metadata: Mapping[str, str] = field(default_factory=dict)
+    rpc_metadata: Mapping[str, Union[str, bytes]] = field(default_factory=dict)
     identity: str = ""
     lazy: bool = False
     runtime: Optional[temporalio.runtime.Runtime] = None
@@ -184,19 +184,23 @@ class ConnectConfig:
             target_url=target_url,
             api_key=self.api_key,
             tls_config=tls_config,
-            retry_config=self.retry_config._to_bridge_config()
-            if self.retry_config
-            else None,
-            keep_alive_config=self.keep_alive_config._to_bridge_config()
-            if self.keep_alive_config
-            else None,
+            retry_config=(
+                self.retry_config._to_bridge_config() if self.retry_config else None
+            ),
+            keep_alive_config=(
+                self.keep_alive_config._to_bridge_config()
+                if self.keep_alive_config
+                else None
+            ),
             metadata=self.rpc_metadata,
             identity=self.identity,
             client_name="temporal-python",
             client_version=__version__,
-            http_connect_proxy_config=self.http_connect_proxy_config._to_bridge_config()
-            if self.http_connect_proxy_config
-            else None,
+            http_connect_proxy_config=(
+                self.http_connect_proxy_config._to_bridge_config()
+                if self.http_connect_proxy_config
+                else None
+            ),
         )
 
 
@@ -228,7 +232,7 @@ class ServiceClient(ABC):
         *,
         service: str = "temporal.api.workflowservice.v1.WorkflowService",
         retry: bool = False,
-        metadata: Mapping[str, str] = {},
+        metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> bool:
         """Check whether the WorkflowService is up.
@@ -260,7 +264,7 @@ class ServiceClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def update_rpc_metadata(self, metadata: Mapping[str, str]) -> None:
+    def update_rpc_metadata(self, metadata: Mapping[str, Union[str, bytes]]) -> None:
         """Update service client's RPC metadata."""
         raise NotImplementedError
 
@@ -278,7 +282,7 @@ class ServiceClient(ABC):
         *,
         service: str,
         retry: bool,
-        metadata: Mapping[str, str],
+        metadata: Mapping[str, Union[str, bytes]],
         timeout: Optional[timedelta],
     ) -> ServiceResponse:
         raise NotImplementedError
@@ -395,6 +399,11 @@ class WorkflowService:
             wsv1.ExecuteMultiOperationRequest,
             wsv1.ExecuteMultiOperationResponse,
         )
+        self.fetch_worker_config = client._new_call(
+            "fetch_worker_config",
+            wsv1.FetchWorkerConfigRequest,
+            wsv1.FetchWorkerConfigResponse,
+        )
         self.get_cluster_info = client._new_call(
             "get_cluster_info",
             wsv1.GetClusterInfoRequest,
@@ -500,6 +509,11 @@ class WorkflowService:
             wsv1.ListWorkflowExecutionsRequest,
             wsv1.ListWorkflowExecutionsResponse,
         )
+        self.list_workers = client._new_call(
+            "list_workers",
+            wsv1.ListWorkersRequest,
+            wsv1.ListWorkersResponse,
+        )
         self.list_workflow_rules = client._new_call(
             "list_workflow_rules",
             wsv1.ListWorkflowRulesRequest,
@@ -549,6 +563,11 @@ class WorkflowService:
             "record_activity_task_heartbeat_by_id",
             wsv1.RecordActivityTaskHeartbeatByIdRequest,
             wsv1.RecordActivityTaskHeartbeatByIdResponse,
+        )
+        self.record_worker_heartbeat = client._new_call(
+            "record_worker_heartbeat",
+            wsv1.RecordWorkerHeartbeatRequest,
+            wsv1.RecordWorkerHeartbeatResponse,
         )
         self.register_namespace = client._new_call(
             "register_namespace",
@@ -710,6 +729,16 @@ class WorkflowService:
             wsv1.UpdateScheduleRequest,
             wsv1.UpdateScheduleResponse,
         )
+        self.update_task_queue_config = client._new_call(
+            "update_task_queue_config",
+            wsv1.UpdateTaskQueueConfigRequest,
+            wsv1.UpdateTaskQueueConfigResponse,
+        )
+        self.update_worker_config = client._new_call(
+            "update_worker_config",
+            wsv1.UpdateWorkerConfigRequest,
+            wsv1.UpdateWorkerConfigResponse,
+        )
         self.update_worker_deployment_version_metadata = client._new_call(
             "update_worker_deployment_version_metadata",
             wsv1.UpdateWorkerDeploymentVersionMetadataRequest,
@@ -829,10 +858,22 @@ class CloudService:
             clv1.AddNamespaceRegionResponse,
             service="cloud",
         )
+        self.add_user_group_member = client._new_call(
+            "add_user_group_member",
+            clv1.AddUserGroupMemberRequest,
+            clv1.AddUserGroupMemberResponse,
+            service="cloud",
+        )
         self.create_api_key = client._new_call(
             "create_api_key",
             clv1.CreateApiKeyRequest,
             clv1.CreateApiKeyResponse,
+            service="cloud",
+        )
+        self.create_connectivity_rule = client._new_call(
+            "create_connectivity_rule",
+            clv1.CreateConnectivityRuleRequest,
+            clv1.CreateConnectivityRuleResponse,
             service="cloud",
         )
         self.create_namespace = client._new_call(
@@ -877,6 +918,12 @@ class CloudService:
             clv1.DeleteApiKeyResponse,
             service="cloud",
         )
+        self.delete_connectivity_rule = client._new_call(
+            "delete_connectivity_rule",
+            clv1.DeleteConnectivityRuleRequest,
+            clv1.DeleteConnectivityRuleResponse,
+            service="cloud",
+        )
         self.delete_namespace = client._new_call(
             "delete_namespace",
             clv1.DeleteNamespaceRequest,
@@ -887,6 +934,12 @@ class CloudService:
             "delete_namespace_export_sink",
             clv1.DeleteNamespaceExportSinkRequest,
             clv1.DeleteNamespaceExportSinkResponse,
+            service="cloud",
+        )
+        self.delete_namespace_region = client._new_call(
+            "delete_namespace_region",
+            clv1.DeleteNamespaceRegionRequest,
+            clv1.DeleteNamespaceRegionResponse,
             service="cloud",
         )
         self.delete_nexus_endpoint = client._new_call(
@@ -941,6 +994,18 @@ class CloudService:
             "get_async_operation",
             clv1.GetAsyncOperationRequest,
             clv1.GetAsyncOperationResponse,
+            service="cloud",
+        )
+        self.get_connectivity_rule = client._new_call(
+            "get_connectivity_rule",
+            clv1.GetConnectivityRuleRequest,
+            clv1.GetConnectivityRuleResponse,
+            service="cloud",
+        )
+        self.get_connectivity_rules = client._new_call(
+            "get_connectivity_rules",
+            clv1.GetConnectivityRulesRequest,
+            clv1.GetConnectivityRulesResponse,
             service="cloud",
         )
         self.get_namespace = client._new_call(
@@ -1015,6 +1080,12 @@ class CloudService:
             clv1.GetUserGroupResponse,
             service="cloud",
         )
+        self.get_user_group_members = client._new_call(
+            "get_user_group_members",
+            clv1.GetUserGroupMembersRequest,
+            clv1.GetUserGroupMembersResponse,
+            service="cloud",
+        )
         self.get_user_groups = client._new_call(
             "get_user_groups",
             clv1.GetUserGroupsRequest,
@@ -1031,6 +1102,12 @@ class CloudService:
             "get_users",
             clv1.GetUsersRequest,
             clv1.GetUsersResponse,
+            service="cloud",
+        )
+        self.remove_user_group_member = client._new_call(
+            "remove_user_group_member",
+            clv1.RemoveUserGroupMemberRequest,
+            clv1.RemoveUserGroupMemberResponse,
             service="cloud",
         )
         self.rename_custom_search_attribute = client._new_call(
@@ -1073,6 +1150,12 @@ class CloudService:
             "update_namespace_export_sink",
             clv1.UpdateNamespaceExportSinkRequest,
             clv1.UpdateNamespaceExportSinkResponse,
+            service="cloud",
+        )
+        self.update_namespace_tags = client._new_call(
+            "update_namespace_tags",
+            clv1.UpdateNamespaceTagsRequest,
+            clv1.UpdateNamespaceTagsResponse,
             service="cloud",
         )
         self.update_nexus_endpoint = client._new_call(
@@ -1174,7 +1257,7 @@ class ServiceCall(Generic[ServiceRequest, ServiceResponse]):
         req: ServiceRequest,
         *,
         retry: bool = False,
-        metadata: Mapping[str, str] = {},
+        metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> ServiceResponse:
         """Invoke underlying client with the given request.
@@ -1233,7 +1316,7 @@ class _BridgeServiceClient(ServiceClient):
         """Underlying service client."""
         return self
 
-    def update_rpc_metadata(self, metadata: Mapping[str, str]) -> None:
+    def update_rpc_metadata(self, metadata: Mapping[str, Union[str, bytes]]) -> None:
         """Update Core client metadata."""
         # Mutate the bridge config and then only mutate the running client
         # metadata if already connected
@@ -1257,7 +1340,7 @@ class _BridgeServiceClient(ServiceClient):
         *,
         service: str,
         retry: bool,
-        metadata: Mapping[str, str],
+        metadata: Mapping[str, Union[str, bytes]],
         timeout: Optional[timedelta],
     ) -> ServiceResponse:
         global LOG_PROTOS
