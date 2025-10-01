@@ -229,14 +229,15 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._info = det.info
         self._context_free_payload_converter = det.payload_converter_class()
         self._context_free_failure_converter = det.failure_converter_class()
-        (
-            self._workflow_context_payload_converter,
-            self._workflow_context_failure_converter,
-        ) = self._converters_with_context(
-            temporalio.converter.WorkflowSerializationContext(
-                namespace=det.info.namespace,
-                workflow_id=det.info.workflow_id,
-            )
+        workflow_context = temporalio.converter.WorkflowSerializationContext(
+            namespace=det.info.namespace,
+            workflow_id=det.info.workflow_id,
+        )
+        self._workflow_context_payload_converter = self._payload_converter_with_context(
+            workflow_context
+        )
+        self._workflow_context_failure_converter = self._failure_converter_with_context(
+            workflow_context
         )
 
         self._extern_functions = det.extern_functions
@@ -785,20 +786,20 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         handle = self._pending_activities.pop(job.seq, None)
         if not handle:
             raise RuntimeError(f"Failed finding activity handle for sequence {job.seq}")
-        payload_converter, failure_converter = self._converters_with_context(
-            temporalio.converter.ActivitySerializationContext(
-                namespace=self._info.namespace,
-                workflow_id=self._info.workflow_id,
-                workflow_type=self._info.workflow_type,
-                activity_type=handle._input.activity,
-                activity_task_queue=(
-                    handle._input.task_queue or self._info.task_queue
-                    if isinstance(handle._input, StartActivityInput)
-                    else self._info.task_queue
-                ),
-                is_local=isinstance(handle._input, StartLocalActivityInput),
-            )
+        activity_context = temporalio.converter.ActivitySerializationContext(
+            namespace=self._info.namespace,
+            workflow_id=self._info.workflow_id,
+            workflow_type=self._info.workflow_type,
+            activity_type=handle._input.activity,
+            activity_task_queue=(
+                handle._input.task_queue or self._info.task_queue
+                if isinstance(handle._input, StartActivityInput)
+                else self._info.task_queue
+            ),
+            is_local=isinstance(handle._input, StartLocalActivityInput),
         )
+        payload_converter = self._payload_converter_with_context(activity_context)
+        failure_converter = self._failure_converter_with_context(activity_context)
         if job.result.HasField("completed"):
             ret: Optional[Any] = None
             if job.result.completed.HasField("result"):
@@ -989,12 +990,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         fut, external_workflow_id = pending
         # We intentionally let this error if future is already done
         if job.HasField("failure"):
-            payload_converter, failure_converter = self._converters_with_context(
-                temporalio.converter.WorkflowSerializationContext(
-                    namespace=self._info.namespace,
-                    workflow_id=external_workflow_id,
-                )
+            workflow_context = temporalio.converter.WorkflowSerializationContext(
+                namespace=self._info.namespace,
+                workflow_id=external_workflow_id,
             )
+            payload_converter = self._payload_converter_with_context(workflow_context)
+            failure_converter = self._failure_converter_with_context(workflow_context)
             fut.set_exception(
                 failure_converter.from_failure(job.failure, payload_converter)
             )
@@ -1013,12 +1014,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         fut, external_workflow_id = pending
         # We intentionally let this error if future is already done
         if job.HasField("failure"):
-            payload_converter, failure_converter = self._converters_with_context(
-                temporalio.converter.WorkflowSerializationContext(
-                    namespace=self._info.namespace,
-                    workflow_id=external_workflow_id,
-                )
+            workflow_context = temporalio.converter.WorkflowSerializationContext(
+                namespace=self._info.namespace,
+                workflow_id=external_workflow_id,
             )
+            payload_converter = self._payload_converter_with_context(workflow_context)
+            failure_converter = self._failure_converter_with_context(workflow_context)
             fut.set_exception(
                 failure_converter.from_failure(job.failure, payload_converter)
             )
@@ -1874,7 +1875,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     async def _outbound_signal_child_workflow(
         self, input: SignalChildWorkflowInput
     ) -> None:
-        payload_converter, _ = self._converters_with_context(
+        payload_converter = self._payload_converter_with_context(
             temporalio.converter.WorkflowSerializationContext(
                 namespace=self._info.namespace,
                 workflow_id=input.child_workflow_id,
@@ -1894,7 +1895,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     async def _outbound_signal_external_workflow(
         self, input: SignalExternalWorkflowInput
     ) -> None:
-        payload_converter, _ = self._converters_with_context(
+        payload_converter = self._payload_converter_with_context(
             temporalio.converter.WorkflowSerializationContext(
                 namespace=input.namespace,
                 workflow_id=input.workflow_id,
@@ -2077,39 +2078,45 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 raise
             raise RuntimeError("Failed decoding arguments") from err
 
-    def _converters_with_context(
+    def _payload_converter_with_context(
         self,
         context: temporalio.converter.SerializationContext,
-    ) -> Tuple[
-        temporalio.converter.PayloadConverter,
-        temporalio.converter.FailureConverter,
-    ]:
-        """Construct workflow payload and failure converters with the given context.
+    ) -> temporalio.converter.PayloadConverter:
+        """Construct workflow payload converter with the given context.
 
         This plays a similar role to DataConverter._with_context, but operates on PayloadConverter
-        and FailureConverter only (since payload encoding/decoding is done by the worker, outside
-        the workflow sandbox).
+        only (payload encoding/decoding is done by the worker, outside the workflow sandbox).
         """
         payload_converter = self._context_free_payload_converter
-        failure_converter = self._context_free_failure_converter
         if isinstance(payload_converter, temporalio.converter.WithSerializationContext):
             payload_converter = payload_converter.with_context(context)
+        return payload_converter
+
+    def _failure_converter_with_context(
+        self,
+        context: temporalio.converter.SerializationContext,
+    ) -> temporalio.converter.FailureConverter:
+        """Construct workflow failure converter with the given context.
+
+        This plays a similar role to DataConverter._with_context, but operates on FailureConverter
+        only (payload encoding/decoding is done by the worker, outside the workflow sandbox).
+        """
+        failure_converter = self._context_free_failure_converter
         if isinstance(failure_converter, temporalio.converter.WithSerializationContext):
             failure_converter = failure_converter.with_context(context)
-        return payload_converter, failure_converter
+        return failure_converter
 
     def get_serialization_context(
         self,
         command_info: Optional[_command_aware_visitor.CommandInfo],
     ) -> Optional[temporalio.converter.SerializationContext]:
-        workflow_context = temporalio.converter.WorkflowSerializationContext(
-            namespace=self._info.namespace,
-            workflow_id=self._info.workflow_id,
-        )
         if command_info is None:
             # Use payload codec with workflow context by default (i.e. for payloads not associated
             # with a pending command)
-            return workflow_context
+            return temporalio.converter.WorkflowSerializationContext(
+                namespace=self._info.namespace,
+                workflow_id=self._info.workflow_id,
+            )
 
         if (
             command_info.command_type
@@ -2170,7 +2177,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
         else:
             # Use payload codec with workflow context for all other payloads
-            return workflow_context
+            return temporalio.converter.WorkflowSerializationContext(
+                namespace=self._info.namespace,
+                workflow_id=self._info.workflow_id,
+            )
 
     def _instantiate_workflow_object(self) -> Any:
         if not self._workflow_input:
@@ -2908,7 +2918,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         self._result_fut = instance.create_future()
         self._started = False
         instance._register_task(self, name=f"activity: {input.activity}")
-        self._payload_converter, _ = self._instance._converters_with_context(
+        self._payload_converter = self._instance._payload_converter_with_context(
             temporalio.converter.ActivitySerializationContext(
                 namespace=self._instance._info.namespace,
                 workflow_id=self._instance._info.workflow_id,
@@ -3069,13 +3079,15 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         self._result_fut: asyncio.Future[Any] = instance.create_future()
         self._first_execution_run_id = "<unknown>"
         instance._register_task(self, name=f"child: {input.workflow}")
-        self._payload_converter, self._failure_converter = (
-            self._instance._converters_with_context(
-                temporalio.converter.WorkflowSerializationContext(
-                    namespace=self._instance._info.namespace,
-                    workflow_id=self._input.id,
-                )
-            )
+        workflow_context = temporalio.converter.WorkflowSerializationContext(
+            namespace=self._instance._info.namespace,
+            workflow_id=self._input.id,
+        )
+        self._payload_converter = self._instance._payload_converter_with_context(
+            workflow_context
+        )
+        self._failure_converter = self._instance._failure_converter_with_context(
+            workflow_context
         )
 
     @property
