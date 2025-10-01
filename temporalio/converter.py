@@ -5,6 +5,7 @@ from __future__ import annotations
 import collections
 import collections.abc
 import dataclasses
+import functools
 import inspect
 import json
 import sys
@@ -352,9 +353,6 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
             converters: Payload converters to delegate to, in order.
         """
         self._set_converters(*converters)
-        self._any_converter_takes_context = any(
-            isinstance(c, WithSerializationContext) for c in converters
-        )
 
     def _set_converters(self, *converters: EncodingPayloadConverter) -> None:
         self.converters = {c.encoding.encode(): c for c in converters}
@@ -452,6 +450,12 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
                 converters.append(c)
 
         return converters if any_with_context else None
+
+    @functools.cached_property
+    def _any_converter_takes_context(self) -> bool:
+        return any(
+            isinstance(c, WithSerializationContext) for c in self.converters.values()
+        )
 
 
 class DefaultPayloadConverter(CompositePayloadConverter):
