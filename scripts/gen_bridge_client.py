@@ -61,8 +61,6 @@ $service_defns
             )
         )
 
-    print(f"successfully generated client at {output_file}")
-
 
 def generate_python_service(service_descriptor: ServiceDescriptor) -> str:
     service_template = Template("""
@@ -158,12 +156,8 @@ $service_calls
     with open(output_file, "w") as f:
         f.write(impl_template.substitute(service_calls="\n".join(service_calls)))
 
-    print(f"successfully generated client at {output_file}")
-
 
 def generate_rust_service_call(service_descriptor: ServiceDescriptor) -> str:
-    print(f"generating rpc call wrapper for {service_descriptor.full_name}")
-
     call_template = Template("""
 fn call_${service_name}<'p>(
     &self,
