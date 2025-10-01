@@ -139,7 +139,6 @@ class ActivitySerializationContext(BaseWorkflowSerializationContext):
     is_local: bool
 
 
-# TODO: duck typing or nominal typing?
 class WithSerializationContext(ABC):
     """Interface for classes that can use serialization context.
 

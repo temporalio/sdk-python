@@ -61,7 +61,6 @@ import temporalio.nexus
 import temporalio.workflow
 from temporalio.nexus._util import ServiceHandlerT
 
-from .api.failure.v1.message_pb2 import Failure
 from .types import (
     AnyType,
     CallableAsyncNoParam,
@@ -1148,6 +1147,7 @@ def patched(id: str) -> bool:
 def payload_converter() -> temporalio.converter.PayloadConverter:
     """Get the payload converter for the current workflow.
 
+    The returned converter has :py:class:`temporalio.converter.WorkflowSerializationContext` set.
     This is often used for dynamic workflows/signals/queries to convert
     payloads.
     """
