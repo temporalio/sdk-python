@@ -1,7 +1,7 @@
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 from google.protobuf.descriptor import Descriptor, FieldDescriptor
 
@@ -88,6 +88,7 @@ import abc
 from typing import Any, MutableSequence
 
 from temporalio.api.common.v1.message_pb2 import Payload
+
 
 class VisitorFunctions(abc.ABC):
     \"\"\"Set of functions which can be called by the visitor. 
