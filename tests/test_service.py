@@ -2,7 +2,6 @@ import inspect
 import os
 import re
 from datetime import timedelta
-from importlib import import_module
 from typing import Any, Callable, Dict, Mapping, Tuple, Type
 
 import google.protobuf.empty_pb2
@@ -10,14 +9,19 @@ import google.protobuf.message
 import google.protobuf.symbol_database
 import grpc
 import pytest
-from google.protobuf.descriptor import MethodDescriptor
+from google.protobuf.descriptor import FileDescriptor, MethodDescriptor
 
 import temporalio
 import temporalio.api.cloud.cloudservice.v1
+import temporalio.api.cloud.cloudservice.v1.service_pb2
 import temporalio.api.errordetails.v1
 import temporalio.api.operatorservice.v1
+import temporalio.api.operatorservice.v1.service_pb2
 import temporalio.api.testservice.v1
+import temporalio.api.testservice.v1.service_pb2
 import temporalio.api.workflowservice.v1
+import temporalio.api.workflowservice.v1.service_pb2
+import temporalio.bridge.proto.health.v1.health_pb2
 import temporalio.service
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
@@ -202,37 +206,36 @@ async def test_rpc_execution_not_unknown(client: Client):
             ), f"Unexpected unknown-RPC error for {target_service_name}.{method_name}: {err}"
 
     async def test_service(
-        *, proto_module: str, proto_service: str, target_service_name: str
+        *, proto_module: FileDescriptor, proto_service: str, target_service_name: str
     ):
         # load the module and test each method of the specified service
-        module = import_module(proto_module)
-        service_descriptor = module.DESCRIPTOR.services_by_name[proto_service]
+        service_descriptor = proto_module.services_by_name[proto_service]
 
         for method_descriptor in service_descriptor.methods:
             await test_method(target_service_name, method_descriptor)
 
     await test_service(
-        proto_module="temporalio.api.workflowservice.v1.service_pb2",
+        proto_module=temporalio.api.workflowservice.v1.service_pb2.DESCRIPTOR,
         proto_service="WorkflowService",
         target_service_name="workflow_service",
     )
     await test_service(
-        proto_module="temporalio.api.operatorservice.v1.service_pb2",
+        proto_module=temporalio.api.operatorservice.v1.service_pb2.DESCRIPTOR,
         proto_service="OperatorService",
         target_service_name="operator_service",
     )
     await test_service(
-        proto_module="temporalio.api.cloud.cloudservice.v1.service_pb2",
+        proto_module=temporalio.api.cloud.cloudservice.v1.service_pb2.DESCRIPTOR,
         proto_service="CloudService",
         target_service_name="cloud_service",
     )
     await test_service(
-        proto_module="temporalio.api.testservice.v1.service_pb2",
+        proto_module=temporalio.api.testservice.v1.service_pb2.DESCRIPTOR,
         proto_service="TestService",
         target_service_name="test_service",
     )
     await test_service(
-        proto_module="temporalio.bridge.proto.health.v1.health_pb2",
+        proto_module=temporalio.bridge.proto.health.v1.health_pb2.DESCRIPTOR,
         proto_service="Health",
         target_service_name="health_service",
     )
