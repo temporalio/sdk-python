@@ -577,6 +577,20 @@ class _Definition:
             f"Activity {fn_name} missing attributes, was it decorated with @activity.defn?"
         )
 
+    @classmethod
+    def get_name_and_result_type(
+        cls, name_or_run_fn: Union[str, Callable[..., Any]]
+    ) -> Tuple[str, Optional[Type]]:
+        if isinstance(name_or_run_fn, str):
+            return name_or_run_fn, None
+        elif callable(name_or_run_fn):
+            defn = cls.must_from_callable(name_or_run_fn)
+            if not defn.name:
+                raise ValueError(f"Activity {name_or_run_fn} definition has no name")
+            return defn.name, defn.ret_type
+        else:
+            raise TypeError("Activity must be a string or callable")
+
     @staticmethod
     def _apply_to_callable(
         fn: Callable,

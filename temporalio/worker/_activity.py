@@ -254,6 +254,7 @@ class _ActivityWorker:
                 workflow_id=activity.info.workflow_id,
                 workflow_type=activity.info.workflow_type,
                 activity_type=activity.info.activity_type,
+                activity_id=activity.info.activity_id,
                 activity_task_queue=self._task_queue,
                 is_local=activity.info.is_local,
             )
@@ -306,6 +307,7 @@ class _ActivityWorker:
             workflow_id=start.workflow_execution.workflow_id,
             workflow_type=start.workflow_type,
             activity_type=start.activity_type,
+            activity_id=start.activity_id,
             activity_task_queue=self._task_queue,
             is_local=start.is_local,
         )

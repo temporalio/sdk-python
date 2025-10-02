@@ -247,6 +247,10 @@ class RetryState(IntEnum):
     )
 
 
+# TODO: This error class has required history event fields. I propose we retain it as
+# workflow-specific and introduce client.ActivityFailureError for an error in a standalone activity.
+# We could deprecate this name and introduce WorkflowActivityError as a preferred-going-forwards
+# alias.
 class ActivityError(FailureError):
     """Error raised on activity failure."""
 
@@ -362,6 +366,8 @@ class ChildWorkflowError(FailureError):
         return self._retry_state
 
 
+# TODO: This error class has required history event fields. Would we retain it as workflow-specific
+# and introduce client.NexusOperationFailureError? See related note on ActivityError above.
 class NexusOperationError(FailureError):
     """Error raised on Nexus operation failure inside a Workflow."""
 
