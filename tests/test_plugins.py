@@ -2,15 +2,17 @@ import dataclasses
 import uuid
 import warnings
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from typing import AsyncIterator, cast
+from typing import AsyncIterator, Optional, cast
 
 import pytest
 
 import temporalio.client
+import temporalio.converter
 import temporalio.worker
 from temporalio import workflow
 from temporalio.client import Client, ClientConfig, OutboundInterceptor, Plugin
 from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.converter import DataConverter
 from temporalio.plugin import create_plugin
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
@@ -237,6 +239,11 @@ class HelloWorkflow:
     async def run(self, name: str) -> str:
         return f"Hello, {name}!"
 
+@workflow.defn
+class HelloWorkflow2:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        return f"Hello, {name}!"
 
 async def test_replay(client: Client) -> None:
     plugin = ReplayCheckPlugin()
@@ -258,10 +265,11 @@ async def test_replay(client: Client) -> None:
 
     await replayer.replay_workflow(await handle.fetch_history())
 
+
 async def test_static_plugins(client: Client) -> None:
     plugin = create_plugin(
         data_converter=pydantic_data_converter,
-        workflows=[HelloWorkflow],
+        workflows=[HelloWorkflow2],
     )
     config = client.config()
     config["plugins"] = [plugin]
@@ -270,23 +278,58 @@ async def test_static_plugins(client: Client) -> None:
     assert new_client.data_converter == pydantic_data_converter
 
     # Test without plugin registered in client
-    worker =  Worker(
+    worker = Worker(
         client,
         task_queue="queue",
         activities=[never_run_activity],
+        workflows=[HelloWorkflow],
         plugins=[plugin],
     )
-    assert worker.config().get("workflows") == [HelloWorkflow]
+    # On a sequence, a value is appended
+    assert worker.config().get("workflows") == [HelloWorkflow, HelloWorkflow2]
 
     # Test with plugin registered in client
-    worker =  Worker(
+    worker = Worker(
         new_client,
         task_queue="queue",
         activities=[never_run_activity],
         plugins=[plugin],
     )
-    assert worker.config().get("workflows") == [HelloWorkflow]
+    assert worker.config().get("workflows") == [HelloWorkflow2]
 
-    replayer = Replayer(workflows=[], plugins=[plugin])
+    replayer = Replayer(workflows=[HelloWorkflow], plugins=[plugin])
     assert replayer.config().get("data_converter") == pydantic_data_converter
-    assert replayer.config().get("workflows") == [HelloWorkflow]
+    assert replayer.config().get("workflows") == [HelloWorkflow, HelloWorkflow2]
+
+
+async def test_static_plugins_callables(client: Client) -> None:
+    def converter(old: Optional[DataConverter]):
+        if old != temporalio.converter.default():
+            raise ValueError("Can't override non-default converter")
+        return pydantic_data_converter
+
+    plugin = create_plugin(
+        data_converter=converter,
+    )
+    config = client.config()
+    config["plugins"] = [plugin]
+    new_client = Client(**config)
+
+    assert new_client.data_converter == pydantic_data_converter
+
+    with pytest.raises(ValueError):
+        config["data_converter"] = pydantic_data_converter
+        Client(**config)
+
+    # On a sequence, the lambda overrides the existing values
+    plugin = create_plugin(
+        workflows=lambda workflows: [],
+    )
+    worker = Worker(
+        client,
+        task_queue="queue",
+        workflows=[HelloWorkflow],
+        activities=[never_run_activity],
+        plugins=[plugin],
+    )
+    assert worker.config().get("workflows") == []

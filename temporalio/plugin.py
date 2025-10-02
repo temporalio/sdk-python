@@ -1,7 +1,17 @@
 import abc
-import dataclasses
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from typing import Any, AsyncIterator, Callable, Optional, Sequence, Set, Type
+from typing import (
+    Any,
+    AsyncIterator,
+    Callable,
+    Optional,
+    Sequence,
+    Set,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import temporalio.client
 import temporalio.converter
@@ -13,24 +23,35 @@ from temporalio.worker import (
     Worker,
     WorkerConfig,
     WorkflowReplayResult,
+    WorkflowRunner,
 )
-from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 
 class Plugin(temporalio.client.Plugin, temporalio.worker.Plugin, abc.ABC):
     pass
 
 
+T = TypeVar("T")
+
+PluginParameter = Union[None, T, Callable[[Optional[T]], T]]
+
+
 def create_plugin(
     *,
-    data_converter: Optional[temporalio.converter.DataConverter] = None,
-    client_interceptors: Optional[Sequence[temporalio.client.Interceptor]] = None,
-    activities: Optional[Sequence[Callable]] = None,
-    nexus_service_handlers: Optional[Sequence[Any]] = None,
-    workflows: Optional[Sequence[Type]] = None,
-    passthrough_modules: Optional[Set[str]] = None,
-    worker_interceptors: Optional[Sequence[temporalio.worker.Interceptor]] = None,
-    workflow_failure_exception_types: Optional[Sequence[Type[BaseException]]] = None,
+    data_converter: PluginParameter[temporalio.converter.DataConverter] = None,
+    client_interceptors: PluginParameter[
+        Sequence[temporalio.client.Interceptor]
+    ] = None,
+    activities: PluginParameter[Sequence[Callable]] = None,
+    nexus_service_handlers: PluginParameter[Sequence[Any]] = None,
+    workflows: PluginParameter[Sequence[Type]] = None,
+    workflow_runner: PluginParameter[WorkflowRunner] = None,
+    worker_interceptors: PluginParameter[
+        Sequence[temporalio.worker.Interceptor]
+    ] = None,
+    workflow_failure_exception_types: PluginParameter[
+        Sequence[Type[BaseException]]
+    ] = None,
     run_context: Optional[AbstractAsyncContextManager[None]] = None,
 ) -> Plugin:
     return _StaticPlugin(
@@ -39,7 +60,7 @@ def create_plugin(
         activities=activities,
         nexus_service_handlers=nexus_service_handlers,
         workflows=workflows,
-        passthrough_modules=passthrough_modules,
+        workflow_runner=workflow_runner,
         worker_interceptors=worker_interceptors,
         workflow_failure_exception_types=workflow_failure_exception_types,
         run_context=run_context,
@@ -50,14 +71,18 @@ class _StaticPlugin(Plugin):
     def __init__(
         self,
         *,
-        data_converter: Optional[temporalio.converter.DataConverter] = None,
-        client_interceptors: Optional[Sequence[temporalio.client.Interceptor]] = None,
-        activities: Optional[Sequence[Callable]] = None,
-        nexus_service_handlers: Optional[Sequence[Any]] = None,
-        workflows: Optional[Sequence[Type]] = None,
-        passthrough_modules: Optional[Set[str]] = None,
-        worker_interceptors: Optional[Sequence[temporalio.worker.Interceptor]] = None,
-        workflow_failure_exception_types: Optional[
+        data_converter: PluginParameter[temporalio.converter.DataConverter] = None,
+        client_interceptors: PluginParameter[
+            Sequence[temporalio.client.Interceptor]
+        ] = None,
+        activities: PluginParameter[Sequence[Callable]] = None,
+        nexus_service_handlers: PluginParameter[Sequence[Any]] = None,
+        workflows: PluginParameter[Sequence[Type]] = None,
+        workflow_runner: PluginParameter[WorkflowRunner] = None,
+        worker_interceptors: PluginParameter[
+            Sequence[temporalio.worker.Interceptor]
+        ] = None,
+        workflow_failure_exception_types: PluginParameter[
             Sequence[Type[BaseException]]
         ] = None,
         run_context: Optional[AbstractAsyncContextManager[None]] = None,
@@ -67,7 +92,7 @@ class _StaticPlugin(Plugin):
         self.activities = activities
         self.nexus_service_handlers = nexus_service_handlers
         self.workflows = workflows
-        self.passthrough_modules = passthrough_modules
+        self.workflow_runner = workflow_runner
         self.worker_interceptors = worker_interceptors
         self.workflow_failure_exception_types = workflow_failure_exception_types
         self.run_context = run_context
@@ -79,18 +104,18 @@ class _StaticPlugin(Plugin):
         self.next_client_plugin = next
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
-        if self.data_converter:
-            if not config["data_converter"] == temporalio.converter.default():
-                raise ValueError(
-                    "Static Plugin was configured with a data converter, but the client was as well."
-                )
-            else:
-                config["data_converter"] = self.data_converter
-
-        if self.client_interceptors:
-            config["interceptors"] = list(config.get("interceptors", [])) + list(
-                self.client_interceptors
-            )
+        self._set_dict(
+            config,  # type: ignore
+            "data_converter",
+            self._resolve_parameter(config.get("data_converter"), self.data_converter),
+        )
+        self._set_dict(
+            config,  # type: ignore
+            "interceptors",
+            self._resolve_append_parameter(
+                config.get("interceptors"), self.client_interceptors
+            ),
+        )
 
         return self.next_client_plugin.configure_client(config)
 
@@ -100,77 +125,82 @@ class _StaticPlugin(Plugin):
         return await self.next_client_plugin.connect_service_client(config)
 
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
-        if self.activities:
-            config["activities"] = list(config.get("activities", [])) + list(
-                self.activities
-            )
+        self._set_dict(
+            config,  # type: ignore
+            "activities",
+            self._resolve_append_parameter(config.get("activities"), self.activities),
+        )
+        self._set_dict(
+            config,  # type: ignore
+            "nexus_service_handlers",
+            self._resolve_append_parameter(
+                config.get("nexus_service_handlers"), self.nexus_service_handlers
+            ),
+        )
+        self._set_dict(
+            config,  # type: ignore
+            "workflows",
+            self._resolve_append_parameter(config.get("workflows"), self.workflows),
+        )
 
-        if self.nexus_service_handlers:
-            config["nexus_service_handlers"] = list(
-                config.get("nexus_service_handlers", [])
-            ) + list(self.nexus_service_handlers)
-
-        if self.workflows:
-            config["workflows"] = list(config.get("workflows", [])) + list(
-                self.workflows
-            )
-
-        if self.passthrough_modules:
-            runner = config.get("workflow_runner")
-            if runner and isinstance(runner, SandboxedWorkflowRunner):
-                config["workflow_runner"] = dataclasses.replace(
-                    runner,
-                    restrictions=runner.restrictions.with_passthrough_modules(
-                        *self.passthrough_modules
-                    ),
-                )
-
-        if self.worker_interceptors:
-            config["interceptors"] = list(config.get("interceptors", [])) + list(
-                self.worker_interceptors
-            )
-
-        if self.workflow_failure_exception_types:
-            config["workflow_failure_exception_types"] = list(
-                config.get("workflow_failure_exception_types", [])
-            ) + list(self.workflow_failure_exception_types)
+        self._set_dict(
+            config,  # type: ignore
+            "workflow_runner",
+            self._resolve_parameter(
+                config.get("workflow_runner"), self.workflow_runner
+            ),
+        )
+        self._set_dict(
+            config,  # type: ignore
+            "interceptors",
+            self._resolve_append_parameter(
+                config.get("interceptors"), self.worker_interceptors
+            ),
+        )
+        self._set_dict(
+            config,  # type: ignore
+            "workflow_failure_exception_types",
+            self._resolve_append_parameter(
+                config.get("workflow_failure_exception_types"),
+                self.workflow_failure_exception_types,
+            ),
+        )
 
         return config
 
     def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
-        if self.data_converter:
-            if not config["data_converter"] == temporalio.converter.default():
-                raise ValueError(
-                    "Static Plugin was configured with a data converter, but the client was as well."
-                )
-            else:
-                config["data_converter"] = self.data_converter
-
-        if self.workflows:
-            config["workflows"] = list(config.get("workflows", [])) + list(
-                self.workflows
-            )
-
-        if self.passthrough_modules:
-            runner = config.get("workflow_runner")
-            if runner and isinstance(runner, SandboxedWorkflowRunner):
-                config["workflow_runner"] = dataclasses.replace(
-                    runner,
-                    restrictions=runner.restrictions.with_passthrough_modules(
-                        *self.passthrough_modules
-                    ),
-                )
-
-        if self.worker_interceptors:
-            config["interceptors"] = list(config.get("interceptors", [])) + list(
-                self.worker_interceptors
-            )
-
-        if self.workflow_failure_exception_types:
-            config["workflow_failure_exception_types"] = list(
-                config.get("workflow_failure_exception_types", [])
-            ) + list(self.workflow_failure_exception_types)
-
+        self._set_dict(
+            config,  # type: ignore
+            "data_converter",
+            self._resolve_parameter(config.get("data_converter"), self.data_converter),
+        )
+        self._set_dict(
+            config,  # type: ignore
+            "workflows",
+            self._resolve_append_parameter(config.get("workflows"), self.workflows),
+        )
+        self._set_dict(
+            config,  # type: ignore
+            "workflow_runner",
+            self._resolve_parameter(
+                config.get("workflow_runner"), self.workflow_runner
+            ),
+        )
+        self._set_dict(
+            config,  # type: ignore
+            "interceptors",
+            self._resolve_append_parameter(
+                config.get("interceptors"), self.worker_interceptors
+            ),
+        )
+        self._set_dict(
+            config,  # type: ignore
+            "workflow_failure_exception_types",
+            self._resolve_append_parameter(
+                config.get("workflow_failure_exception_types"),
+                self.workflow_failure_exception_types,
+            ),
+        )
         return config
 
     async def run_worker(self, worker: Worker) -> None:
@@ -197,3 +227,34 @@ class _StaticPlugin(Plugin):
                 replayer, histories
             ) as results:
                 yield results
+
+    @staticmethod
+    def _resolve_parameter(
+        existing: Optional[T], parameter: PluginParameter[T]
+    ) -> Optional[T]:
+        if parameter is None:
+            return existing
+        elif callable(parameter):
+            return cast(Callable[[Optional[T]], Optional[T]], parameter)(existing)
+        else:
+            return parameter
+
+    @staticmethod
+    def _resolve_append_parameter(
+        existing: Optional[Sequence[T]], parameter: PluginParameter[Sequence[T]]
+    ) -> Optional[Sequence[T]]:
+        if parameter is None:
+            return existing
+        elif callable(parameter):
+            return cast(
+                Callable[[Optional[Sequence[T]]], Optional[Sequence[T]]], parameter
+            )(existing)
+        else:
+            return list(existing or []) + list(parameter)
+
+    @staticmethod
+    def _set_dict(config: dict[str, Any], key: str, value: Optional[Any]) -> None:
+        if value is not None:
+            config[key] = value
+        else:
+            del config[key]
