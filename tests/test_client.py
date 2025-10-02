@@ -1,4 +1,3 @@
-import asyncio
 import dataclasses
 import json
 import os
@@ -8,12 +7,9 @@ from typing import Any, List, Mapping, Optional, Tuple, Union, cast
 from unittest import mock
 
 import google.protobuf.any_pb2
-import google.protobuf.message
 from google.protobuf import json_format
 
 import temporalio.api.common.v1
-import temporalio.api.enums.v1
-import temporalio.api.errordetails.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
@@ -33,9 +29,7 @@ from temporalio.api.enums.v1 import (
     WorkflowTaskFailedCause,
 )
 from temporalio.api.history.v1 import History
-from temporalio.api.workflowservice.v1 import GetSystemInfoRequest, request_response_pb2
-from temporalio.api.batch.v1 import message_pb2
-from temporalio.api.enums.v1 import reset_pb2
+from temporalio.api.workflowservice.v1 import GetSystemInfoRequest
 from temporalio.client import (
     BuildIdOpAddNewCompatible,
     BuildIdOpAddNewDefault,
@@ -44,11 +38,9 @@ from temporalio.client import (
     BuildIdOpPromoteSetByBuildId,
     CancelWorkflowInput,
     Client,
-    ClientConfig,
     CloudOperationsClient,
     Interceptor,
     OutboundInterceptor,
-    Plugin,
     QueryWorkflowInput,
     RPCError,
     RPCStatusCode,
@@ -93,7 +85,6 @@ from temporalio.exceptions import WorkflowAlreadyStartedError
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     assert_eq_eventually,
-    assert_eventually,
     ensure_search_attributes_present,
     new_worker,
     worker_versioning_enabled,
@@ -1554,22 +1545,3 @@ async def test_schedule_last_completion_result(
         )
 
         await handle.delete()
-
-
-async def test_workflow_client_start_batch_operation(client: Client):
-    # This test is used to ensure that the start_batch_operation is wired through
-    # the layers of python -> bridge python -> bridge rust -> core
-    # https://github.com/temporalio/sdk-python/issues/927
-
-    request = request_response_pb2.StartBatchOperationRequest(
-        namespace="default",
-        visibility_query='WorkflowType="test_workflow"',
-        job_id=f"batch-reset-{int(datetime.now().timestamp())}",
-        reason="test",
-        reset_operation=message_pb2.BatchOperationReset(
-            reset_type=reset_pb2.RESET_TYPE_LAST_WORKFLOW_TASK
-        ),
-    )
-
-    response = await client.workflow_service.start_batch_operation(request)
-    assert response is not None
