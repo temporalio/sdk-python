@@ -17,8 +17,8 @@ import google.protobuf.message
 
 import temporalio.api.common.v1
 import temporalio.bridge.client
-import temporalio.bridge.generated.services_generated
 import temporalio.bridge.proto.health.v1
+import temporalio.bridge.services_generated
 import temporalio.exceptions
 import temporalio.runtime
 
@@ -280,23 +280,23 @@ class ServiceClient(ABC):
         raise NotImplementedError
 
 
-class WorkflowService(temporalio.bridge.generated.services_generated.WorkflowService):
+class WorkflowService(temporalio.bridge.services_generated.WorkflowService):
     """Client to the Temporal server's workflow service."""
 
 
-class OperatorService(temporalio.bridge.generated.services_generated.OperatorService):
+class OperatorService(temporalio.bridge.services_generated.OperatorService):
     """Client to the Temporal server's operator service."""
 
 
-class CloudService(temporalio.bridge.generated.services_generated.CloudService):
+class CloudService(temporalio.bridge.services_generated.CloudService):
     """Client to the Temporal server's cloud service."""
 
 
-class TestService(temporalio.bridge.generated.services_generated.TestService):
+class TestService(temporalio.bridge.services_generated.TestService):
     """Client to the Temporal test server's test service."""
 
 
-class HealthService(temporalio.bridge.generated.services_generated.HealthService):
+class HealthService(temporalio.bridge.services_generated.HealthService):
     """Client to the Temporal server's health service."""
 
 

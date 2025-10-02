@@ -17,11 +17,12 @@ import temporalio.bridge.proto.health.v1.health_pb2 as health_service
 
 def generate_python_services(
     file_descriptors: list[FileDescriptor],
-    output_file: str = "temporalio/bridge/generated/services_generated.py",
+    output_file: str = "temporalio/bridge/services_generated.py",
 ):
     print("generating python services")
 
-    services_template = Template("""# Generated file. DO NOT EDIT
+    services_template = Template('''# Generated file. DO NOT EDIT
+"""Generated RPC calls for Temporal services."""
 
 from __future__ import annotations
 
@@ -36,7 +37,7 @@ if TYPE_CHECKING:
     from temporalio.service import ServiceClient
 
 $service_defns
-""")
+''')
 
     def service_name(s):
         return f"import {sanitize_proto_name(s.full_name)[:-len(s.name)-1]}"
@@ -63,13 +64,15 @@ $service_defns
 
 
 def generate_python_service(service_descriptor: ServiceDescriptor) -> str:
-    service_template = Template("""
+    service_template = Template('''
 class $service_name:
+    """RPC calls for the $service_name."""
     def __init__(self, client: ServiceClient):
-        self.client = client
-        self.service = "$rpc_service_name"
+        """Initialize service with the provided ServiceClient."""
+        self._client = client
+        self._service = "$rpc_service_name"
 $method_calls
-""")
+''')
 
     sanitized_service_name: str = service_descriptor.name
     # The health service doesn't end in "Service" in the proto definition
@@ -88,7 +91,7 @@ $method_calls
     ]
 
     method_calls = [
-        generate_python_method_call(method)
+        generate_python_method_call(sanitized_service_name, method)
         for method in sorted(methods, key=lambda m: m.name)
     ]
 
@@ -99,8 +102,10 @@ $method_calls
     )
 
 
-def generate_python_method_call(method_descriptor: MethodDescriptor) -> str:
-    method_template = Template("""
+def generate_python_method_call(
+    service_name: str, method_descriptor: MethodDescriptor
+) -> str:
+    method_template = Template('''
     async def $method_name(
         self,
         req: $request_type,
@@ -108,18 +113,20 @@ def generate_python_method_call(method_descriptor: MethodDescriptor) -> str:
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> $response_type:
-        return await self.client._rpc_call(
+        """Invokes the $service_name.$method_name rpc method."""
+        return await self._client._rpc_call(
             rpc="$method_name",
             req=req,
-            service=self.service,
+            service=self._service,
             resp_type=$response_type,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
         )
-""")
+''')
 
     return method_template.substitute(
+        service_name=service_name,
         method_name=pascal_to_snake(method_descriptor.name),
         request_type=sanitize_proto_name(method_descriptor.input_type.full_name),
         response_type=sanitize_proto_name(method_descriptor.output_type.full_name),
