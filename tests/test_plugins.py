@@ -11,6 +11,7 @@ import temporalio.worker
 from temporalio import workflow
 from temporalio.client import Client, ClientConfig, OutboundInterceptor, Plugin
 from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.plugin import create_plugin
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     Replayer,
@@ -256,3 +257,36 @@ async def test_replay(client: Client) -> None:
     assert replayer.config().get("data_converter") == pydantic_data_converter
 
     await replayer.replay_workflow(await handle.fetch_history())
+
+async def test_static_plugins(client: Client) -> None:
+    plugin = create_plugin(
+        data_converter=pydantic_data_converter,
+        workflows=[HelloWorkflow],
+    )
+    config = client.config()
+    config["plugins"] = [plugin]
+    new_client = Client(**config)
+
+    assert new_client.data_converter == pydantic_data_converter
+
+    # Test without plugin registered in client
+    worker =  Worker(
+        client,
+        task_queue="queue",
+        activities=[never_run_activity],
+        plugins=[plugin],
+    )
+    assert worker.config().get("workflows") == [HelloWorkflow]
+
+    # Test with plugin registered in client
+    worker =  Worker(
+        new_client,
+        task_queue="queue",
+        activities=[never_run_activity],
+        plugins=[plugin],
+    )
+    assert worker.config().get("workflows") == [HelloWorkflow]
+
+    replayer = Replayer(workflows=[], plugins=[plugin])
+    assert replayer.config().get("data_converter") == pydantic_data_converter
+    assert replayer.config().get("workflows") == [HelloWorkflow]
