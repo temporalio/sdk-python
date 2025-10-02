@@ -154,6 +154,47 @@ class WorkflowIDConflictPolicy(IntEnum):
     )
 
 
+class ActivityExecutionStatus(IntEnum):
+    """Status of a standalone activity execution.
+
+    See :py:class:`temporalio.api.enums.v1.ActivityExecutionStatus`.
+    """
+
+    UNSPECIFIED = 0  # ACTIVITY_EXECUTION_STATUS_UNSPECIFIED
+    RUNNING = 1  # ACTIVITY_EXECUTION_STATUS_RUNNING
+    COMPLETED = 2  # ACTIVITY_EXECUTION_STATUS_COMPLETED
+    FAILED = 3  # ACTIVITY_EXECUTION_STATUS_FAILED
+    CANCELED = 4  # ACTIVITY_EXECUTION_STATUS_CANCELED
+    TERMINATED = 5  # ACTIVITY_EXECUTION_STATUS_TERMINATED
+    TIMED_OUT = 6  # ACTIVITY_EXECUTION_STATUS_TIMED_OUT
+
+
+class PendingActivityState(IntEnum):
+    """State of a pending activity.
+
+    See :py:class:`temporalio.api.enums.v1.PendingActivityState`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_UNSPECIFIED
+    )
+    SCHEDULED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_SCHEDULED
+    )
+    STARTED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_STARTED
+    )
+    CANCEL_REQUESTED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_CANCEL_REQUESTED
+    )
+    PAUSED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_PAUSED
+    )
+    PAUSE_REQUESTED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_PAUSE_REQUESTED
+    )
+
+
 class QueryRejectCondition(IntEnum):
     """Whether a query should be rejected in certain conditions.
 
