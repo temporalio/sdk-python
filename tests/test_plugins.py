@@ -239,11 +239,13 @@ class HelloWorkflow:
     async def run(self, name: str) -> str:
         return f"Hello, {name}!"
 
+
 @workflow.defn
 class HelloWorkflow2:
     @workflow.run
     async def run(self, name: str) -> str:
         return f"Hello, {name}!"
+
 
 async def test_replay(client: Client) -> None:
     plugin = ReplayCheckPlugin()

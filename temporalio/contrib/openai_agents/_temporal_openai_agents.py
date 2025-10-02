@@ -47,12 +47,14 @@ from temporalio.converter import (
     DataConverter,
     DefaultPayloadConverter,
 )
+from temporalio.plugin import Plugin, create_plugin
 from temporalio.worker import (
     Replayer,
     ReplayerConfig,
     Worker,
     WorkerConfig,
     WorkflowReplayResult,
+    WorkflowRunner,
 )
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
@@ -172,24 +174,28 @@ class OpenAIPayloadConverter(PydanticPayloadConverter):
         super().__init__(ToJsonOptions(exclude_unset=True))
 
 
-class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
-    """Temporal plugin for integrating OpenAI agents with Temporal workflows.
+def _data_converter(converter: Optional[DataConverter]) -> DataConverter:
+    if converter is None:
+        return DataConverter(payload_converter_class=OpenAIPayloadConverter)
+    elif converter.payload_converter_class is DefaultPayloadConverter:
+        return dataclasses.replace(
+            converter, payload_converter_class=OpenAIPayloadConverter
+        )
+    elif not isinstance(converter.payload_converter, OpenAIPayloadConverter):
+        raise ValueError(
+            "The payload converter must be of type OpenAIPayloadConverter."
+        )
+    return converter
 
-    .. warning::
-        This class is experimental and may change in future versions.
-        Use with caution in production environments.
 
-    This plugin provides seamless integration between the OpenAI Agents SDK and
-    Temporal workflows. It automatically configures the necessary interceptors,
-    activities, and data converters to enable OpenAI agents to run within
-    Temporal workflows with proper tracing and model execution.
-
-    The plugin:
-    1. Configures the Pydantic data converter for type-safe serialization
-    2. Sets up tracing interceptors for OpenAI agent interactions
-    3. Registers model execution activities
-    4. Automatically registers MCP server activities and manages their lifecycles
-    5. Manages the OpenAI agent runtime overrides during worker execution
+def OpenAIAgentsPlugin(
+    model_params: Optional[ModelActivityParameters] = None,
+    model_provider: Optional[ModelProvider] = None,
+    mcp_server_providers: Sequence[
+        Union["StatelessMCPServerProvider", "StatefulMCPServerProvider"]
+    ] = (),
+) -> Plugin:
+    """Create an OpenAI agents plugin.
 
     Args:
         model_params: Configuration parameters for Temporal activity execution
@@ -197,201 +203,59 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         model_provider: Optional model provider for custom model implementations.
             Useful for testing or custom model integrations.
         mcp_server_providers: Sequence of MCP servers to automatically register with the worker.
-            The plugin will wrap each server in a TemporalMCPServer if needed and
-            manage their connection lifecycles tied to the worker lifetime. This is
-            the recommended way to use MCP servers with Temporal workflows.
-
-    Example:
-        >>> from temporalio.client import Client
-        >>> from temporalio.worker import Worker
-        >>> from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters, StatelessMCPServerProvider
-        >>> from agents.mcp import MCPServerStdio
-        >>> from datetime import timedelta
-        >>>
-        >>> # Configure model parameters
-        >>> model_params = ModelActivityParameters(
-        ...     start_to_close_timeout=timedelta(seconds=30),
-        ...     retry_policy=RetryPolicy(maximum_attempts=3)
-        ... )
-        >>>
-        >>> # Create MCP servers
-        >>> filesystem_server = StatelessMCPServerProvider(MCPServerStdio(
-        ...     name="Filesystem Server",
-        ...     params={"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]}
-        ... ))
-        >>>
-        >>> # Create plugin with MCP servers
-        >>> plugin = OpenAIAgentsPlugin(
-        ...     model_params=model_params,
-        ...     mcp_server_providers=[filesystem_server]
-        ... )
-        >>>
-        >>> # Use with client and worker
-        >>> client = await Client.connect(
-        ...     "localhost:7233",
-        ...     plugins=[plugin]
-        ... )
-        >>> worker = Worker(
-        ...     client,
-        ...     task_queue="my-task-queue",
-        ...     workflows=[MyWorkflow],
-        ... )
+            Each server will be wrapped in a TemporalMCPServer if not already wrapped,
+            and their activities will be automatically registered with the worker.
+            The plugin manages the connection lifecycle of these servers.
     """
+    if model_params is None:
+        model_params = ModelActivityParameters()
 
-    def __init__(
-        self,
-        model_params: Optional[ModelActivityParameters] = None,
-        model_provider: Optional[ModelProvider] = None,
-        mcp_server_providers: Sequence[
-            Union["StatelessMCPServerProvider", "StatefulMCPServerProvider"]
-        ] = (),
-    ) -> None:
-        """Initialize the OpenAI agents plugin.
-
-        Args:
-            model_params: Configuration parameters for Temporal activity execution
-                of model calls. If None, default parameters will be used.
-            model_provider: Optional model provider for custom model implementations.
-                Useful for testing or custom model integrations.
-            mcp_server_providers: Sequence of MCP servers to automatically register with the worker.
-                Each server will be wrapped in a TemporalMCPServer if not already wrapped,
-                and their activities will be automatically registered with the worker.
-                The plugin manages the connection lifecycle of these servers.
-        """
-        if model_params is None:
-            model_params = ModelActivityParameters()
-
-        # For the default provider, we provide a default start_to_close_timeout of 60 seconds.
-        # Other providers will need to define their own.
-        if (
-            model_params.start_to_close_timeout is None
-            and model_params.schedule_to_close_timeout is None
-        ):
-            if model_provider is None:
-                model_params.start_to_close_timeout = timedelta(seconds=60)
-            else:
-                raise ValueError(
-                    "When configuring a custom provider, the model activity must have start_to_close_timeout or schedule_to_close_timeout"
-                )
-
-        self._model_params = model_params
-        self._model_provider = model_provider
-        self._mcp_server_providers = mcp_server_providers
-
-    def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
-        """Set the next client plugin"""
-        self.next_client_plugin = next
-
-    async def connect_service_client(
-        self, config: temporalio.service.ConnectConfig
-    ) -> temporalio.service.ServiceClient:
-        """No modifications to service client"""
-        return await self.next_client_plugin.connect_service_client(config)
-
-    def init_worker_plugin(self, next: temporalio.worker.Plugin) -> None:
-        """Set the next worker plugin"""
-        self.next_worker_plugin = next
-
-    @staticmethod
-    def _data_converter(converter: Optional[DataConverter]) -> DataConverter:
-        if converter is None:
-            return DataConverter(payload_converter_class=OpenAIPayloadConverter)
-        elif converter.payload_converter_class is DefaultPayloadConverter:
-            return dataclasses.replace(
-                converter, payload_converter_class=OpenAIPayloadConverter
-            )
-        elif not isinstance(converter.payload_converter, OpenAIPayloadConverter):
+    # For the default provider, we provide a default start_to_close_timeout of 60 seconds.
+    # Other providers will need to define their own.
+    if (
+        model_params.start_to_close_timeout is None
+        and model_params.schedule_to_close_timeout is None
+    ):
+        if model_provider is None:
+            model_params.start_to_close_timeout = timedelta(seconds=60)
+        else:
             raise ValueError(
-                "The payload converter must be of type OpenAIPayloadConverter."
-            )
-        return converter
-
-    def configure_client(self, config: ClientConfig) -> ClientConfig:
-        """Configure the Temporal client for OpenAI agents integration.
-
-        This method sets up the Pydantic data converter to enable proper
-        serialization of OpenAI agent objects and responses.
-
-        Args:
-            config: The client configuration to modify.
-
-        Returns:
-            The modified client configuration.
-        """
-        config["data_converter"] = self._data_converter(config["data_converter"])
-        return self.next_client_plugin.configure_client(config)
-
-    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
-        """Configure the Temporal worker for OpenAI agents integration.
-
-        This method adds the necessary interceptors and activities for OpenAI
-        agent execution:
-        - Adds tracing interceptors for OpenAI agent interactions
-        - Registers model execution activities
-
-        Args:
-            config: The worker configuration to modify.
-
-        Returns:
-            The modified worker configuration.
-        """
-        config["interceptors"] = list(config.get("interceptors") or []) + [
-            OpenAIAgentsTracingInterceptor()
-        ]
-        new_activities = [ModelActivity(self._model_provider).invoke_model_activity]
-
-        server_names = [server.name for server in self._mcp_server_providers]
-        if len(server_names) != len(set(server_names)):
-            raise ValueError(
-                f"More than one mcp server registered with the same name. Please provide unique names."
+                "When configuring a custom provider, the model activity must have start_to_close_timeout or schedule_to_close_timeout"
             )
 
-        for mcp_server in self._mcp_server_providers:
-            new_activities.extend(mcp_server._get_activities())
-        config["activities"] = list(config.get("activities") or []) + new_activities
+    new_activities = [ModelActivity(model_provider).invoke_model_activity]
 
-        runner = config.get("workflow_runner")
+    server_names = [server.name for server in mcp_server_providers]
+    if len(server_names) != len(set(server_names)):
+        raise ValueError(
+            f"More than one mcp server registered with the same name. Please provide unique names."
+        )
+
+    for mcp_server in mcp_server_providers:
+        new_activities.extend(mcp_server._get_activities())
+
+    def workflow_runner(runner: Optional[WorkflowRunner]) -> WorkflowRunner:
+        if not runner:
+            raise ValueError("No WorkflowRunner provided to the OpenAI plugin.")
+
+        # If in sandbox, add additional passthrough
         if isinstance(runner, SandboxedWorkflowRunner):
-            config["workflow_runner"] = dataclasses.replace(
+            return dataclasses.replace(
                 runner,
                 restrictions=runner.restrictions.with_passthrough_modules("mcp"),
             )
-
-        config["workflow_failure_exception_types"] = list(
-            config.get("workflow_failure_exception_types") or []
-        ) + [AgentsWorkflowError]
-        return self.next_worker_plugin.configure_worker(config)
-
-    async def run_worker(self, worker: Worker) -> None:
-        """Run the worker with OpenAI agents temporal overrides.
-
-        This method sets up the necessary runtime overrides for OpenAI agents
-        to work within the Temporal worker context, including custom runners
-        and trace providers.
-
-        Args:
-            worker: The worker instance to run.
-        """
-        with set_open_ai_agent_temporal_overrides(self._model_params):
-            await self.next_worker_plugin.run_worker(worker)
-
-    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
-        """Configure the replayer for OpenAI Agents."""
-        config["interceptors"] = list(config.get("interceptors") or []) + [
-            OpenAIAgentsTracingInterceptor()
-        ]
-        config["data_converter"] = self._data_converter(config.get("data_converter"))
-        return self.next_worker_plugin.configure_replayer(config)
+        return runner
 
     @asynccontextmanager
-    async def run_replayer(
-        self,
-        replayer: Replayer,
-        histories: AsyncIterator[temporalio.client.WorkflowHistory],
-    ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
-        """Set the OpenAI Overrides during replay"""
-        with set_open_ai_agent_temporal_overrides(self._model_params):
-            async with self.next_worker_plugin.run_replayer(
-                replayer, histories
-            ) as results:
-                yield results
+    async def run_context() -> AsyncIterator[None]:
+        with set_open_ai_agent_temporal_overrides(model_params):
+            yield
+
+    return create_plugin(
+        data_converter=_data_converter,
+        worker_interceptors=[OpenAIAgentsTracingInterceptor()],
+        activities=new_activities,
+        workflow_runner=workflow_runner,
+        workflow_failure_exception_types=[AgentsWorkflowError],
+        run_context=lambda: run_context(),
+    )
