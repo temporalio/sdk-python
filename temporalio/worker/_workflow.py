@@ -8,6 +8,7 @@ import logging
 import os
 import sys
 import threading
+from dataclasses import dataclass
 from datetime import timezone
 from types import TracebackType
 from typing import (
@@ -24,6 +25,7 @@ from typing import (
 
 import temporalio.activity
 import temporalio.api.common.v1
+import temporalio.bridge._visitor
 import temporalio.bridge.client
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
@@ -35,6 +37,7 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow
 
+from . import _command_aware_visitor
 from ._interceptor import (
     Interceptor,
     WorkflowInboundInterceptor,
@@ -253,66 +256,85 @@ class _WorkflowWorker:
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
         )
         completion.successful.SetInParent()
+        workflow = None
+        data_converter = self._data_converter
         try:
-            # Decode the activation if there's a codec and not cache remove job
-            if self._data_converter.payload_codec:
-                await temporalio.bridge.worker.decode_activation(
-                    act,
-                    self._data_converter.payload_codec,
-                    decode_headers=self._encode_headers,
-                )
-
             if LOG_PROTOS:
                 logger.debug("Received workflow activation:\n%s", act)
 
-            # If the workflow is not running yet, create it
             workflow = self._running_workflows.get(act.run_id)
             if not workflow:
-                # Must have a initialize job to create instance
                 if not init_job:
                     raise RuntimeError(
                         "Missing initialize workflow, workflow could have unexpectedly been removed from cache"
                     )
+                workflow_id = init_job.workflow_id
+            else:
+                workflow_id = workflow.workflow_id
+                if init_job:
+                    # Should never happen
+                    logger.warning(
+                        "Cache already exists for activation with initialize job"
+                    )
+
+            workflow_context = temporalio.converter.WorkflowSerializationContext(
+                namespace=self._namespace,
+                workflow_id=workflow_id,
+            )
+            data_converter = self._data_converter.with_context(workflow_context)
+            if self._data_converter.payload_codec:
+                assert data_converter.payload_codec
+                if not workflow:
+                    payload_codec = data_converter.payload_codec
+                else:
+                    payload_codec = _CommandAwarePayloadCodec(
+                        workflow.instance,
+                        context_free_payload_codec=self._data_converter.payload_codec,
+                        workflow_context_payload_codec=data_converter.payload_codec,
+                        workflow_context=workflow_context,
+                    )
+                await temporalio.bridge.worker.decode_activation(
+                    act,
+                    payload_codec,
+                    decode_headers=self._encode_headers,
+                )
+            if not workflow:
+                assert init_job
                 workflow = _RunningWorkflow(
-                    self._create_workflow_instance(act, init_job)
+                    self._create_workflow_instance(act, init_job),
+                    workflow_id,
                 )
                 self._running_workflows[act.run_id] = workflow
-            elif init_job:
-                # This should never happen
-                logger.warning(
-                    "Cache already exists for activation with initialize job"
-                )
 
             # Run activation in separate thread so we can check if it's
             # deadlocked
-            if workflow:
-                activate_task = asyncio.get_running_loop().run_in_executor(
-                    self._workflow_task_executor,
-                    workflow.activate,
-                    act,
-                )
+            activate_task = asyncio.get_running_loop().run_in_executor(
+                self._workflow_task_executor,
+                workflow.activate,
+                act,
+            )
 
-                # Run activation task with deadlock timeout
-                try:
-                    completion = await asyncio.wait_for(
-                        activate_task, self._deadlock_timeout_seconds
-                    )
-                except asyncio.TimeoutError:
-                    # Need to create the deadlock exception up here so it
-                    # captures the trace now instead of later after we may have
-                    # interrupted it
-                    deadlock_exc = _DeadlockError.from_deadlocked_workflow(
-                        workflow.instance, self._deadlock_timeout_seconds
-                    )
-                    # When we deadlock, we will raise an exception to fail
-                    # the task. But before we do that, we want to try to
-                    # interrupt the thread and put this activation task on
-                    # the workflow so that the successive eviction can wait
-                    # on it before trying to evict.
-                    workflow.attempt_deadlock_interruption()
-                    # Set the task and raise
-                    workflow.deadlocked_activation_task = activate_task
-                    raise deadlock_exc from None
+            # Run activation task with deadlock timeout
+            try:
+                completion = await asyncio.wait_for(
+                    activate_task, self._deadlock_timeout_seconds
+                )
+            except asyncio.TimeoutError:
+                # Need to create the deadlock exception up here so it
+                # captures the trace now instead of later after we may have
+                # interrupted it
+                deadlock_exc = _DeadlockError.from_deadlocked_workflow(
+                    workflow.instance, self._deadlock_timeout_seconds
+                )
+                # When we deadlock, we will raise an exception to fail
+                # the task. But before we do that, we want to try to
+                # interrupt the thread and put this activation task on
+                # the workflow so that the successive eviction can wait
+                # on it before trying to evict.
+                workflow.attempt_deadlock_interruption()
+                # Set the task and raise
+                workflow.deadlocked_activation_task = activate_task
+                raise deadlock_exc from None
 
         except Exception as err:
             if isinstance(err, _DeadlockError):
@@ -322,12 +344,11 @@ class _WorkflowWorker:
                 "Failed handling activation on workflow with run ID %s", act.run_id
             )
 
-            # Set completion failure
             completion.failed.failure.SetInParent()
             try:
-                self._data_converter.failure_converter.to_failure(
+                data_converter.failure_converter.to_failure(
                     err,
-                    self._data_converter.payload_converter,
+                    data_converter.payload_converter,
                     completion.failed.failure,
                 )
             except Exception as inner_err:
@@ -339,15 +360,24 @@ class _WorkflowWorker:
                     f"Failed converting activation exception: {inner_err}"
                 )
 
-        # Always set the run ID on the completion
         completion.run_id = act.run_id
 
-        # Encode the completion if there's a codec and not cache remove job
-        if self._data_converter.payload_codec:
+        # Encode completion
+        if self._data_converter.payload_codec and workflow:
+            assert data_converter.payload_codec
+            payload_codec = _CommandAwarePayloadCodec(
+                workflow.instance,
+                context_free_payload_codec=self._data_converter.payload_codec,
+                workflow_context_payload_codec=data_converter.payload_codec,
+                workflow_context=temporalio.converter.WorkflowSerializationContext(
+                    namespace=self._namespace,
+                    workflow_id=workflow.workflow_id,
+                ),
+            )
             try:
                 await temporalio.bridge.worker.encode_completion(
                     completion,
-                    self._data_converter.payload_codec,
+                    payload_codec,
                     encode_headers=self._encode_headers,
                 )
             except Exception as err:
@@ -667,8 +697,9 @@ class _DeadlockError(Exception):
 
 
 class _RunningWorkflow:
-    def __init__(self, instance: WorkflowInstance):
+    def __init__(self, instance: WorkflowInstance, workflow_id: str):
         self.instance = instance
+        self.workflow_id = workflow_id
         self.deadlocked_activation_task: Optional[Awaitable] = None
         self._deadlock_can_be_interrupted_lock = threading.Lock()
         self._deadlock_can_be_interrupted = False
@@ -696,6 +727,48 @@ class _RunningWorkflow:
                 temporalio.bridge.runtime.Runtime._raise_in_thread(
                     deadlocked_thread_id, _InterruptDeadlockError
                 )
+
+
+@dataclass(frozen=True)
+class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
+    """A payload codec that sets serialization context for the command associated with each payload.
+
+    This codec responds to the context variable set by
+    :py:class:`_command_aware_visitor.CommandAwarePayloadVisitor`.
+    """
+
+    instance: WorkflowInstance
+    context_free_payload_codec: temporalio.converter.PayloadCodec
+    workflow_context_payload_codec: temporalio.converter.PayloadCodec
+    workflow_context: temporalio.converter.WorkflowSerializationContext
+
+    async def encode(
+        self,
+        payloads: Sequence[temporalio.api.common.v1.Payload],
+    ) -> List[temporalio.api.common.v1.Payload]:
+        return await self._get_current_command_codec().encode(payloads)
+
+    async def decode(
+        self,
+        payloads: Sequence[temporalio.api.common.v1.Payload],
+    ) -> List[temporalio.api.common.v1.Payload]:
+        return await self._get_current_command_codec().decode(payloads)
+
+    def _get_current_command_codec(self) -> temporalio.converter.PayloadCodec:
+        if not isinstance(
+            self.context_free_payload_codec,
+            temporalio.converter.WithSerializationContext,
+        ):
+            return self.context_free_payload_codec
+
+        if context := self.instance.get_serialization_context(
+            _command_aware_visitor.current_command_info.get(),
+        ):
+            if context == self.workflow_context:
+                return self.workflow_context_payload_codec
+            return self.context_free_payload_codec.with_context(context)
+
+        return self.context_free_payload_codec
 
 
 class _InterruptDeadlockError(BaseException):
