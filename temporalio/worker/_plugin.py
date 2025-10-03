@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import abc
 from contextlib import AbstractAsyncContextManager
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import TYPE_CHECKING, AsyncIterator, Awaitable, Callable
 
 from temporalio.client import WorkflowHistory
 
@@ -35,19 +35,6 @@ class Plugin(abc.ABC):
         return type(self).__module__ + "." + type(self).__qualname__
 
     @abc.abstractmethod
-    def init_worker_plugin(self, next: Plugin) -> None:
-        """Initialize this plugin in the plugin chain.
-
-        This method sets up the chain of responsibility pattern by providing a reference
-        to the next plugin in the chain. It is called during worker creation to build
-        the plugin chain. Implementations should store this reference and call the corresponding method
-        of the next plugin on method calls.
-
-        Args:
-            next: The next plugin in the chain to delegate to.
-        """
-
-    @abc.abstractmethod
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         """Hook called when creating a worker to allow modification of configuration.
 
@@ -64,7 +51,9 @@ class Plugin(abc.ABC):
         """
 
     @abc.abstractmethod
-    async def run_worker(self, worker: Worker) -> None:
+    async def run_worker(
+        self, worker: Worker, next: Callable[[Worker], Awaitable[None]]
+    ) -> None:
         """Hook called when running a worker to allow interception of execution.
 
         This method is called when the worker is started and allows plugins to
@@ -73,6 +62,7 @@ class Plugin(abc.ABC):
 
         Args:
             worker: The worker instance to run.
+            next: Callable to continue the worker execution.
         """
 
     @abc.abstractmethod
@@ -94,26 +84,9 @@ class Plugin(abc.ABC):
         self,
         replayer: Replayer,
         histories: AsyncIterator[WorkflowHistory],
+        next: Callable[
+            [Replayer, AsyncIterator[WorkflowHistory]],
+            AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]],
+        ],
     ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
         """Hook called when running a replayer to allow interception of execution."""
-
-
-class _RootPlugin(Plugin):
-    def init_worker_plugin(self, next: Plugin) -> None:
-        raise NotImplementedError()
-
-    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
-        return config
-
-    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
-        return config
-
-    async def run_worker(self, worker: Worker) -> None:
-        await worker._run()
-
-    def run_replayer(
-        self,
-        replayer: Replayer,
-        histories: AsyncIterator[WorkflowHistory],
-    ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
-        return replayer._workflow_replay_iterator(histories)

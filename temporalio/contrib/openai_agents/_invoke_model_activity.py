@@ -155,14 +155,16 @@ class ModelActivity:
 
     def __init__(self, model_provider: Optional[ModelProvider] = None):
         """Initialize the activity with a model provider."""
-        self._model_provider = model_provider or OpenAIProvider(
-            openai_client=AsyncOpenAI(max_retries=0)
-        )
+        self._model_provider = model_provider
 
     @activity.defn
     @_auto_heartbeater
     async def invoke_model_activity(self, input: ActivityModelInput) -> ModelResponse:
         """Activity that invokes a model with the given input."""
+        if not self._model_provider:
+            self._model_provider = OpenAIProvider(
+                openai_client=AsyncOpenAI(max_retries=0)
+            )
         model = self._model_provider.get_model(input.get("model_name"))
 
         async def empty_on_invoke_tool(ctx: RunContextWrapper[Any], input: str) -> str:
