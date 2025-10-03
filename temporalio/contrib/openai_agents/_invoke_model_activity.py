@@ -7,7 +7,7 @@ import enum
 import json
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, Union
+from typing import Any, AsyncIterator, Optional, Union
 
 from agents import (
     AgentOutputSchemaBase,
@@ -28,6 +28,8 @@ from agents import (
     UserError,
     WebSearchTool,
 )
+from agents.items import TResponseStreamEvent
+from agents.stream_events import RawResponsesStreamEvent, StreamEvent
 from openai import (
     APIStatusError,
     AsyncOpenAI,
@@ -227,6 +229,136 @@ class ModelActivity:
             )
         except APIStatusError as e:
             # Listen to server hints
+            retry_after = None
+            retry_after_ms_header = e.response.headers.get("retry-after-ms")
+            if retry_after_ms_header is not None:
+                retry_after = timedelta(milliseconds=float(retry_after_ms_header))
+
+            if retry_after is None:
+                retry_after_header = e.response.headers.get("retry-after")
+                if retry_after_header is not None:
+                    retry_after = timedelta(seconds=float(retry_after_header))
+
+            should_retry_header = e.response.headers.get("x-should-retry")
+            if should_retry_header == "true":
+                raise e
+            if should_retry_header == "false":
+                raise ApplicationError(
+                    "Non retryable OpenAI error",
+                    non_retryable=True,
+                    next_retry_delay=retry_after,
+                ) from e
+
+            # Specifically retryable status codes
+            if e.response.status_code in [408, 409, 429, 500]:
+                raise ApplicationError(
+                    "Retryable OpenAI status code",
+                    non_retryable=False,
+                    next_retry_delay=retry_after,
+                ) from e
+
+            raise ApplicationError(
+                "Non retryable OpenAI status code",
+                non_retryable=True,
+                next_retry_delay=retry_after,
+            ) from e
+
+    @activity.defn
+    @_auto_heartbeater
+    async def invoke_model_streaming_activity(
+        self, input: ActivityModelInput
+    ) -> tuple[ModelResponse, list[dict]]:
+        """Activity that invokes a model with streaming and collects all events."""
+        model = self._model_provider.get_model(input.get("model_name"))
+
+        async def empty_on_invoke_tool(ctx: RunContextWrapper[Any], input: str) -> str:
+            return ""
+
+        async def empty_on_invoke_handoff(
+            ctx: RunContextWrapper[Any], input: str
+        ) -> Any:
+            return None
+
+        def make_tool(tool: ToolInput) -> Tool:
+            if isinstance(
+                tool,
+                (
+                    FileSearchTool,
+                    WebSearchTool,
+                    ImageGenerationTool,
+                    CodeInterpreterTool,
+                ),
+            ):
+                return tool
+            elif isinstance(tool, HostedMCPToolInput):
+                return HostedMCPTool(
+                    tool_config=tool.tool_config,
+                )
+            elif isinstance(tool, FunctionToolInput):
+                return FunctionTool(
+                    name=tool.name,
+                    description=tool.description,
+                    params_json_schema=tool.params_json_schema,
+                    on_invoke_tool=empty_on_invoke_tool,
+                    strict_json_schema=tool.strict_json_schema,
+                )
+            else:
+                raise UserError(f"Unknown tool type: {tool.name}")
+
+        tools = [make_tool(x) for x in input.get("tools", [])]
+        handoffs: list[Handoff[Any, Any]] = [
+            Handoff(
+                tool_name=x.tool_name,
+                tool_description=x.tool_description,
+                input_json_schema=x.input_json_schema,
+                agent_name=x.agent_name,
+                strict_json_schema=x.strict_json_schema,
+                on_invoke_handoff=empty_on_invoke_handoff,
+            )
+            for x in input.get("handoffs", [])
+        ]
+
+        try:
+            # Get streaming response and collect all events
+            stream = model.stream_response(
+                system_instructions=input.get("system_instructions"),
+                input=input["input"],
+                model_settings=input["model_settings"],
+                tools=tools,
+                output_schema=input.get("output_schema"),
+                handoffs=handoffs,
+                tracing=ModelTracing(input["tracing"]),
+                previous_response_id=input.get("previous_response_id"),
+                conversation_id=input.get("conversation_id"),
+                prompt=input.get("prompt"),
+            )
+
+            # Collect all streaming events and convert TResponseStreamEvent to serializable dict format
+            # We'll reconstruct the StreamEvent objects in the workflow
+            collected_events: list[dict] = []
+            async for event in stream:
+                # Convert TResponseStreamEvent to serializable dict
+                stream_event_dict = {"type": "raw_response_event", "data": event}
+                collected_events.append(stream_event_dict)
+
+            # Also get the final response for the complete result
+            final_response = await model.get_response(
+                system_instructions=input.get("system_instructions"),
+                input=input["input"],
+                model_settings=input["model_settings"],
+                tools=tools,
+                output_schema=input.get("output_schema"),
+                handoffs=handoffs,
+                tracing=ModelTracing(input["tracing"]),
+                previous_response_id=input.get("previous_response_id"),
+                conversation_id=input.get("conversation_id"),
+                prompt=input.get("prompt"),
+            )
+
+            return final_response, collected_events
+
+        except APIStatusError as e:
+            # Same error handling as regular model activity
             retry_after = None
             retry_after_ms_header = e.response.headers.get("retry-after-ms")
             if retry_after_ms_header is not None:

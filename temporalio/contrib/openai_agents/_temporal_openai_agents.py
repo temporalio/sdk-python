@@ -338,7 +338,11 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         config["interceptors"] = list(config.get("interceptors") or []) + [
             OpenAIAgentsTracingInterceptor()
         ]
-        new_activities = [ModelActivity(self._model_provider).invoke_model_activity]
+        model_activity = ModelActivity(self._model_provider)
+        new_activities = [
+            model_activity.invoke_model_activity,
+            model_activity.invoke_model_streaming_activity,
+        ]
 
         server_names = [server.name for server in self._mcp_server_providers]
         if len(server_names) != len(set(server_names)):

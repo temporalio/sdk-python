@@ -6,6 +6,7 @@ from agents import (
     Agent,
     AgentsException,
     Handoff,
+    ModelSettings,
     RunConfig,
     RunContextWrapper,
     RunResult,
@@ -15,9 +16,15 @@ from agents import (
     Tool,
     TResponseInputItem,
 )
+from agents.items import TResponseStreamEvent
 from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
+from agents.stream_events import StreamEvent
 
 from temporalio import workflow
+from temporalio.contrib.openai_agents._invoke_model_activity import (
+    ActivityModelInput,
+    ModelTracingInput,
+)
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
 from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
@@ -70,6 +77,102 @@ def _convert_agent(
     )
     new_agent.handoffs = new_handoffs
     return new_agent
+
+
+class TemporalBatchedRunResultStreaming(RunResultStreaming):
+    """A RunResultStreaming that implements batched conversion in Phase I."""
+
+    def __init__(
+        self,
+        runner: "TemporalOpenAIRunner",
+        starting_agent: Agent[Any],
+        input: Union[str, list[TResponseInputItem]],
+        **kwargs,
+    ):
+        # Initialize with minimal data - we'll populate after the activity runs
+        super().__init__(
+            input=input,
+            new_items=[],
+            raw_responses=[],
+            final_output="",
+            input_guardrail_results=[],
+            output_guardrail_results=[],
+            context_wrapper=kwargs.get(
+                "context", type("MockContext", (), {"context": None})()
+            ),
+            current_agent=starting_agent,
+            current_turn=0,
+            max_turns=kwargs.get("max_turns", DEFAULT_MAX_TURNS),
+            _current_agent_output_schema=None,
+            trace=None,
+            is_complete=False,
+        )
+        self._runner = runner
+        self._starting_agent = starting_agent
+        self._input = input
+        self._kwargs = kwargs
+        self._activity_completed = False
+        self._collected_events: list[dict] = []
+
+    async def stream_events(self):
+        """Stream the pre-collected events using batched conversion."""
+        if not self._activity_completed:
+            # Convert the agent and prepare activity input
+            converted_agent = _convert_agent(
+                self._runner.model_params, self._starting_agent, None
+            )
+
+            # Create activity input following the existing pattern
+            activity_input = ActivityModelInput(
+                model_name=_model_name(self._starting_agent),
+                system_instructions=getattr(self._starting_agent, "instructions", None),
+                input=self._input,
+                model_settings=getattr(
+                    self._starting_agent, "model_settings", ModelSettings()
+                ),
+                tools=[],  # Simplified for Phase I
+                output_schema=None,
+                handoffs=[],
+                tracing=ModelTracingInput.DISABLED,
+                previous_response_id=self._kwargs.get("previous_response_id"),
+                conversation_id=self._kwargs.get("conversation_id"),
+            )
+
+            # Execute the streaming activity
+            final_response, self._collected_events = await workflow.execute_activity(
+                "invoke_model_streaming_activity",
+                activity_input,
+                start_to_close_timeout=self._runner.model_params.start_to_close_timeout,
+                schedule_to_start_timeout=self._runner.model_params.schedule_to_start_timeout,
+                schedule_to_close_timeout=self._runner.model_params.schedule_to_close_timeout,
+                heartbeat_timeout=self._runner.model_params.heartbeat_timeout,
+                retry_policy=self._runner.model_params.retry_policy,
+            )
+
+            # Update this instance with the final response data
+            self.final_output = "Streaming complete"  # Simplified for Phase I
+            self.is_complete = True
+            self._activity_completed = True
+
+        # Stream the collected events, reconstructing StreamEvent objects from dicts
+        from typing import cast
+
+        from agents.items import TResponseStreamEvent
+        from agents.stream_events import RawResponsesStreamEvent
+
+        for event_dict in self._collected_events:
+            # For Phase I, all events should be raw_response_event type
+            # Reconstruct RawResponsesStreamEvent from dictionary
+            if event_dict.get("type") == "raw_response_event":
+                # The data should be a serialized TResponseStreamEvent
+                stream_event = RawResponsesStreamEvent(
+                    data=cast(TResponseStreamEvent, event_dict["data"])
+                )
+                yield stream_event
+            else:
+                # For other event types in future phases, we'll implement proper handling
+                # For now, skip unknown event types
+                continue
 
 
 class TemporalOpenAIRunner(AgentRunner):
@@ -192,14 +295,22 @@ class TemporalOpenAIRunner(AgentRunner):
         input: Union[str, list[TResponseInputItem]],
         **kwargs: Any,
     ) -> RunResultStreaming:
-        """Run the agent with streaming responses (not supported in Temporal workflows)."""
+        """Run the agent with streaming responses using batched conversion in Temporal workflows."""
         if not workflow.in_workflow():
             return self._runner.run_streamed(
                 starting_agent,
                 input,
                 **kwargs,
             )
-        raise RuntimeError("Temporal workflows do not support streaming.")
+
+        # Phase I: Batched conversion implementation
+        # Return a streaming result that will collect events from the streaming activity
+        return TemporalBatchedRunResultStreaming(
+            runner=self,
+            starting_agent=starting_agent,
+            input=input,
+            **kwargs,
+        )
 
 
 def _model_name(agent: Agent[Any]) -> Optional[str]:
