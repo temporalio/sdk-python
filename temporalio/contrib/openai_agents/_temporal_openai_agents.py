@@ -252,6 +252,7 @@ def OpenAIAgentsPlugin(
             yield
 
     return create_plugin(
+        name="OpenAIAgentsPlugin",
         data_converter=_data_converter,
         worker_interceptors=[OpenAIAgentsTracingInterceptor()],
         activities=new_activities,

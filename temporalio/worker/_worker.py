@@ -38,7 +38,7 @@ from temporalio.common import (
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
 from ._nexus import _NexusWorker
-from ._plugin import Plugin, _RootPlugin
+from ._plugin import Plugin
 from ._tuning import WorkerTuner
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
@@ -377,12 +377,9 @@ class Worker:
                 )
         plugins = plugins_from_client + list(plugins)
 
-        root_plugin: Plugin = _RootPlugin()
-        for plugin in reversed(plugins):
-            plugin.init_worker_plugin(root_plugin)
-            root_plugin = plugin
-        config = root_plugin.configure_worker(config)
-        self._plugin = root_plugin
+        self.plugins = plugins
+        for plugin in plugins:
+            config = plugin.configure_worker(config)
 
         self._init_from_config(client, config)
 
@@ -690,7 +687,15 @@ class Worker:
         also cancel the shutdown process. Therefore users are encouraged to use
         explicit shutdown instead.
         """
-        await self._plugin.run_worker(self)
+
+        def make_lambda(plugin, next):
+            return lambda w: plugin.run_worker(w, next)
+
+        next_function = lambda w: w._run()
+        for plugin in reversed(self.plugins):
+            next_function = make_lambda(plugin, next_function)
+
+        await next_function(self)
 
     async def _run(self):
         # Eagerly validate which will do a namespace check in Core

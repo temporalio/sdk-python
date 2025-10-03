@@ -21,7 +21,6 @@ import temporalio.workflow
 
 from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor
-from ._plugin import _RootPlugin
 from ._worker import load_default_build_id
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import UnsandboxedWorkflowRunner, WorkflowRunner
@@ -84,12 +83,9 @@ class Replayer:
         )
 
         # Apply plugin configuration
-        root_plugin: temporalio.worker.Plugin = _RootPlugin()
-        for plugin in reversed(plugins):
-            plugin.init_worker_plugin(root_plugin)
-            root_plugin = plugin
-        self._config = root_plugin.configure_replayer(self._config)
-        self._plugin = root_plugin
+        self.plugins = plugins
+        for plugin in plugins:
+            self._config = plugin.configure_replayer(self._config)
 
         # Validate workflows after plugin configuration
         if not self._config["workflows"]:
@@ -176,7 +172,15 @@ class Replayer:
             An async iterator that returns replayed workflow results as they are
             replayed.
         """
-        return self._plugin.run_replayer(self, histories)
+
+        def make_lambda(plugin, next):
+            return lambda r, hs: plugin.run_replayer(r, hs, next)
+
+        next_function = lambda r, hs: r._workflow_replay_iterator(hs)
+        for plugin in reversed(self.plugins):
+            next_function = make_lambda(plugin, next_function)
+
+        return next_function(self, histories)
 
     @asynccontextmanager
     async def _workflow_replay_iterator(

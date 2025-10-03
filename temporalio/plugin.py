@@ -9,6 +9,7 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import (
     Any,
     AsyncIterator,
+    Awaitable,
     Callable,
     Optional,
     Sequence,
@@ -22,6 +23,7 @@ import temporalio.client
 import temporalio.converter
 import temporalio.worker
 from temporalio.client import ClientConfig, WorkflowHistory
+from temporalio.service import ConnectConfig, ServiceClient
 from temporalio.worker import (
     Replayer,
     ReplayerConfig,
@@ -48,6 +50,7 @@ PluginParameter = Union[None, T, Callable[[Optional[T]], T]]
 
 
 def create_plugin(
+    name: str,
     *,
     data_converter: PluginParameter[temporalio.converter.DataConverter] = None,
     client_interceptors: PluginParameter[
@@ -68,6 +71,7 @@ def create_plugin(
     """Create a static plugin with configurable parameters.
 
     Args:
+        name: The name of the plugin.
         data_converter: Data converter for serialization, or callable to customize existing one.
         client_interceptors: Client interceptors to append, or callable to customize existing ones.
         activities: Activity functions to append, or callable to customize existing ones.
@@ -83,6 +87,7 @@ def create_plugin(
         A configured Plugin instance.
     """
     return _StaticPlugin(
+        name=name,
         data_converter=data_converter,
         client_interceptors=client_interceptors,
         activities=activities,
@@ -98,6 +103,7 @@ def create_plugin(
 class _StaticPlugin(Plugin):
     def __init__(
         self,
+        name: str,
         *,
         data_converter: PluginParameter[temporalio.converter.DataConverter],
         client_interceptors: PluginParameter[Sequence[temporalio.client.Interceptor]],
@@ -111,6 +117,7 @@ class _StaticPlugin(Plugin):
         ],
         run_context: Optional[Callable[[], AbstractAsyncContextManager[None]]],
     ) -> None:
+        self._name = name
         self.data_converter = data_converter
         self.client_interceptors = client_interceptors
         self.activities = activities
@@ -121,11 +128,8 @@ class _StaticPlugin(Plugin):
         self.workflow_failure_exception_types = workflow_failure_exception_types
         self.run_context = run_context
 
-    def init_worker_plugin(self, next: temporalio.worker.Plugin) -> None:
-        self.next_worker_plugin = next
-
-    def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
-        self.next_client_plugin = next
+    def name(self) -> str:
+        return self._name
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         self._set_dict(
@@ -141,12 +145,14 @@ class _StaticPlugin(Plugin):
             ),
         )
 
-        return self.next_client_plugin.configure_client(config)
+        return config
 
     async def connect_service_client(
-        self, config: temporalio.service.ConnectConfig
+        self,
+        config: ConnectConfig,
+        next: Callable[[ConnectConfig], Awaitable[ServiceClient]],
     ) -> temporalio.service.ServiceClient:
-        return await self.next_client_plugin.connect_service_client(config)
+        return await next(config)
 
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         self._set_dict(
@@ -227,29 +233,31 @@ class _StaticPlugin(Plugin):
         )
         return config
 
-    async def run_worker(self, worker: Worker) -> None:
+    async def run_worker(
+        self, worker: Worker, next: Callable[[Worker], Awaitable[None]]
+    ) -> None:
         if self.run_context:
             async with self.run_context():
-                await self.next_worker_plugin.run_worker(worker)
+                await next(worker)
         else:
-            await self.next_worker_plugin.run_worker(worker)
+            await next(worker)
 
     @asynccontextmanager
     async def run_replayer(
         self,
         replayer: Replayer,
         histories: AsyncIterator[WorkflowHistory],
+        next: Callable[
+            [Replayer, AsyncIterator[WorkflowHistory]],
+            AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]],
+        ],
     ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
         if self.run_context:
             async with self.run_context():
-                async with self.next_worker_plugin.run_replayer(
-                    replayer, histories
-                ) as results:
+                async with next(replayer, histories) as results:
                     yield results
         else:
-            async with self.next_worker_plugin.run_replayer(
-                replayer, histories
-            ) as results:
+            async with next(replayer, histories) as results:
                 yield results
 
     @staticmethod
