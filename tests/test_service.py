@@ -200,10 +200,12 @@ async def test_rpc_execution_not_unknown(client: Client):
         rpc_call = getattr(target_service, method_name)
         try:
             await rpc_call(request, timeout=timedelta(milliseconds=1))
-        except Exception as err:
+        except ValueError as err:
             assert (
                 "Unknown RPC call" not in str(err)
             ), f"Unexpected unknown-RPC error for {target_service_name}.{method_name}: {err}"
+        except temporalio.service.RPCError:
+            pass
 
     async def test_service(
         *, proto_module: FileDescriptor, proto_service: str, target_service_name: str
