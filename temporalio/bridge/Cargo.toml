@@ -24,6 +24,7 @@ pyo3 = { version = "0.25", features = [
     "extension-module",
     "abi3-py39",
     "anyhow",
+    "multiple-pymethods",
 ] }
 pyo3-async-runtimes = { version = "0.25", features = ["tokio-runtime"] }
 pythonize = "0.25"

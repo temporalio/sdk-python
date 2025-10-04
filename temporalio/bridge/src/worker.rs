@@ -19,7 +19,9 @@ use temporal_sdk_core_api::worker::{
 };
 use temporal_sdk_core_api::Worker;
 use temporal_sdk_core_protos::coresdk::workflow_completion::WorkflowActivationCompletion;
-use temporal_sdk_core_protos::coresdk::{ActivityHeartbeat, ActivityTaskCompletion, nexus::NexusTaskCompletion};
+use temporal_sdk_core_protos::coresdk::{
+    nexus::NexusTaskCompletion, ActivityHeartbeat, ActivityTaskCompletion,
+};
 use temporal_sdk_core_protos::temporal::api::history::v1::History;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
@@ -605,10 +607,11 @@ impl WorkerRef {
         })
     }
 
-    fn complete_nexus_task<'p>(&self,
+    fn complete_nexus_task<'p>(
+        &self,
         py: Python<'p>,
         proto: &Bound<'_, PyBytes>,
-) -> PyResult<Bound<'p, PyAny>> {
+    ) -> PyResult<Bound<'p, PyAny>> {
         let worker = self.worker.as_ref().unwrap().clone();
         let completion = NexusTaskCompletion::decode(proto.as_bytes())
             .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
