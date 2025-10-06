@@ -250,8 +250,9 @@ class OpenAIAgentsPlugin(SimplePlugin):
         mcp_server_providers: Sequence[
             Union["StatelessMCPServerProvider", "StatefulMCPServerProvider"]
         ] = (),
-    ):
-        """Create an OpenAI agents plugin.
+        register_activities: bool = True,
+    ) -> None:
+        """Initialize the OpenAI agents plugin.
 
         Args:
             model_params: Configuration parameters for Temporal activity execution
@@ -262,6 +263,9 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 Each server will be wrapped in a TemporalMCPServer if not already wrapped,
                 and their activities will be automatically registered with the worker.
                 The plugin manages the connection lifecycle of these servers.
+            register_activities: Whether to register activities during the worker execution.
+                This can be disabled on some workers to allow a separation of workflows and activities
+                but should not be disabled on all workers, or agents will not be able to progress.
         """
         if model_params is None:
             model_params = ModelActivityParameters()
@@ -279,16 +283,19 @@ class OpenAIAgentsPlugin(SimplePlugin):
                     "When configuring a custom provider, the model activity must have start_to_close_timeout or schedule_to_close_timeout"
                 )
 
-        new_activities = [ModelActivity(model_provider).invoke_model_activity]
+        if register_activities:
+            new_activities = [ModelActivity(model_provider).invoke_model_activity]
 
-        server_names = [server.name for server in mcp_server_providers]
-        if len(server_names) != len(set(server_names)):
-            raise ValueError(
-                f"More than one mcp server registered with the same name. Please provide unique names."
-            )
+            server_names = [server.name for server in mcp_server_providers]
+            if len(server_names) != len(set(server_names)):
+                raise ValueError(
+                    f"More than one mcp server registered with the same name. Please provide unique names."
+                )
 
-        for mcp_server in mcp_server_providers:
-            new_activities.extend(mcp_server._get_activities())
+            for mcp_server in mcp_server_providers:
+                new_activities.extend(mcp_server._get_activities())
+        else:
+            new_activities = None
 
         def workflow_runner(runner: Optional[WorkflowRunner]) -> WorkflowRunner:
             if not runner:

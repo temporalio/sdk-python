@@ -107,14 +107,11 @@ impl MetricMeterRef {
         unit: Option<String>,
     ) -> MetricHistogramFloatRef {
         MetricHistogramFloatRef {
-            histogram: self
-                .meter
-                .inner
-                .histogram_f64(build_metric_parameters(
-                    name,
-                    description,
-                    unit,
-                )),
+            histogram: self.meter.inner.histogram_f64(build_metric_parameters(
+                name,
+                description,
+                unit,
+            )),
         }
     }
 
@@ -125,14 +122,11 @@ impl MetricMeterRef {
         unit: Option<String>,
     ) -> MetricHistogramDurationRef {
         MetricHistogramDurationRef {
-            histogram: self
-                .meter
-                .inner
-                .histogram_duration(build_metric_parameters(
-                    name,
-                    description,
-                    unit,
-                )),
+            histogram: self.meter.inner.histogram_duration(build_metric_parameters(
+                name,
+                description,
+                unit,
+            )),
         }
     }
 

@@ -30,9 +30,21 @@ subprocess.run(
     ],
     check=True,
 )
-subprocess.run(["uv", "run", "poe", "format"], check=True)
 
 subprocess.run(
     ["uv", "run", os.path.join(os.getcwd(), "scripts", "gen_payload_visitor.py")],
     check=True,
+)
+
+subprocess.run(
+    ["uv", "run", os.path.join(os.getcwd(), "scripts", "gen_bridge_client.py")],
+    check=True,
+)
+
+subprocess.run(["uv", "run", "poe", "format"], check=True)
+
+subprocess.run(
+    ["cargo", "fmt"],
+    check=True,
+    cwd=os.path.join(os.getcwd(), "temporalio", "bridge"),
 )
