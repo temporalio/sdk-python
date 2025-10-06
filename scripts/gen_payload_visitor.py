@@ -203,7 +203,7 @@ class PayloadVisitor:
         # Process regular fields first
         for field in regular_fields:
             # Repeated fields (including maps which are represented as repeated messages)
-            if field.is_repeated:
+            if field.label == FieldDescriptor.LABEL_REPEATED:
                 if (
                     field.message_type is not None
                     and field.message_type.GetOptions().map_entry
