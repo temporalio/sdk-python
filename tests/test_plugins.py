@@ -13,7 +13,7 @@ from temporalio import workflow
 from temporalio.client import Client, ClientConfig, OutboundInterceptor, WorkflowHistory
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.converter import DataConverter
-from temporalio.plugin import create_plugin
+from temporalio.plugin import SimplePlugin
 from temporalio.service import ConnectConfig, ServiceClient
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
@@ -276,7 +276,7 @@ async def test_replay(client: Client) -> None:
 
 
 async def test_static_plugins(client: Client) -> None:
-    plugin = create_plugin(
+    plugin = SimplePlugin(
         "MyPlugin",
         data_converter=pydantic_data_converter,
         workflows=[HelloWorkflow2],
@@ -317,7 +317,7 @@ async def test_static_plugins_callables(client: Client) -> None:
             raise ValueError("Can't override non-default converter")
         return pydantic_data_converter
 
-    plugin = create_plugin(
+    plugin = SimplePlugin(
         "MyPlugin",
         data_converter=converter,
     )
@@ -332,7 +332,7 @@ async def test_static_plugins_callables(client: Client) -> None:
         Client(**config)
 
     # On a sequence, the lambda overrides the existing values
-    plugin = create_plugin(
+    plugin = SimplePlugin(
         "MyPlugin",
         workflows=lambda workflows: [],
     )

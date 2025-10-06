@@ -203,7 +203,7 @@ class Client:
         def make_lambda(plugin, next):
             return lambda config: plugin.connect_service_client(config, next)
 
-        next_function = lambda config: ServiceClient.connect(config)
+        next_function = ServiceClient.connect
         for plugin in reversed(plugins):
             next_function = make_lambda(plugin, next_function)
 

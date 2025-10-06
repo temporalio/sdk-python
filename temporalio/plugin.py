@@ -4,7 +4,6 @@ This module provides plugin functionality that allows customization of both clie
 and worker behavior in the Temporal SDK through configurable parameters.
 """
 
-import abc
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import (
     Any,
@@ -33,90 +32,65 @@ from temporalio.worker import (
     WorkflowRunner,
 )
 
-
-class Plugin(temporalio.client.Plugin, temporalio.worker.Plugin, abc.ABC):
-    """Abstract base class for Temporal plugins.
-
-    This class combines both client and worker plugin capabilities,
-    just used where multiple inheritance is not possible.
-    """
-
-    pass
-
-
 T = TypeVar("T")
 
 PluginParameter = Union[None, T, Callable[[Optional[T]], T]]
 
 
-def create_plugin(
-    name: str,
-    *,
-    data_converter: PluginParameter[temporalio.converter.DataConverter] = None,
-    client_interceptors: PluginParameter[
-        Sequence[temporalio.client.Interceptor]
-    ] = None,
-    activities: PluginParameter[Sequence[Callable]] = None,
-    nexus_service_handlers: PluginParameter[Sequence[Any]] = None,
-    workflows: PluginParameter[Sequence[Type]] = None,
-    workflow_runner: PluginParameter[WorkflowRunner] = None,
-    worker_interceptors: PluginParameter[
-        Sequence[temporalio.worker.Interceptor]
-    ] = None,
-    workflow_failure_exception_types: PluginParameter[
-        Sequence[Type[BaseException]]
-    ] = None,
-    run_context: Optional[Callable[[], AbstractAsyncContextManager[None]]] = None,
-) -> Plugin:
-    """Create a static plugin with configurable parameters.
-
-    Args:
-        name: The name of the plugin.
-        data_converter: Data converter for serialization, or callable to customize existing one.
-        client_interceptors: Client interceptors to append, or callable to customize existing ones.
-        activities: Activity functions to append, or callable to customize existing ones.
-        nexus_service_handlers: Nexus service handlers to append, or callable to customize existing ones.
-        workflows: Workflow classes to append, or callable to customize existing ones.
-        workflow_runner: Workflow runner, or callable to customize existing one.
-        worker_interceptors: Worker interceptors to append, or callable to customize existing ones.
-        workflow_failure_exception_types: Exception types for workflow failures to append,
-            or callable to customize existing ones.
-        run_context: Optional async context manager producer to wrap worker/replayer execution.
-
-    Returns:
-        A configured Plugin instance.
+class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
+    """A simple plugin definition which limits has a limited set of configurations but makes it easier to produce
+    a simple plugin which needs to configure them.
     """
-    return _StaticPlugin(
-        name=name,
-        data_converter=data_converter,
-        client_interceptors=client_interceptors,
-        activities=activities,
-        nexus_service_handlers=nexus_service_handlers,
-        workflows=workflows,
-        workflow_runner=workflow_runner,
-        worker_interceptors=worker_interceptors,
-        workflow_failure_exception_types=workflow_failure_exception_types,
-        run_context=run_context,
-    )
 
-
-class _StaticPlugin(Plugin):
     def __init__(
         self,
         name: str,
         *,
-        data_converter: PluginParameter[temporalio.converter.DataConverter],
-        client_interceptors: PluginParameter[Sequence[temporalio.client.Interceptor]],
-        activities: PluginParameter[Sequence[Callable]],
-        nexus_service_handlers: PluginParameter[Sequence[Any]],
-        workflows: PluginParameter[Sequence[Type]],
-        workflow_runner: PluginParameter[WorkflowRunner],
-        worker_interceptors: PluginParameter[Sequence[temporalio.worker.Interceptor]],
+        data_converter: PluginParameter[temporalio.converter.DataConverter] = None,
+        client_interceptors: PluginParameter[
+            Sequence[temporalio.client.Interceptor]
+        ] = None,
+        activities: PluginParameter[Sequence[Callable]] = None,
+        nexus_service_handlers: PluginParameter[Sequence[Any]] = None,
+        workflows: PluginParameter[Sequence[Type]] = None,
+        workflow_runner: PluginParameter[WorkflowRunner] = None,
+        worker_interceptors: PluginParameter[
+            Sequence[temporalio.worker.Interceptor]
+        ] = None,
         workflow_failure_exception_types: PluginParameter[
             Sequence[Type[BaseException]]
-        ],
-        run_context: Optional[Callable[[], AbstractAsyncContextManager[None]]],
+        ] = None,
+        run_context: Optional[Callable[[], AbstractAsyncContextManager[None]]] = None,
     ) -> None:
+        """Create a simple plugin with configurable parameters. Each of the parameters will be applied to any
+            component for which they are applicable. All arguments are optional, and all but run_context can also
+            be callables for more complex modification. See the type PluginParameter above.
+            For details on each argument, see below.
+
+        Args:
+            name: The name of the plugin.
+            data_converter: Data converter for serialization, or callable to customize existing one.
+                Applied to the Client and Replayer.
+            client_interceptors: Client interceptors to append, or callable to customize existing ones.
+                Applied to the Client.
+            activities: Activity functions to append, or callable to customize existing ones.
+                Applied to the Worker.
+            nexus_service_handlers: Nexus service handlers to append, or callable to customize existing ones.
+                Applied to the Worker.
+            workflows: Workflow classes to append, or callable to customize existing ones.
+                Applied to the Worker and Replayer.
+            workflow_runner: Workflow runner, or callable to customize existing one.
+                Applied to the Worker and Replayer.
+            worker_interceptors: Worker interceptors to append, or callable to customize existing ones.
+                Applied to the Worker and Replayer.
+            workflow_failure_exception_types: Exception types for workflow failures to append,
+                or callable to customize existing ones. Applied to the Worker and Replayer.
+            run_context: Optional async context manager producer to wrap worker/replayer execution.
+                Applied to the Worker and Replayer.
+
+        Returns:
+            A configured Plugin instance.
+        """
         self._name = name
         self.data_converter = data_converter
         self.client_interceptors = client_interceptors
@@ -129,21 +103,22 @@ class _StaticPlugin(Plugin):
         self.run_context = run_context
 
     def name(self) -> str:
+        """See base class."""
         return self._name
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
-        self._set_dict(
-            config,  # type: ignore
-            "data_converter",
-            self._resolve_parameter(config.get("data_converter"), self.data_converter),
+        """See base class."""
+        data_converter = _resolve_parameter(
+            config.get("data_converter"), self.data_converter
         )
-        self._set_dict(
-            config,  # type: ignore
-            "interceptors",
-            self._resolve_append_parameter(
-                config.get("interceptors"), self.client_interceptors
-            ),
+        if data_converter:
+            config["data_converter"] = data_converter
+
+        interceptors = _resolve_append_parameter(
+            config.get("interceptors"), self.client_interceptors
         )
+        if interceptors is not None:
+            config["interceptors"] = interceptors
 
         return config
 
@@ -152,90 +127,85 @@ class _StaticPlugin(Plugin):
         config: ConnectConfig,
         next: Callable[[ConnectConfig], Awaitable[ServiceClient]],
     ) -> temporalio.service.ServiceClient:
+        """See base class."""
         return await next(config)
 
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
-        self._set_dict(
-            config,  # type: ignore
-            "activities",
-            self._resolve_append_parameter(config.get("activities"), self.activities),
+        """See base class."""
+        activities = _resolve_append_parameter(
+            config.get("activities"), self.activities
         )
-        self._set_dict(
-            config,  # type: ignore
-            "nexus_service_handlers",
-            self._resolve_append_parameter(
-                config.get("nexus_service_handlers"), self.nexus_service_handlers
-            ),
-        )
-        self._set_dict(
-            config,  # type: ignore
-            "workflows",
-            self._resolve_append_parameter(config.get("workflows"), self.workflows),
-        )
+        if activities:
+            config["activities"] = activities
 
-        self._set_dict(
-            config,  # type: ignore
-            "workflow_runner",
-            self._resolve_parameter(
-                config.get("workflow_runner"), self.workflow_runner
-            ),
+        nexus_service_handlers = _resolve_append_parameter(
+            config.get("nexus_service_handlers"), self.nexus_service_handlers
         )
-        self._set_dict(
-            config,  # type: ignore
-            "interceptors",
-            self._resolve_append_parameter(
-                config.get("interceptors"), self.worker_interceptors
-            ),
+        if nexus_service_handlers is not None:
+            config["nexus_service_handlers"] = nexus_service_handlers
+
+        workflows = _resolve_append_parameter(config.get("workflows"), self.workflows)
+        if workflows is not None:
+            config["workflows"] = workflows
+
+        workflow_runner = _resolve_parameter(
+            config.get("workflow_runner"), self.workflow_runner
         )
-        self._set_dict(
-            config,  # type: ignore
-            "workflow_failure_exception_types",
-            self._resolve_append_parameter(
-                config.get("workflow_failure_exception_types"),
-                self.workflow_failure_exception_types,
-            ),
+        if workflow_runner:
+            config["workflow_runner"] = workflow_runner
+
+        interceptors = _resolve_append_parameter(
+            config.get("interceptors"), self.worker_interceptors
         )
+        if interceptors is not None:
+            config["interceptors"] = interceptors
+
+        failure_exception_types = _resolve_append_parameter(
+            config.get("workflow_failure_exception_types"),
+            self.workflow_failure_exception_types,
+        )
+        if failure_exception_types is not None:
+            config["workflow_failure_exception_types"] = failure_exception_types
 
         return config
 
     def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
-        self._set_dict(
-            config,  # type: ignore
-            "data_converter",
-            self._resolve_parameter(config.get("data_converter"), self.data_converter),
+        """See base class."""
+        data_converter = _resolve_parameter(
+            config.get("data_converter"), self.data_converter
         )
-        self._set_dict(
-            config,  # type: ignore
-            "workflows",
-            self._resolve_append_parameter(config.get("workflows"), self.workflows),
+        if data_converter:
+            config["data_converter"] = data_converter
+
+        workflows = _resolve_append_parameter(config.get("workflows"), self.workflows)
+        if workflows is not None:
+            config["workflows"] = workflows
+
+        workflow_runner = _resolve_parameter(
+            config.get("workflow_runner"), self.workflow_runner
         )
-        self._set_dict(
-            config,  # type: ignore
-            "workflow_runner",
-            self._resolve_parameter(
-                config.get("workflow_runner"), self.workflow_runner
-            ),
+        if workflow_runner:
+            config["workflow_runner"] = workflow_runner
+
+        interceptors = _resolve_append_parameter(
+            config.get("interceptors"), self.worker_interceptors
         )
-        self._set_dict(
-            config,  # type: ignore
-            "interceptors",
-            self._resolve_append_parameter(
-                config.get("interceptors"), self.worker_interceptors
-            ),
+        if interceptors is not None:
+            config["interceptors"] = interceptors
+
+        failure_exception_types = _resolve_append_parameter(
+            config.get("workflow_failure_exception_types"),
+            self.workflow_failure_exception_types,
         )
-        self._set_dict(
-            config,  # type: ignore
-            "workflow_failure_exception_types",
-            self._resolve_append_parameter(
-                config.get("workflow_failure_exception_types"),
-                self.workflow_failure_exception_types,
-            ),
-        )
+        if failure_exception_types is not None:
+            config["workflow_failure_exception_types"] = failure_exception_types
+
         return config
 
     async def run_worker(
         self, worker: Worker, next: Callable[[Worker], Awaitable[None]]
     ) -> None:
+        """See base class."""
         if self.run_context:
             async with self.run_context():
                 await next(worker)
@@ -252,6 +222,7 @@ class _StaticPlugin(Plugin):
             AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]],
         ],
     ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
+        """See base class."""
         if self.run_context:
             async with self.run_context():
                 async with next(replayer, histories) as results:
@@ -260,33 +231,26 @@ class _StaticPlugin(Plugin):
             async with next(replayer, histories) as results:
                 yield results
 
-    @staticmethod
-    def _resolve_parameter(
-        existing: Optional[T], parameter: PluginParameter[T]
-    ) -> Optional[T]:
-        if parameter is None:
-            return existing
-        elif callable(parameter):
-            return cast(Callable[[Optional[T]], Optional[T]], parameter)(existing)
-        else:
-            return parameter
 
-    @staticmethod
-    def _resolve_append_parameter(
-        existing: Optional[Sequence[T]], parameter: PluginParameter[Sequence[T]]
-    ) -> Optional[Sequence[T]]:
-        if parameter is None:
-            return existing
-        elif callable(parameter):
-            return cast(
-                Callable[[Optional[Sequence[T]]], Optional[Sequence[T]]], parameter
-            )(existing)
-        else:
-            return list(existing or []) + list(parameter)
+def _resolve_parameter(
+    existing: Optional[T], parameter: PluginParameter[T]
+) -> Optional[T]:
+    if parameter is None:
+        return existing
+    elif callable(parameter):
+        return cast(Callable[[Optional[T]], Optional[T]], parameter)(existing)
+    else:
+        return parameter
 
-    @staticmethod
-    def _set_dict(config: dict[str, Any], key: str, value: Optional[Any]) -> None:
-        if value is not None:
-            config[key] = value
-        else:
-            del config[key]
+
+def _resolve_append_parameter(
+    existing: Optional[Sequence[T]], parameter: PluginParameter[Sequence[T]]
+) -> Optional[Sequence[T]]:
+    if parameter is None:
+        return existing
+    elif callable(parameter):
+        return cast(
+            Callable[[Optional[Sequence[T]]], Optional[Sequence[T]]], parameter
+        )(existing)
+    else:
+        return list(existing or []) + list(parameter)
