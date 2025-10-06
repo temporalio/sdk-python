@@ -566,6 +566,7 @@ class _Definition:
     # Types loaded on post init if both are None
     arg_types: Optional[List[Type]] = None
     ret_type: Optional[Type] = None
+    is_streaming: Optional[bool] = None
 
     @staticmethod
     def from_callable(fn: Callable) -> Optional[_Definition]:
@@ -612,10 +613,13 @@ class _Definition:
                 name=activity_name,
                 fn=fn,
                 # iscoroutinefunction does not return true for async __call__
+                # Also check for async generator functions (which have AsyncIterable return type)
                 # TODO(cretz): Why can't MyPy handle this?
                 is_async=(
                     inspect.iscoroutinefunction(fn)
                     or inspect.iscoroutinefunction(fn.__call__)  # type: ignore
+                    or inspect.isasyncgenfunction(fn)
+                    or inspect.isasyncgenfunction(fn.__call__)  # type: ignore
                 ),
                 no_thread_cancel_exception=no_thread_cancel_exception,
             ),
@@ -636,3 +640,30 @@ class _Definition:
                 )
             object.__setattr__(self, "arg_types", arg_types)
             object.__setattr__(self, "ret_type", ret_type)
+        
+        # Detect streaming activities by checking if return type is AsyncIterable
+        if self.is_streaming is None:
+            streaming = self._is_return_type_async_iterable()
+            object.__setattr__(self, "is_streaming", streaming)
+    
+    def _is_return_type_async_iterable(self) -> bool:
+        """Check if the return type is AsyncIterable."""
+        if not self.ret_type:
+            return False
+        
+        # Import collections.abc.AsyncIterable for comparison
+        import collections.abc
+        
+        # Check for direct AsyncIterable type
+        if hasattr(self.ret_type, '__origin__'):
+            origin = self.ret_type.__origin__
+            # Handle AsyncIterable[T] and typing generics
+            if origin is collections.abc.AsyncIterable:
+                return True
+        
+        # Check if it's a subclass of AsyncIterable
+        try:
+            return issubclass(self.ret_type, collections.abc.AsyncIterable)
+        except TypeError:
+            # Not a class, so not AsyncIterable
+            return False

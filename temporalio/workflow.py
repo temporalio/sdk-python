@@ -851,6 +851,7 @@ class _Runtime(ABC):
         cancellation_type: ActivityCancellationType,
         activity_id: Optional[str],
         summary: Optional[str],
+        peekable: bool = False,
     ) -> ActivityHandle[Any]: ...
 
     @abstractmethod
@@ -3320,6 +3321,7 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     summary: Optional[str] = None,
+    peekable: bool = False,
 ) -> ReturnType: ...
 
 
@@ -3336,6 +3338,7 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     summary: Optional[str] = None,
+    peekable: bool = False,
 ) -> ReturnType: ...
 
 
@@ -3353,6 +3356,7 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     summary: Optional[str] = None,
+    peekable: bool = False,
 ) -> ReturnType: ...
 
 
@@ -3370,6 +3374,7 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     summary: Optional[str] = None,
+    peekable: bool = False,
 ) -> ReturnType: ...
 
 
@@ -3387,6 +3392,7 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     summary: Optional[str] = None,
+    peekable: bool = False,
 ) -> ReturnType: ...
 
 
@@ -3404,6 +3410,7 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     summary: Optional[str] = None,
+    peekable: bool = False,
 ) -> ReturnType: ...
 
 
@@ -3423,6 +3430,7 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     summary: Optional[str] = None,
+    peekable: bool = False,
 ) -> Any: ...
 
 
@@ -3440,13 +3448,63 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: Optional[str] = None,
     summary: Optional[str] = None,
+    peekable: bool = False,
 ) -> Any:
     """Start a local activity and wait for completion.
 
     This is a shortcut for ``await`` :py:meth:`start_local_activity`.
+    
+    For streaming activities (those with AsyncIterable return types), this function
+    returns an AsyncIterable regardless of the peekable setting:
+    - peekable=True: Real-time streaming of results as they're produced
+    - peekable=False: Buffered iteration over complete results
+    
+    Args:
+        activity: Activity function or name.
+        arg: Single argument to the activity.
+        args: Multiple arguments to the activity.
+        result_type: Result type for string-named activities.
+        schedule_to_close_timeout: Total time to complete activity.
+        schedule_to_start_timeout: Time to start activity.
+        start_to_close_timeout: Time to complete once started.
+        retry_policy: Retry policy for the activity.
+        local_retry_threshold: Threshold for local retries.
+        cancellation_type: How to handle cancellation.
+        activity_id: Custom activity ID.
+        summary: Summary for the activity.
+        peekable: If True, allows streaming iteration over partial results
+            for streaming activities. When False, waits for complete results.
     """
-    # We call the runtime directly instead of top-level start_local_activity to
-    # ensure we don't miss new parameters
+    # Check if this is a streaming activity
+    if callable(activity):
+        defn = temporalio.activity._Definition.from_callable(activity)
+        if defn and defn.is_streaming:
+            # For streaming activities, always return AsyncIterable
+            handle = _Runtime.current().workflow_start_local_activity(
+                activity,
+                *temporalio.common._arg_or_args(arg, args),
+                result_type=result_type,
+                schedule_to_close_timeout=schedule_to_close_timeout,
+                schedule_to_start_timeout=schedule_to_start_timeout,
+                start_to_close_timeout=start_to_close_timeout,
+                retry_policy=retry_policy,
+                local_retry_threshold=local_retry_threshold,
+                cancellation_type=cancellation_type,
+                activity_id=activity_id,
+                summary=summary,
+                peekable=peekable,
+            )
+            
+            if peekable:
+                # Return peekable handle that streams in real-time
+                return handle
+            else:
+                # Return buffered iterator over final result
+                final_result = await handle
+                from temporalio.worker._streaming import create_buffered_iterator
+                return create_buffered_iterator(final_result)
+    
+    # Regular activity - existing behavior
     return await _Runtime.current().workflow_start_local_activity(
         activity,
         *temporalio.common._arg_or_args(arg, args),
@@ -3459,6 +3517,7 @@ async def execute_local_activity(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         summary=summary,
+        peekable=peekable,
     )
 
 

@@ -458,6 +458,44 @@ class _ActivityWorker:
 
         Exceptions are handled by a caller of this function.
         """
+        # For local activities, check if there's a streaming queue registered
+        streaming_queue = None
+        if start.is_local:
+            from temporalio.worker._streaming import lookup_local_streaming_queue
+            # Try both activity_id and activity_type as fallback for streaming queue lookup
+            streaming_queue = lookup_local_streaming_queue(
+                start.workflow_execution.run_id,
+                start.activity_id
+            )
+            # If not found with activity_id, try with activity_type (activity name)
+            if not streaming_queue:
+                streaming_queue = lookup_local_streaming_queue(
+                    start.workflow_execution.run_id,
+                    start.activity_type
+                )
+        
+        if streaming_queue is not None:
+            # Handle streaming activity with dual-path result delivery
+            return await self._execute_streaming_activity(
+                start, running_activity, task_token, data_converter, streaming_queue
+            )
+        else:
+            # Handle regular activity
+            return await self._execute_regular_activity(
+                start, running_activity, task_token, data_converter
+            )
+
+    async def _execute_regular_activity(
+        self,
+        start: temporalio.bridge.proto.activity_task.Start,  # type: ignore[reportAttributeAccessIssue]
+        running_activity: _RunningActivity,
+        task_token: bytes,
+        data_converter: temporalio.converter.DataConverter,
+    ) -> Any:
+        """Invoke a regular (non-streaming) activity function.
+
+        This is the original activity execution logic.
+        """
         # Find activity or fail
         activity_def = self._activities.get(start.activity_type, self._dynamic_activity)
         if not activity_def:
@@ -629,6 +667,64 @@ class _ActivityWorker:
 
         impl.init(_ActivityOutboundImpl(self, running_activity.info))
         return await impl.execute_activity(input)
+
+    async def _execute_streaming_activity(
+        self,
+        start: temporalio.bridge.proto.activity_task.Start,  # type: ignore[reportAttributeAccessIssue]
+        running_activity: _RunningActivity,
+        task_token: bytes,
+        data_converter: temporalio.converter.DataConverter,
+        streaming_queue: Any,
+    ) -> Any:
+        """Invoke a streaming activity function with dual-path result delivery.
+
+        For streaming activities, we need to:
+        1. Execute the activity (async generator) and collect all results
+        2. Stream results to the workflow queue for peekable activities
+        3. Return the complete list for durable storage
+        """
+        # First, execute the activity using the regular method to get the async generator
+        activity_result = await self._execute_regular_activity(
+            start, running_activity, task_token, data_converter
+        )
+
+        # If it's not an async generator, treat as regular activity
+        if not hasattr(activity_result, '__aiter__'):
+            return activity_result
+
+        # Collect streaming results with dual-path delivery
+        collected_items = []
+        
+        try:
+            async for item in activity_result:
+                # Path 1: Collect for final durable result
+                collected_items.append(item)
+                
+                # Path 2: Stream to workflow queue if provided
+                if streaming_queue:
+                    try:
+                        await streaming_queue.put_item(item)
+                    except Exception:
+                        # Continue even if queue fails - final result is most important
+                        pass
+            
+            # Signal successful completion to queue
+            if streaming_queue:
+                try:
+                    await streaming_queue.put_completion(True)
+                except Exception:
+                    pass
+                    
+        except Exception as e:
+            # On error, signal error to queue and re-raise
+            if streaming_queue:
+                try:
+                    await streaming_queue.put_completion(False, e)
+                except Exception:
+                    pass
+            raise
+        
+        return collected_items
 
     def assert_activity_valid(self, activity) -> None:
         if self._dynamic_activity:

@@ -346,6 +346,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
         # For tracking the thread this workflow is running on (primarily for deadlock situations)
         self._current_thread_id: Optional[int] = None
+        
+        # For tracking streaming activity peek mode
+        self._current_peekable_activity: Optional[str] = None
 
         # The current details (as opposed to static details on workflow start), returned in the
         # metadata query
@@ -1538,11 +1541,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         cancellation_type: temporalio.workflow.ActivityCancellationType,
         activity_id: Optional[str],
         summary: Optional[str],
+        peekable: bool = False,
     ) -> temporalio.workflow.ActivityHandle[Any]:
         # Get activity definition if it's callable
         name: str
         arg_types: Optional[List[Type]] = None
         ret_type = result_type
+        is_streaming = False
+        
         if isinstance(activity, str):
             name = activity
         elif callable(activity):
@@ -1552,30 +1558,125 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             name = defn.name
             arg_types = defn.arg_types
             ret_type = defn.ret_type
+            is_streaming = defn.is_streaming or False
         else:
             raise TypeError("Activity must be a string or callable")
+
+        # Check peek mode restrictions
+        if peekable:
+            # Only streaming activities can be peekable
+            if not is_streaming:
+                raise ValueError("Only streaming activities (AsyncIterable return type) can be peekable")
+            
+            # Enforce one peekable activity at a time
+            if self._current_peekable_activity is not None:
+                raise RuntimeError(
+                    f"Cannot start peekable activity '{name}' while another peekable activity "
+                    f"'{self._current_peekable_activity}' is still in progress. "
+                    "Only one peekable activity is allowed at a time."
+                )
+            
+            # Mark this activity as the current peekable one
+            self._current_peekable_activity = name
 
         cast(_WorkflowExternFunctions, self._extern_functions)[
             "__temporal_assert_local_activity_valid"
         ](name)
 
-        return self._outbound.start_local_activity(
-            StartLocalActivityInput(
-                activity=name,
-                args=args,
-                activity_id=activity_id,
-                schedule_to_close_timeout=schedule_to_close_timeout,
-                schedule_to_start_timeout=schedule_to_start_timeout,
-                start_to_close_timeout=start_to_close_timeout,
-                retry_policy=retry_policy,
-                local_retry_threshold=local_retry_threshold,
-                cancellation_type=cancellation_type,
-                summary=summary,
-                headers={},
-                arg_types=arg_types,
-                ret_type=ret_type,
+        # Create streaming queue if this is a peekable streaming activity
+        streaming_queue = None
+        if peekable and is_streaming:
+            from temporalio.worker._streaming import (
+                StreamingResultQueue, 
+                register_local_streaming_queue
             )
+            streaming_queue = StreamingResultQueue(activity_id or name)
+            
+            # For local activities, register the streaming queue globally so the activity
+            # execution can find it using workflow_run_id and activity_id
+            activity_key = activity_id or name
+            register_local_streaming_queue(
+                self._info.run_id, activity_key, streaming_queue
+            )
+            # Debug logging
+            from temporalio.workflow import logger as workflow_logger
+            workflow_logger.debug(
+                f"Registered streaming queue for activity {name} (id={activity_key}, run_id={self._info.run_id})"
+            )
+
+        # For streaming activities, adjust ret_type to reflect the actual returned type
+        # Streaming activities return List[T] instead of AsyncIterable[T]
+        actual_ret_type = ret_type
+        if is_streaming and ret_type is not None:
+            import typing
+            # Extract the inner type from AsyncIterable[T] and make it List[T]
+            if hasattr(ret_type, '__origin__') and hasattr(ret_type, '__args__'):
+                if ret_type.__origin__ is typing.AsyncIterable or str(ret_type).startswith('typing.AsyncIterable'):
+                    inner_type = ret_type.__args__[0] if ret_type.__args__ else typing.Any
+                    actual_ret_type = typing.List[inner_type]
+        
+        input_obj = StartLocalActivityInput(
+            activity=name,
+            args=args,
+            activity_id=activity_id,
+            schedule_to_close_timeout=schedule_to_close_timeout,
+            schedule_to_start_timeout=schedule_to_start_timeout,
+            start_to_close_timeout=start_to_close_timeout,
+            retry_policy=retry_policy,
+            local_retry_threshold=local_retry_threshold,
+            cancellation_type=cancellation_type,
+            summary=summary,
+            headers={},
+            arg_types=arg_types,
+            ret_type=actual_ret_type,
+            is_streaming=is_streaming,
+            peekable=peekable,
+            streaming_queue=streaming_queue,
         )
+
+        if peekable and is_streaming:
+            # Return a peekable handle for real-time streaming
+            fn = self._create_streaming_activity_coroutine(input_obj, streaming_queue)
+            return PeekableActivityHandle(self, input_obj, fn, streaming_queue)
+        else:
+            # Return regular activity handle
+            return self._outbound.start_local_activity(input_obj)
+    
+    def _create_streaming_activity_coroutine(
+        self, 
+        input_obj: StartLocalActivityInput, 
+        streaming_queue: "temporalio.worker._streaming.StreamingResultQueue"
+    ) -> Coroutine[Any, Any, None]:
+        """Create a coroutine for streaming activity execution.
+        
+        This coroutine starts the activity execution and returns None.
+        The real results come through the streaming queue via PeekableActivityHandle.
+        """
+        
+        async def run_streaming_activity() -> None:
+            # Start the activity execution in the background
+            # The activity execution will populate the streaming queue
+            # and handle the regular completion path to Temporal server
+            while True:
+                try:
+                    # Start the activity - the streaming will happen automatically
+                    # via the dual-path execution in _execute_streaming_activity
+                    activity_handle = self._outbound.start_local_activity(input_obj)
+                    # We need to await this to ensure the activity completes
+                    # but we don't use the result - the streaming queue provides real-time access
+                    await activity_handle
+                    break
+                except _ActivityDoBackoffError as err:
+                    # Handle backoff similar to regular activities
+                    await asyncio.sleep(
+                        err.backoff.backoff_duration.ToTimedelta().total_seconds()
+                    )
+                except asyncio.CancelledError:
+                    # Clean up streaming queue on cancellation
+                    streaming_queue.close()
+                    raise
+                
+        return run_streaming_activity()
 
     async def workflow_start_nexus_operation(
         self,
@@ -2904,6 +3005,106 @@ class _ActivityDoBackoffError(BaseException):
         self.backoff = backoff
 
 
+class PeekableActivityHandle(temporalio.workflow.ActivityHandle[Any]):
+    """Activity handle that supports real-time async iteration over streaming results.
+    
+    This handle enables workflows to iterate over streaming activity results in real-time
+    when peekable=True is used. It implements the async iterator protocol to yield
+    items as they arrive from the activity via a StreamingResultQueue.
+    """
+    
+    def __init__(
+        self,
+        instance: "_WorkflowInstanceImpl", 
+        input: "StartLocalActivityInput",
+        fn: Coroutine[Any, Any, Any],
+        streaming_queue: "temporalio.worker._streaming.StreamingResultQueue"
+    ):
+        """Initialize peekable activity handle.
+        
+        Args:
+            instance: The workflow instance this handle belongs to.
+            input: The local activity input configuration.
+            fn: The coroutine function for the activity execution.
+            streaming_queue: Queue for receiving streaming results.
+        """
+        super().__init__(fn)
+        self._instance = instance
+        self._input = input
+        self._streaming_queue = streaming_queue
+        self._completed = False
+        self._final_result = None
+        self._iterator_exhausted = False
+        
+        # The parent class (ActivityHandle) already creates the task from fn
+        # so we don't need to create another one
+        
+    def __aiter__(self):
+        """Return self as async iterator."""
+        return self
+        
+    async def __anext__(self):
+        """Yield items as they arrive from the streaming activity.
+        
+        Returns:
+            Next item from the streaming activity.
+            
+        Raises:
+            StopAsyncIteration: When the activity completes or fails.
+            Exception: Any exception that occurred during activity execution.
+        """
+        if self._iterator_exhausted:
+            raise StopAsyncIteration
+            
+        # Get next item from the streaming queue
+        msg_type, *data = await self._streaming_queue.get_next_item()
+        
+        if msg_type == 'item':
+            # Got a streaming item - yield it
+            return data[0]
+        elif msg_type == 'complete':
+            # Activity completed
+            self._iterator_exhausted = True
+            success, error = data[0], data[1]
+            
+            if not success and error:
+                # Activity failed - propagate error and clear peek mode
+                self._clear_peek_mode()
+                raise error
+                
+            # Successful completion - clear peek mode and end iteration
+            self._clear_peek_mode()
+            raise StopAsyncIteration
+        else:
+            # Unknown message type
+            self._iterator_exhausted = True
+            self._clear_peek_mode()
+            raise RuntimeError(f"Unknown streaming message type: {msg_type}")
+    
+    def _clear_peek_mode(self):
+        """Clear peek mode if this activity was peekable."""
+        if (hasattr(self._input, 'peekable') and self._input.peekable and 
+            self._instance._current_peekable_activity == self._input.activity):
+            self._instance._current_peekable_activity = None
+    
+    async def result(self):
+        """Wait for the activity to complete and return the final durable result.
+        
+        This method allows both `await handle` and `async for ... in handle` patterns.
+        
+        Returns:
+            The final durable result from the activity (list of all items).
+        """
+        if self._final_result is None:
+            # Wait for the underlying activity to complete through normal path
+            self._final_result = await super().result()
+        return self._final_result
+    
+    def __await__(self):
+        """Support awaiting the handle for final result."""
+        return self.result().__await__()
+
+
 class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
     def __init__(
         self,
@@ -2918,6 +3119,12 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         self._result_fut = instance.create_future()
         self._started = False
         instance._register_task(self, name=f"activity: {input.activity}")
+        
+        # Check if this is a peekable local activity
+        self._is_peekable = (
+            isinstance(input, StartLocalActivityInput) and 
+            getattr(input, 'peekable', False)
+        )
         self._payload_converter = self._instance._payload_converter_with_context(
             temporalio.converter.ActivitySerializationContext(
                 namespace=self._instance._info.namespace,
@@ -2951,6 +3158,8 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
     def _resolve_success(self, result: Any) -> None:
         # We intentionally let this error if already done
         self._result_fut.set_result(result)
+        # Clear peek mode if this was a peekable activity
+        self._clear_peek_mode_if_needed()
 
     def _resolve_failure(self, err: BaseException) -> None:
         # If it was never started, we don't need to set this failure. In cases
@@ -2959,6 +3168,13 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         # on.
         if self._started:
             self._result_fut.set_exception(err)
+        # Clear peek mode if this was a peekable activity
+        self._clear_peek_mode_if_needed()
+        
+    def _clear_peek_mode_if_needed(self) -> None:
+        """Clear peek mode if this activity was peekable."""
+        if self._is_peekable and self._instance._current_peekable_activity == self._input.activity:
+            self._instance._current_peekable_activity = None
 
     def _resolve_backoff(
         self, backoff: temporalio.bridge.proto.activity_result.DoBackoff
