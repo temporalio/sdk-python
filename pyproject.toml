@@ -61,10 +61,21 @@ build-develop-with-release = { cmd = "uv run maturin develop --release --uv" }
 format = [
   { cmd = "uv run ruff check --select I --fix" },
   { cmd = "uv run ruff format" },
+  { cmd = "cargo fmt", cwd = "temporalio/bridge" },
 ]
 gen-docs = "uv run scripts/gen_docs.py"
-gen-protos = "uv run scripts/gen_protos.py"
-gen-protos-docker = "uv run scripts/gen_protos_docker.py"
+gen-protos = [
+  { cmd = "uv run scripts/gen_protos.py" },
+  { cmd = "uv run scripts/gen_payload_visitor.py" },
+  { cmd = "uv run scripts/gen_bridge_client.py" },
+  { ref = "format" },
+]
+gen-protos-docker = [
+  { cmd = "uv run scripts/gen_protos_docker.py" },
+  { cmd = "uv run scripts/gen_payload_visitor.py" },
+  { cmd = "uv run scripts/gen_bridge_client.py" },
+  { ref = "format" },
+]
 lint = [
   { cmd = "uv run ruff check --select I" },
   { cmd = "uv run ruff format --check" },
