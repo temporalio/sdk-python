@@ -1623,10 +1623,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 if ret_type.__origin__ is typing.AsyncIterable or str(
                     ret_type
                 ).startswith("typing.AsyncIterable"):
-                    inner_type = (
-                        ret_type.__args__[0] if ret_type.__args__ else typing.Any
-                    )
-                    actual_ret_type = typing.List[inner_type]
+                    # TODO: Preserve the precise element type once we have a stable
+                    # approach that satisfies mypy for runtime-created generics.
+                    actual_ret_type = typing.List[Any]
 
         # For peekable streaming activities, disable retries
         # Retrying would send duplicate items to the queue and confuse the workflow
@@ -3184,13 +3183,8 @@ class PeekableActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         return self._final_result
 
     def __await__(self):
-        """Support awaiting the handle to get an async iterable.
+        """Return self when awaited so the handle stays iterable."""
 
-        For peekable handles, awaiting returns self (which is iterable).
-        This enables the pattern: async for item in await execute_local_activity(..., peekable=True)
-        """
-
-        # Create an async function that immediately returns self
         async def _return_self():
             return self
 

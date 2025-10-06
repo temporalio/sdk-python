@@ -306,6 +306,7 @@ class ModelActivity:
             async for event in stream:
                 # Convert TResponseStreamEvent (Pydantic model) to JSON-serializable dict
                 # Use mode='json' to ensure all nested objects are properly serialized
+                event_data: Any
                 if hasattr(event, "model_dump"):
                     event_data = event.model_dump(mode="json")
                 else:

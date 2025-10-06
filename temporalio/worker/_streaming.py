@@ -1,5 +1,4 @@
-"""
-Streaming infrastructure for streaming activities.
+"""Streaming infrastructure for streaming activities.
 
 This module provides the queue-based communication system for delivering
 streaming results from activities to workflows in real-time.

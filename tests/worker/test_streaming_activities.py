@@ -10,7 +10,7 @@ import multiprocessing
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, AsyncIterable, Callable, List
+from typing import Any, AsyncIterable, Callable, List, Sequence
 
 import temporalio.activity
 import temporalio.common
@@ -34,7 +34,17 @@ _default_shared_state_manager = SharedStateManager.create_from_multiprocessing(
 )
 
 
+STREAMING_TEST_ACTIVITIES: dict[str, Callable[..., Any]] = {}
+
+
+def _register_activity(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """Register activity for lookup within streaming tests."""
+    STREAMING_TEST_ACTIVITIES[fn.__name__] = fn
+    return fn
+
+
 # Test Activities
+@_register_activity
 @temporalio.activity.defn
 async def streaming_activity_10_items() -> AsyncIterable[int]:
     """Streaming activity that yields 10 integers."""
@@ -45,6 +55,7 @@ async def streaming_activity_10_items() -> AsyncIterable[int]:
         yield i
 
 
+@_register_activity
 @temporalio.activity.defn
 async def streaming_activity_large() -> AsyncIterable[int]:
     """Streaming activity that yields 100 integers for performance testing."""
@@ -55,6 +66,7 @@ async def streaming_activity_large() -> AsyncIterable[int]:
         yield i
 
 
+@_register_activity
 @temporalio.activity.defn
 async def empty_streaming_activity() -> AsyncIterable[int]:
     """Streaming activity that yields no items."""
@@ -62,6 +74,7 @@ async def empty_streaming_activity() -> AsyncIterable[int]:
     yield  # Never reached, but needed for type checker
 
 
+@_register_activity
 @temporalio.activity.defn
 async def streaming_activity_with_error() -> AsyncIterable[int]:
     """Streaming activity that yields some items then raises an error."""
@@ -70,6 +83,15 @@ async def streaming_activity_with_error() -> AsyncIterable[int]:
     raise RuntimeError("Activity failed after yielding items")
 
 
+@_register_activity
+@temporalio.activity.defn
+async def streaming_activity_immediate_error() -> AsyncIterable[int]:
+    """Streaming activity that fails immediately before yielding any items."""
+    raise RuntimeError("Immediate failure")
+    yield  # Never reached
+
+
+@_register_activity
 @temporalio.activity.defn
 async def regular_activity() -> List[int]:
     """Regular non-streaming activity that returns a list."""
@@ -91,8 +113,8 @@ class _StreamingActivityResult:
 class StreamingPeekableWorkflow:
     @temporalio.workflow.run
     async def run(self, activity_fn_name: str, *args: Any) -> List[Any]:
-        # Get the activity function by name from globals
-        activity_fn = globals()[activity_fn_name]
+        # Get the activity function by name from the module-level registry
+        activity_fn = STREAMING_TEST_ACTIVITIES[activity_fn_name]
         results = []
         # Await to get the peekable handle, then iterate for real-time streaming
         async for item in await temporalio.workflow.execute_local_activity(
@@ -109,8 +131,8 @@ class StreamingPeekableWorkflow:
 class StreamingBufferedWorkflow:
     @temporalio.workflow.run
     async def run(self, activity_fn_name: str, *args: Any) -> List[Any]:
-        # Get the activity function by name from globals
-        activity_fn = globals()[activity_fn_name]
+        # Get the activity function by name from the module-level registry
+        activity_fn = STREAMING_TEST_ACTIVITIES[activity_fn_name]
         iterable_result = await temporalio.workflow.execute_local_activity(
             activity_fn,
             *args,
@@ -171,27 +193,34 @@ async def _execute_streaming_workflow_peekable(
     activity_fn: Callable,
     *args: Any,
     schedule_to_close_timeout_ms: int = 10000,
-    additional_activities: List[Callable] = [],
+    additional_activities: Sequence[Callable] | None = None,
 ) -> _StreamingActivityResult:
     """Execute streaming activity with peekable=True using global workflow class."""
-    worker_config = {
-        "client": client,
-        "task_queue": str(uuid.uuid4()),
-        "activities": [activity_fn] + additional_activities,
-        "shared_state_manager": _default_shared_state_manager,
-        "max_concurrent_activities": 50,
-    }
+    activity_list: List[Callable[..., Any]] = [activity_fn]
+    if additional_activities:
+        activity_list.extend(additional_activities)
+    for fn in activity_list:
+        _register_activity(fn)
 
-    async with Worker(**worker_config, workflows=[StreamingPeekableWorkflow]):
+    task_queue = str(uuid.uuid4())
+
+    async with Worker(
+        client=client,
+        task_queue=task_queue,
+        activities=activity_list,
+        workflows=[StreamingPeekableWorkflow],
+        shared_state_manager=_default_shared_state_manager,
+        max_concurrent_activities=50,
+    ):
         handle = await client.start_workflow(
             StreamingPeekableWorkflow.run,
-            activity_fn.__name__,
-            *args,
+            args=(activity_fn.__name__, *args),
             id=str(uuid.uuid4()),
-            task_queue=worker_config["task_queue"],
+            task_queue=task_queue,
+            run_timeout=timedelta(milliseconds=schedule_to_close_timeout_ms),
         )
         return _StreamingActivityResult(
-            act_task_queue=worker_config["task_queue"],
+            act_task_queue=task_queue,
             result=await handle.result(),
             handle=handle,
         )
@@ -203,27 +232,34 @@ async def _execute_streaming_workflow_buffered(
     activity_fn: Callable,
     *args: Any,
     schedule_to_close_timeout_ms: int = 10000,
-    additional_activities: List[Callable] = [],
+    additional_activities: Sequence[Callable] | None = None,
 ) -> _StreamingActivityResult:
     """Execute streaming activity with peekable=False using global workflow class."""
-    worker_config = {
-        "client": client,
-        "task_queue": str(uuid.uuid4()),
-        "activities": [activity_fn] + additional_activities,
-        "shared_state_manager": _default_shared_state_manager,
-        "max_concurrent_activities": 50,
-    }
+    activity_list: List[Callable[..., Any]] = [activity_fn]
+    if additional_activities:
+        activity_list.extend(additional_activities)
+    for fn in activity_list:
+        _register_activity(fn)
 
-    async with Worker(**worker_config, workflows=[StreamingBufferedWorkflow]):
+    task_queue = str(uuid.uuid4())
+
+    async with Worker(
+        client=client,
+        task_queue=task_queue,
+        activities=activity_list,
+        workflows=[StreamingBufferedWorkflow],
+        shared_state_manager=_default_shared_state_manager,
+        max_concurrent_activities=50,
+    ):
         handle = await client.start_workflow(
             StreamingBufferedWorkflow.run,
-            activity_fn.__name__,
-            *args,
+            args=(activity_fn.__name__, *args),
             id=str(uuid.uuid4()),
-            task_queue=worker_config["task_queue"],
+            task_queue=task_queue,
+            run_timeout=timedelta(milliseconds=schedule_to_close_timeout_ms),
         )
         return _StreamingActivityResult(
-            act_task_queue=worker_config["task_queue"],
+            act_task_queue=task_queue,
             result=await handle.result(),
             handle=handle,
         )
@@ -335,19 +371,20 @@ async def test_streaming_error_handling_non_peekable(
 
 async def test_regular_activity_unchanged(client: Client, worker: ExternalWorker):
     """Test that regular activities work unchanged."""
-    worker_config = {
-        "client": client,
-        "task_queue": str(uuid.uuid4()),
-        "activities": [regular_activity],
-        "shared_state_manager": _default_shared_state_manager,
-        "max_concurrent_activities": 50,
-    }
+    task_queue = str(uuid.uuid4())
 
-    async with Worker(**worker_config, workflows=[RegularActivityWorkflow]):
+    async with Worker(
+        client=client,
+        task_queue=task_queue,
+        activities=[regular_activity],
+        workflows=[RegularActivityWorkflow],
+        shared_state_manager=_default_shared_state_manager,
+        max_concurrent_activities=50,
+    ):
         handle = await client.start_workflow(
             RegularActivityWorkflow.run,
             id=str(uuid.uuid4()),
-            task_queue=worker_config["task_queue"],
+            task_queue=task_queue,
         )
         result = await handle.result()
         assert result == [1, 2, 3, 4, 5], f"Expected [1,2,3,4,5], got {result}"
@@ -355,19 +392,20 @@ async def test_regular_activity_unchanged(client: Client, worker: ExternalWorker
 
 async def test_peek_mode_enforcement(client: Client, worker: ExternalWorker):
     """Test that only one peekable activity is allowed at a time."""
-    worker_config = {
-        "client": client,
-        "task_queue": str(uuid.uuid4()),
-        "activities": [streaming_activity_10_items],
-        "shared_state_manager": _default_shared_state_manager,
-        "max_concurrent_activities": 50,
-    }
+    task_queue = str(uuid.uuid4())
 
-    async with Worker(**worker_config, workflows=[PeekModeEnforcementWorkflow]):
+    async with Worker(
+        client=client,
+        task_queue=task_queue,
+        activities=[streaming_activity_10_items],
+        workflows=[PeekModeEnforcementWorkflow],
+        shared_state_manager=_default_shared_state_manager,
+        max_concurrent_activities=50,
+    ):
         handle = await client.start_workflow(
             PeekModeEnforcementWorkflow.run,
             id=str(uuid.uuid4()),
-            task_queue=worker_config["task_queue"],
+            task_queue=task_queue,
         )
         result = await handle.result()
         assert "SUCCESS:" in result, f"Expected success message, got {result}"
@@ -377,6 +415,7 @@ async def test_peek_mode_enforcement(client: Client, worker: ExternalWorker):
 
 
 # Advanced test activities
+@_register_activity
 @temporalio.activity.defn
 async def streaming_activity_with_heartbeat() -> AsyncIterable[int]:
     """Streaming activity with heartbeat testing."""
@@ -388,9 +427,20 @@ async def streaming_activity_with_heartbeat() -> AsyncIterable[int]:
         yield i
 
 
+@_register_activity
+@temporalio.activity.defn
+async def streaming_activity_slow() -> AsyncIterable[int]:
+    """Streaming activity that sleeps between items to trigger timeout tests."""
+    for i in range(3):
+        await asyncio.sleep(2)  # 2 seconds per item, used to trigger timeout
+        yield i
+
+
+@_register_activity
 @temporalio.activity.defn
 async def streaming_activity_cancellation_test() -> AsyncIterable[int]:
     """Streaming activity for testing cancellation behavior."""
+    # TODO: Add explicit cancellation coverage once peekable streaming cancellation is implemented.
     for i in range(20):  # Long-running to allow cancellation
         if temporalio.activity.is_cancelled():
             break
@@ -399,6 +449,7 @@ async def streaming_activity_cancellation_test() -> AsyncIterable[int]:
         yield i
 
 
+@_register_activity
 @temporalio.activity.defn
 async def streaming_activity_mixed_types() -> AsyncIterable[str]:
     """Streaming activity yielding different string values."""
@@ -409,6 +460,7 @@ async def streaming_activity_mixed_types() -> AsyncIterable[str]:
         yield value
 
 
+@_register_activity
 @temporalio.activity.defn
 async def streaming_activity_error_midway() -> AsyncIterable[int]:
     """Streaming activity that fails after yielding half its items."""
@@ -418,6 +470,7 @@ async def streaming_activity_error_midway() -> AsyncIterable[int]:
             raise ValueError(f"Planned error at item {i}")
 
 
+@_register_activity
 @temporalio.activity.defn
 async def regular_activity_with_args(name: str, count: int) -> List[str]:
     """Regular activity with arguments for testing compatibility."""
@@ -460,13 +513,7 @@ async def test_streaming_activity_heartbeat(client: Client, worker: ExternalWork
 
 async def test_streaming_activity_mixed_types(client: Client, worker: ExternalWorker):
     """Test streaming activity with non-integer return types."""
-    worker_config = {
-        "client": client,
-        "task_queue": str(uuid.uuid4()),
-        "activities": [streaming_activity_mixed_types],
-        "shared_state_manager": _default_shared_state_manager,
-        "max_concurrent_activities": 50,
-    }
+    task_queue = str(uuid.uuid4())
 
     @temporalio.workflow.defn
     class StringStreamingWorkflow:
@@ -481,11 +528,18 @@ async def test_streaming_activity_mixed_types(client: Client, worker: ExternalWo
                 results.append(item)
             return results
 
-    async with Worker(**worker_config, workflows=[StringStreamingWorkflow]):
+    async with Worker(
+        client=client,
+        task_queue=task_queue,
+        activities=[streaming_activity_mixed_types],
+        workflows=[StringStreamingWorkflow],
+        shared_state_manager=_default_shared_state_manager,
+        max_concurrent_activities=50,
+    ):
         handle = await client.start_workflow(
             StringStreamingWorkflow.run,
             id=str(uuid.uuid4()),
-            task_queue=worker_config["task_queue"],
+            task_queue=task_queue,
         )
         result = await handle.result()
         expected = ["hello", "world", "streaming", "activity", "test"]
@@ -523,13 +577,7 @@ async def test_regular_activity_with_peekable_false(
     client: Client, worker: ExternalWorker
 ):
     """Test that regular activities work with peekable=False (should be ignored)."""
-    worker_config = {
-        "client": client,
-        "task_queue": str(uuid.uuid4()),
-        "activities": [regular_activity_with_args],
-        "shared_state_manager": _default_shared_state_manager,
-        "max_concurrent_activities": 50,
-    }
+    task_queue = str(uuid.uuid4())
 
     @temporalio.workflow.defn
     class RegularActivityPeekableTestWorkflow:
@@ -543,11 +591,18 @@ async def test_regular_activity_with_peekable_false(
                 peekable=False,  # This should be ignored since it's not a streaming activity
             )
 
-    async with Worker(**worker_config, workflows=[RegularActivityPeekableTestWorkflow]):
+    async with Worker(
+        client=client,
+        task_queue=task_queue,
+        activities=[regular_activity_with_args],
+        workflows=[RegularActivityPeekableTestWorkflow],
+        shared_state_manager=_default_shared_state_manager,
+        max_concurrent_activities=50,
+    ):
         handle = await client.start_workflow(
             RegularActivityPeekableTestWorkflow.run,
             id=str(uuid.uuid4()),
-            task_queue=worker_config["task_queue"],
+            task_queue=task_queue,
         )
         result = await handle.result()
         expected = ["test_0", "test_1", "test_2"]
@@ -558,18 +613,11 @@ async def test_streaming_activity_immediate_error(
     client: Client, worker: ExternalWorker
 ):
     """Test streaming activity that fails immediately before yielding any items."""
-
-    @temporalio.activity.defn
-    async def streaming_activity_immediate_error() -> AsyncIterable[int]:
-        raise RuntimeError("Immediate failure")
-        yield  # Never reached
-
     with pytest.raises(WorkflowFailureError) as exc_info:
         await _execute_streaming_workflow_peekable(
             client,
             worker,
             streaming_activity_immediate_error,
-            additional_activities=[streaming_activity_immediate_error],
         )
 
     error = assert_streaming_activity_application_error(exc_info.value)
@@ -578,20 +626,12 @@ async def test_streaming_activity_immediate_error(
 
 async def test_streaming_activity_timeout(client: Client, worker: ExternalWorker):
     """Test streaming activity timeout behavior."""
-
-    @temporalio.activity.defn
-    async def streaming_activity_slow() -> AsyncIterable[int]:
-        for i in range(3):
-            await asyncio.sleep(2)  # 2 seconds per item, will timeout
-            yield i
-
     with pytest.raises(WorkflowFailureError) as exc_info:
         await _execute_streaming_workflow_peekable(
             client,
             worker,
             streaming_activity_slow,
             schedule_to_close_timeout_ms=3000,  # 3 second timeout, too short
-            additional_activities=[streaming_activity_slow],
         )
 
     # Should get a timeout error
@@ -604,13 +644,7 @@ async def test_multiple_streaming_activities_sequential_peekable(
     client: Client, worker: ExternalWorker
 ):
     """Test multiple streaming activities executed sequentially with peekable=True."""
-    worker_config = {
-        "client": client,
-        "task_queue": str(uuid.uuid4()),
-        "activities": [streaming_activity_10_items, streaming_activity_mixed_types],
-        "shared_state_manager": _default_shared_state_manager,
-        "max_concurrent_activities": 50,
-    }
+    task_queue = str(uuid.uuid4())
 
     @temporalio.workflow.defn
     class MultipleStreamingWorkflow:
@@ -636,11 +670,18 @@ async def test_multiple_streaming_activities_sequential_peekable(
 
             return {"integers": int_results, "strings": str_results}
 
-    async with Worker(**worker_config, workflows=[MultipleStreamingWorkflow]):
+    async with Worker(
+        client=client,
+        task_queue=task_queue,
+        activities=[streaming_activity_10_items, streaming_activity_mixed_types],
+        workflows=[MultipleStreamingWorkflow],
+        shared_state_manager=_default_shared_state_manager,
+        max_concurrent_activities=50,
+    ):
         handle = await client.start_workflow(
             MultipleStreamingWorkflow.run,
             id=str(uuid.uuid4()),
-            task_queue=worker_config["task_queue"],
+            task_queue=task_queue,
         )
         result = await handle.result()
 
@@ -652,13 +693,7 @@ async def test_multiple_streaming_activities_sequential_buffered(
     client: Client, worker: ExternalWorker
 ):
     """Test multiple streaming activities executed sequentially with peekable=False."""
-    worker_config = {
-        "client": client,
-        "task_queue": str(uuid.uuid4()),
-        "activities": [empty_streaming_activity, streaming_activity_10_items],
-        "shared_state_manager": _default_shared_state_manager,
-        "max_concurrent_activities": 50,
-    }
+    task_queue = str(uuid.uuid4())
 
     @temporalio.workflow.defn
     class MultipleBufferedStreamingWorkflow:
@@ -686,11 +721,18 @@ async def test_multiple_streaming_activities_sequential_buffered(
 
             return {"empty": empty_result, "items": items_result}
 
-    async with Worker(**worker_config, workflows=[MultipleBufferedStreamingWorkflow]):
+    async with Worker(
+        client=client,
+        task_queue=task_queue,
+        activities=[empty_streaming_activity, streaming_activity_10_items],
+        workflows=[MultipleBufferedStreamingWorkflow],
+        shared_state_manager=_default_shared_state_manager,
+        max_concurrent_activities=50,
+    ):
         handle = await client.start_workflow(
             MultipleBufferedStreamingWorkflow.run,
             id=str(uuid.uuid4()),
-            task_queue=worker_config["task_queue"],
+            task_queue=task_queue,
         )
         result = await handle.result()
 
@@ -703,17 +745,7 @@ async def test_streaming_and_regular_activities_mixed(
     client: Client, worker: ExternalWorker
 ):
     """Test workflow with both streaming and regular activities."""
-    worker_config = {
-        "client": client,
-        "task_queue": str(uuid.uuid4()),
-        "activities": [
-            streaming_activity_10_items,
-            regular_activity,
-            regular_activity_with_args,
-        ],
-        "shared_state_manager": _default_shared_state_manager,
-        "max_concurrent_activities": 50,
-    }
+    task_queue = str(uuid.uuid4())
 
     @temporalio.workflow.defn
     class MixedActivitiesWorkflow:
@@ -746,11 +778,22 @@ async def test_streaming_and_regular_activities_mixed(
                 "regular_with_args": regular_with_args_result,
             }
 
-    async with Worker(**worker_config, workflows=[MixedActivitiesWorkflow]):
+    async with Worker(
+        client=client,
+        task_queue=task_queue,
+        activities=[
+            streaming_activity_10_items,
+            regular_activity,
+            regular_activity_with_args,
+        ],
+        workflows=[MixedActivitiesWorkflow],
+        shared_state_manager=_default_shared_state_manager,
+        max_concurrent_activities=50,
+    ):
         handle = await client.start_workflow(
             MixedActivitiesWorkflow.run,
             id=str(uuid.uuid4()),
-            task_queue=worker_config["task_queue"],
+            task_queue=task_queue,
         )
         result = await handle.result()
 

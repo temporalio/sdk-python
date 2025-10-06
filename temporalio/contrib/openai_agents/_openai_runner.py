@@ -90,6 +90,11 @@ class TemporalBatchedRunResultStreaming(RunResultStreaming):
         input: Union[str, list[TResponseInputItem]],
         **kwargs,
     ):
+        """Initialize the streaming runner wrapper for batched mode.
+
+        Stores the inputs until the underlying streaming activity completes so we
+        can later emit the collected events through `stream_events`.
+        """
         # Initialize with minimal data - we'll populate after the activity runs
         super().__init__(
             input=input,
@@ -182,7 +187,9 @@ class TemporalBatchedRunResultStreaming(RunResultStreaming):
         from pydantic import TypeAdapter
 
         # Create a TypeAdapter for the ResponseStreamEvent union type to deserialize dicts
-        event_adapter = TypeAdapter(TResponseStreamEvent)
+        event_adapter: TypeAdapter[TResponseStreamEvent] = TypeAdapter(
+            TResponseStreamEvent
+        )
 
         for event_dict in self._collected_events:
             # For Phase I, all events should be raw_response_event type
