@@ -1,10 +1,11 @@
 import asyncio
+import inspect
 from functools import wraps
-from typing import Any, Awaitable, Callable, TypeVar, cast
+from typing import Any, AsyncIterator, Awaitable, Callable, TypeVar, Union, cast
 
 from temporalio import activity
 
-F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
+F = TypeVar("F", bound=Callable[..., Union[Awaitable[Any], AsyncIterator[Any]]])
 
 
 def _auto_heartbeater(fn: F) -> F:
@@ -19,15 +20,34 @@ def _auto_heartbeater(fn: F) -> F:
                 heartbeat_every(heartbeat_timeout.total_seconds() / 2)
             )
         try:
-            return await fn(*args, **kwargs)
-        finally:
+            result = fn(*args, **kwargs)
+            # Check if this is a streaming activity (returns async generator)
+            if inspect.isasyncgen(result):
+                # For streaming activities, yield items while heartbeating
+                async def streaming_wrapper():
+                    try:
+                        async for item in result:
+                            yield item
+                    finally:
+                        if heartbeat_task:
+                            heartbeat_task.cancel()
+                            try:
+                                await heartbeat_task
+                            except asyncio.CancelledError:
+                                pass
+                return streaming_wrapper()
+            else:
+                # For regular activities, await the result
+                return await result
+        except Exception:
+            # Clean up heartbeat task on error
             if heartbeat_task:
                 heartbeat_task.cancel()
-                # Wait for heartbeat cancellation to complete
                 try:
                     await heartbeat_task
                 except asyncio.CancelledError:
                     pass
+            raise
 
     return cast(F, wrapper)
 

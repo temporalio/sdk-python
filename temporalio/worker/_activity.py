@@ -666,7 +666,17 @@ class _ActivityWorker:
             impl = interceptor.intercept_activity(impl)
 
         impl.init(_ActivityOutboundImpl(self, running_activity.info))
-        return await impl.execute_activity(input)
+        result = await impl.execute_activity(input)
+
+        # If result is an async generator (streaming activity with peekable=False),
+        # collect all items and return as a list
+        if hasattr(result, '__aiter__'):
+            collected_items = []
+            async for item in result:
+                collected_items.append(item)
+            return collected_items
+
+        return result
 
     async def _execute_streaming_activity(
         self,
@@ -683,20 +693,153 @@ class _ActivityWorker:
         2. Stream results to the workflow queue for peekable activities
         3. Return the complete list for durable storage
         """
-        # First, execute the activity using the regular method to get the async generator
-        activity_result = await self._execute_regular_activity(
-            start, running_activity, task_token, data_converter
+        # Find activity definition
+        activity_def = self._activities.get(start.activity_type, self._dynamic_activity)
+        if not activity_def:
+            activity_names = ", ".join(sorted(self._activities.keys()))
+            raise temporalio.exceptions.ApplicationError(
+                f"Activity function {start.activity_type} for workflow {start.workflow_execution.workflow_id} "
+                f"is not registered on this worker, available activities: {activity_names}",
+                type="NotFoundError",
+            )
+
+        # Set up events (for async activities only - streaming activities must be async)
+        running_activity.cancelled_event = temporalio.activity._CompositeEvent(
+            thread_event=threading.Event(),
+            async_event=asyncio.Event(),
         )
+
+        # Create the worker shutdown event if not created
+        if not self._worker_shutdown_event:
+            self._worker_shutdown_event = temporalio.activity._CompositeEvent(
+                thread_event=threading.Event(), async_event=asyncio.Event()
+            )
+
+        # Convert arguments
+        arg_types = activity_def.arg_types
+        if not activity_def.name:
+            # Dynamic is just the raw value for each input value
+            arg_types = [temporalio.common.RawValue] * len(start.input)
+        elif arg_types is not None and len(arg_types) != len(start.input):
+            arg_types = None
+        try:
+            args = (
+                []
+                if not start.input
+                else await data_converter.decode(start.input, type_hints=arg_types)
+            )
+        except Exception as err:
+            raise temporalio.exceptions.ApplicationError(
+                "Failed decoding arguments"
+            ) from err
+        # Put the args inside a list if dynamic
+        if not activity_def.name:
+            args = [args]
+
+        # Set up the activity context (similar to _execute_regular_activity)
+        # Decode heartbeat details if present
+        heartbeat_details = []
+        if start.heartbeat_details:
+            try:
+                heartbeat_details = await data_converter.decode(
+                    start.heartbeat_details, type_hints=None
+                )
+            except Exception as err:
+                raise RuntimeError(
+                    "Failed decoding heartbeat details, potential data converter error"
+                ) from err
+
+        # Build info
+        info = temporalio.activity.Info(
+            activity_id=start.activity_id,
+            activity_type=start.activity_type,
+            attempt=start.attempt,
+            current_attempt_scheduled_time=_proto_to_datetime(
+                start.current_attempt_scheduled_time
+            ),
+            heartbeat_details=heartbeat_details,
+            heartbeat_timeout=_proto_to_non_zero_timedelta(start.heartbeat_timeout)
+            if start.HasField("heartbeat_timeout")
+            else None,
+            is_local=start.is_local,
+            schedule_to_close_timeout=_proto_to_non_zero_timedelta(
+                start.schedule_to_close_timeout
+            )
+            if start.HasField("schedule_to_close_timeout")
+            else None,
+            scheduled_time=_proto_to_datetime(start.scheduled_time),
+            start_to_close_timeout=_proto_to_non_zero_timedelta(
+                start.start_to_close_timeout
+            )
+            if start.HasField("start_to_close_timeout")
+            else None,
+            started_time=_proto_to_datetime(start.started_time),
+            task_queue=self._task_queue,
+            task_token=task_token,
+            workflow_id=start.workflow_execution.workflow_id,
+            workflow_namespace=start.workflow_namespace,
+            workflow_run_id=start.workflow_execution.run_id,
+            workflow_type=start.workflow_type,
+            priority=temporalio.common.Priority._from_proto(start.priority),
+            retry_policy=temporalio.common.RetryPolicy.from_proto(start.retry_policy)
+            if start.HasField("retry_policy")
+            else None,
+        )
+
+        if self._encode_headers and data_converter.payload_codec is not None:
+            for payload in start.header_fields.values():
+                new_payload = (await data_converter.payload_codec.decode([payload]))[0]
+                payload.CopyFrom(new_payload)
+
+        running_activity.info = info
+
+        # Set the context early so the logging adapter works
+        temporalio.activity._Context.set(
+            temporalio.activity._Context(
+                info=lambda: info,
+                heartbeat=None,  # TODO: Add heartbeat support for streaming
+                cancelled_event=running_activity.cancelled_event,
+                worker_shutdown_event=self._worker_shutdown_event,
+                shield_thread_cancel_exception=None,
+                payload_converter_class_or_instance=data_converter.payload_converter,
+                runtime_metric_meter=self._metric_meter,
+                client=self._client,
+                cancellation_details=running_activity.cancellation_details,
+            )
+        )
+        temporalio.activity.logger.debug("Starting streaming activity")
+
+        # Build interceptors
+        impl: ActivityInboundInterceptor = _ActivityInboundImpl(self, running_activity)
+        for interceptor in reversed(list(self._interceptors)):
+            impl = interceptor.intercept_activity(impl)
+        impl.init(_ActivityOutboundImpl(self, running_activity.info))
+
+        # Create activity input for interceptor
+        input = ExecuteActivityInput(
+            fn=activity_def.fn,
+            args=args,
+            executor=None,  # Streaming activities are async
+            headers=dict(start.header_fields),
+        )
+
+        # Execute the activity through interceptors to get async generator
+        temporalio.activity.logger.debug("Executing streaming activity")
+        activity_result = await impl.execute_activity(input)
+        temporalio.activity.logger.debug(f"Activity result type: {type(activity_result)}, has __aiter__: {hasattr(activity_result, '__aiter__')}")
 
         # If it's not an async generator, treat as regular activity
         if not hasattr(activity_result, '__aiter__'):
+            temporalio.activity.logger.debug(f"Not an async generator, returning as-is: {activity_result}")
             return activity_result
 
         # Collect streaming results with dual-path delivery
+        temporalio.activity.logger.debug("Starting to collect streaming results")
         collected_items = []
-        
+
         try:
             async for item in activity_result:
+                temporalio.activity.logger.debug(f"Got streaming item: {item}")
                 # Path 1: Collect for final durable result
                 collected_items.append(item)
                 
@@ -831,6 +974,14 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
         context.heartbeat = outbound.heartbeat
 
     async def execute_activity(self, input: ExecuteActivityInput) -> Any:
+        # Handle async generator activities (streaming)
+        is_async_gen = inspect.isasyncgenfunction(input.fn) or inspect.isasyncgenfunction(
+            getattr(input.fn, '__call__', None)
+        )
+        if is_async_gen:
+            # For async generators, just call the function and return the generator
+            return input.fn(*input.args)
+
         # Handle synchronous activity
         is_async = inspect.iscoroutinefunction(input.fn) or inspect.iscoroutinefunction(
             input.fn.__call__  # type: ignore

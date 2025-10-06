@@ -2684,8 +2684,19 @@ class StreamingTextWorkflow:
         return text_content or result.final_output
 
 
-async def test_streaming_text_basic(client: Client):
-    """Test basic text streaming functionality."""
+@pytest.mark.parametrize(
+    "execution_mode",
+    [
+        openai_agents.ActivityExecutionMode.BATCH_ACTIVITY,
+        openai_agents.ActivityExecutionMode.STREAMING_ACTIVITY_NON_PEEKABLE,
+        pytest.param(
+            openai_agents.ActivityExecutionMode.STREAMING_ACTIVITY_PEEKABLE,
+            marks=pytest.mark.skip(reason="Peekable mode has known bugs in SDK"),
+        ),
+    ],
+)
+async def test_streaming_text_basic(client: Client, execution_mode):
+    """Test basic text streaming functionality with different execution modes."""
     # Create simple text events that will be turned into stream deltas
     mock_events = ["Hello ", "world!"]
 
@@ -2696,12 +2707,12 @@ async def test_streaming_text_basic(client: Client):
                 start_to_close_timeout=timedelta(seconds=30)
             ),
             model_provider=TestModelProvider(StreamingTestModel(mock_events)),
+            execution_mode=execution_mode,
         )
     ]
     client = Client(**new_config)
 
     async with new_worker(client, StreamingTextWorkflow) as worker:
-        # Phase I: Should work with batched conversion
         result = await client.execute_workflow(
             StreamingTextWorkflow.run,
             "Tell me a joke",
@@ -2749,8 +2760,19 @@ class StreamingItemsWorkflow:
         return events_collected
 
 
-async def test_streaming_items_workflow(client: Client):
-    """Test streaming with different event types (tool calls, messages, etc)."""
+@pytest.mark.parametrize(
+    "execution_mode",
+    [
+        openai_agents.ActivityExecutionMode.BATCH_ACTIVITY,
+        openai_agents.ActivityExecutionMode.STREAMING_ACTIVITY_NON_PEEKABLE,
+        pytest.param(
+            openai_agents.ActivityExecutionMode.STREAMING_ACTIVITY_PEEKABLE,
+            marks=pytest.mark.skip(reason="Peekable mode has known bugs in SDK"),
+        ),
+    ],
+)
+async def test_streaming_items_workflow(client: Client, execution_mode):
+    """Test streaming with different event types (tool calls, messages, etc) with different execution modes."""
     # Mock streaming events for tools and messages using simple dictionaries
 
     mock_events = [
@@ -2800,6 +2822,7 @@ async def test_streaming_items_workflow(client: Client):
                 start_to_close_timeout=timedelta(seconds=30)
             ),
             model_provider=TestModelProvider(ItemsStreamingModel(mock_events)),
+            execution_mode=execution_mode,
         )
     ]
     client = Client(**new_config)

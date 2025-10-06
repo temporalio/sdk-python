@@ -1636,10 +1636,17 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
         if peekable and is_streaming:
             # Return a peekable handle for real-time streaming
+            from temporalio.workflow import logger as workflow_logger
+            workflow_logger.debug(f"workflow_start_local_activity: peekable=True, is_streaming=True, creating PeekableActivityHandle")
             fn = self._create_streaming_activity_coroutine(input_obj, streaming_queue)
-            return PeekableActivityHandle(self, input_obj, fn, streaming_queue)
+            workflow_logger.debug(f"workflow_start_local_activity: created coroutine fn={fn}")
+            handle = PeekableActivityHandle(self, input_obj, fn, streaming_queue)
+            workflow_logger.debug(f"workflow_start_local_activity: created handle={handle}")
+            return handle
         else:
             # Return regular activity handle
+            from temporalio.workflow import logger as workflow_logger
+            workflow_logger.debug(f"workflow_start_local_activity: peekable={peekable}, is_streaming={is_streaming}, using regular handle")
             return self._outbound.start_local_activity(input_obj)
     
     def _create_streaming_activity_coroutine(
@@ -1657,14 +1664,26 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # Start the activity execution in the background
             # The activity execution will populate the streaming queue
             # and handle the regular completion path to Temporal server
+            from temporalio.workflow import logger as workflow_logger
+            workflow_logger.debug("run_streaming_activity: Starting")
+
+            # Create a copy of input_obj with peekable=False to avoid infinite recursion
+            # The inner activity execution should NOT be peekable - we already have the queue set up
+            from dataclasses import replace
+            inner_input = replace(input_obj, peekable=False)
+
             while True:
                 try:
                     # Start the activity - the streaming will happen automatically
                     # via the dual-path execution in _execute_streaming_activity
-                    activity_handle = self._outbound.start_local_activity(input_obj)
+                    workflow_logger.debug("run_streaming_activity: About to call start_local_activity")
+                    activity_handle = self._outbound.start_local_activity(inner_input)
+                    workflow_logger.debug(f"run_streaming_activity: Got activity handle {activity_handle}")
                     # We need to await this to ensure the activity completes
                     # but we don't use the result - the streaming queue provides real-time access
-                    await activity_handle
+                    workflow_logger.debug("run_streaming_activity: About to await activity_handle")
+                    result = await activity_handle
+                    workflow_logger.debug(f"run_streaming_activity: Activity completed with result {result}")
                     break
                 except _ActivityDoBackoffError as err:
                     # Handle backoff similar to regular activities
@@ -3015,29 +3034,38 @@ class PeekableActivityHandle(temporalio.workflow.ActivityHandle[Any]):
     
     def __init__(
         self,
-        instance: "_WorkflowInstanceImpl", 
+        instance: "_WorkflowInstanceImpl",
         input: "StartLocalActivityInput",
         fn: Coroutine[Any, Any, Any],
         streaming_queue: "temporalio.worker._streaming.StreamingResultQueue"
     ):
         """Initialize peekable activity handle.
-        
+
         Args:
             instance: The workflow instance this handle belongs to.
             input: The local activity input configuration.
             fn: The coroutine function for the activity execution.
             streaming_queue: Queue for receiving streaming results.
         """
+        # Debug logging
+        from temporalio.workflow import logger as workflow_logger
+        workflow_logger.debug(f"PeekableActivityHandle.__init__: Creating handle for {input.activity}")
+        workflow_logger.debug(f"PeekableActivityHandle.__init__: fn={fn}")
+
         super().__init__(fn)
+        workflow_logger.debug(f"PeekableActivityHandle.__init__: After super().__init__, self={self}")
+
         self._instance = instance
         self._input = input
         self._streaming_queue = streaming_queue
         self._completed = False
         self._final_result = None
         self._iterator_exhausted = False
-        
-        # The parent class (ActivityHandle) already creates the task from fn
-        # so we don't need to create another one
+
+        # Register this task with the workflow instance so it actually runs
+        workflow_logger.debug(f"PeekableActivityHandle.__init__: Registering task")
+        instance._register_task(self, name=f"peekable_activity: {input.activity}")
+        workflow_logger.debug(f"PeekableActivityHandle.__init__: Task registered")
         
     def __aiter__(self):
         """Return self as async iterator."""

@@ -40,7 +40,8 @@ async def streaming_activity_10_items() -> AsyncIterable[int]:
     """Streaming activity that yields 10 integers."""
     for i in range(10):
         await asyncio.sleep(0.01)  # Small delay to simulate work
-        temporalio.activity.heartbeat(f"Processing item {i}")
+        # TODO: Fix heartbeat support for streaming activities
+        # temporalio.activity.heartbeat(f"Processing item {i}")
         yield i
 
 

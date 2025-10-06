@@ -1,5 +1,6 @@
 """Parameters for configuring Temporal activity execution for model calls."""
 
+import enum
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import timedelta
@@ -9,6 +10,23 @@ from agents import Agent, TResponseInputItem
 
 from temporalio.common import Priority, RetryPolicy
 from temporalio.workflow import ActivityCancellationType, VersioningIntent
+
+
+class ActivityExecutionMode(enum.Enum):
+    """Mode for executing model invocation activities in workflows.
+
+    This controls how the OpenAI Agents SDK's streaming functionality is integrated
+    with Temporal activities when using Runner.run_streamed().
+
+    - BATCH_ACTIVITY: Collects all streaming events in the activity, returns as a batch
+    - STREAMING_ACTIVITY_NON_PEEKABLE: Streaming activity with peekable=False (batched replay)
+    - STREAMING_ACTIVITY_PEEKABLE: Streaming activity with peekable=True (real-time events)
+
+    Note: Runner.run() (non-streaming) always uses a separate non-streaming activity path.
+    """
+    BATCH_ACTIVITY = "batch_activity"
+    STREAMING_ACTIVITY_NON_PEEKABLE = "streaming_activity_non_peekable"
+    STREAMING_ACTIVITY_PEEKABLE = "streaming_activity_peekable"
 
 
 class ModelSummaryProvider(ABC):

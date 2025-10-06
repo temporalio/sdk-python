@@ -4,10 +4,9 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 """
 
 import enum
-import json
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, AsyncIterator, Optional, Union
+from typing import Any, Optional, Union
 
 from agents import (
     AgentOutputSchemaBase,
@@ -28,14 +27,11 @@ from agents import (
     UserError,
     WebSearchTool,
 )
-from agents.items import TResponseStreamEvent
-from agents.stream_events import RawResponsesStreamEvent, StreamEvent
 from openai import (
     APIStatusError,
     AsyncOpenAI,
 )
 from openai.types.responses.tool_param import Mcp
-from pydantic_core import to_json
 from typing_extensions import Required, TypedDict
 
 from temporalio import activity
@@ -267,7 +263,7 @@ class ModelActivity:
     @_auto_heartbeater
     async def invoke_model_streaming_activity(
         self, input: ActivityModelInput
-    ) -> tuple[ModelResponse, list[dict]]:
+    ) -> list[dict]:
         """Activity that invokes a model with streaming and collects all events."""
         model = self._model_provider.get_model(input.get("model_name"))
 
@@ -334,28 +330,13 @@ class ModelActivity:
             )
 
             # Collect all streaming events and convert TResponseStreamEvent to serializable dict format
-            # We'll reconstruct the StreamEvent objects in the workflow
             collected_events: list[dict] = []
             async for event in stream:
                 # Convert TResponseStreamEvent to serializable dict
                 stream_event_dict = {"type": "raw_response_event", "data": event}
                 collected_events.append(stream_event_dict)
 
-            # Also get the final response for the complete result
-            final_response = await model.get_response(
-                system_instructions=input.get("system_instructions"),
-                input=input["input"],
-                model_settings=input["model_settings"],
-                tools=tools,
-                output_schema=input.get("output_schema"),
-                handoffs=handoffs,
-                tracing=ModelTracing(input["tracing"]),
-                previous_response_id=input.get("previous_response_id"),
-                conversation_id=input.get("conversation_id"),
-                prompt=input.get("prompt"),
-            )
-
-            return final_response, collected_events
+            return collected_events
 
         except APIStatusError as e:
             # Same error handling as regular model activity

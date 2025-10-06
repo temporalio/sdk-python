@@ -17,7 +17,10 @@ try:
 except ImportError:
     pass
 
-from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
+from temporalio.contrib.openai_agents._model_parameters import (
+    ActivityExecutionMode,
+    ModelActivityParameters,
+)
 from temporalio.contrib.openai_agents._temporal_openai_agents import (
     OpenAIAgentsPlugin,
     OpenAIPayloadConverter,
@@ -32,6 +35,7 @@ from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 from . import workflow
 
 __all__ = [
+    "ActivityExecutionMode",
     "AgentsWorkflowError",
     "ModelActivityParameters",
     "OpenAIAgentsPlugin",

@@ -16,16 +16,17 @@ from agents import (
     Tool,
     TResponseInputItem,
 )
-from agents.items import TResponseStreamEvent
 from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
-from agents.stream_events import StreamEvent
 
 from temporalio import workflow
 from temporalio.contrib.openai_agents._invoke_model_activity import (
     ActivityModelInput,
     ModelTracingInput,
 )
-from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
+from temporalio.contrib.openai_agents._model_parameters import (
+    ActivityExecutionMode,
+    ModelActivityParameters,
+)
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
 from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 
@@ -115,13 +116,8 @@ class TemporalBatchedRunResultStreaming(RunResultStreaming):
         self._collected_events: list[dict] = []
 
     async def stream_events(self):
-        """Stream the pre-collected events using batched conversion."""
+        """Stream events from the streaming activity based on execution mode."""
         if not self._activity_completed:
-            # Convert the agent and prepare activity input
-            converted_agent = _convert_agent(
-                self._runner.model_params, self._starting_agent, None
-            )
-
             # Create activity input following the existing pattern
             activity_input = ActivityModelInput(
                 model_name=_model_name(self._starting_agent),
@@ -138,16 +134,35 @@ class TemporalBatchedRunResultStreaming(RunResultStreaming):
                 conversation_id=self._kwargs.get("conversation_id"),
             )
 
-            # Execute the streaming activity
-            final_response, self._collected_events = await workflow.execute_activity(
-                "invoke_model_streaming_activity",
-                activity_input,
-                start_to_close_timeout=self._runner.model_params.start_to_close_timeout,
-                schedule_to_start_timeout=self._runner.model_params.schedule_to_start_timeout,
-                schedule_to_close_timeout=self._runner.model_params.schedule_to_close_timeout,
-                heartbeat_timeout=self._runner.model_params.heartbeat_timeout,
-                retry_policy=self._runner.model_params.retry_policy,
-            )
+            # Execute based on configured mode
+            mode = self._runner.execution_mode
+
+            if mode == ActivityExecutionMode.STREAMING_ACTIVITY_PEEKABLE:
+                # Peekable mode - real-time streaming (Phase II, not yet implemented)
+                raise NotImplementedError(
+                    "STREAMING_ACTIVITY_PEEKABLE mode is not yet implemented. "
+                    "This requires peekable streaming activity support which has known bugs "
+                    "in the SDK. Use BATCH_ACTIVITY or STREAMING_ACTIVITY_NON_PEEKABLE instead."
+                )
+
+            elif mode in (
+                ActivityExecutionMode.BATCH_ACTIVITY,
+                ActivityExecutionMode.STREAMING_ACTIVITY_NON_PEEKABLE,
+            ):
+                # Both modes collect all events in activity, then replay in workflow
+                # The difference is mainly semantic - STREAMING_ACTIVITY_NON_PEEKABLE
+                # explicitly uses a streaming activity, while BATCH_ACTIVITY is the
+                # traditional approach. Both produce the same result.
+                self._collected_events = await workflow.execute_local_activity(
+                    "invoke_model_streaming_activity",
+                    activity_input,
+                    start_to_close_timeout=self._runner.model_params.start_to_close_timeout,
+                    schedule_to_start_timeout=self._runner.model_params.schedule_to_start_timeout,
+                    schedule_to_close_timeout=self._runner.model_params.schedule_to_close_timeout,
+                )
+
+            else:
+                raise ValueError(f"Unknown execution mode: {mode}")
 
             # Update this instance with the final response data
             self.final_output = "Streaming complete"  # Simplified for Phase I
@@ -169,10 +184,6 @@ class TemporalBatchedRunResultStreaming(RunResultStreaming):
                     data=cast(TResponseStreamEvent, event_dict["data"])
                 )
                 yield stream_event
-            else:
-                # For other event types in future phases, we'll implement proper handling
-                # For now, skip unknown event types
-                continue
 
 
 class TemporalOpenAIRunner(AgentRunner):
@@ -182,10 +193,20 @@ class TemporalOpenAIRunner(AgentRunner):
 
     """
 
-    def __init__(self, model_params: ModelActivityParameters) -> None:
-        """Initialize the Temporal OpenAI Runner."""
+    def __init__(
+        self,
+        model_params: ModelActivityParameters,
+        execution_mode: ActivityExecutionMode = ActivityExecutionMode.BATCH_ACTIVITY,
+    ) -> None:
+        """Initialize the Temporal OpenAI Runner.
+
+        Args:
+            model_params: Parameters for activity execution (timeouts, retries, etc.)
+            execution_mode: How to execute streaming activities (BATCH_ACTIVITY by default)
+        """
         self._runner = DEFAULT_AGENT_RUNNER or AgentRunner()
         self.model_params = model_params
+        self.execution_mode = execution_mode
 
     async def run(
         self,
