@@ -640,27 +640,27 @@ class _Definition:
                 )
             object.__setattr__(self, "arg_types", arg_types)
             object.__setattr__(self, "ret_type", ret_type)
-        
+
         # Detect streaming activities by checking if return type is AsyncIterable
         if self.is_streaming is None:
             streaming = self._is_return_type_async_iterable()
             object.__setattr__(self, "is_streaming", streaming)
-    
+
     def _is_return_type_async_iterable(self) -> bool:
         """Check if the return type is AsyncIterable."""
         if not self.ret_type:
             return False
-        
+
         # Import collections.abc.AsyncIterable for comparison
         import collections.abc
-        
+
         # Check for direct AsyncIterable type
-        if hasattr(self.ret_type, '__origin__'):
+        if hasattr(self.ret_type, "__origin__"):
             origin = self.ret_type.__origin__
             # Handle AsyncIterable[T] and typing generics
             if origin is collections.abc.AsyncIterable:
                 return True
-        
+
         # Check if it's a subclass of AsyncIterable
         try:
             return issubclass(self.ret_type, collections.abc.AsyncIterable)

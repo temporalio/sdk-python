@@ -177,10 +177,9 @@ class TemporalBatchedRunResultStreaming(RunResultStreaming):
             self._activity_completed = True
 
         # Stream the collected events, reconstructing StreamEvent objects from dicts
-        from pydantic import TypeAdapter
-
         from agents.items import TResponseStreamEvent
         from agents.stream_events import RawResponsesStreamEvent
+        from pydantic import TypeAdapter
 
         # Create a TypeAdapter for the ResponseStreamEvent union type to deserialize dicts
         event_adapter = TypeAdapter(TResponseStreamEvent)

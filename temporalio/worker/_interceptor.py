@@ -357,11 +357,13 @@ class StartLocalActivityInput:
     # The types may be absent
     arg_types: Optional[List[Type]]
     ret_type: Optional[Type]
-    
+
     # Streaming activity support
     is_streaming: bool = False
     peekable: bool = False
-    streaming_queue: Optional[Any] = None  # StreamingResultQueue - Any to avoid circular import
+    streaming_queue: Optional[Any] = (
+        None  # StreamingResultQueue - Any to avoid circular import
+    )
 
 
 class WorkflowInboundInterceptor:

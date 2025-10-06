@@ -3453,12 +3453,12 @@ async def execute_local_activity(
     """Start a local activity and wait for completion.
 
     This is a shortcut for ``await`` :py:meth:`start_local_activity`.
-    
+
     For streaming activities (those with AsyncIterable return types), this function
     returns an AsyncIterable regardless of the peekable setting:
     - peekable=True: Real-time streaming of results as they're produced
     - peekable=False: Buffered iteration over complete results
-    
+
     Args:
         activity: Activity function or name.
         arg: Single argument to the activity.
@@ -3494,7 +3494,7 @@ async def execute_local_activity(
                 summary=summary,
                 peekable=peekable,
             )
-            
+
             if peekable:
                 # Return peekable handle that streams in real-time
                 return handle
@@ -3502,8 +3502,9 @@ async def execute_local_activity(
                 # Return buffered iterator over final result
                 final_result = await handle
                 from temporalio.worker._streaming import create_buffered_iterator
+
                 return create_buffered_iterator(final_result)
-    
+
     # Regular activity - existing behavior
     return await _Runtime.current().workflow_start_local_activity(
         activity,

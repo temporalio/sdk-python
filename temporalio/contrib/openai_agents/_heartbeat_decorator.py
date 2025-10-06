@@ -35,10 +35,12 @@ def _auto_heartbeater(fn: F) -> F:
                                 await heartbeat_task
                             except asyncio.CancelledError:
                                 pass
+
                 return streaming_wrapper()
             else:
                 # For regular activities, await the result
-                return await result
+                # Type narrowing: if it's not an async generator, it must be awaitable
+                return await cast(Awaitable[Any], result)
         except Exception:
             # Clean up heartbeat task on error
             if heartbeat_task:

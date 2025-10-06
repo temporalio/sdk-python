@@ -24,6 +24,7 @@ class ActivityExecutionMode(enum.Enum):
 
     Note: Runner.run() (non-streaming) always uses a separate non-streaming activity path.
     """
+
     BATCH_ACTIVITY = "batch_activity"
     STREAMING_ACTIVITY_NON_PEEKABLE = "streaming_activity_non_peekable"
     STREAMING_ACTIVITY_PEEKABLE = "streaming_activity_peekable"
