@@ -4,7 +4,7 @@ on:
     branches:
       - main
       - "releases/*"
-      - fix-build-binaries
+      - fix-binary-testing
 
 jobs:
   # Compile the binaries and upload artifacts
@@ -66,7 +66,7 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then
             bindir=Scripts
           fi
-          ./.venv/$bindir/pip install 'protobuf>=3.20,<6' 'types-protobuf>=3.20,<6' 'typing-extensions>=4.2.0,<5' pytest pytest_asyncio grpcio 'nexus-rpc>=1.1.0' pydantic opentelemetry-api opentelemetry-sdk python-dateutil 'openai-agents>=0.2.3,<=0.2.9'
+          ./.venv/$bindir/pip install 'protobuf>=3.20,<6' 'types-protobuf>=3.20,<6' 'typing-extensions>=4.2.0,<5' pytest pytest_asyncio grpcio 'nexus-rpc>=1.1.0' pydantic opentelemetry-api opentelemetry-sdk python-dateutil 'openai-agents>=0.2.3,<=0.2.9' 'googleapis-common-protos==1.70.0'
           ./.venv/$bindir/pip install --no-index --find-links=../dist temporalio
           ./.venv/$bindir/python -m pytest -s -k test_workflow_hello
 
