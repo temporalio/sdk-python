@@ -36,7 +36,7 @@ from openai.types.responses.tool_param import Mcp
 from pydantic_core import to_json
 from typing_extensions import Required, TypedDict
 
-from temporalio import activity
+from temporalio import activity, workflow
 from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbeater
 from temporalio.exceptions import ApplicationError
 
@@ -156,6 +156,10 @@ class ModelActivity:
     def __init__(self, model_provider: Optional[ModelProvider] = None):
         """Initialize the activity with a model provider."""
         self._model_provider = model_provider
+        if model_provider is None and not workflow.in_workflow():
+            self._model_provider = OpenAIProvider(
+                openai_client=AsyncOpenAI(max_retries=0)
+            )
 
     @activity.defn
     @_auto_heartbeater

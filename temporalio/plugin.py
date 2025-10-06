@@ -38,8 +38,8 @@ PluginParameter = Union[None, T, Callable[[Optional[T]], T]]
 
 
 class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
-    """A simple plugin definition which limits has a limited set of configurations but makes it easier to produce
-    a simple plugin which needs to configure them.
+    """A simple plugin definition which has a limited set of configurations but makes it easier to produce
+    a plugin which needs to configure them.
     """
 
     def __init__(
@@ -72,7 +72,8 @@ class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
             data_converter: Data converter for serialization, or callable to customize existing one.
                 Applied to the Client and Replayer.
             client_interceptors: Client interceptors to append, or callable to customize existing ones.
-                Applied to the Client.
+                Applied to the Client. Note, if the provided interceptor is also a worker.Interceptor,
+                it will be added to any worker which uses that client.
             activities: Activity functions to append, or callable to customize existing ones.
                 Applied to the Worker.
             nexus_service_handlers: Nexus service handlers to append, or callable to customize existing ones.
