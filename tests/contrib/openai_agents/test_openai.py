@@ -2707,7 +2707,7 @@ async def test_streaming_text_basic(client: Client, execution_mode):
                 start_to_close_timeout=timedelta(seconds=30)
             ),
             model_provider=TestModelProvider(StreamingTestModel(mock_events)),
-            execution_mode=execution_mode,
+            streaming_execution_mode=execution_mode,
         )
     ]
     client = Client(**new_config)
@@ -2822,7 +2822,7 @@ async def test_streaming_items_workflow(client: Client, execution_mode):
                 start_to_close_timeout=timedelta(seconds=30)
             ),
             model_provider=TestModelProvider(ItemsStreamingModel(mock_events)),
-            execution_mode=execution_mode,
+            streaming_execution_mode=execution_mode,
         )
     ]
     client = Client(**new_config)
@@ -2839,3 +2839,150 @@ async def test_streaming_items_workflow(client: Client, execution_mode):
         # Should count the different event types from streaming
         expected = {"tool_calls": 1, "messages": 1, "agent_updates": 1}
         assert result == expected
+
+
+@workflow.defn
+class RealStreamingWorkflow:
+    @workflow.run
+    async def run(self, prompt: str) -> str:
+        """Simple workflow that uses streaming API internally."""
+        agent = Agent[None](
+            name="Streaming Assistant",
+            model="gpt-4o-mini",
+            instructions="You are a helpful assistant. Be concise.",
+        )
+
+        # Use run_streamed which will use streaming activity internally
+        result = Runner.run_streamed(starting_agent=agent, input=prompt)
+
+        # Just consume the stream to completion
+        async for _ in result.stream_events():
+            pass
+
+        # Return the final output
+        return result.final_output
+
+
+@pytest.mark.parametrize(
+    "execution_mode",
+    [
+        openai_agents.ActivityExecutionMode.BATCH_ACTIVITY,
+        openai_agents.ActivityExecutionMode.STREAMING_ACTIVITY_NON_PEEKABLE,
+    ],
+)
+async def test_streaming_with_real_openai_api(client: Client, execution_mode):
+    """Test streaming with real OpenAI API to verify proper serialization of streaming events."""
+    if not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("No openai API key")
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            streaming_execution_mode=execution_mode,
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(client, RealStreamingWorkflow) as worker:
+        result = await client.execute_workflow(
+            RealStreamingWorkflow.run,
+            "Say hello in exactly 3 words",
+            id=f"streaming-real-{execution_mode.value}-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+        # Verify we got a response from real API
+        assert len(result) > 0, "Should have received a response"
+        assert isinstance(result, str), "Result should be a string"
+
+
+@workflow.defn
+class StreamEventInspectionWorkflow:
+    @workflow.run
+    async def run(self, prompt: str) -> dict[str, Any]:
+        """Workflow that inspects streaming event structure to ensure data is accessible."""
+
+        @function_tool
+        def test_tool(x: str) -> str:
+            """Test tool that returns a result."""
+            return f"Result: {x}"
+
+        agent = Agent[None](
+            name="Assistant",
+            model="gpt-4o-mini",
+            instructions="You are a helpful assistant.",
+            tools=[test_tool],
+        )
+
+        result = Runner.run_streamed(starting_agent=agent, input=prompt)
+
+        # Track event types and ensure we can access event.data.type
+        event_types_seen = []
+        has_function_call = False
+
+        async for event in result.stream_events():
+            if event.type == "raw_response_event":
+                # This should work - event.data should be accessible like a Pydantic object
+                if hasattr(event.data, "type"):
+                    event_types_seen.append(event.data.type)
+                    # Check for function call events
+                    if event.data.type == "response.output_item.added":
+                        if hasattr(event.data, "item") and hasattr(
+                            event.data.item, "type"
+                        ):
+                            if event.data.item.type == "function_call":
+                                has_function_call = True
+
+        return {
+            "event_count": len(event_types_seen),
+            "event_types": list(set(event_types_seen)),
+            "has_function_call": has_function_call,
+        }
+
+
+@pytest.mark.parametrize(
+    "execution_mode",
+    [
+        openai_agents.ActivityExecutionMode.BATCH_ACTIVITY,
+        openai_agents.ActivityExecutionMode.STREAMING_ACTIVITY_NON_PEEKABLE,
+    ],
+)
+async def test_streaming_event_data_access(client: Client, execution_mode):
+    """Test that event.data attributes are accessible like Pydantic objects in workflows.
+
+    This reproduces the issue where workflow code like `event.data.type` fails because
+    event.data is a dict after serialization rather than a Pydantic object.
+    """
+    if not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("No openai API key")
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            streaming_execution_mode=execution_mode,
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(client, StreamEventInspectionWorkflow) as worker:
+        result = await client.execute_workflow(
+            StreamEventInspectionWorkflow.run,
+            "Call the test_tool with input 'hello'",
+            id=f"stream-event-inspect-{execution_mode.value}-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+        # Verify we got events and could access their structure
+        # The key test is that event.data.type was accessible without AttributeError
+        assert result["event_count"] > 0, "Should have received events"
+        assert len(result["event_types"]) > 0, "Should have different event types"
+        # Verify we got standard event types
+        assert (
+            "response.completed" in result["event_types"]
+        ), "Should have response.completed event"

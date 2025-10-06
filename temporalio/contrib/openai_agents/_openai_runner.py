@@ -145,14 +145,21 @@ class TemporalBatchedRunResultStreaming(RunResultStreaming):
                     "in the SDK. Use BATCH_ACTIVITY or STREAMING_ACTIVITY_NON_PEEKABLE instead."
                 )
 
-            elif mode in (
-                ActivityExecutionMode.BATCH_ACTIVITY,
-                ActivityExecutionMode.STREAMING_ACTIVITY_NON_PEEKABLE,
-            ):
-                # Both modes collect all events in activity, then replay in workflow
-                # The difference is mainly semantic - STREAMING_ACTIVITY_NON_PEEKABLE
-                # explicitly uses a streaming activity, while BATCH_ACTIVITY is the
-                # traditional approach. Both produce the same result.
+            elif mode == ActivityExecutionMode.BATCH_ACTIVITY:
+                # Batch mode - uses the traditional non-streaming activity approach
+                # This calls invoke_model_streaming_activity which collects all events
+                # and returns them as a batch
+                self._collected_events = await workflow.execute_local_activity(
+                    "invoke_model_streaming_activity",
+                    activity_input,
+                    start_to_close_timeout=self._runner.model_params.start_to_close_timeout,
+                    schedule_to_start_timeout=self._runner.model_params.schedule_to_start_timeout,
+                    schedule_to_close_timeout=self._runner.model_params.schedule_to_close_timeout,
+                )
+
+            elif mode == ActivityExecutionMode.STREAMING_ACTIVITY_NON_PEEKABLE:
+                # Streaming non-peekable mode - uses a streaming activity but collects
+                # all events before returning them to the workflow
                 self._collected_events = await workflow.execute_local_activity(
                     "invoke_model_streaming_activity",
                     activity_input,
@@ -170,19 +177,22 @@ class TemporalBatchedRunResultStreaming(RunResultStreaming):
             self._activity_completed = True
 
         # Stream the collected events, reconstructing StreamEvent objects from dicts
-        from typing import cast
+        from pydantic import TypeAdapter
 
         from agents.items import TResponseStreamEvent
         from agents.stream_events import RawResponsesStreamEvent
+
+        # Create a TypeAdapter for the ResponseStreamEvent union type to deserialize dicts
+        event_adapter = TypeAdapter(TResponseStreamEvent)
 
         for event_dict in self._collected_events:
             # For Phase I, all events should be raw_response_event type
             # Reconstruct RawResponsesStreamEvent from dictionary
             if event_dict.get("type") == "raw_response_event":
-                # The data should be a serialized TResponseStreamEvent
-                stream_event = RawResponsesStreamEvent(
-                    data=cast(TResponseStreamEvent, event_dict["data"])
-                )
+                # The data was serialized with model_dump(mode='json'), so we need to
+                # reconstruct the Pydantic model from the dict using TypeAdapter
+                event_data = event_adapter.validate_python(event_dict["data"])
+                stream_event = RawResponsesStreamEvent(data=event_data)
                 yield stream_event
 
 

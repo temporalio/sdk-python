@@ -28,7 +28,10 @@ import temporalio.client
 import temporalio.worker
 from temporalio.client import ClientConfig
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
-from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
+from temporalio.contrib.openai_agents._model_parameters import (
+    ActivityExecutionMode,
+    ModelActivityParameters,
+)
 from temporalio.contrib.openai_agents._openai_runner import (
     TemporalOpenAIRunner,
 )
@@ -73,7 +76,7 @@ if typing.TYPE_CHECKING:
 def set_open_ai_agent_temporal_overrides(
     model_params: ModelActivityParameters,
     auto_close_tracing_in_workflows: bool = False,
-    execution_mode: "ActivityExecutionMode" = None,
+    streaming_execution_mode: Optional[ActivityExecutionMode] = None,
 ):
     """Configure Temporal-specific overrides for OpenAI agents.
 
@@ -94,7 +97,7 @@ def set_open_ai_agent_temporal_overrides(
     Args:
         model_params: Configuration parameters for Temporal activity execution of model calls.
         auto_close_tracing_in_workflows: If set to true, close tracing spans immediately.
-        execution_mode: How to execute streaming activities. Defaults to BATCH_ACTIVITY.
+        streaming_execution_mode: How to execute streaming activities. Defaults to BATCH_ACTIVITY.
 
     Returns:
         A context manager that yields the configured TemporalTraceProvider.
@@ -106,14 +109,13 @@ def set_open_ai_agent_temporal_overrides(
     )
 
     # Set default execution mode if not provided
-    if execution_mode is None:
-        from temporalio.contrib.openai_agents._model_parameters import (
-            ActivityExecutionMode,
-        )
-        execution_mode = ActivityExecutionMode.BATCH_ACTIVITY
+    if streaming_execution_mode is None:
+        streaming_execution_mode = ActivityExecutionMode.BATCH_ACTIVITY
 
     try:
-        set_default_agent_runner(TemporalOpenAIRunner(model_params, execution_mode))
+        set_default_agent_runner(
+            TemporalOpenAIRunner(model_params, streaming_execution_mode)
+        )
         set_trace_provider(provider)
         yield provider
     finally:
@@ -254,7 +256,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         mcp_server_providers: Sequence[
             Union["StatelessMCPServerProvider", "StatefulMCPServerProvider"]
         ] = (),
-        execution_mode: "ActivityExecutionMode" = None,
+        streaming_execution_mode: Optional[ActivityExecutionMode] = None,
     ) -> None:
         """Initialize the OpenAI agents plugin.
 
@@ -267,7 +269,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
                 Each server will be wrapped in a TemporalMCPServer if not already wrapped,
                 and their activities will be automatically registered with the worker.
                 The plugin manages the connection lifecycle of these servers.
-            execution_mode: How to execute streaming activities. Defaults to BATCH_ACTIVITY.
+            streaming_execution_mode: How to execute streaming activities. Defaults to BATCH_ACTIVITY.
         """
         if model_params is None:
             model_params = ModelActivityParameters()
@@ -290,12 +292,9 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         self._mcp_server_providers = mcp_server_providers
 
         # Set default execution mode if not provided
-        if execution_mode is None:
-            from temporalio.contrib.openai_agents._model_parameters import (
-                ActivityExecutionMode,
-            )
-            execution_mode = ActivityExecutionMode.BATCH_ACTIVITY
-        self._execution_mode = execution_mode
+        if streaming_execution_mode is None:
+            streaming_execution_mode = ActivityExecutionMode.BATCH_ACTIVITY
+        self._streaming_execution_mode = streaming_execution_mode
 
     def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
         """Set the next client plugin"""
@@ -395,7 +394,9 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         Args:
             worker: The worker instance to run.
         """
-        with set_open_ai_agent_temporal_overrides(self._model_params, execution_mode=self._execution_mode):
+        with set_open_ai_agent_temporal_overrides(
+            self._model_params, streaming_execution_mode=self._streaming_execution_mode
+        ):
             await self.next_worker_plugin.run_worker(worker)
 
     def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
@@ -413,7 +414,9 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         histories: AsyncIterator[temporalio.client.WorkflowHistory],
     ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
         """Set the OpenAI Overrides during replay"""
-        with set_open_ai_agent_temporal_overrides(self._model_params, execution_mode=self._execution_mode):
+        with set_open_ai_agent_temporal_overrides(
+            self._model_params, streaming_execution_mode=self._streaming_execution_mode
+        ):
             async with self.next_worker_plugin.run_replayer(
                 replayer, histories
             ) as results:

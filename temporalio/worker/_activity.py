@@ -462,18 +462,17 @@ class _ActivityWorker:
         streaming_queue = None
         if start.is_local:
             from temporalio.worker._streaming import lookup_local_streaming_queue
+
             # Try both activity_id and activity_type as fallback for streaming queue lookup
             streaming_queue = lookup_local_streaming_queue(
-                start.workflow_execution.run_id,
-                start.activity_id
+                start.workflow_execution.run_id, start.activity_id
             )
             # If not found with activity_id, try with activity_type (activity name)
             if not streaming_queue:
                 streaming_queue = lookup_local_streaming_queue(
-                    start.workflow_execution.run_id,
-                    start.activity_type
+                    start.workflow_execution.run_id, start.activity_type
                 )
-        
+
         if streaming_queue is not None:
             # Handle streaming activity with dual-path result delivery
             return await self._execute_streaming_activity(
@@ -670,7 +669,7 @@ class _ActivityWorker:
 
         # If result is an async generator (streaming activity with peekable=False),
         # collect all items and return as a list
-        if hasattr(result, '__aiter__'):
+        if hasattr(result, "__aiter__"):
             collected_items = []
             async for item in result:
                 collected_items.append(item)
@@ -826,11 +825,15 @@ class _ActivityWorker:
         # Execute the activity through interceptors to get async generator
         temporalio.activity.logger.debug("Executing streaming activity")
         activity_result = await impl.execute_activity(input)
-        temporalio.activity.logger.debug(f"Activity result type: {type(activity_result)}, has __aiter__: {hasattr(activity_result, '__aiter__')}")
+        temporalio.activity.logger.debug(
+            f"Activity result type: {type(activity_result)}, has __aiter__: {hasattr(activity_result, '__aiter__')}"
+        )
 
         # If it's not an async generator, treat as regular activity
-        if not hasattr(activity_result, '__aiter__'):
-            temporalio.activity.logger.debug(f"Not an async generator, returning as-is: {activity_result}")
+        if not hasattr(activity_result, "__aiter__"):
+            temporalio.activity.logger.debug(
+                f"Not an async generator, returning as-is: {activity_result}"
+            )
             return activity_result
 
         # Collect streaming results with dual-path delivery
@@ -842,7 +845,7 @@ class _ActivityWorker:
                 temporalio.activity.logger.debug(f"Got streaming item: {item}")
                 # Path 1: Collect for final durable result
                 collected_items.append(item)
-                
+
                 # Path 2: Stream to workflow queue if provided
                 if streaming_queue:
                     try:
@@ -850,14 +853,14 @@ class _ActivityWorker:
                     except Exception:
                         # Continue even if queue fails - final result is most important
                         pass
-            
+
             # Signal successful completion to queue
             if streaming_queue:
                 try:
                     await streaming_queue.put_completion(True)
                 except Exception:
                     pass
-                    
+
         except Exception as e:
             # On error, signal error to queue and re-raise
             if streaming_queue:
@@ -866,7 +869,7 @@ class _ActivityWorker:
                 except Exception:
                     pass
             raise
-        
+
         return collected_items
 
     def assert_activity_valid(self, activity) -> None:
@@ -975,9 +978,9 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
 
     async def execute_activity(self, input: ExecuteActivityInput) -> Any:
         # Handle async generator activities (streaming)
-        is_async_gen = inspect.isasyncgenfunction(input.fn) or inspect.isasyncgenfunction(
-            getattr(input.fn, '__call__', None)
-        )
+        is_async_gen = inspect.isasyncgenfunction(
+            input.fn
+        ) or inspect.isasyncgenfunction(getattr(input.fn, "__call__", None))
         if is_async_gen:
             # For async generators, just call the function and return the generator
             return input.fn(*input.args)
