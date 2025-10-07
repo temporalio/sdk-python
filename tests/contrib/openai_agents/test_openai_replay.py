@@ -1,6 +1,8 @@
 from pathlib import Path
 
 import pytest
+from agents import OpenAIProvider
+from openai import AsyncOpenAI
 
 from temporalio.client import WorkflowHistory
 from temporalio.contrib.openai_agents import ModelActivityParameters, OpenAIAgentsPlugin
