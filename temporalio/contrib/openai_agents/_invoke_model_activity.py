@@ -155,12 +155,9 @@ class ModelActivity:
 
     def __init__(self, model_provider: Optional[ModelProvider] = None):
         """Initialize the activity with a model provider."""
-        if model_provider:
-            self._model_provider = model_provider
-        else:
-            self._model_provider = OpenAIProvider(
-                openai_client=AsyncOpenAI(max_retries=0)
-            )
+        self._model_provider = model_provider or OpenAIProvider(
+            openai_client=AsyncOpenAI(max_retries=0)
+        )
 
     @activity.defn
     @_auto_heartbeater
