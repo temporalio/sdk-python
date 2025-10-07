@@ -8017,7 +8017,7 @@ async def test_external_activity_cancellation_details(
         # Assert not paused
         assert not activity_info.paused
 
-        external_activity_handle = client.get_workflow_activity_handle(
+        external_activity_handle = client.get_async_activity_handle(
             workflow_id=wf_desc.id, run_id=wf_desc.run_id, activity_id=test_activity_id
         )
 
@@ -8473,7 +8473,7 @@ async def test_search_attribute_codec(client: Client, env_type: str):
         result = await client.execute_workflow(
             SearchAttributeCodecParentWorkflow.run,
             "Temporal",
-            id=f"encryption-workflow-id",
+            id="encryption-workflow-id",
             task_queue=worker.task_queue,
             search_attributes=TypedSearchAttributes(
                 [

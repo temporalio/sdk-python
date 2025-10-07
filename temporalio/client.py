@@ -10,7 +10,6 @@ import functools
 import inspect
 import json
 import re
-import typing
 import uuid
 import warnings
 from abc import ABC, abstractmethod
@@ -1393,118 +1392,94 @@ class Client:
         # Issues a workflowservice CountActivityExecutions call
         raise NotImplementedError
 
-    @typing.overload
     def get_activity_handle(
         self,
         *,
         activity_id: str,
         run_id: Optional[str] = None,
     ) -> ActivityHandle[Any]:
-        raise NotImplementedError
+        """Get a handle to an existing activity, as the caller of that activity.
 
-    @typing.overload
-    def get_activity_handle(
-        self,
-        *,
-        activity_id: str,
-        workflow_id: str,
-        run_id: Optional[str],
-    ) -> WorkflowActivityHandle:
-        raise NotImplementedError
-
-    @typing.overload
-    def get_activity_handle(
-        self,
-        *,
-        task_token: bytes,
-    ) -> WorkflowActivityHandle:
-        raise NotImplementedError
-
-    def get_activity_handle(
-        self,
-        *,
-        activity_id: Optional[str] = None,
-        workflow_id: Optional[str] = None,
-        run_id: Optional[str] = None,
-        task_token: Optional[bytes] = None,
-    ) -> Union[ActivityHandle[Any], WorkflowActivityHandle]:
-        """Get a handle to an existing activity.
+        To get a handle to an activity execution that you control for manual completion and
+        heartbeating, see :py:meth:`Client.get_async_activity_handle`.
 
         Args:
             activity_id: The activity ID.
-            workflow_id: The workflow ID if the activity was started from a workflow.
-            run_id:      The run ID. If not provided, targets the latest run.
-            task_token:  Optional task token for the activity if the activity was
-                         started from a workflow. Cannot be set if any of the id parameters
-                         are set.
+            run_id:      The run ID. If not provided, targets the
+                         latest run.
 
         Returns:
             A handle to the activity.
         """
         raise NotImplementedError
 
-    # Deprecated: get_activity_handle has an equivalent override
     @overload
-    def get_workflow_activity_handle(
+    def get_async_activity_handle(
+        self, *, activity_id: str, run_id: Optional[str]
+    ) -> AsyncActivityHandle:
+        pass
+
+    @overload
+    def get_async_activity_handle(
         self, *, workflow_id: str, run_id: Optional[str], activity_id: str
-    ) -> WorkflowActivityHandle:
+    ) -> AsyncActivityHandle:
         pass
 
-    # Deprecated: get_activity_handle has an equivalent override
     @overload
-    def get_workflow_activity_handle(
-        self, *, task_token: bytes
-    ) -> WorkflowActivityHandle:
+    def get_async_activity_handle(self, *, task_token: bytes) -> AsyncActivityHandle:
         pass
 
-    def get_workflow_activity_handle(
+    def get_async_activity_handle(
         self,
         *,
         workflow_id: Optional[str] = None,
         run_id: Optional[str] = None,
         activity_id: Optional[str] = None,
         task_token: Optional[bytes] = None,
-    ) -> WorkflowActivityHandle:
-        """Get a handle to an activity started by a workflow.
+    ) -> AsyncActivityHandle:
+        """Get a handle to an activity execution that you control, for manual completion and heartbeating.
 
-        .. warning::
-            DEPRECATED: This method is deprecated.
-            Use :py:meth:`Client.get_activity_handle` instead.
+        To get a handle to a standalone activity execution as the caller of that activity, see
+        :py:meth:`Client.get_activity_handle`.
 
-        Either the workflow_id, run_id, and activity_id can be provided, or a
-        singular task_token can be provided.
+        This function may be used to get a handle to a standalone activity started by a client, or
+        an activity started by a workflow.
+
+        To get a handle to an activity started by a workflow, use one of the following two calls:
+        - Supply ``workflow_id``, ``run_id``, and ``activity_id``
+        - Supply the activity ``task_token`` alone
+
+        To get a handle to a standalone activity started by a client, supply ``activity_id`` and
+        ``run_id``
+
 
         Args:
-            workflow_id: Workflow ID for the activity. Cannot be set if
-                task_token is set.
-            run_id: Run ID for the activity. Cannot be set if task_token is set.
-            activity_id: ID for the activity. Cannot be set if task_token is
-                set.
-            task_token: Task token for the activity. Cannot be set if any of the
-                id parameters are set.
+            workflow_id: Workflow ID for the activity.
+            run_id: Run ID for the activity. Cannot be
+                    set if task_token is set.
+            activity_id: ID for the activity.
+            activity_id: ID for the activity.
+            task_token: Task token for the activity.
 
         Returns:
-            A handle that can be used for completion or heartbeat.
+            A handle that can be used for completion or heartbeating.
         """
         if task_token is not None:
             if workflow_id is not None or run_id is not None or activity_id is not None:
                 raise ValueError("Task token cannot be present with other IDs")
-            return WorkflowActivityHandle(self, task_token)
+            return AsyncActivityHandle(self, task_token)
         elif workflow_id is not None:
             if activity_id is None:
                 raise ValueError(
                     "Workflow ID, run ID, and activity ID must all be given together"
                 )
-            return WorkflowActivityHandle(
+            return AsyncActivityHandle(
                 self,
                 AsyncActivityIDReference(
                     workflow_id=workflow_id, run_id=run_id, activity_id=activity_id
                 ),
             )
         raise ValueError("Task token or workflow/run/activity ID must be present")
-
-    # Deprecated alias
-    get_async_activity_handle = get_workflow_activity_handle
 
     async def create_schedule(
         self,
@@ -1791,7 +1766,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
     @property
     def id(self) -> str:
-        """ID for the workflow."""
+        """ID of the workflow."""
         return self._id
 
     @property
@@ -3080,12 +3055,19 @@ class ActivityIDReference:
 AsyncActivityIDReference = ActivityIDReference
 
 
-class _BaseActivityHandle(WithSerializationContext):
-    """Handle representing an activity."""
+class AsyncActivityHandle(WithSerializationContext):
+    """Handle representing an external activity for completion and heartbeat."""
 
-    _client: Client
-    _id_or_token: Union[ActivityIDReference, bytes]
-    _data_converter_override: Optional[DataConverter]
+    def __init__(
+        self,
+        client: Client,
+        id_or_token: Union[AsyncActivityIDReference, bytes],
+        data_converter_override: Optional[DataConverter] = None,
+    ) -> None:
+        """Create an async activity handle."""
+        self._client = client
+        self._id_or_token = id_or_token
+        self._data_converter_override = data_converter_override
 
     async def heartbeat(
         self,
@@ -3188,126 +3170,6 @@ class _BaseActivityHandle(WithSerializationContext):
             ),
         )
 
-    async def pause(
-        self,
-        *,
-        reason: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
-    ) -> None:
-        """Pause the activity.
-
-        Args:
-            reason: Reason for pausing the activity.
-            rpc_metadata: Headers used on the RPC call. Keys here override
-                client-level RPC metadata keys.
-            rpc_timeout: Optional RPC deadline to set for the RPC call.
-        """
-        if not isinstance(self._id_or_token, ActivityIDReference):
-            raise ValueError("Cannot pause activity with task token")
-
-        await self._client.workflow_service.pause_activity(
-            temporalio.api.workflowservice.v1.PauseActivityRequest(
-                namespace=self._client.namespace,
-                execution=temporalio.api.common.v1.WorkflowExecution(
-                    workflow_id=self._id_or_token.workflow_id or "",
-                    run_id=self._id_or_token.run_id or "",
-                ),
-                identity=self._client.identity,
-                id=self._id_or_token.activity_id,
-                reason=reason or "",
-            ),
-            retry=True,
-            metadata=rpc_metadata,
-            timeout=rpc_timeout,
-        )
-
-    async def unpause(
-        self,
-        *,
-        reset_attempts: bool = False,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
-    ) -> None:
-        """Unpause the activity.
-
-        Args:
-            reset_attempts: Whether to reset the number of attempts.
-            rpc_metadata: Headers used on the RPC call. Keys here override
-                client-level RPC metadata keys.
-            rpc_timeout: Optional RPC deadline to set for the RPC call.
-        """
-        if not isinstance(self._id_or_token, ActivityIDReference):
-            raise ValueError("Cannot unpause activity with task token")
-
-        await self._client.workflow_service.unpause_activity(
-            temporalio.api.workflowservice.v1.UnpauseActivityRequest(
-                namespace=self._client.namespace,
-                execution=temporalio.api.common.v1.WorkflowExecution(
-                    workflow_id=self._id_or_token.workflow_id or "",
-                    run_id=self._id_or_token.run_id or "",
-                ),
-                identity=self._client.identity,
-                id=self._id_or_token.activity_id,
-                reset_attempts=reset_attempts,
-            ),
-            retry=True,
-            metadata=rpc_metadata,
-            timeout=rpc_timeout,
-        )
-
-    async def reset(
-        self,
-        *,
-        reset_heartbeat: bool = False,
-        keep_paused: bool = False,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
-    ) -> None:
-        """Reset the activity.
-
-        Args:
-            reset_heartbeat: Whether to reset heartbeat details.
-            keep_paused: If activity is paused, whether to keep it paused after reset.
-            rpc_metadata: Headers used on the RPC call. Keys here override
-                client-level RPC metadata keys.
-            rpc_timeout: Optional RPC deadline to set for the RPC call.
-        """
-        if not isinstance(self._id_or_token, ActivityIDReference):
-            raise ValueError("Cannot reset activity with task token")
-
-        await self._client.workflow_service.reset_activity(
-            temporalio.api.workflowservice.v1.ResetActivityRequest(
-                namespace=self._client.namespace,
-                execution=temporalio.api.common.v1.WorkflowExecution(
-                    workflow_id=self._id_or_token.workflow_id or "",
-                    run_id=self._id_or_token.run_id or "",
-                ),
-                identity=self._client.identity,
-                id=self._id_or_token.activity_id,
-                reset_heartbeat=reset_heartbeat,
-                keep_paused=keep_paused,
-            ),
-            retry=True,
-            metadata=rpc_metadata,
-            timeout=rpc_timeout,
-        )
-
-
-class WorkflowActivityHandle(_BaseActivityHandle):
-    """Handle representing an activity started by a workflow."""
-
-    def __init__(
-        self,
-        client: Client,
-        id_or_token: Union[ActivityIDReference, bytes],
-        data_converter_override: Optional[DataConverter] = None,
-    ) -> None:
-        """Create an async activity handle."""
-        self._client = client
-        self._id_or_token = id_or_token
-        self._data_converter_override = data_converter_override
-
     def with_context(self, context: SerializationContext) -> Self:
         """Create a new AsyncActivityHandle with a different serialization context.
 
@@ -3332,29 +3194,38 @@ class WorkflowActivityHandle(_BaseActivityHandle):
         )
 
 
-# Deprecated alias
-AsyncActivityHandle = WorkflowActivityHandle
-
-
 # TODO: in the future when messages can be sent to activities, we will want the activity handle to
 # be generic in the activity type in addition to the return type (as WorkflowHandle), to support
 # static type inference for signal/query/update.
-class ActivityHandle(Generic[ReturnType], _BaseActivityHandle):
+class ActivityHandle(Generic[ReturnType]):
     """Handle representing a standalone activity execution."""
 
     def __init__(
         self,
         client: Client,
-        activity_id_reference: ActivityIDReference,
+        id: str,
+        *,
+        run_id: str,
         data_converter_override: Optional[DataConverter] = None,
     ) -> None:
-        """Create an async activity handle."""
+        """Create activity handle."""
         self._client = client
-        self._id_or_token = activity_id_reference
+        self._id = id
+        self._run_id = run_id
         self._data_converter_override = data_converter_override
 
+    @property
+    def id(self) -> str:
+        """ID of the activity."""
+        return self._id
+
+    @property
+    def run_id(self) -> str:
+        """Run ID of the activity."""
+        return self._run_id
+
     def with_context(self, context: SerializationContext) -> Self:
-        """Create a new AsyncActivityHandle with a different serialization context.
+        """Create a new ActivityHandle with a different serialization context.
 
         Payloads received by the activity will be decoded and deserialized using a data converter
         with :py:class:`ActivitySerializationContext` set as context. If you are using a custom data
@@ -3367,13 +3238,14 @@ class ActivityHandle(Generic[ReturnType], _BaseActivityHandle):
         cls = type(self)
         if cls.__init__ is not ActivityHandle.__init__:
             raise TypeError(
-                "If you have subclassed AsyncActivityHandle and overridden the __init__ method "
+                "If you have subclassed ActivityHandle and overridden the __init__ method "
                 "then you must override with_context to return an instance of your class."
             )
         return cls(
             self._client,
-            cast(ActivityIDReference, self._id_or_token),
-            data_converter,
+            id=self._id,
+            run_id=self._run_id,
+            data_converter_override=data_converter,
         )
 
     async def result(
@@ -3461,6 +3333,126 @@ class ActivityHandle(Generic[ReturnType], _BaseActivityHandle):
 
     # TODO:
     # update_options
+
+    async def pause(
+        self,
+        *,
+        reason: Optional[str] = None,
+        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> None:
+        """Pause the activity.
+
+        Args:
+            reason: Reason for pausing the activity.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+        """
+        id_ref = ActivityIDReference(
+            activity_id=self._id,
+            run_id=self._run_id,
+            workflow_id=None,
+        )
+        if not isinstance(id_ref, ActivityIDReference):
+            raise ValueError("Cannot pause activity with task token")
+
+        await self._client.workflow_service.pause_activity(
+            temporalio.api.workflowservice.v1.PauseActivityRequest(
+                namespace=self._client.namespace,
+                execution=temporalio.api.common.v1.WorkflowExecution(
+                    workflow_id=id_ref.workflow_id or "",
+                    run_id=id_ref.run_id or "",
+                ),
+                identity=self._client.identity,
+                id=id_ref.activity_id,
+                reason=reason or "",
+            ),
+            retry=True,
+            metadata=rpc_metadata,
+            timeout=rpc_timeout,
+        )
+
+    async def unpause(
+        self,
+        *,
+        reset_attempts: bool = False,
+        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> None:
+        """Unpause the activity.
+
+        Args:
+            reset_attempts: Whether to reset the number of attempts.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+        """
+        id_ref = ActivityIDReference(
+            activity_id=self._id,
+            run_id=self._run_id,
+            workflow_id=None,
+        )
+        if not isinstance(id_ref, ActivityIDReference):
+            raise ValueError("Cannot unpause activity with task token")
+
+        await self._client.workflow_service.unpause_activity(
+            temporalio.api.workflowservice.v1.UnpauseActivityRequest(
+                namespace=self._client.namespace,
+                execution=temporalio.api.common.v1.WorkflowExecution(
+                    workflow_id=id_ref.workflow_id or "",
+                    run_id=id_ref.run_id or "",
+                ),
+                identity=self._client.identity,
+                id=id_ref.activity_id,
+                reset_attempts=reset_attempts,
+            ),
+            retry=True,
+            metadata=rpc_metadata,
+            timeout=rpc_timeout,
+        )
+
+    async def reset(
+        self,
+        *,
+        reset_heartbeat: bool = False,
+        keep_paused: bool = False,
+        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> None:
+        """Reset the activity.
+
+        Args:
+            reset_heartbeat: Whether to reset heartbeat details.
+            keep_paused: If activity is paused, whether to keep it paused after reset.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+        """
+        id_ref = ActivityIDReference(
+            activity_id=self._id,
+            run_id=self._run_id,
+            workflow_id=None,
+        )
+        if not isinstance(id_ref, ActivityIDReference):
+            raise ValueError("Cannot reset activity with task token")
+
+        await self._client.workflow_service.reset_activity(
+            temporalio.api.workflowservice.v1.ResetActivityRequest(
+                namespace=self._client.namespace,
+                execution=temporalio.api.common.v1.WorkflowExecution(
+                    workflow_id=id_ref.workflow_id or "",
+                    run_id=id_ref.run_id or "",
+                ),
+                identity=self._client.identity,
+                id=id_ref.activity_id,
+                reset_heartbeat=reset_heartbeat,
+                keep_paused=keep_paused,
+            ),
+            retry=True,
+            metadata=rpc_metadata,
+            timeout=rpc_timeout,
+        )
 
 
 @dataclass
