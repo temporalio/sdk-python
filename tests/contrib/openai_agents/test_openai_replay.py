@@ -45,9 +45,6 @@ async def test_replay(file_name: str) -> None:
                 OutputGuardrailWorkflow,
             ],
             plugins=[
-                OpenAIAgentsPlugin(
-                    # Activities won't be used by replayer
-                    register_activities=False,
-                )
+                OpenAIAgentsPlugin()
             ],
         ).replay_workflow(WorkflowHistory.from_json("fake", history_json))

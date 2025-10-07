@@ -283,7 +283,11 @@ class OpenAIAgentsPlugin(SimplePlugin):
                     "When configuring a custom provider, the model activity must have start_to_close_timeout or schedule_to_close_timeout"
                 )
 
-        if register_activities:
+        # Delay activity construction until they are actually needed
+        def add_activities(activities: Optional[Sequence[Callable]]) -> Sequence[Callable]:
+            if not register_activities:
+                return activities or []
+
             new_activities = [ModelActivity(model_provider).invoke_model_activity]
 
             server_names = [server.name for server in mcp_server_providers]
@@ -294,8 +298,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
 
             for mcp_server in mcp_server_providers:
                 new_activities.extend(mcp_server._get_activities())
-        else:
-            new_activities = None
+            return (list(activities) or []) + new_activities
 
         def workflow_runner(runner: Optional[WorkflowRunner]) -> WorkflowRunner:
             if not runner:
@@ -318,7 +321,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
             name="OpenAIAgentsPlugin",
             data_converter=_data_converter,
             worker_interceptors=[OpenAIAgentsTracingInterceptor()],
-            activities=new_activities,
+            activities=add_activities,
             workflow_runner=workflow_runner,
             workflow_failure_exception_types=[AgentsWorkflowError],
             run_context=lambda: run_context(),
