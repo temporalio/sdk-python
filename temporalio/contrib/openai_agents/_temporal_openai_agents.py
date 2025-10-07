@@ -284,7 +284,9 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 )
 
         # Delay activity construction until they are actually needed
-        def add_activities(activities: Optional[Sequence[Callable]]) -> Sequence[Callable]:
+        def add_activities(
+            activities: Optional[Sequence[Callable]],
+        ) -> Sequence[Callable]:
             if not register_activities:
                 return activities or []
 
