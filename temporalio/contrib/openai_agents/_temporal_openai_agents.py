@@ -300,7 +300,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
 
             for mcp_server in mcp_server_providers:
                 new_activities.extend(mcp_server._get_activities())
-            return (list(activities) or []) + new_activities
+            return list(activities or []) + new_activities
 
         def workflow_runner(runner: Optional[WorkflowRunner]) -> WorkflowRunner:
             if not runner:
