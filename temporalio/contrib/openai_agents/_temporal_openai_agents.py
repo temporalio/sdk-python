@@ -22,11 +22,7 @@ from agents.items import TResponseStreamEvent
 from agents.run import get_default_agent_runner, set_default_agent_runner
 from agents.tracing import get_trace_provider
 from agents.tracing.provider import DefaultTraceProvider
-from openai.types.responses import ResponsePromptParam
 
-import temporalio.client
-import temporalio.worker
-from temporalio.client import ClientConfig
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._openai_runner import (
@@ -47,13 +43,8 @@ from temporalio.converter import (
     DataConverter,
     DefaultPayloadConverter,
 )
-from temporalio.worker import (
-    Replayer,
-    ReplayerConfig,
-    Worker,
-    WorkerConfig,
-    WorkflowReplayResult,
-)
+from temporalio.plugin import SimplePlugin
+from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 # Unsupported on python 3.9
@@ -172,7 +163,21 @@ class OpenAIPayloadConverter(PydanticPayloadConverter):
         super().__init__(ToJsonOptions(exclude_unset=True))
 
 
-class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
+def _data_converter(converter: Optional[DataConverter]) -> DataConverter:
+    if converter is None:
+        return DataConverter(payload_converter_class=OpenAIPayloadConverter)
+    elif converter.payload_converter_class is DefaultPayloadConverter:
+        return dataclasses.replace(
+            converter, payload_converter_class=OpenAIPayloadConverter
+        )
+    elif not isinstance(converter.payload_converter, OpenAIPayloadConverter):
+        raise ValueError(
+            "The payload converter must be of type OpenAIPayloadConverter."
+        )
+    return converter
+
+
+class OpenAIAgentsPlugin(SimplePlugin):
     """Temporal plugin for integrating OpenAI agents with Temporal workflows.
 
     .. warning::
@@ -245,6 +250,7 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         mcp_server_providers: Sequence[
             Union["StatelessMCPServerProvider", "StatefulMCPServerProvider"]
         ] = (),
+        register_activities: bool = True,
     ) -> None:
         """Initialize the OpenAI agents plugin.
 
@@ -257,6 +263,9 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
                 Each server will be wrapped in a TemporalMCPServer if not already wrapped,
                 and their activities will be automatically registered with the worker.
                 The plugin manages the connection lifecycle of these servers.
+            register_activities: Whether to register activities during the worker execution.
+                This can be disabled on some workers to allow a separation of workflows and activities
+                but should not be disabled on all workers, or agents will not be able to progress.
         """
         if model_params is None:
             model_params = ModelActivityParameters()
@@ -274,124 +283,48 @@ class OpenAIAgentsPlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
                     "When configuring a custom provider, the model activity must have start_to_close_timeout or schedule_to_close_timeout"
                 )
 
-        self._model_params = model_params
-        self._model_provider = model_provider
-        self._mcp_server_providers = mcp_server_providers
+        # Delay activity construction until they are actually needed
+        def add_activities(
+            activities: Optional[Sequence[Callable]],
+        ) -> Sequence[Callable]:
+            if not register_activities:
+                return activities or []
 
-    def init_client_plugin(self, next: temporalio.client.Plugin) -> None:
-        """Set the next client plugin"""
-        self.next_client_plugin = next
+            new_activities = [ModelActivity(model_provider).invoke_model_activity]
 
-    async def connect_service_client(
-        self, config: temporalio.service.ConnectConfig
-    ) -> temporalio.service.ServiceClient:
-        """No modifications to service client"""
-        return await self.next_client_plugin.connect_service_client(config)
+            server_names = [server.name for server in mcp_server_providers]
+            if len(server_names) != len(set(server_names)):
+                raise ValueError(
+                    f"More than one mcp server registered with the same name. Please provide unique names."
+                )
 
-    def init_worker_plugin(self, next: temporalio.worker.Plugin) -> None:
-        """Set the next worker plugin"""
-        self.next_worker_plugin = next
+            for mcp_server in mcp_server_providers:
+                new_activities.extend(mcp_server._get_activities())
+            return list(activities or []) + new_activities
 
-    @staticmethod
-    def _data_converter(converter: Optional[DataConverter]) -> DataConverter:
-        if converter is None:
-            return DataConverter(payload_converter_class=OpenAIPayloadConverter)
-        elif converter.payload_converter_class is DefaultPayloadConverter:
-            return dataclasses.replace(
-                converter, payload_converter_class=OpenAIPayloadConverter
-            )
-        elif not isinstance(converter.payload_converter, OpenAIPayloadConverter):
-            raise ValueError(
-                "The payload converter must be of type OpenAIPayloadConverter."
-            )
-        return converter
+        def workflow_runner(runner: Optional[WorkflowRunner]) -> WorkflowRunner:
+            if not runner:
+                raise ValueError("No WorkflowRunner provided to the OpenAI plugin.")
 
-    def configure_client(self, config: ClientConfig) -> ClientConfig:
-        """Configure the Temporal client for OpenAI agents integration.
+            # If in sandbox, add additional passthrough
+            if isinstance(runner, SandboxedWorkflowRunner):
+                return dataclasses.replace(
+                    runner,
+                    restrictions=runner.restrictions.with_passthrough_modules("mcp"),
+                )
+            return runner
 
-        This method sets up the Pydantic data converter to enable proper
-        serialization of OpenAI agent objects and responses.
+        @asynccontextmanager
+        async def run_context() -> AsyncIterator[None]:
+            with set_open_ai_agent_temporal_overrides(model_params):
+                yield
 
-        Args:
-            config: The client configuration to modify.
-
-        Returns:
-            The modified client configuration.
-        """
-        config["data_converter"] = self._data_converter(config["data_converter"])
-        return self.next_client_plugin.configure_client(config)
-
-    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
-        """Configure the Temporal worker for OpenAI agents integration.
-
-        This method adds the necessary interceptors and activities for OpenAI
-        agent execution:
-        - Adds tracing interceptors for OpenAI agent interactions
-        - Registers model execution activities
-
-        Args:
-            config: The worker configuration to modify.
-
-        Returns:
-            The modified worker configuration.
-        """
-        config["interceptors"] = list(config.get("interceptors") or []) + [
-            OpenAIAgentsTracingInterceptor()
-        ]
-        new_activities = [ModelActivity(self._model_provider).invoke_model_activity]
-
-        server_names = [server.name for server in self._mcp_server_providers]
-        if len(server_names) != len(set(server_names)):
-            raise ValueError(
-                f"More than one mcp server registered with the same name. Please provide unique names."
-            )
-
-        for mcp_server in self._mcp_server_providers:
-            new_activities.extend(mcp_server._get_activities())
-        config["activities"] = list(config.get("activities") or []) + new_activities
-
-        runner = config.get("workflow_runner")
-        if isinstance(runner, SandboxedWorkflowRunner):
-            config["workflow_runner"] = dataclasses.replace(
-                runner,
-                restrictions=runner.restrictions.with_passthrough_modules("mcp"),
-            )
-
-        config["workflow_failure_exception_types"] = list(
-            config.get("workflow_failure_exception_types") or []
-        ) + [AgentsWorkflowError]
-        return self.next_worker_plugin.configure_worker(config)
-
-    async def run_worker(self, worker: Worker) -> None:
-        """Run the worker with OpenAI agents temporal overrides.
-
-        This method sets up the necessary runtime overrides for OpenAI agents
-        to work within the Temporal worker context, including custom runners
-        and trace providers.
-
-        Args:
-            worker: The worker instance to run.
-        """
-        with set_open_ai_agent_temporal_overrides(self._model_params):
-            await self.next_worker_plugin.run_worker(worker)
-
-    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
-        """Configure the replayer for OpenAI Agents."""
-        config["interceptors"] = list(config.get("interceptors") or []) + [
-            OpenAIAgentsTracingInterceptor()
-        ]
-        config["data_converter"] = self._data_converter(config.get("data_converter"))
-        return self.next_worker_plugin.configure_replayer(config)
-
-    @asynccontextmanager
-    async def run_replayer(
-        self,
-        replayer: Replayer,
-        histories: AsyncIterator[temporalio.client.WorkflowHistory],
-    ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
-        """Set the OpenAI Overrides during replay"""
-        with set_open_ai_agent_temporal_overrides(self._model_params):
-            async with self.next_worker_plugin.run_replayer(
-                replayer, histories
-            ) as results:
-                yield results
+        super().__init__(
+            name="OpenAIAgentsPlugin",
+            data_converter=_data_converter,
+            worker_interceptors=[OpenAIAgentsTracingInterceptor()],
+            activities=add_activities,
+            workflow_runner=workflow_runner,
+            workflow_failure_exception_types=[AgentsWorkflowError],
+            run_context=lambda: run_context(),
+        )

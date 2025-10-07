@@ -70,11 +70,13 @@ from temporalio.converter import (
     WorkflowSerializationContext,
 )
 from temporalio.service import (
+    ConnectConfig,
     HttpConnectProxyConfig,
     KeepAliveConfig,
     RetryConfig,
     RPCError,
     RPCStatusCode,
+    ServiceClient,
     TLSConfig,
 )
 
@@ -198,12 +200,14 @@ class Client:
             http_connect_proxy_config=http_connect_proxy_config,
         )
 
-        root_plugin: Plugin = _RootPlugin()
-        for plugin in reversed(plugins):
-            plugin.init_client_plugin(root_plugin)
-            root_plugin = plugin
+        def make_lambda(plugin, next):
+            return lambda config: plugin.connect_service_client(config, next)
 
-        service_client = await root_plugin.connect_service_client(connect_config)
+        next_function = ServiceClient.connect
+        for plugin in reversed(plugins):
+            next_function = make_lambda(plugin, next_function)
+
+        service_client = await next_function(connect_config)
 
         return Client(
             service_client,
@@ -243,12 +247,10 @@ class Client:
             plugins=plugins,
         )
 
-        root_plugin: Plugin = _RootPlugin()
-        for plugin in reversed(plugins):
-            plugin.init_client_plugin(root_plugin)
-            root_plugin = plugin
+        for plugin in plugins:
+            config = plugin.configure_client(config)
 
-        self._init_from_config(root_plugin.configure_client(config))
+        self._init_from_config(config)
 
     def _init_from_config(self, config: ClientConfig):
         self._config = config
@@ -7542,20 +7544,6 @@ class Plugin(abc.ABC):
         return type(self).__module__ + "." + type(self).__qualname__
 
     @abstractmethod
-    def init_client_plugin(self, next: Plugin) -> None:
-        """Initialize this plugin in the plugin chain.
-
-        This method sets up the chain of responsibility pattern by providing a reference
-        to the next plugin in the chain. It is called during client creation to build
-        the plugin chain. Note, this may be called twice in the case of :py:meth:`connect`.
-        Implementations should store this reference and call the corresponding method
-        of the next plugin on method calls.
-
-        Args:
-            next: The next plugin in the chain to delegate to.
-        """
-
-    @abstractmethod
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         """Hook called when creating a client to allow modification of configuration.
 
@@ -7572,8 +7560,10 @@ class Plugin(abc.ABC):
 
     @abstractmethod
     async def connect_service_client(
-        self, config: temporalio.service.ConnectConfig
-    ) -> temporalio.service.ServiceClient:
+        self,
+        config: ConnectConfig,
+        next: Callable[[ConnectConfig], Awaitable[ServiceClient]],
+    ) -> ServiceClient:
         """Hook called when connecting to the Temporal service.
 
         This method is called during service client connection and allows plugins
@@ -7586,16 +7576,3 @@ class Plugin(abc.ABC):
         Returns:
             The connected service client.
         """
-
-
-class _RootPlugin(Plugin):
-    def init_client_plugin(self, next: Plugin) -> None:
-        raise NotImplementedError()
-
-    def configure_client(self, config: ClientConfig) -> ClientConfig:
-        return config
-
-    async def connect_service_client(
-        self, config: temporalio.service.ConnectConfig
-    ) -> temporalio.service.ServiceClient:
-        return await temporalio.service.ServiceClient.connect(config)
