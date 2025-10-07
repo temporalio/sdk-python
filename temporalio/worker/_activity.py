@@ -458,44 +458,7 @@ class _ActivityWorker:
 
         Exceptions are handled by a caller of this function.
         """
-        # For local activities, check if there's a streaming queue registered
-        streaming_queue = None
-        if start.is_local:
-            from temporalio.worker._streaming import lookup_local_streaming_queue
-
-            # Try both activity_id and activity_type as fallback for streaming queue lookup
-            streaming_queue = lookup_local_streaming_queue(
-                start.workflow_execution.run_id, start.activity_id
-            )
-            # If not found with activity_id, try with activity_type (activity name)
-            if not streaming_queue:
-                streaming_queue = lookup_local_streaming_queue(
-                    start.workflow_execution.run_id, start.activity_type
-                )
-
-        if streaming_queue is not None:
-            # Handle streaming activity with dual-path result delivery
-            return await self._execute_streaming_activity(
-                start, running_activity, task_token, data_converter, streaming_queue
-            )
-        else:
-            # Handle regular activity
-            return await self._execute_regular_activity(
-                start, running_activity, task_token, data_converter
-            )
-
-    async def _execute_regular_activity(
-        self,
-        start: temporalio.bridge.proto.activity_task.Start,  # type: ignore[reportAttributeAccessIssue]
-        running_activity: _RunningActivity,
-        task_token: bytes,
-        data_converter: temporalio.converter.DataConverter,
-    ) -> Any:
-        """Invoke a regular (non-streaming) activity function.
-
-        This is the original activity execution logic.
-        """
-        # Find activity or fail
+        # Fetch activity definition to determine streaming capability
         activity_def = self._activities.get(start.activity_type, self._dynamic_activity)
         if not activity_def:
             activity_names = ", ".join(sorted(self._activities.keys()))
@@ -505,6 +468,59 @@ class _ActivityWorker:
                 type="NotFoundError",
             )
 
+        is_streaming_activity = bool(activity_def.is_streaming)
+
+        # For local streaming activities, check if there's a streaming queue registered.
+        # Only use the queue on the first attempt to avoid duplicate items on retries.
+        streaming_queue = None
+        if (
+            is_streaming_activity
+            and start.is_local
+            and start.attempt == 1
+        ):
+            from temporalio.worker._streaming import lookup_local_streaming_queue
+
+            streaming_queue = lookup_local_streaming_queue(
+                start.workflow_execution.run_id, start.activity_id
+            )
+            if not streaming_queue:
+                streaming_queue = lookup_local_streaming_queue(
+                    start.workflow_execution.run_id, start.activity_type
+                )
+
+        if is_streaming_activity:
+            # Streaming activities always use the streaming execution path, with the
+            # queue providing real-time delivery when peekable=True.
+            return await self._execute_streaming_activity(
+                start,
+                running_activity,
+                task_token,
+                data_converter,
+                streaming_queue,
+                activity_def,
+            )
+
+        # Non-streaming activity: fall back to the standard execution path
+        return await self._execute_regular_activity(
+            start,
+            running_activity,
+            task_token,
+            data_converter,
+            activity_def,
+        )
+
+    async def _execute_regular_activity(
+        self,
+        start: temporalio.bridge.proto.activity_task.Start,  # type: ignore[reportAttributeAccessIssue]
+        running_activity: _RunningActivity,
+        task_token: bytes,
+        data_converter: temporalio.converter.DataConverter,
+        activity_def: temporalio.activity._Definition,
+    ) -> Any:
+        """Invoke a regular (non-streaming) activity function.
+
+        This is the original activity execution logic.
+        """
         # Create the worker shutdown event if not created
         if not self._worker_shutdown_event:
             self._worker_shutdown_event = temporalio.activity._CompositeEvent(
@@ -684,6 +700,7 @@ class _ActivityWorker:
         task_token: bytes,
         data_converter: temporalio.converter.DataConverter,
         streaming_queue: Any,
+        activity_def: temporalio.activity._Definition,
     ) -> Any:
         """Invoke a streaming activity function with dual-path result delivery.
 
@@ -692,16 +709,6 @@ class _ActivityWorker:
         2. Stream results to the workflow queue for peekable activities
         3. Return the complete list for durable storage
         """
-        # Find activity definition
-        activity_def = self._activities.get(start.activity_type, self._dynamic_activity)
-        if not activity_def:
-            activity_names = ", ".join(sorted(self._activities.keys()))
-            raise temporalio.exceptions.ApplicationError(
-                f"Activity function {start.activity_type} for workflow {start.workflow_execution.workflow_id} "
-                f"is not registered on this worker, available activities: {activity_names}",
-                type="NotFoundError",
-            )
-
         # Set up events (for async activities only - streaming activities must be async)
         running_activity.cancelled_event = temporalio.activity._CompositeEvent(
             thread_event=threading.Event(),
@@ -861,13 +868,10 @@ class _ActivityWorker:
                 except Exception:
                     pass
 
-        except Exception as e:
-            # On error, signal error to queue and re-raise
-            if streaming_queue:
-                try:
-                    await streaming_queue.put_completion(False, e)
-                except Exception:
-                    pass
+        except Exception:
+            # Allow the original exception to propagate so the workflow observes the
+            # standard ActivityError semantics. Retry behavior is controlled via the
+            # retry policy configured at scheduling time.
             raise
 
         return collected_items

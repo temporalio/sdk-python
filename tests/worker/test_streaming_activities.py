@@ -187,6 +187,103 @@ class PeekModeEnforcementWorkflow:
         return f"{name}_completed_with_{len(results)}_items"
 
 
+@temporalio.workflow.defn
+class RegularActivityPeekableTestWorkflow:
+    @temporalio.workflow.run
+    async def run(self) -> List[str]:
+        # peekable should be ignored for regular activities
+        return await temporalio.workflow.execute_local_activity(
+            regular_activity_with_args,
+            args=["test", 3],
+            schedule_to_close_timeout=timedelta(seconds=10),
+            peekable=False,
+        )
+
+
+@temporalio.workflow.defn
+class MultipleStreamingWorkflow:
+    @temporalio.workflow.run
+    async def run(self) -> dict[str, List[Any]]:
+        # First activity (integers)
+        int_results: List[Any] = []
+        async for item in await temporalio.workflow.execute_local_activity(
+            streaming_activity_10_items,
+            schedule_to_close_timeout=timedelta(seconds=10),
+            peekable=True,
+        ):
+            int_results.append(item)
+
+        # Second activity (strings)
+        str_results: List[Any] = []
+        async for item in await temporalio.workflow.execute_local_activity(
+            streaming_activity_mixed_types,
+            schedule_to_close_timeout=timedelta(seconds=10),
+            peekable=True,
+        ):
+            str_results.append(item)
+
+        return {"integers": int_results, "strings": str_results}
+
+
+@temporalio.workflow.defn
+class MultipleBufferedStreamingWorkflow:
+    @temporalio.workflow.run
+    async def run(self) -> dict[str, List[Any]]:
+        # First activity (empty)
+        empty_result: List[Any] = []
+        empty_iterable = await temporalio.workflow.execute_local_activity(
+            empty_streaming_activity,
+            schedule_to_close_timeout=timedelta(seconds=5),
+            peekable=False,
+        )
+        async for item in empty_iterable:
+            empty_result.append(item)
+
+        # Second activity (with items)
+        items_result: List[Any] = []
+        items_iterable = await temporalio.workflow.execute_local_activity(
+            streaming_activity_10_items,
+            schedule_to_close_timeout=timedelta(seconds=10),
+            peekable=False,
+        )
+        async for item in items_iterable:
+            items_result.append(item)
+
+        return {"empty": empty_result, "items": items_result}
+
+
+@temporalio.workflow.defn
+class MixedActivitiesWorkflow:
+    @temporalio.workflow.run
+    async def run(self) -> dict[str, Any]:
+        # Regular activity
+        regular_result = await temporalio.workflow.execute_local_activity(
+            regular_activity, schedule_to_close_timeout=timedelta(seconds=10)
+        )
+
+        # Streaming activity (peekable)
+        streaming_result: List[Any] = []
+        async for item in await temporalio.workflow.execute_local_activity(
+            streaming_activity_10_items,
+            schedule_to_close_timeout=timedelta(seconds=10),
+            peekable=True,
+        ):
+            streaming_result.append(item)
+
+        # Another regular activity with args
+        regular_with_args_result = await temporalio.workflow.execute_local_activity(
+            regular_activity_with_args,
+            args=["mixed", 3],
+            schedule_to_close_timeout=timedelta(seconds=10),
+        )
+
+        return {
+            "regular": regular_result,
+            "streaming": streaming_result,
+            "regular_with_args": regular_with_args_result,
+        }
+
+
 async def _execute_streaming_workflow_peekable(
     client: Client,
     worker: ExternalWorker,
@@ -267,9 +364,15 @@ async def _execute_streaming_workflow_buffered(
 
 def assert_streaming_activity_error(err: WorkflowFailureError) -> BaseException:
     """Assert workflow failed due to streaming activity error and return the cause."""
-    assert isinstance(err.cause, ActivityError)
-    assert err.cause.__cause__
-    return err.cause.__cause__
+    cause = err.cause
+    if isinstance(cause, ActivityError):
+        assert cause.__cause__
+        return cause.__cause__
+
+    # Local streaming activities may surface the underlying ApplicationError
+    # directly when executed via the in-process path.
+    assert isinstance(cause, ApplicationError)
+    return cause
 
 
 def assert_streaming_activity_application_error(
@@ -513,37 +616,11 @@ async def test_streaming_activity_heartbeat(client: Client, worker: ExternalWork
 
 async def test_streaming_activity_mixed_types(client: Client, worker: ExternalWorker):
     """Test streaming activity with non-integer return types."""
-    task_queue = str(uuid.uuid4())
-
-    @temporalio.workflow.defn
-    class StringStreamingWorkflow:
-        @temporalio.workflow.run
-        async def run(self) -> List[str]:
-            results = []
-            async for item in await temporalio.workflow.execute_local_activity(
-                streaming_activity_mixed_types,
-                schedule_to_close_timeout=timedelta(seconds=10),
-                peekable=True,
-            ):
-                results.append(item)
-            return results
-
-    async with Worker(
-        client=client,
-        task_queue=task_queue,
-        activities=[streaming_activity_mixed_types],
-        workflows=[StringStreamingWorkflow],
-        shared_state_manager=_default_shared_state_manager,
-        max_concurrent_activities=50,
-    ):
-        handle = await client.start_workflow(
-            StringStreamingWorkflow.run,
-            id=str(uuid.uuid4()),
-            task_queue=task_queue,
-        )
-        result = await handle.result()
-        expected = ["hello", "world", "streaming", "activity", "test"]
-        assert result == expected, f"Expected {expected}, got {result}"
+    result = await _execute_streaming_workflow_peekable(
+        client, worker, streaming_activity_mixed_types
+    )
+    expected = ["hello", "world", "streaming", "activity", "test"]
+    assert result.result == expected, f"Expected {expected}, got {result.result}"
 
 
 # Error handling and edge cases
@@ -578,18 +655,6 @@ async def test_regular_activity_with_peekable_false(
 ):
     """Test that regular activities work with peekable=False (should be ignored)."""
     task_queue = str(uuid.uuid4())
-
-    @temporalio.workflow.defn
-    class RegularActivityPeekableTestWorkflow:
-        @temporalio.workflow.run
-        async def run(self) -> List[str]:
-            # peekable should be ignored for regular activities
-            return await temporalio.workflow.execute_local_activity(
-                regular_activity_with_args,
-                args=["test", 3],
-                schedule_to_close_timeout=timedelta(seconds=10),
-                peekable=False,  # This should be ignored since it's not a streaming activity
-            )
 
     async with Worker(
         client=client,
@@ -646,30 +711,6 @@ async def test_multiple_streaming_activities_sequential_peekable(
     """Test multiple streaming activities executed sequentially with peekable=True."""
     task_queue = str(uuid.uuid4())
 
-    @temporalio.workflow.defn
-    class MultipleStreamingWorkflow:
-        @temporalio.workflow.run
-        async def run(self) -> dict:
-            # First activity
-            int_results = []
-            async for item in await temporalio.workflow.execute_local_activity(
-                streaming_activity_10_items,
-                schedule_to_close_timeout=timedelta(seconds=10),
-                peekable=True,
-            ):
-                int_results.append(item)
-
-            # Second activity (different type)
-            str_results = []
-            async for item in await temporalio.workflow.execute_local_activity(
-                streaming_activity_mixed_types,
-                schedule_to_close_timeout=timedelta(seconds=10),
-                peekable=True,
-            ):
-                str_results.append(item)
-
-            return {"integers": int_results, "strings": str_results}
-
     async with Worker(
         client=client,
         task_queue=task_queue,
@@ -694,32 +735,6 @@ async def test_multiple_streaming_activities_sequential_buffered(
 ):
     """Test multiple streaming activities executed sequentially with peekable=False."""
     task_queue = str(uuid.uuid4())
-
-    @temporalio.workflow.defn
-    class MultipleBufferedStreamingWorkflow:
-        @temporalio.workflow.run
-        async def run(self) -> dict:
-            # First activity (empty)
-            empty_result = []
-            empty_iterable = await temporalio.workflow.execute_local_activity(
-                empty_streaming_activity,
-                schedule_to_close_timeout=timedelta(seconds=5),
-                peekable=False,
-            )
-            async for item in empty_iterable:
-                empty_result.append(item)
-
-            # Second activity (with items)
-            items_result = []
-            items_iterable = await temporalio.workflow.execute_local_activity(
-                streaming_activity_10_items,
-                schedule_to_close_timeout=timedelta(seconds=10),
-                peekable=False,
-            )
-            async for item in items_iterable:
-                items_result.append(item)
-
-            return {"empty": empty_result, "items": items_result}
 
     async with Worker(
         client=client,
@@ -746,37 +761,6 @@ async def test_streaming_and_regular_activities_mixed(
 ):
     """Test workflow with both streaming and regular activities."""
     task_queue = str(uuid.uuid4())
-
-    @temporalio.workflow.defn
-    class MixedActivitiesWorkflow:
-        @temporalio.workflow.run
-        async def run(self) -> dict:
-            # Regular activity
-            regular_result = await temporalio.workflow.execute_local_activity(
-                regular_activity, schedule_to_close_timeout=timedelta(seconds=10)
-            )
-
-            # Streaming activity (peekable)
-            streaming_result = []
-            async for item in await temporalio.workflow.execute_local_activity(
-                streaming_activity_10_items,
-                schedule_to_close_timeout=timedelta(seconds=10),
-                peekable=True,
-            ):
-                streaming_result.append(item)
-
-            # Another regular activity with args
-            regular_with_args_result = await temporalio.workflow.execute_local_activity(
-                regular_activity_with_args,
-                args=["mixed", 3],
-                schedule_to_close_timeout=timedelta(seconds=10),
-            )
-
-            return {
-                "regular": regular_result,
-                "streaming": streaming_result,
-                "regular_with_args": regular_with_args_result,
-            }
 
     async with Worker(
         client=client,

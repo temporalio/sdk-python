@@ -15,7 +15,7 @@ import traceback
 import warnings
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import timedelta
 from enum import IntEnum
 from typing import (
@@ -1597,11 +1597,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 register_local_streaming_queue,
             )
 
-            streaming_queue = StreamingResultQueue(activity_id or name)
+            activity_key = activity_id or name
+            streaming_queue = StreamingResultQueue(activity_key)
 
             # For local activities, register the streaming queue globally so the activity
             # execution can find it using workflow_run_id and activity_id
-            activity_key = activity_id or name
             register_local_streaming_queue(
                 self._info.run_id, activity_key, streaming_queue
             )
@@ -1627,13 +1627,20 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     # approach that satisfies mypy for runtime-created generics.
                     actual_ret_type = typing.List[Any]
 
-        # For peekable streaming activities, disable retries
-        # Retrying would send duplicate items to the queue and confuse the workflow
-        # Errors should be sent to the queue for the workflow to handle
+        # For streaming activities, default to a single attempt unless the caller
+        # explicitly provides a retry policy. This prevents long-running retries
+        # that would otherwise outlive the workflow run timeout, while still
+        # allowing callers to opt in to custom retry behavior.
         actual_retry_policy = retry_policy
-        if peekable and is_streaming:
-            # Disable retries by setting maximum_attempts to 1
-            actual_retry_policy = temporalio.common.RetryPolicy(maximum_attempts=1)
+        if is_streaming:
+            if retry_policy is None:
+                actual_retry_policy = temporalio.common.RetryPolicy(
+                    maximum_attempts=1
+                )
+            else:
+                actual_retry_policy = replace(retry_policy)
+                if actual_retry_policy.maximum_attempts == 0:
+                    actual_retry_policy.maximum_attempts = 1
 
         input_obj = StartLocalActivityInput(
             activity=name,
@@ -1664,7 +1671,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             workflow_logger.debug(
                 "workflow_start_local_activity: peekable=True, is_streaming=True, creating PeekableActivityHandle"
             )
-            fn = self._create_streaming_activity_coroutine(input_obj, streaming_queue)
+            fn = self._create_streaming_activity_coroutine(
+                input_obj, streaming_queue, activity_key
+            )
             workflow_logger.debug(
                 f"workflow_start_local_activity: created coroutine fn={fn}"
             )
@@ -1686,6 +1695,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self,
         input_obj: StartLocalActivityInput,
         streaming_queue: StreamingResultQueue,
+        activity_key: str,
     ) -> Coroutine[Any, Any, None]:
         """Create a coroutine for streaming activity execution.
 
@@ -1703,8 +1713,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
             # Create a copy of input_obj with peekable=False to avoid infinite recursion
             # The inner activity execution should NOT be peekable - we already have the queue set up
-            from dataclasses import replace
-
             inner_input = replace(input_obj, peekable=False)
 
             try:
@@ -1720,7 +1728,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 # We need to await this to ensure the activity completes
                 # but we don't use the result - the streaming queue provides real-time access
                 workflow_logger.debug(
-                    "run_streaming_activity: About to await activity_handle"
+                    f"run_streaming_activity: About to await activity_handle, retry_policy={inner_input.retry_policy}"
                 )
                 result = await activity_handle
                 workflow_logger.debug(
@@ -1730,15 +1738,24 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 # Clean up streaming queue on cancellation
                 streaming_queue.close()
                 raise
-            except Exception:
-                # For peekable streaming activities, errors are already sent to the queue
-                # by the activity execution (_execute_streaming_activity).
-                # We don't retry or re-raise here - just let the background task exit.
-                # The workflow code consuming from the queue will receive the error.
+            except Exception as e:
+                # Activity failed after all retries exhausted
+                # Send error to queue so workflow iterator can handle it
                 workflow_logger.debug(
-                    "run_streaming_activity: Activity failed, error sent to queue"
+                    f"run_streaming_activity: Activity failed after all retries, items_consumed={streaming_queue.items_consumed}"
                 )
-                pass
+                try:
+                    await streaming_queue.put_completion(False, e)
+                except Exception as ex:
+                    workflow_logger.debug(
+                        f"run_streaming_activity: Failed to send completion: {ex}"
+                    )
+            finally:
+                from temporalio.worker._streaming import (
+                    unregister_local_streaming_queue,
+                )
+
+                unregister_local_streaming_queue(self._info.run_id, activity_key)
 
         return run_streaming_activity()
 

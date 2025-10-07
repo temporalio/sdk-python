@@ -56,6 +56,7 @@ class StreamingResultQueue:
         self._queue: asyncio.Queue[QueueItem] = asyncio.Queue()
         self._completed = False
         self._error: Optional[Exception] = None
+        self._items_consumed = 0  # Track how many items workflow has consumed
 
     async def put_item(self, item: Any) -> None:
         """Add a streaming result item to the queue.
@@ -87,7 +88,11 @@ class StreamingResultQueue:
             - ('item', value): A streaming result item
             - ('complete', success, error): Stream completion signal
         """
-        return await self._queue.get()
+        item = await self._queue.get()
+        # Track consumption of actual items (not completion signals)
+        if item[0] == "item":
+            self._items_consumed += 1
+        return item
 
     @property
     def activity_id(self) -> str:
@@ -103,6 +108,11 @@ class StreamingResultQueue:
     def error(self) -> Optional[Exception]:
         """Get the error that caused failure (if any)."""
         return self._error
+
+    @property
+    def items_consumed(self) -> int:
+        """Get the number of items consumed from this queue by the workflow."""
+        return self._items_consumed
 
     def close(self) -> None:
         """Close the queue and clean up resources.
