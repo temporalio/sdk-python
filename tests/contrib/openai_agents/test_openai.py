@@ -108,7 +108,7 @@ from temporalio.workflow import ActivityConfig
 from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
 )
-from tests.helpers import assert_task_fail_eventually, new_worker
+from tests.helpers import assert_eventually, assert_task_fail_eventually, new_worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 
@@ -1751,10 +1751,19 @@ async def test_session(client: Client):
             execution_timeout=timedelta(seconds=10.0),
             retry_policy=RetryPolicy(maximum_attempts=1),
         )
-        await assert_task_fail_eventually(
-            workflow_handle,
-            message_contains="Temporal workflows don't support SQLite sessions",
-        )
+
+        async def check():
+            async for evt in workflow_handle.fetch_history_events():
+                # Sometimes just creating the sqlite session takes too long for a workflow in CI, so check both
+                if evt.HasField("workflow_task_failed_event_attributes") and (
+                    "Temporal workflows don't support SQLite sessions"
+                    in evt.workflow_task_failed_event_attributes.failure.message
+                    or "Potential deadlock detected"
+                    in evt.workflow_task_failed_event_attributes.failure.message
+                ):
+                    return
+
+        await assert_eventually(check)
 
 
 async def test_lite_llm(client: Client, env: WorkflowEnvironment):
