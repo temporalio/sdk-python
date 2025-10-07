@@ -275,7 +275,7 @@ async def test_replay(client: Client) -> None:
     await replayer.replay_workflow(await handle.fetch_history())
 
 
-async def test_static_plugins(client: Client) -> None:
+async def test_simple_plugins(client: Client) -> None:
     plugin = SimplePlugin(
         "MyPlugin",
         data_converter=pydantic_data_converter,
@@ -311,7 +311,7 @@ async def test_static_plugins(client: Client) -> None:
     assert replayer.config().get("workflows") == [HelloWorkflow, HelloWorkflow2]
 
 
-async def test_static_plugins_callables(client: Client) -> None:
+async def test_simple_plugins_callables(client: Client) -> None:
     def converter(old: Optional[DataConverter]):
         if old != temporalio.converter.default():
             raise ValueError("Can't override non-default converter")
@@ -344,3 +344,21 @@ async def test_static_plugins_callables(client: Client) -> None:
         plugins=[plugin],
     )
     assert worker.config().get("workflows") == []
+
+
+class MediumPlugin(SimplePlugin):
+    def __init__(self):
+        super().__init__("MediumPlugin", data_converter=pydantic_data_converter)
+
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+        config = super().configure_worker(config)
+        config["task_queue"] = "override"
+        return config
+
+
+async def test_medium_plugin(client: Client) -> None:
+    plugin = MediumPlugin()
+    worker = Worker(
+        client, task_queue="queue", plugins=[plugin], workflows=[HelloWorkflow]
+    )
+    assert worker.config().get("task_queue") == "override"

@@ -1,6 +1,8 @@
 from pathlib import Path
 
 import pytest
+from agents import OpenAIProvider
+from openai import AsyncOpenAI
 
 from temporalio.client import WorkflowHistory
 from temporalio.contrib.openai_agents import ModelActivityParameters, OpenAIAgentsPlugin
@@ -42,5 +44,11 @@ async def test_replay(file_name: str) -> None:
                 InputGuardrailWorkflow,
                 OutputGuardrailWorkflow,
             ],
-            plugins=[OpenAIAgentsPlugin()],
+            plugins=[
+                OpenAIAgentsPlugin(
+                    model_provider=OpenAIProvider(
+                        openai_client=AsyncOpenAI(max_retries=0, api_key="PLACEHOLDER")
+                    )
+                )
+            ],
         ).replay_workflow(WorkflowHistory.from_json("fake", history_json))

@@ -86,8 +86,8 @@ class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
                 Applied to the Worker and Replayer.
             workflow_failure_exception_types: Exception types for workflow failures to append,
                 or callable to customize existing ones. Applied to the Worker and Replayer.
-            run_context: Optional async context manager producer to wrap worker/replayer execution.
-                Applied to the Worker and Replayer.
+            run_context: A place to run custom code to wrap around the Worker (or Replayer) execution.
+                Specifically, it's an async context manager producer. Applied to the Worker and Replayer.
 
         Returns:
             A configured Plugin instance.
