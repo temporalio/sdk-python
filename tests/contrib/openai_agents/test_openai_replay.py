@@ -12,9 +12,11 @@ from tests.contrib.openai_agents.test_openai import (
     CustomerServiceWorkflow,
     HelloWorldAgent,
     InputGuardrailWorkflow,
+    McpServerStatefulWorkflow,
+    McpServerWorkflow,
     OutputGuardrailWorkflow,
     ResearchWorkflow,
-    ToolsWorkflow, McpServerWorkflow, McpServerStatefulWorkflow,
+    ToolsWorkflow,
 )
 
 

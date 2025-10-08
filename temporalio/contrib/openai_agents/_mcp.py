@@ -35,7 +35,7 @@ class _StatelessMCPServerReference(MCPServer):
         server: str,
         config: Optional[ActivityConfig],
         cache_tools_list: bool,
-        factory_arguments: Optional[Any] = None,
+        factory_argument: Optional[Any] = None,
     ):
         self._name = server + "-stateless"
         self._config = config or ActivityConfig(
@@ -43,7 +43,7 @@ class _StatelessMCPServerReference(MCPServer):
         )
         self._cache_tools_list = cache_tools_list
         self._tools = None
-        self._factory_arguments = factory_arguments
+        self._factory_argument = factory_argument
         super().__init__()
 
     @property
@@ -65,7 +65,7 @@ class _StatelessMCPServerReference(MCPServer):
             return self._tools
         tools = await workflow.execute_activity(
             self.name + "-list-tools",
-            args=[self._factory_arguments],
+            args=[self._factory_argument],
             result_type=list[MCPTool],
             **self._config,
         )
@@ -78,7 +78,7 @@ class _StatelessMCPServerReference(MCPServer):
     ) -> CallToolResult:
         return await workflow.execute_activity(
             self.name + "-call-tool",
-            args=[tool_name, arguments, self._factory_arguments],
+            args=[tool_name, arguments, self._factory_argument],
             result_type=CallToolResult,
             **self._config,
         )
@@ -86,7 +86,7 @@ class _StatelessMCPServerReference(MCPServer):
     async def list_prompts(self) -> ListPromptsResult:
         return await workflow.execute_activity(
             self.name + "-list-prompts",
-            args=[self._factory_arguments],
+            args=[self._factory_argument],
             result_type=ListPromptsResult,
             **self._config,
         )
@@ -96,7 +96,7 @@ class _StatelessMCPServerReference(MCPServer):
     ) -> GetPromptResult:
         return await workflow.execute_activity(
             self.name + "-get-prompt",
-            args=[name, arguments, self._factory_arguments],
+            args=[name, arguments, self._factory_argument],
             result_type=GetPromptResult,
             **self._config,
         )
@@ -131,8 +131,8 @@ class StatelessMCPServerProvider:
 
     def _get_activities(self) -> Sequence[Callable]:
         @activity.defn(name=self.name + "-list-tools")
-        async def list_tools(factory_arguments: Optional[Any]) -> list[MCPTool]:
-            server = self._server_factory(factory_arguments)
+        async def list_tools(factory_argument: Optional[Any]) -> list[MCPTool]:
+            server = self._server_factory(factory_argument)
             try:
                 await server.connect()
                 return await server.list_tools()
@@ -141,9 +141,11 @@ class StatelessMCPServerProvider:
 
         @activity.defn(name=self.name + "-call-tool")
         async def call_tool(
-            tool_name: str, arguments: Optional[dict[str, Any]], factory_arguments: Optional[Any]
+            tool_name: str,
+            arguments: Optional[dict[str, Any]],
+            factory_argument: Optional[Any],
         ) -> CallToolResult:
-            server = self._server_factory(factory_arguments)
+            server = self._server_factory(factory_argument)
             try:
                 await server.connect()
                 return await server.call_tool(tool_name, arguments)
@@ -151,8 +153,8 @@ class StatelessMCPServerProvider:
                 await server.cleanup()
 
         @activity.defn(name=self.name + "-list-prompts")
-        async def list_prompts(factory_arguments: Optional[Any]) -> ListPromptsResult:
-            server = self._server_factory(factory_arguments)
+        async def list_prompts(factory_argument: Optional[Any]) -> ListPromptsResult:
+            server = self._server_factory(factory_argument)
             try:
                 await server.connect()
                 return await server.list_prompts()
@@ -161,9 +163,11 @@ class StatelessMCPServerProvider:
 
         @activity.defn(name=self.name + "-get-prompt")
         async def get_prompt(
-            name: str, arguments: Optional[dict[str, Any]], factory_arguments: Optional[Any]
+            name: str,
+            arguments: Optional[dict[str, Any]],
+            factory_argument: Optional[Any],
         ) -> GetPromptResult:
-            server = self._server_factory(factory_arguments)
+            server = self._server_factory(factory_argument)
             try:
                 await server.connect()
                 return await server.get_prompt(name, arguments)
@@ -210,6 +214,7 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
         server: str,
         config: Optional[ActivityConfig],
         server_session_config: Optional[ActivityConfig],
+        factory_argument: Optional[Any],
     ):
         self._name = server + "-stateful"
         self._config = config or ActivityConfig(
@@ -220,6 +225,7 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
             start_to_close_timeout=timedelta(hours=1),
         )
         self._connect_handle: Optional[ActivityHandle] = None
+        self._factory_argument = factory_argument
         super().__init__()
 
     @property
@@ -230,7 +236,7 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
         self._config["task_queue"] = self.name + "@" + workflow.info().run_id
         self._connect_handle = workflow.start_activity(
             self.name + "-server-session",
-            args=[],
+            args=[self._factory_argument],
             **self._server_session_config,
         )
 
@@ -331,7 +337,7 @@ class StatefulMCPServerProvider:
 
     def __init__(
         self,
-        server_factory: Callable[[], MCPServer],
+        server_factory: Callable[[Optional[Any]], MCPServer],
     ):
         """Initialize the stateful temporal MCP server.
 
@@ -340,7 +346,7 @@ class StatefulMCPServerProvider:
                 so that state is not shared between workflow runs
         """
         self._server_factory = server_factory
-        self._name = server_factory().name + "-stateful"
+        self._name = server_factory(None).name + "-stateful"
         self._connect_handle: Optional[ActivityHandle] = None
         self._servers: dict[str, MCPServer] = {}
         super().__init__()
@@ -381,7 +387,7 @@ class StatefulMCPServerProvider:
                 activity.heartbeat(*details)
 
         @activity.defn(name=self.name + "-server-session")
-        async def connect() -> None:
+        async def connect(factory_argument: Optional[Any]) -> None:
             heartbeat_task = asyncio.create_task(heartbeat_every(30))
 
             server_id = self.name + "@" + activity.info().workflow_run_id
@@ -389,7 +395,7 @@ class StatefulMCPServerProvider:
                 raise ApplicationError(
                     "Cannot connect to an already running server. Use a distinct name if running multiple servers in one workflow."
                 )
-            server = self._server_factory()
+            server = self._server_factory(factory_argument)
             try:
                 self._servers[server_id] = server
                 try:
