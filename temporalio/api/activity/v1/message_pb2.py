@@ -15,20 +15,56 @@ _sym_db = _symbol_database.Default()
 
 
 from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
+from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 from temporalio.api.common.v1 import (
     message_pb2 as temporal_dot_api_dot_common_dot_v1_dot_message__pb2,
+)
+from temporalio.api.deployment.v1 import (
+    message_pb2 as temporal_dot_api_dot_deployment_dot_v1_dot_message__pb2,
+)
+from temporalio.api.enums.v1 import (
+    activity_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_activity__pb2,
+)
+from temporalio.api.enums.v1 import (
+    workflow_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_workflow__pb2,
+)
+from temporalio.api.failure.v1 import (
+    message_pb2 as temporal_dot_api_dot_failure_dot_v1_dot_message__pb2,
+)
+from temporalio.api.sdk.v1 import (
+    user_metadata_pb2 as temporal_dot_api_dot_sdk_dot_v1_dot_user__metadata__pb2,
 )
 from temporalio.api.taskqueue.v1 import (
     message_pb2 as temporal_dot_api_dot_taskqueue_dot_v1_dot_message__pb2,
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b"\n&temporal/api/activity/v1/message.proto\x12\x18temporal.api.activity.v1\x1a$temporal/api/common/v1/message.proto\x1a'temporal/api/taskqueue/v1/message.proto\x1a\x1egoogle/protobuf/duration.proto\"\xf3\x02\n\x0f\x41\x63tivityOptions\x12\x38\n\ntask_queue\x18\x01 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12<\n\x19schedule_to_close_timeout\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration\x12<\n\x19schedule_to_start_timeout\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x16start_to_close_timeout\x18\x04 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x34\n\x11heartbeat_timeout\x18\x05 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x0cretry_policy\x18\x06 \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicyB\x93\x01\n\x1bio.temporal.api.activity.v1B\x0cMessageProtoP\x01Z'go.temporal.io/api/activity/v1;activity\xaa\x02\x1aTemporalio.Api.Activity.V1\xea\x02\x1dTemporalio::Api::Activity::V1b\x06proto3"
+    b'\n&temporal/api/activity/v1/message.proto\x12\x18temporal.api.activity.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a(temporal/api/deployment/v1/message.proto\x1a$temporal/api/enums/v1/activity.proto\x1a$temporal/api/enums/v1/workflow.proto\x1a%temporal/api/failure/v1/message.proto\x1a\'temporal/api/taskqueue/v1/message.proto\x1a\'temporal/api/sdk/v1/user_metadata.proto"i\n\x11OnConflictOptions\x12\x19\n\x11\x61ttach_request_id\x18\x01 \x01(\x08\x12#\n\x1b\x61ttach_completion_callbacks\x18\x02 \x01(\x08\x12\x14\n\x0c\x61ttach_links\x18\x03 \x01(\x08"\xf3\x02\n\x0f\x41\x63tivityOptions\x12\x38\n\ntask_queue\x18\x01 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12<\n\x19schedule_to_close_timeout\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration\x12<\n\x19schedule_to_start_timeout\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x16start_to_close_timeout\x18\x04 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x34\n\x11heartbeat_timeout\x18\x05 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x0cretry_policy\x18\x06 \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy"\xdd\r\n\x15\x41\x63tivityExecutionInfo\x12\x13\n\x0b\x61\x63tivity_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\t\x12;\n\ractivity_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.ActivityType\x12>\n\x06status\x18\x04 \x01(\x0e\x32..temporal.api.enums.v1.ActivityExecutionStatus\x12>\n\trun_state\x18\x05 \x01(\x0e\x32+.temporal.api.enums.v1.PendingActivityState\x12;\n\x11heartbeat_details\x18\x06 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x37\n\x13last_heartbeat_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x35\n\x11last_started_time\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x0f\n\x07\x61ttempt\x18\t \x01(\x05\x12\x18\n\x10maximum_attempts\x18\n \x01(\x05\x12\x32\n\x0escheduled_time\x18\x0b \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x33\n\x0f\x65xpiration_time\x18\x0c \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x0clast_failure\x18\r \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12\x1c\n\x14last_worker_identity\x18\x0e \x01(\t\x12\x39\n\x16\x63urrent_retry_interval\x18\x0f \x01(\x0b\x32\x19.google.protobuf.Duration\x12>\n\x1alast_attempt_complete_time\x18\x10 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12>\n\x1anext_attempt_schedule_time\x18\x11 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12T\n\x17last_deployment_version\x18\x12 \x01(\x0b\x32\x33.temporal.api.deployment.v1.WorkerDeploymentVersion\x12\x32\n\x08priority\x18\x13 \x01(\x0b\x32 .temporal.api.common.v1.Priority\x12\x43\n\x10\x61\x63tivity_options\x18\x14 \x01(\x0b\x32).temporal.api.activity.v1.ActivityOptions\x12/\n\x05input\x18\x15 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x1e\n\x16state_transition_count\x18\x16 \x01(\x03\x12\x43\n\x11search_attributes\x18\x17 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12.\n\x06header\x18\x18 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12!\n\x19\x65\x61ger_execution_requested\x18\x19 \x01(\x08\x12>\n\x14\x63ompletion_callbacks\x18\x1a \x03(\x0b\x32 .temporal.api.common.v1.Callback\x12\x38\n\ruser_metadata\x18\x1b \x01(\x0b\x32!.temporal.api.sdk.v1.UserMetadata\x12+\n\x05links\x18\x1c \x03(\x0b\x32\x1c.temporal.api.common.v1.Link\x12\x17\n\x0f\x63\x61nceled_reason\x18\x1d \x01(\t\x12M\n\npause_info\x18\x1e \x01(\x0b\x32\x39.temporal.api.activity.v1.ActivityExecutionInfo.PauseInfo\x1a\xc8\x01\n\tPauseInfo\x12.\n\npause_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12R\n\x06manual\x18\x02 \x01(\x0b\x32@.temporal.api.activity.v1.ActivityExecutionInfo.PauseInfo.ManualH\x00\x1a*\n\x06Manual\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x0e\n\x06reason\x18\x02 \x01(\tB\x0b\n\tpaused_by"\xf7\x03\n\x10\x41\x63tivityListInfo\x12\x13\n\x0b\x61\x63tivity_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x03 \x01(\t\x12;\n\ractivity_type\x18\x04 \x01(\x0b\x32$.temporal.api.common.v1.ActivityType\x12\x32\n\x0escheduled_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nclose_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12>\n\x06status\x18\x07 \x01(\x0e\x32..temporal.api.enums.v1.ActivityExecutionStatus\x12\x43\n\x11search_attributes\x18\x08 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12\x12\n\ntask_queue\x18\t \x01(\t\x12\x1e\n\x16state_transition_count\x18\n \x01(\x03\x12\x18\n\x10state_size_bytes\x18\x0b \x01(\x03\x12\x35\n\x12\x65xecution_duration\x18\x0c \x01(\x0b\x32\x19.google.protobuf.DurationB\x93\x01\n\x1bio.temporal.api.activity.v1B\x0cMessageProtoP\x01Z\'go.temporal.io/api/activity/v1;activity\xaa\x02\x1aTemporalio.Api.Activity.V1\xea\x02\x1dTemporalio::Api::Activity::V1b\x06proto3'
 )
 
 
+_ONCONFLICTOPTIONS = DESCRIPTOR.message_types_by_name["OnConflictOptions"]
 _ACTIVITYOPTIONS = DESCRIPTOR.message_types_by_name["ActivityOptions"]
+_ACTIVITYEXECUTIONINFO = DESCRIPTOR.message_types_by_name["ActivityExecutionInfo"]
+_ACTIVITYEXECUTIONINFO_PAUSEINFO = _ACTIVITYEXECUTIONINFO.nested_types_by_name[
+    "PauseInfo"
+]
+_ACTIVITYEXECUTIONINFO_PAUSEINFO_MANUAL = (
+    _ACTIVITYEXECUTIONINFO_PAUSEINFO.nested_types_by_name["Manual"]
+)
+_ACTIVITYLISTINFO = DESCRIPTOR.message_types_by_name["ActivityListInfo"]
+OnConflictOptions = _reflection.GeneratedProtocolMessageType(
+    "OnConflictOptions",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _ONCONFLICTOPTIONS,
+        "__module__": "temporal.api.activity.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.activity.v1.OnConflictOptions)
+    },
+)
+_sym_db.RegisterMessage(OnConflictOptions)
+
 ActivityOptions = _reflection.GeneratedProtocolMessageType(
     "ActivityOptions",
     (_message.Message,),
@@ -40,9 +76,61 @@ ActivityOptions = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(ActivityOptions)
 
+ActivityExecutionInfo = _reflection.GeneratedProtocolMessageType(
+    "ActivityExecutionInfo",
+    (_message.Message,),
+    {
+        "PauseInfo": _reflection.GeneratedProtocolMessageType(
+            "PauseInfo",
+            (_message.Message,),
+            {
+                "Manual": _reflection.GeneratedProtocolMessageType(
+                    "Manual",
+                    (_message.Message,),
+                    {
+                        "DESCRIPTOR": _ACTIVITYEXECUTIONINFO_PAUSEINFO_MANUAL,
+                        "__module__": "temporal.api.activity.v1.message_pb2",
+                        # @@protoc_insertion_point(class_scope:temporal.api.activity.v1.ActivityExecutionInfo.PauseInfo.Manual)
+                    },
+                ),
+                "DESCRIPTOR": _ACTIVITYEXECUTIONINFO_PAUSEINFO,
+                "__module__": "temporal.api.activity.v1.message_pb2",
+                # @@protoc_insertion_point(class_scope:temporal.api.activity.v1.ActivityExecutionInfo.PauseInfo)
+            },
+        ),
+        "DESCRIPTOR": _ACTIVITYEXECUTIONINFO,
+        "__module__": "temporal.api.activity.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.activity.v1.ActivityExecutionInfo)
+    },
+)
+_sym_db.RegisterMessage(ActivityExecutionInfo)
+_sym_db.RegisterMessage(ActivityExecutionInfo.PauseInfo)
+_sym_db.RegisterMessage(ActivityExecutionInfo.PauseInfo.Manual)
+
+ActivityListInfo = _reflection.GeneratedProtocolMessageType(
+    "ActivityListInfo",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _ACTIVITYLISTINFO,
+        "__module__": "temporal.api.activity.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.activity.v1.ActivityListInfo)
+    },
+)
+_sym_db.RegisterMessage(ActivityListInfo)
+
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\033io.temporal.api.activity.v1B\014MessageProtoP\001Z'go.temporal.io/api/activity/v1;activity\252\002\032Temporalio.Api.Activity.V1\352\002\035Temporalio::Api::Activity::V1"
-    _ACTIVITYOPTIONS._serialized_start = 180
-    _ACTIVITYOPTIONS._serialized_end = 551
+    _ONCONFLICTOPTIONS._serialized_start = 410
+    _ONCONFLICTOPTIONS._serialized_end = 515
+    _ACTIVITYOPTIONS._serialized_start = 518
+    _ACTIVITYOPTIONS._serialized_end = 889
+    _ACTIVITYEXECUTIONINFO._serialized_start = 892
+    _ACTIVITYEXECUTIONINFO._serialized_end = 2649
+    _ACTIVITYEXECUTIONINFO_PAUSEINFO._serialized_start = 2449
+    _ACTIVITYEXECUTIONINFO_PAUSEINFO._serialized_end = 2649
+    _ACTIVITYEXECUTIONINFO_PAUSEINFO_MANUAL._serialized_start = 2594
+    _ACTIVITYEXECUTIONINFO_PAUSEINFO_MANUAL._serialized_end = 2636
+    _ACTIVITYLISTINFO._serialized_start = 2652
+    _ACTIVITYLISTINFO._serialized_end = 3155
 # @@protoc_insertion_point(module_scope)

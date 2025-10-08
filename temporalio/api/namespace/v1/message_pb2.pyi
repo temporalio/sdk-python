@@ -51,18 +51,26 @@ class NamespaceInfo(google.protobuf.message.Message):
         EAGER_WORKFLOW_START_FIELD_NUMBER: builtins.int
         SYNC_UPDATE_FIELD_NUMBER: builtins.int
         ASYNC_UPDATE_FIELD_NUMBER: builtins.int
+        WORKER_HEARTBEATS_FIELD_NUMBER: builtins.int
+        REPORTED_PROBLEMS_SEARCH_ATTRIBUTE_FIELD_NUMBER: builtins.int
         eager_workflow_start: builtins.bool
         """True if the namespace supports eager workflow start."""
         sync_update: builtins.bool
         """True if the namespace supports sync update"""
         async_update: builtins.bool
         """True if the namespace supports async update"""
+        worker_heartbeats: builtins.bool
+        """True if the namespace supports worker heartbeats"""
+        reported_problems_search_attribute: builtins.bool
+        """True if the namespace supports reported problems search attribute"""
         def __init__(
             self,
             *,
             eager_workflow_start: builtins.bool = ...,
             sync_update: builtins.bool = ...,
             async_update: builtins.bool = ...,
+            worker_heartbeats: builtins.bool = ...,
+            reported_problems_search_attribute: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -71,8 +79,12 @@ class NamespaceInfo(google.protobuf.message.Message):
                 b"async_update",
                 "eager_workflow_start",
                 b"eager_workflow_start",
+                "reported_problems_search_attribute",
+                b"reported_problems_search_attribute",
                 "sync_update",
                 b"sync_update",
+                "worker_heartbeats",
+                b"worker_heartbeats",
             ],
         ) -> None: ...
 
