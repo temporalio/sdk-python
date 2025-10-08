@@ -2480,21 +2480,29 @@ async def test_mcp_server(
         client, McpServerStatefulWorkflow, McpServerWorkflow
     ) as worker:
         if stateful:
-            result = await client.execute_workflow(
+            handle = await client.start_workflow(
                 McpServerStatefulWorkflow.run,
                 args=[timedelta(seconds=30)],
                 id=f"mcp-server-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=30),
             )
+            result = await handle.result()
+            history = await handle.fetch_history()
+            with open(f"mcp_history_{"stateful" if stateful else "stateless"}.json", "w") as f:
+                f.write(history.to_json())
         else:
-            result = await client.execute_workflow(
+            handle = await client.start_workflow(
                 McpServerWorkflow.run,
                 args=[caching],
                 id=f"mcp-server-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=30),
             )
+            result = await handle.result()
+            history = await handle.fetch_history()
+            with open(f"mcp_history_{"stateful" if stateful else "stateless"}.json", "w") as f:
+                f.write(history.to_json())
         if use_local_model:
             assert result == "Hi Tom and Tim!"
     if use_local_model:

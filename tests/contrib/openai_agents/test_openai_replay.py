@@ -14,7 +14,7 @@ from tests.contrib.openai_agents.test_openai import (
     InputGuardrailWorkflow,
     OutputGuardrailWorkflow,
     ResearchWorkflow,
-    ToolsWorkflow,
+    ToolsWorkflow, McpServerWorkflow, McpServerStatefulWorkflow,
 )
 
 
@@ -28,6 +28,8 @@ from tests.contrib.openai_agents.test_openai import (
         "output-guardrail-workflow-history.json",
         "research-workflow-history.json",
         "tools-workflow-history.json",
+        "mcp-history-stateless.json",
+        "mcp-history-stateful.json",
     ],
 )
 async def test_replay(file_name: str) -> None:
@@ -43,6 +45,8 @@ async def test_replay(file_name: str) -> None:
                 HelloWorldAgent,
                 InputGuardrailWorkflow,
                 OutputGuardrailWorkflow,
+                McpServerWorkflow,
+                McpServerStatefulWorkflow,
             ],
             plugins=[OpenAIAgentsPlugin()],
         ).replay_workflow(WorkflowHistory.from_json("fake", history_json))
