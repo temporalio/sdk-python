@@ -3526,13 +3526,21 @@ class ActivityHandle(Generic[ReturnType]):
         id: str,
         *,
         run_id: str,
+        result_type: Optional[Type] = None,
         data_converter_override: Optional[DataConverter] = None,
     ) -> None:
         """Create activity handle."""
         self._client = client
         self._id = id
         self._run_id = run_id
+        self._result_type = result_type
         self._data_converter_override = data_converter_override
+        self._known_outcome: Optional[
+            Union[
+                temporalio.api.common.v1.Payloads,
+                temporalio.api.failure.v1.Failure,
+            ]
+        ] = None
 
     @property
     def id(self) -> str:
@@ -3565,6 +3573,7 @@ class ActivityHandle(Generic[ReturnType]):
             self._client,
             id=self._id,
             run_id=self._run_id,
+            result_type=self._result_type,
             data_converter_override=data_converter,
         )
 
@@ -3576,21 +3585,89 @@ class ActivityHandle(Generic[ReturnType]):
     ) -> ReturnType:
         """Wait for result of the activity.
 
+        The result may already be known if this method has been called before,
+        in which case no network call is made. Otherwise the result will be
+        polled for until it is available.
+
         Args:
             rpc_metadata: Headers used on the RPC call. Keys here override
                 client-level RPC metadata keys.
-            rpc_timeout: Optional RPC deadline to set for each RPC call. Note,
-                this is the timeout for each history RPC call not this overall
-                function.
+            rpc_timeout: Optional RPC deadline to set for each RPC call. Note:
+                this is the timeout for each RPC call while polling, not a
+                timeout for the function as a whole. If an individual RPC
+                times out, it will be retried until the result is available.
 
         Returns:
             The result of the activity.
 
         Raises:
-            :py:class:`ActivityFailureError`: If the activity completed with a failure.
+            ActivityFailureError: If the activity completed with a failure.
+            RPCError: Activity result could not be fetched for some reason.
         """
-        # Repeatedly issues workflowservice GetActivityResult long-polls.
-        raise NotImplementedError
+        await self._poll_until_outcome(
+            rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
+        )
+        data_converter = self._data_converter_override or self._client.data_converter
+        assert self._known_outcome
+        if isinstance(self._known_outcome, temporalio.api.failure.v1.Failure):
+            raise ActivityFailedError(
+                cause=await data_converter.decode_failure(self._known_outcome),
+            )
+        payloads = self._known_outcome
+        if not payloads.payloads:
+            # E.g. a void workflow function in another language may not set any payloads.
+            return None  # type: ignore
+        type_hints = [self._result_type] if self._result_type else None
+        results = await data_converter.decode(payloads.payloads, type_hints)
+        if not results:
+            # Following workflow/update/query result processing. Technically not necessary since
+            # from_payloads is documented to always return non-empty
+            return None  # type: ignore
+        elif len(results) > 1:
+            warnings.warn(f"Expected single activity result, got {len(results)}")
+        return results[0]
+
+    async def _poll_until_outcome(
+        self,
+        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> None:
+        """Poll for activity result until it's available."""
+        if self._known_outcome:
+            return
+
+        req = temporalio.api.workflowservice.v1.GetActivityExecutionResultRequest(
+            namespace=self._client.namespace,
+            activity_id=self._id,
+            run_id=self._run_id,
+            wait=True,  # Enable long polling
+        )
+
+        # Continue polling as long as we have no outcome
+        while True:
+            try:
+                res = await self._client.workflow_service.get_activity_execution_result(
+                    req,
+                    retry=True,
+                    metadata=rpc_metadata,
+                    timeout=rpc_timeout,
+                )
+                if res.HasField("result"):
+                    self._known_outcome = res.result
+                    return
+                elif res.HasField("failure"):
+                    self._known_outcome = res.failure
+                    return
+            except RPCError as err:
+                if err.status == RPCStatusCode.DEADLINE_EXCEEDED:
+                    # Deadline exceeded is expected with long polling; retry
+                    continue
+                elif err.status == RPCStatusCode.CANCELLED:
+                    raise asyncio.CancelledError() from err
+                else:
+                    raise
+            except asyncio.CancelledError:
+                raise
 
     async def cancel(
         self,
@@ -6225,7 +6302,7 @@ class WorkflowUpdateRPCTimeoutOrCancelledError(RPCTimeoutOrCancelledError):
         super().__init__("Timeout or cancellation waiting for update")
 
 
-class ActivityFailureError(temporalio.exceptions.TemporalError):
+class ActivityFailedError(temporalio.exceptions.TemporalError):
     """Error that occurs when a standalone activity is unsuccessful."""
 
     def __init__(self, *, cause: BaseException) -> None:
