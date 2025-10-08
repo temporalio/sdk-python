@@ -92,7 +92,6 @@ from temporalio.common import RetryPolicy
 from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents import (
     ModelActivityParameters,
-    StatefulMCPServerProvider,
     TestModel,
     TestModelProvider,
 )
@@ -109,7 +108,7 @@ from temporalio.workflow import ActivityConfig
 from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
 )
-from tests.helpers import assert_eventually, assert_task_fail_eventually, new_worker
+from tests.helpers import assert_eventually, new_worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 
@@ -2667,7 +2666,7 @@ async def test_stateful_mcp_server_no_worker(client: Client):
     ) as worker:
         workflow_handle = await client.start_workflow(
             McpServerStatefulWorkflow.run,
-            args=[timedelta(seconds=1)],
+            args=[timedelta(seconds=1), None],
             id=f"mcp-server-{uuid.uuid4()}",
             task_queue=worker.task_queue,
             execution_timeout=timedelta(seconds=30),
