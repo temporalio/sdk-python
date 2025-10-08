@@ -152,17 +152,21 @@ class StatelessMCPServerProvider:
                 so that state is not shared between workflow runs
         """
         self._server_factory = server_factory
+
+        # Cache whether the server factory needs to be provided with arguments
+        sig = inspect.signature(self._server_factory)
+        self._server_accepts_arguments = len(sig.parameters) != 0
+
         self._name = self._create_server(None).name + "-stateless"
         super().__init__()
 
     def _create_server(self, factory_argument: Optional[Any]) -> MCPServer:
-        sig = inspect.signature(self._server_factory)
-        if len(sig.parameters) == 0:
-            return cast(Callable[[], MCPServer], self._server_factory)()
-        else:
+        if self._server_accepts_arguments:
             return cast(Callable[[Optional[Any]], MCPServer], self._server_factory)(
                 factory_argument
             )
+        else:
+            return cast(Callable[[], MCPServer], self._server_factory)()
 
     @property
     def name(self) -> str:
