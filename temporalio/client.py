@@ -3031,35 +3031,35 @@ class ActivityExecution:
     activity_id: str
     """Activity ID."""
 
-    run_id: str
-    """Run ID of the activity."""
-
     activity_type: str
     """Type name of the activity."""
 
-    scheduled_time: datetime
-    """Time the activity was originally scheduled."""
-
     close_time: Optional[datetime]
     """Time the activity reached a terminal status, if closed."""
-
-    status: temporalio.common.ActivityExecutionStatus
-    """Current status of the activity."""
-
-    search_attributes: temporalio.common.SearchAttributes
-    """Search attributes from the start request."""
-
-    task_queue: str
-    """Task queue the activity was scheduled on."""
-
-    state_transition_count: int
-    """Number of state transitions."""
 
     execution_duration: Optional[timedelta]
     """Duration from scheduled to close time, only populated if closed."""
 
     raw_info: temporalio.api.activity.v1.ActivityListInfo
     """Underlying protobuf info."""
+
+    run_id: str
+    """Run ID of the activity."""
+
+    scheduled_time: datetime
+    """Time the activity was originally scheduled."""
+
+    search_attributes: temporalio.common.SearchAttributes
+    """Search attributes from the start request."""
+
+    state_transition_count: int
+    """Number of state transitions."""
+
+    status: temporalio.common.ActivityExecutionStatus
+    """Current status of the activity."""
+
+    task_queue: str
+    """Task queue the activity was scheduled on."""
 
     @classmethod
     def _from_raw_info(
@@ -3071,36 +3071,36 @@ class ActivityExecution:
         """Create from raw proto activity list info."""
         return cls(
             activity_id=info.activity_id,
-            run_id=info.run_id,
             activity_type=(
                 info.activity_type.name if info.HasField("activity_type") else ""
-            ),
-            scheduled_time=(
-                info.scheduled_time.ToDatetime().replace(tzinfo=timezone.utc)
-                if info.HasField("scheduled_time")
-                else datetime.min
             ),
             close_time=(
                 info.close_time.ToDatetime().replace(tzinfo=timezone.utc)
                 if info.HasField("close_time")
                 else None
             ),
-            status=(
-                temporalio.common.ActivityExecutionStatus(info.status)
-                if info.status
-                else temporalio.common.ActivityExecutionStatus.RUNNING
-            ),
-            search_attributes=temporalio.converter.decode_search_attributes(
-                info.search_attributes
-            ),
-            task_queue=info.task_queue,
-            state_transition_count=info.state_transition_count,
             execution_duration=(
                 info.execution_duration.ToTimedelta()
                 if info.HasField("execution_duration")
                 else None
             ),
             raw_info=info,
+            run_id=info.run_id,
+            scheduled_time=(
+                info.scheduled_time.ToDatetime().replace(tzinfo=timezone.utc)
+                if info.HasField("scheduled_time")
+                else datetime.min
+            ),
+            search_attributes=temporalio.converter.decode_search_attributes(
+                info.search_attributes
+            ),
+            state_transition_count=info.state_transition_count,
+            status=(
+                temporalio.common.ActivityExecutionStatus(info.status)
+                if info.status
+                else temporalio.common.ActivityExecutionStatus.RUNNING
+            ),
+            task_queue=info.task_queue,
         )
 
 
@@ -3108,32 +3108,32 @@ class ActivityExecution:
 class WorkflowActivityExecution:
     """Info for a workflow activity execution from list response."""
 
-    workflow_id: str
-    """ID of the workflow that started this activity."""
-
-    workflow_run_id: Optional[str]
-    """Run ID of the workflow that started this activity."""
-
     activity_id: str
     """Activity ID."""
 
     activity_type: str
     """Type name of the activity."""
 
-    scheduled_time: datetime
-    """Time the activity was originally scheduled."""
-
     close_time: Optional[datetime]
     """Time the activity reached a terminal status, if closed."""
-
-    task_queue: str
-    """Task queue the activity was scheduled on."""
 
     execution_duration: Optional[timedelta]
     """Duration from scheduled to close time, only populated if closed."""
 
     raw_info: temporalio.api.activity.v1.ActivityListInfo
     """Underlying protobuf info."""
+
+    scheduled_time: datetime
+    """Time the activity was originally scheduled."""
+
+    task_queue: str
+    """Task queue the activity was scheduled on."""
+
+    workflow_id: str
+    """ID of the workflow that started this activity."""
+
+    workflow_run_id: Optional[str]
+    """Run ID of the workflow that started this activity."""
 
     @classmethod
     def _from_raw_info(
@@ -3145,29 +3145,29 @@ class WorkflowActivityExecution:
         """Create from raw proto activity list info."""
         # For workflow activities, we expect workflow_id to be set
         return cls(
-            workflow_id=info.workflow_id,
-            workflow_run_id=None,  # Not provided in list response
             activity_id=info.activity_id,
             activity_type=info.activity_type.name
             if info.HasField("activity_type")
             else "",
-            scheduled_time=(
-                info.scheduled_time.ToDatetime().replace(tzinfo=timezone.utc)
-                if info.HasField("scheduled_time")
-                else datetime.min
-            ),
             close_time=(
                 info.close_time.ToDatetime().replace(tzinfo=timezone.utc)
                 if info.HasField("close_time")
                 else None
             ),
-            task_queue=info.task_queue,
             execution_duration=(
                 info.execution_duration.ToTimedelta()
                 if info.HasField("execution_duration")
                 else None
             ),
             raw_info=info,
+            scheduled_time=(
+                info.scheduled_time.ToDatetime().replace(tzinfo=timezone.utc)
+                if info.HasField("scheduled_time")
+                else datetime.min
+            ),
+            task_queue=info.task_queue,
+            workflow_id=info.workflow_id,
+            workflow_run_id=None,  # Not provided in list response
         )
 
 
@@ -3195,20 +3195,34 @@ class ActivityExecutionDescription:
     activity_id: str
     """Activity ID."""
 
-    run_id: str
-    """Run ID of the activity."""
-
     activity_type: str
     """Type name of the activity."""
 
-    status: temporalio.common.ActivityExecutionStatus
-    """Current status of the activity."""
+    attempt: int
+    """Current attempt number."""
 
-    run_state: Optional[temporalio.common.PendingActivityState]
-    """More detailed breakdown if status is RUNNING."""
+    canceled_reason: Optional[str]
+    """Reason for cancellation, if cancel was requested."""
+
+    current_retry_interval: Optional[timedelta]
+    """Time until the next retry, if applicable."""
+
+    eager_execution_requested: bool
+    """Whether eager execution was requested."""
+    expiration_time: datetime
+    """Scheduled time plus schedule_to_close_timeout."""
 
     heartbeat_details: Sequence[Any]
     """Details from the last heartbeat."""
+
+    input: Sequence[Any]
+    """Serialized activity input."""
+
+    last_attempt_complete_time: Optional[datetime]
+    """Time when the last attempt completed."""
+
+    last_failure: Optional[Exception]
+    """Failure from the last failed attempt, if any."""
 
     last_heartbeat_time: Optional[datetime]
     """Time of the last heartbeat."""
@@ -3216,56 +3230,41 @@ class ActivityExecutionDescription:
     last_started_time: Optional[datetime]
     """Time the last attempt was started."""
 
-    attempt: int
-    """Current attempt number."""
+    last_worker_identity: str
+    """Identity of the last worker that processed the activity."""
 
     maximum_attempts: int
     """Maximum number of attempts allowed."""
 
-    scheduled_time: datetime
-    """Time the activity was originally scheduled."""
-
-    expiration_time: datetime
-    """Scheduled time plus schedule_to_close_timeout."""
-
-    last_failure: Optional[Exception]
-    """Failure from the last failed attempt, if any."""
-
-    last_worker_identity: str
-    """Identity of the last worker that processed the activity."""
-
-    current_retry_interval: Optional[timedelta]
-    """Time until the next retry, if applicable."""
-
-    last_attempt_complete_time: Optional[datetime]
-    """Time when the last attempt completed."""
-
     next_attempt_schedule_time: Optional[datetime]
     """Time when the next attempt will be scheduled."""
-
-    task_queue: str
-    """Task queue the activity is scheduled on."""
 
     paused: bool
     """Whether the activity is paused."""
 
-    input: Sequence[Any]
-    """Serialized activity input."""
+    raw_info: Any
+    """Raw proto response."""
 
-    state_transition_count: int
-    """Number of state transitions."""
+    run_id: str
+    """Run ID of the activity."""
+
+    run_state: Optional[temporalio.common.PendingActivityState]
+    """More detailed breakdown if status is RUNNING."""
+
+    scheduled_time: datetime
+    """Time the activity was originally scheduled."""
 
     search_attributes: temporalio.common.SearchAttributes
     """Search attributes."""
 
-    eager_execution_requested: bool
-    """Whether eager execution was requested."""
+    state_transition_count: int
+    """Number of state transitions."""
 
-    canceled_reason: Optional[str]
-    """Reason for cancellation, if cancel was requested."""
+    status: temporalio.common.ActivityExecutionStatus
+    """Current status of the activity."""
 
-    raw_info: Any
-    """Raw proto response."""
+    task_queue: str
+    """Task queue the activity is scheduled on."""
 
     @classmethod
     async def _from_raw_info(
@@ -3276,24 +3275,44 @@ class ActivityExecutionDescription:
         """Create from raw proto activity info."""
         return cls(
             activity_id=info.activity_id,
-            run_id=info.run_id,
             activity_type=(
                 info.activity_type.name if info.HasField("activity_type") else ""
             ),
-            status=(
-                temporalio.common.ActivityExecutionStatus(info.status)
-                if info.status
-                else temporalio.common.ActivityExecutionStatus.RUNNING
-            ),
-            run_state=(
-                temporalio.common.PendingActivityState(info.run_state)
-                if info.run_state
+            attempt=info.attempt,
+            canceled_reason=info.canceled_reason,
+            current_retry_interval=(
+                info.current_retry_interval.ToTimedelta()
+                if info.HasField("current_retry_interval")
                 else None
+            ),
+            eager_execution_requested=info.eager_execution_requested,
+            expiration_time=(
+                info.expiration_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("expiration_time")
+                else datetime.min
             ),
             heartbeat_details=(
                 await data_converter.decode(info.heartbeat_details.payloads)
                 if info.HasField("heartbeat_details")
                 else []
+            ),
+            input=(
+                await data_converter.decode(info.input.payloads)
+                if info.HasField("input")
+                else []
+            ),
+            last_attempt_complete_time=(
+                info.last_attempt_complete_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("last_attempt_complete_time")
+                else None
+            ),
+            last_failure=(
+                cast(
+                    Optional[Exception],
+                    await data_converter.decode_failure(info.last_failure),
+                )
+                if info.HasField("last_failure")
+                else None
             ),
             last_heartbeat_time=(
                 info.last_heartbeat_time.ToDatetime(tzinfo=timezone.utc)
@@ -3305,41 +3324,34 @@ class ActivityExecutionDescription:
                 if info.HasField("last_started_time")
                 else None
             ),
-            attempt=info.attempt,
+            last_worker_identity=info.last_worker_identity,
             maximum_attempts=info.maximum_attempts,
+            next_attempt_schedule_time=(
+                info.next_attempt_schedule_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("next_attempt_schedule_time")
+                else None
+            ),
+            paused=info.HasField("pause_info"),
+            raw_info=info,
+            run_id=info.run_id,
+            run_state=(
+                temporalio.common.PendingActivityState(info.run_state)
+                if info.run_state
+                else None
+            ),
             scheduled_time=(
                 info.scheduled_time.ToDatetime(tzinfo=timezone.utc)
                 if info.HasField("scheduled_time")
                 else datetime.min
             ),
-            expiration_time=(
-                info.expiration_time.ToDatetime(tzinfo=timezone.utc)
-                if info.HasField("expiration_time")
-                else datetime.min
+            search_attributes=temporalio.converter.decode_search_attributes(
+                info.search_attributes
             ),
-            last_failure=(
-                cast(
-                    Optional[Exception],
-                    await data_converter.decode_failure(info.last_failure),
-                )
-                if info.HasField("last_failure")
-                else None
-            ),
-            last_worker_identity=info.last_worker_identity,
-            current_retry_interval=(
-                info.current_retry_interval.ToTimedelta()
-                if info.HasField("current_retry_interval")
-                else None
-            ),
-            last_attempt_complete_time=(
-                info.last_attempt_complete_time.ToDatetime(tzinfo=timezone.utc)
-                if info.HasField("last_attempt_complete_time")
-                else None
-            ),
-            next_attempt_schedule_time=(
-                info.next_attempt_schedule_time.ToDatetime(tzinfo=timezone.utc)
-                if info.HasField("next_attempt_schedule_time")
-                else None
+            state_transition_count=info.state_transition_count,
+            status=(
+                temporalio.common.ActivityExecutionStatus(info.status)
+                if info.status
+                else temporalio.common.ActivityExecutionStatus.RUNNING
             ),
             task_queue=(
                 info.activity_options.task_queue.name
@@ -3347,19 +3359,6 @@ class ActivityExecutionDescription:
                 and info.activity_options.HasField("task_queue")
                 else ""
             ),
-            paused=info.HasField("pause_info"),
-            input=(
-                await data_converter.decode(info.input.payloads)
-                if info.HasField("input")
-                else []
-            ),
-            state_transition_count=info.state_transition_count,
-            search_attributes=temporalio.converter.decode_search_attributes(
-                info.search_attributes
-            ),
-            eager_execution_requested=info.eager_execution_requested,
-            canceled_reason=info.canceled_reason,
-            raw_info=info,
         )
 
 
