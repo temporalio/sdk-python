@@ -97,7 +97,8 @@ class BaseWorkflowSerializationContext(SerializationContext):
     """Base serialization context shared by workflow and activity serialization contexts."""
 
     namespace: str
-    workflow_id: str
+    workflow_id: Optional[str]
+    """Workflow ID."""
 
 
 @dataclass(frozen=True)
@@ -134,10 +135,20 @@ class ActivitySerializationContext(BaseWorkflowSerializationContext):
         is_local: Whether the activity is a local activity.
     """
 
-    workflow_type: str
+    workflow_type: Optional[str]
+    """Workflow type."""
+
     activity_type: str
+    """Activity type."""
+
+    activity_id: Optional[str]
+    """Activity ID."""
+
     activity_task_queue: str
+    """Activity task queue."""
+
     is_local: bool
+    """Whether the activity is a local activity."""
 
 
 class WithSerializationContext(ABC):

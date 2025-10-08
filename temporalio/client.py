@@ -43,6 +43,7 @@ import google.protobuf.timestamp_pb2
 from google.protobuf.internal.containers import MessageMap
 from typing_extensions import Concatenate, Required, Self, TypedDict
 
+import temporalio.activity
 import temporalio.api.activity.v1
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -65,6 +66,7 @@ import temporalio.service
 import temporalio.workflow
 from temporalio.activity import ActivityCancellationDetails
 from temporalio.converter import (
+    ActivitySerializationContext,
     DataConverter,
     SerializationContext,
     WithSerializationContext,
@@ -1287,18 +1289,19 @@ class Client:
     # - TODO: Support sync and async activity functions
     async def start_activity(
         self,
-        activity: Callable[..., ReturnType],
+        activity: Union[str, Callable[..., Awaitable[ReturnType]]],
         *,
-        args: Sequence[Any],
+        args: Sequence[Any] = [],
         id: str,
         task_queue: str,
+        result_type: Optional[Type] = None,
         # Either schedule_to_close_timeout or start_to_close_timeout must be present
         schedule_to_close_timeout: Optional[timedelta] = None,
         start_to_close_timeout: Optional[timedelta] = None,
         schedule_to_start_timeout: Optional[timedelta] = None,
         heartbeat_timeout: Optional[timedelta] = None,
-        id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
-        id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.FAIL,
+        id_reuse_policy: temporalio.common.IdReusePolicy = temporalio.common.IdReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.IdConflictPolicy = temporalio.common.IdConflictPolicy.FAIL,
         retry_policy: Optional[temporalio.common.RetryPolicy] = None,
         search_attributes: Optional[
             Union[
@@ -1315,41 +1318,118 @@ class Client:
         """Start an activity and return its handle.
 
         Args:
-            activity: The activity function to execute.
+            activity: String name or callable activity function to execute.
             args: Arguments to pass to the activity.
             id: Unique identifier for the activity. Required.
             task_queue: Task queue to send the activity to.
+            result_type: For string name activities, optional type to deserialize result into.
             schedule_to_close_timeout: Total time allowed for the activity from schedule to completion.
             start_to_close_timeout: Time allowed for a single execution attempt.
             schedule_to_start_timeout: Time allowed for the activity to sit in the task queue.
             heartbeat_timeout: Time between heartbeats before the activity is considered failed.
             id_reuse_policy: How to handle reusing activity IDs from closed activities.
+                Default is ALLOW_DUPLICATE.
             id_conflict_policy: How to handle activity ID conflicts with running activities.
+                Default is FAIL.
             retry_policy: Retry policy for the activity.
-            search_attributes: Search attributes to attach to the activity.
-            static_summary: A single-line fixed summary for this workflow execution that may appear
+            search_attributes: Search attributes for the activity.
+            static_summary: A single-line fixed summary for this activity that may appear
                 in the UI/CLI. This can be in single-line Temporal markdown format.
-            static_details: General fixed details for this workflow execution that may appear in
-                UI/CLI. This can be in Temporal markdown format and can span multiple lines. This is
-                a fixed value on the workflow that cannot be updated. For details that can be
-                updated, use :py:meth:`temporalio.workflow.get_current_details` within the workflow.
-            priority: Priority metadata.
+            static_details: General fixed details for this activity that may appear in
+                UI/CLI. This can be in Temporal markdown format and can span multiple lines.
+            priority: Priority of the activity execution.
             rpc_metadata: Headers used on the RPC call.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
         Returns:
             A handle to the started activity.
         """
-        # Issues workflowservice StartActivityExecution
-        raise NotImplementedError
+        name, result_type_from_type_annotation = (
+            temporalio.activity._Definition.get_name_and_result_type(activity)
+        )
+        return await self._impl.start_activity(
+            StartActivityInput(
+                activity_type=name,
+                args=args,
+                id=id,
+                task_queue=task_queue,
+                ret_type=result_type or result_type_from_type_annotation,
+                schedule_to_close_timeout=schedule_to_close_timeout,
+                start_to_close_timeout=start_to_close_timeout,
+                schedule_to_start_timeout=schedule_to_start_timeout,
+                heartbeat_timeout=heartbeat_timeout,
+                id_reuse_policy=id_reuse_policy,
+                id_conflict_policy=id_conflict_policy,
+                retry_policy=retry_policy,
+                search_attributes=search_attributes,
+                static_summary=static_summary,
+                static_details=static_details,
+                headers={},
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+                priority=priority,
+            )
+        )
 
-    # Same parameters as start_activity
-    # (*args **kwargs is just temporary to avoid duplicating parameter lists while they're being designed)
-    async def execute_activity(self, *args, **kwargs) -> ReturnType:
+    async def execute_activity(
+        self,
+        activity: Union[str, Callable[..., Awaitable[ReturnType]]],
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str,
+        result_type: Optional[Type] = None,
+        # Either schedule_to_close_timeout or start_to_close_timeout must be present
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        start_to_close_timeout: Optional[timedelta] = None,
+        schedule_to_start_timeout: Optional[timedelta] = None,
+        heartbeat_timeout: Optional[timedelta] = None,
+        id_reuse_policy: temporalio.common.IdReusePolicy = temporalio.common.IdReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.IdConflictPolicy = temporalio.common.IdConflictPolicy.FAIL,
+        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        search_attributes: Optional[
+            Union[
+                temporalio.common.SearchAttributes,
+                temporalio.common.TypedSearchAttributes,
+            ]
+        ] = None,
+        static_summary: Optional[str] = None,
+        static_details: Optional[str] = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> ReturnType:
+        """Start an activity, wait for it to complete, and return its result.
+
+        This is a convenience method that combines :py:meth:`start_activity` and
+        :py:meth:`ActivityHandle.result`.
+
+        Returns:
+            The result of the activity.
+
+        Raises:
+            ActivityFailedError: If the activity completed with a failure.
         """
-        Start an activity, wait for it to complete, and return its result.
-        """
-        handle = await self.start_activity(*args, **kwargs)
+        handle = await self.start_activity(
+            activity,
+            args=args,
+            id=id,
+            task_queue=task_queue,
+            result_type=result_type,
+            schedule_to_close_timeout=schedule_to_close_timeout,
+            start_to_close_timeout=start_to_close_timeout,
+            schedule_to_start_timeout=schedule_to_start_timeout,
+            heartbeat_timeout=heartbeat_timeout,
+            id_reuse_policy=id_reuse_policy,
+            id_conflict_policy=id_conflict_policy,
+            retry_policy=retry_policy,
+            search_attributes=search_attributes,
+            static_summary=static_summary,
+            static_details=static_details,
+            priority=priority,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
+        )
         return await handle.result()
 
     def list_activities(
@@ -1456,6 +1536,7 @@ class Client:
     def get_async_activity_handle(self, *, task_token: bytes) -> AsyncActivityHandle:
         pass
 
+    # TODO(dan): add typed API get_async_activity_handle_for?
     def get_async_activity_handle(
         self,
         *,
@@ -6474,6 +6555,36 @@ class TerminateWorkflowInput:
 
 
 @dataclass
+class StartActivityInput:
+    """Input for :py:meth:`OutboundInterceptor.start_activity`."""
+
+    activity_type: str
+    args: Sequence[Any]
+    id: str
+    task_queue: str
+    ret_type: Optional[Type]
+    schedule_to_close_timeout: Optional[timedelta]
+    start_to_close_timeout: Optional[timedelta]
+    schedule_to_start_timeout: Optional[timedelta]
+    heartbeat_timeout: Optional[timedelta]
+    id_reuse_policy: temporalio.common.IdReusePolicy
+    id_conflict_policy: temporalio.common.IdConflictPolicy
+    retry_policy: Optional[temporalio.common.RetryPolicy]
+    priority: temporalio.common.Priority
+    search_attributes: Optional[
+        Union[
+            temporalio.common.SearchAttributes,
+            temporalio.common.TypedSearchAttributes,
+        ]
+    ]
+    static_summary: Optional[str]
+    static_details: Optional[str]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
+    rpc_metadata: Mapping[str, Union[str, bytes]]
+    rpc_timeout: Optional[timedelta]
+
+
+@dataclass
 class CancelActivityInput:
     """Input for :py:meth:`OutboundInterceptor.cancel_activity`."""
 
@@ -6865,6 +6976,10 @@ class OutboundInterceptor:
         await self.next.terminate_workflow(input)
 
     ### Activity calls
+
+    async def start_activity(self, input: StartActivityInput) -> ActivityHandle[Any]:
+        """Called for every :py:meth:`Client.start_activity` call."""
+        return await self.next.start_activity(input)
 
     async def cancel_activity(self, input: CancelActivityInput) -> None:
         """Called for every :py:meth:`ActivityHandle.cancel` call."""
@@ -7342,6 +7457,110 @@ class _ClientImpl(OutboundInterceptor):
         await self._client.workflow_service.terminate_workflow_execution(
             req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
         )
+
+    async def start_activity(self, input: StartActivityInput) -> ActivityHandle[Any]:
+        """Start an activity and return a handle to it."""
+        if not (input.start_to_close_timeout or input.schedule_to_close_timeout):
+            raise ValueError(
+                "Activity must have start_to_close_timeout or schedule_to_close_timeout"
+            )
+        req = await self._build_start_activity_execution_request(input)
+
+        # TODO(dan): any counterpart of WorkflowExecutionAlreadyStartedFailure?
+        # If RPCError with err.status == RPCStatusCode.ALREADY_EXISTS
+
+        resp = await self._client.workflow_service.start_activity_execution(
+            req,
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+        return ActivityHandle(
+            self._client,
+            id=input.id,
+            run_id=resp.run_id,
+            result_type=input.ret_type,
+        )
+
+    async def _build_start_activity_execution_request(
+        self, input: StartActivityInput
+    ) -> temporalio.api.workflowservice.v1.StartActivityExecutionRequest:
+        """Build StartActivityExecutionRequest from input."""
+        data_converter = self._client.data_converter.with_context(
+            ActivitySerializationContext(
+                namespace=self._client.namespace,
+                activity_id=input.id,
+                activity_type=input.activity_type,
+                activity_task_queue=input.task_queue,
+                is_local=False,
+                workflow_id=None,
+                workflow_type=None,
+            )
+        )
+
+        req = temporalio.api.workflowservice.v1.StartActivityExecutionRequest(
+            namespace=self._client.namespace,
+            identity=self._client.identity,
+            activity_id=input.id,
+            activity_type=temporalio.api.common.v1.ActivityType(
+                name=input.activity_type
+            ),
+            id_reuse_policy=cast(
+                "temporalio.api.enums.v1.IdReusePolicy.ValueType",
+                int(input.id_reuse_policy),
+            ),
+            id_conflict_policy=cast(
+                "temporalio.api.enums.v1.IdConflictPolicy.ValueType",
+                int(input.id_conflict_policy),
+            ),
+        )
+
+        # Build ActivityOptions
+        options = temporalio.api.activity.v1.ActivityOptions(
+            task_queue=temporalio.api.taskqueue.v1.TaskQueue(name=input.task_queue),
+        )
+        if input.schedule_to_close_timeout is not None:
+            options.schedule_to_close_timeout.FromTimedelta(
+                input.schedule_to_close_timeout
+            )
+        if input.start_to_close_timeout is not None:
+            options.start_to_close_timeout.FromTimedelta(input.start_to_close_timeout)
+        if input.schedule_to_start_timeout is not None:
+            options.schedule_to_start_timeout.FromTimedelta(
+                input.schedule_to_start_timeout
+            )
+        if input.heartbeat_timeout is not None:
+            options.heartbeat_timeout.FromTimedelta(input.heartbeat_timeout)
+        if input.retry_policy is not None:
+            input.retry_policy.apply_to_proto(options.retry_policy)
+        req.options.CopyFrom(options)
+
+        # Set input payloads
+        if input.args:
+            req.input.payloads.extend(await data_converter.encode(input.args))
+
+        # Set search attributes
+        if input.search_attributes is not None:
+            temporalio.converter.encode_search_attributes(
+                input.search_attributes, req.search_attributes
+            )
+
+        # Set user metadata
+        metadata = await _encode_user_metadata(
+            data_converter, input.static_summary, input.static_details
+        )
+        if metadata is not None:
+            req.user_metadata.CopyFrom(metadata)
+
+        # Set headers
+        if input.headers is not None:
+            await self._apply_headers(input.headers, req.header.fields)
+
+        # Set priority
+        if input.priority is not None:
+            req.priority.CopyFrom(input.priority._to_proto())
+
+        return req
 
     async def cancel_activity(self, input: CancelActivityInput) -> None:
         """Cancel a standalone activity."""

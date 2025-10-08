@@ -154,6 +154,42 @@ class WorkflowIDConflictPolicy(IntEnum):
     )
 
 
+class IdReusePolicy(IntEnum):
+    """How already-closed entity IDs are handled on start.
+
+    See :py:class:`temporalio.api.enums.v1.IdReusePolicy`.
+    """
+
+    UNSPECIFIED = int(temporalio.api.enums.v1.IdReusePolicy.ID_REUSE_POLICY_UNSPECIFIED)
+    ALLOW_DUPLICATE = int(
+        temporalio.api.enums.v1.IdReusePolicy.ID_REUSE_POLICY_ALLOW_DUPLICATE
+    )
+    ALLOW_DUPLICATE_FAILED_ONLY = int(
+        temporalio.api.enums.v1.IdReusePolicy.ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY
+    )
+    REJECT_DUPLICATE = int(
+        temporalio.api.enums.v1.IdReusePolicy.ID_REUSE_POLICY_REJECT_DUPLICATE
+    )
+
+
+class IdConflictPolicy(IntEnum):
+    """How already-running entity IDs are handled on start.
+
+    See :py:class:`temporalio.api.enums.v1.IdConflictPolicy`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.IdConflictPolicy.ID_CONFLICT_POLICY_UNSPECIFIED
+    )
+    FAIL = int(temporalio.api.enums.v1.IdConflictPolicy.ID_CONFLICT_POLICY_FAIL)
+    USE_EXISTING = int(
+        temporalio.api.enums.v1.IdConflictPolicy.ID_CONFLICT_POLICY_USE_EXISTING
+    )
+    TERMINATE_EXISTING = int(
+        temporalio.api.enums.v1.IdConflictPolicy.ID_CONFLICT_POLICY_TERMINATE_EXISTING
+    )
+
+
 class ActivityExecutionStatus(IntEnum):
     """Status of a standalone activity execution.
 

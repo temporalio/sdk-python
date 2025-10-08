@@ -231,6 +231,7 @@ async def test_payload_conversion_calls_follow_expected_sequence_and_contexts(
                 workflow_id=workflow_id,
                 workflow_type=PayloadConversionWorkflow.__name__,
                 activity_type=passthrough_activity.__name__,
+                activity_id=None,
                 activity_task_queue=task_queue,
                 is_local=False,
             )
@@ -370,6 +371,7 @@ async def test_heartbeat_details_payload_conversion(client: Client):
                 workflow_id=workflow_id,
                 workflow_type=HeartbeatDetailsSerializationContextTestWorkflow.__name__,
                 activity_type=activity_with_heartbeat_details.__name__,
+                activity_id=None,
                 activity_task_queue=task_queue,
                 is_local=False,
             )
@@ -459,6 +461,7 @@ async def test_local_activity_payload_conversion(client: Client):
                 workflow_id=workflow_id,
                 workflow_type=LocalActivityWorkflow.__name__,
                 activity_type=local_activity.__name__,
+                activity_id=None,
                 activity_task_queue=task_queue,
                 is_local=True,
             )
@@ -572,6 +575,7 @@ async def test_async_activity_completion_payload_conversion(
             workflow_id=workflow_id,
             workflow_type=AsyncActivityCompletionSerializationContextTestWorkflow.__name__,
             activity_type=async_activity.__name__,
+            activity_id=None,
             activity_task_queue=task_queue,
             is_local=False,
         )
@@ -644,6 +648,7 @@ def test_subclassed_async_activity_handle(client: Client):
         workflow_id="workflow-id",
         workflow_type="workflow-type",
         activity_type="activity-type",
+        activity_id=None,
         activity_task_queue="activity-task-queue",
         is_local=False,
     )
@@ -1062,7 +1067,7 @@ class FailureConverterTestWorkflow:
         raise Exception("Unreachable")
 
 
-test_traces: dict[str, list[TraceItem]] = defaultdict(list)
+test_traces: dict[Optional[str], list[TraceItem]] = defaultdict(list)
 
 
 class FailureConverterWithContext(DefaultFailureConverter, WithSerializationContext):
@@ -1154,6 +1159,7 @@ async def test_failure_converter_with_context(client: Client):
                 workflow_id=workflow_id,
                 workflow_type=FailureConverterTestWorkflow.__name__,
                 activity_type=failing_activity.__name__,
+                activity_id=None,
                 activity_task_queue=task_queue,
                 is_local=False,
             )
@@ -1360,6 +1366,7 @@ async def test_local_activity_codec_with_context(client: Client):
             workflow_id=workflow_id,
             workflow_type=LocalActivityCodecTestWorkflow.__name__,
             activity_type=codec_test_local_activity.__name__,
+            activity_id=None,
             activity_task_queue=task_queue,
             is_local=True,
         )
