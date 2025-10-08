@@ -35,6 +35,7 @@ class _StatelessMCPServerReference(MCPServer):
         server: str,
         config: Optional[ActivityConfig],
         cache_tools_list: bool,
+        factory_arguments: Optional[Any] = None,
     ):
         self._name = server + "-stateless"
         self._config = config or ActivityConfig(
@@ -42,6 +43,7 @@ class _StatelessMCPServerReference(MCPServer):
         )
         self._cache_tools_list = cache_tools_list
         self._tools = None
+        self._factory_arguments = factory_arguments
         super().__init__()
 
     @property
@@ -63,7 +65,7 @@ class _StatelessMCPServerReference(MCPServer):
             return self._tools
         tools = await workflow.execute_activity(
             self.name + "-list-tools",
-            args=[],
+            args=[self._factory_arguments],
             result_type=list[MCPTool],
             **self._config,
         )
@@ -76,7 +78,7 @@ class _StatelessMCPServerReference(MCPServer):
     ) -> CallToolResult:
         return await workflow.execute_activity(
             self.name + "-call-tool",
-            args=[tool_name, arguments],
+            args=[tool_name, arguments, self._factory_arguments],
             result_type=CallToolResult,
             **self._config,
         )
@@ -84,7 +86,7 @@ class _StatelessMCPServerReference(MCPServer):
     async def list_prompts(self) -> ListPromptsResult:
         return await workflow.execute_activity(
             self.name + "-list-prompts",
-            args=[],
+            args=[self._factory_arguments],
             result_type=ListPromptsResult,
             **self._config,
         )
@@ -94,7 +96,7 @@ class _StatelessMCPServerReference(MCPServer):
     ) -> GetPromptResult:
         return await workflow.execute_activity(
             self.name + "-get-prompt",
-            args=[name, arguments],
+            args=[name, arguments, self._factory_arguments],
             result_type=GetPromptResult,
             **self._config,
         )
@@ -111,7 +113,7 @@ class StatelessMCPServerProvider:
     function, this cannot be used.
     """
 
-    def __init__(self, server_factory: Callable[[], MCPServer]):
+    def __init__(self, server_factory: Callable[[Optional[Any]], MCPServer]):
         """Initialize the stateless temporal MCP server.
 
         Args:
@@ -119,7 +121,7 @@ class StatelessMCPServerProvider:
                 so that state is not shared between workflow runs
         """
         self._server_factory = server_factory
-        self._name = server_factory().name + "-stateless"
+        self._name = server_factory(None).name + "-stateless"
         super().__init__()
 
     @property
@@ -129,8 +131,8 @@ class StatelessMCPServerProvider:
 
     def _get_activities(self) -> Sequence[Callable]:
         @activity.defn(name=self.name + "-list-tools")
-        async def list_tools() -> list[MCPTool]:
-            server = self._server_factory()
+        async def list_tools(factory_arguments: Optional[Any]) -> list[MCPTool]:
+            server = self._server_factory(factory_arguments)
             try:
                 await server.connect()
                 return await server.list_tools()
@@ -139,9 +141,9 @@ class StatelessMCPServerProvider:
 
         @activity.defn(name=self.name + "-call-tool")
         async def call_tool(
-            tool_name: str, arguments: Optional[dict[str, Any]]
+            tool_name: str, arguments: Optional[dict[str, Any]], factory_arguments: Optional[Any]
         ) -> CallToolResult:
-            server = self._server_factory()
+            server = self._server_factory(factory_arguments)
             try:
                 await server.connect()
                 return await server.call_tool(tool_name, arguments)
@@ -149,8 +151,8 @@ class StatelessMCPServerProvider:
                 await server.cleanup()
 
         @activity.defn(name=self.name + "-list-prompts")
-        async def list_prompts() -> ListPromptsResult:
-            server = self._server_factory()
+        async def list_prompts(factory_arguments: Optional[Any]) -> ListPromptsResult:
+            server = self._server_factory(factory_arguments)
             try:
                 await server.connect()
                 return await server.list_prompts()
@@ -159,9 +161,9 @@ class StatelessMCPServerProvider:
 
         @activity.defn(name=self.name + "-get-prompt")
         async def get_prompt(
-            name: str, arguments: Optional[dict[str, Any]]
+            name: str, arguments: Optional[dict[str, Any]], factory_arguments: Optional[Any]
         ) -> GetPromptResult:
-            server = self._server_factory()
+            server = self._server_factory(factory_arguments)
             try:
                 await server.connect()
                 return await server.get_prompt(name, arguments)
