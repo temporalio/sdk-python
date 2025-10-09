@@ -316,7 +316,6 @@ async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
 async def test_opentelemetry_tracing_update_with_start(
     client: Client, env: WorkflowEnvironment
 ):
-    # TODO(cretz): Fix
     if env.supports_time_skipping:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
