@@ -2464,9 +2464,9 @@ async def test_mcp_server(
 
     tracking_server = get_tracking_server(name="HelloServer")
     server: Union[StatefulMCPServerProvider, StatelessMCPServerProvider] = (
-        StatefulMCPServerProvider(lambda _: tracking_server)
+        StatefulMCPServerProvider("HelloServer", lambda _: tracking_server)
         if stateful
-        else StatelessMCPServerProvider(lambda _: tracking_server)
+        else StatelessMCPServerProvider("HelloServer", lambda _: tracking_server)
     )
 
     new_config = client.config()
@@ -2577,9 +2577,9 @@ async def test_mcp_server_factory_argument(client: Client, stateful: bool):
         return get_tracking_server("HelloServer")
 
     server: Union[StatefulMCPServerProvider, StatelessMCPServerProvider] = (
-        StatefulMCPServerProvider(factory)
+        StatefulMCPServerProvider("HelloServer", factory)
         if stateful
-        else StatelessMCPServerProvider(factory)
+        else StatelessMCPServerProvider("HelloServer", factory)
     )
 
     new_config = client.config()
@@ -2625,6 +2625,7 @@ async def test_stateful_mcp_server_no_worker(client: Client):
     from temporalio.contrib.openai_agents import StatefulMCPServerProvider
 
     server = StatefulMCPServerProvider(
+        "Filesystem-Server",
         lambda _: MCPServerStdio(
             name="Filesystem-Server",
             params={
@@ -2635,7 +2636,7 @@ async def test_stateful_mcp_server_no_worker(client: Client):
                     os.path.dirname(os.path.abspath(__file__)),
                 ],
             },
-        )
+        ),
     )
 
     # Override the connect activity to not actually start a worker

@@ -141,6 +141,7 @@ class StatelessMCPServerProvider:
 
     def __init__(
         self,
+        name: str,
         server_factory: Union[
             Callable[[], MCPServer], Callable[[Optional[Any]], MCPServer]
         ],
@@ -148,8 +149,9 @@ class StatelessMCPServerProvider:
         """Initialize the stateless temporal MCP server.
 
         Args:
+            name: The name of the MCP server.
             server_factory: A function which will produce MCPServer instances. It should return a new server each time
-                so that state is not shared between workflow runs
+                so that state is not shared between workflow runs.
         """
         self._server_factory = server_factory
 
@@ -157,7 +159,7 @@ class StatelessMCPServerProvider:
         sig = inspect.signature(self._server_factory)
         self._server_accepts_arguments = len(sig.parameters) != 0
 
-        self._name = self._create_server(None).name + "-stateless"
+        self._name = name + "-stateless"
         super().__init__()
 
     def _create_server(self, factory_argument: Optional[Any]) -> MCPServer:
@@ -417,16 +419,18 @@ class StatefulMCPServerProvider:
 
     def __init__(
         self,
+        name: str,
         server_factory: Callable[[Optional[Any]], MCPServer],
     ):
         """Initialize the stateful temporal MCP server.
 
         Args:
+            name: The name of the MCP server.
             server_factory: A function which will produce MCPServer instances. It should return a new server each time
                 so that state is not shared between workflow runs
         """
         self._server_factory = server_factory
-        self._name = server_factory(None).name + "-stateful"
+        self._name = name + "-stateful"
         self._connect_handle: Optional[ActivityHandle] = None
         self._servers: dict[str, MCPServer] = {}
         super().__init__()
