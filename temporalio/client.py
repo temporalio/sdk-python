@@ -1208,6 +1208,7 @@ class Client:
             start_workflow_input=start_workflow_operation._start_workflow_input,
             update_workflow_input=update_input,
             _on_start=on_start,
+            headers={},
             _on_start_error=on_start_error,
         )
 
@@ -5538,6 +5539,7 @@ class StartWorkflowUpdateWithStartInput:
         [temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse], None
     ]
     _on_start_error: Callable[[BaseException], None]
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
 @dataclass
@@ -6362,6 +6364,10 @@ class _ClientImpl(OutboundInterceptor):
         err: Optional[BaseException] = None
 
         try:
+            # fan headers out to commands
+            input.start_workflow_input.headers = input.headers
+            input.update_workflow_input.headers = input.headers
+
             return await self._start_workflow_update_with_start(
                 input.start_workflow_input, input.update_workflow_input, on_start
             )
