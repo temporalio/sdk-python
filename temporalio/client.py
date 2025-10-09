@@ -6363,11 +6363,11 @@ class _ClientImpl(OutboundInterceptor):
 
         err: Optional[BaseException] = None
 
-        try:
-            # fan headers out to both operations
-            input.start_workflow_input.headers = input.headers
-            input.update_workflow_input.headers = input.headers
+        # fan headers out to both operations
+        input.start_workflow_input.headers = input.headers
+        input.update_workflow_input.headers = input.headers
 
+        try:
             return await self._start_workflow_update_with_start(
                 input.start_workflow_input, input.update_workflow_input, on_start
             )
