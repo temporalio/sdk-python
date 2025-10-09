@@ -2565,13 +2565,10 @@ async def test_mcp_server_factory_argument(client: Client, stateful: bool):
         StatelessMCPServerProvider,
     )
 
-    args_seen = False
-
     def factory(args: Optional[Any]) -> MCPServer:
         print("Invoking factory: ", args)
         if args is not None:
-            nonlocal args_seen
-            args_seen = True
+            assert args is not None
             assert cast(dict[str, str], args).get("user") == "blah"
 
         return get_tracking_server("HelloServer")
@@ -2614,7 +2611,6 @@ async def test_mcp_server_factory_argument(client: Client, stateful: bool):
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=30),
             )
-    assert args_seen
 
 
 async def test_stateful_mcp_server_no_worker(client: Client):
