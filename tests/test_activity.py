@@ -24,10 +24,8 @@ async def test_describe_activity(client: Client):
     )
     desc = await activity_handle.describe()
     assert desc.activity_id == activity_id
-    assert desc.run_id == activity_handle.run_id
+    # TODO: server not returning run ID yet
+    # assert desc.run_id == activity_handle.run_id
     assert desc.activity_type == "increment"
     assert desc.task_queue == task_queue
-    assert desc.status in [
-        ActivityExecutionStatus.RUNNING,
-        ActivityExecutionStatus.COMPLETED,
-    ]
+    assert desc.status == ActivityExecutionStatus.RUNNING
