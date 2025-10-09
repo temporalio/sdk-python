@@ -14,7 +14,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import StatusCode, get_tracer
 
 from temporalio import activity, workflow
-from temporalio.client import Client, WithStartWorkflowOperation
+from temporalio.client import Client, WithStartWorkflowOperation, WorkflowUpdateStage
 from temporalio.common import RetryPolicy, WorkflowIDConflictPolicy
 from temporalio.contrib.opentelemetry import TracingInterceptor
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
@@ -184,8 +184,6 @@ async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
         )
     global ready_for_update
     ready_for_update = asyncio.Semaphore(0)
-    global ready_for_update_with_start
-    ready_for_update_with_start = asyncio.Semaphore(0)
     # Create a tracer that has an in-memory exporter
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
@@ -320,8 +318,6 @@ async def test_opentelemetry_tracing_update_with_start(
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
         )
-    global ready_for_update
-    ready_for_update = asyncio.Semaphore(0)
     global ready_for_update_with_start
     ready_for_update_with_start = asyncio.Semaphore(0)
     # Create a tracer that has an in-memory exporter
@@ -365,25 +361,27 @@ async def test_opentelemetry_tracing_update_with_start(
                 task_queue=task_queue,
                 id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
             )
-            await client.execute_update_with_start_workflow(
-                update=TracingWorkflow.update_with_start,
+            await client.start_update_with_start_workflow(
+                TracingWorkflow.update_with_start,
                 start_workflow_operation=start_op,
                 id=handle.id,
+                wait_for_stage=WorkflowUpdateStage.ACCEPTED,
             )
         await handle.result()
 
-        # issue update with start again now that the former has completed
+        # issue update with start again to trigger a new workflow
+        workflow_id = f"workflow_{uuid.uuid4()}"
         start_op = WithStartWorkflowOperation(
             TracingWorkflow.run,
             TracingWorkflowParam(actions=[]),
-            id="second-workflow",
+            id=workflow_id,
             task_queue=task_queue,
             id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
         )
         await client.execute_update_with_start_workflow(
             update=TracingWorkflow.update_with_start,
             start_workflow_operation=start_op,
-            id="second-workflow",
+            id=workflow_id,
         )
 
     # Dump debug with attributes, but do string assertion test without
