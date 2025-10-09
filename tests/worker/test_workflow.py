@@ -44,7 +44,9 @@ from typing_extensions import Literal, Protocol, runtime_checkable
 import temporalio.activity
 import temporalio.api.sdk.v1
 import temporalio.client
+import temporalio.converter
 import temporalio.worker
+import temporalio.worker._command_aware_visitor
 import temporalio.workflow
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
@@ -1608,6 +1610,12 @@ class CustomWorkflowInstance(WorkflowInstance):
         comp = self._unsandboxed.activate(act)
         self._runner._pairs.append((act, comp))
         return comp
+
+    def get_serialization_context(
+        self,
+        command_info: Optional[temporalio.worker._command_aware_visitor.CommandInfo],
+    ) -> Optional[temporalio.converter.SerializationContext]:
+        return self._unsandboxed.get_serialization_context(command_info)
 
 
 async def test_workflow_with_custom_runner(client: Client):
@@ -4837,7 +4845,7 @@ async def test_workflow_update_timeout_or_cancel(client: Client):
         try:
             await called.wait()
         finally:
-            client.workflow_service.poll_workflow_execution_update = unpatched_call
+            client.workflow_service.poll_workflow_execution_update = unpatched_call  # type: ignore
         result_task.cancel()
         with pytest.raises(WorkflowUpdateRPCTimeoutOrCancelledError):
             await result_task
@@ -8369,3 +8377,109 @@ async def test_previous_run_failure(client: Client):
         )
         result = await handle.result()
         assert result == "Done"
+
+
+class EncryptionCodec(PayloadCodec):
+    def __init__(
+        self,
+        key_id: str = "test-key-id",
+        key: bytes = b"test-key-test-key-test-key-test!",
+    ) -> None:
+        super().__init__()
+        self.key_id = key_id
+
+    async def encode(self, payloads: Sequence[Payload]) -> List[Payload]:
+        # We blindly encode all payloads with the key and set the metadata
+        # saying which key we used
+        return [
+            Payload(
+                metadata={
+                    "encoding": b"binary/encrypted",
+                    "encryption-key-id": self.key_id.encode(),
+                },
+                data=self.encrypt(p.SerializeToString()),
+            )
+            for p in payloads
+        ]
+
+    async def decode(self, payloads: Sequence[Payload]) -> List[Payload]:
+        ret: List[Payload] = []
+        for p in payloads:
+            # Ignore ones w/out our expected encoding
+            if p.metadata.get("encoding", b"").decode() != "binary/encrypted":
+                ret.append(p)
+                continue
+            # Confirm our key ID is the same
+            key_id = p.metadata.get("encryption-key-id", b"").decode()
+            if key_id != self.key_id:
+                raise ValueError(
+                    f"Unrecognized key ID {key_id}. Current key ID is {self.key_id}."
+                )
+            # Decrypt and append
+            ret.append(Payload.FromString(self.decrypt(p.data)))
+        return ret
+
+    def encrypt(self, data: bytes) -> bytes:
+        nonce = os.urandom(12)
+        return data
+
+    def decrypt(self, data: bytes) -> bytes:
+        return data
+
+
+@workflow.defn
+class SearchAttributeCodecParentWorkflow:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        print(
+            await workflow.execute_child_workflow(
+                workflow=SearchAttributeCodecChildWorkflow.run,
+                arg=name,
+                id=f"child-{name}",
+                search_attributes=workflow.info().typed_search_attributes,
+            )
+        )
+        return f"Hello, {name}"
+
+
+@workflow.defn
+class SearchAttributeCodecChildWorkflow:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        return f"Hello from child, {name}"
+
+
+async def test_search_attribute_codec(client: Client, env_type: str):
+    if env_type != "local":
+        pytest.skip("Only testing search attributes on local which disables cache")
+    await ensure_search_attributes_present(
+        client,
+        SearchAttributeWorkflow.text_attribute,
+    )
+
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        temporalio.converter.default(), payload_codec=EncryptionCodec()
+    )
+    client = Client(**config)
+
+    # Run a worker for the workflow
+    async with new_worker(
+        client,
+        SearchAttributeCodecParentWorkflow,
+        SearchAttributeCodecChildWorkflow,
+    ) as worker:
+        # Run workflow
+        result = await client.execute_workflow(
+            SearchAttributeCodecParentWorkflow.run,
+            "Temporal",
+            id=f"encryption-workflow-id",
+            task_queue=worker.task_queue,
+            search_attributes=TypedSearchAttributes(
+                [
+                    SearchAttributePair(
+                        SearchAttributeWorkflow.text_attribute, "test_text"
+                    )
+                ]
+            ),
+        )

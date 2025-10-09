@@ -15,8 +15,8 @@ import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.common
 import temporalio.converter
-import temporalio.worker._workflow_instance
 import temporalio.workflow
+from temporalio.worker import _command_aware_visitor
 
 from ...api.common.v1.message_pb2 import Payloads
 from ...api.failure.v1.message_pb2 import Failure
@@ -185,3 +185,20 @@ class _Instance(WorkflowInstance):
 
     def get_thread_id(self) -> Optional[int]:
         return self._current_thread_id
+
+    def get_serialization_context(
+        self,
+        command_info: Optional[_command_aware_visitor.CommandInfo],
+    ) -> Optional[temporalio.converter.SerializationContext]:
+        # Forward call to the sandboxed instance
+        self.importer.restriction_context.is_runtime = True
+        try:
+            self._run_code(
+                "with __temporal_importer.applied():\n"
+                "  __temporal_context = __temporal_in_sandbox.get_serialization_context(__temporal_command_info)\n",
+                __temporal_importer=self.importer,
+                __temporal_command_info=command_info,
+            )
+            return self.globals_and_locals.pop("__temporal_context", None)  # type: ignore
+        finally:
+            self.importer.restriction_context.is_runtime = False

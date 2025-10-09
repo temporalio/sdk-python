@@ -10,6 +10,6 @@ COPY ./ ./
 RUN mkdir -p ./temporalio/api
 RUN uv add "protobuf<4"
 RUN uv sync --all-extras
-RUN poe gen-protos
+RUN uv run scripts/gen_protos.py
 
 CMD ["sh", "-c", "cp -r ./temporalio/api/* /api_new && cp -r ./temporalio/bridge/proto/* /bridge_new"]

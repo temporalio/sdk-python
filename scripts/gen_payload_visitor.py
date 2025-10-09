@@ -1,7 +1,7 @@
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 from google.protobuf.descriptor import Descriptor, FieldDescriptor
 
@@ -30,6 +30,11 @@ def emit_loop(
     if field_name == "headers":
         return f"""\
         if not self.skip_headers:
+            for v in {iter_expr}:
+                await self._visit_{child_method}(fs, v)"""
+    elif field_name == "search_attributes":
+        return f"""\
+        if not self.skip_search_attributes:
             for v in {iter_expr}:
                 await self._visit_{child_method}(fs, v)"""
     else:
@@ -83,6 +88,7 @@ import abc
 from typing import Any, MutableSequence
 
 from temporalio.api.common.v1.message_pb2 import Payload
+
 
 class VisitorFunctions(abc.ABC):
     \"\"\"Set of functions which can be called by the visitor. 

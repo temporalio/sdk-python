@@ -313,9 +313,8 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
             let mut build = OtelCollectorOptionsBuilder::default();
             build
                 .url(
-                    Url::parse(&otel_conf.url).map_err(|err| {
-                        PyValueError::new_err(format!("Invalid OTel URL: {err}"))
-                    })?,
+                    Url::parse(&otel_conf.url)
+                        .map_err(|err| PyValueError::new_err(format!("Invalid OTel URL: {err}")))?,
                 )
                 .headers(otel_conf.headers)
                 .use_seconds_for_durations(otel_conf.durations_as_seconds);
