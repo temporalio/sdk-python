@@ -307,10 +307,6 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
             input=input,
             kind=opentelemetry.trace.SpanKind.CLIENT,
         ):
-            span = opentelemetry.trace.get_current_span().get_span_context()
-            print(
-                f"start_update_with_start_span {opentelemetry.trace.format_trace_id(span.trace_id)} {opentelemetry.trace.format_span_id(span.span_id)}"
-            )
             return await super().start_update_with_start_workflow(input)
 
 
