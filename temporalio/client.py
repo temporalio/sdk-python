@@ -6364,7 +6364,7 @@ class _ClientImpl(OutboundInterceptor):
         err: Optional[BaseException] = None
 
         try:
-            # fan headers out to commands
+            # fan headers out to both operations
             input.start_workflow_input.headers = input.headers
             input.update_workflow_input.headers = input.headers
 

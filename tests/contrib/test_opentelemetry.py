@@ -207,64 +207,63 @@ async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
     ):
         # Run workflow with various actions
         workflow_id = f"workflow_{uuid.uuid4()}"
-        workflow_params = TracingWorkflowParam(
-            actions=[
-                # First fail on replay
-                TracingWorkflowAction(fail_on_non_replay=True),
-                # Wait for a signal
-                TracingWorkflowAction(wait_until_signal_count=1),
-                # Exec activity that fails task before complete
-                TracingWorkflowAction(
-                    activity=TracingWorkflowActionActivity(
-                        param=TracingActivityParam(fail_until_attempt=2),
-                        fail_on_non_replay_before_complete=True,
-                    ),
-                ),
-                # Wait for update
-                TracingWorkflowAction(wait_and_do_update=True),
-                # Exec child workflow that fails task before complete
-                TracingWorkflowAction(
-                    child_workflow=TracingWorkflowActionChildWorkflow(
-                        id=f"{workflow_id}_child",
-                        # Exec activity and finish after two signals
-                        param=TracingWorkflowParam(
-                            actions=[
-                                TracingWorkflowAction(
-                                    activity=TracingWorkflowActionActivity(
-                                        param=TracingActivityParam(),
-                                        local=True,
-                                    ),
-                                ),
-                                # Wait for the two signals
-                                TracingWorkflowAction(wait_until_signal_count=2),
-                            ]
-                        ),
-                        signal=True,
-                        external_signal=True,
-                        fail_on_non_replay_before_complete=True,
-                    )
-                ),
-                # Continue as new and run one local activity
-                TracingWorkflowAction(
-                    continue_as_new=TracingWorkflowActionContinueAsNew(
-                        param=TracingWorkflowParam(
-                            # Do a local activity in the continue as new
-                            actions=[
-                                TracingWorkflowAction(
-                                    activity=TracingWorkflowActionActivity(
-                                        param=TracingActivityParam(),
-                                        local=True,
-                                    ),
-                                )
-                            ]
-                        )
-                    )
-                ),
-            ],
-        )
         handle = await client.start_workflow(
             TracingWorkflow.run,
-            workflow_params,
+            TracingWorkflowParam(
+                actions=[
+                    # First fail on replay
+                    TracingWorkflowAction(fail_on_non_replay=True),
+                    # Wait for a signal
+                    TracingWorkflowAction(wait_until_signal_count=1),
+                    # Exec activity that fails task before complete
+                    TracingWorkflowAction(
+                        activity=TracingWorkflowActionActivity(
+                            param=TracingActivityParam(fail_until_attempt=2),
+                            fail_on_non_replay_before_complete=True,
+                        ),
+                    ),
+                    # Wait for update
+                    TracingWorkflowAction(wait_and_do_update=True),
+                    # Exec child workflow that fails task before complete
+                    TracingWorkflowAction(
+                        child_workflow=TracingWorkflowActionChildWorkflow(
+                            id=f"{workflow_id}_child",
+                            # Exec activity and finish after two signals
+                            param=TracingWorkflowParam(
+                                actions=[
+                                    TracingWorkflowAction(
+                                        activity=TracingWorkflowActionActivity(
+                                            param=TracingActivityParam(),
+                                            local=True,
+                                        ),
+                                    ),
+                                    # Wait for the two signals
+                                    TracingWorkflowAction(wait_until_signal_count=2),
+                                ]
+                            ),
+                            signal=True,
+                            external_signal=True,
+                            fail_on_non_replay_before_complete=True,
+                        )
+                    ),
+                    # Continue as new and run one local activity
+                    TracingWorkflowAction(
+                        continue_as_new=TracingWorkflowActionContinueAsNew(
+                            param=TracingWorkflowParam(
+                                # Do a local activity in the continue as new
+                                actions=[
+                                    TracingWorkflowAction(
+                                        activity=TracingWorkflowActionActivity(
+                                            param=TracingActivityParam(),
+                                            local=True,
+                                        ),
+                                    )
+                                ]
+                            )
+                        )
+                    ),
+                ],
+            ),
             id=workflow_id,
             task_queue=task_queue,
         )
