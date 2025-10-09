@@ -151,8 +151,11 @@ class _ActivityWorker:
                     poll_task.cancel()
                     await exception_task
                 task = await poll_task
-
                 if task.HasField("start"):
+                    # Mimic standalone activity
+                    task.start.workflow_type = ""
+                    task.start.workflow_execution.workflow_id = ""
+
                     # Cancelled event and sync field will be updated inside
                     # _run_activity when the activity function is obtained. Max
                     # size of 1000 should be plenty for the heartbeat queue.
