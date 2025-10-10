@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from dataclasses import dataclass
 from datetime import timedelta
 
 import pytest
@@ -66,27 +67,33 @@ async def test_start_activity_and_get_result(client: Client):
         assert await result_via_execute_activity == 2
 
 
+@dataclass
+class ActivityInput:
+    wait_for_signal_workflow_id: str
+
+
 @activity.defn
-async def async_activity() -> int:
+async def async_activity(input: ActivityInput) -> int:
     # Notify test that the activity has started and is ready to be completed manually
     await (
         activity.client()
-        .get_workflow_handle("activity-started-wf-id")
+        .get_workflow_handle(input.wait_for_signal_workflow_id)
         .signal(WaitForSignalWorkflow.signal)
     )
     activity.raise_complete_async()
 
 
-@pytest.mark.skip(
-    "RespondActivityTaskCompleted not implemented in server for standalone activity"
-)
+@pytest.mark.skip("StartActivityExecution not implemented in server")
 async def test_manual_completion(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
+    wait_for_signal_workflow_id = str(uuid.uuid4())
 
     activity_handle = await client.start_activity(
         async_activity,
-        args=(),  # TODO: overloads
+        args=(
+            ActivityInput(wait_for_signal_workflow_id=wait_for_signal_workflow_id),
+        ),  # TODO: overloads
         id=activity_id,
         task_queue=task_queue,
         start_to_close_timeout=timedelta(seconds=5),
@@ -101,7 +108,7 @@ async def test_manual_completion(client: Client):
         # Wait for activity to start
         await client.execute_workflow(
             WaitForSignalWorkflow.run,
-            id="activity-started-wf-id",
+            id=wait_for_signal_workflow_id,
             task_queue=task_queue,
         )
         # Complete activity manually
@@ -119,10 +126,13 @@ async def test_manual_completion(client: Client):
 async def test_manual_cancellation(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
+    wait_for_signal_workflow_id = str(uuid.uuid4())
 
     activity_handle = await client.start_activity(
         async_activity,
-        args=(),  # TODO: overloads
+        args=(
+            ActivityInput(wait_for_signal_workflow_id=wait_for_signal_workflow_id),
+        ),  # TODO: overloads
         id=activity_id,
         task_queue=task_queue,
         start_to_close_timeout=timedelta(seconds=5),
@@ -136,7 +146,7 @@ async def test_manual_cancellation(client: Client):
     ):
         await client.execute_workflow(
             WaitForSignalWorkflow.run,
-            id="activity-started-wf-id",
+            id=wait_for_signal_workflow_id,
             task_queue=task_queue,
         )
         async_activity_handle = client.get_async_activity_handle(
@@ -156,10 +166,13 @@ async def test_manual_cancellation(client: Client):
 async def test_manual_fail(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
+    wait_for_signal_workflow_id = str(uuid.uuid4())
 
     activity_handle = await client.start_activity(
         async_activity,
-        args=(),  # TODO: overloads
+        args=(
+            ActivityInput(wait_for_signal_workflow_id=wait_for_signal_workflow_id),
+        ),  # TODO: overloads
         id=activity_id,
         task_queue=task_queue,
         start_to_close_timeout=timedelta(seconds=5),
@@ -172,7 +185,7 @@ async def test_manual_fail(client: Client):
     ):
         await client.execute_workflow(
             WaitForSignalWorkflow.run,
-            id="activity-started-wf-id",
+            id=wait_for_signal_workflow_id,
             task_queue=task_queue,
         )
         async_activity_handle = client.get_async_activity_handle(
@@ -187,10 +200,10 @@ async def test_manual_fail(client: Client):
 
 
 @activity.defn
-async def activity_for_testing_heartbeat() -> str:
+async def activity_for_testing_heartbeat(input: ActivityInput) -> str:
     wait_for_heartbeat_wf_handle = await activity.client().start_workflow(
         WaitForSignalWorkflow.run,
-        id="test-has-sent-heartbeat-wf-id",
+        id=input.wait_for_signal_workflow_id,
         task_queue=activity.info().task_queue,
     )
     info = activity.info()
@@ -212,10 +225,13 @@ async def activity_for_testing_heartbeat() -> str:
 async def test_manual_heartbeat(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
+    wait_for_signal_workflow_id = str(uuid.uuid4())
 
     activity_handle = await client.start_activity(
         activity_for_testing_heartbeat,
-        args=(),  # TODO: overloads
+        args=(
+            ActivityInput(wait_for_signal_workflow_id=wait_for_signal_workflow_id),
+        ),  # TODO: overloads
         id=activity_id,
         task_queue=task_queue,
         start_to_close_timeout=timedelta(seconds=5),
@@ -233,7 +249,7 @@ async def test_manual_heartbeat(client: Client):
         await async_activity_handle.heartbeat("Test heartbeat details")
         await client.get_workflow_handle_for(
             WaitForSignalWorkflow.run,
-            workflow_id="test-has-sent-heartbeat-wf-id",
+            workflow_id=wait_for_signal_workflow_id,
         ).signal(WaitForSignalWorkflow.signal)
         assert await activity_handle.result() == "Test heartbeat details"
 
