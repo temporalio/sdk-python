@@ -11,6 +11,8 @@ from temporalio.common import ActivityExecutionStatus
 from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.worker import Worker
 
+STANDALONE_ACTIVITY_MATCHING_TASKS_IMPLEMENTED = False
+
 
 @activity.defn
 async def increment(input: int) -> int:
@@ -105,12 +107,13 @@ async def test_manual_completion(client: Client):
         activities=[async_activity],
         workflows=[WaitForSignalWorkflow],
     ):
-        # Wait for activity to start
-        await client.execute_workflow(
-            WaitForSignalWorkflow.run,
-            id=wait_for_signal_workflow_id,
-            task_queue=task_queue,
-        )
+        if STANDALONE_ACTIVITY_MATCHING_TASKS_IMPLEMENTED:
+            # Wait for activity to start
+            await client.execute_workflow(
+                WaitForSignalWorkflow.run,
+                id=wait_for_signal_workflow_id,
+                task_queue=task_queue,
+            )
         # Complete activity manually
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
@@ -144,11 +147,14 @@ async def test_manual_cancellation(client: Client):
         activities=[async_activity],
         workflows=[WaitForSignalWorkflow],
     ):
-        await client.execute_workflow(
-            WaitForSignalWorkflow.run,
-            id=wait_for_signal_workflow_id,
-            task_queue=task_queue,
-        )
+        if STANDALONE_ACTIVITY_MATCHING_TASKS_IMPLEMENTED:
+            # Wait for activity to start
+            await client.execute_workflow(
+                WaitForSignalWorkflow.run,
+                id=wait_for_signal_workflow_id,
+                task_queue=task_queue,
+            )
+        # Cancel activity manually
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
             run_id=activity_handle.run_id,
@@ -183,11 +189,14 @@ async def test_manual_fail(client: Client):
         activities=[async_activity],
         workflows=[WaitForSignalWorkflow],
     ):
-        await client.execute_workflow(
-            WaitForSignalWorkflow.run,
-            id=wait_for_signal_workflow_id,
-            task_queue=task_queue,
-        )
+        if STANDALONE_ACTIVITY_MATCHING_TASKS_IMPLEMENTED:
+            # Wait for activity to start
+            await client.execute_workflow(
+                WaitForSignalWorkflow.run,
+                id=wait_for_signal_workflow_id,
+                task_queue=task_queue,
+            )
+        # Fail activity manually
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
             run_id=activity_handle.run_id,
@@ -242,13 +251,13 @@ async def test_manual_heartbeat(client: Client):
         activities=[activity_for_testing_heartbeat],
         workflows=[WaitForSignalWorkflow],
     ):
+        # Send heartbeat manually
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
             run_id=activity_handle.run_id,
         )
         await async_activity_handle.heartbeat("Test heartbeat details")
-        await client.get_workflow_handle_for(
-            WaitForSignalWorkflow.run,
+        await client.get_workflow_handle(
             workflow_id=wait_for_signal_workflow_id,
         ).signal(WaitForSignalWorkflow.signal)
         assert await activity_handle.result() == "Test heartbeat details"
