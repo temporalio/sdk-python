@@ -510,7 +510,7 @@ async def test_local_activity_payload_conversion(client: Client):
 
 
 @workflow.defn
-class EventWorkflow:
+class WaitForSignalWorkflow:
     # Like a global asyncio.Event()
 
     def __init__(self) -> None:
@@ -527,10 +527,11 @@ class EventWorkflow:
 
 @activity.defn
 async def async_activity() -> TraceData:
+    # Notify test that the activity has started and is ready to be completed manually
     await (
         activity.client()
         .get_workflow_handle("activity-started-wf-id")
-        .signal(EventWorkflow.signal)
+        .signal(WaitForSignalWorkflow.signal)
     )
     activity.raise_complete_async()
 
@@ -564,7 +565,7 @@ async def test_async_activity_completion_payload_conversion(
         task_queue=task_queue,
         workflows=[
             AsyncActivityCompletionSerializationContextTestWorkflow,
-            EventWorkflow,
+            WaitForSignalWorkflow,
         ],
         activities=[async_activity],
         workflow_runner=UnsandboxedWorkflowRunner(),  # so that we can use isinstance
@@ -584,7 +585,7 @@ async def test_async_activity_completion_payload_conversion(
         )
 
         act_started_wf_handle = await client.start_workflow(
-            EventWorkflow.run,
+            WaitForSignalWorkflow.run,
             id="activity-started-wf-id",
             task_queue=task_queue,
         )
