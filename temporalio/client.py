@@ -1566,7 +1566,6 @@ class Client:
             run_id: Run ID for the activity. Cannot be
                     set if task_token is set.
             activity_id: ID for the activity.
-            activity_id: ID for the activity.
             task_token: Task token for the activity.
 
         Returns:
@@ -1587,7 +1586,18 @@ class Client:
                     workflow_id=workflow_id, run_id=run_id, activity_id=activity_id
                 ),
             )
-        raise ValueError("Task token or workflow/run/activity ID must be present")
+        elif activity_id is not None:
+            return AsyncActivityHandle(
+                self,
+                AsyncActivityIDReference(
+                    activity_id=activity_id,
+                    run_id=run_id,
+                    workflow_id=None,
+                ),
+            )
+        raise ValueError(
+            "Require task token, or workflow_id & run_id & activity_id, or activity_id & run_id"
+        )
 
     async def create_schedule(
         self,
