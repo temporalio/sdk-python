@@ -1,3 +1,4 @@
+from .activity_pb2 import ActivityExecutionStatus
 from .batch_operation_pb2 import BatchOperationState, BatchOperationType
 from .command_type_pb2 import CommandType
 from .common_pb2 import (
@@ -26,6 +27,7 @@ from .failed_cause_pb2 import (
     StartChildWorkflowExecutionFailedCause,
     WorkflowTaskFailedCause,
 )
+from .id_pb2 import IdConflictPolicy, IdReusePolicy
 from .namespace_pb2 import ArchivalState, NamespaceState, ReplicationState
 from .nexus_pb2 import NexusHandlerErrorRetryBehavior
 from .query_pb2 import QueryRejectCondition, QueryResultType
@@ -55,6 +57,7 @@ from .workflow_pb2 import (
 )
 
 __all__ = [
+    "ActivityExecutionStatus",
     "ApplicationErrorCategory",
     "ArchivalState",
     "BatchOperationState",
@@ -69,6 +72,8 @@ __all__ = [
     "EncodingType",
     "EventType",
     "HistoryEventFilterType",
+    "IdConflictPolicy",
+    "IdReusePolicy",
     "IndexedValueType",
     "NamespaceState",
     "NexusHandlerErrorRetryBehavior",
