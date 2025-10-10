@@ -179,6 +179,7 @@ class PayloadConversionWorkflow:
             data,
             start_to_close_timeout=timedelta(seconds=10),
             heartbeat_timeout=timedelta(seconds=2),
+            activity_id="activity-id",
         )
         data = await workflow.execute_child_workflow(
             EchoWorkflow.run, data, id=f"{workflow.info().workflow_id}_child"
@@ -231,7 +232,7 @@ async def test_payload_conversion_calls_follow_expected_sequence_and_contexts(
                 workflow_id=workflow_id,
                 workflow_type=PayloadConversionWorkflow.__name__,
                 activity_type=passthrough_activity.__name__,
-                activity_id=None,
+                activity_id="activity-id",
                 activity_task_queue=task_queue,
                 is_local=False,
             )
@@ -329,6 +330,7 @@ class HeartbeatDetailsSerializationContextTestWorkflow:
                 initial_interval=timedelta(milliseconds=100),
                 maximum_attempts=2,
             ),
+            activity_id="activity-id",
         )
 
 
@@ -371,7 +373,7 @@ async def test_heartbeat_details_payload_conversion(client: Client):
                 workflow_id=workflow_id,
                 workflow_type=HeartbeatDetailsSerializationContextTestWorkflow.__name__,
                 activity_type=activity_with_heartbeat_details.__name__,
-                activity_id=None,
+                activity_id="activity-id",
                 activity_task_queue=task_queue,
                 is_local=False,
             )
@@ -421,6 +423,7 @@ class LocalActivityWorkflow:
             local_activity,
             data,
             start_to_close_timeout=timedelta(seconds=10),
+            activity_id="activity-id",
         )
 
 
@@ -461,7 +464,7 @@ async def test_local_activity_payload_conversion(client: Client):
                 workflow_id=workflow_id,
                 workflow_type=LocalActivityWorkflow.__name__,
                 activity_type=local_activity.__name__,
-                activity_id=None,
+                activity_id="activity-id",
                 activity_task_queue=task_queue,
                 is_local=True,
             )
@@ -575,7 +578,7 @@ async def test_async_activity_completion_payload_conversion(
             workflow_id=workflow_id,
             workflow_type=AsyncActivityCompletionSerializationContextTestWorkflow.__name__,
             activity_type=async_activity.__name__,
-            activity_id=None,
+            activity_id="async-activity-id",
             activity_task_queue=task_queue,
             is_local=False,
         )
@@ -648,7 +651,7 @@ def test_subclassed_async_activity_handle(client: Client):
         workflow_id="workflow-id",
         workflow_type="workflow-type",
         activity_type="activity-type",
-        activity_id=None,
+        activity_id="activity-id",
         activity_task_queue="activity-task-queue",
         is_local=False,
     )
@@ -1063,6 +1066,7 @@ class FailureConverterTestWorkflow:
             failing_activity,
             start_to_close_timeout=timedelta(seconds=10),
             retry_policy=RetryPolicy(maximum_attempts=1),
+            activity_id="activity-id",
         )
         raise Exception("Unreachable")
 
@@ -1159,7 +1163,7 @@ async def test_failure_converter_with_context(client: Client):
                 workflow_id=workflow_id,
                 workflow_type=FailureConverterTestWorkflow.__name__,
                 activity_type=failing_activity.__name__,
-                activity_id=None,
+                activity_id="activity-id",
                 activity_task_queue=task_queue,
                 is_local=False,
             )
@@ -1328,6 +1332,7 @@ class LocalActivityCodecTestWorkflow:
             codec_test_local_activity,
             data,
             start_to_close_timeout=timedelta(seconds=10),
+            activity_id="activity-id",
         )
 
 
@@ -1366,7 +1371,7 @@ async def test_local_activity_codec_with_context(client: Client):
             workflow_id=workflow_id,
             workflow_type=LocalActivityCodecTestWorkflow.__name__,
             activity_type=codec_test_local_activity.__name__,
-            activity_id=None,
+            activity_id="activity-id",
             activity_task_queue=task_queue,
             is_local=True,
         )
@@ -1600,6 +1605,7 @@ class PayloadEncryptionWorkflow:
                 payload_encryption_activity,
                 "outbound",
                 start_to_close_timeout=timedelta(seconds=10),
+                activity_id="activity-id",
             ),
             workflow.execute_child_workflow(
                 PayloadEncryptionChildWorkflow.run,
