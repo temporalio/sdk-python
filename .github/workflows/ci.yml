@@ -36,7 +36,7 @@ jobs:
           - os: ubuntu-arm
             runsOn: ubuntu-24.04-arm64-2-core
           - os: macos-intel
-            runsOn: macos-13
+            runsOn: macos-15-intel
           # On 3.13.3 there is some issue with macOS intel where it hangs after pytest with some
           # test that may have a worker that cannot properly shutdown, but it does not occur on
           # other versions, platforms, etc. See https://github.com/temporalio/sdk-python/issues/834.
