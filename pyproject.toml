@@ -175,6 +175,7 @@ sidebar-expand-depth = 2
 enableTypeIgnoreComments = true
 reportAny = "none"
 reportCallInDefaultInitializer = "none"
+reportDeprecated = "none"
 reportExplicitAny = "none"
 reportIgnoreCommentWithoutRule = "none"
 reportImplicitAbstractClass = "none"
