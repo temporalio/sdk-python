@@ -13,13 +13,14 @@ from temporalio.worker import Worker
 
 STANDALONE_ACTIVITY_MATCHING_TASKS_IMPLEMENTED = False
 
+pytest.skip("Standalone activity is not implemented in server", allow_module_level=True)
+
 
 @activity.defn
 async def increment(input: int) -> int:
     return input + 1
 
 
-@pytest.mark.skip("StartActivityExecution not implemented in server")
 async def test_start_activity_and_describe_activity(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
@@ -40,7 +41,6 @@ async def test_start_activity_and_describe_activity(client: Client):
     assert desc.status == ActivityExecutionStatus.RUNNING
 
 
-@pytest.mark.skip("GetActivityExecutionResult not implemented in server")
 async def test_start_activity_and_get_result(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
@@ -85,7 +85,6 @@ async def async_activity(input: ActivityInput) -> int:
     activity.raise_complete_async()
 
 
-@pytest.mark.skip("StartActivityExecution not implemented in server")
 async def test_manual_completion(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
@@ -123,9 +122,6 @@ async def test_manual_completion(client: Client):
         assert await activity_handle.result() == 7
 
 
-@pytest.mark.skip(
-    "RespondActivityTaskCanceled not implemented in server for standalone activity"
-)
 async def test_manual_cancellation(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
@@ -166,9 +162,6 @@ async def test_manual_cancellation(client: Client):
         assert str(err.value.cause) == "Test cancellation"
 
 
-@pytest.mark.skip(
-    "RespondActivityTaskFailed not implemented in server for standalone activity"
-)
 async def test_manual_fail(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
@@ -228,9 +221,6 @@ async def activity_for_testing_heartbeat(input: ActivityInput) -> str:
         raise AssertionError(f"Unexpected attempt number: {info.attempt}")
 
 
-@pytest.mark.skip(
-    "RecordActivityTaskHeartbeat not implemented in server for standalone activity"
-)
 async def test_manual_heartbeat(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
