@@ -14,8 +14,9 @@ use temporal_sdk_core::api::errors::PollError;
 use temporal_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporal_sdk_core_api::errors::WorkflowErrorType;
 use temporal_sdk_core_api::worker::{
-    SlotInfo, SlotInfoTrait, SlotKind, SlotKindType, SlotMarkUsedContext, SlotReleaseContext,
-    SlotReservationContext, SlotSupplier as SlotSupplierTrait, SlotSupplierPermit,
+    PluginInfo as CorePluginInfo, SlotInfo, SlotInfoTrait, SlotKind, SlotKindType,
+    SlotMarkUsedContext, SlotReleaseContext, SlotReservationContext,
+    SlotSupplier as SlotSupplierTrait, SlotSupplierPermit,
 };
 use temporal_sdk_core_api::Worker;
 use temporal_sdk_core_protos::coresdk::workflow_completion::WorkflowActivationCompletion;
@@ -63,6 +64,7 @@ pub struct WorkerConfig {
     nondeterminism_as_workflow_fail: bool,
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
     nexus_task_poller_behavior: PollerBehavior,
+    plugins: Vec<String>,
 }
 
 #[derive(FromPyObject)]
@@ -722,6 +724,15 @@ fn convert_worker_config(
                 .collect::<HashMap<String, HashSet<WorkflowErrorType>>>(),
         )
         .nexus_task_poller_behavior(conf.nexus_task_poller_behavior)
+        .plugins(
+            conf.plugins
+                .into_iter()
+                .map(|name| CorePluginInfo {
+                    name,
+                    version: None,
+                })
+                .collect(),
+        )
         .build()
         .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {err}")))
 }

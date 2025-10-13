@@ -149,6 +149,7 @@ async def test_worker_plugin_basic_config(client: Client) -> None:
         plugins=[MyWorkerPlugin()],
     )
     assert worker.config().get("task_queue") == "replaced_queue"
+    assert worker.config().get("plugins") == [MyWorkerPlugin().name()]
 
     # Test client plugin propagation to worker plugins
     new_config = client.config()
@@ -156,6 +157,7 @@ async def test_worker_plugin_basic_config(client: Client) -> None:
     client = Client(**new_config)
     worker = Worker(client, task_queue="queue", activities=[never_run_activity])
     assert worker.config().get("task_queue") == "combined"
+    assert worker.config().get("plugins") == [MyCombinedPlugin().name()]
 
     # Test both. Client propagated plugins are called first, so the worker plugin overrides in this case
     worker = Worker(
@@ -165,6 +167,10 @@ async def test_worker_plugin_basic_config(client: Client) -> None:
         plugins=[MyWorkerPlugin()],
     )
     assert worker.config().get("task_queue") == "replaced_queue"
+    assert worker.config().get("plugins") == [
+        MyCombinedPlugin().name(),
+        MyWorkerPlugin().name(),
+    ]
 
 
 async def test_worker_duplicated_plugin(client: Client) -> None:
@@ -271,6 +277,7 @@ async def test_replay(client: Client) -> None:
     replayer = Replayer(workflows=[], plugins=[plugin])
     assert len(replayer.config().get("workflows") or []) == 1
     assert replayer.config().get("data_converter") == pydantic_data_converter
+    assert replayer.config().get("plugins") == [plugin.name()]
 
     await replayer.replay_workflow(await handle.fetch_history())
 
