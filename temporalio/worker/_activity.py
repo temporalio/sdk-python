@@ -256,11 +256,12 @@ class _ActivityWorker:
         if activity.info:
             context = temporalio.converter.ActivitySerializationContext(
                 namespace=activity.info.workflow_namespace,
-                workflow_id=activity.info.workflow_id,
-                workflow_type=activity.info.workflow_type,
+                activity_id=activity.info.activity_id,
                 activity_type=activity.info.activity_type,
                 activity_task_queue=self._task_queue,
                 is_local=activity.info.is_local,
+                workflow_id=activity.info.workflow_id,
+                workflow_type=activity.info.workflow_type,
             )
             data_converter = data_converter.with_context(context)
 
@@ -308,11 +309,12 @@ class _ActivityWorker:
         # Create serialization context for the activity
         context = temporalio.converter.ActivitySerializationContext(
             namespace=start.workflow_namespace,
-            workflow_id=start.workflow_execution.workflow_id,
-            workflow_type=start.workflow_type,
+            activity_id=start.activity_id,
             activity_type=start.activity_type,
             activity_task_queue=self._task_queue,
             is_local=start.is_local,
+            workflow_id=start.workflow_execution.workflow_id,
+            workflow_type=start.workflow_type,
         )
         data_converter = self._data_converter.with_context(context)
         try:

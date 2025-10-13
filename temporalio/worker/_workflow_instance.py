@@ -788,8 +788,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             raise RuntimeError(f"Failed finding activity handle for sequence {job.seq}")
         activity_context = temporalio.converter.ActivitySerializationContext(
             namespace=self._info.namespace,
-            workflow_id=self._info.workflow_id,
-            workflow_type=self._info.workflow_type,
+            activity_id=handle._input.activity_id,
             activity_type=handle._input.activity,
             activity_task_queue=(
                 handle._input.task_queue or self._info.task_queue
@@ -797,6 +796,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 else self._info.task_queue
             ),
             is_local=isinstance(handle._input, StartLocalActivityInput),
+            workflow_id=self._info.workflow_id,
+            workflow_type=self._info.workflow_type,
         )
         payload_converter = self._payload_converter_with_context(activity_context)
         failure_converter = self._failure_converter_with_context(activity_context)
@@ -2127,8 +2128,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             activity_handle = self._pending_activities[command_info.command_seq]
             return temporalio.converter.ActivitySerializationContext(
                 namespace=self._info.namespace,
-                workflow_id=self._info.workflow_id,
-                workflow_type=self._info.workflow_type,
+                activity_id=activity_handle._input.activity_id,
                 activity_type=activity_handle._input.activity,
                 activity_task_queue=(
                     activity_handle._input.task_queue
@@ -2137,6 +2137,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     else self._info.task_queue
                 ),
                 is_local=isinstance(activity_handle._input, StartLocalActivityInput),
+                workflow_id=self._info.workflow_id,
+                workflow_type=self._info.workflow_type,
             )
 
         elif (
@@ -2921,8 +2923,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         self._payload_converter = self._instance._payload_converter_with_context(
             temporalio.converter.ActivitySerializationContext(
                 namespace=self._instance._info.namespace,
-                workflow_id=self._instance._info.workflow_id,
-                workflow_type=self._instance._info.workflow_type,
+                activity_id=self._input.activity_id,
                 activity_type=self._input.activity,
                 activity_task_queue=(
                     self._input.task_queue or self._instance._info.task_queue
@@ -2930,6 +2931,8 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
                     else self._instance._info.task_queue
                 ),
                 is_local=isinstance(self._input, StartLocalActivityInput),
+                workflow_id=self._instance._info.workflow_id,
+                workflow_type=self._instance._info.workflow_type,
             )
         )
 
