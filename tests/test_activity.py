@@ -17,7 +17,7 @@ async def increment(input: int) -> int:
     return input + 1
 
 
-async def test_start_activity_and_describe_activity(client: Client):
+async def test_describe(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
 
@@ -37,7 +37,7 @@ async def test_start_activity_and_describe_activity(client: Client):
     assert desc.status == ActivityExecutionStatus.RUNNING
 
 
-async def test_start_activity_and_get_result(client: Client):
+async def test_get_result(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
 
