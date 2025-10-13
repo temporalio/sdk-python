@@ -154,7 +154,7 @@ async def test_manual_cancellation(client: Client):
         with pytest.raises(ActivityFailedError) as err:
             await activity_handle.result()
         assert isinstance(err.value.cause, CancelledError)
-        assert str(err.value.cause) == "Test cancellation"
+        assert list(err.value.cause.details) == ["Test cancellation"]
 
         desc = await activity_handle.describe()
         assert desc.status == ActivityExecutionStatus.CANCELED
@@ -189,7 +189,7 @@ async def test_manual_failure(client: Client):
             activity_id=activity_id,
             run_id=activity_handle.run_id,
         )
-        await async_activity_handle.fail(Exception("Test failure"))
+        await async_activity_handle.fail(ApplicationError("Test failure"))
         with pytest.raises(ActivityFailedError) as err:
             await activity_handle.result()
         assert isinstance(err.value.cause, ApplicationError)
