@@ -80,6 +80,7 @@ class Replayer:
             runtime=runtime,
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
             header_codec_behavior=header_codec_behavior,
+            plugins=[plugin.name() for plugin in plugins],
         )
 
         # Apply plugin configuration
@@ -293,6 +294,7 @@ class Replayer:
                     nexus_task_poller_behavior=temporalio.bridge.worker.PollerBehaviorSimpleMaximum(
                         1
                     ),
+                    plugins=self._config.get("plugins", []),
                 ),
             )
             # Start worker
@@ -368,6 +370,7 @@ class ReplayerConfig(TypedDict, total=False):
     runtime: Optional[temporalio.runtime.Runtime]
     disable_safe_workflow_eviction: bool
     header_codec_behavior: HeaderCodecBehavior
+    plugins: Sequence[str]
 
 
 @dataclass(frozen=True)

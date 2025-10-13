@@ -376,6 +376,7 @@ class Worker:
                     f"The same plugin type {type(client_plugin)} is present from both client and worker. It may run twice and may not be the intended behavior."
                 )
         plugins = plugins_from_client + list(plugins)
+        config["plugins"] = [plugin.name() for plugin in plugins]
 
         self.plugins = plugins
         for plugin in plugins:
@@ -609,6 +610,7 @@ class Worker:
                 nexus_task_poller_behavior=config[
                     "nexus_task_poller_behavior"
                 ]._to_bridge(),
+                plugins=config.get("plugins", []),
             ),
         )
 
@@ -621,6 +623,7 @@ class Worker:
         config = self._config.copy()
         config["activities"] = list(config.get("activities", []))
         config["workflows"] = list(config.get("workflows", []))
+        config["plugins"] = list(config.get("plugins", []))
         return config
 
     @property
@@ -902,6 +905,7 @@ class WorkerConfig(TypedDict, total=False):
     workflow_task_poller_behavior: PollerBehavior
     activity_task_poller_behavior: PollerBehavior
     nexus_task_poller_behavior: PollerBehavior
+    plugins: Sequence[str]
 
 
 def _warn_if_activity_executor_max_workers_is_inconsistent(
