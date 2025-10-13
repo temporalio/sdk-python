@@ -116,6 +116,9 @@ async def test_manual_completion(client: Client):
         await async_activity_handle.complete(7)
         assert await activity_handle.result() == 7
 
+        desc = await activity_handle.describe()
+        assert desc.status == ActivityExecutionStatus.COMPLETED
+
 
 async def test_manual_cancellation(client: Client):
     activity_id = str(uuid.uuid4())
@@ -153,8 +156,11 @@ async def test_manual_cancellation(client: Client):
         assert isinstance(err.value.cause, CancelledError)
         assert str(err.value.cause) == "Test cancellation"
 
+        desc = await activity_handle.describe()
+        assert desc.status == ActivityExecutionStatus.CANCELED
 
-async def test_manual_fail(client: Client):
+
+async def test_manual_failure(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     wait_for_signal_workflow_id = str(uuid.uuid4())
@@ -188,6 +194,9 @@ async def test_manual_fail(client: Client):
             await activity_handle.result()
         assert isinstance(err.value.cause, ApplicationError)
         assert str(err.value.cause) == "Test failure"
+
+        desc = await activity_handle.describe()
+        assert desc.status == ActivityExecutionStatus.FAILED
 
 
 @activity.defn
