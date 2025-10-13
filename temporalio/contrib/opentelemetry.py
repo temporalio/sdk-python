@@ -307,10 +307,12 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
             input=input.start_workflow_input,
             kind=opentelemetry.trace.SpanKind.CLIENT,
         ):
-            if input.update_workflow_input:
-                input.update_workflow_input.headers = self.root._context_to_headers(
-                    input.update_workflow_input.headers
-                )
+            otel_header = input.start_workflow_input.headers.get(self.root.header_key)
+            if otel_header:
+                input.update_workflow_input.headers = {
+                    **input.update_workflow_input.headers,
+                    self.root.header_key: otel_header,
+                }
 
             return await super().start_update_with_start_workflow(input)
 
