@@ -244,8 +244,7 @@ async def test_manual_heartbeat(client: Client):
             run_id=activity_handle.run_id,
         )
         await async_activity_handle.heartbeat("Test heartbeat details")
-        await client.get_workflow_handle_for(
-            WaitForSignalWorkflow.run,
+        await client.get_workflow_handle(
             workflow_id=wait_for_signal_workflow_id,
         ).signal(WaitForSignalWorkflow.signal)
         assert await activity_handle.result() == "Test heartbeat details"
