@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Iterable, List, Optional
 
+import opentelemetry.context
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -22,11 +23,12 @@ from temporalio.contrib.opentelemetry import workflow as otel_workflow
 from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
-from tests.worker.test_workflow import (
+from tests.helpers.cache_evitction import (
     CacheEvictionTearDownWorkflow,
     WaitForeverWorkflow,
     wait_forever_activity,
 )
+from tests.helpers import LogCapturer
 
 # Passing through because Python 3.9 has an import bug at
 # https://github.com/python/cpython/issues/91351
@@ -471,19 +473,6 @@ async def test_opentelemetry_safe_detach(client: Client):
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     tracer = get_tracer(__name__, tracer_provider=provider)
 
-    class _OtelLogSpy(logging.Handler):
-        def __init__(self, level: int | str = 0) -> None:
-            self.seenOtelFailedMessage = False
-            super().__init__(level)
-
-        def emit(self, record: logging.LogRecord) -> None:
-            if not self.seenOtelFailedMessage:
-                self.seenOtelFailedMessage = (
-                    record.levelno == logging.ERROR
-                    and record.name == "opentelemetry.context"
-                    and record.message == "Failed to detach context"
-                )
-
     async with Worker(
         client,
         workflows=[CacheEvictionTearDownWorkflow, WaitForeverWorkflow],
@@ -497,28 +486,34 @@ async def test_opentelemetry_safe_detach(client: Client):
         old_hook = sys.unraisablehook
         hook_calls: List[sys.UnraisableHookArgs] = []
         sys.unraisablehook = hook_calls.append
-        log_spy = _OtelLogSpy()
-        logging.getLogger().addHandler(log_spy)
-        try:
-            handle = await client.start_workflow(
-                CacheEvictionTearDownWorkflow.run,
-                id=f"wf-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-            )
 
-            # CacheEvictionTearDownWorkflow requires 3 signals to be sent
-            await handle.signal(CacheEvictionTearDownWorkflow.signal)
-            await handle.signal(CacheEvictionTearDownWorkflow.signal)
-            await handle.signal(CacheEvictionTearDownWorkflow.signal)
+        with LogCapturer().logs_captured(opentelemetry.context.logger) as capturer:
+            try:
+                handle = await client.start_workflow(
+                    CacheEvictionTearDownWorkflow.run,
+                    id=f"wf-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
 
-            await handle.result()
-        finally:
-            sys.unraisablehook = old_hook
-            logging.getLogger().removeHandler(log_spy)
+                # CacheEvictionTearDownWorkflow requires 3 signals to be sent
+                await handle.signal(CacheEvictionTearDownWorkflow.signal)
+                await handle.signal(CacheEvictionTearDownWorkflow.signal)
+                await handle.signal(CacheEvictionTearDownWorkflow.signal)
 
-        # Confirm at least 1 exception
-        assert hook_calls
+                await handle.result()
+            finally:
+                sys.unraisablehook = old_hook
 
-        assert (
-            not log_spy.seenOtelFailedMessage
-        ), "Detach from context message should not be logged"
+            # Confirm at least 1 exception
+            assert hook_calls
+
+            def otel_context_error(record: logging.LogRecord) -> bool:
+                return (
+                    record.levelno == logging.ERROR
+                    and record.name == "opentelemetry.context"
+                    and record.message == "Failed to detach context"
+                )
+
+            assert (
+                capturer.find(otel_context_error) is None
+            ), "Detach from context message should not be logged"

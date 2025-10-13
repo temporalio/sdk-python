@@ -26,8 +26,7 @@ import opentelemetry.trace
 import opentelemetry.trace.propagation.tracecontext
 import opentelemetry.util.types
 from opentelemetry.context import Context
-from opentelemetry.trace import Span, SpanKind, Status, StatusCode, _Links
-from opentelemetry.util import types
+from opentelemetry.trace import Status, StatusCode
 from typing_extensions import Protocol, TypeAlias, TypedDict
 
 import temporalio.activity
@@ -449,8 +448,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             )
             return await super().handle_query(input)
         finally:
-            detach_context = opentelemetry.context.get_current()
-            if detach_context is attach_context:
+            if attach_context == opentelemetry.context.get_current():
                 opentelemetry.context.detach(token)
 
     def handle_update_validator(
@@ -541,8 +539,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
                     kind=opentelemetry.trace.SpanKind.INTERNAL,
                 )
 
-            detach_context = opentelemetry.context.get_current()
-            if detach_context is attach_context:
+            if attach_context == opentelemetry.context.get_current():
                 opentelemetry.context.detach(token)
 
     #
