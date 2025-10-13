@@ -3128,8 +3128,6 @@ class ActivityExecutionAsyncIterator:
             return ret
 
 
-# TODO: this is named ActivityListInfo in our draft proto PR
-# https://github.com/temporalio/api/pull/640/files
 @dataclass(frozen=True)
 class ActivityExecution:
     """Info for a standalone activity execution from list response.

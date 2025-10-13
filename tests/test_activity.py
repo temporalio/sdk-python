@@ -11,6 +11,8 @@ from temporalio.common import ActivityExecutionStatus
 from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.worker import Worker
 
+pytest.skip(reason="Standalone Activity server support is under development")
+
 
 @activity.defn
 async def increment(input: int) -> int:
