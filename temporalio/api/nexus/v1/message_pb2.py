@@ -61,12 +61,12 @@ Failure = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _FAILURE_METADATAENTRY,
-                "__module__": "temporal.api.nexus.v1.message_pb2",
+                "__module__": "temporalio.api.nexus.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.Failure.MetadataEntry)
             },
         ),
         "DESCRIPTOR": _FAILURE,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.Failure)
     },
 )
@@ -78,7 +78,7 @@ HandlerError = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _HANDLERERROR,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.HandlerError)
     },
 )
@@ -89,7 +89,7 @@ UnsuccessfulOperationError = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UNSUCCESSFULOPERATIONERROR,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.UnsuccessfulOperationError)
     },
 )
@@ -100,7 +100,7 @@ Link = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LINK,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.Link)
     },
 )
@@ -115,12 +115,12 @@ StartOperationRequest = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _STARTOPERATIONREQUEST_CALLBACKHEADERENTRY,
-                "__module__": "temporal.api.nexus.v1.message_pb2",
+                "__module__": "temporalio.api.nexus.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.StartOperationRequest.CallbackHeaderEntry)
             },
         ),
         "DESCRIPTOR": _STARTOPERATIONREQUEST,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.StartOperationRequest)
     },
 )
@@ -132,7 +132,7 @@ CancelOperationRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CANCELOPERATIONREQUEST,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.CancelOperationRequest)
     },
 )
@@ -147,12 +147,12 @@ Request = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _REQUEST_HEADERENTRY,
-                "__module__": "temporal.api.nexus.v1.message_pb2",
+                "__module__": "temporalio.api.nexus.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.Request.HeaderEntry)
             },
         ),
         "DESCRIPTOR": _REQUEST,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.Request)
     },
 )
@@ -168,7 +168,7 @@ StartOperationResponse = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _STARTOPERATIONRESPONSE_SYNC,
-                "__module__": "temporal.api.nexus.v1.message_pb2",
+                "__module__": "temporalio.api.nexus.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.StartOperationResponse.Sync)
             },
         ),
@@ -177,12 +177,12 @@ StartOperationResponse = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _STARTOPERATIONRESPONSE_ASYNC,
-                "__module__": "temporal.api.nexus.v1.message_pb2",
+                "__module__": "temporalio.api.nexus.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.StartOperationResponse.Async)
             },
         ),
         "DESCRIPTOR": _STARTOPERATIONRESPONSE,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.StartOperationResponse)
     },
 )
@@ -195,7 +195,7 @@ CancelOperationResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CANCELOPERATIONRESPONSE,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.CancelOperationResponse)
     },
 )
@@ -206,7 +206,7 @@ Response = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONSE,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.Response)
     },
 )
@@ -217,7 +217,7 @@ Endpoint = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ENDPOINT,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.Endpoint)
     },
 )
@@ -228,7 +228,7 @@ EndpointSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ENDPOINTSPEC,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.EndpointSpec)
     },
 )
@@ -243,7 +243,7 @@ EndpointTarget = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _ENDPOINTTARGET_WORKER,
-                "__module__": "temporal.api.nexus.v1.message_pb2",
+                "__module__": "temporalio.api.nexus.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.EndpointTarget.Worker)
             },
         ),
@@ -252,12 +252,12 @@ EndpointTarget = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _ENDPOINTTARGET_EXTERNAL,
-                "__module__": "temporal.api.nexus.v1.message_pb2",
+                "__module__": "temporalio.api.nexus.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.EndpointTarget.External)
             },
         ),
         "DESCRIPTOR": _ENDPOINTTARGET,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.EndpointTarget)
     },
 )
