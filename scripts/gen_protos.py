@@ -64,7 +64,6 @@ def fix_generated_output(base_path: Path):
     - protoc doesn't generate the correct import paths
         (https://github.com/protocolbuffers/protobuf/issues/1491)
     """
-    print("Fixing generated protoc output")
     imports: Mapping[str, List[str]] = collections.defaultdict(list)
     for p in base_path.iterdir():
         if p.is_dir():
