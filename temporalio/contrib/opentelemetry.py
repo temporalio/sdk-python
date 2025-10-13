@@ -304,9 +304,14 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
         with self.root._start_as_current_span(
             f"StartUpdateWithStartWorkflow:{input.start_workflow_input.workflow}",
             attributes=attrs,
-            input=input,
+            input=input.start_workflow_input,
             kind=opentelemetry.trace.SpanKind.CLIENT,
         ):
+            if input.update_workflow_input:
+                input.update_workflow_input.headers = self.root._context_to_headers(
+                    input.update_workflow_input.headers
+                )
+
             return await super().start_update_with_start_workflow(input)
 
 
