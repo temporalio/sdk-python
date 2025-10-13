@@ -516,6 +516,6 @@ async def test_opentelemetry_safe_detach(client: Client):
                     and "Failed to detach context" in record.message
                 )
 
-            assert capturer.find(otel_context_error) is None, (
-                "Detach from context message should not be logged"
-            )
+            assert (
+                capturer.find(otel_context_error) is None
+            ), "Detach from context message should not be logged"
