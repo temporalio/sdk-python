@@ -1317,6 +1317,9 @@ class Client:
     ) -> ActivityHandle[ReturnType]:
         """Start an activity and return its handle.
 
+        .. warning::
+           This API is experimental.
+
         Args:
             activity: String name or callable activity function to execute.
             args: Arguments to pass to the activity.
@@ -1401,6 +1404,9 @@ class Client:
     ) -> ReturnType:
         """Start an activity, wait for it to complete, and return its result.
 
+        .. warning::
+           This API is experimental.
+
         This is a convenience method that combines :py:meth:`start_activity` and
         :py:meth:`ActivityHandle.result`.
 
@@ -1444,6 +1450,9 @@ class Client:
     ) -> ActivityExecutionAsyncIterator:
         """List activities.
 
+        .. warning::
+           This API is experimental.
+
         This does not make a request until the first iteration is attempted.
         Therefore any errors will not occur until then.
 
@@ -1484,6 +1493,9 @@ class Client:
     ) -> ActivityExecutionCount:
         """Count activities matching the query.
 
+        .. warning::
+           This API is experimental.
+
         Args:
             query: A Temporal visibility filter for activities.
             rpc_metadata: Headers used on the RPC call. Keys here override
@@ -1506,6 +1518,9 @@ class Client:
         run_id: Optional[str] = None,
     ) -> ActivityHandle[Any]:
         """Get a handle to an existing activity, as the caller of that activity.
+
+        .. warning::
+           This API is experimental.
 
         To get a handle to an activity execution that you control for manual completion and
         heartbeating, see :py:meth:`Client.get_async_activity_handle`.
@@ -3117,7 +3132,11 @@ class ActivityExecutionAsyncIterator:
 # https://github.com/temporalio/api/pull/640/files
 @dataclass(frozen=True)
 class ActivityExecution:
-    """Info for a standalone activity execution from list response."""
+    """Info for a standalone activity execution from list response.
+
+    .. warning::
+       This API is experimental.
+    """
 
     activity_id: str
     """Activity ID."""
@@ -3197,7 +3216,11 @@ class ActivityExecution:
 
 @dataclass(frozen=True)
 class WorkflowActivityExecution:
-    """Info for a workflow activity execution from list response."""
+    """Info for a workflow activity execution from list response.
+
+    .. warning::
+       This API is experimental.
+    """
 
     activity_id: str
     """Activity ID."""
@@ -3264,7 +3287,11 @@ class WorkflowActivityExecution:
 
 @dataclass(frozen=True)
 class ActivityExecutionCount:
-    """Representation of a count from a count activities call."""
+    """Representation of a count from a count activities call.
+
+    .. warning::
+       This API is experimental.
+    """
 
     count: int
     """Total count matching the filter, if any."""
@@ -3281,7 +3308,11 @@ class ActivityExecutionCount:
 
 @dataclass(frozen=True)
 class ActivityExecutionDescription:
-    """Detailed information about an activity execution from describe response."""
+    """Detailed information about an activity execution from describe response.
+
+    .. warning::
+       This API is experimental.
+    """
 
     activity_id: str
     """Activity ID."""
@@ -3455,7 +3486,11 @@ class ActivityExecutionDescription:
 
 @dataclass(frozen=True)
 class ActivityIDReference:
-    """Information identifying an activity execution."""
+    """Information identifying an activity execution.
+
+    .. warning::
+       This API is experimental.
+    """
 
     workflow_id: Optional[str]
     run_id: Optional[str]
@@ -3609,7 +3644,11 @@ class AsyncActivityHandle(WithSerializationContext):
 # be generic in the activity type in addition to the return type (as WorkflowHandle), to support
 # static type inference for signal/query/update.
 class ActivityHandle(Generic[ReturnType]):
-    """Handle representing a standalone activity execution."""
+    """Handle representing a standalone activity execution.
+
+    .. warning::
+       This API is experimental.
+    """
 
     def __init__(
         self,
@@ -3675,6 +3714,9 @@ class ActivityHandle(Generic[ReturnType]):
         rpc_timeout: Optional[timedelta] = None,
     ) -> ReturnType:
         """Wait for result of the activity.
+
+        .. warning::
+           This API is experimental.
 
         The result may already be known if this method has been called before,
         in which case no network call is made. Otherwise the result will be
@@ -3769,6 +3811,9 @@ class ActivityHandle(Generic[ReturnType]):
     ) -> None:
         """Request cancellation of the activity.
 
+        .. warning::
+           This API is experimental.
+
         Requesting cancellation of an activity does not automatically transition the activity to
         canceled status. If the activity is heartbeating, a :py:class:`exceptions.CancelledError`
         exception will be raised when receiving the heartbeat response; if the activity allows this
@@ -3799,6 +3844,9 @@ class ActivityHandle(Generic[ReturnType]):
     ) -> None:
         """Terminate the activity execution immediately.
 
+        .. warning::
+           This API is experimental.
+
         Termination does not reach the worker and the activity code cannot react to it.
         A terminated activity may have a running attempt and will be requested to be
         canceled by the server when it heartbeats.
@@ -3825,6 +3873,9 @@ class ActivityHandle(Generic[ReturnType]):
         rpc_timeout: Optional[timedelta] = None,
     ) -> ActivityExecutionDescription:
         """Describe the activity execution.
+
+        .. warning::
+           This API is experimental.
 
         Args:
             rpc_metadata: Headers used on the RPC call.
@@ -3853,6 +3904,9 @@ class ActivityHandle(Generic[ReturnType]):
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Pause the activity.
+
+        .. warning::
+           This API is experimental.
 
         Args:
             reason: Reason for pausing the activity.
@@ -3893,6 +3947,9 @@ class ActivityHandle(Generic[ReturnType]):
     ) -> None:
         """Unpause the activity.
 
+        .. warning::
+           This API is experimental.
+
         Args:
             reset_attempts: Whether to reset the number of attempts.
             rpc_metadata: Headers used on the RPC call. Keys here override
@@ -3932,6 +3989,9 @@ class ActivityHandle(Generic[ReturnType]):
         rpc_timeout: Optional[timedelta] = None,
     ) -> None:
         """Reset the activity.
+
+        .. warning::
+           This API is experimental.
 
         Args:
             reset_heartbeat: Whether to reset heartbeat details.
@@ -6394,7 +6454,11 @@ class WorkflowUpdateRPCTimeoutOrCancelledError(RPCTimeoutOrCancelledError):
 
 
 class ActivityFailedError(temporalio.exceptions.TemporalError):
-    """Error that occurs when a standalone activity is unsuccessful."""
+    """Error that occurs when a standalone activity is unsuccessful.
+
+    .. warning::
+       This API is experimental.
+    """
 
     def __init__(self, *, cause: BaseException) -> None:
         """Create activity failure error."""
@@ -6566,7 +6630,11 @@ class TerminateWorkflowInput:
 
 @dataclass
 class StartActivityInput:
-    """Input for :py:meth:`OutboundInterceptor.start_activity`."""
+    """Input for :py:meth:`OutboundInterceptor.start_activity`.
+
+    .. warning::
+       This API is experimental.
+    """
 
     activity_type: str
     args: Sequence[Any]
@@ -6596,7 +6664,11 @@ class StartActivityInput:
 
 @dataclass
 class CancelActivityInput:
-    """Input for :py:meth:`OutboundInterceptor.cancel_activity`."""
+    """Input for :py:meth:`OutboundInterceptor.cancel_activity`.
+
+    .. warning::
+       This API is experimental.
+    """
 
     activity_id: str
     run_id: str
@@ -6607,7 +6679,11 @@ class CancelActivityInput:
 
 @dataclass
 class TerminateActivityInput:
-    """Input for :py:meth:`OutboundInterceptor.terminate_activity`."""
+    """Input for :py:meth:`OutboundInterceptor.terminate_activity`.
+
+    .. warning::
+       This API is experimental.
+    """
 
     activity_id: str
     run_id: str
@@ -6618,7 +6694,11 @@ class TerminateActivityInput:
 
 @dataclass
 class DescribeActivityInput:
-    """Input for :py:meth:`OutboundInterceptor.describe_activity`."""
+    """Input for :py:meth:`OutboundInterceptor.describe_activity`.
+
+    .. warning::
+       This API is experimental.
+    """
 
     activity_id: str
     run_id: str
@@ -6628,7 +6708,11 @@ class DescribeActivityInput:
 
 @dataclass
 class ListActivitiesInput:
-    """Input for :py:meth:`OutboundInterceptor.list_activities`."""
+    """Input for :py:meth:`OutboundInterceptor.list_activities`.
+
+    .. warning::
+       This API is experimental.
+    """
 
     query: Optional[str]
     page_size: int
@@ -6640,7 +6724,11 @@ class ListActivitiesInput:
 
 @dataclass
 class CountActivitiesInput:
-    """Input for :py:meth:`OutboundInterceptor.count_activities`."""
+    """Input for :py:meth:`OutboundInterceptor.count_activities`.
+
+    .. warning::
+       This API is experimental.
+    """
 
     query: Optional[str]
     rpc_metadata: Mapping[str, Union[str, bytes]]
@@ -6988,33 +7076,57 @@ class OutboundInterceptor:
     ### Activity calls
 
     async def start_activity(self, input: StartActivityInput) -> ActivityHandle[Any]:
-        """Called for every :py:meth:`Client.start_activity` call."""
+        """Called for every :py:meth:`Client.start_activity` call.
+
+        .. warning::
+           This API is experimental.
+        """
         return await self.next.start_activity(input)
 
     async def cancel_activity(self, input: CancelActivityInput) -> None:
-        """Called for every :py:meth:`ActivityHandle.cancel` call."""
+        """Called for every :py:meth:`ActivityHandle.cancel` call.
+
+        .. warning::
+           This API is experimental.
+        """
         await self.next.cancel_activity(input)
 
     async def terminate_activity(self, input: TerminateActivityInput) -> None:
-        """Called for every :py:meth:`ActivityHandle.terminate` call."""
+        """Called for every :py:meth:`ActivityHandle.terminate` call.
+
+        .. warning::
+           This API is experimental.
+        """
         await self.next.terminate_activity(input)
 
     async def describe_activity(
         self, input: DescribeActivityInput
     ) -> ActivityExecutionDescription:
-        """Called for every :py:meth:`ActivityHandle.describe` call."""
+        """Called for every :py:meth:`ActivityHandle.describe` call.
+
+        .. warning::
+           This API is experimental.
+        """
         return await self.next.describe_activity(input)
 
     def list_activities(
         self, input: ListActivitiesInput
     ) -> ActivityExecutionAsyncIterator:
-        """Called for every :py:meth:`Client.list_activities` call."""
+        """Called for every :py:meth:`Client.list_activities` call.
+
+        .. warning::
+           This API is experimental.
+        """
         return self.next.list_activities(input)
 
     async def count_activities(
         self, input: CountActivitiesInput
     ) -> ActivityExecutionCount:
-        """Called for every :py:meth:`Client.count_activities` call."""
+        """Called for every :py:meth:`Client.count_activities` call.
+
+        .. warning::
+           This API is experimental.
+        """
         return await self.next.count_activities(input)
 
     async def start_workflow_update(

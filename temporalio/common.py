@@ -157,6 +157,9 @@ class WorkflowIDConflictPolicy(IntEnum):
 class IdReusePolicy(IntEnum):
     """How already-closed entity IDs are handled on start.
 
+    .. warning::
+       This API is experimental.
+
     See :py:class:`temporalio.api.enums.v1.IdReusePolicy`.
     """
 
@@ -174,6 +177,9 @@ class IdReusePolicy(IntEnum):
 
 class IdConflictPolicy(IntEnum):
     """How already-running entity IDs are handled on start.
+
+    .. warning::
+       This API is experimental.
 
     See :py:class:`temporalio.api.enums.v1.IdConflictPolicy`.
     """
@@ -193,6 +199,9 @@ class IdConflictPolicy(IntEnum):
 class ActivityExecutionStatus(IntEnum):
     """Status of a standalone activity execution.
 
+    .. warning::
+       This API is experimental.
+
     See :py:class:`temporalio.api.enums.v1.ActivityExecutionStatus`.
     """
 
@@ -207,6 +216,9 @@ class ActivityExecutionStatus(IntEnum):
 
 class PendingActivityState(IntEnum):
     """State of a pending activity.
+
+    .. warning::
+       This API is experimental.
 
     See :py:class:`temporalio.api.enums.v1.PendingActivityState`.
     """
