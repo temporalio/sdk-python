@@ -130,6 +130,7 @@ from temporalio.worker import (
 )
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import (
+    LogCapturer,
     admitted_update_task,
     assert_eq_eventually,
     assert_eventually,
@@ -143,16 +144,15 @@ from tests.helpers import (
     pause_and_assert,
     unpause_and_assert,
     workflow_update_exists,
-    LogCapturer,
-)
-from tests.helpers.external_stack_trace import (
-    ExternalStackTraceWorkflow,
-    external_wait_cancel,
 )
 from tests.helpers.cache_evitction import (
     CacheEvictionTearDownWorkflow,
     WaitForeverWorkflow,
     wait_forever_activity,
+)
+from tests.helpers.external_stack_trace import (
+    ExternalStackTraceWorkflow,
+    external_wait_cancel,
 )
 
 # Passing through because Python 3.9 has an import bug at

@@ -23,12 +23,12 @@ from temporalio.contrib.opentelemetry import workflow as otel_workflow
 from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
+from tests.helpers import LogCapturer
 from tests.helpers.cache_evitction import (
     CacheEvictionTearDownWorkflow,
     WaitForeverWorkflow,
     wait_forever_activity,
 )
-from tests.helpers import LogCapturer
 
 # Passing through because Python 3.9 has an import bug at
 # https://github.com/python/cpython/issues/91351
