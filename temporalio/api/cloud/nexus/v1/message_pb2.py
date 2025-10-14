@@ -41,7 +41,7 @@ EndpointSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ENDPOINTSPEC,
-        "__module__": "temporal.api.cloud.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.nexus.v1.EndpointSpec)
     },
 )
@@ -52,7 +52,7 @@ EndpointTargetSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ENDPOINTTARGETSPEC,
-        "__module__": "temporal.api.cloud.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.nexus.v1.EndpointTargetSpec)
     },
 )
@@ -63,7 +63,7 @@ WorkerTargetSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKERTARGETSPEC,
-        "__module__": "temporal.api.cloud.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.nexus.v1.WorkerTargetSpec)
     },
 )
@@ -74,7 +74,7 @@ EndpointPolicySpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ENDPOINTPOLICYSPEC,
-        "__module__": "temporal.api.cloud.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.nexus.v1.EndpointPolicySpec)
     },
 )
@@ -85,7 +85,7 @@ AllowedCloudNamespacePolicySpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ALLOWEDCLOUDNAMESPACEPOLICYSPEC,
-        "__module__": "temporal.api.cloud.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.nexus.v1.AllowedCloudNamespacePolicySpec)
     },
 )
@@ -96,7 +96,7 @@ Endpoint = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ENDPOINT,
-        "__module__": "temporal.api.cloud.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.nexus.v1.Endpoint)
     },
 )
