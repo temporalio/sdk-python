@@ -295,6 +295,7 @@ class Replayer:
                         1
                     ),
                     plugins=self._config.get("plugins", []),
+                    skip_client_worker_set_check=True,
                 ),
             )
             # Start worker

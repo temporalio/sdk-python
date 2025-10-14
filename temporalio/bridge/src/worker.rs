@@ -14,9 +14,8 @@ use temporal_sdk_core::api::errors::PollError;
 use temporal_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporal_sdk_core_api::errors::WorkflowErrorType;
 use temporal_sdk_core_api::worker::{
-    PluginInfo as CorePluginInfo, SlotInfo, SlotInfoTrait, SlotKind, SlotKindType,
-    SlotMarkUsedContext, SlotReleaseContext, SlotReservationContext,
-    SlotSupplier as SlotSupplierTrait, SlotSupplierPermit,
+    SlotInfo, SlotInfoTrait, SlotKind, SlotKindType, SlotMarkUsedContext, SlotReleaseContext,
+    SlotReservationContext, SlotSupplier as SlotSupplierTrait, SlotSupplierPermit,
 };
 use temporal_sdk_core_api::Worker;
 use temporal_sdk_core_protos::coresdk::workflow_completion::WorkflowActivationCompletion;
@@ -24,6 +23,7 @@ use temporal_sdk_core_protos::coresdk::{
     nexus::NexusTaskCompletion, ActivityHeartbeat, ActivityTaskCompletion,
 };
 use temporal_sdk_core_protos::temporal::api::history::v1::History;
+use temporal_sdk_core_protos::temporal::api::worker::v1::PluginInfo;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::error;
@@ -65,6 +65,7 @@ pub struct WorkerConfig {
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
     nexus_task_poller_behavior: PollerBehavior,
     plugins: Vec<String>,
+    skip_client_worker_set_check: bool,
 }
 
 #[derive(FromPyObject)]
@@ -727,12 +728,13 @@ fn convert_worker_config(
         .plugins(
             conf.plugins
                 .into_iter()
-                .map(|name| CorePluginInfo {
+                .map(|name| PluginInfo {
                     name,
-                    version: None,
+                    version: String::new(),
                 })
-                .collect(),
+                .collect::<Vec<_>>(),
         )
+        .skip_client_worker_set_check(conf.skip_client_worker_set_check)
         .build()
         .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {err}")))
 }
