@@ -47,7 +47,7 @@ Summary = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SUMMARY,
-        "__module__": "temporal.api.cloud.usage.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.usage.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.usage.v1.Summary)
     },
 )
@@ -58,7 +58,7 @@ RecordGroup = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RECORDGROUP,
-        "__module__": "temporal.api.cloud.usage.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.usage.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.usage.v1.RecordGroup)
     },
 )
@@ -69,7 +69,7 @@ GroupBy = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GROUPBY,
-        "__module__": "temporal.api.cloud.usage.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.usage.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.usage.v1.GroupBy)
     },
 )
@@ -80,7 +80,7 @@ Record = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RECORD,
-        "__module__": "temporal.api.cloud.usage.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.usage.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.usage.v1.Record)
     },
 )
