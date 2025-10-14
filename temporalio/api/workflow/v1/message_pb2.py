@@ -113,7 +113,7 @@ WorkflowExecutionInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.WorkflowExecutionInfo)
     },
 )
@@ -128,12 +128,12 @@ WorkflowExecutionExtendedInfo = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _WORKFLOWEXECUTIONEXTENDEDINFO_REQUESTIDINFOSENTRY,
-                "__module__": "temporal.api.workflow.v1.message_pb2",
+                "__module__": "temporalio.api.workflow.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.WorkflowExecutionExtendedInfo.RequestIdInfosEntry)
             },
         ),
         "DESCRIPTOR": _WORKFLOWEXECUTIONEXTENDEDINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.WorkflowExecutionExtendedInfo)
     },
 )
@@ -145,7 +145,7 @@ WorkflowExecutionVersioningInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONVERSIONINGINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.WorkflowExecutionVersioningInfo)
     },
 )
@@ -156,7 +156,7 @@ DeploymentTransition = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DEPLOYMENTTRANSITION,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.DeploymentTransition)
     },
 )
@@ -167,7 +167,7 @@ DeploymentVersionTransition = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DEPLOYMENTVERSIONTRANSITION,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.DeploymentVersionTransition)
     },
 )
@@ -178,7 +178,7 @@ WorkflowExecutionConfig = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONCONFIG,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.WorkflowExecutionConfig)
     },
 )
@@ -197,7 +197,7 @@ PendingActivityInfo = _reflection.GeneratedProtocolMessageType(
                     (_message.Message,),
                     {
                         "DESCRIPTOR": _PENDINGACTIVITYINFO_PAUSEINFO_MANUAL,
-                        "__module__": "temporal.api.workflow.v1.message_pb2",
+                        "__module__": "temporalio.api.workflow.v1.message_pb2",
                         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.PendingActivityInfo.PauseInfo.Manual)
                     },
                 ),
@@ -206,17 +206,17 @@ PendingActivityInfo = _reflection.GeneratedProtocolMessageType(
                     (_message.Message,),
                     {
                         "DESCRIPTOR": _PENDINGACTIVITYINFO_PAUSEINFO_RULE,
-                        "__module__": "temporal.api.workflow.v1.message_pb2",
+                        "__module__": "temporalio.api.workflow.v1.message_pb2",
                         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.PendingActivityInfo.PauseInfo.Rule)
                     },
                 ),
                 "DESCRIPTOR": _PENDINGACTIVITYINFO_PAUSEINFO,
-                "__module__": "temporal.api.workflow.v1.message_pb2",
+                "__module__": "temporalio.api.workflow.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.PendingActivityInfo.PauseInfo)
             },
         ),
         "DESCRIPTOR": _PENDINGACTIVITYINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.PendingActivityInfo)
     },
 )
@@ -230,7 +230,7 @@ PendingChildExecutionInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PENDINGCHILDEXECUTIONINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.PendingChildExecutionInfo)
     },
 )
@@ -241,7 +241,7 @@ PendingWorkflowTaskInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PENDINGWORKFLOWTASKINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.PendingWorkflowTaskInfo)
     },
 )
@@ -252,7 +252,7 @@ ResetPoints = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESETPOINTS,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.ResetPoints)
     },
 )
@@ -263,7 +263,7 @@ ResetPointInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESETPOINTINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.ResetPointInfo)
     },
 )
@@ -274,7 +274,7 @@ NewWorkflowExecutionInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NEWWORKFLOWEXECUTIONINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.NewWorkflowExecutionInfo)
     },
 )
@@ -289,7 +289,7 @@ CallbackInfo = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _CALLBACKINFO_WORKFLOWCLOSED,
-                "__module__": "temporal.api.workflow.v1.message_pb2",
+                "__module__": "temporalio.api.workflow.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.CallbackInfo.WorkflowClosed)
             },
         ),
@@ -298,12 +298,12 @@ CallbackInfo = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _CALLBACKINFO_TRIGGER,
-                "__module__": "temporal.api.workflow.v1.message_pb2",
+                "__module__": "temporalio.api.workflow.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.CallbackInfo.Trigger)
             },
         ),
         "DESCRIPTOR": _CALLBACKINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.CallbackInfo)
     },
 )
@@ -316,7 +316,7 @@ PendingNexusOperationInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PENDINGNEXUSOPERATIONINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.PendingNexusOperationInfo)
     },
 )
@@ -327,7 +327,7 @@ NexusOperationCancellationInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NEXUSOPERATIONCANCELLATIONINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.NexusOperationCancellationInfo)
     },
 )
@@ -338,7 +338,7 @@ WorkflowExecutionOptions = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONOPTIONS,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.WorkflowExecutionOptions)
     },
 )
@@ -353,12 +353,12 @@ VersioningOverride = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _VERSIONINGOVERRIDE_PINNEDOVERRIDE,
-                "__module__": "temporal.api.workflow.v1.message_pb2",
+                "__module__": "temporalio.api.workflow.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.VersioningOverride.PinnedOverride)
             },
         ),
         "DESCRIPTOR": _VERSIONINGOVERRIDE,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.VersioningOverride)
     },
 )
@@ -370,7 +370,7 @@ OnConflictOptions = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ONCONFLICTOPTIONS,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.OnConflictOptions)
     },
 )
@@ -381,7 +381,7 @@ RequestIdInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _REQUESTIDINFO,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.RequestIdInfo)
     },
 )
@@ -396,7 +396,7 @@ PostResetOperation = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _POSTRESETOPERATION_SIGNALWORKFLOW,
-                "__module__": "temporal.api.workflow.v1.message_pb2",
+                "__module__": "temporalio.api.workflow.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.PostResetOperation.SignalWorkflow)
             },
         ),
@@ -405,12 +405,12 @@ PostResetOperation = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _POSTRESETOPERATION_UPDATEWORKFLOWOPTIONS,
-                "__module__": "temporal.api.workflow.v1.message_pb2",
+                "__module__": "temporalio.api.workflow.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.PostResetOperation.UpdateWorkflowOptions)
             },
         ),
         "DESCRIPTOR": _POSTRESETOPERATION,
-        "__module__": "temporal.api.workflow.v1.message_pb2",
+        "__module__": "temporalio.api.workflow.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.workflow.v1.PostResetOperation)
     },
 )

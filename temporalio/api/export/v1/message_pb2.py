@@ -30,7 +30,7 @@ WorkflowExecution = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTION,
-        "__module__": "temporal.api.export.v1.message_pb2",
+        "__module__": "temporalio.api.export.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.export.v1.WorkflowExecution)
     },
 )
@@ -41,7 +41,7 @@ WorkflowExecutions = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONS,
-        "__module__": "temporal.api.export.v1.message_pb2",
+        "__module__": "temporalio.api.export.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.export.v1.WorkflowExecutions)
     },
 )
