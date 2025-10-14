@@ -30,7 +30,7 @@ ServiceResponse = TypeVar("ServiceResponse", bound=google.protobuf.message.Messa
 logger = logging.getLogger(__name__)
 
 # Set to true to log all requests and responses
-LOG_PROTOS = False
+LOG_PROTOS = True
 
 
 @dataclass
@@ -377,7 +377,7 @@ class _BridgeServiceClient(ServiceClient):
         except temporalio.bridge.client.RPCError as err:
             # Intentionally swallowing the cause instead of using "from"
             status, message, details = err.args
-            raise RPCError(message, RPCStatusCode(status), details)
+            raise RPCError(message, RPCStatusCode(status), details) from err
 
 
 class RPCStatusCode(IntEnum):
