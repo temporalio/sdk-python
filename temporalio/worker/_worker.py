@@ -395,8 +395,6 @@ class Worker:
         """
         self._config = config
 
-        config.setdefault("skip_client_worker_set_check", False)
-
         if not (
             config["activities"]
             or config["nexus_service_handlers"]

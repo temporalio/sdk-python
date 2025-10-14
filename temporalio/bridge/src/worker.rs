@@ -647,11 +647,12 @@ impl WorkerRef {
         Ok(())
     }
 
-    fn replace_client(&self, client: &client::ClientRef) {
+    fn replace_client(&self, client: &client::ClientRef) -> PyResult<()> {
         self.worker
             .as_ref()
             .expect("missing worker")
-            .replace_client(client.retry_client.clone().into_inner());
+            .replace_client(client.retry_client.clone().into_inner())
+            .map_err(|err| PyValueError::new_err(format!("Failed replacing client: {err}")))
     }
 
     fn initiate_shutdown(&self) -> PyResult<()> {
