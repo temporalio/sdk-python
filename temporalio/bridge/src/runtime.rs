@@ -124,10 +124,9 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
 
     // Build metric config, but actual metrics instance is late-bound after
     // CoreRuntime is created since it needs Tokio runtime
-    let mut metrics_conf = metrics;
-    if let Some(metrics_conf_ref) = metrics_conf.as_ref() {
-        telemetry_build.attach_service_name(metrics_conf_ref.attach_service_name);
-        if let Some(prefix) = &metrics_conf_ref.metric_prefix {
+    if let Some(metrics_conf) = metrics.as_ref() {
+        telemetry_build.attach_service_name(metrics_conf.attach_service_name);
+        if let Some(prefix) = &metrics_conf.metric_prefix {
             telemetry_build.metric_prefix(prefix.to_string());
         }
     }
@@ -156,7 +155,7 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
     // We late-bind the metrics after core runtime is created since it needs
     // the Tokio handle
     let mut metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>> = None;
-    if let Some(metrics_conf) = metrics_conf.take() {
+    if let Some(metrics_conf) = metrics {
         let _guard = core.tokio_handle().enter();
         // If they want buffered, cannot have Prom/OTel and we make buffered
         if metrics_conf.buffered_with_size > 0 {
