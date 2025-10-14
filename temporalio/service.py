@@ -378,7 +378,7 @@ class _BridgeServiceClient(ServiceClient):
             # Intentionally swallowing the cause instead of using "from"
             status, message, details = err.args
             logger.debug(
-                "Service %s request failed: %s, %s, %s", status, message, details
+                "Service request failed: %s, %s, %s", status, message, details
             )
             raise RPCError(message, RPCStatusCode(status), details) from err
 
