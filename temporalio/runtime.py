@@ -142,7 +142,7 @@ class LoggingConfig:
 
 
 LoggingConfig.default = LoggingConfig(
-    filter=TelemetryFilter(core_level="DEBUG", other_level="DEBUG")
+    filter=TelemetryFilter(core_level="DEBUG", other_level="TRACE")
 )
 
 _module_start_time = time.time()
