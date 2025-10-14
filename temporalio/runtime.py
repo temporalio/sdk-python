@@ -70,13 +70,37 @@ class Runtime:
             raise RuntimeError("Runtime default already set")
         _default_runtime = runtime
 
-    def __init__(self, *, telemetry: TelemetryConfig) -> None:
-        """Create a default runtime with the given telemetry config.
+    def __init__(
+        self,
+        *,
+        telemetry: Optional[TelemetryConfig] = None,
+        runtime_options: Optional["RuntimeOptions"] = None,
+    ) -> None:
+        """Create a runtime with the provided configuration.
 
         Each new runtime creates a new internal thread pool, so use sparingly.
+
+        Args:
+            telemetry: Telemetry configuration when not supplying
+                ``runtime_options``.
+            runtime_options: Full runtime configuration including telemetry and
+                worker heartbeating options.
+
+        Raises:
+            ValueError: If both ``telemetry`` and ``runtime_options`` are
+                provided.
         """
+        if runtime_options and telemetry:
+            raise ValueError("Cannot supply both telemetry and runtime_options")
+
+        if runtime_options is None:
+            telemetry = telemetry or TelemetryConfig()
+            runtime_options = RuntimeOptions(telemetry=telemetry)
+        else:
+            telemetry = runtime_options.telemetry
+
         self._core_runtime = temporalio.bridge.runtime.Runtime(
-            telemetry=telemetry._to_bridge_config()
+            options=runtime_options._to_bridge_config()
         )
         if isinstance(telemetry.metrics, MetricBuffer):
             telemetry.metrics._runtime = self
@@ -388,6 +412,34 @@ class TelemetryConfig:
                 global_tags=self.global_tags or None,
                 metric_prefix=self.metric_prefix,
             ),
+        )
+
+
+@dataclass(frozen=True)
+class RuntimeOptions:
+    """Configuration for runtime initialization."""
+
+    telemetry: TelemetryConfig = field(default_factory=TelemetryConfig)
+    """Telemetry configuration applied to the runtime."""
+
+    worker_heartbeat_interval: Optional[timedelta] = None
+    """Interval for worker heartbeats. ``None`` disables heartbeating."""
+
+    def _to_bridge_config(self) -> temporalio.bridge.runtime.RuntimeOptions:
+        heartbeat_millis: Optional[int]
+        if self.worker_heartbeat_interval is None:
+            heartbeat_millis = None
+        else:
+            if self.worker_heartbeat_interval <= timedelta(0):
+                raise ValueError("worker_heartbeat_interval must be positive")
+            heartbeat_millis = int(
+                self.worker_heartbeat_interval.total_seconds() * 1000
+            )
+            if heartbeat_millis == 0:
+                heartbeat_millis = 1
+        return temporalio.bridge.runtime.RuntimeOptions(
+            telemetry=self.telemetry._to_bridge_config(),
+            worker_heartbeat_interval_millis=heartbeat_millis,
         )
 
 

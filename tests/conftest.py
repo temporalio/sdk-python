@@ -6,6 +6,8 @@ from typing import AsyncGenerator
 import pytest
 import pytest_asyncio
 
+import temporalio.worker
+
 from . import DEV_SERVER_DOWNLOAD_VERSION
 
 # If there is an integration test environment variable set, we must remove the
@@ -55,6 +57,18 @@ def pytest_addoption(parser):
         default="local",
         help="Which workflow environment to use ('local', 'time-skipping', or ip:port for existing server)",
     )
+
+
+@pytest.fixture(autouse=True)
+def _force_worker_skip_client_set(monkeypatch):
+    original_init = temporalio.worker.Worker.__init__
+
+    def patched_init(self, *args, **kwargs):
+        kwargs.setdefault("skip_client_worker_set_check", True)
+        return original_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(temporalio.worker.Worker, "__init__", patched_init)
+    yield
 
 
 @pytest.fixture(scope="session")
