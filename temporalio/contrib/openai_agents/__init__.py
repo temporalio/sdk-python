@@ -16,15 +16,13 @@ from temporalio.contrib.openai_agents._model_parameters import ModelActivityPara
 from temporalio.contrib.openai_agents._temporal_openai_agents import (
     OpenAIAgentsPlugin,
     OpenAIPayloadConverter,
-    TestModel,
-    TestModelProvider,
 )
 from temporalio.contrib.openai_agents._trace_interceptor import (
     OpenAIAgentsTracingInterceptor,
 )
 from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 
-from . import workflow
+from . import test, workflow
 
 __all__ = [
     "AgentsWorkflowError",
@@ -33,7 +31,6 @@ __all__ = [
     "OpenAIPayloadConverter",
     "StatelessMCPServerProvider",
     "StatefulMCPServerProvider",
-    "TestModel",
-    "TestModelProvider",
+    "test",
     "workflow",
 ]

@@ -6,28 +6,14 @@ from contextlib import asynccontextmanager, contextmanager
 from datetime import timedelta
 from typing import AsyncIterator, Callable, Optional, Sequence, Union
 
-from agents import (
-    AgentOutputSchemaBase,
-    Handoff,
-    Model,
-    ModelProvider,
-    ModelResponse,
-    ModelSettings,
-    ModelTracing,
-    Tool,
-    TResponseInputItem,
-    set_trace_provider,
-)
-from agents.items import TResponseStreamEvent
+from agents import ModelProvider, set_trace_provider
 from agents.run import get_default_agent_runner, set_default_agent_runner
 from agents.tracing import get_trace_provider
 from agents.tracing.provider import DefaultTraceProvider
 
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
-from temporalio.contrib.openai_agents._openai_runner import (
-    TemporalOpenAIRunner,
-)
+from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
     TemporalTraceProvider,
 )
@@ -35,14 +21,8 @@ from temporalio.contrib.openai_agents._trace_interceptor import (
     OpenAIAgentsTracingInterceptor,
 )
 from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
-from temporalio.contrib.pydantic import (
-    PydanticPayloadConverter,
-    ToJsonOptions,
-)
-from temporalio.converter import (
-    DataConverter,
-    DefaultPayloadConverter,
-)
+from temporalio.contrib.pydantic import PydanticPayloadConverter, ToJsonOptions
+from temporalio.converter import DataConverter, DefaultPayloadConverter
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
@@ -95,58 +75,6 @@ def set_open_ai_agent_temporal_overrides(
     finally:
         set_default_agent_runner(previous_runner)
         set_trace_provider(previous_trace_provider or DefaultTraceProvider())
-
-
-class TestModelProvider(ModelProvider):
-    """Test model provider which simply returns the given module."""
-
-    __test__ = False
-
-    def __init__(self, model: Model):
-        """Initialize a test model provider with a model."""
-        self._model = model
-
-    def get_model(self, model_name: Union[str, None]) -> Model:
-        """Get a model from the model provider."""
-        return self._model
-
-
-class TestModel(Model):
-    """Test model for use mocking model responses."""
-
-    __test__ = False
-
-    def __init__(self, fn: Callable[[], ModelResponse]) -> None:
-        """Initialize a test model with a callable."""
-        self.fn = fn
-
-    async def get_response(
-        self,
-        system_instructions: Union[str, None],
-        input: Union[str, list[TResponseInputItem]],
-        model_settings: ModelSettings,
-        tools: list[Tool],
-        output_schema: Union[AgentOutputSchemaBase, None],
-        handoffs: list[Handoff],
-        tracing: ModelTracing,
-        **kwargs,
-    ) -> ModelResponse:
-        """Get a response from the model."""
-        return self.fn()
-
-    def stream_response(
-        self,
-        system_instructions: Optional[str],
-        input: Union[str, list[TResponseInputItem]],
-        model_settings: ModelSettings,
-        tools: list[Tool],
-        output_schema: Optional[AgentOutputSchemaBase],
-        handoffs: list[Handoff],
-        tracing: ModelTracing,
-        **kwargs,
-    ) -> AsyncIterator[TResponseStreamEvent]:
-        """Get a streamed response from the model. Unimplemented."""
-        raise NotImplementedError()
 
 
 class OpenAIPayloadConverter(PydanticPayloadConverter):
