@@ -70,7 +70,7 @@ CertificateFilterSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CERTIFICATEFILTERSPEC,
-        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.CertificateFilterSpec)
     },
 )
@@ -81,7 +81,7 @@ MtlsAuthSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _MTLSAUTHSPEC,
-        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.MtlsAuthSpec)
     },
 )
@@ -92,7 +92,7 @@ ApiKeyAuthSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _APIKEYAUTHSPEC,
-        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.ApiKeyAuthSpec)
     },
 )
@@ -111,17 +111,17 @@ CodecServerSpec = _reflection.GeneratedProtocolMessageType(
                     (_message.Message,),
                     {
                         "DESCRIPTOR": _CODECSERVERSPEC_CUSTOMERRORMESSAGE_ERRORMESSAGE,
-                        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+                        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
                         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.CodecServerSpec.CustomErrorMessage.ErrorMessage)
                     },
                 ),
                 "DESCRIPTOR": _CODECSERVERSPEC_CUSTOMERRORMESSAGE,
-                "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+                "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.CodecServerSpec.CustomErrorMessage)
             },
         ),
         "DESCRIPTOR": _CODECSERVERSPEC,
-        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.CodecServerSpec)
     },
 )
@@ -134,7 +134,7 @@ LifecycleSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LIFECYCLESPEC,
-        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.LifecycleSpec)
     },
 )
@@ -145,7 +145,7 @@ HighAvailabilitySpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _HIGHAVAILABILITYSPEC,
-        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.HighAvailabilitySpec)
     },
 )
@@ -160,7 +160,7 @@ NamespaceSpec = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _NAMESPACESPEC_CUSTOMSEARCHATTRIBUTESENTRY,
-                "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+                "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.NamespaceSpec.CustomSearchAttributesEntry)
             },
         ),
@@ -169,12 +169,12 @@ NamespaceSpec = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _NAMESPACESPEC_SEARCHATTRIBUTESENTRY,
-                "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+                "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.NamespaceSpec.SearchAttributesEntry)
             },
         ),
         "DESCRIPTOR": _NAMESPACESPEC,
-        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.NamespaceSpec)
     },
 )
@@ -187,7 +187,7 @@ Endpoints = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ENDPOINTS,
-        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.Endpoints)
     },
 )
@@ -198,7 +198,7 @@ Limits = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LIMITS,
-        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.Limits)
     },
 )
@@ -209,7 +209,7 @@ AWSPrivateLinkInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _AWSPRIVATELINKINFO,
-        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.AWSPrivateLinkInfo)
     },
 )
@@ -220,7 +220,7 @@ PrivateConnectivity = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PRIVATECONNECTIVITY,
-        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.PrivateConnectivity)
     },
 )
@@ -235,7 +235,7 @@ Namespace = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _NAMESPACE_REGIONSTATUSENTRY,
-                "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+                "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.Namespace.RegionStatusEntry)
             },
         ),
@@ -244,12 +244,12 @@ Namespace = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _NAMESPACE_TAGSENTRY,
-                "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+                "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.Namespace.TagsEntry)
             },
         ),
         "DESCRIPTOR": _NAMESPACE,
-        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.Namespace)
     },
 )
@@ -262,7 +262,7 @@ NamespaceRegionStatus = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NAMESPACEREGIONSTATUS,
-        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.NamespaceRegionStatus)
     },
 )
@@ -273,7 +273,7 @@ ExportSinkSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _EXPORTSINKSPEC,
-        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.ExportSinkSpec)
     },
 )
@@ -284,7 +284,7 @@ ExportSink = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _EXPORTSINK,
-        "__module__": "temporal.api.cloud.namespace.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.namespace.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.namespace.v1.ExportSink)
     },
 )

@@ -32,7 +32,7 @@ MetricsSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _METRICSSPEC,
-        "__module__": "temporal.api.cloud.account.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.account.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.account.v1.MetricsSpec)
     },
 )
@@ -43,7 +43,7 @@ AccountSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACCOUNTSPEC,
-        "__module__": "temporal.api.cloud.account.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.account.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.account.v1.AccountSpec)
     },
 )
@@ -54,7 +54,7 @@ Metrics = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _METRICS,
-        "__module__": "temporal.api.cloud.account.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.account.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.account.v1.Metrics)
     },
 )
@@ -65,7 +65,7 @@ Account = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACCOUNT,
-        "__module__": "temporal.api.cloud.account.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.account.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.account.v1.Account)
     },
 )

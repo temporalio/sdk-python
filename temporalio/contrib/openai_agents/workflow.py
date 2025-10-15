@@ -250,6 +250,7 @@ def stateless_mcp_server(
     name: str,
     config: Optional[ActivityConfig] = None,
     cache_tools_list: bool = False,
+    factory_argument: Optional[Any] = None,
 ) -> "MCPServer":
     """A stateless MCP server implementation for Temporal workflows.
 
@@ -269,18 +270,22 @@ def stateless_mcp_server(
         config: Optional activity configuration for MCP operation activities.
                Defaults to 1-minute start-to-close timeout.
         cache_tools_list: If true, the list of tools will be cached for the duration of the server
+        factory_argument: Optional argument to be provided to the factory when producing an MCPServer
     """
     from temporalio.contrib.openai_agents._mcp import (
         _StatelessMCPServerReference,
     )
 
-    return _StatelessMCPServerReference(name, config, cache_tools_list)
+    return _StatelessMCPServerReference(
+        name, config, cache_tools_list, factory_argument
+    )
 
 
 def stateful_mcp_server(
     name: str,
     config: Optional[ActivityConfig] = None,
     server_session_config: Optional[ActivityConfig] = None,
+    factory_argument: Optional[Any] = None,
 ) -> AbstractAsyncContextManager["MCPServer"]:
     """A stateful MCP server implementation for Temporal workflows.
 
@@ -305,12 +310,15 @@ def stateful_mcp_server(
                Defaults to 1-minute start-to-close and 30-second schedule-to-start timeouts.
         server_session_config: Optional activity configuration for the connection activity.
                        Defaults to 1-hour start-to-close timeout.
+        factory_argument: Optional argument to be provided to the factory when producing an MCPServer
     """
     from temporalio.contrib.openai_agents._mcp import (
         _StatefulMCPServerReference,
     )
 
-    return _StatefulMCPServerReference(name, config, server_session_config)
+    return _StatefulMCPServerReference(
+        name, config, server_session_config, factory_argument
+    )
 
 
 class ToolSerializationError(TemporalError):
