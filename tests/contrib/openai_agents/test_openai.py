@@ -102,6 +102,12 @@ from temporalio.contrib.openai_agents._temporal_model_stub import (
     _extract_summary,
     _TemporalModelStub,
 )
+from temporalio.contrib.openai_agents.testing import (
+    ResponseBuilders,
+    StaticTestModel,
+    TestModel,
+    TestModelProvider,
+)
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import ApplicationError, CancelledError, TemporalError
 from temporalio.testing import WorkflowEnvironment
