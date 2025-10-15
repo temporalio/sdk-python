@@ -22,7 +22,7 @@ from temporalio.contrib.openai_agents._trace_interceptor import (
 )
 from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 
-from . import test, workflow
+from . import testing, workflow
 
 __all__ = [
     "AgentsWorkflowError",
@@ -31,6 +31,6 @@ __all__ = [
     "OpenAIPayloadConverter",
     "StatelessMCPServerProvider",
     "StatefulMCPServerProvider",
-    "test",
+    "testing",
     "workflow",
 ]
