@@ -1760,8 +1760,8 @@ async def test_session(client: Client):
 async def test_lite_llm(client: Client, env: WorkflowEnvironment):
     if not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
-    if sys.version_info < (3, 10):
-        pytest.skip("Lite LLM does not import below 3.10")
+    if sys.version_info < (3, 10) or sys.version_info >= (3, 14):
+        pytest.skip("Lite LLM does not yet support Python 3.14")
 
     from agents.extensions.models.litellm_provider import LitellmProvider
 
