@@ -78,8 +78,8 @@ def event_loop():
             )
 
 
-class NoEventLoopPolicy(asyncio.AbstractEventLoopPolicy): # type: ignore[name-defined]
-    def __init__(self, underlying: asyncio.AbstractEventLoopPolicy): # type: ignore[name-defined]
+class NoEventLoopPolicy(asyncio.AbstractEventLoopPolicy):  # type: ignore[name-defined]
+    def __init__(self, underlying: asyncio.AbstractEventLoopPolicy):  # type: ignore[name-defined]
         super().__init__()
         self._underlying = underlying
 
