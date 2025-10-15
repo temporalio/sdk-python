@@ -112,7 +112,7 @@ class Replayer:
         Args:
             history: The history to replay. Can be fetched directly, or use
                 :py:meth:`temporalio.client.WorkflowHistory.from_json` to parse
-                a history downloaded via ``tctl`` or the web UI.
+                a history downloaded via ``Temporal CLI`` or the web UI.
             raise_on_replay_failure: If ``True`` (the default), this will raise
                 a :py:attr:`WorkflowReplayResult.replay_failure` if it is
                 present.
