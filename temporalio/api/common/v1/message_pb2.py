@@ -74,7 +74,7 @@ DataBlob = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DATABLOB,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.DataBlob)
     },
 )
@@ -85,7 +85,7 @@ Payloads = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PAYLOADS,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Payloads)
     },
 )
@@ -100,12 +100,12 @@ Payload = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _PAYLOAD_METADATAENTRY,
-                "__module__": "temporal.api.common.v1.message_pb2",
+                "__module__": "temporalio.api.common.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Payload.MetadataEntry)
             },
         ),
         "DESCRIPTOR": _PAYLOAD,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Payload)
     },
 )
@@ -121,12 +121,12 @@ SearchAttributes = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _SEARCHATTRIBUTES_INDEXEDFIELDSENTRY,
-                "__module__": "temporal.api.common.v1.message_pb2",
+                "__module__": "temporalio.api.common.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.common.v1.SearchAttributes.IndexedFieldsEntry)
             },
         ),
         "DESCRIPTOR": _SEARCHATTRIBUTES,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.SearchAttributes)
     },
 )
@@ -142,12 +142,12 @@ Memo = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _MEMO_FIELDSENTRY,
-                "__module__": "temporal.api.common.v1.message_pb2",
+                "__module__": "temporalio.api.common.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Memo.FieldsEntry)
             },
         ),
         "DESCRIPTOR": _MEMO,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Memo)
     },
 )
@@ -163,12 +163,12 @@ Header = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _HEADER_FIELDSENTRY,
-                "__module__": "temporal.api.common.v1.message_pb2",
+                "__module__": "temporalio.api.common.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Header.FieldsEntry)
             },
         ),
         "DESCRIPTOR": _HEADER,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Header)
     },
 )
@@ -180,7 +180,7 @@ WorkflowExecution = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTION,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.WorkflowExecution)
     },
 )
@@ -191,7 +191,7 @@ WorkflowType = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWTYPE,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.WorkflowType)
     },
 )
@@ -202,7 +202,7 @@ ActivityType = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACTIVITYTYPE,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.ActivityType)
     },
 )
@@ -213,7 +213,7 @@ RetryPolicy = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RETRYPOLICY,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.RetryPolicy)
     },
 )
@@ -224,7 +224,7 @@ MeteringMetadata = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _METERINGMETADATA,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.MeteringMetadata)
     },
 )
@@ -235,7 +235,7 @@ WorkerVersionStamp = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKERVERSIONSTAMP,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.WorkerVersionStamp)
     },
 )
@@ -246,7 +246,7 @@ WorkerVersionCapabilities = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKERVERSIONCAPABILITIES,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.WorkerVersionCapabilities)
     },
 )
@@ -257,7 +257,7 @@ ResetOptions = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESETOPTIONS,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.ResetOptions)
     },
 )
@@ -276,12 +276,12 @@ Callback = _reflection.GeneratedProtocolMessageType(
                     (_message.Message,),
                     {
                         "DESCRIPTOR": _CALLBACK_NEXUS_HEADERENTRY,
-                        "__module__": "temporal.api.common.v1.message_pb2",
+                        "__module__": "temporalio.api.common.v1.message_pb2",
                         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Callback.Nexus.HeaderEntry)
                     },
                 ),
                 "DESCRIPTOR": _CALLBACK_NEXUS,
-                "__module__": "temporal.api.common.v1.message_pb2",
+                "__module__": "temporalio.api.common.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Callback.Nexus)
             },
         ),
@@ -290,12 +290,12 @@ Callback = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _CALLBACK_INTERNAL,
-                "__module__": "temporal.api.common.v1.message_pb2",
+                "__module__": "temporalio.api.common.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Callback.Internal)
             },
         ),
         "DESCRIPTOR": _CALLBACK,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Callback)
     },
 )
@@ -317,7 +317,7 @@ Link = _reflection.GeneratedProtocolMessageType(
                     (_message.Message,),
                     {
                         "DESCRIPTOR": _LINK_WORKFLOWEVENT_EVENTREFERENCE,
-                        "__module__": "temporal.api.common.v1.message_pb2",
+                        "__module__": "temporalio.api.common.v1.message_pb2",
                         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Link.WorkflowEvent.EventReference)
                     },
                 ),
@@ -326,12 +326,12 @@ Link = _reflection.GeneratedProtocolMessageType(
                     (_message.Message,),
                     {
                         "DESCRIPTOR": _LINK_WORKFLOWEVENT_REQUESTIDREFERENCE,
-                        "__module__": "temporal.api.common.v1.message_pb2",
+                        "__module__": "temporalio.api.common.v1.message_pb2",
                         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Link.WorkflowEvent.RequestIdReference)
                     },
                 ),
                 "DESCRIPTOR": _LINK_WORKFLOWEVENT,
-                "__module__": "temporal.api.common.v1.message_pb2",
+                "__module__": "temporalio.api.common.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Link.WorkflowEvent)
             },
         ),
@@ -340,12 +340,12 @@ Link = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _LINK_BATCHJOB,
-                "__module__": "temporal.api.common.v1.message_pb2",
+                "__module__": "temporalio.api.common.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Link.BatchJob)
             },
         ),
         "DESCRIPTOR": _LINK,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Link)
     },
 )
@@ -360,7 +360,7 @@ Priority = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PRIORITY,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.Priority)
     },
 )
@@ -371,7 +371,7 @@ WorkerSelector = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKERSELECTOR,
-        "__module__": "temporal.api.common.v1.message_pb2",
+        "__module__": "temporalio.api.common.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.common.v1.WorkerSelector)
     },
 )

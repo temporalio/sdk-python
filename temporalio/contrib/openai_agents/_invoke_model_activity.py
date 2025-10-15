@@ -36,7 +36,7 @@ from openai.types.responses.tool_param import Mcp
 from pydantic_core import to_json
 from typing_extensions import Required, TypedDict
 
-from temporalio import activity
+from temporalio import activity, workflow
 from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbeater
 from temporalio.exceptions import ApplicationError
 

@@ -86,7 +86,6 @@ jobs:
           uv sync --all-extras
           poe build-develop
           poe gen-protos
-          poe format
           [[ -z $(git status --porcelain temporalio) ]] || (git diff temporalio; echo "Protos changed"; exit 1)
           poe test -s
         timeout-minutes: 10
@@ -117,6 +116,8 @@ jobs:
         with:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: "clippy"
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: temporalio/bridge -> target

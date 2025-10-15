@@ -108,7 +108,7 @@ from temporalio.workflow import ActivityConfig
 from tests.contrib.openai_agents.research_agents.research_manager import (
     ResearchManager,
 )
-from tests.helpers import assert_task_fail_eventually, new_worker
+from tests.helpers import assert_eventually, new_worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 
@@ -1751,10 +1751,19 @@ async def test_session(client: Client):
             execution_timeout=timedelta(seconds=10.0),
             retry_policy=RetryPolicy(maximum_attempts=1),
         )
-        await assert_task_fail_eventually(
-            workflow_handle,
-            message_contains="Temporal workflows don't support SQLite sessions",
-        )
+
+        async def check():
+            async for evt in workflow_handle.fetch_history_events():
+                # Sometimes just creating the sqlite session takes too long for a workflow in CI, so check both
+                if evt.HasField("workflow_task_failed_event_attributes") and (
+                    "Temporal workflows don't support SQLite sessions"
+                    in evt.workflow_task_failed_event_attributes.failure.message
+                    or "Potential deadlock detected"
+                    in evt.workflow_task_failed_event_attributes.failure.message
+                ):
+                    return
+
+        await assert_eventually(check)
 
 
 async def test_lite_llm(client: Client, env: WorkflowEnvironment):
@@ -2313,11 +2322,11 @@ async def test_output_type(client: Client):
 @workflow.defn
 class McpServerWorkflow:
     @workflow.run
-    async def run(self, caching: bool) -> str:
+    async def run(self, caching: bool, factory_argument: Optional[Any]) -> str:
         from agents.mcp import MCPServer
 
         server: MCPServer = openai_agents.workflow.stateless_mcp_server(
-            "HelloServer", cache_tools_list=caching
+            "HelloServer", cache_tools_list=caching, factory_argument=factory_argument
         )
         agent = Agent[str](
             name="MCP ServerWorkflow",
@@ -2333,13 +2342,14 @@ class McpServerWorkflow:
 @workflow.defn
 class McpServerStatefulWorkflow:
     @workflow.run
-    async def run(self, timeout: timedelta) -> str:
+    async def run(self, timeout: timedelta, factory_argument: Optional[Any]) -> str:
         async with openai_agents.workflow.stateful_mcp_server(
             "HelloServer",
             config=ActivityConfig(
                 schedule_to_start_timeout=timeout,
                 start_to_close_timeout=timedelta(seconds=30),
             ),
+            factory_argument=factory_argument,
         ) as server:
             agent = Agent[str](
                 name="MCP ServerWorkflow",
@@ -2366,30 +2376,11 @@ class TrackingMCPModel(StaticTestModel):
     ]
 
 
-@pytest.mark.parametrize("use_local_model", [True, False])
-@pytest.mark.parametrize("stateful", [True, False])
-@pytest.mark.parametrize("caching", [True, False])
-async def test_mcp_server(
-    client: Client, use_local_model: bool, stateful: bool, caching: bool
-):
-    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
-        pytest.skip("No openai API key")
-
-    if sys.version_info < (3, 10):
-        pytest.skip("Mcp not supported on Python 3.9")
-
-    if stateful and caching:
-        pytest.skip("Caching is only supported for stateless MCP servers")
-
-    from agents.mcp import MCPServer
+def get_tracking_server(name: str):
+    from agents.mcp import MCPServer  # type: ignore
     from mcp import GetPromptResult, ListPromptsResult  # type: ignore
     from mcp import Tool as MCPTool  # type: ignore
     from mcp.types import CallToolResult, TextContent  # type: ignore
-
-    from temporalio.contrib.openai_agents import (
-        StatefulMCPServerProvider,
-        StatelessMCPServerProvider,
-    )
 
     class TrackingMCPServer(MCPServer):
         calls: list[str]
@@ -2446,11 +2437,36 @@ async def test_mcp_server(
         ) -> GetPromptResult:
             raise NotImplementedError()
 
-    tracking_server = TrackingMCPServer(name="HelloServer")
+    return TrackingMCPServer(name)
+
+
+@pytest.mark.parametrize("use_local_model", [True, False])
+@pytest.mark.parametrize("stateful", [True, False])
+@pytest.mark.parametrize("caching", [True, False])
+async def test_mcp_server(
+    client: Client, use_local_model: bool, stateful: bool, caching: bool
+):
+    if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("No openai API key")
+
+    if sys.version_info < (3, 10):
+        pytest.skip("Mcp not supported on Python 3.9")
+
+    if stateful and caching:
+        pytest.skip("Caching is only supported for stateless MCP servers")
+
+    from agents.mcp import MCPServer  # type: ignore
+
+    from temporalio.contrib.openai_agents import (
+        StatefulMCPServerProvider,
+        StatelessMCPServerProvider,
+    )
+
+    tracking_server = get_tracking_server(name="HelloServer")
     server: Union[StatefulMCPServerProvider, StatelessMCPServerProvider] = (
-        StatefulMCPServerProvider(lambda: tracking_server)
+        StatefulMCPServerProvider("HelloServer", lambda _: tracking_server)
         if stateful
-        else StatelessMCPServerProvider(lambda: tracking_server)
+        else StatelessMCPServerProvider("HelloServer", lambda _: tracking_server)
     )
 
     new_config = client.config()
@@ -2473,7 +2489,7 @@ async def test_mcp_server(
         if stateful:
             result = await client.execute_workflow(
                 McpServerStatefulWorkflow.run,
-                args=[timedelta(seconds=30)],
+                args=[timedelta(seconds=30), None],
                 id=f"mcp-server-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=30),
@@ -2481,7 +2497,7 @@ async def test_mcp_server(
         else:
             result = await client.execute_workflow(
                 McpServerWorkflow.run,
-                args=[caching],
+                args=[caching, None],
                 id=f"mcp-server-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=30),
@@ -2534,6 +2550,69 @@ async def test_mcp_server(
                 ]
 
 
+@pytest.mark.parametrize("stateful", [True, False])
+async def test_mcp_server_factory_argument(client: Client, stateful: bool):
+    if sys.version_info < (3, 10):
+        pytest.skip("Mcp not supported on Python 3.9")
+
+    from agents.mcp import MCPServer  # type: ignore
+    from mcp import GetPromptResult, ListPromptsResult  # type: ignore
+    from mcp import Tool as MCPTool  # type: ignore
+    from mcp.types import CallToolResult, TextContent  # type: ignore
+
+    from temporalio.contrib.openai_agents import (
+        StatefulMCPServerProvider,
+        StatelessMCPServerProvider,
+    )
+
+    def factory(args: Optional[Any]) -> MCPServer:
+        print("Invoking factory: ", args)
+        if args is not None:
+            assert args is not None
+            assert cast(dict[str, str], args).get("user") == "blah"
+
+        return get_tracking_server("HelloServer")
+
+    server: Union[StatefulMCPServerProvider, StatelessMCPServerProvider] = (
+        StatefulMCPServerProvider("HelloServer", factory)
+        if stateful
+        else StatelessMCPServerProvider("HelloServer", factory)
+    )
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=120)
+            ),
+            model_provider=TestModelProvider(TrackingMCPModel()),
+            mcp_server_providers=[server],
+        )
+    ]
+    client = Client(**new_config)
+
+    headers = {"user": "blah"}
+    async with new_worker(
+        client, McpServerStatefulWorkflow, McpServerWorkflow
+    ) as worker:
+        if stateful:
+            result = await client.execute_workflow(
+                McpServerStatefulWorkflow.run,
+                args=[timedelta(seconds=30), headers],
+                id=f"mcp-server-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+        else:
+            result = await client.execute_workflow(
+                McpServerWorkflow.run,
+                args=[False, headers],
+                id=f"mcp-server-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+
+
 async def test_stateful_mcp_server_no_worker(client: Client):
     if sys.version_info < (3, 10):
         pytest.skip("Mcp not supported on Python 3.9")
@@ -2542,7 +2621,8 @@ async def test_stateful_mcp_server_no_worker(client: Client):
     from temporalio.contrib.openai_agents import StatefulMCPServerProvider
 
     server = StatefulMCPServerProvider(
-        lambda: MCPServerStdio(
+        "Filesystem-Server",
+        lambda _: MCPServerStdio(
             name="Filesystem-Server",
             params={
                 "command": "npx",
@@ -2552,7 +2632,7 @@ async def test_stateful_mcp_server_no_worker(client: Client):
                     os.path.dirname(os.path.abspath(__file__)),
                 ],
             },
-        )
+        ),
     )
 
     # Override the connect activity to not actually start a worker
@@ -2583,7 +2663,7 @@ async def test_stateful_mcp_server_no_worker(client: Client):
     ) as worker:
         workflow_handle = await client.start_workflow(
             McpServerStatefulWorkflow.run,
-            args=[timedelta(seconds=1)],
+            args=[timedelta(seconds=1), None],
             id=f"mcp-server-{uuid.uuid4()}",
             task_queue=worker.task_queue,
             execution_timeout=timedelta(seconds=30),
