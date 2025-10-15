@@ -1,3 +1,5 @@
+"""Testing utilities for OpenAI agents."""
+
 from typing import AsyncIterator, Callable, Optional, Union
 
 from agents import (
@@ -21,12 +23,11 @@ from openai.types.responses import (
 
 
 class ResponseBuilders:
-    """
-    Builders for creating model responses for testing.
-    """
+    """Builders for creating model responses for testing."""
 
     @staticmethod
     def model_response(output: TResponseOutputItem) -> ModelResponse:
+        """Create a ModelResponse with the given output."""
         return ModelResponse(
             output=[output],
             usage=Usage(),
@@ -35,6 +36,7 @@ class ResponseBuilders:
 
     @staticmethod
     def response_output_message(text: str) -> ResponseOutputMessage:
+        """Create a ResponseOutputMessage with text content."""
         return ResponseOutputMessage(
             id="",
             content=[
@@ -51,6 +53,7 @@ class ResponseBuilders:
 
     @staticmethod
     def tool_call(arguments: str, name: str) -> ModelResponse:
+        """Create a ModelResponse with a function tool call."""
         return ResponseBuilders.model_response(
             ResponseFunctionToolCall(
                 arguments=arguments,
@@ -64,6 +67,7 @@ class ResponseBuilders:
 
     @staticmethod
     def output_message(text: str) -> ModelResponse:
+        """Create a ModelResponse with an output message."""
         return ResponseBuilders.model_response(
             ResponseBuilders.response_output_message(text)
         )
@@ -132,5 +136,6 @@ class StaticTestModel(TestModel):
     def __init__(
         self,
     ) -> None:
+        """Initialize the static test model with predefined responses."""
         self._responses = iter(self.responses)
         super().__init__(lambda: next(self._responses))
