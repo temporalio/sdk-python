@@ -13,7 +13,9 @@ from agents.tracing.provider import DefaultTraceProvider
 
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
-from temporalio.contrib.openai_agents._openai_runner import TemporalOpenAIRunner
+from temporalio.contrib.openai_agents._openai_runner import (
+    TemporalOpenAIRunner,
+)
 from temporalio.contrib.openai_agents._temporal_trace_provider import (
     TemporalTraceProvider,
 )
@@ -21,8 +23,14 @@ from temporalio.contrib.openai_agents._trace_interceptor import (
     OpenAIAgentsTracingInterceptor,
 )
 from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
-from temporalio.contrib.pydantic import PydanticPayloadConverter, ToJsonOptions
-from temporalio.converter import DataConverter, DefaultPayloadConverter
+from temporalio.contrib.pydantic import (
+    PydanticPayloadConverter,
+    ToJsonOptions,
+)
+from temporalio.converter import (
+    DataConverter,
+    DefaultPayloadConverter,
+)
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner

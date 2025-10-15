@@ -7,7 +7,9 @@ from agents.tracing import get_trace_provider
 
 from temporalio.client import Client
 from temporalio.contrib import openai_agents
-from temporalio.contrib.openai_agents.testing import TestModelProvider
+from temporalio.contrib.openai_agents.testing import (
+    TestModelProvider,
+)
 from tests.contrib.openai_agents.test_openai import ResearchWorkflow, TestResearchModel
 from tests.helpers import new_worker
 

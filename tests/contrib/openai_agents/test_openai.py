@@ -60,6 +60,7 @@ from agents.items import (
     HandoffOutputItem,
     ToolCallItem,
     ToolCallOutputItem,
+    TResponseOutputItem,
     TResponseStreamEvent,
 )
 from agents.mcp import MCPServer, MCPServerStdio
@@ -68,9 +69,12 @@ from openai.types.responses import (
     EasyInputMessageParam,
     ResponseCodeInterpreterToolCall,
     ResponseFileSearchToolCall,
+    ResponseFunctionToolCall,
     ResponseFunctionToolCallParam,
     ResponseFunctionWebSearch,
     ResponseInputTextParam,
+    ResponseOutputMessage,
+    ResponseOutputText,
 )
 from openai.types.responses.response_file_search_tool_call import Result
 from openai.types.responses.response_function_web_search import ActionSearch
@@ -91,8 +95,6 @@ from temporalio.contrib.openai_agents import (
     ModelActivityParameters,
     StatefulMCPServerProvider,
     StatelessMCPServerProvider,
-    TestModel,
-    TestModelProvider,
 )
 from temporalio.contrib.openai_agents._model_parameters import ModelSummaryProvider
 from temporalio.contrib.openai_agents._openai_runner import _convert_agent
@@ -100,17 +102,13 @@ from temporalio.contrib.openai_agents._temporal_model_stub import (
     _extract_summary,
     _TemporalModelStub,
 )
-from temporalio.contrib.openai_agents.testing import (
-    ResponseBuilders,
-    StaticTestModel,
-    TestModel,
-    TestModelProvider,
-)
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import ApplicationError, CancelledError, TemporalError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.workflow import ActivityConfig
-from tests.contrib.openai_agents.research_agents.research_manager import ResearchManager
+from tests.contrib.openai_agents.research_agents.research_manager import (
+    ResearchManager,
+)
 from tests.helpers import assert_eventually, new_worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
@@ -141,9 +139,9 @@ async def test_hello_world_agent(client: Client, use_local_model: bool):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=(
-                TestModelProvider(TestHelloModel()) if use_local_model else None
-            ),
+            model_provider=TestModelProvider(TestHelloModel())
+            if use_local_model
+            else None,
         )
     ]
     client = Client(**new_config)
@@ -323,9 +321,9 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=(
-                TestModelProvider(TestWeatherModel()) if use_local_model else None
-            ),
+            model_provider=TestModelProvider(TestWeatherModel())
+            if use_local_model
+            else None,
         )
     ]
     client = Client(**new_config)
@@ -490,9 +488,9 @@ async def test_nexus_tool_workflow(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=(
-                TestModelProvider(TestNexusWeatherModel()) if use_local_model else None
-            ),
+            model_provider=TestModelProvider(TestNexusWeatherModel())
+            if use_local_model
+            else None,
         )
     ]
     client = Client(**new_config)
@@ -593,9 +591,9 @@ async def test_research_workflow(client: Client, use_local_model: bool):
                 start_to_close_timeout=timedelta(seconds=120),
                 schedule_to_close_timeout=timedelta(seconds=120),
             ),
-            model_provider=(
-                TestModelProvider(TestResearchModel()) if use_local_model else None
-            ),
+            model_provider=TestModelProvider(TestResearchModel())
+            if use_local_model
+            else None,
         )
     ]
     client = Client(**new_config)
@@ -744,9 +742,9 @@ async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=(
-                TestModelProvider(AgentAsToolsModel()) if use_local_model else None
-            ),
+            model_provider=TestModelProvider(AgentAsToolsModel())
+            if use_local_model
+            else None,
         )
     ]
     client = Client(**new_config)
@@ -1008,9 +1006,9 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=(
-                TestModelProvider(CustomerServiceModel()) if use_local_model else None
-            ),
+            model_provider=TestModelProvider(CustomerServiceModel())
+            if use_local_model
+            else None,
         )
     ]
     client = Client(**new_config)
@@ -1238,15 +1236,11 @@ async def test_input_guardrail(client: Client, use_local_model: bool):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=(
-                TestModelProvider(
-                    InputGuardrailModel(
-                        "", openai_client=AsyncOpenAI(api_key="Fake key")
-                    )
-                )
-                if use_local_model
-                else None
-            ),
+            model_provider=TestModelProvider(
+                InputGuardrailModel("", openai_client=AsyncOpenAI(api_key="Fake key"))
+            )
+            if use_local_model
+            else None,
         )
     ]
     client = Client(**new_config)
@@ -1341,9 +1335,9 @@ async def test_output_guardrail(client: Client, use_local_model: bool):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=(
-                TestModelProvider(OutputGuardrailModel()) if use_local_model else None
-            ),
+            model_provider=TestModelProvider(OutputGuardrailModel())
+            if use_local_model
+            else None,
         )
     ]
     client = Client(**new_config)
@@ -1809,9 +1803,9 @@ async def test_file_search_tool(client: Client, use_local_model):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=(
-                TestModelProvider(FileSearchToolModel()) if use_local_model else None
-            ),
+            model_provider=TestModelProvider(FileSearchToolModel())
+            if use_local_model
+            else None,
         )
     ]
     client = Client(**new_config)
@@ -1885,9 +1879,9 @@ async def test_image_generation_tool(client: Client, use_local_model):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=(
-                TestModelProvider(ImageGenerationModel()) if use_local_model else None
-            ),
+            model_provider=TestModelProvider(ImageGenerationModel())
+            if use_local_model
+            else None,
         )
     ]
     client = Client(**new_config)
@@ -2423,9 +2417,9 @@ async def test_mcp_server(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=120)
             ),
-            model_provider=(
-                TestModelProvider(TrackingMCPModel()) if use_local_model else None
-            ),
+            model_provider=TestModelProvider(TrackingMCPModel())
+            if use_local_model
+            else None,
             mcp_server_providers=[server],
         )
     ]
