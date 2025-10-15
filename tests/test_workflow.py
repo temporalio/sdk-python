@@ -225,7 +225,7 @@ class BadDefn(BadDefnBase):
         pass
 
     # Intentionally missing decorator
-    def base_update(self):  # type: ignore[reportIncompatibleVariableOverride]
+    def base_update(self):  # type: ignore[override]
         pass
 
 

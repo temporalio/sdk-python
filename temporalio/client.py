@@ -942,7 +942,7 @@ class Client:
             MultiParamSpec, LocalReturnType
         ],
         *,
-        args: MultiParamSpec.args,  # pyright: ignore
+        args: MultiParamSpec.args,  # type: ignore
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, Union[str, bytes]] = {},
@@ -1061,7 +1061,7 @@ class Client:
             MultiParamSpec, LocalReturnType
         ],
         *,
-        args: MultiParamSpec.args,  # pyright: ignore
+        args: MultiParamSpec.args,  # type: ignore
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         wait_for_stage: WorkflowUpdateStage,
         id: Optional[str] = None,
@@ -2252,7 +2252,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             MultiParamSpec, LocalReturnType
         ],
         *,
-        args: MultiParamSpec.args,  # pyright: ignore
+        args: MultiParamSpec.args,  # type: ignore
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, Union[str, bytes]] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -2353,7 +2353,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             MultiParamSpec, LocalReturnType
         ],
         *,
-        args: MultiParamSpec.args,  # pyright: ignore
+        args: MultiParamSpec.args,  # type: ignore
         wait_for_stage: WorkflowUpdateStage,
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, Union[str, bytes]] = {},

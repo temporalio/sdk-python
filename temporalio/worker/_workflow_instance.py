@@ -2603,7 +2603,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             return
         handle._apply_cancel_command(self._add_command())
 
-    def call_soon(
+    def call_soon( # type: ignore[override]
         self,
         callback: Callable[..., Any],
         *args: Any,
@@ -2616,7 +2616,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._ready.append(handle)
         return handle
 
-    def call_later(
+    def call_later( # type: ignore[override]
         self,
         delay: float,
         callback: Callable[..., Any],
@@ -2626,7 +2626,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         options = _TimerOptionsCtxVar.get()
         return self._timer_impl(delay, options, callback, *args, context=context)
 
-    def call_at(
+    def call_at( # type: ignore[override]
         self,
         when: float,
         callback: Callable[..., Any],
