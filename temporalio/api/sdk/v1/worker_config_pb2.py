@@ -35,7 +35,7 @@ WorkerConfig = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _WORKERCONFIG_SIMPLEPOLLERBEHAVIOR,
-                "__module__": "temporal.api.sdk.v1.worker_config_pb2",
+                "__module__": "temporalio.api.sdk.v1.worker_config_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.WorkerConfig.SimplePollerBehavior)
             },
         ),
@@ -44,12 +44,12 @@ WorkerConfig = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _WORKERCONFIG_AUTOSCALINGPOLLERBEHAVIOR,
-                "__module__": "temporal.api.sdk.v1.worker_config_pb2",
+                "__module__": "temporalio.api.sdk.v1.worker_config_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.WorkerConfig.AutoscalingPollerBehavior)
             },
         ),
         "DESCRIPTOR": _WORKERCONFIG,
-        "__module__": "temporal.api.sdk.v1.worker_config_pb2",
+        "__module__": "temporalio.api.sdk.v1.worker_config_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.WorkerConfig)
     },
 )

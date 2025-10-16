@@ -228,8 +228,6 @@ class Worker:
 
                 Defaults to fixed-size 100 slots for each slot kind if unset and none of the
                 max_* arguments are provided.
-
-                WARNING: This argument is experimental
             max_concurrent_workflow_task_polls: Maximum number of concurrent
                 poll workflow task requests we will perform at a time on this worker's task queue.
                 Must be set to at least two if ``max_cached_workflows`` is nonzero.

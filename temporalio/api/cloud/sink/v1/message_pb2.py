@@ -26,7 +26,7 @@ S3Spec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _S3SPEC,
-        "__module__": "temporal.api.cloud.sink.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.sink.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.sink.v1.S3Spec)
     },
 )
@@ -37,7 +37,7 @@ GCSSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GCSSPEC,
-        "__module__": "temporal.api.cloud.sink.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.sink.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.sink.v1.GCSSpec)
     },
 )
