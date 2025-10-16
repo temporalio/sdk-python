@@ -45,7 +45,7 @@ from typing import (
 
 import nexusrpc.handler
 from nexusrpc import InputT, OutputT
-from typing_extensions import Self, TypeAlias, TypedDict
+from typing_extensions import Self, TypeAlias, TypedDict, TypeVarTuple, Unpack
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -2603,10 +2603,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             return
         handle._apply_cancel_command(self._add_command())
 
-    def call_soon(  # type: ignore[override]
+    _Ts = TypeVarTuple("_Ts")
+
+    def call_soon(
         self,
-        callback: Callable[..., Any],
-        *args: Any,
+        callback: Callable[[Unpack[_Ts]], object],
+        *args: Unpack[_Ts],
         context: Optional[contextvars.Context] = None,
     ) -> asyncio.Handle:
         # We need to allow this during delete because this is how tasks schedule
@@ -2616,21 +2618,21 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._ready.append(handle)
         return handle
 
-    def call_later(  # type: ignore[override]
+    def call_later(
         self,
         delay: float,
-        callback: Callable[..., Any],
-        *args: Any,
+        callback: Callable[[Unpack[_Ts]], object],
+        *args: Unpack[_Ts],
         context: Optional[contextvars.Context] = None,
     ) -> asyncio.TimerHandle:
         options = _TimerOptionsCtxVar.get()
         return self._timer_impl(delay, options, callback, *args, context=context)
 
-    def call_at(  # type: ignore[override]
+    def call_at(
         self,
         when: float,
-        callback: Callable[..., Any],
-        *args: Any,
+        callback: Callable[[Unpack[_Ts]], object],
+        *args: Unpack[_Ts],
         context: Optional[contextvars.Context] = None,
     ) -> asyncio.TimerHandle:
         # We usually would not support fixed-future-time call (and we didn't

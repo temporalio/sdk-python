@@ -454,7 +454,7 @@ class _ThreadLocalSysModules(
     ) -> Dict[str, types.ModuleType]:
         if sys.version_info < (3, 9):
             raise NotImplementedError
-        return self.current.__or__(other)  # type: ignore
+        return self.current.__or__(other)  # type: ignore[operator]
 
     def __ior__(
         self, other: Mapping[str, types.ModuleType]
