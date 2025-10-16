@@ -1,4 +1,6 @@
 import asyncio
+from contextlib import redirect_stderr, redirect_stdout
+import io
 import os
 import sys
 from typing import AsyncGenerator
@@ -54,16 +56,30 @@ def pytest_runtest_protocol(item):
 
     if not _IN_GHA and item.config.getoption("-s"):
         print()
+        outcome = yield
     elif _IN_GHA:
         file, _lineno, _testname = item.location
         if file != _gha_current_file:
             print()
-            print(f"::notice title=pytest file::{file}", flush=True)
+            print(f"\033[1;94mTesting {file}\033[0m", flush=True)
             _gha_current_file = file
 
-        print(f"::group::{item.nodeid}", flush=True)
+        test_output_buf = io.StringIO()
+        with redirect_stdout(test_output_buf):
+            with redirect_stderr(test_output_buf):
+                outcome = yield
 
-    outcome = yield
+        if outcome.get_result():
+            print(f"::group::\033[1;92m{item.nodeid}\033[0m", flush=True)
+        else:
+            print(f"::group::\033[1;91m{item.nodeid}\033[0m", flush=True)
+
+        output = test_output_buf.getvalue()
+        if len(output) > 0:
+            print(output)
+
+    else:
+        outcome = yield
 
     if _IN_GHA:
         print("::endgroup::", flush=True)
