@@ -15,6 +15,7 @@ from typing import (
     Any,
     Callable,
     ContextManager,
+    Coroutine,
     Dict,
     Iterator,
     Mapping,
@@ -423,7 +424,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             if sys.version_info >= (3, 11):
                 await asyncio.create_task(self._handle_signal(input), context=ctx)
             else:
-                await ctx.run(asyncio.create_task, self._handle_signal(input))
+                await ctx.run(lambda: asyncio.create_task(self._handle_signal(input)))
 
     async def _handle_signal(self, input: temporalio.worker.HandleSignalInput) -> None:
         """Implementation of

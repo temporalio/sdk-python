@@ -431,7 +431,7 @@ class _ContextPropagationWorkflowOutboundInterceptor(
             )
         else:
             handle: temporalio.workflow.ChildWorkflowHandle = await ctx.run(
-                asyncio.create_task, self.next.start_child_workflow(input)
+                lambda: asyncio.create_task(self.next.start_child_workflow(input))
             )
         if span:
             handle.add_done_callback(lambda _: ctx.run(span.finish))  # type: ignore
