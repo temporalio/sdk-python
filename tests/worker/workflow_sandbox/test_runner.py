@@ -189,7 +189,7 @@ async def test_workflow_sandbox_restrictions(client: Client):
         # We can only validate this restriction prior to 3.14 because we had to exempt it due to
         # https://github.com/python/cpython/issues/140228
         if sys.version_info < (3, 14):
-            invalid_code_to_check += "import os.path\nos.path.abspath('foo')"
+            invalid_code_to_check.append("import os.path\nos.path.abspath('foo')")
 
         for code in invalid_code_to_check:
             with pytest.raises(WorkflowFailureError) as err:
