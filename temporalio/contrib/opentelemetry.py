@@ -9,6 +9,7 @@ from contextlib import (
     contextmanager,
 )
 from dataclasses import dataclass
+import sys
 from types import TracebackType
 from typing import (
     Any,
@@ -394,7 +395,12 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         :py:meth:`temporalio.worker.WorkflowInboundInterceptor.execute_workflow`.
         """
         with self._top_level_workflow_context(success_is_complete=True) as ctx:
-            return await ctx.run(asyncio.create_task, self._execute_workflow(input))
+            if sys.version_info >= (3, 11):
+                return await asyncio.create_task(
+                    self._execute_workflow(input), context=ctx
+                )
+            else:
+                return await ctx.run(asyncio.create_task, self._execute_workflow(input))
 
     async def _execute_workflow(
         self, input: temporalio.worker.ExecuteWorkflowInput
@@ -414,7 +420,12 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         # Create a span in the current context for the signal and link any
         # header given
         with self._top_level_workflow_context(success_is_complete=False) as ctx:
-            return await ctx.run(asyncio.create_task, self._handle_signal(input))
+            if sys.version_info >= (3, 11):
+                return await asyncio.create_task(
+                    self._handle_signal(input), context=ctx
+                )
+            else:
+                return await ctx.run(asyncio.create_task, self._handle_signal(input))
 
     async def _handle_signal(self, input: temporalio.worker.HandleSignalInput) -> None:
         """Implementation of
@@ -511,9 +522,14 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         :py:meth:`temporalio.worker.WorkflowInboundInterceptor.handle_update_handler`.
         """
         with self._top_level_workflow_context(success_is_complete=False) as ctx:
-            return await ctx.run(
-                asyncio.create_task, self._handle_update_handler(input)
-            )
+            if sys.version_info >= (3, 11):
+                return await asyncio.create_task(
+                    self._handle_update_handler(input), context=ctx
+                )
+            else:
+                return await ctx.run(
+                    asyncio.create_task, self._handle_update_handler(input)
+                )
 
     async def _handle_update_handler(
         self, input: temporalio.worker.HandleUpdateInput

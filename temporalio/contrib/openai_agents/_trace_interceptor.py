@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import random
+import sys
 import uuid
 from contextlib import contextmanager
 from typing import Any, Mapping, Optional, Protocol, Type
@@ -424,9 +425,14 @@ class _ContextPropagationWorkflowOutboundInterceptor(
             data={"workflow": input.workflow},
             input=input,
         )
-        handle = await ctx.run(
-            asyncio.create_task, self.next.start_child_workflow(input)
-        )
+        if sys.version_info >= (3, 11):
+            handle = await asyncio.create_task(
+                self.next.start_child_workflow(input), context=ctx
+            )
+        else:
+            handle = await ctx.run(
+                asyncio.create_task, self.next.start_child_workflow(input)
+            )
         if span:
             handle.add_done_callback(lambda _: ctx.run(span.finish))  # type: ignore
         return handle
