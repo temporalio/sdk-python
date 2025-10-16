@@ -5,6 +5,7 @@ import dataclasses
 import functools
 import inspect
 import os
+import sys
 import time
 import uuid
 from dataclasses import dataclass
@@ -30,7 +31,6 @@ from tests.worker.workflow_sandbox.testmodules.proto import SomeMessage
 # https://github.com/python/cpython/issues/91351
 with workflow.unsafe.imports_passed_through():
     import pytest
-
 
 global_state = ["global orig"]
 # We just access os.name in here to show we _can_. It's access-restricted at
@@ -176,7 +176,6 @@ async def test_workflow_sandbox_restrictions(client: Client):
             "import datetime\ndatetime.datetime.now()",
             "import os\ngetattr(os.environ, 'foo')",
             "import os\nos.getenv('foo')",
-            "import os.path\nos.path.abspath('foo')",
             "import random\nrandom.choice(['foo', 'bar'])",
             "import secrets\nsecrets.choice(['foo', 'bar'])",
             "import threading\nthreading.current_thread()",
@@ -186,6 +185,12 @@ async def test_workflow_sandbox_restrictions(client: Client):
             "import http.client\nhttp.client.HTTPConnection('example.com')",
             "import uuid\nuuid.uuid4()",
         ]
+
+        # We can only validate this restriction prior to 3.14 because we had to exempt it due to
+        # https://github.com/python/cpython/issues/140228
+        if sys.version_info < (3, 14):
+            (invalid_code_to_check.append("import os.path\nos.path.abspath('foo')"),)
+
         for code in invalid_code_to_check:
             with pytest.raises(WorkflowFailureError) as err:
                 await client.execute_workflow(
