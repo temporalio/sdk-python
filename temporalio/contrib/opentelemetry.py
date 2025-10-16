@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import contextvars
 import asyncio
+import contextvars
+import sys
 from contextlib import (
     AbstractContextManager,
     contextmanager,
 )
 from dataclasses import dataclass
-import sys
 from types import TracebackType
 from typing import (
     Any,
