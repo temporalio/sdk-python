@@ -649,7 +649,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             success_is_complete: bool,
         ):
             self._ctx = contextvars.copy_context()
-            self._token = None
+            self._token: Optional[contextvars.Token] = None
             self._owner = interceptor
             self._success_is_complete = success_is_complete
 
@@ -662,7 +662,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             exc_type: Optional[type[BaseException]],
             exc_value: Optional[BaseException],
             traceback: Optional[TracebackType],  # noqa: F811
-        ) -> bool | None:
+        ):
             self._ctx.run(self._end, exc_type, exc_value, traceback)
 
         def _start(self):

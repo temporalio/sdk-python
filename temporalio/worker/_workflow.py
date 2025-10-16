@@ -337,9 +337,6 @@ class _WorkflowWorker:
                 raise deadlock_exc from None
 
         except Exception as err:
-            if isinstance(err, GeneratorExit):
-                print("###############generator exit#############")
-
             if isinstance(err, _DeadlockError):
                 err.swap_traceback()
 
