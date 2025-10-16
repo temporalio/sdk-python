@@ -45,18 +45,8 @@ _IN_GHA = os.getenv("GITHUB_ACTIONS", "").lower() == "true"
 _gha_current_file = None
 
 
-def pytest_configure(config):
-    if not _IN_GHA:
-        return
-    tr = config.pluginmanager.getplugin("terminalreporter")
-    if tr:
-        tr.showfspath = False
-        # if hasattr(tr, "write_fspath_result"):
-        #     tr.write_fspath_result = lambda *a, **k: None
-
-
-@pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_setup(item):
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
+def pytest_runtest_protocol(item):
     """Print a newline so that custom printed output starts on new line.
     In GHA, group test output together.
     """
@@ -72,9 +62,13 @@ def pytest_runtest_setup(item):
             _gha_current_file = file
 
         print(f"::group::{item.nodeid}", flush=True)
-    yield
+
+    outcome = yield
+
     if _IN_GHA:
         print("::endgroup::", flush=True)
+
+    return outcome
 
 
 def pytest_report_teststatus(report, config):
