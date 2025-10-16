@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Iterable, List, Optional
 
+import pytest
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -21,11 +22,6 @@ from temporalio.contrib.opentelemetry import workflow as otel_workflow
 from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
-
-# Passing through because Python 3.9 has an import bug at
-# https://github.com/python/cpython/issues/91351
-with workflow.unsafe.imports_passed_through():
-    import pytest
 
 
 @dataclass

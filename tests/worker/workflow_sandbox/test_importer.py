@@ -142,8 +142,6 @@ def test_workflow_sandbox_importer_sys_module():
 
 
 def test_thread_local_sys_module_attrs():
-    if sys.version_info < (3, 9):
-        pytest.skip("Dict or methods only in >= 3.9")
     # Python chose not to put everything in MutableMapping they do in dict, see
     # https://bugs.python.org/issue22101. Therefore we manually confirm that
     # every attribute of sys modules is also in thread local sys modules to
@@ -154,7 +152,7 @@ def test_thread_local_sys_module_attrs():
     # Let's also test "or" and "copy"
     norm = {"foo": 123}
     thread_local = _ThreadLocalSysModules({"foo": 123})  # type: ignore[dict-item]
-    assert (norm | {"bar": 456}) == (thread_local | {"bar": 456})
+    assert (norm | {"bar": 456}) == (thread_local | {"bar": 456})  # type: ignore
     norm |= {"baz": 789}
     thread_local |= {"baz": 789}  # type: ignore
     assert norm.copy() == thread_local.copy()
