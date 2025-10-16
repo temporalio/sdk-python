@@ -426,11 +426,11 @@ class _ContextPropagationWorkflowOutboundInterceptor(
             input=input,
         )
         if sys.version_info >= (3, 11):
-            handle = await asyncio.create_task(
+            handle: temporalio.workflow.ChildWorkflowHandle = await asyncio.create_task(
                 self.next.start_child_workflow(input), context=ctx
             )
         else:
-            handle = await ctx.run(
+            handle: temporalio.workflow.ChildWorkflowHandle = await ctx.run(
                 asyncio.create_task, self.next.start_child_workflow(input)
             )
         if span:

@@ -421,11 +421,9 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         # header given
         with self._top_level_workflow_context(success_is_complete=False) as ctx:
             if sys.version_info >= (3, 11):
-                return await asyncio.create_task(
-                    self._handle_signal(input), context=ctx
-                )
+                await asyncio.create_task(self._handle_signal(input), context=ctx)
             else:
-                return await ctx.run(asyncio.create_task, self._handle_signal(input))
+                await ctx.run(asyncio.create_task, self._handle_signal(input))
 
     async def _handle_signal(self, input: temporalio.worker.HandleSignalInput) -> None:
         """Implementation of
