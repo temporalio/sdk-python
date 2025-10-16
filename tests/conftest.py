@@ -1,6 +1,8 @@
 import asyncio
+import io
 import os
 import sys
+from contextlib import redirect_stderr, redirect_stdout
 from typing import AsyncGenerator
 
 import pytest
@@ -41,11 +43,64 @@ from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
+_IN_GHA = os.getenv("GITHUB_ACTIONS", "").lower() == "true"
+_gha_current_file = None
 
-def pytest_runtest_setup(item):
-    """Print a newline so that custom printed output starts on new line."""
-    if item.config.getoption("-s"):
+
+def pytest_configure(config):
+    if not _IN_GHA:
+        return
+    tr = config.pluginmanager.getplugin("terminalreporter")
+    if tr:
+        tr.showfspath = False
+        if hasattr(tr, "write_fspath_result"):
+            tr.write_fspath_result = lambda *a, **k: None
+
+
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
+def pytest_runtest_protocol(item):
+    """Print a newline so that custom printed output starts on new line.
+    In GHA, group test output together.
+    """
+    global _gha_current_file
+
+    if not _IN_GHA and item.config.getoption("-s"):
         print()
+        outcome = yield
+    elif _IN_GHA:
+        file, _lineno, _testname = item.location
+        if file != _gha_current_file:
+            print()
+            print(f"\033[1;94mTesting {file}\033[0m", flush=True)
+            _gha_current_file = file
+
+        test_output_buf = io.StringIO()
+        with redirect_stdout(test_output_buf):
+            with redirect_stderr(test_output_buf):
+                outcome = yield
+
+        if outcome.get_result():
+            print(f"::group::\033[1;92m{item.nodeid}\033[0m", flush=True)
+        else:
+            print(f"::group::\033[1;91m{item.nodeid}\033[0m", flush=True)
+
+        output = test_output_buf.getvalue()
+        if len(output) > 0:
+            print(output)
+
+    else:
+        outcome = yield
+
+    if _IN_GHA:
+        print("::endgroup::", flush=True)
+
+    return outcome
+
+
+def pytest_report_teststatus(report, config):
+    """In GHA, suppress progress and allow grouping to format test output"""
+    if _IN_GHA:
+        return report.outcome, "", report.outcome.upper()
 
 
 def pytest_addoption(parser):
