@@ -47,12 +47,6 @@ from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
-# Unsupported on python 3.9
-try:
-    from agents.mcp import MCPServer
-except ImportError:
-    pass
-
 if typing.TYPE_CHECKING:
     from temporalio.contrib.openai_agents import (
         StatefulMCPServerProvider,

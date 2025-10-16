@@ -64,18 +64,7 @@ def event_loop():
     try:
         loop.close()
     except TypeError:
-        # In 3.9 tests, loop closing fails for an unclear reason, but not in
-        # 3.13 tests
-        if sys.version_info >= (3, 10):
-            raise
-    finally:
-        # In 3.9 tests, the pytest-asyncio library finalizer that creates a new
-        # event loop fails, but not in 3.13 tests. So for now we will make a new
-        # policy that does not create the loop.
-        if sys.version_info < (3, 10):
-            asyncio.set_event_loop_policy(
-                NoEventLoopPolicy(asyncio.get_event_loop_policy())
-            )
+        raise
 
 
 class NoEventLoopPolicy(asyncio.AbstractEventLoopPolicy):  # type: ignore[name-defined]
