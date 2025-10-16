@@ -203,9 +203,11 @@ class Worker:
                 interceptors already on the client that also implement
                 :py:class:`Interceptor` are prepended to this list and should
                 not be explicitly given here.
-            build_id: Unique identifier for the current runtime. This is best
-                set as a hash of all code and should change only when code does.
-                If unset, a best-effort identifier is generated.
+            build_id: A unique identifier for the current runtime, ideally provided as a 
+            representation of the complete source code. If not explicitly set, the system 
+            automatically generates a best-effort identifier by traversing and computing 
+            hashes of all modules in the codebase. In very large codebases this automatic 
+            process may significantly increase initialization time.
                 Exclusive with `deployment_config`.
                 WARNING: Deprecated. Use `deployment_config` instead.
             identity: Identity for this worker client. If unset, the client
