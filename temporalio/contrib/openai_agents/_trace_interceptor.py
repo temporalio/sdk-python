@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextvars
 import random
 import uuid
 from contextlib import contextmanager
@@ -400,48 +402,58 @@ class _ContextPropagationWorkflowOutboundInterceptor(
     def start_activity(
         self, input: temporalio.worker.StartActivityInput
     ) -> temporalio.workflow.ActivityHandle:
-        trace = get_trace_provider().get_current_trace()
-        span: Optional[Span] = None
-        if trace:
-            span = custom_span(
-                name="temporal:startActivity", data={"activity": input.activity}
-            )
-            span.start(mark_as_current=True)
-
-        set_header_from_context(input, temporalio.workflow.payload_converter())
-        handle = self.next.start_activity(input)
+        ctx = contextvars.copy_context()
+        span = ctx.run(
+            self._create_span,
+            name="temporal:startActivity",
+            data={"activity": input.activity},
+            input=input,
+        )
+        handle = ctx.run(self.next.start_activity, input)
         if span:
-            handle.add_done_callback(lambda _: span.finish())  # type: ignore
+            handle.add_done_callback(lambda _: ctx.run(span.finish))  # type: ignore
         return handle
 
     async def start_child_workflow(
         self, input: temporalio.worker.StartChildWorkflowInput
     ) -> temporalio.workflow.ChildWorkflowHandle:
-        trace = get_trace_provider().get_current_trace()
-        span: Optional[Span] = None
-        if trace:
-            span = custom_span(
-                name="temporal:startChildWorkflow", data={"workflow": input.workflow}
-            )
-            span.start(mark_as_current=True)
-        set_header_from_context(input, temporalio.workflow.payload_converter())
-        handle = await self.next.start_child_workflow(input)
+        ctx = contextvars.copy_context()
+        span = ctx.run(
+            self._create_span,
+            name="temporal:startChildWorkflow",
+            data={"workflow": input.workflow},
+            input=input,
+        )
+        handle = await ctx.run(
+            asyncio.create_task, self.next.start_child_workflow(input)
+        )
         if span:
-            handle.add_done_callback(lambda _: span.finish())  # type: ignore
+            handle.add_done_callback(lambda _: ctx.run(span.finish))  # type: ignore
         return handle
 
     def start_local_activity(
         self, input: temporalio.worker.StartLocalActivityInput
     ) -> temporalio.workflow.ActivityHandle:
+        ctx = contextvars.copy_context()
+        span = ctx.run(
+            self._create_span,
+            name="temporal:startLocalActivity",
+            data={"activity": input.activity},
+            input=input,
+        )
+        handle = ctx.run(self.next.start_local_activity, input)
+        if span:
+            handle.add_done_callback(lambda _: ctx.run(span.finish))  # type: ignore
+        return handle
+
+    def _create_span(
+        self, name: str, data: dict[str, Any], input: _InputWithHeaders
+    ) -> Optional[Span]:
         trace = get_trace_provider().get_current_trace()
         span: Optional[Span] = None
         if trace:
-            span = custom_span(
-                name="temporal:startLocalActivity", data={"activity": input.activity}
-            )
+            span = custom_span(name=name, data=data)
             span.start(mark_as_current=True)
+
         set_header_from_context(input, temporalio.workflow.payload_converter())
-        handle = self.next.start_local_activity(input)
-        if span:
-            handle.add_done_callback(lambda _: span.finish())  # type: ignore
-        return handle
+        return span
