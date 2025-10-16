@@ -3355,7 +3355,7 @@ class WorkflowHistory:
     ) -> WorkflowHistory:
         """Construct a WorkflowHistory from an ID and a json dump of history.
 
-        This is built to work both with Temporal UI/tctl JSON as well as
+        This is built to work both with Temporal UI/CLI JSON as well as
         :py:meth:`to_json` even though they are slightly different.
 
         Args:
