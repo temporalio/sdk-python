@@ -41,11 +41,46 @@ from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
+_IN_GHA = os.getenv("GITHUB_ACTIONS", "").lower() == "true"
+_gha_current_file = None
 
+
+def pytest_configure(config):
+    if not _IN_GHA:
+        return
+    tr = config.pluginmanager.getplugin("terminalreporter")
+    if tr:
+        tr.showfspath = False
+        # if hasattr(tr, "write_fspath_result"):
+        #     tr.write_fspath_result = lambda *a, **k: None
+
+
+@pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_setup(item):
-    """Print a newline so that custom printed output starts on new line."""
-    if item.config.getoption("-s"):
+    """Print a newline so that custom printed output starts on new line.
+    In GHA, group test output together.
+    """
+    global _gha_current_file
+
+    if not _IN_GHA and item.config.getoption("-s"):
         print()
+    elif _IN_GHA:
+        file, _lineno, _testname = item.location
+        if file != _gha_current_file:
+            print()
+            print(f"::notice title=pytest file::{file}", flush=True)
+            _gha_current_file = file
+
+        print(f"::group::{item.nodeid}", flush=True)
+    yield
+    if _IN_GHA:
+        print("::endgroup::", flush=True)
+
+
+def pytest_report_teststatus(report, config):
+    """In GHA, suppress progress and allow grouping to format test output"""
+    if _IN_GHA:
+        return report.outcome, "", report.outcome.upper()
 
 
 def pytest_addoption(parser):
