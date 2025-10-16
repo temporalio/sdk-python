@@ -103,7 +103,7 @@ jobs:
         env:
           TEMPORAL_TEST_PROTO3: 1
         run: |
-          uv add --python 3.9 "protobuf<4"
+          uv add --python 3.10 "protobuf<4"
           uv sync --all-extras
           poe build-develop
           poe gen-protos
