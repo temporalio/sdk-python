@@ -47,6 +47,16 @@ _IN_GHA = os.getenv("GITHUB_ACTIONS", "").lower() == "true"
 _gha_current_file = None
 
 
+def pytest_configure(config):
+    if not _IN_GHA:
+        return
+    tr = config.pluginmanager.getplugin("terminalreporter")
+    if tr:
+        tr.showfspath = False
+        if hasattr(tr, "write_fspath_result"):
+            tr.write_fspath_result = lambda *a, **k: None
+
+
 @pytest.hookimpl(hookwrapper=True, tryfirst=True)
 def pytest_runtest_protocol(item):
     """Print a newline so that custom printed output starts on new line.
