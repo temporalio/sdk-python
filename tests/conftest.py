@@ -1,8 +1,8 @@
 import asyncio
-from contextlib import redirect_stderr, redirect_stdout
 import io
 import os
 import sys
+from contextlib import redirect_stderr, redirect_stdout
 from typing import AsyncGenerator
 
 import pytest
