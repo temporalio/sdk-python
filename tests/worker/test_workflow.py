@@ -145,7 +145,7 @@ from tests.helpers import (
     unpause_and_assert,
     workflow_update_exists,
 )
-from tests.helpers.cache_evitction import (
+from tests.helpers.cache_eviction import (
     CacheEvictionTearDownWorkflow,
     WaitForeverWorkflow,
     wait_forever_activity,

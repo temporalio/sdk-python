@@ -24,7 +24,7 @@ from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers import LogCapturer
-from tests.helpers.cache_evitction import (
+from tests.helpers.cache_eviction import (
     CacheEvictionTearDownWorkflow,
     WaitForeverWorkflow,
     wait_forever_activity,
