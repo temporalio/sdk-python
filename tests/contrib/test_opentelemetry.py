@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Iterable, List, Optional
 
+import opentelemetry.context
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -21,6 +23,12 @@ from temporalio.contrib.opentelemetry import workflow as otel_workflow
 from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
+from tests.helpers import LogCapturer
+from tests.helpers.cache_eviction import (
+    CacheEvictionTearDownWorkflow,
+    WaitForeverWorkflow,
+    wait_forever_activity,
+)
 
 # Passing through because Python 3.9 has an import bug at
 # https://github.com/python/cpython/issues/91351
@@ -424,7 +432,10 @@ def dump_spans(
                 span_links: List[str] = []
                 for link in span.links:
                     for link_span in spans:
-                        if link_span.context.span_id == link.context.span_id:
+                        if (
+                            link_span.context is not None
+                            and link_span.context.span_id == link.context.span_id
+                        ):
                             span_links.append(link_span.name)
                 span_str += f" (links: {', '.join(span_links)})"
             # Signals can duplicate in rare situations, so we make sure not to
@@ -434,7 +445,7 @@ def dump_spans(
             ret.append(span_str)
             ret += dump_spans(
                 spans,
-                parent_id=span.context.span_id,
+                parent_id=span.context.span_id if span.context else None,
                 with_attributes=with_attributes,
                 indent_depth=indent_depth + 1,
             )
@@ -551,3 +562,63 @@ async def test_opentelemetry_benign_exception(client: Client):
 # * workflow failure and wft failure
 # * signal with start
 # * signal failure and wft failure from signal
+
+
+async def test_opentelemetry_safe_detach(client: Client):
+    # This test simulates forcing eviction. This purposely raises GeneratorExit on
+    # GC which triggers the finally which could run on any thread Python
+    # chooses. When this occurs, we should not detach the token from the context
+    # b/c the context no longer exists
+
+    # Create a tracer that has an in-memory exporter
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+
+    async with Worker(
+        client,
+        workflows=[CacheEvictionTearDownWorkflow, WaitForeverWorkflow],
+        activities=[wait_forever_activity],
+        max_cached_workflows=0,
+        task_queue=f"task_queue_{uuid.uuid4()}",
+        disable_safe_workflow_eviction=True,
+        interceptors=[TracingInterceptor(tracer)],
+    ) as worker:
+        # Put a hook to catch unraisable exceptions
+        old_hook = sys.unraisablehook
+        hook_calls: List[sys.UnraisableHookArgs] = []
+        sys.unraisablehook = hook_calls.append
+
+        with LogCapturer().logs_captured(opentelemetry.context.logger) as capturer:
+            try:
+                handle = await client.start_workflow(
+                    CacheEvictionTearDownWorkflow.run,
+                    id=f"wf-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+
+                # CacheEvictionTearDownWorkflow requires 3 signals to be sent
+                await handle.signal(CacheEvictionTearDownWorkflow.signal)
+                await handle.signal(CacheEvictionTearDownWorkflow.signal)
+                await handle.signal(CacheEvictionTearDownWorkflow.signal)
+
+                await handle.result()
+            finally:
+                sys.unraisablehook = old_hook
+
+            # Confirm at least 1 exception
+            if len(hook_calls) < 1:
+                logging.warning(
+                    "Expected at least 1 exception. Unable to properly verify context detachment"
+                )
+
+            def otel_context_error(record: logging.LogRecord) -> bool:
+                return (
+                    record.name == "opentelemetry.context"
+                    and "Failed to detach context" in record.message
+                )
+
+            assert (
+                capturer.find(otel_context_error) is None
+            ), "Detach from context message should not be logged"
