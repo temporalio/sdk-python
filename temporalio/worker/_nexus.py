@@ -129,6 +129,15 @@ class _NexusWorker:
 
             except Exception as err:
                 raise RuntimeError("Nexus worker failed") from err
+            
+    async def _drain_inflight_tasks(self):
+        for task in list(self._running_tasks.values()):
+            try:
+                task.cancel()
+            except Exception:
+                pass
+        self._running_tasks.clear()
+
 
     # Only call this if run() raised an error
     async def drain_poll_queue(self) -> None:
@@ -142,7 +151,14 @@ class _NexusWorker:
                 completion.error.failure.message = "Worker shutting down"
                 await self._bridge_worker().complete_nexus_task(completion)
             except temporalio.bridge.worker.PollShutdownError:
+                # Cancel pending task and gracefully drain inflight ones
+                await self._drain_inflight_tasks()
                 return
+            except Exception as err:
+                # Reclassify as INTERNAL error to avoid retry storms
+                # Use RuntimeError like other workers when unable to drain
+                # instead of the undefined RetryableInternalError.
+                raise RuntimeError("Nexus worker failed") from err
 
     # Only call this after run()/drain_poll_queue() have returned. This will not
     # raise an exception.

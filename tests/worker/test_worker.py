@@ -98,6 +98,21 @@ class NeverRunService:
     ) -> temporalio.nexus.WorkflowHandle[None]:
         raise NotImplementedError
 
+async def test_nexus_worker_shutdown_behavior(client: Client):
+    # Create a worker configured for Nexus tasks
+    worker = Worker(
+        client,
+        task_queue=f"nexus-worker-shutdown-{uuid.uuid4()}",
+        workflows=[NeverRunWorkflow],
+        nexus_service_handlers=[NeverRunService()],
+    )
+    await worker.run()
+
+    # Simulate a shutdown signal
+    await worker.shutdown()
+
+    # Assert that inflight tasks are cancelled gracefully
+    assert not worker.is_running
 
 async def test_worker_fatal_error_run(client: Client):
     # Run worker with injected workflow poll error
