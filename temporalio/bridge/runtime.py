@@ -23,9 +23,9 @@ class Runtime:
             thread_id, exc_type
         )
 
-    def __init__(self, *, telemetry: TelemetryConfig) -> None:
+    def __init__(self, *, options: RuntimeOptions) -> None:
         """Create SDK Core runtime."""
-        self._ref = temporalio.bridge.temporal_sdk_bridge.init_runtime(telemetry)
+        self._ref = temporalio.bridge.temporal_sdk_bridge.init_runtime(options)
 
     def retrieve_buffered_metrics(self, durations_as_seconds: bool) -> Sequence[Any]:
         """Get buffered metrics."""
@@ -89,6 +89,14 @@ class TelemetryConfig:
 
     logging: Optional[LoggingConfig]
     metrics: Optional[MetricsConfig]
+
+
+@dataclass(frozen=True)
+class RuntimeOptions:
+    """Python representation of the Rust struct for runtime options."""
+
+    telemetry: TelemetryConfig
+    worker_heartbeat_interval_millis: Optional[int] = None
 
 
 # WARNING: This must match Rust runtime::BufferedLogEntry

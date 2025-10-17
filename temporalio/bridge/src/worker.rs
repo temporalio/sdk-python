@@ -23,6 +23,7 @@ use temporal_sdk_core_protos::coresdk::{
     nexus::NexusTaskCompletion, ActivityHeartbeat, ActivityTaskCompletion,
 };
 use temporal_sdk_core_protos::temporal::api::history::v1::History;
+use temporal_sdk_core_protos::temporal::api::worker::v1::PluginInfo;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::error;
@@ -63,6 +64,8 @@ pub struct WorkerConfig {
     nondeterminism_as_workflow_fail: bool,
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
     nexus_task_poller_behavior: PollerBehavior,
+    plugins: Vec<String>,
+    skip_client_worker_set_check: bool,
 }
 
 #[derive(FromPyObject)]
@@ -644,11 +647,12 @@ impl WorkerRef {
         Ok(())
     }
 
-    fn replace_client(&self, client: &client::ClientRef) {
+    fn replace_client(&self, client: &client::ClientRef) -> PyResult<()> {
         self.worker
             .as_ref()
             .expect("missing worker")
-            .replace_client(client.retry_client.clone().into_inner());
+            .replace_client(client.retry_client.clone().into_inner())
+            .map_err(|err| PyValueError::new_err(format!("Failed replacing client: {err}")))
     }
 
     fn initiate_shutdown(&self) -> PyResult<()> {
@@ -722,6 +726,16 @@ fn convert_worker_config(
                 .collect::<HashMap<String, HashSet<WorkflowErrorType>>>(),
         )
         .nexus_task_poller_behavior(conf.nexus_task_poller_behavior)
+        .plugins(
+            conf.plugins
+                .into_iter()
+                .map(|name| PluginInfo {
+                    name,
+                    version: String::new(),
+                })
+                .collect::<Vec<_>>(),
+        )
+        .skip_client_worker_set_check(conf.skip_client_worker_set_check)
         .build()
         .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {err}")))
 }
