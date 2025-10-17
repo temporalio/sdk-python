@@ -234,25 +234,31 @@ class WeatherServiceHandler:
 
 
 def weather_mock_model():
-    return TestModel.returning_responses([
-        ResponseBuilders.tool_call('{"city":"Tokyo"}', "get_weather"),
-        ResponseBuilders.tool_call('{"input":{"city":"Tokyo"}}', "get_weather_object"),
-        ResponseBuilders.tool_call(
-            '{"city":"Tokyo","country":"Japan"}', "get_weather_country"
-        ),
-        ResponseBuilders.tool_call('{"city":"Tokyo"}', "get_weather_context"),
-        ResponseBuilders.tool_call('{"city":"Tokyo"}', "get_weather_method"),
-        ResponseBuilders.output_message("Test weather result"),
-    ])
+    return TestModel.returning_responses(
+        [
+            ResponseBuilders.tool_call('{"city":"Tokyo"}', "get_weather"),
+            ResponseBuilders.tool_call(
+                '{"input":{"city":"Tokyo"}}', "get_weather_object"
+            ),
+            ResponseBuilders.tool_call(
+                '{"city":"Tokyo","country":"Japan"}', "get_weather_country"
+            ),
+            ResponseBuilders.tool_call('{"city":"Tokyo"}', "get_weather_context"),
+            ResponseBuilders.tool_call('{"city":"Tokyo"}', "get_weather_method"),
+            ResponseBuilders.output_message("Test weather result"),
+        ]
+    )
 
 
 def nexus_weather_mock_model():
-    return TestModel.returning_responses([
-        ResponseBuilders.tool_call(
-            '{"input":{"city":"Tokyo"}}', "get_weather_nexus_operation"
-        ),
-        ResponseBuilders.output_message("Test nexus weather result"),
-    ])
+    return TestModel.returning_responses(
+        [
+            ResponseBuilders.tool_call(
+                '{"input":{"city":"Tokyo"}}', "get_weather_nexus_operation"
+            ),
+            ResponseBuilders.output_message("Test nexus weather result"),
+        ]
+    )
 
 
 @workflow.defn
@@ -436,9 +442,11 @@ async def get_weather_failure(city: str) -> Weather:
 
 
 def weather_failure_mock_model():
-    return TestModel.returning_responses([
-        ResponseBuilders.tool_call('{"city":"Tokyo"}', "get_weather_failure"),
-    ])
+    return TestModel.returning_responses(
+        [
+            ResponseBuilders.tool_call('{"city":"Tokyo"}', "get_weather_failure"),
+        ]
+    )
 
 
 async def test_tool_failure_workflow(client: Client):
@@ -723,16 +731,18 @@ class AgentsAsToolsWorkflow:
 
 
 def agent_as_tools_mock_model():
-    return TestModel.returning_responses([
-        ResponseBuilders.tool_call('{"input":"I am full"}', "translate_to_spanish"),
-        ResponseBuilders.output_message("Estoy lleno."),
-        ResponseBuilders.output_message(
-            'The translation to Spanish is: "Estoy lleno."'
-        ),
-        ResponseBuilders.output_message(
-            'The translation to Spanish is: "Estoy lleno."'
-        ),
-    ])
+    return TestModel.returning_responses(
+        [
+            ResponseBuilders.tool_call('{"input":"I am full"}', "translate_to_spanish"),
+            ResponseBuilders.output_message("Estoy lleno."),
+            ResponseBuilders.output_message(
+                'The translation to Spanish is: "Estoy lleno."'
+            ),
+            ResponseBuilders.output_message(
+                'The translation to Spanish is: "Estoy lleno."'
+            ),
+        ]
+    )
 
 
 @pytest.mark.parametrize("use_local_model", [True, False])
@@ -915,24 +925,27 @@ class ProcessUserMessageInput(BaseModel):
 
 
 def customer_service_mock_model():
-    return TestModel.returning_responses([
-        ResponseBuilders.output_message("Hi there! How can I assist you today?"),
-        ResponseBuilders.tool_call("{}", "transfer_to_seat_booking_agent"),
-        ResponseBuilders.output_message(
-            "Could you please provide your confirmation number?"
-        ),
-        ResponseBuilders.output_message(
-            "Thanks! What seat number would you like to change to?"
-        ),
-        ResponseBuilders.tool_call(
-            '{"confirmation_number":"11111","new_seat":"window seat"}', "update_seat"
-        ),
-        ResponseBuilders.output_message(
-            "Your seat has been updated to a window seat. If there's anything else you need, feel free to let me know!"
-        ),
-        ResponseBuilders.tool_call("{}", "transfer_to_triage_agent"),
-        ResponseBuilders.output_message("You're welcome!"),
-    ])
+    return TestModel.returning_responses(
+        [
+            ResponseBuilders.output_message("Hi there! How can I assist you today?"),
+            ResponseBuilders.tool_call("{}", "transfer_to_seat_booking_agent"),
+            ResponseBuilders.output_message(
+                "Could you please provide your confirmation number?"
+            ),
+            ResponseBuilders.output_message(
+                "Thanks! What seat number would you like to change to?"
+            ),
+            ResponseBuilders.tool_call(
+                '{"confirmation_number":"11111","new_seat":"window seat"}',
+                "update_seat",
+            ),
+            ResponseBuilders.output_message(
+                "Your seat has been updated to a window seat. If there's anything else you need, feel free to let me know!"
+            ),
+            ResponseBuilders.tool_call("{}", "transfer_to_triage_agent"),
+            ResponseBuilders.output_message("You're welcome!"),
+        ]
+    )
 
 
 @workflow.defn
@@ -1271,11 +1284,13 @@ async def test_input_guardrail(client: Client, use_local_model: bool):
 
 
 def output_guardrail_mock_model():
-    return TestModel.returning_responses([
-        ResponseBuilders.output_message(
-            '{"reasoning":"The phone number\'s area code (650) is associated with a region. However, the exact location is not definitive, but it\'s commonly linked to the San Francisco Peninsula in California, including cities like San Mateo, Palo Alto, and parts of Silicon Valley. It\'s important to note that area codes don\'t always guarantee a specific location due to mobile number portability.","response":"The area code 650 is typically associated with California, particularly the San Francisco Peninsula, including cities like Palo Alto and San Mateo.","user_name":null}'
-        )
-    ])
+    return TestModel.returning_responses(
+        [
+            ResponseBuilders.output_message(
+                '{"reasoning":"The phone number\'s area code (650) is associated with a region. However, the exact location is not definitive, but it\'s commonly linked to the San Francisco Peninsula in California, including cities like San Mateo, Palo Alto, and parts of Silicon Valley. It\'s important to note that area codes don\'t always guarantee a specific location due to mobile number portability.","response":"The area code 650 is typically associated with California, particularly the San Francisco Peninsula, including cities like Palo Alto and San Mateo.","user_name":null}'
+            )
+        ]
+    )
 
 
 # The agent's output type
@@ -1362,10 +1377,12 @@ async def test_output_guardrail(client: Client, use_local_model: bool):
 
 
 def workflow_tool_mock_model():
-    return TestModel.returning_responses([
-        ResponseBuilders.tool_call("{}", "run_tool"),
-        ResponseBuilders.output_message("Workflow tool was used"),
-    ])
+    return TestModel.returning_responses(
+        [
+            ResponseBuilders.tool_call("{}", "run_tool"),
+            ResponseBuilders.output_message("Workflow tool was used"),
+        ]
+    )
 
 
 @workflow.defn
@@ -1748,25 +1765,27 @@ async def test_lite_llm(client: Client, env: WorkflowEnvironment):
 
 
 def file_search_tool_mock_model():
-    return TestModel.returning_responses([
-        ModelResponse(
-            output=[
-                ResponseFileSearchToolCall(
-                    queries=["side character in the Iliad"],
-                    type="file_search_call",
-                    id="id",
-                    status="completed",
-                    results=[
-                        Result(text="Some scene"),
-                        Result(text="Other scene"),
-                    ],
-                ),
-                ResponseBuilders.response_output_message("Patroclus"),
-            ],
-            usage=Usage(),
-            response_id=None,
-        ),
-    ])
+    return TestModel.returning_responses(
+        [
+            ModelResponse(
+                output=[
+                    ResponseFileSearchToolCall(
+                        queries=["side character in the Iliad"],
+                        type="file_search_call",
+                        id="id",
+                        status="completed",
+                        results=[
+                            Result(text="Some scene"),
+                            Result(text="Other scene"),
+                        ],
+                    ),
+                    ResponseBuilders.response_output_message("Patroclus"),
+                ],
+                usage=Usage(),
+                response_id=None,
+            ),
+        ]
+    )
 
 
 @workflow.defn
@@ -1830,20 +1849,22 @@ async def test_file_search_tool(client: Client, use_local_model):
 
 
 def image_generation_mock_model():
-    return TestModel.returning_responses([
-        ModelResponse(
-            output=[
-                ImageGenerationCall(
-                    type="image_generation_call",
-                    id="id",
-                    status="completed",
-                ),
-                ResponseBuilders.response_output_message("Patroclus"),
-            ],
-            usage=Usage(),
-            response_id=None,
-        ),
-    ])
+    return TestModel.returning_responses(
+        [
+            ModelResponse(
+                output=[
+                    ImageGenerationCall(
+                        type="image_generation_call",
+                        id="id",
+                        status="completed",
+                    ),
+                    ResponseBuilders.response_output_message("Patroclus"),
+                ],
+                usage=Usage(),
+                response_id=None,
+            ),
+        ]
+    )
 
 
 @workflow.defn
@@ -1904,22 +1925,24 @@ async def test_image_generation_tool(client: Client, use_local_model):
 
 
 def code_interpreter_mock_model():
-    return TestModel.returning_responses([
-        ModelResponse(
-            output=[
-                ResponseCodeInterpreterToolCall(
-                    container_id="",
-                    code="some code",
-                    type="code_interpreter_call",
-                    id="id",
-                    status="completed",
-                ),
-                ResponseBuilders.response_output_message("Over 9000"),
-            ],
-            usage=Usage(),
-            response_id=None,
-        ),
-    ])
+    return TestModel.returning_responses(
+        [
+            ModelResponse(
+                output=[
+                    ResponseCodeInterpreterToolCall(
+                        container_id="",
+                        code="some code",
+                        type="code_interpreter_call",
+                        id="id",
+                        status="completed",
+                    ),
+                    ResponseBuilders.response_output_message("Over 9000"),
+                ],
+                usage=Usage(),
+                response_id=None,
+            ),
+        ]
+    )
 
 
 @workflow.defn
@@ -1976,36 +1999,38 @@ async def test_code_interpreter_tool(client: Client):
 
 
 def hosted_mcp_mock_model():
-    return TestModel.returning_responses([
-        ModelResponse(
-            output=[
-                McpApprovalRequest(
-                    arguments="",
-                    name="",
-                    server_label="gitmcp",
-                    type="mcp_approval_request",
-                    id="id",
-                )
-            ],
-            usage=Usage(),
-            response_id=None,
-        ),
-        ModelResponse(
-            output=[
-                McpCall(
-                    arguments="",
-                    name="",
-                    server_label="",
-                    type="mcp_call",
-                    id="id",
-                    output="Mcp output",
-                ),
-                ResponseBuilders.response_output_message("Some language"),
-            ],
-            usage=Usage(),
-            response_id=None,
-        ),
-    ])
+    return TestModel.returning_responses(
+        [
+            ModelResponse(
+                output=[
+                    McpApprovalRequest(
+                        arguments="",
+                        name="",
+                        server_label="gitmcp",
+                        type="mcp_approval_request",
+                        id="id",
+                    )
+                ],
+                usage=Usage(),
+                response_id=None,
+            ),
+            ModelResponse(
+                output=[
+                    McpCall(
+                        arguments="",
+                        name="",
+                        server_label="",
+                        type="mcp_call",
+                        id="id",
+                        output="Mcp output",
+                    ),
+                    ResponseBuilders.response_output_message("Some language"),
+                ],
+                usage=Usage(),
+                response_id=None,
+            ),
+        ]
+    )
 
 
 @workflow.defn
@@ -2083,12 +2108,14 @@ class AssertDifferentModelProvider(ModelProvider):
 
 
 def multiple_models_mock_model():
-    return TestModel.returning_responses([
-        ResponseBuilders.tool_call("{}", "transfer_to_underling"),
-        ResponseBuilders.output_message(
-            "I'm here to help! Was there a specific task you needed assistance with regarding the storeroom?"
-        ),
-    ])
+    return TestModel.returning_responses(
+        [
+            ResponseBuilders.tool_call("{}", "transfer_to_underling"),
+            ResponseBuilders.output_message(
+                "I'm here to help! Was there a specific task you needed assistance with regarding the storeroom?"
+            ),
+        ]
+    )
 
 
 @workflow.defn
@@ -2233,11 +2260,13 @@ class OutputTypeWorkflow:
 
 
 def output_type_mock_model():
-    return TestModel.returning_responses([
-        ResponseBuilders.output_message(
-            '{"answer": "My answer"}',
-        ),
-    ])
+    return TestModel.returning_responses(
+        [
+            ResponseBuilders.output_message(
+                '{"answer": "My answer"}',
+            ),
+        ]
+    )
 
 
 async def test_output_type(client: Client):
@@ -2311,17 +2340,19 @@ class McpServerStatefulWorkflow:
 
 
 def tracking_mcp_mock_model():
-    return TestModel.returning_responses([
-        ResponseBuilders.tool_call(
-            arguments='{"name":"Tom"}',
-            name="Say-Hello",
-        ),
-        ResponseBuilders.tool_call(
-            arguments='{"name":"Tim"}',
-            name="Say-Hello",
-        ),
-        ResponseBuilders.output_message("Hi Tom and Tim!"),
-    ])
+    return TestModel.returning_responses(
+        [
+            ResponseBuilders.tool_call(
+                arguments='{"name":"Tom"}',
+                name="Say-Hello",
+            ),
+            ResponseBuilders.tool_call(
+                arguments='{"name":"Tim"}',
+                name="Say-Hello",
+            ),
+            ResponseBuilders.output_message("Hi Tom and Tim!"),
+        ]
+    )
 
 
 def get_tracking_server(name: str):
