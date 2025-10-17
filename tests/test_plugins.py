@@ -6,10 +6,10 @@ from typing import AsyncIterator, Awaitable, Callable, Optional, cast
 
 import pytest
 
+import temporalio.bridge.temporal_sdk_bridge
 import temporalio.client
 import temporalio.converter
 import temporalio.worker
-import temporalio.bridge.temporal_sdk_bridge
 from temporalio import workflow
 from temporalio.client import Client, ClientConfig, OutboundInterceptor, WorkflowHistory
 from temporalio.contrib.pydantic import pydantic_data_converter

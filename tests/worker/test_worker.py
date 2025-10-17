@@ -17,6 +17,7 @@ from temporalio import activity, workflow
 from temporalio.api.workflowservice.v1 import (
     DescribeWorkerDeploymentRequest,
     DescribeWorkerDeploymentResponse,
+    ListWorkersRequest,
     SetWorkerDeploymentCurrentVersionRequest,
     SetWorkerDeploymentCurrentVersionResponse,
     SetWorkerDeploymentRampingVersionRequest,
@@ -28,7 +29,12 @@ from temporalio.client import (
     TaskReachabilityType,
 )
 from temporalio.common import PinnedVersioningOverride, RawValue, VersioningBehavior
-from temporalio.runtime import PrometheusConfig, Runtime, TelemetryConfig
+from temporalio.runtime import (
+    PrometheusConfig,
+    Runtime,
+    RuntimeOptions,
+    TelemetryConfig,
+)
 from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
