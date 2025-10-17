@@ -422,7 +422,7 @@ class RuntimeOptions:
     telemetry: TelemetryConfig = field(default_factory=TelemetryConfig)
     """Telemetry configuration applied to the runtime."""
 
-    worker_heartbeat_interval: Optional[timedelta] = None
+    worker_heartbeat_interval: Optional[timedelta] = timedelta(seconds=30)
     """Interval for worker heartbeats. ``None`` disables heartbeating."""
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.RuntimeOptions:
