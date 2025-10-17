@@ -10,7 +10,7 @@ from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents.testing import (
     TestModelProvider,
 )
-from tests.contrib.openai_agents.test_openai import ResearchWorkflow, TestResearchModel
+from tests.contrib.openai_agents.test_openai import ResearchWorkflow, research_mock_model
 from tests.helpers import new_worker
 
 
@@ -42,7 +42,7 @@ async def test_tracing(client: Client):
     new_config = client.config()
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
-            model_provider=TestModelProvider(TestResearchModel())
+            model_provider=TestModelProvider(research_mock_model())
         )
     ]
     client = Client(**new_config)
