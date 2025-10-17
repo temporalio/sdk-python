@@ -10,7 +10,10 @@ from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents.testing import (
     TestModelProvider,
 )
-from tests.contrib.openai_agents.test_openai import ResearchWorkflow, research_mock_model
+from tests.contrib.openai_agents.test_openai import (
+    ResearchWorkflow,
+    research_mock_model,
+)
 from tests.helpers import new_worker
 
 
