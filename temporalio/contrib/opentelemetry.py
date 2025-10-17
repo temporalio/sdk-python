@@ -2,20 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
-import contextvars
-import sys
-from contextlib import (
-    AbstractContextManager,
-    contextmanager,
-)
+from contextlib import contextmanager
 from dataclasses import dataclass
-from types import TracebackType
 from typing import (
     Any,
     Callable,
-    ContextManager,
-    Coroutine,
     Dict,
     Iterator,
     Mapping,
@@ -419,38 +410,15 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         """Implementation of
         :py:meth:`temporalio.worker.WorkflowInboundInterceptor.execute_workflow`.
         """
-        with self._top_level_workflow_context(success_is_complete=True) as ctx:
-            if sys.version_info >= (3, 11):
-                return await asyncio.create_task(
-                    self._execute_workflow(input), context=ctx
-                )
-            else:
-                return await ctx.run(asyncio.create_task, self._execute_workflow(input))
-
-    async def _execute_workflow(
-        self, input: temporalio.worker.ExecuteWorkflowInput
-    ) -> Any:
-        # Entrypoint of workflow should be `server` in OTel
-        self._completed_span(
-            f"RunWorkflow:{temporalio.workflow.info().workflow_type}",
-            kind=opentelemetry.trace.SpanKind.SERVER,
-        )
-        # with self._with_complete_span(success_is_complete=True):
-        return await super().execute_workflow(input)
+        with self._top_level_workflow_context(success_is_complete=True):
+            # Entrypoint of workflow should be `server` in OTel
+            self._completed_span(
+                f"RunWorkflow:{temporalio.workflow.info().workflow_type}",
+                kind=opentelemetry.trace.SpanKind.SERVER,
+            )
+            return await super().execute_workflow(input)
 
     async def handle_signal(self, input: temporalio.worker.HandleSignalInput) -> None:
-        """Implementation of
-        :py:meth:`temporalio.worker.WorkflowInboundInterceptor.handle_signal`.
-        """
-        # Create a span in the current context for the signal and link any
-        # header given
-        with self._top_level_workflow_context(success_is_complete=False) as ctx:
-            if sys.version_info >= (3, 11):
-                await asyncio.create_task(self._handle_signal(input), context=ctx)
-            else:
-                await ctx.run(lambda: asyncio.create_task(self._handle_signal(input)))
-
-    async def _handle_signal(self, input: temporalio.worker.HandleSignalInput) -> None:
         """Implementation of
         :py:meth:`temporalio.worker.WorkflowInboundInterceptor.handle_signal`.
         """
@@ -462,22 +430,18 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             link_context_carrier = self.payload_converter.from_payloads(
                 [link_context_header]
             )[0]
-        self._completed_span(
-            f"HandleSignal:{input.signal}",
-            link_context_carrier=link_context_carrier,
-            kind=opentelemetry.trace.SpanKind.SERVER,
-        )
-        await super().handle_signal(input)
+        with self._top_level_workflow_context(success_is_complete=False):
+            self._completed_span(
+                f"HandleSignal:{input.signal}",
+                link_context_carrier=link_context_carrier,
+                kind=opentelemetry.trace.SpanKind.SERVER,
+            )
+            await super().handle_signal(input)
 
     async def handle_query(self, input: temporalio.worker.HandleQueryInput) -> Any:
         """Implementation of
         :py:meth:`temporalio.worker.WorkflowInboundInterceptor.handle_query`.
         """
-        # handle_query does not manage the contextvars.Context itself because
-        # scheduling an asyncio task in a read only operation is not allowed.
-        # The operation is synchronous which makes default contextvars.Context
-        # safe.
-
         # Only trace this if there is a header, and make that span the parent.
         # We do not put anything that happens in a query handler on the workflow
         # span.
@@ -508,18 +472,10 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             )
             return await super().handle_query(input)
         finally:
-            opentelemetry.context.detach(token)
+            if attach_context == opentelemetry.context.get_current():
+                opentelemetry.context.detach(token)
 
     def handle_update_validator(
-        self, input: temporalio.worker.HandleUpdateInput
-    ) -> None:
-        """Implementation of
-        :py:meth:`temporalio.worker.WorkflowInboundInterceptor.handle_update_validator`.
-        """
-        with self._top_level_workflow_context(success_is_complete=False) as ctx:
-            ctx.run(self._handle_update_validator, input)
-
-    def _handle_update_validator(
         self, input: temporalio.worker.HandleUpdateInput
     ) -> None:
         """Implementation of
@@ -531,6 +487,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             link_context_carrier = self.payload_converter.from_payloads(
                 [link_context_header]
             )[0]
+        with self._top_level_workflow_context(success_is_complete=False):
             self._completed_span(
                 f"ValidateUpdate:{input.update}",
                 link_context_carrier=link_context_carrier,
@@ -544,34 +501,19 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         """Implementation of
         :py:meth:`temporalio.worker.WorkflowInboundInterceptor.handle_update_handler`.
         """
-        with self._top_level_workflow_context(success_is_complete=False) as ctx:
-            if sys.version_info >= (3, 11):
-                return await asyncio.create_task(
-                    self._handle_update_handler(input), context=ctx
-                )
-            else:
-                return await ctx.run(
-                    asyncio.create_task, self._handle_update_handler(input)
-                )
-
-    async def _handle_update_handler(
-        self, input: temporalio.worker.HandleUpdateInput
-    ) -> Any:
-        """Implementation of
-        :py:meth:`temporalio.worker.WorkflowInboundInterceptor.handle_update_handler`.
-        """
         link_context_header = input.headers.get(self.header_key)
         link_context_carrier: Optional[_CarrierDict] = None
         if link_context_header:
             link_context_carrier = self.payload_converter.from_payloads(
                 [link_context_header]
             )[0]
-        self._completed_span(
-            f"HandleUpdate:{input.update}",
-            link_context_carrier=link_context_carrier,
-            kind=opentelemetry.trace.SpanKind.SERVER,
-        )
-        return await super().handle_update_handler(input)
+        with self._top_level_workflow_context(success_is_complete=False):
+            self._completed_span(
+                f"HandleUpdate:{input.update}",
+                link_context_carrier=link_context_carrier,
+                kind=opentelemetry.trace.SpanKind.SERVER,
+            )
+            return await super().handle_update_handler(input)
 
     def _load_workflow_context_carrier(self) -> Optional[_CarrierDict]:
         if self._workflow_context_carrier:
@@ -584,13 +526,47 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         )[0]
         return self._workflow_context_carrier
 
+    @contextmanager
     def _top_level_workflow_context(
         self, *, success_is_complete: bool
-    ) -> ContextManager[contextvars.Context]:
-        return self._TopLevelWorkflowContextManager(
-            self, success_is_complete=success_is_complete
-        )
+    ) -> Iterator[None]:
+        # Load context only if there is a carrier, otherwise use empty context
+        context_carrier = self._load_workflow_context_carrier()
+        attach_context: opentelemetry.context.Context
+        if context_carrier:
+            attach_context = self.text_map_propagator.extract(context_carrier)
+        else:
+            attach_context = opentelemetry.context.Context()
+        # We need to put this interceptor on the context too
+        attach_context = self._set_on_context(attach_context)
+        # Need to know whether completed and whether there was a fail-workflow
+        # exception
+        success = False
+        exception: Optional[Exception] = None
+        # Run under this context
+        token = opentelemetry.context.attach(attach_context)
 
+        try:
+            yield None
+            success = True
+        except temporalio.exceptions.FailureError as err:
+            # We only record the failure errors since those are the only ones
+            # that lead to workflow completions
+            exception = err
+            raise
+        finally:
+            # Create a completed span before detaching context
+            if exception or (success and success_is_complete):
+                self._completed_span(
+                    f"CompleteWorkflow:{temporalio.workflow.info().workflow_type}",
+                    exception=exception,
+                    kind=opentelemetry.trace.SpanKind.INTERNAL,
+                )
+
+            if attach_context == opentelemetry.context.get_current():
+                opentelemetry.context.detach(token)
+
+    #
     def _context_to_headers(
         self, headers: Mapping[str, temporalio.api.common.v1.Payload]
     ) -> Mapping[str, temporalio.api.common.v1.Payload]:
@@ -663,65 +639,6 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         self, context: opentelemetry.context.Context
     ) -> opentelemetry.context.Context:
         return opentelemetry.context.set_value(_interceptor_context_key, self, context)
-
-    class _TopLevelWorkflowContextManager(AbstractContextManager):
-        def __init__(
-            self,
-            interceptor: TracingWorkflowInboundInterceptor,
-            *,
-            success_is_complete: bool,
-        ):
-            self._ctx = contextvars.copy_context()
-            self._token: Optional[contextvars.Token] = None
-            self._owner = interceptor
-            self._success_is_complete = success_is_complete
-
-        def __enter__(self):
-            self._ctx.run(self._start)
-            return self._ctx
-
-        def __exit__(
-            self,
-            exc_type: Optional[type[BaseException]],
-            exc_value: Optional[BaseException],
-            traceback: Optional[TracebackType],  # noqa: F811
-        ):
-            self._ctx.run(self._end, exc_type, exc_value, traceback)
-
-        def _start(self):
-            # Load context only if there is a carrier, otherwise use empty context
-            context_carrier = self._owner._load_workflow_context_carrier()
-            attach_context: opentelemetry.context.Context
-            if context_carrier:
-                attach_context = self._owner.text_map_propagator.extract(
-                    context_carrier
-                )
-            else:
-                attach_context = opentelemetry.context.Context()
-            # We need to put this interceptor on the context too
-            attach_context = self._owner._set_on_context(attach_context)
-            self._token = opentelemetry.context.attach(attach_context)
-
-        def _end(
-            self,
-            exc_type: Optional[type[BaseException]],
-            exc_value: Optional[BaseException],
-            _traceback: Optional[TracebackType],
-        ):
-            success = exc_type is None
-            exception: Optional[temporalio.exceptions.FailureError] = None
-            if isinstance(exc_value, temporalio.exceptions.FailureError):
-                exception = exc_value
-
-            if (success and self._success_is_complete) or exception is not None:
-                self._owner._completed_span(
-                    f"CompleteWorkflow:{temporalio.workflow.info().workflow_type}",
-                    exception=exception,
-                    kind=opentelemetry.trace.SpanKind.INTERNAL,
-                )
-
-            if self._token:
-                opentelemetry.context.detach(self._token)
 
 
 class _TracingWorkflowOutboundInterceptor(
