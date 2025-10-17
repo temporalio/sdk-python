@@ -142,7 +142,7 @@ class LoggingConfig:
 
 
 LoggingConfig.default = LoggingConfig(
-    filter=TelemetryFilter(core_level="WARN", other_level="ERROR")
+    filter=TelemetryFilter(core_level="INFO", other_level="INFO")
 )
 
 _module_start_time = time.time()

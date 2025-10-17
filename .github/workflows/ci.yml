@@ -76,6 +76,34 @@ jobs:
       - run: poe lint
       - run: poe build-develop
       - run: mkdir junit-xml
+      - run: poe test ${{matrix.pytestExtraArgs}} -k "test_workflow_query_rpc_timeout" -sv --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 5
+      - run: poe test ${{matrix.pytestExtraArgs}} -k "test_workflow_query_rpc_timeout" -sv --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 5
+      - run: poe test ${{matrix.pytestExtraArgs}} -k "test_workflow_query_rpc_timeout" -sv --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 5
+      - run: poe test ${{matrix.pytestExtraArgs}} -k "test_workflow_query_rpc_timeout" -sv --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 5
+      - run: poe test ${{matrix.pytestExtraArgs}} -k "test_workflow_query_rpc_timeout" -sv --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 5
+      - run: poe test ${{matrix.pytestExtraArgs}} -k "test_workflow_query_rpc_timeout" -sv --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 5
+      - run: poe test ${{matrix.pytestExtraArgs}} -k "test_workflow_query_rpc_timeout" -sv --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 5
+      - run: poe test ${{matrix.pytestExtraArgs}} -k "test_workflow_query_rpc_timeout" -sv --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 5
+      - run: poe test ${{matrix.pytestExtraArgs}} -k "test_workflow_query_rpc_timeout" -sv --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 5
+      - run: poe test ${{matrix.pytestExtraArgs}} -k "test_workflow_query_rpc_timeout" -sv --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 5
+      - run: poe test ${{matrix.pytestExtraArgs}} -k "test_workflow_query_rpc_timeout" -sv --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 5
+      - run: poe test ${{matrix.pytestExtraArgs}} -k "test_workflow_query_rpc_timeout" -sv --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 5
+      - run: poe test ${{matrix.pytestExtraArgs}} -k "test_workflow_query_rpc_timeout" -sv --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 5
+      - run: poe test ${{matrix.pytestExtraArgs}} -k "test_workflow_query_rpc_timeout" -sv --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+        timeout-minutes: 5
       - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
         timeout-minutes: 15
       # Time skipping doesn't yet support ARM
