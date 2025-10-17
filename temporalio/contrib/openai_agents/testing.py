@@ -26,14 +26,16 @@ class ResponseBuilders:
     """Builders for creating model responses for testing.
 
     .. warning::
-        This API is experimental and may change in the future."""
+        This API is experimental and may change in the future.
+    """
 
     @staticmethod
     def model_response(output: TResponseOutputItem) -> ModelResponse:
         """Create a ModelResponse with the given output.
 
         .. warning::
-           This API is experimental and may change in the future."""
+           This API is experimental and may change in the future.
+        """
         return ModelResponse(
             output=[output],
             usage=Usage(),
@@ -45,7 +47,8 @@ class ResponseBuilders:
         """Create a ResponseOutputMessage with text content.
 
         .. warning::
-           This API is experimental and may change in the future."""
+           This API is experimental and may change in the future.
+        """
         return ResponseOutputMessage(
             id="",
             content=[
@@ -65,7 +68,8 @@ class ResponseBuilders:
         """Create a ModelResponse with a function tool call.
 
         .. warning::
-           This API is experimental and may change in the future."""
+           This API is experimental and may change in the future.
+        """
         return ResponseBuilders.model_response(
             ResponseFunctionToolCall(
                 arguments=arguments,
@@ -82,7 +86,8 @@ class ResponseBuilders:
         """Create a ModelResponse with an output message.
 
         .. warning::
-           This API is experimental and may change in the future."""
+           This API is experimental and may change in the future.
+        """
         return ResponseBuilders.model_response(
             ResponseBuilders.response_output_message(text)
         )
@@ -92,7 +97,8 @@ class TestModelProvider(ModelProvider):
     """Test model provider which simply returns the given module.
 
     .. warning::
-        This API is experimental and may change in the future."""
+        This API is experimental and may change in the future.
+    """
 
     __test__ = False
 
@@ -100,14 +106,16 @@ class TestModelProvider(ModelProvider):
         """Initialize a test model provider with a model.
 
         .. warning::
-           This API is experimental and may change in the future."""
+           This API is experimental and may change in the future.
+        """
         self._model = model
 
     def get_model(self, model_name: Union[str, None]) -> Model:
         """Get a model from the model provider.
 
         .. warning::
-           This API is experimental and may change in the future."""
+           This API is experimental and may change in the future.
+        """
         return self._model
 
 
@@ -115,7 +123,8 @@ class TestModel(Model):
     """Test model for use mocking model responses.
 
     .. warning::
-        This API is experimental and may change in the future."""
+        This API is experimental and may change in the future.
+    """
 
     __test__ = False
 
@@ -123,7 +132,8 @@ class TestModel(Model):
         """Initialize a test model with a callable.
 
         .. warning::
-           This API is experimental and may change in the future."""
+           This API is experimental and may change in the future.
+        """
         self.fn = fn
 
     async def get_response(
@@ -159,6 +169,7 @@ class TestModel(Model):
         """Create a mock model which sequentially returns responses from a list.
 
         .. warning::
-           This API is experimental and may change in the future."""
+           This API is experimental and may change in the future.
+        """
         i = iter(responses)
         return TestModel(lambda: next(i))
