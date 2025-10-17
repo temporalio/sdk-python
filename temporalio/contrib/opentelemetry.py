@@ -446,21 +446,21 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         # We do not put anything that happens in a query handler on the workflow
         # span.
         context_header = input.headers.get(self.header_key)
-        attach_context: opentelemetry.context.Context
+        context: opentelemetry.context.Context
         link_context_carrier: Optional[_CarrierDict] = None
         if context_header:
             context_carrier = self.payload_converter.from_payloads([context_header])[0]
-            attach_context = self.text_map_propagator.extract(context_carrier)
+            context = self.text_map_propagator.extract(context_carrier)
             # If there is a workflow span, use it as the link
             link_context_carrier = self._load_workflow_context_carrier()
         else:
             # Use an empty context
-            attach_context = opentelemetry.context.Context()
+            context = opentelemetry.context.Context()
 
         # We need to put this interceptor on the context too
-        attach_context = self._set_on_context(attach_context)
+        context = self._set_on_context(context)
         # Run under context with new span
-        token = opentelemetry.context.attach(attach_context)
+        token = opentelemetry.context.attach(context)
         try:
             # This won't be created if there was no context header
             self._completed_span(
@@ -476,7 +476,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             # different contextvars.Context than the one the token was created
             # on. As such we do a best effort detach to avoid using a mismatched
             # token.
-            if attach_context is opentelemetry.context.get_current():
+            if context is opentelemetry.context.get_current():
                 opentelemetry.context.detach(token)
 
     def handle_update_validator(
@@ -536,19 +536,19 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
     ) -> Iterator[None]:
         # Load context only if there is a carrier, otherwise use empty context
         context_carrier = self._load_workflow_context_carrier()
-        attach_context: opentelemetry.context.Context
+        context: opentelemetry.context.Context
         if context_carrier:
-            attach_context = self.text_map_propagator.extract(context_carrier)
+            context = self.text_map_propagator.extract(context_carrier)
         else:
-            attach_context = opentelemetry.context.Context()
+            context = opentelemetry.context.Context()
         # We need to put this interceptor on the context too
-        attach_context = self._set_on_context(attach_context)
+        context = self._set_on_context(context)
         # Need to know whether completed and whether there was a fail-workflow
         # exception
         success = False
         exception: Optional[Exception] = None
         # Run under this context
-        token = opentelemetry.context.attach(attach_context)
+        token = opentelemetry.context.attach(context)
 
         try:
             yield None
@@ -571,7 +571,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             # different contextvars.Context than the one the token was created
             # on. As such we do a best effort detach to avoid using a mismatched
             # token.
-            if attach_context is opentelemetry.context.get_current():
+            if context is opentelemetry.context.get_current():
                 opentelemetry.context.detach(token)
 
     def _context_to_headers(
