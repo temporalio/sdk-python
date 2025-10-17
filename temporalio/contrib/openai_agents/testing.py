@@ -23,11 +23,17 @@ from openai.types.responses import (
 
 
 class ResponseBuilders:
-    """Builders for creating model responses for testing."""
+    """Builders for creating model responses for testing.
+    
+    .. warning::
+        This API is experimental and may change in the future."""
 
     @staticmethod
     def model_response(output: TResponseOutputItem) -> ModelResponse:
-        """Create a ModelResponse with the given output."""
+        """Create a ModelResponse with the given output.
+    
+        .. warning::
+           This API is experimental and may change in the future."""
         return ModelResponse(
             output=[output],
             usage=Usage(),
@@ -36,7 +42,10 @@ class ResponseBuilders:
 
     @staticmethod
     def response_output_message(text: str) -> ResponseOutputMessage:
-        """Create a ResponseOutputMessage with text content."""
+        """Create a ResponseOutputMessage with text content.
+    
+        .. warning::
+           This API is experimental and may change in the future."""
         return ResponseOutputMessage(
             id="",
             content=[
@@ -53,7 +62,10 @@ class ResponseBuilders:
 
     @staticmethod
     def tool_call(arguments: str, name: str) -> ModelResponse:
-        """Create a ModelResponse with a function tool call."""
+        """Create a ModelResponse with a function tool call.
+    
+        .. warning::
+           This API is experimental and may change in the future."""
         return ResponseBuilders.model_response(
             ResponseFunctionToolCall(
                 arguments=arguments,
@@ -67,33 +79,51 @@ class ResponseBuilders:
 
     @staticmethod
     def output_message(text: str) -> ModelResponse:
-        """Create a ModelResponse with an output message."""
+        """Create a ModelResponse with an output message.
+    
+        .. warning::
+           This API is experimental and may change in the future."""
         return ResponseBuilders.model_response(
             ResponseBuilders.response_output_message(text)
         )
 
 
 class TestModelProvider(ModelProvider):
-    """Test model provider which simply returns the given module."""
+    """Test model provider which simply returns the given module.
+    
+    .. warning::
+        This API is experimental and may change in the future."""
 
     __test__ = False
 
     def __init__(self, model: Model):
-        """Initialize a test model provider with a model."""
+        """Initialize a test model provider with a model.
+    
+        .. warning::
+           This API is experimental and may change in the future."""
         self._model = model
 
     def get_model(self, model_name: Union[str, None]) -> Model:
-        """Get a model from the model provider."""
+        """Get a model from the model provider.
+    
+        .. warning::
+           This API is experimental and may change in the future."""
         return self._model
 
 
 class TestModel(Model):
-    """Test model for use mocking model responses."""
+    """Test model for use mocking model responses.
+    
+    .. warning::
+        This API is experimental and may change in the future."""
 
     __test__ = False
 
     def __init__(self, fn: Callable[[], ModelResponse]) -> None:
-        """Initialize a test model with a callable."""
+        """Initialize a test model with a callable.
+    
+        .. warning::
+           This API is experimental and may change in the future."""
         self.fn = fn
 
     async def get_response(
@@ -107,7 +137,7 @@ class TestModel(Model):
         tracing: ModelTracing,
         **kwargs,
     ) -> ModelResponse:
-        """Get a response from the model."""
+        """Get a response from the mocked model, by calling the callable passed to the constructor."""
         return self.fn()
 
     def stream_response(
@@ -128,7 +158,9 @@ class TestModel(Model):
 class StaticTestModel(TestModel):
     """Static test model for use mocking model responses.
     Set a responses attribute to a list of model responses, which will be returned sequentially.
-    """
+    
+    .. warning::
+        This API is experimental and may change in the future."""
 
     __test__ = False
     responses: list[ModelResponse] = []
@@ -136,6 +168,9 @@ class StaticTestModel(TestModel):
     def __init__(
         self,
     ) -> None:
-        """Initialize the static test model with predefined responses."""
+        """Initialize the static test model with predefined responses.
+    
+        .. warning::
+           This API is experimental and may change in the future."""
         self._responses = iter(self.responses)
         super().__init__(lambda: next(self._responses))
