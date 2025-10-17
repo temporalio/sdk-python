@@ -8473,7 +8473,7 @@ async def test_search_attribute_codec(client: Client, env_type: str):
         result = await client.execute_workflow(
             SearchAttributeCodecParentWorkflow.run,
             "Temporal",
-            id=f"encryption-workflow-id",
+            id="encryption-workflow-id",
             task_queue=worker.task_queue,
             search_attributes=TypedSearchAttributes(
                 [
