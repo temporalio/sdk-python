@@ -154,23 +154,11 @@ class TestModel(Model):
         """Get a streamed response from the model. Unimplemented."""
         raise NotImplementedError()
 
-
-class StaticTestModel(TestModel):
-    """Static test model for use mocking model responses.
-    Set a responses attribute to a list of model responses, which will be returned sequentially.
-    
-    .. warning::
-        This API is experimental and may change in the future."""
-
-    __test__ = False
-    responses: list[ModelResponse] = []
-
-    def __init__(
-        self,
-    ) -> None:
-        """Initialize the static test model with predefined responses.
+    @staticmethod
+    def returning_responses(responses: list[ModelResponse]) -> "TestModel":
+        """Create a mock model which sequentially returns responses from a list.
     
         .. warning::
            This API is experimental and may change in the future."""
-        self._responses = iter(self.responses)
-        super().__init__(lambda: next(self._responses))
+        i = iter(responses)
+        return TestModel(lambda: next(i))

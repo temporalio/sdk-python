@@ -101,7 +101,6 @@ from temporalio.contrib.openai_agents._temporal_model_stub import (
 )
 from temporalio.contrib.openai_agents.testing import (
     ResponseBuilders,
-    StaticTestModel,
     TestModel,
     TestModelProvider,
 )
@@ -116,8 +115,8 @@ from tests.helpers import assert_eventually, new_worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 
-class TestHelloModel(StaticTestModel):
-    responses = [ResponseBuilders.output_message("test")]
+def hello_mock_model():
+    return TestModel.returning_responses([ResponseBuilders.output_message("test")])
 
 
 @workflow.defn
@@ -142,7 +141,7 @@ async def test_hello_world_agent(client: Client, use_local_model: bool):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=TestModelProvider(TestHelloModel())
+            model_provider=TestModelProvider(hello_mock_model())
             if use_local_model
             else None,
         )
@@ -234,8 +233,8 @@ class WeatherServiceHandler:
         )
 
 
-class TestWeatherModel(StaticTestModel):
-    responses = [
+def weather_mock_model():
+    return TestModel.returning_responses([
         ResponseBuilders.tool_call('{"city":"Tokyo"}', "get_weather"),
         ResponseBuilders.tool_call('{"input":{"city":"Tokyo"}}', "get_weather_object"),
         ResponseBuilders.tool_call(
@@ -244,16 +243,16 @@ class TestWeatherModel(StaticTestModel):
         ResponseBuilders.tool_call('{"city":"Tokyo"}', "get_weather_context"),
         ResponseBuilders.tool_call('{"city":"Tokyo"}', "get_weather_method"),
         ResponseBuilders.output_message("Test weather result"),
-    ]
+    ])
 
 
-class TestNexusWeatherModel(StaticTestModel):
-    responses = [
+def nexus_weather_mock_model():
+    return TestModel.returning_responses([
         ResponseBuilders.tool_call(
             '{"input":{"city":"Tokyo"}}', "get_weather_nexus_operation"
         ),
         ResponseBuilders.output_message("Test nexus weather result"),
-    ]
+    ])
 
 
 @workflow.defn
@@ -324,7 +323,7 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=TestModelProvider(TestWeatherModel())
+            model_provider=TestModelProvider(weather_mock_model())
             if use_local_model
             else None,
         )
@@ -436,10 +435,10 @@ async def get_weather_failure(city: str) -> Weather:
     raise ApplicationError("No weather", non_retryable=True)
 
 
-class TestWeatherFailureModel(StaticTestModel):
-    responses = [
+def weather_failure_mock_model():
+    return TestModel.returning_responses([
         ResponseBuilders.tool_call('{"city":"Tokyo"}', "get_weather_failure"),
-    ]
+    ])
 
 
 async def test_tool_failure_workflow(client: Client):
@@ -449,7 +448,7 @@ async def test_tool_failure_workflow(client: Client):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=TestModelProvider(TestWeatherFailureModel()),
+            model_provider=TestModelProvider(weather_failure_mock_model()),
         )
     ]
     client = Client(**new_config)
@@ -491,7 +490,7 @@ async def test_nexus_tool_workflow(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=TestModelProvider(TestNexusWeatherModel())
+            model_provider=TestModelProvider(nexus_weather_mock_model())
             if use_local_model
             else None,
         )
@@ -546,7 +545,7 @@ async def test_nexus_tool_workflow(
 
 
 @no_type_check
-class TestResearchModel(StaticTestModel):
+def research_mock_model():
     responses = [
         ResponseBuilders.output_message(
             '{"searches":[{"query":"best Caribbean surfing spots April","reason":"Identify locations with optimal surfing conditions in the Caribbean during April."},{"query":"top Caribbean islands for hiking April","reason":"Find Caribbean islands with excellent hiking opportunities that are ideal in April."},{"query":"Caribbean water sports destinations April","reason":"Locate Caribbean destinations offering a variety of water sports activities in April."},{"query":"surfing conditions Caribbean April","reason":"Understand the surfing conditions and which islands are suitable for surfing in April."},{"query":"Caribbean adventure travel hiking surfing","reason":"Explore adventure travel options that combine hiking and surfing in the Caribbean."},{"query":"best beaches for surfing Caribbean April","reason":"Identify which Caribbean beaches are renowned for surfing in April."},{"query":"Caribbean islands with national parks hiking","reason":"Find islands with national parks or reserves that offer hiking trails."},{"query":"Caribbean weather April surfing conditions","reason":"Research the weather conditions in April affecting surfing in the Caribbean."},{"query":"Caribbean water sports rentals April","reason":"Look for places where water sports equipment can be rented in the Caribbean during April."},{"query":"Caribbean multi-activity vacation packages","reason":"Look for vacation packages that offer a combination of surfing, hiking, and water sports."}]}'
@@ -573,6 +572,7 @@ class TestResearchModel(StaticTestModel):
             '{"follow_up_questions":[], "markdown_report":"report", "short_summary":"rep"}'
         )
     )
+    return TestModel.returning_responses(responses)
 
 
 @workflow.defn
@@ -594,7 +594,7 @@ async def test_research_workflow(client: Client, use_local_model: bool):
                 start_to_close_timeout=timedelta(seconds=120),
                 schedule_to_close_timeout=timedelta(seconds=120),
             ),
-            model_provider=TestModelProvider(TestResearchModel())
+            model_provider=TestModelProvider(research_mock_model())
             if use_local_model
             else None,
         )
@@ -722,8 +722,8 @@ class AgentsAsToolsWorkflow:
         return synthesizer_result.final_output
 
 
-class AgentAsToolsModel(StaticTestModel):
-    responses = [
+def agent_as_tools_mock_model():
+    return TestModel.returning_responses([
         ResponseBuilders.tool_call('{"input":"I am full"}', "translate_to_spanish"),
         ResponseBuilders.output_message("Estoy lleno."),
         ResponseBuilders.output_message(
@@ -732,7 +732,7 @@ class AgentAsToolsModel(StaticTestModel):
         ResponseBuilders.output_message(
             'The translation to Spanish is: "Estoy lleno."'
         ),
-    ]
+    ])
 
 
 @pytest.mark.parametrize("use_local_model", [True, False])
@@ -745,7 +745,7 @@ async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=TestModelProvider(AgentAsToolsModel())
+            model_provider=TestModelProvider(agent_as_tools_mock_model())
             if use_local_model
             else None,
         )
@@ -914,8 +914,8 @@ class ProcessUserMessageInput(BaseModel):
     chat_length: int
 
 
-class CustomerServiceModel(StaticTestModel):
-    responses = [
+def customer_service_mock_model():
+    return TestModel.returning_responses([
         ResponseBuilders.output_message("Hi there! How can I assist you today?"),
         ResponseBuilders.tool_call("{}", "transfer_to_seat_booking_agent"),
         ResponseBuilders.output_message(
@@ -932,7 +932,7 @@ class CustomerServiceModel(StaticTestModel):
         ),
         ResponseBuilders.tool_call("{}", "transfer_to_triage_agent"),
         ResponseBuilders.output_message("You're welcome!"),
-    ]
+    ])
 
 
 @workflow.defn
@@ -1009,7 +1009,7 @@ async def test_customer_service_workflow(client: Client, use_local_model: bool):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=TestModelProvider(CustomerServiceModel())
+            model_provider=TestModelProvider(customer_service_mock_model())
             if use_local_model
             else None,
         )
@@ -1270,12 +1270,12 @@ async def test_input_guardrail(client: Client, use_local_model: bool):
             assert result[1] == "Sorry, I can't help you with your math homework."
 
 
-class OutputGuardrailModel(StaticTestModel):
-    responses = [
+def output_guardrail_mock_model():
+    return TestModel.returning_responses([
         ResponseBuilders.output_message(
             '{"reasoning":"The phone number\'s area code (650) is associated with a region. However, the exact location is not definitive, but it\'s commonly linked to the San Francisco Peninsula in California, including cities like San Mateo, Palo Alto, and parts of Silicon Valley. It\'s important to note that area codes don\'t always guarantee a specific location due to mobile number portability.","response":"The area code 650 is typically associated with California, particularly the San Francisco Peninsula, including cities like Palo Alto and San Mateo.","user_name":null}'
         )
-    ]
+    ])
 
 
 # The agent's output type
@@ -1338,7 +1338,7 @@ async def test_output_guardrail(client: Client, use_local_model: bool):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=TestModelProvider(OutputGuardrailModel())
+            model_provider=TestModelProvider(output_guardrail_mock_model())
             if use_local_model
             else None,
         )
@@ -1361,11 +1361,11 @@ async def test_output_guardrail(client: Client, use_local_model: bool):
             assert not result
 
 
-class WorkflowToolModel(StaticTestModel):
-    responses = [
+def workflow_tool_mock_model():
+    return TestModel.returning_responses([
         ResponseBuilders.tool_call("{}", "run_tool"),
         ResponseBuilders.output_message("Workflow tool was used"),
-    ]
+    ])
 
 
 @workflow.defn
@@ -1395,7 +1395,7 @@ async def test_workflow_method_tools(client: Client):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=TestModelProvider(WorkflowToolModel()),
+            model_provider=TestModelProvider(workflow_tool_mock_model()),
         )
     ]
     client = Client(**new_config)
@@ -1572,7 +1572,7 @@ class AlternateModelAgent:
 class CheckModelNameProvider(ModelProvider):
     def get_model(self, model_name: Optional[str]) -> Model:
         assert model_name == "test_model"
-        return TestHelloModel()
+        return hello_mock_model()
 
 
 async def test_alternative_model(client: Client):
@@ -1683,7 +1683,7 @@ async def test_session(client: Client):
     new_config = client.config()
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
-            model_provider=TestModelProvider(TestHelloModel()),
+            model_provider=TestModelProvider(hello_mock_model()),
         )
     ]
     client = Client(**new_config)
@@ -1747,8 +1747,8 @@ async def test_lite_llm(client: Client, env: WorkflowEnvironment):
         await workflow_handle.result()
 
 
-class FileSearchToolModel(StaticTestModel):
-    responses = [
+def file_search_tool_mock_model():
+    return TestModel.returning_responses([
         ModelResponse(
             output=[
                 ResponseFileSearchToolCall(
@@ -1766,7 +1766,7 @@ class FileSearchToolModel(StaticTestModel):
             usage=Usage(),
             response_id=None,
         ),
-    ]
+    ])
 
 
 @workflow.defn
@@ -1806,7 +1806,7 @@ async def test_file_search_tool(client: Client, use_local_model):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=TestModelProvider(FileSearchToolModel())
+            model_provider=TestModelProvider(file_search_tool_mock_model())
             if use_local_model
             else None,
         )
@@ -1829,8 +1829,8 @@ async def test_file_search_tool(client: Client, use_local_model):
             assert result == "Patroclus"
 
 
-class ImageGenerationModel(StaticTestModel):
-    responses = [
+def image_generation_mock_model():
+    return TestModel.returning_responses([
         ModelResponse(
             output=[
                 ImageGenerationCall(
@@ -1843,7 +1843,7 @@ class ImageGenerationModel(StaticTestModel):
             usage=Usage(),
             response_id=None,
         ),
-    ]
+    ])
 
 
 @workflow.defn
@@ -1882,7 +1882,7 @@ async def test_image_generation_tool(client: Client, use_local_model):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=TestModelProvider(ImageGenerationModel())
+            model_provider=TestModelProvider(image_generation_mock_model())
             if use_local_model
             else None,
         )
@@ -1903,8 +1903,8 @@ async def test_image_generation_tool(client: Client, use_local_model):
         result = await workflow_handle.result()
 
 
-class CodeInterpreterModel(StaticTestModel):
-    responses = [
+def code_interpreter_mock_model():
+    return TestModel.returning_responses([
         ModelResponse(
             output=[
                 ResponseCodeInterpreterToolCall(
@@ -1919,7 +1919,7 @@ class CodeInterpreterModel(StaticTestModel):
             usage=Usage(),
             response_id=None,
         ),
-    ]
+    ])
 
 
 @workflow.defn
@@ -1955,7 +1955,7 @@ async def test_code_interpreter_tool(client: Client):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=60)
             ),
-            model_provider=TestModelProvider(CodeInterpreterModel()),
+            model_provider=TestModelProvider(code_interpreter_mock_model()),
         )
     ]
     client = Client(**new_config)
@@ -1975,8 +1975,8 @@ async def test_code_interpreter_tool(client: Client):
         assert result == "Over 9000"
 
 
-class HostedMCPModel(StaticTestModel):
-    responses = [
+def hosted_mcp_mock_model():
+    return TestModel.returning_responses([
         ModelResponse(
             output=[
                 McpApprovalRequest(
@@ -2005,7 +2005,7 @@ class HostedMCPModel(StaticTestModel):
             usage=Usage(),
             response_id=None,
         ),
-    ]
+    ])
 
 
 @workflow.defn
@@ -2050,7 +2050,7 @@ async def test_hosted_mcp_tool(client: Client):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=120)
             ),
-            model_provider=TestModelProvider(HostedMCPModel()),
+            model_provider=TestModelProvider(hosted_mcp_mock_model()),
         )
     ]
     client = Client(**new_config)
@@ -2082,13 +2082,13 @@ class AssertDifferentModelProvider(ModelProvider):
         return self._model
 
 
-class MultipleModelsModel(StaticTestModel):
-    responses = [
+def multiple_models_mock_model():
+    return TestModel.returning_responses([
         ResponseBuilders.tool_call("{}", "transfer_to_underling"),
         ResponseBuilders.output_message(
             "I'm here to help! Was there a specific task you needed assistance with regarding the storeroom?"
         ),
-    ]
+    ])
 
 
 @workflow.defn
@@ -2115,7 +2115,7 @@ class MultipleModelWorkflow:
 
 
 async def test_multiple_models(client: Client):
-    provider = AssertDifferentModelProvider(MultipleModelsModel())
+    provider = AssertDifferentModelProvider(multiple_models_mock_model())
     new_config = client.config()
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
@@ -2143,7 +2143,7 @@ async def test_multiple_models(client: Client):
 
 
 async def test_run_config_models(client: Client):
-    provider = AssertDifferentModelProvider(MultipleModelsModel())
+    provider = AssertDifferentModelProvider(multiple_models_mock_model())
     new_config = client.config()
     new_config["plugins"] = [
         openai_agents.OpenAIAgentsPlugin(
@@ -2189,7 +2189,7 @@ async def test_summary_provider(client: Client):
                 start_to_close_timeout=timedelta(seconds=120),
                 summary_override=SummaryProvider(),
             ),
-            model_provider=TestModelProvider(TestHelloModel()),
+            model_provider=TestModelProvider(hello_mock_model()),
         )
     ]
     client = Client(**new_config)
@@ -2232,12 +2232,12 @@ class OutputTypeWorkflow:
         return result.final_output
 
 
-class OutputTypeModel(StaticTestModel):
-    responses = [
+def output_type_mock_model():
+    return TestModel.returning_responses([
         ResponseBuilders.output_message(
             '{"answer": "My answer"}',
         ),
-    ]
+    ])
 
 
 async def test_output_type(client: Client):
@@ -2247,7 +2247,7 @@ async def test_output_type(client: Client):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=120),
             ),
-            model_provider=TestModelProvider(OutputTypeModel()),
+            model_provider=TestModelProvider(output_type_mock_model()),
         )
     ]
     client = Client(**new_config)
@@ -2310,8 +2310,8 @@ class McpServerStatefulWorkflow:
             return result.final_output
 
 
-class TrackingMCPModel(StaticTestModel):
-    responses = [
+def tracking_mcp_mock_model():
+    return TestModel.returning_responses([
         ResponseBuilders.tool_call(
             arguments='{"name":"Tom"}',
             name="Say-Hello",
@@ -2321,7 +2321,7 @@ class TrackingMCPModel(StaticTestModel):
             name="Say-Hello",
         ),
         ResponseBuilders.output_message("Hi Tom and Tim!"),
-    ]
+    ])
 
 
 def get_tracking_server(name: str):
@@ -2423,7 +2423,7 @@ async def test_mcp_server(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=120)
             ),
-            model_provider=TestModelProvider(TrackingMCPModel())
+            model_provider=TestModelProvider(tracking_mcp_mock_model())
             if use_local_model
             else None,
             mcp_server_providers=[server],
@@ -2533,7 +2533,7 @@ async def test_mcp_server_factory_argument(client: Client, stateful: bool):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=120)
             ),
-            model_provider=TestModelProvider(TrackingMCPModel()),
+            model_provider=TestModelProvider(tracking_mcp_mock_model()),
             mcp_server_providers=[server],
         )
     ]
@@ -2599,7 +2599,7 @@ async def test_stateful_mcp_server_no_worker(client: Client):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=120)
             ),
-            model_provider=TestModelProvider(TrackingMCPModel()),
+            model_provider=TestModelProvider(tracking_mcp_mock_model()),
             mcp_server_providers=[server],
         )
     ]
