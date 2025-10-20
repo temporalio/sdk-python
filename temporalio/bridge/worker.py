@@ -15,9 +15,10 @@ from typing import (
     Sequence,
     Set,
     Tuple,
-    TypeAlias,
     Union,
 )
+
+from typing_extensions import TypeAlias
 
 import temporalio.api.common.v1
 import temporalio.api.history.v1

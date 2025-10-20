@@ -7,7 +7,7 @@ import enum
 import json
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, TypedDict, Union
+from typing import Any, Optional, Union
 
 from agents import (
     AgentOutputSchemaBase,
@@ -34,7 +34,7 @@ from openai import (
 )
 from openai.types.responses.tool_param import Mcp
 from pydantic_core import to_json
-from typing_extensions import Required
+from typing_extensions import Required, TypedDict
 
 from temporalio import activity, workflow
 from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbeater

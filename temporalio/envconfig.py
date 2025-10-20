@@ -8,17 +8,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import (
-    Any,
-    Dict,
-    Literal,
-    Mapping,
-    Optional,
-    TypeAlias,
-    TypedDict,
-    Union,
-    cast,
-)
+from typing import Any, Dict, Literal, Mapping, Optional, Union, cast
+
+from typing_extensions import TypeAlias, TypedDict
 
 import temporalio.service
 from temporalio.bridge.temporal_sdk_bridge import envconfig as _bridge_envconfig

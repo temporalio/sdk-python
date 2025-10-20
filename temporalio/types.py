@@ -1,6 +1,8 @@
 """Advanced types."""
 
-from typing import Any, Awaitable, Callable, ParamSpec, Protocol, Type, TypeVar, Union
+from typing import Any, Awaitable, Callable, Type, TypeVar, Union
+
+from typing_extensions import ParamSpec, Protocol
 
 AnyType = TypeVar("AnyType")
 ClassType = TypeVar("ClassType", bound=Type)

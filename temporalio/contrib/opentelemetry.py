@@ -12,11 +12,8 @@ from typing import (
     Mapping,
     NoReturn,
     Optional,
-    Protocol,
     Sequence,
     Type,
-    TypeAlias,
-    TypedDict,
     cast,
 )
 
@@ -31,6 +28,7 @@ import opentelemetry.util.types
 from opentelemetry.context import Context
 from opentelemetry.trace import Span, SpanKind, Status, StatusCode, _Links
 from opentelemetry.util import types
+from typing_extensions import Protocol, TypeAlias, TypedDict
 
 import temporalio.activity
 import temporalio.api.common.v1

@@ -14,12 +14,12 @@ from typing import (
     Sequence,
     Set,
     Tuple,
-    TypedDict,
     Union,
     cast,
 )
 
 from pydantic import BaseModel
+from typing_extensions import TypedDict
 
 
 class FruitEnum(str, Enum):

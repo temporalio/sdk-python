@@ -21,33 +21,35 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Concatenate,
     Dict,
     Generator,
     Generic,
     Iterable,
     Iterator,
     List,
-    Literal,
     Mapping,
     MutableMapping,
     NoReturn,
     Optional,
-    Protocol,
     Sequence,
     Tuple,
     Type,
-    TypedDict,
     TypeVar,
     Union,
     cast,
     overload,
-    runtime_checkable,
 )
 
 import nexusrpc
 import nexusrpc.handler
 from nexusrpc import InputT, OutputT
+from typing_extensions import (
+    Concatenate,
+    Literal,
+    Protocol,
+    TypedDict,
+    runtime_checkable,
+)
 
 import temporalio.api.common.v1
 import temporalio.bridge.proto.child_workflow

@@ -11,7 +11,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Concatenate,
     Generator,
     Optional,
     Union,
@@ -19,6 +18,7 @@ from typing import (
 )
 
 from nexusrpc.handler import CancelOperationContext, StartOperationContext
+from typing_extensions import Concatenate
 
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1

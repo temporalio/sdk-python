@@ -13,13 +13,12 @@ from typing import (
     Mapping,
     NewType,
     Optional,
-    Protocol,
     Sequence,
     TypeVar,
     Union,
 )
 
-from typing_extensions import Self
+from typing_extensions import Protocol, Self
 
 import temporalio.bridge.metric
 import temporalio.bridge.runtime

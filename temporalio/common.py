@@ -18,22 +18,19 @@ from typing import (
     Iterator,
     List,
     Mapping,
-    NamedTuple,
     Optional,
     Sequence,
     Text,
     Tuple,
     Type,
-    TypeAlias,
     TypeVar,
     Union,
-    get_origin,
     get_type_hints,
     overload,
 )
 
 import google.protobuf.internal.containers
-from typing_extensions import Self
+from typing_extensions import NamedTuple, Self, TypeAlias, get_origin
 
 import temporalio.api.common.v1
 import temporalio.api.deployment.v1

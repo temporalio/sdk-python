@@ -26,13 +26,14 @@ from typing import (
     Mapping,
     MutableMapping,
     Optional,
-    ParamSpec,
     Sequence,
     Set,
     Tuple,
     TypeVar,
     no_type_check,
 )
+
+from typing_extensions import ParamSpec
 
 import temporalio.workflow
 
@@ -451,11 +452,15 @@ class _ThreadLocalSysModules(
     def __or__(
         self, other: Mapping[str, types.ModuleType]
     ) -> Dict[str, types.ModuleType]:
+        if sys.version_info < (3, 9):
+            raise NotImplementedError
         return self.current.__or__(other)  # type: ignore[operator]
 
     def __ior__(
         self, other: Mapping[str, types.ModuleType]
     ) -> Dict[str, types.ModuleType]:
+        if sys.version_info < (3, 9):
+            raise NotImplementedError
         return self.current.__ior__(other)
 
     __ror__ = __or__
