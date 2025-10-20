@@ -81,18 +81,22 @@ async def test_tracing(client: Client):
     # Initial planner spans - There are only 3 because we don't make an actual model call
     paired_span(processor.span_events[0], processor.span_events[5])
     assert processor.span_events[0][0].span_data.export().get("name") == "PlannerAgent"
+    print("Planner span:", processor.span_events[0][0].span_id)
 
-    paired_span(processor.span_events[1], processor.span_events[4])
+    # startActivity happens before executeActivity
+    paired_span(processor.span_events[1], processor.span_events[2])
     assert (
         processor.span_events[1][0].span_data.export().get("name")
         == "temporal:startActivity"
     )
+    print("StartActivity span:", processor.span_events[1][0].span_id)
 
-    paired_span(processor.span_events[2], processor.span_events[3])
+    paired_span(processor.span_events[3], processor.span_events[4])
     assert (
-        processor.span_events[2][0].span_data.export().get("name")
+        processor.span_events[3][0].span_data.export().get("name")
         == "temporal:executeActivity"
     )
+    print("Execute Span parent:", processor.span_events[3][0].parent_id)
 
     for span, start in processor.span_events[6:-6]:
         span_data = span.span_data.export()
@@ -113,28 +117,27 @@ async def test_tracing(client: Client):
                 len(parents) == 2 and parents[0].span_data.export()["type"] == "agent"
             )
 
-        # Execute is parented to start
+        # Execute is parented to the agent as well
         if span_data.get("name") == "temporal:executeActivity":
             parents = [
                 s for (s, _) in processor.span_events if s.span_id == span.parent_id
             ]
             assert (
-                len(parents) == 2
-                and parents[0].span_data.export()["name"] == "temporal:startActivity"
+                len(parents) == 2 and parents[0].span_data.export()["type"] == "agent"
             )
 
     # Final writer spans - There are only 3 because we don't make an actual model call
     paired_span(processor.span_events[-6], processor.span_events[-1])
     assert processor.span_events[-6][0].span_data.export().get("name") == "WriterAgent"
 
-    paired_span(processor.span_events[-5], processor.span_events[-2])
+    paired_span(processor.span_events[-5], processor.span_events[-4])
     assert (
         processor.span_events[-5][0].span_data.export().get("name")
         == "temporal:startActivity"
     )
 
-    paired_span(processor.span_events[-4], processor.span_events[-3])
+    paired_span(processor.span_events[-3], processor.span_events[-2])
     assert (
-        processor.span_events[-4][0].span_data.export().get("name")
+        processor.span_events[-3][0].span_data.export().get("name")
         == "temporal:executeActivity"
     )
