@@ -21,7 +21,7 @@ from temporalio.runtime import (
     TelemetryFilter,
 )
 from temporalio.worker import Worker
-from tests.helpers import assert_eq_eventually, assert_eventually, find_free_port
+from tests.helpers import assert_eq_eventually, assert_eventually, find_free_port, worker_versioning_enabled
 
 
 @workflow.defn
@@ -260,10 +260,12 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
 
 
 def test_runtime_options_to_bridge_config() -> None:
-    assert RuntimeOptions()._to_bridge_config().worker_heartbeat_interval_millis is None
-    options = RuntimeOptions(worker_heartbeat_interval=timedelta(seconds=30))
-    bridge_config = options._to_bridge_config()
-    assert bridge_config.worker_heartbeat_interval_millis == 30_000
+    assert RuntimeOptions()._to_bridge_config().worker_heartbeat_interval_millis == 30_000
+    bridge_config = RuntimeOptions(worker_heartbeat_interval=timedelta(seconds=60))._to_bridge_config()
+    assert bridge_config.worker_heartbeat_interval_millis == 60_000
+
+    bridge_config1 = RuntimeOptions(worker_heartbeat_interval=None)._to_bridge_config()
+    assert bridge_config1.worker_heartbeat_interval_millis is None
 
 
 def test_runtime_options_invalid_heartbeat() -> None:

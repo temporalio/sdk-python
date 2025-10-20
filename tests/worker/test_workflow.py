@@ -5210,57 +5210,19 @@ class TickingWorkflow:
             await asyncio.sleep(0.1)
 
 
-async def test_workflow_replace_worker_client(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
-        pytest.skip("Only testing against two real servers")
-    # We are going to start a second ephemeral server and then replace the
-    # client. So we will start a no-cache ticking workflow with the current
-    # client and confirm it has accomplished at least one task. Then we will
-    # start another on the other client, and confirm it gets started too. Then
-    # we will terminate both. We have to use a ticking workflow with only one
-    # poller to force a quick re-poll to recognize our client change quickly (as
-    # opposed to just waiting the minute for poll timeout).
-    async with await WorkflowEnvironment.start_local(
-        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION
-    ) as other_env:
-        # Start both workflows on different servers
-        task_queue = f"tq-{uuid.uuid4()}"
-        handle1 = await client.start_workflow(
-            TickingWorkflow.run, id=f"wf-{uuid.uuid4()}", task_queue=task_queue
-        )
-        handle2 = await other_env.client.start_workflow(
-            TickingWorkflow.run, id=f"wf-{uuid.uuid4()}", task_queue=task_queue
-        )
-
-        async def any_task_completed(handle: WorkflowHandle) -> bool:
-            async for e in handle.fetch_history_events():
-                if e.HasField("workflow_task_completed_event_attributes"):
-                    return True
-            return False
-
-        # Now start the worker on the first env
-        async with Worker(
-            client,
-            task_queue=task_queue,
-            workflows=[TickingWorkflow],
-            max_cached_workflows=0,
-            max_concurrent_workflow_task_polls=1,
-        ) as worker:
-            # Confirm the first ticking workflow has completed a task but not
-            # the second
-            await assert_eq_eventually(True, lambda: any_task_completed(handle1))
-            assert not await any_task_completed(handle2)
-
-            # Now replace the client, which should be used fairly quickly
-            # because we should have timer-done poll completions every 100ms
-            worker.client = other_env.client
-
-            # Now confirm the other workflow has started
-            await assert_eq_eventually(True, lambda: any_task_completed(handle2))
-
-            # Terminate both
-            await handle1.terminate()
-            await handle2.terminate()
+async def test_workflow_replace_worker_client(client: Client):
+    other_runtime = Runtime()
+    other_client = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        runtime=other_runtime,
+    )
+    async with new_worker(client, HelloWorkflow) as worker:
+        with pytest.raises(
+            ValueError,
+            match="New client is not on the same runtime as the existing client",
+        ):
+            worker.client = other_client
 
 
 @activity.defn(dynamic=True)
