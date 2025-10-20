@@ -6,10 +6,11 @@ use std::time::Duration;
 use temporal_client::{
     ClientKeepAliveConfig as CoreClientKeepAliveConfig, ClientOptions, ClientOptionsBuilder,
     ConfiguredClient, HttpConnectProxyOptions, RetryClient, RetryConfig,
-    TemporalServiceClientWithMetrics, TlsConfig,
+    TlsConfig, TemporalServiceClient,
 };
-use tonic::metadata::{
-    AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataKey, BinaryMetadataValue,
+use temporal_client::tonic::{
+    self,
+    metadata::{AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataKey, BinaryMetadataValue},
 };
 use url::Url;
 
@@ -17,7 +18,7 @@ use crate::runtime;
 
 pyo3::create_exception!(temporal_sdk_bridge, RPCError, PyException);
 
-type Client = RetryClient<ConfiguredClient<TemporalServiceClientWithMetrics>>;
+type Client = RetryClient<ConfiguredClient<TemporalServiceClient>>;
 
 #[pyclass]
 pub struct ClientRef {
