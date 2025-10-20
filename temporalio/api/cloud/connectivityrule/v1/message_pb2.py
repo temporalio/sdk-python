@@ -34,7 +34,7 @@ ConnectivityRule = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CONNECTIVITYRULE,
-        "__module__": "temporal.api.cloud.connectivityrule.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.connectivityrule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.connectivityrule.v1.ConnectivityRule)
     },
 )
@@ -45,7 +45,7 @@ ConnectivityRuleSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CONNECTIVITYRULESPEC,
-        "__module__": "temporal.api.cloud.connectivityrule.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.connectivityrule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.connectivityrule.v1.ConnectivityRuleSpec)
     },
 )
@@ -56,7 +56,7 @@ PublicConnectivityRule = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PUBLICCONNECTIVITYRULE,
-        "__module__": "temporal.api.cloud.connectivityrule.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.connectivityrule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.connectivityrule.v1.PublicConnectivityRule)
     },
 )
@@ -67,7 +67,7 @@ PrivateConnectivityRule = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PRIVATECONNECTIVITYRULE,
-        "__module__": "temporal.api.cloud.connectivityrule.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.connectivityrule.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.connectivityrule.v1.PrivateConnectivityRule)
     },
 )

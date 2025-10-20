@@ -30,7 +30,7 @@ AsyncOperation = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ASYNCOPERATION,
-        "__module__": "temporal.api.cloud.operation.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.operation.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.operation.v1.AsyncOperation)
     },
 )

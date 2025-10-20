@@ -40,7 +40,7 @@ WorkerPollerInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKERPOLLERINFO,
-        "__module__": "temporal.api.worker.v1.message_pb2",
+        "__module__": "temporalio.api.worker.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.WorkerPollerInfo)
     },
 )
@@ -51,7 +51,7 @@ WorkerSlotsInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKERSLOTSINFO,
-        "__module__": "temporal.api.worker.v1.message_pb2",
+        "__module__": "temporalio.api.worker.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.WorkerSlotsInfo)
     },
 )
@@ -62,7 +62,7 @@ WorkerHostInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKERHOSTINFO,
-        "__module__": "temporal.api.worker.v1.message_pb2",
+        "__module__": "temporalio.api.worker.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.WorkerHostInfo)
     },
 )
@@ -73,7 +73,7 @@ WorkerHeartbeat = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKERHEARTBEAT,
-        "__module__": "temporal.api.worker.v1.message_pb2",
+        "__module__": "temporalio.api.worker.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.WorkerHeartbeat)
     },
 )
@@ -84,7 +84,7 @@ WorkerInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKERINFO,
-        "__module__": "temporal.api.worker.v1.message_pb2",
+        "__module__": "temporalio.api.worker.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.WorkerInfo)
     },
 )
@@ -95,7 +95,7 @@ PluginInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PLUGININFO,
-        "__module__": "temporal.api.worker.v1.message_pb2",
+        "__module__": "temporalio.api.worker.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.worker.v1.PluginInfo)
     },
 )
