@@ -4,6 +4,9 @@ on:
   schedule:
     # Run at 3 AM PST (11:00 UTC) - offset from existing nightly
     - cron: '00 11 * * *'
+  push:
+    branches:
+      - add-nightly-throughput-stress-workflow
   workflow_dispatch:
     inputs:
       duration:
