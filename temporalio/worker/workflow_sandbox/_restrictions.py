@@ -14,6 +14,7 @@ import logging
 import math
 import operator
 import random
+import sys
 import types
 import warnings
 from copy import copy, deepcopy
@@ -646,11 +647,18 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
         # "linecache": SandboxMatcher.all_uses,
         # Restrict almost everything in OS at runtime
         "os": SandboxMatcher(
+            # As of https://github.com/python/cpython/pull/132662 in python 3.14 we have to allow os.path calls
+            # which may occur during exception tracing. See https://github.com/python/cpython/issues/140228.
+            children={
+                "path": SandboxMatcher.none
+                if sys.version_info >= (3, 14)
+                else SandboxMatcher.all
+            },
             access={"name"},
             use={"*"},
             # As of https://github.com/python/cpython/pull/112097, os.stat
             # calls are now made when displaying errors
-            exclude={"stat"},
+            exclude={"stat", "path"} if sys.version_info >= (3, 14) else {"stat"},
             # Only restricted at runtime
             only_runtime=True,
         ),
