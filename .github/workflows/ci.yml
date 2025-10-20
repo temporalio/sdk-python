@@ -19,11 +19,6 @@ jobs:
         python: ["3.10", "3.14"]
         os: [ubuntu-latest, ubuntu-arm, macos-intel, macos-arm, windows-latest]
         include:
-#          # On 3.9 there is a problem with import errors caused by pytests' loader that surface due
-#          # to a bug in CPython (https://github.com/python/cpython/issues/91351), so we avoid using
-#          # the assert rewriter.
-#          - python: "3.10"
-#            pytestExtraArgs: "--assert=plain"
           - os: ubuntu-latest
             python: "3.14"
             docsTarget: true
