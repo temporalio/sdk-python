@@ -41,7 +41,7 @@ env:
 jobs:
   throughput-stress:
     runs-on: ubuntu-latest-4-cores
-    timeout-minutes: ${{ inputs.job_timeout_minutes || vars.NIGHTLY_JOB_TIMEOUT_MINUTES || 420 }}
+    timeout-minutes: ${{ fromJSON(inputs.job_timeout_minutes || vars.NIGHTLY_JOB_TIMEOUT_MINUTES || 420) }}
 
     steps:
       - name: Print test configuration
