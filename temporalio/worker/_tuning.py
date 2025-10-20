@@ -5,9 +5,16 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Callable, Literal, Optional, Protocol, Union, runtime_checkable
-
-from typing_extensions import TypeAlias
+from typing import (
+    Any,
+    Callable,
+    Literal,
+    Optional,
+    Protocol,
+    TypeAlias,
+    Union,
+    runtime_checkable,
+)
 
 import temporalio.bridge.worker
 from temporalio.common import WorkerDeploymentVersion

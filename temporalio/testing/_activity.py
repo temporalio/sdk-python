@@ -7,9 +7,7 @@ import inspect
 import threading
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Optional, Set, TypeVar
-
-from typing_extensions import ParamSpec
+from typing import Any, Callable, Optional, ParamSpec, Set, TypeVar
 
 import temporalio.activity
 import temporalio.common

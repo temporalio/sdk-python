@@ -38,6 +38,8 @@ from typing import (
     Set,
     Tuple,
     Type,
+    TypeAlias,
+    TypedDict,
     TypeVar,
     Union,
     cast,
@@ -45,7 +47,7 @@ from typing import (
 
 import nexusrpc.handler
 from nexusrpc import InputT, OutputT
-from typing_extensions import Self, TypeAlias, TypedDict, TypeVarTuple, Unpack
+from typing_extensions import Self, TypeVarTuple, Unpack
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -2945,9 +2947,6 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             # the cancel (i.e. cancelled before started)
             if not self._started and not self.done():
                 self._apply_cancel_command(self._instance._add_command())
-        # Message not supported in older versions
-        if sys.version_info < (3, 9):
-            return super().cancel()
         return super().cancel(msg)
 
     def _resolve_success(self, result: Any) -> None:

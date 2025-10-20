@@ -26,14 +26,13 @@ from typing import (
     Text,
     Tuple,
     Type,
+    TypedDict,
     Union,
 )
 from uuid import UUID, uuid4
 
 import pydantic
 import pytest
-import typing_extensions
-from typing_extensions import TypedDict
 
 import temporalio.api.common.v1
 import temporalio.common
@@ -374,9 +373,9 @@ def test_json_type_hints():
     ok(Literal["foo"], "foo")
     ok(Literal["foo", False], False)
     fail(Literal["foo", "bar"], "baz")
-    ok(typing_extensions.Literal["foo"], "foo")
-    ok(typing_extensions.Literal["foo", False], False)
-    fail(typing_extensions.Literal["foo", "bar"], "baz")
+    ok(Literal["foo"], "foo")
+    ok(Literal["foo", False], False)
+    fail(Literal["foo", "bar"], "baz")
 
     # Dataclass
     ok(MyDataClass, MyDataClass("foo", 5, SerializableEnum.FOO))

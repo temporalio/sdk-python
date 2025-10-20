@@ -43,7 +43,6 @@ import google.protobuf.json_format
 import google.protobuf.message
 import google.protobuf.symbol_database
 import nexusrpc
-import typing_extensions
 from typing_extensions import Self
 
 import temporalio.api.common.v1
@@ -1697,7 +1696,7 @@ def value_to_type(
     type_args: Tuple = getattr(hint, "__args__", ())
 
     # Literal
-    if origin is Literal or origin is typing_extensions.Literal:
+    if origin is Literal:
         if value not in type_args:
             raise TypeError(f"Value {value} not in literal values {type_args}")
         return value

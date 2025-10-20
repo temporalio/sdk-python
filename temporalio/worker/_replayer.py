@@ -7,9 +7,7 @@ import concurrent.futures
 import logging
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type
-
-from typing_extensions import TypedDict
+from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type, TypedDict
 
 import temporalio.api.history.v1
 import temporalio.bridge.proto.workflow_activation

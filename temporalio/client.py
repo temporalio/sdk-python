@@ -22,6 +22,7 @@ from typing import (
     AsyncIterator,
     Awaitable,
     Callable,
+    Concatenate,
     Dict,
     FrozenSet,
     Generic,
@@ -32,6 +33,7 @@ from typing import (
     Text,
     Tuple,
     Type,
+    TypedDict,
     Union,
     cast,
     overload,
@@ -41,7 +43,7 @@ import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.timestamp_pb2
 from google.protobuf.internal.containers import MessageMap
-from typing_extensions import Concatenate, Required, Self, TypedDict
+from typing_extensions import Required, Self
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1

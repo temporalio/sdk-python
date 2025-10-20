@@ -6,9 +6,7 @@ Nothing in this module should be considered stable. The API may change.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Type
-
-from typing_extensions import Protocol
+from typing import Any, Callable, Dict, Mapping, Optional, Protocol, Sequence, Type
 
 import temporalio.bridge.temporal_sdk_bridge
 

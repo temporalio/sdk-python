@@ -26,21 +26,23 @@ from typing import (
     Callable,
     Dict,
     List,
+    Literal,
     Mapping,
     NoReturn,
     Optional,
+    Protocol,
     Sequence,
     Tuple,
     Type,
     Union,
     cast,
+    runtime_checkable,
 )
 from urllib.request import urlopen
 
 import pydantic
 import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
-from typing_extensions import Literal, Protocol, runtime_checkable
 
 import temporalio.activity
 import temporalio.api.sdk.v1
