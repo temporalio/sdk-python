@@ -942,7 +942,7 @@ class Client:
             MultiParamSpec, LocalReturnType
         ],
         *,
-        args: MultiParamSpec.args,  # pyright: ignore
+        args: MultiParamSpec.args,  # type: ignore
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, Union[str, bytes]] = {},
@@ -1061,7 +1061,7 @@ class Client:
             MultiParamSpec, LocalReturnType
         ],
         *,
-        args: MultiParamSpec.args,  # pyright: ignore
+        args: MultiParamSpec.args,  # type: ignore
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         wait_for_stage: WorkflowUpdateStage,
         id: Optional[str] = None,
@@ -2252,7 +2252,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             MultiParamSpec, LocalReturnType
         ],
         *,
-        args: MultiParamSpec.args,  # pyright: ignore
+        args: MultiParamSpec.args,  # type: ignore
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, Union[str, bytes]] = {},
         rpc_timeout: Optional[timedelta] = None,
@@ -2353,7 +2353,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             MultiParamSpec, LocalReturnType
         ],
         *,
-        args: MultiParamSpec.args,  # pyright: ignore
+        args: MultiParamSpec.args,  # type: ignore
         wait_for_stage: WorkflowUpdateStage,
         id: Optional[str] = None,
         rpc_metadata: Mapping[str, Union[str, bytes]] = {},
@@ -3355,7 +3355,7 @@ class WorkflowHistory:
     ) -> WorkflowHistory:
         """Construct a WorkflowHistory from an ID and a json dump of history.
 
-        This is built to work both with Temporal UI/tctl JSON as well as
+        This is built to work both with Temporal UI/CLI JSON as well as
         :py:meth:`to_json` even though they are slightly different.
 
         Args:
