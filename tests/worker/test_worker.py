@@ -8,6 +8,7 @@ from typing import Any, Awaitable, Callable, Optional, Sequence
 from urllib.request import urlopen
 
 import nexusrpc
+import pytest
 
 import temporalio.api.enums.v1
 import temporalio.nexus
@@ -58,11 +59,6 @@ from tests.helpers import (
     worker_versioning_enabled,
 )
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
-
-# Passing through because Python 3.9 has an import bug at
-# https://github.com/python/cpython/issues/91351
-with workflow.unsafe.imports_passed_through():
-    import pytest
 
 
 def test_load_default_worker_binary_id():

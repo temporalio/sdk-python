@@ -1676,8 +1676,8 @@ worker = Worker(
 ### Workflow Replay
 
 Given a workflow's history, it can be replayed locally to check for things like non-determinism errors. For example,
-assuming `history_str` is populated with a JSON string history either exported from the web UI or from `tctl`, the
-following function will replay it:
+assuming `history_str` is populated with a JSON string history either exported from the web UI or from the 
+`Temporal CLI`, the following function will replay it:
 
 ```python
 from temporalio.client import WorkflowHistory
