@@ -62,8 +62,8 @@ jobs:
       - run: uv sync --all-extras
       - run: poe bridge-lint
         if: ${{ matrix.clippyLinter }}
-      - run: poe lint
       - run: poe build-develop
+      - run: poe lint
       - run: mkdir junit-xml
       - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
         timeout-minutes: 15
