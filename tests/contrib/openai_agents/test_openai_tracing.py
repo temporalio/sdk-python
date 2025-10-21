@@ -114,7 +114,7 @@ async def test_tracing(client: Client):
                 len(parents) == 2 and parents[0].span_data.export()["type"] == "agent"
             )
 
-        # Execute is parented to the agent as well
+        # Execute is parented to the start activity span
         if span_data.get("name") == "temporal:executeActivity":
             parents = [
                 s for (s, _) in processor.span_events if s.span_id == span.parent_id
