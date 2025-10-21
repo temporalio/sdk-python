@@ -588,7 +588,6 @@ async def test_opentelemetry_safe_detach(client: Client):
 
         with LogCapturer().logs_captured(opentelemetry.context.logger) as capturer:
             try:
-                print("===== in detach test")
                 handle = await client.start_workflow(
                     CacheEvictionTearDownWorkflow.run,
                     id=f"wf-{uuid.uuid4()}",
@@ -596,19 +595,13 @@ async def test_opentelemetry_safe_detach(client: Client):
                 )
 
                 # CacheEvictionTearDownWorkflow requires 3 signals to be sent
-                print("===== signal 1")
                 await handle.signal(CacheEvictionTearDownWorkflow.signal)
-                print("===== signal 2")
                 await handle.signal(CacheEvictionTearDownWorkflow.signal)
-                print("===== signal 3")
                 await handle.signal(CacheEvictionTearDownWorkflow.signal)
 
-                print("===== awaiting result")
                 await handle.result()
             finally:
                 sys.unraisablehook = old_hook
-
-            print("===== inspecting logs")
 
             # Confirm at least 1 exception
             if len(hook_calls) < 1:
@@ -622,6 +615,6 @@ async def test_opentelemetry_safe_detach(client: Client):
                     and "Failed to detach context" in record.message
                 )
 
-            assert capturer.find(otel_context_error) is None, (
-                "Detach from context message should not be logged"
-            )
+            assert (
+                capturer.find(otel_context_error) is None
+            ), "Detach from context message should not be logged"
