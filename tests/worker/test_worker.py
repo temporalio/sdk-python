@@ -32,7 +32,6 @@ from temporalio.common import PinnedVersioningOverride, RawValue, VersioningBeha
 from temporalio.runtime import (
     PrometheusConfig,
     Runtime,
-    RuntimeOptions,
     TelemetryConfig,
 )
 from temporalio.service import RPCError

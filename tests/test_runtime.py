@@ -16,7 +16,6 @@ from temporalio.runtime import (
     LoggingConfig,
     PrometheusConfig,
     Runtime,
-    RuntimeOptions,
     TelemetryConfig,
     TelemetryFilter,
 )
@@ -265,20 +264,24 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
 
 
 def test_runtime_options_to_bridge_config() -> None:
-    assert (
-        RuntimeOptions()._to_bridge_config().worker_heartbeat_interval_millis == 30_000
-    )
-    bridge_config = RuntimeOptions(
-        worker_heartbeat_interval=timedelta(seconds=60)
-    )._to_bridge_config()
-    assert bridge_config.worker_heartbeat_interval_millis == 60_000
+    runtime = Runtime(telemetry=TelemetryConfig())
+    assert runtime._heartbeat_millis == 30_000
 
-    bridge_config1 = RuntimeOptions(worker_heartbeat_interval=None)._to_bridge_config()
-    assert bridge_config1.worker_heartbeat_interval_millis is None
+    runtime = Runtime(
+        telemetry=TelemetryConfig(),
+        worker_heartbeat_interval=timedelta(seconds=60),
+    )
+    assert runtime._heartbeat_millis == 60_000
+
+    runtime = Runtime(
+        telemetry=TelemetryConfig(),
+        worker_heartbeat_interval=None,
+    )
+    assert runtime._heartbeat_millis is None
 
 
 def test_runtime_options_invalid_heartbeat() -> None:
     with pytest.raises(ValueError):
-        RuntimeOptions(
-            worker_heartbeat_interval=timedelta(seconds=-5)
-        )._to_bridge_config()
+        Runtime(
+            telemetry=TelemetryConfig(), worker_heartbeat_interval=timedelta(seconds=-5)
+        )
