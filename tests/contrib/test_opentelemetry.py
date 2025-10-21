@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 import logging
+import queue
 import sys
+import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -19,7 +22,10 @@ from opentelemetry.trace import StatusCode, get_tracer
 from temporalio import activity, workflow
 from temporalio.client import Client, WithStartWorkflowOperation, WorkflowUpdateStage
 from temporalio.common import RetryPolicy, WorkflowIDConflictPolicy
-from temporalio.contrib.opentelemetry import TracingInterceptor
+from temporalio.contrib.opentelemetry import (
+    TracingInterceptor,
+    TracingWorkflowInboundInterceptor,
+)
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
 from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 from temporalio.testing import WorkflowEnvironment
@@ -560,61 +566,48 @@ async def test_opentelemetry_benign_exception(client: Client):
 # * signal failure and wft failure from signal
 
 
-async def test_opentelemetry_safe_detach(client: Client):
-    # This test simulates forcing eviction. This purposely raises GeneratorExit on
-    # GC which triggers the finally which could run on any thread Python
-    # chooses. When this occurs, we should not detach the token from the context
-    # b/c the context no longer exists
+def test_opentelemetry_safe_detach():
+    class _fake_self:
+        def _load_workflow_context_carrier(*args):
+            return None
 
-    # Create a tracer that has an in-memory exporter
-    exporter = InMemorySpanExporter()
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
-    tracer = get_tracer(__name__, tracer_provider=provider)
+        def _set_on_context(self, ctx):
+            return opentelemetry.context.set_value("test-key", "test-value", ctx)
 
-    async with Worker(
-        client,
-        workflows=[CacheEvictionTearDownWorkflow, WaitForeverWorkflow],
-        activities=[wait_forever_activity],
-        max_cached_workflows=0,
-        task_queue=f"task_queue_{uuid.uuid4()}",
-        disable_safe_workflow_eviction=True,
-        interceptors=[TracingInterceptor(tracer)],
-    ) as worker:
-        # Put a hook to catch unraisable exceptions
-        old_hook = sys.unraisablehook
-        hook_calls: List[sys.UnraisableHookArgs] = []
-        sys.unraisablehook = hook_calls.append
+        def _completed_span(*args, **kwargs):
+            pass
 
-        with LogCapturer().logs_captured(opentelemetry.context.logger) as capturer:
-            try:
-                handle = await client.start_workflow(
-                    CacheEvictionTearDownWorkflow.run,
-                    id=f"wf-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                )
+    # create a context manager and force enter to happen on this thread
+    context_manager = TracingWorkflowInboundInterceptor._top_level_workflow_context(
+        _fake_self(),  # type: ignore
+        success_is_complete=True,
+    )
+    context_manager.__enter__()
 
-                # CacheEvictionTearDownWorkflow requires 3 signals to be sent
-                await handle.signal(CacheEvictionTearDownWorkflow.signal)
-                await handle.signal(CacheEvictionTearDownWorkflow.signal)
-                await handle.signal(CacheEvictionTearDownWorkflow.signal)
+    # move reference to context manager into queue
+    q: queue.Queue = queue.Queue()
+    q.put(context_manager)
+    del context_manager
 
-                await handle.result()
-            finally:
-                sys.unraisablehook = old_hook
+    def worker():
+        # pull reference from queue and delete the last reference
+        context_manager = q.get()
+        del context_manager
+        # force gc
+        gc.collect()
 
-            # Confirm at least 1 exception
-            if len(hook_calls) < 1:
-                logging.warning(
-                    "Expected at least 1 exception. Unable to properly verify context detachment"
-                )
+    with LogCapturer().logs_captured(opentelemetry.context.logger) as capturer:
+        # run forced gc on other thread so exit happens there
+        t = threading.Thread(target=worker)
+        t.start()
+        t.join(timeout=5)
 
-            def otel_context_error(record: logging.LogRecord) -> bool:
-                return (
-                    record.name == "opentelemetry.context"
-                    and "Failed to detach context" in record.message
-                )
+        def otel_context_error(record: logging.LogRecord) -> bool:
+            return (
+                record.name == "opentelemetry.context"
+                and "Failed to detach context" in record.message
+            )
 
-            assert (
-                capturer.find(otel_context_error) is None
-            ), "Detach from context message should not be logged"
+        assert (
+            capturer.find(otel_context_error) is None
+        ), "Detach from context message should not be logged"
