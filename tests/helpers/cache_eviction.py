@@ -46,17 +46,23 @@ class CacheEvictionTearDownWorkflow:
         # Let's also start something in the background that we never wait on
         asyncio.create_task(asyncio.sleep(1000))
         try:
+            print("----- in evict workflow")
             # Wait for signal count to reach 2
             await asyncio.sleep(0.01)
+            print("----- waiting for signal")
             await workflow.wait_condition(lambda: self._signal_count > 1)
         finally:
             # This finally, on eviction, is actually called but the command
             # should be ignored
+            print("----- sleeping")
             await asyncio.sleep(0.01)
+            print("----- waiting for signals 2 & 3")
             await workflow.wait_condition(lambda: self._signal_count > 2)
             # Cancel gather tasks and wait on them, but ignore the errors
             for task in tasks:
                 task.cancel()
+
+            print("----- evict workflow ending")
             await gather_fut
 
     @workflow.signal
