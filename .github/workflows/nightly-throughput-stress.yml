@@ -117,9 +117,8 @@ jobs:
 
       - name: Run throughput stress scenario with local SDK
         working-directory: omes
+        continue-on-error: true
         run: |
-          set +e  # Don't fail immediately on error
-
           # Use run-scenario-with-worker to build and run in one step
           # Pass the SDK directory as --version for local testing
           # Note: The hardcoded values below match OMES defaults, except:
@@ -128,7 +127,7 @@ jobs:
           go run ./cmd run-scenario-with-worker \
             --scenario throughput_stress \
             --language python \
-            --version $(pwd)/../sdk-python \
+            --version $(pwd)/.. \
             --run-id $RUN_ID \
             --duration $TEST_DURATION \
             --timeout $TEST_TIMEOUT \
@@ -140,7 +139,7 @@ jobs:
             --option min-throughput-per-hour=1000 \
             2>&1 | tee $WORKER_LOG_DIR/scenario.log
 
-          SCENARIO_EXIT_CODE=$?
+          SCENARIO_EXIT_CODE=${PIPESTATUS[0]}
           echo "SCENARIO_EXIT_CODE=$SCENARIO_EXIT_CODE" >> $GITHUB_ENV
           exit $SCENARIO_EXIT_CODE
 
