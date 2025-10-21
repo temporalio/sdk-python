@@ -123,7 +123,8 @@ async def test_tracing(client: Client):
                 s for (s, _) in processor.span_events if s.span_id == span.parent_id
             ]
             assert (
-                len(parents) == 2 and parents[0].span_data.export()["type"] == "agent"
+                len(parents) == 2
+                and parents[0].span_data.export()["name"] == "temporal:startActivity"
             )
 
     # Final writer spans - There are only 3 because we don't make an actual model call

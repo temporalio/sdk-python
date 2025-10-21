@@ -370,61 +370,66 @@ class _ContextPropagationWorkflowOutboundInterceptor(
     async def signal_child_workflow(
         self, input: temporalio.worker.SignalChildWorkflowInput
     ) -> None:
-        trace = get_trace_provider().get_current_trace()
-        set_header_from_context(input, temporalio.workflow.payload_converter())
-        if trace:
+        if get_trace_provider().get_current_trace():
             with custom_span(
                 name="temporal:signalChildWorkflow",
                 data={"workflowId": input.child_workflow_id},
             ):
+                set_header_from_context(input, temporalio.workflow.payload_converter())
                 await self.next.signal_child_workflow(input)
-        await self.next.signal_child_workflow(input)
+        else:
+            set_header_from_context(input, temporalio.workflow.payload_converter())
+            await self.next.signal_child_workflow(input)
 
     async def signal_external_workflow(
         self, input: temporalio.worker.SignalExternalWorkflowInput
     ) -> None:
-        trace = get_trace_provider().get_current_trace()
-        set_header_from_context(input, temporalio.workflow.payload_converter())
-        if trace:
+        if get_trace_provider().get_current_trace():
             with custom_span(
                 name="temporal:signalExternalWorkflow",
                 data={"workflowId": input.workflow_id},
             ):
+                set_header_from_context(input, temporalio.workflow.payload_converter())
                 await self.next.signal_external_workflow(input)
-        await self.next.signal_external_workflow(input)
+        else:
+            set_header_from_context(input, temporalio.workflow.payload_converter())
+            await self.next.signal_external_workflow(input)
 
     def start_activity(
         self, input: temporalio.worker.StartActivityInput
     ) -> temporalio.workflow.ActivityHandle:
-        trace = get_trace_provider().get_current_trace()
-        set_header_from_context(input, temporalio.workflow.payload_converter())
-        if trace:
+        if get_trace_provider().get_current_trace():
             with custom_span(
                 name="temporal:startActivity", data={"activity": input.activity}
             ):
+                set_header_from_context(input, temporalio.workflow.payload_converter())
                 return self.next.start_activity(input)
+
+        set_header_from_context(input, temporalio.workflow.payload_converter())
         return self.next.start_activity(input)
 
     async def start_child_workflow(
         self, input: temporalio.worker.StartChildWorkflowInput
     ) -> temporalio.workflow.ChildWorkflowHandle:
-        trace = get_trace_provider().get_current_trace()
-        set_header_from_context(input, temporalio.workflow.payload_converter())
-        if trace:
+        if get_trace_provider().get_current_trace():
             with custom_span(
                 name="temporal:startChildWorkflow", data={"workflow": input.workflow}
             ):
+                set_header_from_context(input, temporalio.workflow.payload_converter())
                 return await self.next.start_child_workflow(input)
+
+        set_header_from_context(input, temporalio.workflow.payload_converter())
         return await self.next.start_child_workflow(input)
 
     def start_local_activity(
         self, input: temporalio.worker.StartLocalActivityInput
     ) -> temporalio.workflow.ActivityHandle:
-        trace = get_trace_provider().get_current_trace()
-        set_header_from_context(input, temporalio.workflow.payload_converter())
-        if trace:
+        if get_trace_provider().get_current_trace():
             with custom_span(
                 name="temporal:startLocalActivity", data={"activity": input.activity}
             ):
+                set_header_from_context(input, temporalio.workflow.payload_converter())
                 return self.next.start_local_activity(input)
+
+        set_header_from_context(input, temporalio.workflow.payload_converter())
         return self.next.start_local_activity(input)
