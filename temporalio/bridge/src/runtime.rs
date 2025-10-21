@@ -131,20 +131,13 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
         }
     }
 
-    let mut runtime_options_build = RuntimeOptionsBuilder::default();
-    runtime_options_build.telemetry_options(
-        telemetry_build
-            .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid telemetry config: {err}")))?,
-    );
-
-    if let Some(ms) = worker_heartbeat_interval_millis {
-        runtime_options_build.heartbeat_interval(Some(Duration::from_millis(ms)));
-    } else {
-        runtime_options_build.heartbeat_interval(None);
-    }
-
-    let runtime_options = runtime_options_build
+    let runtime_options = RuntimeOptionsBuilder::default()
+        .telemetry_options(
+            telemetry_build
+                .build()
+                .map_err(|err| PyValueError::new_err(format!("Invalid telemetry config: {err}")))?,
+        )
+        .heartbeat_interval(worker_heartbeat_interval_millis.map(Duration::from_millis))
         .build()
         .map_err(|err| PyValueError::new_err(format!("Invalid runtime options: {err}")))?;
 

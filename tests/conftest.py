@@ -60,7 +60,7 @@ def pytest_addoption(parser):
 
 
 @pytest.fixture(autouse=True)
-def _force_worker_skip_client_set(monkeypatch):
+def _skip_client_worker_set_check(monkeypatch):
     original_init = temporalio.worker.Worker.__init__
 
     def patched_init(self, *args, **kwargs):
