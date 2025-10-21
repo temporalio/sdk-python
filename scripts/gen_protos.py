@@ -42,6 +42,10 @@ py_fixes = [
     partial(
         re.compile(r"from temporal\.sdk\.core\.").sub, r"from temporalio.bridge.proto."
     ),
+    partial(
+        re.compile(r"'__module__' : 'temporal\.api\.").sub,
+        r"'__module__' : 'temporalio.api.",
+    ),
 ]
 
 pyi_fixes = [
@@ -60,7 +64,6 @@ def fix_generated_output(base_path: Path):
     - protoc doesn't generate the correct import paths
         (https://github.com/protocolbuffers/protobuf/issues/1491)
     """
-
     imports: Mapping[str, List[str]] = collections.defaultdict(list)
     for p in base_path.iterdir():
         if p.is_dir():

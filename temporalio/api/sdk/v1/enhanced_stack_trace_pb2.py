@@ -36,12 +36,12 @@ EnhancedStackTrace = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _ENHANCEDSTACKTRACE_SOURCESENTRY,
-                "__module__": "temporal.api.sdk.v1.enhanced_stack_trace_pb2",
+                "__module__": "temporalio.api.sdk.v1.enhanced_stack_trace_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.EnhancedStackTrace.SourcesEntry)
             },
         ),
         "DESCRIPTOR": _ENHANCEDSTACKTRACE,
-        "__module__": "temporal.api.sdk.v1.enhanced_stack_trace_pb2",
+        "__module__": "temporalio.api.sdk.v1.enhanced_stack_trace_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.EnhancedStackTrace)
     },
 )
@@ -53,7 +53,7 @@ StackTraceSDKInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STACKTRACESDKINFO,
-        "__module__": "temporal.api.sdk.v1.enhanced_stack_trace_pb2",
+        "__module__": "temporalio.api.sdk.v1.enhanced_stack_trace_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.StackTraceSDKInfo)
     },
 )
@@ -64,7 +64,7 @@ StackTraceFileSlice = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STACKTRACEFILESLICE,
-        "__module__": "temporal.api.sdk.v1.enhanced_stack_trace_pb2",
+        "__module__": "temporalio.api.sdk.v1.enhanced_stack_trace_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.StackTraceFileSlice)
     },
 )
@@ -75,7 +75,7 @@ StackTraceFileLocation = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STACKTRACEFILELOCATION,
-        "__module__": "temporal.api.sdk.v1.enhanced_stack_trace_pb2",
+        "__module__": "temporalio.api.sdk.v1.enhanced_stack_trace_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.StackTraceFileLocation)
     },
 )
@@ -86,7 +86,7 @@ StackTrace = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STACKTRACE,
-        "__module__": "temporal.api.sdk.v1.enhanced_stack_trace_pb2",
+        "__module__": "temporalio.api.sdk.v1.enhanced_stack_trace_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.StackTrace)
     },
 )

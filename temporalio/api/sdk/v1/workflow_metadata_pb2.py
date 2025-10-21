@@ -29,7 +29,7 @@ WorkflowMetadata = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWMETADATA,
-        "__module__": "temporal.api.sdk.v1.workflow_metadata_pb2",
+        "__module__": "temporalio.api.sdk.v1.workflow_metadata_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.WorkflowMetadata)
     },
 )
@@ -40,7 +40,7 @@ WorkflowDefinition = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWDEFINITION,
-        "__module__": "temporal.api.sdk.v1.workflow_metadata_pb2",
+        "__module__": "temporalio.api.sdk.v1.workflow_metadata_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.WorkflowDefinition)
     },
 )
@@ -51,7 +51,7 @@ WorkflowInteractionDefinition = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWINTERACTIONDEFINITION,
-        "__module__": "temporal.api.sdk.v1.workflow_metadata_pb2",
+        "__module__": "temporalio.api.sdk.v1.workflow_metadata_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.WorkflowInteractionDefinition)
     },
 )

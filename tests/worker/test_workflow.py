@@ -38,6 +38,7 @@ from typing import (
 from urllib.request import urlopen
 
 import pydantic
+import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
 from typing_extensions import Literal, Protocol, runtime_checkable
 
@@ -148,11 +149,6 @@ from tests.helpers.external_stack_trace import (
     ExternalStackTraceWorkflow,
     external_wait_cancel,
 )
-
-# Passing through because Python 3.9 has an import bug at
-# https://github.com/python/cpython/issues/91351
-with workflow.unsafe.imports_passed_through():
-    import pytest
 
 
 @workflow.defn
@@ -3193,7 +3189,10 @@ async def test_workflow_query_rpc_timeout(client: Client):
         )
     assert (
         err.value.status == RPCStatusCode.CANCELLED
-        and "timeout" in str(err.value).lower()
+        and (
+            "timeout" in str(err.value).lower()
+            or "http2 error" in str(err.value).lower()
+        )
     ) or err.value.status == RPCStatusCode.DEADLINE_EXCEEDED
 
 

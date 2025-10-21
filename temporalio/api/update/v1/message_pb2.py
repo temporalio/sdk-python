@@ -43,7 +43,7 @@ WaitPolicy = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WAITPOLICY,
-        "__module__": "temporal.api.update.v1.message_pb2",
+        "__module__": "temporalio.api.update.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.update.v1.WaitPolicy)
     },
 )
@@ -54,7 +54,7 @@ UpdateRef = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATEREF,
-        "__module__": "temporal.api.update.v1.message_pb2",
+        "__module__": "temporalio.api.update.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.update.v1.UpdateRef)
     },
 )
@@ -65,7 +65,7 @@ Outcome = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _OUTCOME,
-        "__module__": "temporal.api.update.v1.message_pb2",
+        "__module__": "temporalio.api.update.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.update.v1.Outcome)
     },
 )
@@ -76,7 +76,7 @@ Meta = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _META,
-        "__module__": "temporal.api.update.v1.message_pb2",
+        "__module__": "temporalio.api.update.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.update.v1.Meta)
     },
 )
@@ -87,7 +87,7 @@ Input = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _INPUT,
-        "__module__": "temporal.api.update.v1.message_pb2",
+        "__module__": "temporalio.api.update.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.update.v1.Input)
     },
 )
@@ -98,7 +98,7 @@ Request = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _REQUEST,
-        "__module__": "temporal.api.update.v1.message_pb2",
+        "__module__": "temporalio.api.update.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.update.v1.Request)
     },
 )
@@ -109,7 +109,7 @@ Rejection = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _REJECTION,
-        "__module__": "temporal.api.update.v1.message_pb2",
+        "__module__": "temporalio.api.update.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.update.v1.Rejection)
     },
 )
@@ -120,7 +120,7 @@ Acceptance = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACCEPTANCE,
-        "__module__": "temporal.api.update.v1.message_pb2",
+        "__module__": "temporalio.api.update.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.update.v1.Acceptance)
     },
 )
@@ -131,7 +131,7 @@ Response = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONSE,
-        "__module__": "temporal.api.update.v1.message_pb2",
+        "__module__": "temporalio.api.update.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.update.v1.Response)
     },
 )

@@ -58,7 +58,7 @@ AccountAccess = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACCOUNTACCESS,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.AccountAccess)
     },
 )
@@ -69,7 +69,7 @@ NamespaceAccess = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NAMESPACEACCESS,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.NamespaceAccess)
     },
 )
@@ -84,12 +84,12 @@ Access = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _ACCESS_NAMESPACEACCESSESENTRY,
-                "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+                "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.Access.NamespaceAccessesEntry)
             },
         ),
         "DESCRIPTOR": _ACCESS,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.Access)
     },
 )
@@ -101,7 +101,7 @@ NamespaceScopedAccess = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NAMESPACESCOPEDACCESS,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.NamespaceScopedAccess)
     },
 )
@@ -112,7 +112,7 @@ UserSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _USERSPEC,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.UserSpec)
     },
 )
@@ -123,7 +123,7 @@ Invitation = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _INVITATION,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.Invitation)
     },
 )
@@ -134,7 +134,7 @@ User = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _USER,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.User)
     },
 )
@@ -145,7 +145,7 @@ GoogleGroupSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GOOGLEGROUPSPEC,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.GoogleGroupSpec)
     },
 )
@@ -156,7 +156,7 @@ SCIMGroupSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SCIMGROUPSPEC,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.SCIMGroupSpec)
     },
 )
@@ -167,7 +167,7 @@ CloudGroupSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CLOUDGROUPSPEC,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.CloudGroupSpec)
     },
 )
@@ -178,7 +178,7 @@ UserGroupSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _USERGROUPSPEC,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.UserGroupSpec)
     },
 )
@@ -189,7 +189,7 @@ UserGroup = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _USERGROUP,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.UserGroup)
     },
 )
@@ -200,7 +200,7 @@ UserGroupMemberId = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _USERGROUPMEMBERID,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.UserGroupMemberId)
     },
 )
@@ -211,7 +211,7 @@ UserGroupMember = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _USERGROUPMEMBER,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.UserGroupMember)
     },
 )
@@ -222,7 +222,7 @@ ServiceAccount = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SERVICEACCOUNT,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.ServiceAccount)
     },
 )
@@ -233,7 +233,7 @@ ServiceAccountSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SERVICEACCOUNTSPEC,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.ServiceAccountSpec)
     },
 )
@@ -244,7 +244,7 @@ ApiKey = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _APIKEY,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.ApiKey)
     },
 )
@@ -255,7 +255,7 @@ ApiKeySpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _APIKEYSPEC,
-        "__module__": "temporal.api.cloud.identity.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.identity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.identity.v1.ApiKeySpec)
     },
 )

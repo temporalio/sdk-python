@@ -105,7 +105,7 @@ ScheduleActivityTaskCommandAttributes = _reflection.GeneratedProtocolMessageType
     (_message.Message,),
     {
         "DESCRIPTOR": _SCHEDULEACTIVITYTASKCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.ScheduleActivityTaskCommandAttributes)
     },
 )
@@ -116,7 +116,7 @@ RequestCancelActivityTaskCommandAttributes = _reflection.GeneratedProtocolMessag
     (_message.Message,),
     {
         "DESCRIPTOR": _REQUESTCANCELACTIVITYTASKCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.RequestCancelActivityTaskCommandAttributes)
     },
 )
@@ -127,7 +127,7 @@ StartTimerCommandAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STARTTIMERCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.StartTimerCommandAttributes)
     },
 )
@@ -138,7 +138,7 @@ CompleteWorkflowExecutionCommandAttributes = _reflection.GeneratedProtocolMessag
     (_message.Message,),
     {
         "DESCRIPTOR": _COMPLETEWORKFLOWEXECUTIONCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.CompleteWorkflowExecutionCommandAttributes)
     },
 )
@@ -149,7 +149,7 @@ FailWorkflowExecutionCommandAttributes = _reflection.GeneratedProtocolMessageTyp
     (_message.Message,),
     {
         "DESCRIPTOR": _FAILWORKFLOWEXECUTIONCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.FailWorkflowExecutionCommandAttributes)
     },
 )
@@ -160,7 +160,7 @@ CancelTimerCommandAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CANCELTIMERCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.CancelTimerCommandAttributes)
     },
 )
@@ -171,7 +171,7 @@ CancelWorkflowExecutionCommandAttributes = _reflection.GeneratedProtocolMessageT
     (_message.Message,),
     {
         "DESCRIPTOR": _CANCELWORKFLOWEXECUTIONCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.CancelWorkflowExecutionCommandAttributes)
     },
 )
@@ -183,7 +183,7 @@ RequestCancelExternalWorkflowExecutionCommandAttributes = (
         (_message.Message,),
         {
             "DESCRIPTOR": _REQUESTCANCELEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES,
-            "__module__": "temporal.api.command.v1.message_pb2",
+            "__module__": "temporalio.api.command.v1.message_pb2",
             # @@protoc_insertion_point(class_scope:temporal.api.command.v1.RequestCancelExternalWorkflowExecutionCommandAttributes)
         },
     )
@@ -196,7 +196,7 @@ SignalExternalWorkflowExecutionCommandAttributes = (
         (_message.Message,),
         {
             "DESCRIPTOR": _SIGNALEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES,
-            "__module__": "temporal.api.command.v1.message_pb2",
+            "__module__": "temporalio.api.command.v1.message_pb2",
             # @@protoc_insertion_point(class_scope:temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes)
         },
     )
@@ -209,7 +209,7 @@ UpsertWorkflowSearchAttributesCommandAttributes = (
         (_message.Message,),
         {
             "DESCRIPTOR": _UPSERTWORKFLOWSEARCHATTRIBUTESCOMMANDATTRIBUTES,
-            "__module__": "temporal.api.command.v1.message_pb2",
+            "__module__": "temporalio.api.command.v1.message_pb2",
             # @@protoc_insertion_point(class_scope:temporal.api.command.v1.UpsertWorkflowSearchAttributesCommandAttributes)
         },
     )
@@ -221,7 +221,7 @@ ModifyWorkflowPropertiesCommandAttributes = _reflection.GeneratedProtocolMessage
     (_message.Message,),
     {
         "DESCRIPTOR": _MODIFYWORKFLOWPROPERTIESCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.ModifyWorkflowPropertiesCommandAttributes)
     },
 )
@@ -236,12 +236,12 @@ RecordMarkerCommandAttributes = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _RECORDMARKERCOMMANDATTRIBUTES_DETAILSENTRY,
-                "__module__": "temporal.api.command.v1.message_pb2",
+                "__module__": "temporalio.api.command.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.command.v1.RecordMarkerCommandAttributes.DetailsEntry)
             },
         ),
         "DESCRIPTOR": _RECORDMARKERCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.RecordMarkerCommandAttributes)
     },
 )
@@ -254,7 +254,7 @@ ContinueAsNewWorkflowExecutionCommandAttributes = (
         (_message.Message,),
         {
             "DESCRIPTOR": _CONTINUEASNEWWORKFLOWEXECUTIONCOMMANDATTRIBUTES,
-            "__module__": "temporal.api.command.v1.message_pb2",
+            "__module__": "temporalio.api.command.v1.message_pb2",
             # @@protoc_insertion_point(class_scope:temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributes)
         },
     )
@@ -266,7 +266,7 @@ StartChildWorkflowExecutionCommandAttributes = _reflection.GeneratedProtocolMess
     (_message.Message,),
     {
         "DESCRIPTOR": _STARTCHILDWORKFLOWEXECUTIONCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributes)
     },
 )
@@ -277,7 +277,7 @@ ProtocolMessageCommandAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PROTOCOLMESSAGECOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.ProtocolMessageCommandAttributes)
     },
 )
@@ -292,12 +292,12 @@ ScheduleNexusOperationCommandAttributes = _reflection.GeneratedProtocolMessageTy
             (_message.Message,),
             {
                 "DESCRIPTOR": _SCHEDULENEXUSOPERATIONCOMMANDATTRIBUTES_NEXUSHEADERENTRY,
-                "__module__": "temporal.api.command.v1.message_pb2",
+                "__module__": "temporalio.api.command.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.command.v1.ScheduleNexusOperationCommandAttributes.NexusHeaderEntry)
             },
         ),
         "DESCRIPTOR": _SCHEDULENEXUSOPERATIONCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.ScheduleNexusOperationCommandAttributes)
     },
 )
@@ -309,7 +309,7 @@ RequestCancelNexusOperationCommandAttributes = _reflection.GeneratedProtocolMess
     (_message.Message,),
     {
         "DESCRIPTOR": _REQUESTCANCELNEXUSOPERATIONCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.RequestCancelNexusOperationCommandAttributes)
     },
 )
@@ -320,7 +320,7 @@ Command = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _COMMAND,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.Command)
     },
 )

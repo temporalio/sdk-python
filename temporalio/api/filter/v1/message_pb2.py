@@ -34,7 +34,7 @@ WorkflowExecutionFilter = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONFILTER,
-        "__module__": "temporal.api.filter.v1.message_pb2",
+        "__module__": "temporalio.api.filter.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.filter.v1.WorkflowExecutionFilter)
     },
 )
@@ -45,7 +45,7 @@ WorkflowTypeFilter = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWTYPEFILTER,
-        "__module__": "temporal.api.filter.v1.message_pb2",
+        "__module__": "temporalio.api.filter.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.filter.v1.WorkflowTypeFilter)
     },
 )
@@ -56,7 +56,7 @@ StartTimeFilter = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STARTTIMEFILTER,
-        "__module__": "temporal.api.filter.v1.message_pb2",
+        "__module__": "temporalio.api.filter.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.filter.v1.StartTimeFilter)
     },
 )
@@ -67,7 +67,7 @@ StatusFilter = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STATUSFILTER,
-        "__module__": "temporal.api.filter.v1.message_pb2",
+        "__module__": "temporalio.api.filter.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.filter.v1.StatusFilter)
     },
 )

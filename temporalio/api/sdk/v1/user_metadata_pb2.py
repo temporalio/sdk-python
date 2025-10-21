@@ -29,7 +29,7 @@ UserMetadata = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _USERMETADATA,
-        "__module__": "temporal.api.sdk.v1.user_metadata_pb2",
+        "__module__": "temporalio.api.sdk.v1.user_metadata_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.UserMetadata)
     },
 )

@@ -39,12 +39,12 @@ WorkflowRuleAction = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _WORKFLOWRULEACTION_ACTIONACTIVITYPAUSE,
-                "__module__": "temporal.api.rules.v1.message_pb2",
+                "__module__": "temporalio.api.rules.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.rules.v1.WorkflowRuleAction.ActionActivityPause)
             },
         ),
         "DESCRIPTOR": _WORKFLOWRULEACTION,
-        "__module__": "temporal.api.rules.v1.message_pb2",
+        "__module__": "temporalio.api.rules.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.rules.v1.WorkflowRuleAction)
     },
 )
@@ -60,12 +60,12 @@ WorkflowRuleSpec = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _WORKFLOWRULESPEC_ACTIVITYSTARTINGTRIGGER,
-                "__module__": "temporal.api.rules.v1.message_pb2",
+                "__module__": "temporalio.api.rules.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.rules.v1.WorkflowRuleSpec.ActivityStartingTrigger)
             },
         ),
         "DESCRIPTOR": _WORKFLOWRULESPEC,
-        "__module__": "temporal.api.rules.v1.message_pb2",
+        "__module__": "temporalio.api.rules.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.rules.v1.WorkflowRuleSpec)
     },
 )
@@ -77,7 +77,7 @@ WorkflowRule = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWRULE,
-        "__module__": "temporal.api.rules.v1.message_pb2",
+        "__module__": "temporalio.api.rules.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.rules.v1.WorkflowRule)
     },
 )

@@ -34,7 +34,7 @@ ActivityOptions = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ACTIVITYOPTIONS,
-        "__module__": "temporal.api.activity.v1.message_pb2",
+        "__module__": "temporalio.api.activity.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.activity.v1.ActivityOptions)
     },
 )

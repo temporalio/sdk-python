@@ -110,12 +110,12 @@ AddSearchAttributesRequest = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _ADDSEARCHATTRIBUTESREQUEST_SEARCHATTRIBUTESENTRY,
-                "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+                "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.AddSearchAttributesRequest.SearchAttributesEntry)
             },
         ),
         "DESCRIPTOR": _ADDSEARCHATTRIBUTESREQUEST,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.AddSearchAttributesRequest)
     },
 )
@@ -127,7 +127,7 @@ AddSearchAttributesResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ADDSEARCHATTRIBUTESRESPONSE,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.AddSearchAttributesResponse)
     },
 )
@@ -138,7 +138,7 @@ RemoveSearchAttributesRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _REMOVESEARCHATTRIBUTESREQUEST,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.RemoveSearchAttributesRequest)
     },
 )
@@ -149,7 +149,7 @@ RemoveSearchAttributesResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _REMOVESEARCHATTRIBUTESRESPONSE,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.RemoveSearchAttributesResponse)
     },
 )
@@ -160,7 +160,7 @@ ListSearchAttributesRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTSEARCHATTRIBUTESREQUEST,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.ListSearchAttributesRequest)
     },
 )
@@ -175,7 +175,7 @@ ListSearchAttributesResponse = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _LISTSEARCHATTRIBUTESRESPONSE_CUSTOMATTRIBUTESENTRY,
-                "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+                "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.ListSearchAttributesResponse.CustomAttributesEntry)
             },
         ),
@@ -184,7 +184,7 @@ ListSearchAttributesResponse = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _LISTSEARCHATTRIBUTESRESPONSE_SYSTEMATTRIBUTESENTRY,
-                "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+                "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.ListSearchAttributesResponse.SystemAttributesEntry)
             },
         ),
@@ -193,12 +193,12 @@ ListSearchAttributesResponse = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _LISTSEARCHATTRIBUTESRESPONSE_STORAGESCHEMAENTRY,
-                "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+                "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.ListSearchAttributesResponse.StorageSchemaEntry)
             },
         ),
         "DESCRIPTOR": _LISTSEARCHATTRIBUTESRESPONSE,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.ListSearchAttributesResponse)
     },
 )
@@ -212,7 +212,7 @@ DeleteNamespaceRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DELETENAMESPACEREQUEST,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.DeleteNamespaceRequest)
     },
 )
@@ -223,7 +223,7 @@ DeleteNamespaceResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DELETENAMESPACERESPONSE,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.DeleteNamespaceResponse)
     },
 )
@@ -234,7 +234,7 @@ AddOrUpdateRemoteClusterRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ADDORUPDATEREMOTECLUSTERREQUEST,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.AddOrUpdateRemoteClusterRequest)
     },
 )
@@ -245,7 +245,7 @@ AddOrUpdateRemoteClusterResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ADDORUPDATEREMOTECLUSTERRESPONSE,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.AddOrUpdateRemoteClusterResponse)
     },
 )
@@ -256,7 +256,7 @@ RemoveRemoteClusterRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _REMOVEREMOTECLUSTERREQUEST,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.RemoveRemoteClusterRequest)
     },
 )
@@ -267,7 +267,7 @@ RemoveRemoteClusterResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _REMOVEREMOTECLUSTERRESPONSE,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.RemoveRemoteClusterResponse)
     },
 )
@@ -278,7 +278,7 @@ ListClustersRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTCLUSTERSREQUEST,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.ListClustersRequest)
     },
 )
@@ -289,7 +289,7 @@ ListClustersResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTCLUSTERSRESPONSE,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.ListClustersResponse)
     },
 )
@@ -300,7 +300,7 @@ ClusterMetadata = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CLUSTERMETADATA,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.ClusterMetadata)
     },
 )
@@ -311,7 +311,7 @@ GetNexusEndpointRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETNEXUSENDPOINTREQUEST,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.GetNexusEndpointRequest)
     },
 )
@@ -322,7 +322,7 @@ GetNexusEndpointResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GETNEXUSENDPOINTRESPONSE,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.GetNexusEndpointResponse)
     },
 )
@@ -333,7 +333,7 @@ CreateNexusEndpointRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CREATENEXUSENDPOINTREQUEST,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.CreateNexusEndpointRequest)
     },
 )
@@ -344,7 +344,7 @@ CreateNexusEndpointResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CREATENEXUSENDPOINTRESPONSE,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.CreateNexusEndpointResponse)
     },
 )
@@ -355,7 +355,7 @@ UpdateNexusEndpointRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATENEXUSENDPOINTREQUEST,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.UpdateNexusEndpointRequest)
     },
 )
@@ -366,7 +366,7 @@ UpdateNexusEndpointResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UPDATENEXUSENDPOINTRESPONSE,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.UpdateNexusEndpointResponse)
     },
 )
@@ -377,7 +377,7 @@ DeleteNexusEndpointRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DELETENEXUSENDPOINTREQUEST,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.DeleteNexusEndpointRequest)
     },
 )
@@ -388,7 +388,7 @@ DeleteNexusEndpointResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DELETENEXUSENDPOINTRESPONSE,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.DeleteNexusEndpointResponse)
     },
 )
@@ -399,7 +399,7 @@ ListNexusEndpointsRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTNEXUSENDPOINTSREQUEST,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.ListNexusEndpointsRequest)
     },
 )
@@ -410,7 +410,7 @@ ListNexusEndpointsResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LISTNEXUSENDPOINTSRESPONSE,
-        "__module__": "temporal.api.operatorservice.v1.request_response_pb2",
+        "__module__": "temporalio.api.operatorservice.v1.request_response_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.operatorservice.v1.ListNexusEndpointsResponse)
     },
 )

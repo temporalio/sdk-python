@@ -33,7 +33,7 @@ ReleaseInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RELEASEINFO,
-        "__module__": "temporal.api.version.v1.message_pb2",
+        "__module__": "temporalio.api.version.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.version.v1.ReleaseInfo)
     },
 )
@@ -44,7 +44,7 @@ Alert = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ALERT,
-        "__module__": "temporal.api.version.v1.message_pb2",
+        "__module__": "temporalio.api.version.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.version.v1.Alert)
     },
 )
@@ -55,7 +55,7 @@ VersionInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _VERSIONINFO,
-        "__module__": "temporal.api.version.v1.message_pb2",
+        "__module__": "temporalio.api.version.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.version.v1.VersionInfo)
     },
 )
