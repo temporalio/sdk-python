@@ -81,7 +81,6 @@ async def test_tracing(client: Client):
     # Initial planner spans - There are only 3 because we don't make an actual model call
     paired_span(processor.span_events[0], processor.span_events[5])
     assert processor.span_events[0][0].span_data.export().get("name") == "PlannerAgent"
-    print("Planner span:", processor.span_events[0][0].span_id)
 
     # startActivity happens before executeActivity
     paired_span(processor.span_events[1], processor.span_events[2])
@@ -89,14 +88,12 @@ async def test_tracing(client: Client):
         processor.span_events[1][0].span_data.export().get("name")
         == "temporal:startActivity"
     )
-    print("StartActivity span:", processor.span_events[1][0].span_id)
 
     paired_span(processor.span_events[3], processor.span_events[4])
     assert (
         processor.span_events[3][0].span_data.export().get("name")
         == "temporal:executeActivity"
     )
-    print("Execute Span parent:", processor.span_events[3][0].parent_id)
 
     for span, start in processor.span_events[6:-6]:
         span_data = span.span_data.export()
