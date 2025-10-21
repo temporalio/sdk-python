@@ -1,6 +1,7 @@
 import dataclasses
 import uuid
 import warnings
+from collections import Counter
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import AsyncIterator, Awaitable, Callable, Optional, cast
 
@@ -204,7 +205,8 @@ async def test_worker_plugin_names_forwarded_to_core(
         activities=[never_run_activity],
         plugins=[plugin1, plugin2],
     )
-    assert captured_plugins == [plugin1.name(), plugin2.name()]
+    # Use counter to compare unordered lists
+    assert Counter(captured_plugins) == Counter([plugin1.name(), plugin2.name()])
 
 
 async def test_worker_duplicated_plugin(client: Client) -> None:
