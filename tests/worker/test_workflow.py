@@ -5211,7 +5211,7 @@ class TickingWorkflow:
 
 
 async def test_workflow_replace_worker_client(client: Client):
-    other_runtime = Runtime()
+    other_runtime = Runtime(telemetry=TelemetryConfig())
     other_client = await Client.connect(
         client.service_client.config.target_host,
         namespace=client.namespace,

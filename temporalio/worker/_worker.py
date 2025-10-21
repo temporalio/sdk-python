@@ -561,6 +561,10 @@ class Worker:
                 maximum=config["max_concurrent_activity_task_polls"]
             )
 
+        worker_plugins = [plugin.name() for plugin in config.get("plugins", [])]
+        client_plugins = [plugin.name() for plugin in config["client"].plugins]
+        plugins = list(set(worker_plugins + client_plugins))
+
         # Create bridge worker last. We have empirically observed that if it is
         # created before an error is raised from the activity worker
         # constructor, a deadlock/hang will occur presumably while trying to
@@ -615,7 +619,7 @@ class Worker:
                 nexus_task_poller_behavior=config[
                     "nexus_task_poller_behavior"
                 ]._to_bridge(),
-                plugins=[plugin.name() for plugin in config.get("plugins", [])],
+                plugins=plugins,
                 skip_client_worker_set_check=config["skip_client_worker_set_check"],
             ),
         )
