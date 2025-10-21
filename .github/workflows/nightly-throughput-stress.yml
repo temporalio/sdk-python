@@ -153,6 +153,7 @@ jobs:
         if: env.SCENARIO_EXIT_CODE != '0'
         uses: slackapi/slack-github-action@v2
         with:
+          webhook-type: incoming-webhook
           payload: |
             {
               "text": "Nightly Python throughput stress test failed",
