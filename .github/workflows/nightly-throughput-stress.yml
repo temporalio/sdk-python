@@ -139,12 +139,10 @@ jobs:
             --option min-throughput-per-hour=1000 \
             2>&1 | tee $WORKER_LOG_DIR/scenario.log
 
-          SCENARIO_EXIT_CODE=${PIPESTATUS[0]}
-          echo "SCENARIO_EXIT_CODE=$SCENARIO_EXIT_CODE" >> $GITHUB_ENV
-          exit $SCENARIO_EXIT_CODE
+            echo "SCENARIO_EXIT_CODE=${PIPESTATUS[0]}" >> $GITHUB_ENV
 
       - name: Upload logs on failure
-        if: failure()
+        if: env.SCENARIO_EXIT_CODE != '0'
         uses: actions/upload-artifact@v4
         with:
           name: throughput-stress-logs
@@ -152,7 +150,7 @@ jobs:
           retention-days: 30
 
       - name: Notify Slack on failure
-        if: failure()
+        if: env.SCENARIO_EXIT_CODE != '0'
         uses: slackapi/slack-github-action@v2
         with:
           payload: |
