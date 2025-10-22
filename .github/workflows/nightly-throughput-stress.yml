@@ -15,7 +15,7 @@ on:
         default: '6h'
         type: string
       timeout:
-        description: 'Scenario timeout (should always be 30m more than duration)'
+        description: 'Scenario timeout (should always be greater than duration)'
         required: false
         default: '6h30m'
         type: string
