@@ -172,29 +172,37 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         kind: opentelemetry.trace.SpanKind,
         context: Optional[Context] = None,
     ) -> Iterator[None]:
-        with self.tracer.start_as_current_span(
-            name,
-            attributes=attributes,
-            kind=kind,
-            context=context,
-            set_status_on_exception=False,
-        ) as span:
-            if input:
-                input.headers = self._context_to_headers(input.headers)
-            try:
-                yield None
-            except Exception as exc:
-                if (
-                    not isinstance(exc, ApplicationError)
-                    or exc.category != ApplicationErrorCategory.BENIGN
-                ):
-                    span.set_status(
-                        Status(
-                            status_code=StatusCode.ERROR,
-                            description=f"{type(exc).__name__}: {exc}",
+        if context:
+            token = opentelemetry.context.attach(context)
+        else:
+            token = None
+        try:
+            with self.tracer.start_as_current_span(
+                name,
+                attributes=attributes,
+                kind=kind,
+                context=context,
+                set_status_on_exception=False,
+            ) as span:
+                if input:
+                    input.headers = self._context_to_headers(input.headers)
+                try:
+                    yield None
+                except Exception as exc:
+                    if (
+                        not isinstance(exc, ApplicationError)
+                        or exc.category != ApplicationErrorCategory.BENIGN
+                    ):
+                        span.set_status(
+                            Status(
+                                status_code=StatusCode.ERROR,
+                                description=f"{type(exc).__name__}: {exc}",
+                            )
                         )
-                    )
-                raise
+                    raise
+        finally:
+            if token:
+                opentelemetry.context.detach(token)
 
     def _completed_workflow_span(
         self, params: _CompletedWorkflowSpanParams
@@ -305,34 +313,17 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
         self, input: temporalio.worker.ExecuteActivityInput
     ) -> Any:
         info = temporalio.activity.info()
-        extracted_ctx = self.root._context_from_headers(input.headers)
-
-        if extracted_ctx:
-            token = opentelemetry.context.attach(extracted_ctx)
-            try:
-                with self.root._start_as_current_span(
-                    f"RunActivity:{info.activity_type}",
-                    attributes={
-                        "temporalWorkflowID": info.workflow_id,
-                        "temporalRunID": info.workflow_run_id,
-                        "temporalActivityID": info.activity_id,
-                    },
-                    kind=opentelemetry.trace.SpanKind.SERVER,
-                ):
-                    return await super().execute_activity(input)
-            finally:
-                opentelemetry.context.detach(token)
-        else:
-            with self.root._start_as_current_span(
-                f"RunActivity:{info.activity_type}",
-                attributes={
-                    "temporalWorkflowID": info.workflow_id,
-                    "temporalRunID": info.workflow_run_id,
-                    "temporalActivityID": info.activity_id,
-                },
-                kind=opentelemetry.trace.SpanKind.SERVER,
-            ):
-                return await super().execute_activity(input)
+        with self.root._start_as_current_span(
+            f"RunActivity:{info.activity_type}",
+            context=self.root._context_from_headers(input.headers),
+            attributes={
+                "temporalWorkflowID": info.workflow_id,
+                "temporalRunID": info.workflow_run_id,
+                "temporalActivityID": info.activity_id,
+            },
+            kind=opentelemetry.trace.SpanKind.SERVER,
+        ):
+            return await super().execute_activity(input)
 
 
 class _InputWithHeaders(Protocol):
