@@ -411,6 +411,29 @@ class BenignWorkflow:
         )
 
 
+@activity.defn
+async def read_baggage_activity() -> dict:
+    """Activity that reads baggage from context."""
+    from opentelemetry import baggage
+
+    return {
+        "user_id": baggage.get_baggage("user.id"),
+        "tenant_id": baggage.get_baggage("tenant.id"),
+    }
+
+
+@workflow.defn
+class BaggageTestWorkflow:
+    """Workflow that executes activity and returns baggage values."""
+
+    @workflow.run
+    async def run(self) -> dict:
+        return await workflow.execute_activity(
+            read_baggage_activity,
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+
+
 async def test_opentelemetry_benign_exception(client: Client):
     # Create a tracer that has an in-memory exporter
     exporter = InMemorySpanExporter()
@@ -440,6 +463,52 @@ async def test_opentelemetry_benign_exception(client: Client):
         )
     spans = exporter.get_finished_spans()
     assert all(span.status.status_code == StatusCode.UNSET for span in spans)
+
+
+async def test_opentelemetry_baggage_propagation_basic(
+    client: Client, env: WorkflowEnvironment
+):
+    """Test that baggage values propagate from workflow to activity.
+
+    This test currently FAILS, demonstrating the bug.
+    """
+    from opentelemetry import baggage, context
+
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+
+    client_config = client.config()
+    client_config["interceptors"] = [TracingInterceptor(tracer)]
+    client = Client(**client_config)
+
+    task_queue = f"task_queue_{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[BaggageTestWorkflow],
+        activities=[read_baggage_activity],
+    ):
+        ctx = baggage.set_baggage("user.id", "test-user-123")
+        ctx = baggage.set_baggage("tenant.id", "acme-corp", context=ctx)
+
+        token = context.attach(ctx)
+        try:
+            result = await client.execute_workflow(
+                BaggageTestWorkflow.run,
+                id=f"workflow_{uuid.uuid4()}",
+                task_queue=task_queue,
+            )
+        finally:
+            context.detach(token)
+
+        assert (
+            result["user_id"] == "test-user-123"
+        ), "user.id baggage should propagate to activity"
+        assert (
+            result["tenant_id"] == "acme-corp"
+        ), "tenant.id baggage should propagate to activity"
 
 
 # TODO(cretz): Additional tests to write
