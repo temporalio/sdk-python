@@ -17,16 +17,6 @@ from typing import (
     cast,
 )
 
-import temporalio.activity
-import temporalio.api.common.v1
-import temporalio.client
-import temporalio.converter
-import temporalio.exceptions
-import temporalio.worker
-import temporalio.workflow
-from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
-from typing_extensions import Protocol, TypeAlias, TypedDict
-
 import opentelemetry.baggage.propagation
 import opentelemetry.context
 import opentelemetry.context.context
@@ -37,6 +27,16 @@ import opentelemetry.trace.propagation.tracecontext
 import opentelemetry.util.types
 from opentelemetry.context import Context
 from opentelemetry.trace import Status, StatusCode
+from typing_extensions import Protocol, TypeAlias, TypedDict
+
+import temporalio.activity
+import temporalio.api.common.v1
+import temporalio.client
+import temporalio.converter
+import temporalio.exceptions
+import temporalio.worker
+import temporalio.workflow
+from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 
 # OpenTelemetry dynamically, lazily chooses its context implementation at
 # runtime. When first accessed, they use pkg_resources.iter_entry_points + load.

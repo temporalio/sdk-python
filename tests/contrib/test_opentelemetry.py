@@ -7,13 +7,14 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Callable, Dict, Generator, Iterable, List, Optional
+from typing import Callable, Dict, Generator, Iterable, List, Optional, cast
 
 from opentelemetry import baggage, context
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode, get_tracer
+
 from temporalio import activity, workflow
 from temporalio.client import Client
 from temporalio.common import RetryPolicy
@@ -464,18 +465,22 @@ def client_with_tracing(client: Client) -> Client:
     return Client(**client_config)
 
 
+def get_baggage_value(key: str) -> str:
+    return cast("str", baggage.get_baggage(key))
+
+
 @activity.defn
-async def read_baggage_activity() -> Dict[str, str | None]:
+async def read_baggage_activity() -> Dict[str, str]:
     return {
-        "user_id": baggage.get_baggage("user.id"),
-        "tenant_id": baggage.get_baggage("tenant.id"),
+        "user_id": get_baggage_value("user.id"),
+        "tenant_id": get_baggage_value("tenant.id"),
     }
 
 
 @workflow.defn
 class ReadBaggageTestWorkflow:
     @workflow.run
-    async def run(self) -> Dict[str, str | None]:
+    async def run(self) -> Dict[str, str]:
         return await workflow.execute_activity(
             read_baggage_activity,
             start_to_close_timeout=timedelta(seconds=10),
@@ -508,17 +513,20 @@ async def test_opentelemetry_baggage_propagation_basic(
 
 
 @activity.defn
-async def read_baggage_local_activity() -> Dict[str, str | None]:
-    return {
-        "user_id": baggage.get_baggage("user.id"),
-        "tenant_id": baggage.get_baggage("tenant.id"),
-    }
+async def read_baggage_local_activity() -> Dict[str, str]:
+    return cast(
+        Dict[str, str],
+        {
+            "user_id": get_baggage_value("user.id"),
+            "tenant_id": get_baggage_value("tenant.id"),
+        },
+    )
 
 
 @workflow.defn
 class LocalActivityBaggageTestWorkflow:
     @workflow.run
-    async def run(self) -> Dict[str, str | None]:
+    async def run(self) -> Dict[str, str]:
         return await workflow.execute_local_activity(
             read_baggage_local_activity,
             start_to_close_timeout=timedelta(seconds=10),
@@ -551,12 +559,12 @@ async def test_opentelemetry_baggage_propagation_local_activity(
         assert result["tenant_id"] == "local-corp"
 
 
-retry_attempt_baggage_values: List[Optional[str]] = []
+retry_attempt_baggage_values: List[str] = []
 
 
 @activity.defn
 async def failing_baggage_activity() -> None:
-    retry_attempt_baggage_values.append(baggage.get_baggage("user.id"))
+    retry_attempt_baggage_values.append(get_baggage_value("user.id"))
     if activity.info().attempt < 2:
         raise RuntimeError("Intentional failure")
 
