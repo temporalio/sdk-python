@@ -118,6 +118,7 @@ from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 with workflow.unsafe.imports_passed_through():
     import pytest
 
+
 class StaticTestModel(TestModel):
     __test__ = False
     responses: list[ModelResponse] = []

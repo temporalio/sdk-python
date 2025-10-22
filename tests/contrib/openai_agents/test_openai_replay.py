@@ -19,6 +19,7 @@ from tests.contrib.openai_agents.test_openai import (
 with workflow.unsafe.imports_passed_through():
     import pytest
 
+
 @pytest.mark.parametrize(
     "file_name",
     [
