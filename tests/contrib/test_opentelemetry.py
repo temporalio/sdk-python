@@ -482,6 +482,44 @@ class RetryBaggageTestWorkflow:
         )
 
 
+@activity.defn
+async def exception_baggage_activity() -> None:
+    user_id = baggage.get_baggage("user.id")
+    if user_id != "test-user-123":
+        raise AssertionError(f"Expected user.id='test-user-123', got '{user_id}'")
+    raise RuntimeError("Intentional activity failure")
+
+
+@workflow.defn
+class BaggageExceptionWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        try:
+            await workflow.execute_activity(
+                exception_baggage_activity,
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        except Exception as e:
+            return f"exception_handled: {e.failure.cause.application_failure_info.type}"
+        return "no_exception"
+
+
+@activity.defn
+async def simple_no_context_activity() -> str:
+    return "success"
+
+
+@workflow.defn
+class SimpleNoContextWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return await workflow.execute_activity(
+            simple_no_context_activity,
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+
+
 async def test_opentelemetry_benign_exception(client: Client):
     # Create a tracer that has an in-memory exporter
     exporter = InMemorySpanExporter()
@@ -668,6 +706,63 @@ async def test_opentelemetry_baggage_propagation_with_retries(
         # Verify baggage was present on all attempts
         assert len(retry_attempt_baggage_values) == 2
         assert all(v == "test-user-retry" for v in retry_attempt_baggage_values)
+
+
+async def test_opentelemetry_baggage_exception_handling(
+    client: Client, env: WorkflowEnvironment
+):
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+
+    client_config = client.config()
+    client_config["interceptors"] = [TracingInterceptor(tracer)]
+    client = Client(**client_config)
+
+    task_queue = f"task_queue_{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[BaggageExceptionWorkflow],
+        activities=[exception_baggage_activity],
+    ):
+        with baggage_values({"user.id": "test-user-123"}):
+            result = await client.execute_workflow(
+                BaggageExceptionWorkflow.run,
+                id=f"workflow_{uuid.uuid4()}",
+                task_queue=task_queue,
+            )
+
+        assert result == "exception_handled: RuntimeError"
+
+
+async def test_opentelemetry_interceptor_works_if_no_context(
+    client: Client, env: WorkflowEnvironment
+):
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+
+    client_config = client.config()
+    client_config["interceptors"] = [TracingInterceptor(tracer)]
+    client = Client(**client_config)
+
+    task_queue = f"task_queue_{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[SimpleNoContextWorkflow],
+        activities=[simple_no_context_activity],
+    ):
+        result = await client.execute_workflow(
+            SimpleNoContextWorkflow.run,
+            id=f"workflow_{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+
+        assert result == "success"
 
 
 # TODO(cretz): Additional tests to write
