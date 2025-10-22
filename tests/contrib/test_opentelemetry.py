@@ -8,11 +8,11 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Iterable, List, Optional
 
+from opentelemetry import baggage, context
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode, get_tracer
-
 from temporalio import activity, workflow
 from temporalio.client import Client
 from temporalio.common import RetryPolicy
@@ -413,9 +413,6 @@ class BenignWorkflow:
 
 @activity.defn
 async def read_baggage_activity() -> dict:
-    """Activity that reads baggage from context."""
-    from opentelemetry import baggage
-
     return {
         "user_id": baggage.get_baggage("user.id"),
         "tenant_id": baggage.get_baggage("tenant.id"),
@@ -423,9 +420,7 @@ async def read_baggage_activity() -> dict:
 
 
 @workflow.defn
-class BaggageTestWorkflow:
-    """Workflow that executes activity and returns baggage values."""
-
+class ReadBaggageTestWorkflow:
     @workflow.run
     async def run(self) -> dict:
         return await workflow.execute_activity(
@@ -468,12 +463,6 @@ async def test_opentelemetry_benign_exception(client: Client):
 async def test_opentelemetry_baggage_propagation_basic(
     client: Client, env: WorkflowEnvironment
 ):
-    """Test that baggage values propagate from workflow to activity.
-
-    This test currently FAILS, demonstrating the bug.
-    """
-    from opentelemetry import baggage, context
-
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
@@ -487,7 +476,7 @@ async def test_opentelemetry_baggage_propagation_basic(
     async with Worker(
         client,
         task_queue=task_queue,
-        workflows=[BaggageTestWorkflow],
+        workflows=[ReadBaggageTestWorkflow],
         activities=[read_baggage_activity],
     ):
         ctx = baggage.set_baggage("user.id", "test-user-123")
@@ -496,7 +485,7 @@ async def test_opentelemetry_baggage_propagation_basic(
         token = context.attach(ctx)
         try:
             result = await client.execute_workflow(
-                BaggageTestWorkflow.run,
+                ReadBaggageTestWorkflow.run,
                 id=f"workflow_{uuid.uuid4()}",
                 task_queue=task_queue,
             )

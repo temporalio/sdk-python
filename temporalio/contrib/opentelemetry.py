@@ -17,6 +17,16 @@ from typing import (
     cast,
 )
 
+import temporalio.activity
+import temporalio.api.common.v1
+import temporalio.client
+import temporalio.converter
+import temporalio.exceptions
+import temporalio.worker
+import temporalio.workflow
+from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
+from typing_extensions import Protocol, TypeAlias, TypedDict
+
 import opentelemetry.baggage.propagation
 import opentelemetry.context
 import opentelemetry.context.context
@@ -26,18 +36,7 @@ import opentelemetry.trace
 import opentelemetry.trace.propagation.tracecontext
 import opentelemetry.util.types
 from opentelemetry.context import Context
-from opentelemetry.trace import Span, SpanKind, Status, StatusCode, _Links
-from opentelemetry.util import types
-from typing_extensions import Protocol, TypeAlias, TypedDict
-
-import temporalio.activity
-import temporalio.api.common.v1
-import temporalio.client
-import temporalio.converter
-import temporalio.exceptions
-import temporalio.worker
-import temporalio.workflow
-from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
+from opentelemetry.trace import Status, StatusCode
 
 # OpenTelemetry dynamically, lazily chooses its context implementation at
 # runtime. When first accessed, they use pkg_resources.iter_entry_points + load.
@@ -306,17 +305,34 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
         self, input: temporalio.worker.ExecuteActivityInput
     ) -> Any:
         info = temporalio.activity.info()
-        with self.root._start_as_current_span(
-            f"RunActivity:{info.activity_type}",
-            context=self.root._context_from_headers(input.headers),
-            attributes={
-                "temporalWorkflowID": info.workflow_id,
-                "temporalRunID": info.workflow_run_id,
-                "temporalActivityID": info.activity_id,
-            },
-            kind=opentelemetry.trace.SpanKind.SERVER,
-        ):
-            return await super().execute_activity(input)
+        extracted_ctx = self.root._context_from_headers(input.headers)
+
+        if extracted_ctx:
+            token = opentelemetry.context.attach(extracted_ctx)
+            try:
+                with self.root._start_as_current_span(
+                    f"RunActivity:{info.activity_type}",
+                    attributes={
+                        "temporalWorkflowID": info.workflow_id,
+                        "temporalRunID": info.workflow_run_id,
+                        "temporalActivityID": info.activity_id,
+                    },
+                    kind=opentelemetry.trace.SpanKind.SERVER,
+                ):
+                    return await super().execute_activity(input)
+            finally:
+                opentelemetry.context.detach(token)
+        else:
+            with self.root._start_as_current_span(
+                f"RunActivity:{info.activity_type}",
+                attributes={
+                    "temporalWorkflowID": info.workflow_id,
+                    "temporalRunID": info.workflow_run_id,
+                    "temporalActivityID": info.activity_id,
+                },
+                kind=opentelemetry.trace.SpanKind.SERVER,
+            ):
+                return await super().execute_activity(input)
 
 
 class _InputWithHeaders(Protocol):
