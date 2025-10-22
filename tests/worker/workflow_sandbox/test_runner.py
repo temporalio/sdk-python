@@ -13,8 +13,6 @@ from datetime import date, datetime, timedelta
 from enum import IntEnum
 from typing import Callable, Dict, List, Optional, Sequence, Set, Type
 
-import pytest
-
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
 from temporalio.exceptions import ApplicationError
@@ -28,6 +26,11 @@ from temporalio.worker.workflow_sandbox import (
 from tests.helpers import assert_eq_eventually
 from tests.worker.workflow_sandbox.testmodules import stateful_module
 from tests.worker.workflow_sandbox.testmodules.proto import SomeMessage
+
+# Passing through because Python <=3.12 has an import bug at
+# https://github.com/python/cpython/issues/91351
+with workflow.unsafe.imports_passed_through():
+    import pytest
 
 global_state = ["global orig"]
 # We just access os.name in here to show we _can_. It's access-restricted at
