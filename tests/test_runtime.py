@@ -265,13 +265,13 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
 
 def test_runtime_options_to_bridge_config() -> None:
     runtime = Runtime(telemetry=TelemetryConfig())
-    assert runtime._heartbeat_millis == 30_000
+    assert runtime._heartbeat_millis == 60_000
 
     runtime = Runtime(
         telemetry=TelemetryConfig(),
-        worker_heartbeat_interval=timedelta(seconds=60),
+        worker_heartbeat_interval=timedelta(seconds=10),
     )
-    assert runtime._heartbeat_millis == 60_000
+    assert runtime._heartbeat_millis == 10_000
 
     runtime = Runtime(
         telemetry=TelemetryConfig(),

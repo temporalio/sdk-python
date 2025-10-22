@@ -74,7 +74,7 @@ class Runtime:
         self,
         *,
         telemetry: TelemetryConfig,
-        worker_heartbeat_interval: Optional[timedelta] = timedelta(seconds=30),
+        worker_heartbeat_interval: Optional[timedelta] = timedelta(seconds=60),
     ) -> None:
         """Create a runtime with the provided configuration.
 
