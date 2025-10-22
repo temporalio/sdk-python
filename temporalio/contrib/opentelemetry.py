@@ -172,10 +172,7 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         kind: opentelemetry.trace.SpanKind,
         context: Optional[Context] = None,
     ) -> Iterator[None]:
-        if context:
-            token = opentelemetry.context.attach(context)
-        else:
-            token = None
+        token = opentelemetry.context.attach(context) if context else None
         try:
             with self.tracer.start_as_current_span(
                 name,

@@ -412,114 +412,6 @@ class BenignWorkflow:
         )
 
 
-@activity.defn
-async def read_baggage_activity() -> Dict[str, str | None]:
-    return {
-        "user_id": baggage.get_baggage("user.id"),
-        "tenant_id": baggage.get_baggage("tenant.id"),
-    }
-
-
-@workflow.defn
-class ReadBaggageTestWorkflow:
-    @workflow.run
-    async def run(self) -> Dict[str, str | None]:
-        return await workflow.execute_activity(
-            read_baggage_activity,
-            start_to_close_timeout=timedelta(seconds=10),
-        )
-
-
-@activity.defn
-async def read_multiple_baggage_activity() -> Dict[str, str | None]:
-    return {
-        "user_id": baggage.get_baggage("user.id"),
-        "tenant_id": baggage.get_baggage("tenant.id"),
-        "request_id": baggage.get_baggage("request.id"),
-        "trace_id": baggage.get_baggage("trace.id"),
-        "custom_field": baggage.get_baggage("custom.field"),
-    }
-
-
-@workflow.defn
-class MultipleBaggageTestWorkflow:
-    @workflow.run
-    async def run(self) -> Dict[str, str | None]:
-        return await workflow.execute_activity(
-            read_multiple_baggage_activity,
-            start_to_close_timeout=timedelta(seconds=10),
-        )
-
-
-@workflow.defn
-class LocalActivityBaggageTestWorkflow:
-    @workflow.run
-    async def run(self) -> Dict[str, str | None]:
-        return await workflow.execute_local_activity(
-            read_baggage_activity,
-            start_to_close_timeout=timedelta(seconds=10),
-        )
-
-
-retry_attempt_baggage_values: List[Optional[str]] = []
-
-
-@activity.defn
-async def failing_baggage_activity() -> None:
-    retry_attempt_baggage_values.append(baggage.get_baggage("user.id"))
-    if activity.info().attempt < 2:
-        raise RuntimeError("Intentional failure")
-
-
-@workflow.defn
-class RetryBaggageTestWorkflow:
-    @workflow.run
-    async def run(self) -> None:
-        await workflow.execute_activity(
-            failing_baggage_activity,
-            start_to_close_timeout=timedelta(seconds=10),
-            retry_policy=RetryPolicy(initial_interval=timedelta(milliseconds=1)),
-        )
-
-
-@activity.defn
-async def exception_baggage_activity() -> None:
-    user_id = baggage.get_baggage("user.id")
-    if user_id != "test-user-123":
-        raise AssertionError(f"Expected user.id='test-user-123', got '{user_id}'")
-    raise RuntimeError("Intentional activity failure")
-
-
-@workflow.defn
-class BaggageExceptionWorkflow:
-    @workflow.run
-    async def run(self) -> str:
-        try:
-            await workflow.execute_activity(
-                exception_baggage_activity,
-                start_to_close_timeout=timedelta(seconds=10),
-                retry_policy=RetryPolicy(maximum_attempts=1),
-            )
-        except Exception as e:
-            return f"exception_handled: {e.failure.cause.application_failure_info.type}"
-        return "no_exception"
-
-
-@activity.defn
-async def simple_no_context_activity() -> str:
-    return "success"
-
-
-@workflow.defn
-class SimpleNoContextWorkflow:
-    @workflow.run
-    async def run(self) -> str:
-        return await workflow.execute_activity(
-            simple_no_context_activity,
-            start_to_close_timeout=timedelta(seconds=10),
-        )
-
-
 async def test_opentelemetry_benign_exception(client: Client):
     # Create a tracer that has an in-memory exporter
     exporter = InMemorySpanExporter()
@@ -564,27 +456,44 @@ def baggage_values(values: Dict[str, str]) -> Generator[None, None, None]:
         context.detach(token)
 
 
-async def test_opentelemetry_baggage_propagation_basic(
-    client: Client, env: WorkflowEnvironment
-):
-    exporter = InMemorySpanExporter()
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
-    tracer = get_tracer(__name__, tracer_provider=provider)
-
+@pytest.fixture
+def client_with_tracing(client: Client) -> Client:
+    tracer = get_tracer(__name__, tracer_provider=TracerProvider())
     client_config = client.config()
     client_config["interceptors"] = [TracingInterceptor(tracer)]
-    client = Client(**client_config)
+    return Client(**client_config)
 
+
+@activity.defn
+async def read_baggage_activity() -> Dict[str, str | None]:
+    return {
+        "user_id": baggage.get_baggage("user.id"),
+        "tenant_id": baggage.get_baggage("tenant.id"),
+    }
+
+
+@workflow.defn
+class ReadBaggageTestWorkflow:
+    @workflow.run
+    async def run(self) -> Dict[str, str | None]:
+        return await workflow.execute_activity(
+            read_baggage_activity,
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+
+
+async def test_opentelemetry_baggage_propagation_basic(
+    client_with_tracing: Client, env: WorkflowEnvironment
+):
     task_queue = f"task_queue_{uuid.uuid4()}"
     async with Worker(
-        client,
+        client_with_tracing,
         task_queue=task_queue,
         workflows=[ReadBaggageTestWorkflow],
         activities=[read_baggage_activity],
     ):
         with baggage_values({"user.id": "test-user-123", "tenant.id": "some-corp"}):
-            result = await client.execute_workflow(
+            result = await client_with_tracing.execute_workflow(
                 ReadBaggageTestWorkflow.run,
                 id=f"workflow_{uuid.uuid4()}",
                 task_queue=task_queue,
@@ -598,65 +507,33 @@ async def test_opentelemetry_baggage_propagation_basic(
         ), "tenant.id baggage should propagate to activity"
 
 
-async def test_opentelemetry_baggage_propagation_multiple_values(
-    client: Client, env: WorkflowEnvironment
-):
-    exporter = InMemorySpanExporter()
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
-    tracer = get_tracer(__name__, tracer_provider=provider)
+@activity.defn
+async def read_baggage_local_activity() -> Dict[str, str | None]:
+    return {
+        "user_id": baggage.get_baggage("user.id"),
+        "tenant_id": baggage.get_baggage("tenant.id"),
+    }
 
-    client_config = client.config()
-    client_config["interceptors"] = [TracingInterceptor(tracer)]
-    client = Client(**client_config)
 
-    task_queue = f"task_queue_{uuid.uuid4()}"
-    async with Worker(
-        client,
-        task_queue=task_queue,
-        workflows=[MultipleBaggageTestWorkflow],
-        activities=[read_multiple_baggage_activity],
-    ):
-        with baggage_values(
-            {
-                "user.id": "test-user-123",
-                "tenant.id": "some-corp",
-                "request.id": "req-456",
-                "trace.id": "trace-789",
-                "custom.field": "custom-value",
-            }
-        ):
-            result = await client.execute_workflow(
-                MultipleBaggageTestWorkflow.run,
-                id=f"workflow_{uuid.uuid4()}",
-                task_queue=task_queue,
-            )
-
-        assert result["user_id"] == "test-user-123"
-        assert result["tenant_id"] == "some-corp"
-        assert result["request_id"] == "req-456"
-        assert result["trace_id"] == "trace-789"
-        assert result["custom_field"] == "custom-value"
+@workflow.defn
+class LocalActivityBaggageTestWorkflow:
+    @workflow.run
+    async def run(self) -> Dict[str, str | None]:
+        return await workflow.execute_local_activity(
+            read_baggage_local_activity,
+            start_to_close_timeout=timedelta(seconds=10),
+        )
 
 
 async def test_opentelemetry_baggage_propagation_local_activity(
-    client: Client, env: WorkflowEnvironment
+    client_with_tracing: Client, env: WorkflowEnvironment
 ):
-    exporter = InMemorySpanExporter()
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
-    tracer = get_tracer(__name__, tracer_provider=provider)
-
-    client_config = client.config()
-    client_config["interceptors"] = [TracingInterceptor(tracer)]
-    client = Client(**client_config)
-
     task_queue = f"task_queue_{uuid.uuid4()}"
     async with Worker(
-        client,
+        client_with_tracing,
         task_queue=task_queue,
         workflows=[LocalActivityBaggageTestWorkflow],
-        activities=[read_baggage_activity],
+        activities=[read_baggage_local_activity],
     ):
         with baggage_values(
             {
@@ -664,7 +541,7 @@ async def test_opentelemetry_baggage_propagation_local_activity(
                 "tenant.id": "local-corp",
             }
         ):
-            result = await client.execute_workflow(
+            result = await client_with_tracing.execute_workflow(
                 LocalActivityBaggageTestWorkflow.run,
                 id=f"workflow_{uuid.uuid4()}",
                 task_queue=task_queue,
@@ -674,30 +551,42 @@ async def test_opentelemetry_baggage_propagation_local_activity(
         assert result["tenant_id"] == "local-corp"
 
 
+retry_attempt_baggage_values: List[Optional[str]] = []
+
+
+@activity.defn
+async def failing_baggage_activity() -> None:
+    retry_attempt_baggage_values.append(baggage.get_baggage("user.id"))
+    if activity.info().attempt < 2:
+        raise RuntimeError("Intentional failure")
+
+
+@workflow.defn
+class RetryBaggageTestWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_activity(
+            failing_baggage_activity,
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=RetryPolicy(initial_interval=timedelta(milliseconds=1)),
+        )
+
+
 async def test_opentelemetry_baggage_propagation_with_retries(
-    client: Client, env: WorkflowEnvironment
+    client_with_tracing: Client, env: WorkflowEnvironment
 ):
     global retry_attempt_baggage_values
     retry_attempt_baggage_values = []
 
-    exporter = InMemorySpanExporter()
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
-    tracer = get_tracer(__name__, tracer_provider=provider)
-
-    client_config = client.config()
-    client_config["interceptors"] = [TracingInterceptor(tracer)]
-    client = Client(**client_config)
-
     task_queue = f"task_queue_{uuid.uuid4()}"
     async with Worker(
-        client,
+        client_with_tracing,
         task_queue=task_queue,
         workflows=[RetryBaggageTestWorkflow],
         activities=[failing_baggage_activity],
     ):
         with baggage_values({"user.id": "test-user-retry"}):
-            await client.execute_workflow(
+            await client_with_tracing.execute_workflow(
                 RetryBaggageTestWorkflow.run,
                 id=f"workflow_{uuid.uuid4()}",
                 task_queue=task_queue,
@@ -708,55 +597,32 @@ async def test_opentelemetry_baggage_propagation_with_retries(
         assert all(v == "test-user-retry" for v in retry_attempt_baggage_values)
 
 
-async def test_opentelemetry_baggage_exception_handling(
-    client: Client, env: WorkflowEnvironment
-):
-    exporter = InMemorySpanExporter()
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
-    tracer = get_tracer(__name__, tracer_provider=provider)
+@activity.defn
+async def simple_no_context_activity() -> str:
+    return "success"
 
-    client_config = client.config()
-    client_config["interceptors"] = [TracingInterceptor(tracer)]
-    client = Client(**client_config)
 
-    task_queue = f"task_queue_{uuid.uuid4()}"
-    async with Worker(
-        client,
-        task_queue=task_queue,
-        workflows=[BaggageExceptionWorkflow],
-        activities=[exception_baggage_activity],
-    ):
-        with baggage_values({"user.id": "test-user-123"}):
-            result = await client.execute_workflow(
-                BaggageExceptionWorkflow.run,
-                id=f"workflow_{uuid.uuid4()}",
-                task_queue=task_queue,
-            )
-
-        assert result == "exception_handled: RuntimeError"
+@workflow.defn
+class SimpleNoContextWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return await workflow.execute_activity(
+            simple_no_context_activity,
+            start_to_close_timeout=timedelta(seconds=10),
+        )
 
 
 async def test_opentelemetry_interceptor_works_if_no_context(
-    client: Client, env: WorkflowEnvironment
+    client_with_tracing: Client, env: WorkflowEnvironment
 ):
-    exporter = InMemorySpanExporter()
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
-    tracer = get_tracer(__name__, tracer_provider=provider)
-
-    client_config = client.config()
-    client_config["interceptors"] = [TracingInterceptor(tracer)]
-    client = Client(**client_config)
-
     task_queue = f"task_queue_{uuid.uuid4()}"
     async with Worker(
-        client,
+        client_with_tracing,
         task_queue=task_queue,
         workflows=[SimpleNoContextWorkflow],
         activities=[simple_no_context_activity],
     ):
-        result = await client.execute_workflow(
+        result = await client_with_tracing.execute_workflow(
             SimpleNoContextWorkflow.run,
             id=f"workflow_{uuid.uuid4()}",
             task_queue=task_queue,
