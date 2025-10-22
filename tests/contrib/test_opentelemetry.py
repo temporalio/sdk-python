@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Dict, Generator, Iterable, List, Optional
+from typing import Callable, Dict, Generator, Iterable, List, Optional
 
 from opentelemetry import baggage, context
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
@@ -574,7 +574,7 @@ class RetryBaggageTestWorkflow:
 
 async def test_opentelemetry_baggage_propagation_with_retries(
     client_with_tracing: Client, env: WorkflowEnvironment
-):
+) -> None:
     global retry_attempt_baggage_values
     retry_attempt_baggage_values = []
 
@@ -595,6 +595,94 @@ async def test_opentelemetry_baggage_propagation_with_retries(
         # Verify baggage was present on all attempts
         assert len(retry_attempt_baggage_values) == 2
         assert all(v == "test-user-retry" for v in retry_attempt_baggage_values)
+
+
+@activity.defn
+async def context_clear_noop_activity() -> None:
+    pass
+
+
+@activity.defn
+async def context_clear_exception_activity() -> None:
+    raise Exception("Simulated exception")
+
+
+@workflow.defn
+class ContextClearWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_activity(
+            context_clear_noop_activity,
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=RetryPolicy(
+                maximum_attempts=1, initial_interval=timedelta(milliseconds=1)
+            ),
+        )
+
+
+EXPECT_FAILURE = True
+
+
+@pytest.mark.parametrize(
+    "activity,expect_failure",
+    [
+        (context_clear_noop_activity, not EXPECT_FAILURE),
+        (context_clear_exception_activity, EXPECT_FAILURE),
+    ],
+)
+async def test_opentelemetry_context_restored_after_activity(
+    client_with_tracing: Client,
+    env: WorkflowEnvironment,
+    activity: Callable[[], None],
+    expect_failure: bool,
+) -> None:
+    attach_count = 0
+    detach_count = 0
+    original_attach = context.attach
+    original_detach = context.detach
+
+    def tracked_attach(ctx):
+        nonlocal attach_count
+        attach_count += 1
+        return original_attach(ctx)
+
+    def tracked_detach(token):
+        nonlocal detach_count
+        detach_count += 1
+        return original_detach(token)
+
+    context.attach = tracked_attach
+    context.detach = tracked_detach
+
+    try:
+        task_queue = f"task_queue_{uuid.uuid4()}"
+        async with Worker(
+            client_with_tracing,
+            task_queue=task_queue,
+            workflows=[ContextClearWorkflow],
+            activities=[activity],
+        ):
+            with baggage_values({"user.id": "test-123"}):
+                try:
+                    await client_with_tracing.execute_workflow(
+                        ContextClearWorkflow.run,
+                        id=f"workflow_{uuid.uuid4()}",
+                        task_queue=task_queue,
+                    )
+                    assert (
+                        not expect_failure
+                    ), "This test should have raised an exception"
+                except Exception:
+                    assert expect_failure, "This test is not expeced to raise"
+
+        assert (
+            attach_count == detach_count
+        ), f"Context leak detected: {attach_count} attaches vs {detach_count} detaches. "
+        assert attach_count > 0, "Expected at least one context attach/detach"
+
+    finally:
+        context.attach = original_attach
+        context.detach = original_detach
 
 
 @activity.defn
