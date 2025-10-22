@@ -16,39 +16,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.9", "3.13"]
+        python: ["3.10", "3.14"]
         os: [ubuntu-latest, ubuntu-arm, macos-intel, macos-arm, windows-latest]
         include:
-          # On 3.9 there is a problem with import errors caused by pytests' loader that surface due
-          # to a bug in CPython (https://github.com/python/cpython/issues/91351), so we avoid using
-          # the assert rewriter.
-          - python: "3.9"
-            pytestExtraArgs: "--assert=plain"
           - os: ubuntu-latest
-            python: "3.13"
+            python: "3.14"
             docsTarget: true
             cloudTestTarget: true
             openaiTestTarget: true
             clippyLinter: true
           - os: ubuntu-latest
-            python: "3.9"
+            python: "3.10"
             protoCheckTarget: true
           - os: ubuntu-arm
             runsOn: ubuntu-24.04-arm64-2-core
           - os: macos-intel
             runsOn: macos-15-intel
-          # On 3.13.3 there is some issue with macOS intel where it hangs after pytest with some
-          # test that may have a worker that cannot properly shutdown, but it does not occur on
-          # other versions, platforms, etc. See https://github.com/temporalio/sdk-python/issues/834.
-          - os: macos-intel
-            python: "3.13"
-            pythonOverride: "3.13.2"
           - os: macos-arm
             runsOn: macos-latest
-          # On 3.13.5, python3.lib is missing for the linker
-          - os: windows-latest
-            python: "3.13"
-            pythonOverride: "3.13.4"
     runs-on: ${{ matrix.runsOn || matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -113,7 +98,7 @@ jobs:
         env:
           TEMPORAL_TEST_PROTO3: 1
         run: |
-          uv add --python 3.9 "protobuf<4"
+          uv add --python 3.10 "protobuf<4"
           uv sync --all-extras
           poe build-develop
           poe gen-protos
