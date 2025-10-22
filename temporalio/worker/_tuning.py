@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Callable, Literal, Optional, Protocol, Union, runtime_checkable
 
-from typing_extensions import TypeAlias
+from typing_extensions import Self, TypeAlias
 
 import temporalio.bridge.worker
 from temporalio.common import WorkerDeploymentVersion
@@ -310,8 +310,9 @@ def _to_bridge_slot_supplier(
 class WorkerTuner(ABC):
     """WorkerTuners allow for the dynamic customization of some aspects of worker configuration"""
 
-    @staticmethod
+    @classmethod
     def create_resource_based(
+        cls,
         *,
         target_memory_usage: float,
         target_cpu_usage: float,
@@ -319,7 +320,7 @@ class WorkerTuner(ABC):
         activity_config: Optional[ResourceBasedSlotConfig] = None,
         local_activity_config: Optional[ResourceBasedSlotConfig] = None,
         nexus_config: Optional[ResourceBasedSlotConfig] = None,
-    ) -> WorkerTuner:
+    ) -> Self:
         """Create a resource-based tuner with the provided options."""
         resource_cfg = ResourceBasedTunerConfig(target_memory_usage, target_cpu_usage)
         wf = ResourceBasedSlotSupplier(
@@ -341,14 +342,15 @@ class WorkerTuner(ABC):
             nexus,
         )
 
-    @staticmethod
+    @classmethod
     def create_fixed(
+        cls,
         *,
         workflow_slots: Optional[int] = None,
         activity_slots: Optional[int] = None,
         local_activity_slots: Optional[int] = None,
         nexus_slots: Optional[int] = None,
-    ) -> WorkerTuner:
+    ) -> Self:
         """Create a fixed-size tuner with the provided number of slots.
 
         Any unspecified slot numbers will default to 100.
@@ -362,14 +364,15 @@ class WorkerTuner(ABC):
             FixedSizeSlotSupplier(nexus_slots if nexus_slots else 100),
         )
 
-    @staticmethod
+    @classmethod
     def create_composite(
+        cls,
         *,
         workflow_supplier: SlotSupplier,
         activity_supplier: SlotSupplier,
         local_activity_supplier: SlotSupplier,
         nexus_supplier: SlotSupplier,
-    ) -> WorkerTuner:
+    ) -> Self:
         """Create a tuner composed of the provided slot suppliers."""
         return _CompositeTuner(
             workflow_supplier,
