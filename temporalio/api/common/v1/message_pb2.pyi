@@ -847,21 +847,57 @@ class Link(google.protobuf.message.Message):
             self, field_name: typing_extensions.Literal["job_id", b"job_id"]
         ) -> None: ...
 
+    class Activity(google.protobuf.message.Message):
+        """A link to an activity."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        NAMESPACE_FIELD_NUMBER: builtins.int
+        ACTIVITY_ID_FIELD_NUMBER: builtins.int
+        RUN_ID_FIELD_NUMBER: builtins.int
+        namespace: builtins.str
+        activity_id: builtins.str
+        run_id: builtins.str
+        def __init__(
+            self,
+            *,
+            namespace: builtins.str = ...,
+            activity_id: builtins.str = ...,
+            run_id: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "activity_id",
+                b"activity_id",
+                "namespace",
+                b"namespace",
+                "run_id",
+                b"run_id",
+            ],
+        ) -> None: ...
+
     WORKFLOW_EVENT_FIELD_NUMBER: builtins.int
     BATCH_JOB_FIELD_NUMBER: builtins.int
+    ACTIVITY_FIELD_NUMBER: builtins.int
     @property
     def workflow_event(self) -> global___Link.WorkflowEvent: ...
     @property
     def batch_job(self) -> global___Link.BatchJob: ...
+    @property
+    def activity(self) -> global___Link.Activity: ...
     def __init__(
         self,
         *,
         workflow_event: global___Link.WorkflowEvent | None = ...,
         batch_job: global___Link.BatchJob | None = ...,
+        activity: global___Link.Activity | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "activity",
+            b"activity",
             "batch_job",
             b"batch_job",
             "variant",
@@ -873,6 +909,8 @@ class Link(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "activity",
+            b"activity",
             "batch_job",
             b"batch_job",
             "variant",
@@ -883,7 +921,9 @@ class Link(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-    ) -> typing_extensions.Literal["workflow_event", "batch_job"] | None: ...
+    ) -> (
+        typing_extensions.Literal["workflow_event", "batch_job", "activity"] | None
+    ): ...
 
 global___Link = Link
 
@@ -937,7 +977,7 @@ class Priority(google.protobuf.message.Message):
     configuration, and defaults to 5.
 
     If priority is not present (or zero), then the effective priority will be
-    the default priority, which is is calculated by (min+max)/2. With the
+    the default priority, which is calculated by (min+max)/2. With the
     default max of 5, and min of 1, that comes out to 3.
     """
     fairness_key: builtins.str

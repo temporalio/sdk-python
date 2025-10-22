@@ -4,13 +4,21 @@ isort:skip_file
 """
 
 import builtins
+import collections.abc
 import sys
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
+import google.protobuf.internal.containers
 import google.protobuf.message
+import google.protobuf.timestamp_pb2
 
 import temporalio.api.common.v1.message_pb2
+import temporalio.api.deployment.v1.message_pb2
+import temporalio.api.enums.v1.activity_pb2
+import temporalio.api.enums.v1.workflow_pb2
+import temporalio.api.failure.v1.message_pb2
+import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 
 if sys.version_info >= (3, 8):
@@ -19,6 +27,43 @@ else:
     import typing_extensions
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
+
+class OnConflictOptions(google.protobuf.message.Message):
+    """When StartActivityExecution uses the ID_CONFLICT_POLICY_USE_EXISTING and there is already an existing running
+    activity, OnConflictOptions defines actions to be taken on the existing running activity, updating its state.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ATTACH_REQUEST_ID_FIELD_NUMBER: builtins.int
+    ATTACH_COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
+    ATTACH_LINKS_FIELD_NUMBER: builtins.int
+    attach_request_id: builtins.bool
+    """Attaches the request ID to the running workflow."""
+    attach_completion_callbacks: builtins.bool
+    """Attaches the completion callbacks to the running workflow."""
+    attach_links: builtins.bool
+    """Attaches the links to the WorkflowExecutionOptionsUpdatedEvent history event."""
+    def __init__(
+        self,
+        *,
+        attach_request_id: builtins.bool = ...,
+        attach_completion_callbacks: builtins.bool = ...,
+        attach_links: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "attach_completion_callbacks",
+            b"attach_completion_callbacks",
+            "attach_links",
+            b"attach_links",
+            "attach_request_id",
+            b"attach_request_id",
+        ],
+    ) -> None: ...
+
+global___OnConflictOptions = OnConflictOptions
 
 class ActivityOptions(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -62,7 +107,8 @@ class ActivityOptions(google.protobuf.message.Message):
     def heartbeat_timeout(self) -> google.protobuf.duration_pb2.Duration:
         """Maximum permitted time between successful worker heartbeats."""
     @property
-    def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy: ...
+    def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy:
+        """The retry policy for the activity. Will never exceed `schedule_to_close_timeout`."""
     def __init__(
         self,
         *,
@@ -109,3 +155,479 @@ class ActivityOptions(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ActivityOptions = ActivityOptions
+
+class ActivityExecutionInfo(google.protobuf.message.Message):
+    """Info for a standalone activity."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class PauseInfo(google.protobuf.message.Message):
+        """TODO: Move this to a common package?"""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        class Manual(google.protobuf.message.Message):
+            DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+            IDENTITY_FIELD_NUMBER: builtins.int
+            REASON_FIELD_NUMBER: builtins.int
+            identity: builtins.str
+            """The identity of the actor that paused the activity."""
+            reason: builtins.str
+            """Reason for pausing the activity."""
+            def __init__(
+                self,
+                *,
+                identity: builtins.str = ...,
+                reason: builtins.str = ...,
+            ) -> None: ...
+            def ClearField(
+                self,
+                field_name: typing_extensions.Literal[
+                    "identity", b"identity", "reason", b"reason"
+                ],
+            ) -> None: ...
+
+        PAUSE_TIME_FIELD_NUMBER: builtins.int
+        MANUAL_FIELD_NUMBER: builtins.int
+        @property
+        def pause_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+            """The time when the activity was paused."""
+        @property
+        def manual(self) -> global___ActivityExecutionInfo.PauseInfo.Manual:
+            """The activity was paused by direct API invocation."""
+        def __init__(
+            self,
+            *,
+            pause_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+            manual: global___ActivityExecutionInfo.PauseInfo.Manual | None = ...,
+        ) -> None: ...
+        def HasField(
+            self,
+            field_name: typing_extensions.Literal[
+                "manual",
+                b"manual",
+                "pause_time",
+                b"pause_time",
+                "paused_by",
+                b"paused_by",
+            ],
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "manual",
+                b"manual",
+                "pause_time",
+                b"pause_time",
+                "paused_by",
+                b"paused_by",
+            ],
+        ) -> None: ...
+        def WhichOneof(
+            self, oneof_group: typing_extensions.Literal["paused_by", b"paused_by"]
+        ) -> typing_extensions.Literal["manual"] | None: ...
+
+    ACTIVITY_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    ACTIVITY_TYPE_FIELD_NUMBER: builtins.int
+    STATUS_FIELD_NUMBER: builtins.int
+    RUN_STATE_FIELD_NUMBER: builtins.int
+    HEARTBEAT_DETAILS_FIELD_NUMBER: builtins.int
+    LAST_HEARTBEAT_TIME_FIELD_NUMBER: builtins.int
+    LAST_STARTED_TIME_FIELD_NUMBER: builtins.int
+    ATTEMPT_FIELD_NUMBER: builtins.int
+    MAXIMUM_ATTEMPTS_FIELD_NUMBER: builtins.int
+    SCHEDULED_TIME_FIELD_NUMBER: builtins.int
+    EXPIRATION_TIME_FIELD_NUMBER: builtins.int
+    LAST_FAILURE_FIELD_NUMBER: builtins.int
+    LAST_WORKER_IDENTITY_FIELD_NUMBER: builtins.int
+    CURRENT_RETRY_INTERVAL_FIELD_NUMBER: builtins.int
+    LAST_ATTEMPT_COMPLETE_TIME_FIELD_NUMBER: builtins.int
+    NEXT_ATTEMPT_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
+    LAST_DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
+    PRIORITY_FIELD_NUMBER: builtins.int
+    ACTIVITY_OPTIONS_FIELD_NUMBER: builtins.int
+    INPUT_FIELD_NUMBER: builtins.int
+    STATE_TRANSITION_COUNT_FIELD_NUMBER: builtins.int
+    SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    HEADER_FIELD_NUMBER: builtins.int
+    EAGER_EXECUTION_REQUESTED_FIELD_NUMBER: builtins.int
+    COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
+    USER_METADATA_FIELD_NUMBER: builtins.int
+    LINKS_FIELD_NUMBER: builtins.int
+    CANCELED_REASON_FIELD_NUMBER: builtins.int
+    PAUSE_INFO_FIELD_NUMBER: builtins.int
+    activity_id: builtins.str
+    """Unique identifier of this activity within its namespace along with run ID (below)."""
+    run_id: builtins.str
+    @property
+    def activity_type(self) -> temporalio.api.common.v1.message_pb2.ActivityType:
+        """The type of the activity, a string that maps to a registered activity on a worker."""
+    status: temporalio.api.enums.v1.activity_pb2.ActivityExecutionStatus.ValueType
+    """A general status for this activity, indicates whether it is currently running or in one of the terminal statuses."""
+    run_state: temporalio.api.enums.v1.workflow_pb2.PendingActivityState.ValueType
+    """More detailed breakdown of ACTIVITY_EXECUTION_STATUS_RUNNING."""
+    @property
+    def heartbeat_details(self) -> temporalio.api.common.v1.message_pb2.Payloads:
+        """Details provided in the last recorded activity heartbeat."""
+    @property
+    def last_heartbeat_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Time the last heartbeat was recorded."""
+    @property
+    def last_started_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Time the last attempt was started."""
+    attempt: builtins.int
+    """The attempt this activity is currently on.
+    Incremented each time a new attempt is started.
+    TODO: Confirm if this is on scheduled or started.
+    """
+    maximum_attempts: builtins.int
+    @property
+    def scheduled_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Time the activity was originally scheduled via a StartActivityExecution request."""
+    @property
+    def expiration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Scheduled time + schedule to close timeout."""
+    @property
+    def last_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """Failure details from the last failed attempt."""
+    last_worker_identity: builtins.str
+    @property
+    def current_retry_interval(self) -> google.protobuf.duration_pb2.Duration:
+        """Time from the last attempt failure to the next activity retry.
+        If the activity is currently running, this represents the next retry interval in case the attempt fails.
+        If activity is currently backing off between attempt, this represents the current retry interval.
+        If there is no next retry allowed, this field will be null.
+        This interval is typically calculated from the specified retry policy, but may be modified if an activity fails
+        with a retryable application failure specifying a retry delay.
+        """
+    @property
+    def last_attempt_complete_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the last activity attempt completed. If activity has not been completed yet, it will be null."""
+    @property
+    def next_attempt_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the next activity attempt will be scheduled.
+        If activity is currently scheduled or started, this field will be null.
+        """
+    @property
+    def last_deployment_version(
+        self,
+    ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion:
+        """The Worker Deployment Version this activity was dispatched to most recently.
+        If nil, the activity has not yet been dispatched or was last dispatched to an unversioned worker.
+        """
+    @property
+    def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
+        """Priority metadata."""
+    @property
+    def activity_options(self) -> global___ActivityOptions:
+        """Current activity options. May be different from the one used to start the activity."""
+    @property
+    def input(self) -> temporalio.api.common.v1.message_pb2.Payloads:
+        """Serialized activity input, passed as arguments to the activity function."""
+    state_transition_count: builtins.int
+    """Incremented each time the activity's state is mutated in persistence."""
+    @property
+    def search_attributes(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.SearchAttributes: ...
+    @property
+    def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
+    eager_execution_requested: builtins.bool
+    """Whether the activity was started with a request_eager_execution flag set to `true`, indicating that the first
+    task was delivered inline in the start response, bypassing matching.
+    """
+    @property
+    def completion_callbacks(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Callback
+    ]:
+        """Callbacks to be called by the server when this activity reaches a terminal status.
+        Callback addresses must be whitelisted in the server's dynamic configuration.
+        """
+    @property
+    def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
+        """Metadata for use by user interfaces to display the fixed as-of-start summary and details of the activity."""
+    @property
+    def links(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Link
+    ]:
+        """Links to be associated with the activity."""
+    canceled_reason: builtins.str
+    """Set if activity cancelation was requested."""
+    @property
+    def pause_info(self) -> global___ActivityExecutionInfo.PauseInfo: ...
+    def __init__(
+        self,
+        *,
+        activity_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+        activity_type: temporalio.api.common.v1.message_pb2.ActivityType | None = ...,
+        status: temporalio.api.enums.v1.activity_pb2.ActivityExecutionStatus.ValueType = ...,
+        run_state: temporalio.api.enums.v1.workflow_pb2.PendingActivityState.ValueType = ...,
+        heartbeat_details: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
+        last_heartbeat_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        last_started_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        attempt: builtins.int = ...,
+        maximum_attempts: builtins.int = ...,
+        scheduled_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        expiration_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        last_failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
+        last_worker_identity: builtins.str = ...,
+        current_retry_interval: google.protobuf.duration_pb2.Duration | None = ...,
+        last_attempt_complete_time: google.protobuf.timestamp_pb2.Timestamp
+        | None = ...,
+        next_attempt_schedule_time: google.protobuf.timestamp_pb2.Timestamp
+        | None = ...,
+        last_deployment_version: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion
+        | None = ...,
+        priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        activity_options: global___ActivityOptions | None = ...,
+        input: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
+        state_transition_count: builtins.int = ...,
+        search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
+        | None = ...,
+        header: temporalio.api.common.v1.message_pb2.Header | None = ...,
+        eager_execution_requested: builtins.bool = ...,
+        completion_callbacks: collections.abc.Iterable[
+            temporalio.api.common.v1.message_pb2.Callback
+        ]
+        | None = ...,
+        user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
+        links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
+        | None = ...,
+        canceled_reason: builtins.str = ...,
+        pause_info: global___ActivityExecutionInfo.PauseInfo | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_options",
+            b"activity_options",
+            "activity_type",
+            b"activity_type",
+            "current_retry_interval",
+            b"current_retry_interval",
+            "expiration_time",
+            b"expiration_time",
+            "header",
+            b"header",
+            "heartbeat_details",
+            b"heartbeat_details",
+            "input",
+            b"input",
+            "last_attempt_complete_time",
+            b"last_attempt_complete_time",
+            "last_deployment_version",
+            b"last_deployment_version",
+            "last_failure",
+            b"last_failure",
+            "last_heartbeat_time",
+            b"last_heartbeat_time",
+            "last_started_time",
+            b"last_started_time",
+            "next_attempt_schedule_time",
+            b"next_attempt_schedule_time",
+            "pause_info",
+            b"pause_info",
+            "priority",
+            b"priority",
+            "scheduled_time",
+            b"scheduled_time",
+            "search_attributes",
+            b"search_attributes",
+            "user_metadata",
+            b"user_metadata",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_id",
+            b"activity_id",
+            "activity_options",
+            b"activity_options",
+            "activity_type",
+            b"activity_type",
+            "attempt",
+            b"attempt",
+            "canceled_reason",
+            b"canceled_reason",
+            "completion_callbacks",
+            b"completion_callbacks",
+            "current_retry_interval",
+            b"current_retry_interval",
+            "eager_execution_requested",
+            b"eager_execution_requested",
+            "expiration_time",
+            b"expiration_time",
+            "header",
+            b"header",
+            "heartbeat_details",
+            b"heartbeat_details",
+            "input",
+            b"input",
+            "last_attempt_complete_time",
+            b"last_attempt_complete_time",
+            "last_deployment_version",
+            b"last_deployment_version",
+            "last_failure",
+            b"last_failure",
+            "last_heartbeat_time",
+            b"last_heartbeat_time",
+            "last_started_time",
+            b"last_started_time",
+            "last_worker_identity",
+            b"last_worker_identity",
+            "links",
+            b"links",
+            "maximum_attempts",
+            b"maximum_attempts",
+            "next_attempt_schedule_time",
+            b"next_attempt_schedule_time",
+            "pause_info",
+            b"pause_info",
+            "priority",
+            b"priority",
+            "run_id",
+            b"run_id",
+            "run_state",
+            b"run_state",
+            "scheduled_time",
+            b"scheduled_time",
+            "search_attributes",
+            b"search_attributes",
+            "state_transition_count",
+            b"state_transition_count",
+            "status",
+            b"status",
+            "user_metadata",
+            b"user_metadata",
+        ],
+    ) -> None: ...
+
+global___ActivityExecutionInfo = ActivityExecutionInfo
+
+class ActivityListInfo(google.protobuf.message.Message):
+    """Limited activity information returned in the list response."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ACTIVITY_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: builtins.int
+    ACTIVITY_TYPE_FIELD_NUMBER: builtins.int
+    SCHEDULED_TIME_FIELD_NUMBER: builtins.int
+    CLOSE_TIME_FIELD_NUMBER: builtins.int
+    STATUS_FIELD_NUMBER: builtins.int
+    SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    TASK_QUEUE_FIELD_NUMBER: builtins.int
+    STATE_TRANSITION_COUNT_FIELD_NUMBER: builtins.int
+    STATE_SIZE_BYTES_FIELD_NUMBER: builtins.int
+    EXECUTION_DURATION_FIELD_NUMBER: builtins.int
+    activity_id: builtins.str
+    """For standalone activity - a unique identifier of this activity within its namespace along with run ID (below)."""
+    run_id: builtins.str
+    """The run ID of the workflow or standalone activity."""
+    workflow_id: builtins.str
+    """Workflow that contains this activity - only present for workflow activity."""
+    @property
+    def activity_type(self) -> temporalio.api.common.v1.message_pb2.ActivityType:
+        """The type of the activity, a string that maps to a registered activity on a worker."""
+    @property
+    def scheduled_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Time the activity was originally scheduled via a StartActivityExecution request.
+        TODO: Workflows call this schedule_time but it's scheduled_time in PendingActivityInfo, what should we choose for
+        consistency?
+        """
+    @property
+    def close_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """If the activity is in a terminal status, this field represents the time the activity transitioned to that status."""
+    status: temporalio.api.enums.v1.activity_pb2.ActivityExecutionStatus.ValueType
+    """Only scheduled and terminal statuses appear here. More detailed information in PendingActivityInfo but not
+    available in the list response.
+    """
+    @property
+    def search_attributes(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.SearchAttributes:
+        """Search attributes from the start request."""
+    task_queue: builtins.str
+    """The task queue this activity was scheduled on when it was originally started, updated on activity options update."""
+    state_transition_count: builtins.int
+    """Updated on terminal status."""
+    state_size_bytes: builtins.int
+    """Updated once on scheduled and once on terminal status."""
+    @property
+    def execution_duration(self) -> google.protobuf.duration_pb2.Duration:
+        """The difference between close time and scheduled time.
+        This field is only populated if the activity is closed.
+        """
+    def __init__(
+        self,
+        *,
+        activity_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+        workflow_id: builtins.str = ...,
+        activity_type: temporalio.api.common.v1.message_pb2.ActivityType | None = ...,
+        scheduled_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        close_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        status: temporalio.api.enums.v1.activity_pb2.ActivityExecutionStatus.ValueType = ...,
+        search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
+        | None = ...,
+        task_queue: builtins.str = ...,
+        state_transition_count: builtins.int = ...,
+        state_size_bytes: builtins.int = ...,
+        execution_duration: google.protobuf.duration_pb2.Duration | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_type",
+            b"activity_type",
+            "close_time",
+            b"close_time",
+            "execution_duration",
+            b"execution_duration",
+            "scheduled_time",
+            b"scheduled_time",
+            "search_attributes",
+            b"search_attributes",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_id",
+            b"activity_id",
+            "activity_type",
+            b"activity_type",
+            "close_time",
+            b"close_time",
+            "execution_duration",
+            b"execution_duration",
+            "run_id",
+            b"run_id",
+            "scheduled_time",
+            b"scheduled_time",
+            "search_attributes",
+            b"search_attributes",
+            "state_size_bytes",
+            b"state_size_bytes",
+            "state_transition_count",
+            b"state_transition_count",
+            "status",
+            b"status",
+            "task_queue",
+            b"task_queue",
+            "workflow_id",
+            b"workflow_id",
+        ],
+    ) -> None: ...
+
+global___ActivityListInfo = ActivityListInfo
