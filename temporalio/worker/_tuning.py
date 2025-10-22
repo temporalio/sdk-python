@@ -320,7 +320,7 @@ class WorkerTuner(ABC):
         activity_config: Optional[ResourceBasedSlotConfig] = None,
         local_activity_config: Optional[ResourceBasedSlotConfig] = None,
         nexus_config: Optional[ResourceBasedSlotConfig] = None,
-    ) -> Self:
+    ) -> WorkerTuner:
         """Create a resource-based tuner with the provided options."""
         resource_cfg = ResourceBasedTunerConfig(target_memory_usage, target_cpu_usage)
         wf = ResourceBasedSlotSupplier(
@@ -350,7 +350,7 @@ class WorkerTuner(ABC):
         activity_slots: Optional[int] = None,
         local_activity_slots: Optional[int] = None,
         nexus_slots: Optional[int] = None,
-    ) -> Self:
+    ) -> WorkerTuner:
         """Create a fixed-size tuner with the provided number of slots.
 
         Any unspecified slot numbers will default to 100.
@@ -372,7 +372,7 @@ class WorkerTuner(ABC):
         activity_supplier: SlotSupplier,
         local_activity_supplier: SlotSupplier,
         nexus_supplier: SlotSupplier,
-    ) -> Self:
+    ) -> WorkerTuner:
         """Create a tuner composed of the provided slot suppliers."""
         return _CompositeTuner(
             workflow_supplier,

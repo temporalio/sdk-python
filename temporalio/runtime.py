@@ -38,7 +38,7 @@ class Runtime:
     """
 
     @classmethod
-    def default(cls) -> Self:
+    def default(cls) -> Runtime:
         """Get the default runtime, creating if not already created.
 
         If the default runtime needs to be different, it should be done with

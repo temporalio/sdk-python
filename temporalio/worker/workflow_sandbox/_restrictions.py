@@ -185,7 +185,7 @@ class SandboxMatcher:
     """
 
     @classmethod
-    def nested_child(cls, path: Sequence[str], child: SandboxMatcher) -> Self:
+    def nested_child(cls, path: Sequence[str], child: SandboxMatcher) -> SandboxMatcher:
         """Create a matcher where the given child is put at the given path.
 
         Args:
@@ -202,7 +202,7 @@ class SandboxMatcher:
 
     access: Set[str] = frozenset()  # type: ignore
     """Immutable set of names to match access.
-    
+
     This is often only used for pass through checks and not member restrictions.
     If this is used for member restrictions, even importing/accessing the value
     will fail as opposed to :py:attr:`use` which is for when it is used.
@@ -212,7 +212,7 @@ class SandboxMatcher:
 
     use: Set[str] = frozenset()  # type: ignore
     """Immutable set of names to match use.
-    
+
     This is best used for member restrictions on functions/classes because the
     restriction will not apply to referencing/importing the item, just when it
     is used.
@@ -248,7 +248,7 @@ class SandboxMatcher:
 
     exclude: Set[str] = frozenset()  # type: ignore
     """Immutable set of names to exclude.
-    
+
     These override anything that may have been matched elsewhere.
     """
 

@@ -100,7 +100,7 @@ class WorkflowEnvironment:
         dev_server_download_version: str = "default",
         dev_server_extra_args: Sequence[str] = [],
         dev_server_download_ttl: Optional[timedelta] = None,
-    ) -> Self:
+    ) -> WorkflowEnvironment:
         """Start a full Temporal server locally, downloading if necessary.
 
         This environment is good for testing full server capabilities, but does
@@ -254,7 +254,7 @@ class WorkflowEnvironment:
         test_server_download_version: str = "default",
         test_server_extra_args: Sequence[str] = [],
         test_server_download_ttl: Optional[timedelta] = None,
-    ) -> Self:
+    ) -> WorkflowEnvironment:
         """Start a time skipping workflow environment.
 
         By default, this environment will automatically skip to the next events
