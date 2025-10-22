@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 import logging
+import queue
+import sys
+import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Iterable, List, Optional
 
+import opentelemetry.context
 import pytest
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -17,11 +22,20 @@ from opentelemetry.trace import StatusCode, get_tracer
 from temporalio import activity, workflow
 from temporalio.client import Client, WithStartWorkflowOperation, WorkflowUpdateStage
 from temporalio.common import RetryPolicy, WorkflowIDConflictPolicy
-from temporalio.contrib.opentelemetry import TracingInterceptor
+from temporalio.contrib.opentelemetry import (
+    TracingInterceptor,
+    TracingWorkflowInboundInterceptor,
+)
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
 from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
+from tests.helpers import LogCapturer
+from tests.helpers.cache_eviction import (
+    CacheEvictionTearDownWorkflow,
+    WaitForeverWorkflow,
+    wait_forever_activity,
+)
 
 
 @dataclass
@@ -420,7 +434,10 @@ def dump_spans(
                 span_links: List[str] = []
                 for link in span.links:
                     for link_span in spans:
-                        if link_span.context.span_id == link.context.span_id:
+                        if (
+                            link_span.context is not None
+                            and link_span.context.span_id == link.context.span_id
+                        ):
                             span_links.append(link_span.name)
                 span_str += f" (links: {', '.join(span_links)})"
             # Signals can duplicate in rare situations, so we make sure not to
@@ -430,7 +447,7 @@ def dump_spans(
             ret.append(span_str)
             ret += dump_spans(
                 spans,
-                parent_id=span.context.span_id,
+                parent_id=span.context.span_id if span.context else None,
                 with_attributes=with_attributes,
                 indent_depth=indent_depth + 1,
             )
@@ -547,3 +564,50 @@ async def test_opentelemetry_benign_exception(client: Client):
 # * workflow failure and wft failure
 # * signal with start
 # * signal failure and wft failure from signal
+
+
+def test_opentelemetry_safe_detach():
+    class _fake_self:
+        def _load_workflow_context_carrier(*args):
+            return None
+
+        def _set_on_context(self, ctx):
+            return opentelemetry.context.set_value("test-key", "test-value", ctx)
+
+        def _completed_span(*args, **kwargs):
+            pass
+
+    # create a context manager and force enter to happen on this thread
+    context_manager = TracingWorkflowInboundInterceptor._top_level_workflow_context(
+        _fake_self(),  # type: ignore
+        success_is_complete=True,
+    )
+    context_manager.__enter__()
+
+    # move reference to context manager into queue
+    q: queue.Queue = queue.Queue()
+    q.put(context_manager)
+    del context_manager
+
+    def worker():
+        # pull reference from queue and delete the last reference
+        context_manager = q.get()
+        del context_manager
+        # force gc
+        gc.collect()
+
+    with LogCapturer().logs_captured(opentelemetry.context.logger) as capturer:
+        # run forced gc on other thread so exit happens there
+        t = threading.Thread(target=worker)
+        t.start()
+        t.join(timeout=5)
+
+        def otel_context_error(record: logging.LogRecord) -> bool:
+            return (
+                record.name == "opentelemetry.context"
+                and "Failed to detach context" in record.message
+            )
+
+        assert (
+            capturer.find(otel_context_error) is None
+        ), "Detach from context message should not be logged"
