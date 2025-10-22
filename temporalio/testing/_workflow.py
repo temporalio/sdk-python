@@ -19,6 +19,8 @@ from typing import (
     cast,
 )
 
+from typing_extensions import Self
+
 import google.protobuf.empty_pb2
 
 import temporalio.api.testservice.v1
@@ -73,8 +75,9 @@ class WorkflowEnvironment:
             _client_with_interceptors(client, _AssertionErrorInterceptor())
         )
 
-    @staticmethod
+    @classmethod
     async def start_local(
+        cls,
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
@@ -100,7 +103,7 @@ class WorkflowEnvironment:
         dev_server_download_version: str = "default",
         dev_server_extra_args: Sequence[str] = [],
         dev_server_download_ttl: Optional[timedelta] = None,
-    ) -> WorkflowEnvironment:
+    ) -> Self:
         """Start a full Temporal server locally, downloading if necessary.
 
         This environment is good for testing full server capabilities, but does
