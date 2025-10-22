@@ -19,9 +19,8 @@ from typing import (
     cast,
 )
 
-from typing_extensions import Self
-
 import google.protobuf.empty_pb2
+from typing_extensions import Self
 
 import temporalio.api.testservice.v1
 import temporalio.bridge.testing
@@ -71,9 +70,7 @@ class WorkflowEnvironment:
             The workflow environment that runs against the given client.
         """
         # Add the assertion interceptor
-        return cls(
-            _client_with_interceptors(client, _AssertionErrorInterceptor())
-        )
+        return cls(_client_with_interceptors(client, _AssertionErrorInterceptor()))
 
     @classmethod
     async def start_local(
