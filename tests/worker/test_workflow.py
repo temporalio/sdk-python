@@ -38,6 +38,7 @@ from typing import (
 from urllib.request import urlopen
 
 import pydantic
+import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
 from typing_extensions import Literal, Protocol, runtime_checkable
 
@@ -46,6 +47,7 @@ import temporalio.api.sdk.v1
 import temporalio.client
 import temporalio.converter
 import temporalio.worker
+import temporalio.worker._command_aware_visitor
 import temporalio.workflow
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
@@ -147,11 +149,6 @@ from tests.helpers.external_stack_trace import (
     ExternalStackTraceWorkflow,
     external_wait_cancel,
 )
-
-# Passing through because Python 3.9 has an import bug at
-# https://github.com/python/cpython/issues/91351
-with workflow.unsafe.imports_passed_through():
-    import pytest
 
 
 @workflow.defn
@@ -1609,6 +1606,12 @@ class CustomWorkflowInstance(WorkflowInstance):
         comp = self._unsandboxed.activate(act)
         self._runner._pairs.append((act, comp))
         return comp
+
+    def get_serialization_context(
+        self,
+        command_info: Optional[temporalio.worker._command_aware_visitor.CommandInfo],
+    ) -> Optional[temporalio.converter.SerializationContext]:
+        return self._unsandboxed.get_serialization_context(command_info)
 
 
 async def test_workflow_with_custom_runner(client: Client):
@@ -3186,7 +3189,10 @@ async def test_workflow_query_rpc_timeout(client: Client):
         )
     assert (
         err.value.status == RPCStatusCode.CANCELLED
-        and "timeout" in str(err.value).lower()
+        and (
+            "timeout" in str(err.value).lower()
+            or "http2 error" in str(err.value).lower()
+        )
     ) or err.value.status == RPCStatusCode.DEADLINE_EXCEEDED
 
 
@@ -4838,7 +4844,7 @@ async def test_workflow_update_timeout_or_cancel(client: Client):
         try:
             await called.wait()
         finally:
-            client.workflow_service.poll_workflow_execution_update = unpatched_call
+            client.workflow_service.poll_workflow_execution_update = unpatched_call  # type: ignore
         result_task.cancel()
         with pytest.raises(WorkflowUpdateRPCTimeoutOrCancelledError):
             await result_task

@@ -1,7 +1,7 @@
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 from google.protobuf.descriptor import Descriptor, FieldDescriptor
 
@@ -88,6 +88,7 @@ import abc
 from typing import Any, MutableSequence
 
 from temporalio.api.common.v1.message_pb2 import Payload
+
 
 class VisitorFunctions(abc.ABC):
     \"\"\"Set of functions which can be called by the visitor. 
@@ -202,7 +203,7 @@ class PayloadVisitor:
         # Process regular fields first
         for field in regular_fields:
             # Repeated fields (including maps which are represented as repeated messages)
-            if field.is_repeated:
+            if field.label == FieldDescriptor.LABEL_REPEATED:
                 if (
                     field.message_type is not None
                     and field.message_type.GetOptions().map_entry

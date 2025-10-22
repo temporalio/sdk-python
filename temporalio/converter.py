@@ -5,6 +5,7 @@ from __future__ import annotations
 import collections
 import collections.abc
 import dataclasses
+import functools
 import inspect
 import json
 import sys
@@ -43,6 +44,7 @@ import google.protobuf.message
 import google.protobuf.symbol_database
 import nexusrpc
 import typing_extensions
+from typing_extensions import Self
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -63,6 +65,106 @@ if sys.version_info >= (3, 10):
     from types import UnionType
 
 logger = getLogger(__name__)
+
+
+class SerializationContext(ABC):
+    """Base serialization context.
+
+    Provides contextual information during serialization and deserialization operations.
+
+    Examples:
+        In client code, when starting a workflow, or sending a signal/update/query to a workflow,
+        or receiving the result of an update/query, or handling an exception from a workflow, the
+        context type is :py:class:`WorkflowSerializationContext` and the workflow ID set of the
+        target workflow will be set in the context.
+
+        In workflow code, when operating on a payload being sent/received to/from a child workflow,
+        or handling an exception from a child workflow, the context type is
+        :py:class:`WorkflowSerializationContext` and the workflow ID is that of the child workflow,
+        not of the currently executing (i.e. parent) workflow.
+
+        In workflow code, when operating on a payload to be sent/received to/from an activity, the
+        context type is :py:class:`ActivitySerializationContext` and the workflow ID is that of the
+        currently-executing workflow. ActivitySerializationContext is also set on data converter
+        operations in the activity context.
+    """
+
+    pass
+
+
+@dataclass(frozen=True)
+class BaseWorkflowSerializationContext(SerializationContext):
+    """Base serialization context shared by workflow and activity serialization contexts."""
+
+    namespace: str
+    workflow_id: str
+
+
+@dataclass(frozen=True)
+class WorkflowSerializationContext(BaseWorkflowSerializationContext):
+    """Serialization context for workflows.
+
+    See :py:class:`SerializationContext` for more details.
+
+    Attributes:
+        namespace: The namespace the workflow is running in.
+        workflow_id: The ID of the workflow. Note that this is the ID of the workflow of which the
+            payload being operated on is an input or output. Note also that when creating/describing
+            schedules, this may be the workflow ID prefix as configured, not the final workflow ID
+            when the workflow is created by the schedule.
+    """
+
+    pass
+
+
+@dataclass(frozen=True)
+class ActivitySerializationContext(BaseWorkflowSerializationContext):
+    """Serialization context for activities.
+
+    See :py:class:`SerializationContext` for more details.
+
+    Attributes:
+        namespace: Workflow/activity namespace.
+        workflow_id: Workflow ID. Note, when creating/describing schedules,
+            this may be the workflow ID prefix as configured, not the final workflow ID when the
+            workflow is created by the schedule.
+        workflow_type: Workflow Type.
+        activity_type: Activity Type.
+        activity_task_queue: Activity task queue.
+        is_local: Whether the activity is a local activity.
+    """
+
+    workflow_type: str
+    activity_type: str
+    activity_task_queue: str
+    is_local: bool
+
+
+class WithSerializationContext(ABC):
+    """Interface for classes that can use serialization context.
+
+    The following classes may implement this interface:
+    - :py:class:`PayloadConverter`
+    - :py:class:`PayloadCodec`
+    - :py:class:`FailureConverter`
+    - :py:class:`EncodingPayloadConverter`
+
+    During data converter operations (encoding/decoding, serialization/deserialization, and failure
+    conversion), instances of classes implementing this interface will be replaced by the result of
+    calling with_context(context). This allows overridden methods (encode/decode,
+    to_payload/from_payload, etc) to use the context.
+    """
+
+    def with_context(self, context: SerializationContext) -> Self:
+        """Return a copy of this object configured to use the given context.
+
+        Args:
+            context: The serialization context to use.
+
+        Returns:
+            A new instance configured with the context.
+        """
+        raise NotImplementedError()
 
 
 class PayloadConverter(ABC):
@@ -232,7 +334,7 @@ class EncodingPayloadConverter(ABC):
         raise NotImplementedError
 
 
-class CompositePayloadConverter(PayloadConverter):
+class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
     """Composite payload converter that delegates to a list of encoding payload converters.
 
     Encoding/decoding are attempted on each payload converter successively until
@@ -250,7 +352,9 @@ class CompositePayloadConverter(PayloadConverter):
         Args:
             converters: Payload converters to delegate to, in order.
         """
-        # Insertion order preserved here since Python 3.7
+        self._set_converters(*converters)
+
+    def _set_converters(self, *converters: EncodingPayloadConverter) -> None:
         self.converters = {c.encoding.encode(): c for c in converters}
 
     def to_payloads(
@@ -314,6 +418,44 @@ class CompositePayloadConverter(PayloadConverter):
                     f"Payload at index {index} with encoding {encoding.decode()} could not be converted"
                 ) from err
         return values
+
+    def with_context(self, context: SerializationContext) -> Self:
+        """Return a new instance with context set on the component converters.
+
+        If none of the component converters returned new instances, return self.
+        """
+        converters = self.get_converters_with_context(context)
+        if converters is None:
+            return self
+        new_instance = type(self)()  # Must have a nullary constructor
+        new_instance._set_converters(*converters)
+        return new_instance
+
+    def get_converters_with_context(
+        self, context: SerializationContext
+    ) -> Optional[list[EncodingPayloadConverter]]:
+        """Return converter instances with context set.
+
+        If no converter uses context, return None.
+        """
+        if not self._any_converter_takes_context:
+            return None
+        converters: list[EncodingPayloadConverter] = []
+        any_with_context = False
+        for c in self.converters.values():
+            if isinstance(c, WithSerializationContext):
+                converters.append(c.with_context(context))
+                any_with_context |= converters[-1] is not c
+            else:
+                converters.append(c)
+
+        return converters if any_with_context else None
+
+    @functools.cached_property
+    def _any_converter_takes_context(self) -> bool:
+        return any(
+            isinstance(c, WithSerializationContext) for c in self.converters.values()
+        )
 
 
 class DefaultPayloadConverter(CompositePayloadConverter):
@@ -1108,7 +1250,7 @@ class DefaultFailureConverterWithEncodedAttributes(DefaultFailureConverter):
 
 
 @dataclass(frozen=True)
-class DataConverter:
+class DataConverter(WithSerializationContext):
     """Data converter for converting and encoding payloads to/from Python values.
 
     This combines :py:class:`PayloadConverter` which converts values with
@@ -1211,6 +1353,32 @@ class DataConverter:
         if self.payload_codec:
             await self.payload_codec.decode_failure(failure)
         return self.failure_converter.from_failure(failure, self.payload_converter)
+
+    def with_context(self, context: SerializationContext) -> Self:
+        """Return an instance with context set on the component converters."""
+        payload_converter = self.payload_converter
+        payload_codec = self.payload_codec
+        failure_converter = self.failure_converter
+        if isinstance(payload_converter, WithSerializationContext):
+            payload_converter = payload_converter.with_context(context)
+        if isinstance(payload_codec, WithSerializationContext):
+            payload_codec = payload_codec.with_context(context)
+        if isinstance(failure_converter, WithSerializationContext):
+            failure_converter = failure_converter.with_context(context)
+        if all(
+            new is orig
+            for new, orig in [
+                (payload_converter, self.payload_converter),
+                (payload_codec, self.payload_codec),
+                (failure_converter, self.failure_converter),
+            ]
+        ):
+            return self
+        cloned = dataclasses.replace(self)
+        object.__setattr__(cloned, "payload_converter", payload_converter)
+        object.__setattr__(cloned, "payload_codec", payload_codec)
+        object.__setattr__(cloned, "failure_converter", failure_converter)
+        return cloned
 
 
 DefaultPayloadConverter.default_encoding_payload_converters = (

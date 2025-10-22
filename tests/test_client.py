@@ -1,4 +1,3 @@
-import asyncio
 import dataclasses
 import json
 import os
@@ -8,12 +7,10 @@ from typing import Any, List, Mapping, Optional, Tuple, Union, cast
 from unittest import mock
 
 import google.protobuf.any_pb2
-import google.protobuf.message
+import pytest
 from google.protobuf import json_format
 
 import temporalio.api.common.v1
-import temporalio.api.enums.v1
-import temporalio.api.errordetails.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
@@ -42,11 +39,9 @@ from temporalio.client import (
     BuildIdOpPromoteSetByBuildId,
     CancelWorkflowInput,
     Client,
-    ClientConfig,
     CloudOperationsClient,
     Interceptor,
     OutboundInterceptor,
-    Plugin,
     QueryWorkflowInput,
     RPCError,
     RPCStatusCode,
@@ -88,11 +83,9 @@ from temporalio.common import (
 )
 from temporalio.converter import DataConverter
 from temporalio.exceptions import WorkflowAlreadyStartedError
-from temporalio.service import ServiceCall
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     assert_eq_eventually,
-    assert_eventually,
     ensure_search_attributes_present,
     new_worker,
     worker_versioning_enabled,
@@ -108,11 +101,6 @@ from tests.helpers.worker import (
     KSSleepAction,
     KSWorkflowParams,
 )
-
-# Passing through because Python 3.9 has an import bug at
-# https://github.com/python/cpython/issues/91351
-with workflow.unsafe.imports_passed_through():
-    import pytest
 
 
 async def test_start_id_reuse(
@@ -299,12 +287,7 @@ async def test_terminate(client: Client, worker: ExternalWorker):
 
 
 async def test_rpc_already_exists_error_is_raised(client: Client):
-    class start_workflow_execution(
-        ServiceCall[
-            temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
-            temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
-        ]
-    ):
+    class start_workflow_execution:
         already_exists_err = RPCError(
             "fake already exists error", RPCStatusCode.ALREADY_EXISTS, b""
         )

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Callable, Dict, Generator, Iterable, List, Optional, cast
 
+import pytest
 from opentelemetry import baggage, context
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -16,18 +17,13 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import StatusCode, get_tracer
 
 from temporalio import activity, workflow
-from temporalio.client import Client
-from temporalio.common import RetryPolicy
+from temporalio.client import Client, WithStartWorkflowOperation, WorkflowUpdateStage
+from temporalio.common import RetryPolicy, WorkflowIDConflictPolicy
 from temporalio.contrib.opentelemetry import TracingInterceptor
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
 from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
-
-# Passing through because Python 3.9 has an import bug at
-# https://github.com/python/cpython/issues/91351
-with workflow.unsafe.imports_passed_through():
-    import pytest
 
 
 @dataclass
@@ -57,6 +53,7 @@ class TracingWorkflowAction:
     continue_as_new: Optional[TracingWorkflowActionContinueAsNew] = None
     wait_until_signal_count: int = 0
     wait_and_do_update: bool = False
+    wait_and_do_start_with_update: bool = False
 
 
 @dataclass
@@ -81,6 +78,7 @@ class TracingWorkflowActionContinueAsNew:
 
 
 ready_for_update: asyncio.Semaphore
+ready_for_update_with_start: asyncio.Semaphore
 
 
 @workflow.defn
@@ -88,6 +86,7 @@ class TracingWorkflow:
     def __init__(self) -> None:
         self._signal_count = 0
         self._did_update = False
+        self._did_update_with_start = False
 
     @workflow.run
     async def run(self, param: TracingWorkflowParam) -> None:
@@ -142,6 +141,9 @@ class TracingWorkflow:
             if action.wait_and_do_update:
                 ready_for_update.release()
                 await workflow.wait_condition(lambda: self._did_update)
+            if action.wait_and_do_start_with_update:
+                ready_for_update_with_start.release()
+                await workflow.wait_condition(lambda: self._did_update_with_start)
 
     async def _raise_on_non_replay(self) -> None:
         replaying = workflow.unsafe.is_replaying()
@@ -162,6 +164,10 @@ class TracingWorkflow:
     @workflow.update
     def update(self) -> None:
         self._did_update = True
+
+    @workflow.update
+    def update_with_start(self) -> None:
+        self._did_update_with_start = True
 
     @update.validator
     def update_validator(self) -> None:
@@ -300,6 +306,99 @@ async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
         "  HandleQuery:query (links: StartWorkflow:TracingWorkflow)",
         "SignalWorkflow:signal",
         "StartWorkflowUpdate:update",
+    ]
+
+
+async def test_opentelemetry_tracing_update_with_start(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
+        )
+    global ready_for_update_with_start
+    ready_for_update_with_start = asyncio.Semaphore(0)
+    # Create a tracer that has an in-memory exporter
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+    # Create new client with tracer interceptor
+    client_config = client.config()
+    client_config["interceptors"] = [TracingInterceptor(tracer)]
+    client = Client(**client_config)
+
+    task_queue = f"task_queue_{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[TracingWorkflow],
+        activities=[tracing_activity],
+        # Needed so we can wait to send update at the right time
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ):
+        # Run workflow with various actions
+        workflow_id = f"workflow_{uuid.uuid4()}"
+        workflow_params = TracingWorkflowParam(
+            actions=[
+                # Wait for update
+                TracingWorkflowAction(wait_and_do_start_with_update=True),
+            ]
+        )
+        handle = await client.start_workflow(
+            TracingWorkflow.run,
+            workflow_params,
+            id=workflow_id,
+            task_queue=task_queue,
+        )
+        async with ready_for_update_with_start:
+            start_op = WithStartWorkflowOperation(
+                TracingWorkflow.run,
+                workflow_params,
+                id=handle.id,
+                task_queue=task_queue,
+                id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
+            )
+            await client.start_update_with_start_workflow(
+                TracingWorkflow.update_with_start,
+                start_workflow_operation=start_op,
+                id=handle.id,
+                wait_for_stage=WorkflowUpdateStage.ACCEPTED,
+            )
+        await handle.result()
+
+        # issue update with start again to trigger a new workflow
+        workflow_id = f"workflow_{uuid.uuid4()}"
+        start_op = WithStartWorkflowOperation(
+            TracingWorkflow.run,
+            TracingWorkflowParam(actions=[]),
+            id=workflow_id,
+            task_queue=task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
+        )
+        await client.execute_update_with_start_workflow(
+            update=TracingWorkflow.update_with_start,
+            start_workflow_operation=start_op,
+            id=workflow_id,
+        )
+
+    # Dump debug with attributes, but do string assertion test without
+    logging.debug(
+        "Spans:\n%s",
+        "\n".join(dump_spans(exporter.get_finished_spans(), with_attributes=False)),
+    )
+    assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
+        "StartWorkflow:TracingWorkflow",
+        "  RunWorkflow:TracingWorkflow",
+        "  MyCustomSpan",
+        "  HandleUpdate:update_with_start (links: StartUpdateWithStartWorkflow:TracingWorkflow)",
+        "  CompleteWorkflow:TracingWorkflow",
+        "StartUpdateWithStartWorkflow:TracingWorkflow",
+        "StartUpdateWithStartWorkflow:TracingWorkflow",
+        "  HandleUpdate:update_with_start (links: StartUpdateWithStartWorkflow:TracingWorkflow)",
+        "  RunWorkflow:TracingWorkflow",
+        "  MyCustomSpan",
+        "  CompleteWorkflow:TracingWorkflow",
     ]
 
 

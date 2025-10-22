@@ -61,7 +61,7 @@ WorkerDeploymentOptions = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKERDEPLOYMENTOPTIONS,
-        "__module__": "temporal.api.deployment.v1.message_pb2",
+        "__module__": "temporalio.api.deployment.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.WorkerDeploymentOptions)
     },
 )
@@ -72,7 +72,7 @@ Deployment = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DEPLOYMENT,
-        "__module__": "temporal.api.deployment.v1.message_pb2",
+        "__module__": "temporalio.api.deployment.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.Deployment)
     },
 )
@@ -87,7 +87,7 @@ DeploymentInfo = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _DEPLOYMENTINFO_METADATAENTRY,
-                "__module__": "temporal.api.deployment.v1.message_pb2",
+                "__module__": "temporalio.api.deployment.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.DeploymentInfo.MetadataEntry)
             },
         ),
@@ -96,12 +96,12 @@ DeploymentInfo = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _DEPLOYMENTINFO_TASKQUEUEINFO,
-                "__module__": "temporal.api.deployment.v1.message_pb2",
+                "__module__": "temporalio.api.deployment.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.DeploymentInfo.TaskQueueInfo)
             },
         ),
         "DESCRIPTOR": _DEPLOYMENTINFO,
-        "__module__": "temporal.api.deployment.v1.message_pb2",
+        "__module__": "temporalio.api.deployment.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.DeploymentInfo)
     },
 )
@@ -118,12 +118,12 @@ UpdateDeploymentMetadata = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _UPDATEDEPLOYMENTMETADATA_UPSERTENTRIESENTRY,
-                "__module__": "temporal.api.deployment.v1.message_pb2",
+                "__module__": "temporalio.api.deployment.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.UpdateDeploymentMetadata.UpsertEntriesEntry)
             },
         ),
         "DESCRIPTOR": _UPDATEDEPLOYMENTMETADATA,
-        "__module__": "temporal.api.deployment.v1.message_pb2",
+        "__module__": "temporalio.api.deployment.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.UpdateDeploymentMetadata)
     },
 )
@@ -135,7 +135,7 @@ DeploymentListInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _DEPLOYMENTLISTINFO,
-        "__module__": "temporal.api.deployment.v1.message_pb2",
+        "__module__": "temporalio.api.deployment.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.DeploymentListInfo)
     },
 )
@@ -150,12 +150,12 @@ WorkerDeploymentVersionInfo = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _WORKERDEPLOYMENTVERSIONINFO_VERSIONTASKQUEUEINFO,
-                "__module__": "temporal.api.deployment.v1.message_pb2",
+                "__module__": "temporalio.api.deployment.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.WorkerDeploymentVersionInfo.VersionTaskQueueInfo)
             },
         ),
         "DESCRIPTOR": _WORKERDEPLOYMENTVERSIONINFO,
-        "__module__": "temporal.api.deployment.v1.message_pb2",
+        "__module__": "temporalio.api.deployment.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.WorkerDeploymentVersionInfo)
     },
 )
@@ -167,7 +167,7 @@ VersionDrainageInfo = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _VERSIONDRAINAGEINFO,
-        "__module__": "temporal.api.deployment.v1.message_pb2",
+        "__module__": "temporalio.api.deployment.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.VersionDrainageInfo)
     },
 )
@@ -182,12 +182,12 @@ WorkerDeploymentInfo = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _WORKERDEPLOYMENTINFO_WORKERDEPLOYMENTVERSIONSUMMARY,
-                "__module__": "temporal.api.deployment.v1.message_pb2",
+                "__module__": "temporalio.api.deployment.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.WorkerDeploymentInfo.WorkerDeploymentVersionSummary)
             },
         ),
         "DESCRIPTOR": _WORKERDEPLOYMENTINFO,
-        "__module__": "temporal.api.deployment.v1.message_pb2",
+        "__module__": "temporalio.api.deployment.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.WorkerDeploymentInfo)
     },
 )
@@ -199,7 +199,7 @@ WorkerDeploymentVersion = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKERDEPLOYMENTVERSION,
-        "__module__": "temporal.api.deployment.v1.message_pb2",
+        "__module__": "temporalio.api.deployment.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.WorkerDeploymentVersion)
     },
 )
@@ -214,12 +214,12 @@ VersionMetadata = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _VERSIONMETADATA_ENTRIESENTRY,
-                "__module__": "temporal.api.deployment.v1.message_pb2",
+                "__module__": "temporalio.api.deployment.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.VersionMetadata.EntriesEntry)
             },
         ),
         "DESCRIPTOR": _VERSIONMETADATA,
-        "__module__": "temporal.api.deployment.v1.message_pb2",
+        "__module__": "temporalio.api.deployment.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.VersionMetadata)
     },
 )
@@ -231,7 +231,7 @@ RoutingConfig = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ROUTINGCONFIG,
-        "__module__": "temporal.api.deployment.v1.message_pb2",
+        "__module__": "temporalio.api.deployment.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.deployment.v1.RoutingConfig)
     },
 )
