@@ -198,7 +198,7 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
                         )
                     raise
         finally:
-            if token:
+            if token and context is opentelemetry.context.get_current():
                 opentelemetry.context.detach(token)
 
     def _completed_workflow_span(
