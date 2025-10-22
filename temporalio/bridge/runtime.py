@@ -96,7 +96,7 @@ class RuntimeOptions:
     """Python representation of the Rust struct for runtime options."""
 
     telemetry: TelemetryConfig
-    worker_heartbeat_interval_millis: Optional[int] = 30_000  # 30s
+    worker_heartbeat_interval_millis: Optional[int] = 60_000  # 60s
 
 
 # WARNING: This must match Rust runtime::BufferedLogEntry
