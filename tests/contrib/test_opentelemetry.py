@@ -4,9 +4,10 @@ import asyncio
 import logging
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Iterable, List, Optional
+from typing import Dict, Generator, Iterable, List, Optional
 
 from opentelemetry import baggage, context
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
@@ -412,7 +413,7 @@ class BenignWorkflow:
 
 
 @activity.defn
-async def read_baggage_activity() -> dict:
+async def read_baggage_activity() -> Dict[str, str | None]:
     return {
         "user_id": baggage.get_baggage("user.id"),
         "tenant_id": baggage.get_baggage("tenant.id"),
@@ -422,10 +423,62 @@ async def read_baggage_activity() -> dict:
 @workflow.defn
 class ReadBaggageTestWorkflow:
     @workflow.run
-    async def run(self) -> dict:
+    async def run(self) -> Dict[str, str | None]:
         return await workflow.execute_activity(
             read_baggage_activity,
             start_to_close_timeout=timedelta(seconds=10),
+        )
+
+
+@activity.defn
+async def read_multiple_baggage_activity() -> Dict[str, str | None]:
+    return {
+        "user_id": baggage.get_baggage("user.id"),
+        "tenant_id": baggage.get_baggage("tenant.id"),
+        "request_id": baggage.get_baggage("request.id"),
+        "trace_id": baggage.get_baggage("trace.id"),
+        "custom_field": baggage.get_baggage("custom.field"),
+    }
+
+
+@workflow.defn
+class MultipleBaggageTestWorkflow:
+    @workflow.run
+    async def run(self) -> Dict[str, str | None]:
+        return await workflow.execute_activity(
+            read_multiple_baggage_activity,
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+
+
+@workflow.defn
+class LocalActivityBaggageTestWorkflow:
+    @workflow.run
+    async def run(self) -> Dict[str, str | None]:
+        return await workflow.execute_local_activity(
+            read_baggage_activity,
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+
+
+retry_attempt_baggage_values: List[Optional[str]] = []
+
+
+@activity.defn
+async def failing_baggage_activity() -> None:
+    retry_attempt_baggage_values.append(baggage.get_baggage("user.id"))
+    if activity.info().attempt < 2:
+        raise RuntimeError("Intentional failure")
+
+
+@workflow.defn
+class RetryBaggageTestWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_activity(
+            failing_baggage_activity,
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=RetryPolicy(initial_interval=timedelta(milliseconds=1)),
         )
 
 
@@ -460,6 +513,19 @@ async def test_opentelemetry_benign_exception(client: Client):
     assert all(span.status.status_code == StatusCode.UNSET for span in spans)
 
 
+@contextmanager
+def baggage_values(values: Dict[str, str]) -> Generator[None, None, None]:
+    ctx = context.get_current()
+    for key, value in values.items():
+        ctx = baggage.set_baggage(key, value, context=ctx)
+
+    token = context.attach(ctx)
+    try:
+        yield
+    finally:
+        context.detach(token)
+
+
 async def test_opentelemetry_baggage_propagation_basic(
     client: Client, env: WorkflowEnvironment
 ):
@@ -479,25 +545,129 @@ async def test_opentelemetry_baggage_propagation_basic(
         workflows=[ReadBaggageTestWorkflow],
         activities=[read_baggage_activity],
     ):
-        ctx = baggage.set_baggage("user.id", "test-user-123")
-        ctx = baggage.set_baggage("tenant.id", "acme-corp", context=ctx)
-
-        token = context.attach(ctx)
-        try:
+        with baggage_values({"user.id": "test-user-123", "tenant.id": "some-corp"}):
             result = await client.execute_workflow(
                 ReadBaggageTestWorkflow.run,
                 id=f"workflow_{uuid.uuid4()}",
                 task_queue=task_queue,
             )
-        finally:
-            context.detach(token)
 
         assert (
             result["user_id"] == "test-user-123"
         ), "user.id baggage should propagate to activity"
         assert (
-            result["tenant_id"] == "acme-corp"
+            result["tenant_id"] == "some-corp"
         ), "tenant.id baggage should propagate to activity"
+
+
+async def test_opentelemetry_baggage_propagation_multiple_values(
+    client: Client, env: WorkflowEnvironment
+):
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+
+    client_config = client.config()
+    client_config["interceptors"] = [TracingInterceptor(tracer)]
+    client = Client(**client_config)
+
+    task_queue = f"task_queue_{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[MultipleBaggageTestWorkflow],
+        activities=[read_multiple_baggage_activity],
+    ):
+        with baggage_values(
+            {
+                "user.id": "test-user-123",
+                "tenant.id": "some-corp",
+                "request.id": "req-456",
+                "trace.id": "trace-789",
+                "custom.field": "custom-value",
+            }
+        ):
+            result = await client.execute_workflow(
+                MultipleBaggageTestWorkflow.run,
+                id=f"workflow_{uuid.uuid4()}",
+                task_queue=task_queue,
+            )
+
+        assert result["user_id"] == "test-user-123"
+        assert result["tenant_id"] == "some-corp"
+        assert result["request_id"] == "req-456"
+        assert result["trace_id"] == "trace-789"
+        assert result["custom_field"] == "custom-value"
+
+
+async def test_opentelemetry_baggage_propagation_local_activity(
+    client: Client, env: WorkflowEnvironment
+):
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+
+    client_config = client.config()
+    client_config["interceptors"] = [TracingInterceptor(tracer)]
+    client = Client(**client_config)
+
+    task_queue = f"task_queue_{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[LocalActivityBaggageTestWorkflow],
+        activities=[read_baggage_activity],
+    ):
+        with baggage_values(
+            {
+                "user.id": "test-user-456",
+                "tenant.id": "local-corp",
+            }
+        ):
+            result = await client.execute_workflow(
+                LocalActivityBaggageTestWorkflow.run,
+                id=f"workflow_{uuid.uuid4()}",
+                task_queue=task_queue,
+            )
+
+        assert result["user_id"] == "test-user-456"
+        assert result["tenant_id"] == "local-corp"
+
+
+async def test_opentelemetry_baggage_propagation_with_retries(
+    client: Client, env: WorkflowEnvironment
+):
+    global retry_attempt_baggage_values
+    retry_attempt_baggage_values = []
+
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+
+    client_config = client.config()
+    client_config["interceptors"] = [TracingInterceptor(tracer)]
+    client = Client(**client_config)
+
+    task_queue = f"task_queue_{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[RetryBaggageTestWorkflow],
+        activities=[failing_baggage_activity],
+    ):
+        with baggage_values({"user.id": "test-user-retry"}):
+            await client.execute_workflow(
+                RetryBaggageTestWorkflow.run,
+                id=f"workflow_{uuid.uuid4()}",
+                task_queue=task_queue,
+            )
+
+        # Verify baggage was present on all attempts
+        assert len(retry_attempt_baggage_values) == 2
+        assert all(v == "test-user-retry" for v in retry_attempt_baggage_values)
 
 
 # TODO(cretz): Additional tests to write
