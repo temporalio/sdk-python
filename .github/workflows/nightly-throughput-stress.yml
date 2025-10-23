@@ -12,23 +12,23 @@ on:
       duration:
         description: 'Test duration (e.g., 6h, 1h)'
         required: false
-        default: '6h'
+        default: '5h'
         type: string
       timeout:
         description: 'Scenario timeout (should always be greater than duration)'
         required: false
-        default: '6h30m'
+        default: '5h30m'
         type: string
       job_timeout_minutes:
         description: 'GitHub Actions job timeout in minutes'
         required: false
-        default: 420
+        default: 360
         type: number
 
 env:
   # Workflow configuration
-  TEST_DURATION: ${{ inputs.duration || vars.NIGHTLY_TEST_DURATION || '6h' }}
-  TEST_TIMEOUT: ${{ inputs.timeout || vars.NIGHTLY_TEST_TIMEOUT || '6h30m' }}
+  TEST_DURATION: ${{ inputs.duration || vars.NIGHTLY_TEST_DURATION || '5h' }}
+  TEST_TIMEOUT: ${{ inputs.timeout || vars.NIGHTLY_TEST_TIMEOUT || '5h30m' }}
 
   # Logging and artifacts
   WORKER_LOG_DIR: /tmp/throughput-stress-logs
@@ -41,7 +41,7 @@ env:
 jobs:
   throughput-stress:
     runs-on: ubuntu-latest-4-cores
-    timeout-minutes: ${{ fromJSON(inputs.job_timeout_minutes || vars.NIGHTLY_JOB_TIMEOUT_MINUTES || 420) }}
+    timeout-minutes: ${{ fromJSON(inputs.job_timeout_minutes || vars.NIGHTLY_JOB_TIMEOUT_MINUTES || 360) }}
 
     steps:
       - name: Print test configuration
