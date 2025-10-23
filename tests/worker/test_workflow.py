@@ -131,6 +131,7 @@ from temporalio.worker import (
 )
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import (
+    LogCapturer,
     admitted_update_task,
     assert_eq_eventually,
     assert_eventually,
@@ -144,6 +145,11 @@ from tests.helpers import (
     pause_and_assert,
     unpause_and_assert,
     workflow_update_exists,
+)
+from tests.helpers.cache_eviction import (
+    CacheEvictionTearDownWorkflow,
+    WaitForeverWorkflow,
+    wait_forever_activity,
 )
 from tests.helpers.external_stack_trace import (
     ExternalStackTraceWorkflow,
@@ -1992,37 +1998,6 @@ class LoggingWorkflow:
         return self._last_signal
 
 
-class LogCapturer:
-    def __init__(self) -> None:
-        self.log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
-
-    @contextmanager
-    def logs_captured(self, *loggers: logging.Logger):
-        handler = logging.handlers.QueueHandler(self.log_queue)
-
-        prev_levels = [l.level for l in loggers]
-        for l in loggers:
-            l.setLevel(logging.INFO)
-            l.addHandler(handler)
-        try:
-            yield self
-        finally:
-            for i, l in enumerate(loggers):
-                l.removeHandler(handler)
-                l.setLevel(prev_levels[i])
-
-    def find_log(self, starts_with: str) -> Optional[logging.LogRecord]:
-        return self.find(lambda l: l.message.startswith(starts_with))
-
-    def find(
-        self, pred: Callable[[logging.LogRecord], bool]
-    ) -> Optional[logging.LogRecord]:
-        for record in cast(List[logging.LogRecord], self.log_queue.queue):
-            if pred(record):
-                return record
-        return None
-
-
 async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
     workflow.logger.full_workflow_info_on_extra = True
     with LogCapturer().logs_captured(
@@ -3736,70 +3711,6 @@ async def test_manual_result_type(client: Client):
         assert res3 == {"some_string": "from-query"}
         res4 = await handle.query("some_query", result_type=ManualResultType)
         assert res4 == ManualResultType(some_string="from-query")
-
-
-@activity.defn
-async def wait_forever_activity() -> None:
-    await asyncio.Future()
-
-
-@workflow.defn
-class WaitForeverWorkflow:
-    @workflow.run
-    async def run(self) -> None:
-        await asyncio.Future()
-
-
-@workflow.defn
-class CacheEvictionTearDownWorkflow:
-    def __init__(self) -> None:
-        self._signal_count = 0
-
-    @workflow.run
-    async def run(self) -> None:
-        # Start several things in background. This is just to show that eviction
-        # can work even with these things running.
-        tasks = [
-            asyncio.create_task(
-                workflow.execute_activity(
-                    wait_forever_activity, start_to_close_timeout=timedelta(hours=1)
-                )
-            ),
-            asyncio.create_task(
-                workflow.execute_child_workflow(WaitForeverWorkflow.run)
-            ),
-            asyncio.create_task(asyncio.sleep(1000)),
-            asyncio.shield(
-                workflow.execute_activity(
-                    wait_forever_activity, start_to_close_timeout=timedelta(hours=1)
-                )
-            ),
-            asyncio.create_task(workflow.wait_condition(lambda: False)),
-        ]
-        gather_fut = asyncio.gather(*tasks, return_exceptions=True)
-        # Let's also start something in the background that we never wait on
-        asyncio.create_task(asyncio.sleep(1000))
-        try:
-            # Wait for signal count to reach 2
-            await asyncio.sleep(0.01)
-            await workflow.wait_condition(lambda: self._signal_count > 1)
-        finally:
-            # This finally, on eviction, is actually called but the command
-            # should be ignored
-            await asyncio.sleep(0.01)
-            await workflow.wait_condition(lambda: self._signal_count > 2)
-            # Cancel gather tasks and wait on them, but ignore the errors
-            for task in tasks:
-                task.cancel()
-            await gather_fut
-
-    @workflow.signal
-    async def signal(self) -> None:
-        self._signal_count += 1
-
-    @workflow.query
-    def signal_count(self) -> int:
-        return self._signal_count
 
 
 async def test_cache_eviction_tear_down(client: Client):
