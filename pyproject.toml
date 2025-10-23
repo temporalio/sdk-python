@@ -5,7 +5,8 @@ description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.10"
 readme = "README.md"
-license = { file = "LICENSE", text = "MIT" }
+License-Expression = "MIT"
+License-File = "LICENSE"
 keywords = ["temporal", "workflow"]
 dependencies = [
   "nexus-rpc==1.1.0",
