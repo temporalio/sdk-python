@@ -477,7 +477,12 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             )
             return await super().handle_query(input)
         finally:
-            opentelemetry.context.detach(token)
+            # In some exceptional cases this finally is executed with a
+            # different contextvars.Context than the one the token was created
+            # on. As such we do a best effort detach to avoid using a mismatched
+            # token.
+            if context is opentelemetry.context.get_current():
+                opentelemetry.context.detach(token)
 
     def handle_update_validator(
         self, input: temporalio.worker.HandleUpdateInput
@@ -549,6 +554,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         exception: Optional[Exception] = None
         # Run under this context
         token = opentelemetry.context.attach(context)
+
         try:
             yield None
             success = True
@@ -565,7 +571,13 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
                     exception=exception,
                     kind=opentelemetry.trace.SpanKind.INTERNAL,
                 )
-            opentelemetry.context.detach(token)
+
+            # In some exceptional cases this finally is executed with a
+            # different contextvars.Context than the one the token was created
+            # on. As such we do a best effort detach to avoid using a mismatched
+            # token.
+            if context is opentelemetry.context.get_current():
+                opentelemetry.context.detach(token)
 
     def _context_to_headers(
         self, headers: Mapping[str, temporalio.api.common.v1.Payload]
