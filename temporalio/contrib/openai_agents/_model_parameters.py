@@ -70,3 +70,5 @@ class ModelActivityParameters:
 
     priority: Priority = Priority.default
     """Priority for the activity execution."""
+
+    use_local_activity: bool = False
