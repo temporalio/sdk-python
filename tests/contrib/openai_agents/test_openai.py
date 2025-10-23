@@ -2680,7 +2680,7 @@ async def test_local_hello_world_agent(client: Client):
                 start_to_close_timeout=timedelta(seconds=30),
                 use_local_activity=True,
             ),
-            model_provider=TestModelProvider(TestHelloModel())
+            model_provider=TestModelProvider(TestHelloModel()),
         )
     ]
     client = Client(**new_config)
