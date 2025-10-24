@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import functools
-import importlib
 import inspect
 import os
 import sys
@@ -499,7 +498,7 @@ class _TestWorkflowInboundInterceptor(WorkflowInboundInterceptor):
         with workflow.unsafe.sandbox_import_policy(
             workflow.SandboxImportPolicy.WARN_ON_NON_PASSTHROUGH
         ):
-            import opentelemetry
+            import tests.worker.workflow_sandbox.testmodules.lazy_module_interceptor
 
         return await super().execute_workflow(input)
 
@@ -516,14 +515,43 @@ class LazyImportWorkflow:
     @workflow.run
     async def run(self) -> None:
         try:
-            import opentelemetry.version
+            import tests.worker.workflow_sandbox.testmodules.lazy_module
         except DisallowedUnintentionalPassthroughError as err:
             raise ApplicationError(
                 str(err), type="DisallowedUnintentionalPassthroughError"
             ) from err
 
 
-async def test_workflow_sandbox_import_warnings(client: Client):
+async def test_workflow_sandbox_import_default_warnings(client: Client):
+    restrictions = dataclasses.replace(
+        SandboxRestrictions.default,
+        # passthrough this test module to avoid a ton of noisy warnings
+        passthrough_modules=SandboxRestrictions.passthrough_modules_default
+        | {"tests.worker.workflow_sandbox.test_runner"},
+    )
+
+    async with Worker(
+        client,
+        task_queue=str(uuid.uuid4()),
+        workflows=[LazyImportWorkflow],
+        workflow_runner=SandboxedWorkflowRunner(restrictions),
+    ) as worker:
+        with pytest.warns() as recorder:
+            await client.execute_workflow(
+                LazyImportWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+            _assert_expected_warnings(
+                recorder,
+                {
+                    "Module tests.worker.workflow_sandbox.testmodules.lazy_module was imported after initial workflow load.",
+                },
+            )
+
+
+async def test_workflow_sandbox_import_all_warnings(client: Client):
     restrictions = dataclasses.replace(
         SandboxRestrictions.default,
         import_policy=SandboxRestrictions.import_policy_all_warnings,
@@ -539,21 +567,21 @@ async def test_workflow_sandbox_import_warnings(client: Client):
         interceptors=[_TestInterceptor()],
         workflow_runner=SandboxedWorkflowRunner(restrictions),
     ) as worker:
-        with pytest.warns() as records:
+        with pytest.warns() as recorder:
             await client.execute_workflow(
                 LazyImportWorkflow.run,
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
 
-            expected_warnings = {
-                "Module opentelemetry was not intentionally passed through to the sandbox.",
-                "Module opentelemetry.version was imported after initial workflow load.",
-                "Module opentelemetry.version was not intentionally passed through to the sandbox.",
-            }
-            actual_warnings = {str(w.message) for w in records}
-
-            assert expected_warnings <= actual_warnings
+            _assert_expected_warnings(
+                recorder,
+                {
+                    "Module tests.worker.workflow_sandbox.testmodules.lazy_module_interceptor was not intentionally passed through to the sandbox.",
+                    "Module tests.worker.workflow_sandbox.testmodules.lazy_module was imported after initial workflow load.",
+                    "Module tests.worker.workflow_sandbox.testmodules.lazy_module was not intentionally passed through to the sandbox.",
+                },
+            )
 
 
 async def test_workflow_sandbox_import_errors(client: Client):
@@ -571,16 +599,31 @@ async def test_workflow_sandbox_import_errors(client: Client):
         workflows=[LazyImportWorkflow],
         workflow_runner=SandboxedWorkflowRunner(restrictions),
     ) as worker:
-        with pytest.raises(WorkflowFailureError) as err:
-            await client.execute_workflow(
-                LazyImportWorkflow.run,
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
+        with pytest.warns() as recorder:
+            with pytest.raises(WorkflowFailureError) as err:
+                await client.execute_workflow(
+                    LazyImportWorkflow.run,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+
+            assert isinstance(err.value.cause, ApplicationError)
+            assert err.value.cause.type == "DisallowedUnintentionalPassthroughError"
+            assert (
+                "Module tests.worker.workflow_sandbox.testmodules.lazy_module was not intentionally passed through to the sandbox."
+                == err.value.cause.message
             )
 
-        assert isinstance(err.value.cause, ApplicationError)
-        assert err.value.cause.type == "DisallowedUnintentionalPassthroughError"
-        assert (
-            "Module opentelemetry.version was not intentionally passed through to the sandbox."
-            == err.value.cause.message
-        )
+            _assert_expected_warnings(
+                recorder,
+                {
+                    "Module tests.worker.workflow_sandbox.testmodules.lazy_module was imported after initial workflow load.",
+                },
+            )
+
+
+def _assert_expected_warnings(
+    recorder: pytest.WarningsRecorder, expected_warnings: Set[str]
+):
+    actual_warnings = {str(w.message) for w in recorder}
+    assert expected_warnings <= actual_warnings
