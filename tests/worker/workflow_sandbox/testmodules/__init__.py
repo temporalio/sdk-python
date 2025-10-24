@@ -14,4 +14,5 @@ restrictions = SandboxRestrictions(
         "tests.worker.workflow_sandbox.testmodules.invalid_module_members".split("."),
         SandboxMatcher(use={"invalid_function"}),
     ),
+    import_notification_policy=SandboxRestrictions.import_notification_policy_default,
 )
