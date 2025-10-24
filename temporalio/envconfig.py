@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Literal, Mapping, Optional, Union, cast
 
-from typing_extensions import TypeAlias, TypedDict
+from typing_extensions import Self, TypeAlias, TypedDict
 
 import temporalio.service
 from temporalio.bridge.temporal_sdk_bridge import envconfig as _bridge_envconfig
@@ -148,12 +148,12 @@ class ClientConfigTLS:
             client_private_key=_read_source(self.client_private_key),
         )
 
-    @staticmethod
-    def from_dict(d: Optional[ClientConfigTLSDict]) -> Optional[ClientConfigTLS]:
+    @classmethod
+    def from_dict(cls, d: Optional[ClientConfigTLSDict]) -> Optional[Self]:
         """Create a ClientConfigTLS from a dictionary."""
         if not d:
             return None
-        return ClientConfigTLS(
+        return cls(
             disabled=d.get("disabled"),
             server_name=d.get("server_name"),
             # Note: Bridge uses snake_case, but TOML uses kebab-case which is
@@ -202,10 +202,10 @@ class ClientConfigProfile:
     grpc_meta: Mapping[str, str] = field(default_factory=dict)
     """gRPC metadata."""
 
-    @staticmethod
-    def from_dict(d: ClientConfigProfileDict) -> ClientConfigProfile:
+    @classmethod
+    def from_dict(cls, d: ClientConfigProfileDict) -> Self:
         """Create a ClientConfigProfile from a dictionary."""
-        return ClientConfigProfile(
+        return cls(
             address=d.get("address"),
             namespace=d.get("namespace"),
             api_key=d.get("api_key"),
@@ -318,14 +318,15 @@ class ClientConfig:
         """Convert to a dictionary that can be used for TOML serialization."""
         return {k: v.to_dict() for k, v in self.profiles.items()}
 
-    @staticmethod
+    @classmethod
     def from_dict(
+        cls,
         d: Mapping[str, Mapping[str, Any]],
-    ) -> ClientConfig:
+    ) -> Self:
         """Create a ClientConfig from a dictionary."""
         # We must cast the inner dictionary because the source is often a plain
         # Mapping[str, Any] from the bridge or other sources.
-        return ClientConfig(
+        return cls(
             profiles={
                 k: ClientConfigProfile.from_dict(cast(ClientConfigProfileDict, v))
                 for k, v in d.items()
