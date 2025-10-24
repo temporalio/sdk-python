@@ -103,7 +103,7 @@ class DisallowedUnintentionalPassthroughError(temporalio.workflow.Nondeterminism
 
     @staticmethod
     def default_message(qualified_name: str) -> str:
-        """Get default message for disallowed unintential passthrough."""
+        """Get default message for disallowed unintentional passthrough."""
         return f"Module {qualified_name} was not intentionally passed through to the sandbox."
 
 
