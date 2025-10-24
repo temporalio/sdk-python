@@ -70,3 +70,6 @@ class ModelActivityParameters:
 
     priority: Priority = Priority.default
     """Priority for the activity execution."""
+
+    use_local_activity: bool = False
+    """Whether to use a local activity. If changed during a workflow execution, that would break determinism."""
