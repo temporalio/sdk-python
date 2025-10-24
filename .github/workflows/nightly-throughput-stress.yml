@@ -117,7 +117,6 @@ jobs:
 
       - name: Run throughput stress scenario with local SDK
         working-directory: omes
-        continue-on-error: true
         run: |
           # Use run-scenario-with-worker to build and run in one step
           # Pass the SDK directory as --version for local testing
@@ -139,10 +138,8 @@ jobs:
             --option min-throughput-per-hour=1000 \
             2>&1 | tee $WORKER_LOG_DIR/scenario.log
 
-            echo "SCENARIO_EXIT_CODE=${PIPESTATUS[0]}" >> $GITHUB_ENV
-
       - name: Upload logs on failure
-        if: env.SCENARIO_EXIT_CODE != '0'
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
           name: throughput-stress-logs
@@ -150,7 +147,7 @@ jobs:
           retention-days: 30
 
       - name: Notify Slack on failure
-        if: env.SCENARIO_EXIT_CODE != '0'
+        if: failure() || cancelled()
         uses: slackapi/slack-github-action@v2
         with:
           webhook-type: incoming-webhook
@@ -170,13 +167,12 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_SDK_ALERTS_WEBHOOK }}
 
-      - name: Fail if scenario failed
+      - name: Report test results
         if: always()
         run: |
-          if [ "${SCENARIO_EXIT_CODE:-1}" != "0" ]; then
-            echo "❌ Throughput stress test failed with exit code ${SCENARIO_EXIT_CODE}"
-            echo "Check the artifacts for detailed logs and state"
-            exit 1
-          else
+          if [ "${{ steps.*.outcome }}" = "success" ]; then
             echo "✅ Throughput stress test completed successfully"
+          else
+            echo "❌ Throughput stress test failed"
+            echo "📦 Check the uploaded artifacts for detailed logs and state"
           fi
