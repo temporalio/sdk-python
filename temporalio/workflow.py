@@ -1410,24 +1410,20 @@ async def wait_condition(
 _sandbox_unrestricted = threading.local()
 _in_sandbox = threading.local()
 _imports_passed_through = threading.local()
+_sandbox_import_notification_policy_override = threading.local()
 
 
-# TODO(amazzeo): this name is confusing with existing import passthrough phrasing.
-class SandboxImportPolicy(Flag):
-    # TODO(amazzeo): Need to establish consistent phrasing about the time this is applied
-    """Defines the behavior taken when modules are imported into the sandbox after the workflow is initially loaded."""
+class SandboxImportNotificationPolicy(Flag):
+    """Defines the behavior taken when modules are imported into the sandbox after the workflow is initially loaded or unintentionally missing from the passthrough list."""
 
-    UNSET = auto()
-    """All imports that do not violate sandbox restrictions are allowed and no warning is generated."""
+    SILENT = auto()
+    """Allow imports that do not violate sandbox restrictions and no warnings are generated."""
     WARN_ON_DYNAMIC_IMPORT = auto()
-    """Issue a warning when an import is triggered in the sandbox after initial workflow load."""
-    WARN_ON_NON_PASSTHROUGH = auto()
-    """Issue a warning when an import is triggered in the sandbox that was not passed through."""
-    RAISE_ON_NON_PASSTHROUGH = auto()
-    """Raise an error when an import is triggered in the sandbox that was not passed through."""
-
-
-_sandbox_import_policy = threading.local()
+    """Allows dynamic imports that do not violate sandbox restrictions but issues a warning when an import is triggered in the sandbox after initial workflow load."""
+    WARN_ON_UNINTENTIONAL_PASSTHROUGH = auto()
+    """Allows imports that do not violate sandbox restrictions but issues a warning when an import is triggered in the sandbox that was unintentionally passed through."""
+    RAISE_ON_UNINTENTIONAL_PASSTHROUGH = auto()
+    """Raise an error when an import is triggered in the sandbox that was unintentionally passed through."""
 
 
 class unsafe:
@@ -1517,24 +1513,33 @@ class unsafe:
             _imports_passed_through.value = False
 
     @staticmethod
-    def current_sandbox_import_policy() -> SandboxImportPolicy:
+    def current_sandbox_import_notification_policy() -> (
+        Optional[SandboxImportNotificationPolicy]
+    ):
+        """Gets the current import notification policy override if one is set."""
         applied_policy = getattr(
-            _sandbox_import_policy, "value", SandboxImportPolicy.UNSET
+            _sandbox_import_notification_policy_override,
+            "value",
+            None,
         )
         return applied_policy
 
     @staticmethod
     @contextmanager
-    def sandbox_import_policy(policy: SandboxImportPolicy) -> Iterator[None]:
-        # TODO(amazzeo): the default behavior here seems inappropriate
-        original_policy = _sandbox_import_policy.value = getattr(
-            _sandbox_import_policy, "value", SandboxImportPolicy.UNSET
+    def sandbox_import_notification_policy(
+        policy: SandboxImportNotificationPolicy,
+    ) -> Iterator[None]:
+        """Context manager to apply the given import notification policy."""
+        original_policy = _sandbox_import_notification_policy_override.value = getattr(
+            _sandbox_import_notification_policy_override,
+            "value",
+            None,
         )
-        _sandbox_import_policy.value = policy
+        _sandbox_import_notification_policy_override.value = policy
         try:
             yield None
         finally:
-            _sandbox_import_policy.value = original_policy
+            _sandbox_import_notification_policy_override.value = original_policy
 
 
 class LoggerAdapter(logging.LoggerAdapter):

@@ -55,10 +55,10 @@ customize, and work around sandbox issues.
 #   * https://github.com/GrahamDumpleton/wrapt/issues/130
 
 from ._restrictions import (
+    DisallowedUnintentionalPassthroughError,
     RestrictedWorkflowAccessError,
     SandboxMatcher,
     SandboxRestrictions,
-    DisallowedUnintentionalPassthroughError,
 )
 from ._runner import SandboxedWorkflowRunner
 
