@@ -17,8 +17,6 @@ from datetime import datetime, timedelta, timezone
 from time import sleep
 from typing import Any, Callable, List, NoReturn, Optional, Sequence, Type
 
-import pytest
-
 import temporalio.api.workflowservice.v1
 from temporalio import activity, workflow
 from temporalio.client import (
@@ -51,6 +49,11 @@ from tests.helpers.worker import (
     KSWorkflowParams,
     kitchen_sink_retry_policy,
 )
+
+# Passing through because Python <=3.12 has an import bug at
+# https://github.com/python/cpython/issues/91351
+with workflow.unsafe.imports_passed_through():
+    import pytest
 
 _default_shared_state_manager = SharedStateManager.create_from_multiprocessing(
     multiprocessing.Manager()

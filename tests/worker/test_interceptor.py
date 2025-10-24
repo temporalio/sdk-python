@@ -3,8 +3,6 @@ import uuid
 from datetime import timedelta
 from typing import Any, Callable, List, NoReturn, Optional, Tuple, Type
 
-import pytest
-
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowUpdateFailedError
 from temporalio.exceptions import ApplicationError, NexusOperationError
@@ -31,6 +29,11 @@ from temporalio.worker import (
 )
 from temporalio.worker._interceptor import StartNexusOperationInput
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+
+# Passing through because Python <=3.12 has an import bug at
+# https://github.com/python/cpython/issues/91351
+with workflow.unsafe.imports_passed_through():
+    import pytest
 
 interceptor_traces: List[Tuple[str, Any]] = []
 

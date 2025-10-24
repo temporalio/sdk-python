@@ -1,7 +1,6 @@
 from pathlib import Path
 
-import pytest
-
+from temporalio import workflow
 from temporalio.client import WorkflowHistory
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 from temporalio.worker import Replayer
@@ -14,6 +13,11 @@ from tests.contrib.openai_agents.test_openai import (
     ResearchWorkflow,
     ToolsWorkflow,
 )
+
+# Passing through because Python <=3.12 has an import bug at
+# https://github.com/python/cpython/issues/91351
+with workflow.unsafe.imports_passed_through():
+    import pytest
 
 
 @pytest.mark.parametrize(

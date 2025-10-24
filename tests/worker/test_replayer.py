@@ -8,8 +8,6 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any, Dict, Optional, Type
 
-import pytest
-
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHistory
 from temporalio.exceptions import ApplicationError
@@ -28,6 +26,11 @@ from tests.worker.test_workflow import (
     ActivityAndSignalsWhileWorkflowDown,
     SignalsActivitiesTimersUpdatesTracingWorkflow,
 )
+
+# Passing through because Python <=3.12 has an import bug at
+# https://github.com/python/cpython/issues/91351
+with workflow.unsafe.imports_passed_through():
+    import pytest
 
 
 @activity.defn
