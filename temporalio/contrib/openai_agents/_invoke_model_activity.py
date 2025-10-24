@@ -248,15 +248,18 @@ class ModelActivity:
                 ) from e
 
             # Specifically retryable status codes
-            if e.response.status_code in [408, 409, 429, 500]:
+            if (
+                e.response.status_code in [408, 409, 429]
+                or e.response.status_code >= 500
+            ):
                 raise ApplicationError(
-                    "Retryable OpenAI status code",
+                    f"Retryable OpenAI status code: {e.response.status_code}",
                     non_retryable=False,
                     next_retry_delay=retry_after,
                 ) from e
 
             raise ApplicationError(
-                "Non retryable OpenAI status code",
+                f"Non retryable OpenAI status code: {e.response.status_code}",
                 non_retryable=True,
                 next_retry_delay=retry_after,
             ) from e
