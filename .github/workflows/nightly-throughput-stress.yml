@@ -118,6 +118,11 @@ jobs:
       - name: Run throughput stress scenario with local SDK
         working-directory: omes
         run: |
+          # This makes the pipeline return the exit code of the first failing command
+          # Otherwise the output of the `tee` command will be used
+          # (which is troublesome when the scenario fails but the `tee` command succeeds)
+          set -o pipefail
+
           # Use run-scenario-with-worker to build and run in one step
           # Pass the SDK directory as --version for local testing
           # Note: The hardcoded values below match OMES defaults, except:
@@ -175,4 +180,5 @@ jobs:
           else
             echo "❌ Throughput stress test failed"
             echo "📦 Check the uploaded artifacts for detailed logs and state"
+            exit 1
           fi
