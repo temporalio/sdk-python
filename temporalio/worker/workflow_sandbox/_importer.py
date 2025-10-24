@@ -38,11 +38,11 @@ from typing_extensions import ParamSpec
 import temporalio.workflow
 
 from ._restrictions import (
-    DisallowedUnintentionalPassthroughError,
     RestrictedModule,
     RestrictedWorkflowAccessError,
     RestrictionContext,
     SandboxRestrictions,
+    UnintentionalPassthroughError,
 )
 
 logger = logging.getLogger(__name__)
@@ -315,7 +315,7 @@ class Importer:
             if self._is_import_notification_policy_applied(
                 temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_UNINTENTIONAL_PASSTHROUGH
             ):
-                raise DisallowedUnintentionalPassthroughError(name)
+                raise UnintentionalPassthroughError(name)
 
             if self._is_import_notification_policy_applied(
                 temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH

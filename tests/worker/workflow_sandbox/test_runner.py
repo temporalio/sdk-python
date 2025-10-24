@@ -25,11 +25,11 @@ from temporalio.worker._interceptor import (
     WorkflowInterceptorClassInput,
 )
 from temporalio.worker.workflow_sandbox import (
-    DisallowedUnintentionalPassthroughError,
     RestrictedWorkflowAccessError,
     SandboxedWorkflowRunner,
     SandboxMatcher,
     SandboxRestrictions,
+    UnintentionalPassthroughError,
 )
 from tests.helpers import assert_eq_eventually
 from tests.worker.workflow_sandbox.testmodules import stateful_module
@@ -516,9 +516,9 @@ class LazyImportWorkflow:
     async def run(self) -> None:
         try:
             import tests.worker.workflow_sandbox.testmodules.lazy_module  # noqa: F401
-        except DisallowedUnintentionalPassthroughError as err:
+        except UnintentionalPassthroughError as err:
             raise ApplicationError(
-                str(err), type="DisallowedUnintentionalPassthroughError"
+                str(err), type="UnintentionalPassthroughError"
             ) from err
 
 
@@ -587,7 +587,7 @@ async def test_workflow_sandbox_import_all_warnings(client: Client):
 async def test_workflow_sandbox_import_errors(client: Client):
     restrictions = dataclasses.replace(
         SandboxRestrictions.default,
-        import_notification_policy=SandboxRestrictions.import_notification_policy_disallow_unintentional_passthrough,
+        import_notification_policy=SandboxRestrictions.import_notification_policy_require_explicit_passthrough,
         # passthrough this test module to avoid a ton of noisy warnings
         passthrough_modules=SandboxRestrictions.passthrough_modules_default
         | {"tests.worker.workflow_sandbox.test_runner"},
@@ -608,7 +608,7 @@ async def test_workflow_sandbox_import_errors(client: Client):
                 )
 
             assert isinstance(err.value.cause, ApplicationError)
-            assert err.value.cause.type == "DisallowedUnintentionalPassthroughError"
+            assert err.value.cause.type == "UnintentionalPassthroughError"
             assert (
                 "Module tests.worker.workflow_sandbox.testmodules.lazy_module was not intentionally passed through to the sandbox."
                 == err.value.cause.message

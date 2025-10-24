@@ -83,7 +83,7 @@ class RestrictedWorkflowAccessError(temporalio.workflow.NondeterminismError):
 
 
 # TODO(amazzeo): is NondeterminisimError appropriate as a subclass?
-class DisallowedUnintentionalPassthroughError(temporalio.workflow.NondeterminismError):
+class UnintentionalPassthroughError(temporalio.workflow.NondeterminismError):
     """Error that occurs when a workflow unintentionally passes an import to the sandbox when
     the import notification policy includes :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_NON_PASSTHROUGH`.
 
@@ -94,16 +94,16 @@ class DisallowedUnintentionalPassthroughError(temporalio.workflow.Nondeterminism
     def __init__(
         self, qualified_name: str, *, override_message: Optional[str] = None
     ) -> None:
-        """Create a disallowed unintentional passthrough error."""
+        """Create an unintentional passthrough error."""
         super().__init__(
             override_message
-            or DisallowedUnintentionalPassthroughError.default_message(qualified_name)
+            or UnintentionalPassthroughError.default_message(qualified_name)
         )
         self.qualified_name = qualified_name
 
     @staticmethod
     def default_message(qualified_name: str) -> str:
-        """Get default message for disallowed unintentional passthrough."""
+        """Get default message for unintentional passthrough."""
         return f"Module {qualified_name} was not intentionally passed through to the sandbox."
 
 
@@ -156,7 +156,7 @@ class SandboxRestrictions:
     Equivalent to :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT` | :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH` 
     """
 
-    import_notification_policy_disallow_unintentional_passthrough: ClassVar[
+    import_notification_policy_require_explicit_passthrough: ClassVar[
         temporalio.workflow.SandboxImportNotificationPolicy
     ]
     """
@@ -574,7 +574,7 @@ SandboxRestrictions.import_notification_policy_all_warnings = (
     temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT
     | temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH
 )
-SandboxRestrictions.import_notification_policy_disallow_unintentional_passthrough = (
+SandboxRestrictions.import_notification_policy_require_explicit_passthrough = (
     temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT
     | temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_UNINTENTIONAL_PASSTHROUGH
 )
