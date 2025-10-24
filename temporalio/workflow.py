@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from enum import Enum, IntEnum
+from enum import Enum, Flag, IntEnum, auto
 from functools import partial
 from random import Random
 from typing import (
@@ -1412,6 +1412,24 @@ _in_sandbox = threading.local()
 _imports_passed_through = threading.local()
 
 
+# TODO(amazzeo): this name is confusing with existing import passthrough phrasing.
+class SandboxImportPolicy(Flag):
+    # TODO(amazzeo): Need to establish consistent phrasing about the time this is applied
+    """Defines the behavior taken when modules are imported into the sandbox after the workflow is initially loaded."""
+
+    UNSET = auto()
+    """All imports that do not violate sandbox restrictions are allowed and no warning is generated."""
+    WARN_ON_DYNAMIC_IMPORT = auto()
+    """Issue a warning when an import is triggered in the sandbox after initial workflow load."""
+    WARN_ON_NON_PASSTHROUGH = auto()
+    """Issue a warning when an import is triggered in the sandbox that was not passed through."""
+    RAISE_ON_NON_PASSTHROUGH = auto()
+    """Raise an error when an import is triggered in the sandbox that was not passed through."""
+
+
+_sandbox_import_policy = threading.local()
+
+
 class unsafe:
     """Contains static methods that should not normally be called during
     workflow execution except in advanced cases.
@@ -1497,6 +1515,26 @@ class unsafe:
             yield None
         finally:
             _imports_passed_through.value = False
+
+    @staticmethod
+    def current_sandbox_import_policy() -> SandboxImportPolicy:
+        applied_policy = getattr(
+            _sandbox_import_policy, "value", SandboxImportPolicy.UNSET
+        )
+        return applied_policy
+
+    @staticmethod
+    @contextmanager
+    def sandbox_import_policy(policy: SandboxImportPolicy) -> Iterator[None]:
+        # TODO(amazzeo): the default behavior here seems inappropriate
+        original_policy = _sandbox_import_policy.value = getattr(
+            _sandbox_import_policy, "value", SandboxImportPolicy.UNSET
+        )
+        _sandbox_import_policy.value = policy
+        try:
+            yield None
+        finally:
+            _sandbox_import_policy.value = original_policy
 
 
 class LoggerAdapter(logging.LoggerAdapter):

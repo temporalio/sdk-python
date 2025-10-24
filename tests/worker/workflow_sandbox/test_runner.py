@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import functools
+import importlib
 import inspect
 import os
 import sys
@@ -11,19 +12,25 @@ import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import IntEnum
-from typing import Callable, Dict, List, Optional, Sequence, Set, Type
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Type
 
 import pytest
 
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
 from temporalio.exceptions import ApplicationError
-from temporalio.worker import Worker
+from temporalio.worker import Worker, WorkflowInboundInterceptor
+from temporalio.worker._interceptor import (
+    ExecuteWorkflowInput,
+    Interceptor,
+    WorkflowInterceptorClassInput,
+)
 from temporalio.worker.workflow_sandbox import (
     RestrictedWorkflowAccessError,
     SandboxedWorkflowRunner,
     SandboxMatcher,
     SandboxRestrictions,
+    DisallowedUnintentionalPassthroughError,
 )
 from tests.helpers import assert_eq_eventually
 from tests.worker.workflow_sandbox.testmodules import stateful_module
@@ -483,3 +490,97 @@ def new_worker(
         activities=activities,
         workflow_runner=SandboxedWorkflowRunner(restrictions=restrictions),
     )
+
+
+class _TestWorkflowInboundInterceptor(WorkflowInboundInterceptor):
+    async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
+        # import in the interceptor to show it will be captured
+        # applying this policy should squelch the "after initial workload" warning
+        with workflow.unsafe.sandbox_import_policy(
+            workflow.SandboxImportPolicy.WARN_ON_NON_PASSTHROUGH
+        ):
+            import opentelemetry
+
+        return await super().execute_workflow(input)
+
+
+class _TestInterceptor(Interceptor):
+    def workflow_interceptor_class(
+        self, input: WorkflowInterceptorClassInput
+    ) -> Type[_TestWorkflowInboundInterceptor]:
+        return _TestWorkflowInboundInterceptor
+
+
+@workflow.defn
+class LazyImportWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        try:
+            import opentelemetry.version
+        except DisallowedUnintentionalPassthroughError as err:
+            raise ApplicationError(
+                str(err), type="DisallowedUnintentionalPassthroughError"
+            ) from err
+
+
+async def test_workflow_sandbox_import_warnings(client: Client):
+    restrictions = dataclasses.replace(
+        SandboxRestrictions.default,
+        import_policy=SandboxRestrictions.import_policy_all_warnings,
+        # passthrough this test module to avoid a ton of noisy warnings
+        passthrough_modules=SandboxRestrictions.passthrough_modules_default
+        | {"tests.worker.workflow_sandbox.test_runner"},
+    )
+
+    async with Worker(
+        client,
+        task_queue=str(uuid.uuid4()),
+        workflows=[LazyImportWorkflow],
+        interceptors=[_TestInterceptor()],
+        workflow_runner=SandboxedWorkflowRunner(restrictions),
+    ) as worker:
+        with pytest.warns() as records:
+            await client.execute_workflow(
+                LazyImportWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+            expected_warnings = {
+                "Module opentelemetry was not intentionally passed through to the sandbox.",
+                "Module opentelemetry.version was imported after initial workflow load.",
+                "Module opentelemetry.version was not intentionally passed through to the sandbox.",
+            }
+            actual_warnings = {str(w.message) for w in records}
+
+            assert expected_warnings <= actual_warnings
+
+
+async def test_workflow_sandbox_import_errors(client: Client):
+    restrictions = dataclasses.replace(
+        SandboxRestrictions.default,
+        import_policy=SandboxRestrictions.import_policy_disallow_unintentional_passthrough,
+        # passthrough this test module to avoid a ton of noisy warnings
+        passthrough_modules=SandboxRestrictions.passthrough_modules_default
+        | {"tests.worker.workflow_sandbox.test_runner"},
+    )
+
+    async with Worker(
+        client,
+        task_queue=str(uuid.uuid4()),
+        workflows=[LazyImportWorkflow],
+        workflow_runner=SandboxedWorkflowRunner(restrictions),
+    ) as worker:
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                LazyImportWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+        assert isinstance(err.value.cause, ApplicationError)
+        assert err.value.cause.type == "DisallowedUnintentionalPassthroughError"
+        assert (
+            "Module opentelemetry.version was not intentionally passed through to the sandbox."
+            == err.value.cause.message
+        )

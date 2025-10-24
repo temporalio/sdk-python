@@ -58,11 +58,13 @@ from ._restrictions import (
     RestrictedWorkflowAccessError,
     SandboxMatcher,
     SandboxRestrictions,
+    DisallowedUnintentionalPassthroughError,
 )
 from ._runner import SandboxedWorkflowRunner
 
 __all__ = [
     "RestrictedWorkflowAccessError",
+    "DisallowedUnintentionalPassthroughError",
     "SandboxedWorkflowRunner",
     "SandboxMatcher",
     "SandboxRestrictions",

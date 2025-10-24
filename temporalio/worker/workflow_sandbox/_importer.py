@@ -40,6 +40,7 @@ import temporalio.workflow
 from ._restrictions import (
     RestrictedModule,
     RestrictedWorkflowAccessError,
+    DisallowedUnintentionalPassthroughError,
     RestrictionContext,
     SandboxRestrictions,
 )
@@ -200,6 +201,17 @@ class Importer:
 
         # Check module restrictions and passthrough modules
         if full_name not in sys.modules:
+            # Issue a warning if appropriate
+            if (
+                self.restriction_context.in_activation
+                and self._is_import_policy_applied(
+                    temporalio.workflow.SandboxImportPolicy.WARN_ON_DYNAMIC_IMPORT
+                )
+            ):
+                warnings.warn(
+                    f"Module {name} was imported after initial workflow load."
+                )
+
             # Make sure not an entirely invalid module
             self._assert_valid_module(full_name)
 
@@ -282,6 +294,15 @@ class Importer:
                 break
         return True
 
+    def _is_import_policy_applied(
+        self, policy: temporalio.workflow.SandboxImportPolicy
+    ) -> bool:
+        applied_policy = temporalio.workflow.unsafe.current_sandbox_import_policy()
+        if applied_policy != temporalio.workflow.SandboxImportPolicy.UNSET:
+            return policy in applied_policy
+
+        return policy in self.restrictions.import_policy
+
     def _maybe_passthrough_module(self, name: str) -> Optional[types.ModuleType]:
         # If imports not passed through and all modules are not passed through
         # and name not in passthrough modules, check parents
@@ -289,6 +310,19 @@ class Importer:
             not temporalio.workflow.unsafe.is_imports_passed_through()
             and not self.module_configured_passthrough(name)
         ):
+            if self._is_import_policy_applied(
+                temporalio.workflow.SandboxImportPolicy.RAISE_ON_NON_PASSTHROUGH
+            ):
+                # TODO(amazzeo): this is not an appropriate error type
+                raise DisallowedUnintentionalPassthroughError(name)
+
+            if self._is_import_policy_applied(
+                temporalio.workflow.SandboxImportPolicy.WARN_ON_NON_PASSTHROUGH
+            ):
+                warnings.warn(
+                    f"Module {name} was not intentionally passed through to the sandbox."
+                )
+
             return None
         # Do the pass through
         with self._unapplied():

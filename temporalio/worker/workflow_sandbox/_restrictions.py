@@ -82,6 +82,23 @@ class RestrictedWorkflowAccessError(temporalio.workflow.NondeterminismError):
         )
 
 
+# TODO(amazzeo): is NondeterminisimError appropriate as a subclass?
+class DisallowedUnintentionalPassthroughError(temporalio.workflow.NondeterminismError):
+    def __init__(
+        self, qualified_name: str, *, override_message: Optional[str] = None
+    ) -> None:
+        super().__init__(
+            override_message
+            or DisallowedUnintentionalPassthroughError.default_message(qualified_name)
+        )
+        self.qualified_name = qualified_name
+
+    @staticmethod
+    def default_message(qualified_name: str) -> str:
+        """Get default message for restricted access."""
+        return f"Module {qualified_name} was not intentionally passed through to the sandbox."
+
+
 @dataclass(frozen=True)
 class SandboxRestrictions:
     """Set of restrictions that can be applied to a sandbox."""
@@ -109,6 +126,15 @@ class SandboxRestrictions:
     class methods (including __init__, etc). The check compares the against the
     fully qualified path to the item.
     """
+
+    import_policy: temporalio.workflow.SandboxImportPolicy = (
+        temporalio.workflow.SandboxImportPolicy.WARN_ON_DYNAMIC_IMPORT
+    )
+
+    import_policy_all_warnings: ClassVar[temporalio.workflow.SandboxImportPolicy]
+    import_policy_disallow_unintentional_passthrough: ClassVar[
+        temporalio.workflow.SandboxImportPolicy
+    ]
 
     passthrough_all_modules: bool = False
     """
@@ -285,6 +311,7 @@ class SandboxMatcher:
         Returns:
             The matcher if matched.
         """
+
         # We prefer to avoid recursion
         matcher = self
         for v in child_path:
@@ -305,10 +332,12 @@ class SandboxMatcher:
             if not child_matcher:
                 return None
             matcher = child_matcher
+
         if not context.is_runtime and matcher.only_runtime:
             return None
         if not matcher.match_self:
             return None
+
         return matcher
 
     def match_access(
@@ -494,6 +523,15 @@ SandboxRestrictions.passthrough_modules_with_temporal = (
         "openai",
         "agents",
     }
+)
+
+SandboxRestrictions.import_policy_all_warnings = (
+    temporalio.workflow.SandboxImportPolicy.WARN_ON_DYNAMIC_IMPORT
+    | temporalio.workflow.SandboxImportPolicy.WARN_ON_NON_PASSTHROUGH
+)
+SandboxRestrictions.import_policy_disallow_unintentional_passthrough = (
+    temporalio.workflow.SandboxImportPolicy.WARN_ON_DYNAMIC_IMPORT
+    | temporalio.workflow.SandboxImportPolicy.RAISE_ON_NON_PASSTHROUGH
 )
 
 # sys.stdlib_module_names is only available on 3.10+, so we hardcode here. A
@@ -819,6 +857,7 @@ class RestrictionContext:
     def __init__(self) -> None:
         """Create a restriction context."""
         self.is_runtime = False
+        self.in_activation = False
 
 
 @dataclass
