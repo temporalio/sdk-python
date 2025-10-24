@@ -17,6 +17,7 @@ from temporalio import activity, workflow
 from temporalio.api.workflowservice.v1 import (
     DescribeWorkerDeploymentRequest,
     DescribeWorkerDeploymentResponse,
+    ListWorkersRequest,
     SetWorkerDeploymentCurrentVersionRequest,
     SetWorkerDeploymentCurrentVersionResponse,
     SetWorkerDeploymentRampingVersionRequest,
@@ -28,7 +29,11 @@ from temporalio.client import (
     TaskReachabilityType,
 )
 from temporalio.common import PinnedVersioningOverride, RawValue, VersioningBehavior
-from temporalio.runtime import PrometheusConfig, Runtime, TelemetryConfig
+from temporalio.runtime import (
+    PrometheusConfig,
+    Runtime,
+    TelemetryConfig,
+)
 from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
@@ -1133,7 +1138,9 @@ async def test_can_run_autoscaling_polling_worker(
         activity_pollers = [l for l in matches if "activity_task" in l]
         assert len(activity_pollers) == 1
         assert activity_pollers[0].endswith("2")
-        workflow_pollers = [l for l in matches if "workflow_task" in l]
+        workflow_pollers = [
+            l for l in matches if "workflow_task" in l and w.task_queue in l
+        ]
         assert len(workflow_pollers) == 2
         # There's sticky & non-sticky pollers, and they may have a count of 1 or 2 depending on
         # initialization timing.

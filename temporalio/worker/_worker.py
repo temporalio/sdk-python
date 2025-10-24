@@ -148,6 +148,7 @@ class Worker:
         nexus_task_poller_behavior: PollerBehavior = PollerBehaviorSimpleMaximum(
             maximum=5
         ),
+        skip_client_worker_set_check: bool = False,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -322,6 +323,9 @@ class Worker:
                 Defaults to a 5-poller maximum.
             nexus_task_poller_behavior: Specify the behavior of Nexus task polling.
                 Defaults to a 5-poller maximum.
+            skip_client_worker_set_check: Skip the runtime validation that ensures
+                the client is registered with the worker set. This should only be
+                used in tests.
         """
         config = WorkerConfig(
             client=client,
@@ -364,6 +368,7 @@ class Worker:
             workflow_task_poller_behavior=workflow_task_poller_behavior,
             activity_task_poller_behavior=activity_task_poller_behavior,
             nexus_task_poller_behavior=nexus_task_poller_behavior,
+            skip_client_worker_set_check=skip_client_worker_set_check,
         )
 
         plugins_from_client = cast(
@@ -376,6 +381,7 @@ class Worker:
                     f"The same plugin type {type(client_plugin)} is present from both client and worker. It may run twice and may not be the intended behavior."
                 )
         plugins = plugins_from_client + list(plugins)
+        config["plugins"] = plugins
 
         self.plugins = plugins
         for plugin in plugins:
@@ -555,6 +561,10 @@ class Worker:
                 maximum=config["max_concurrent_activity_task_polls"]
             )
 
+        worker_plugins = [plugin.name() for plugin in config.get("plugins", [])]
+        client_plugins = [plugin.name() for plugin in config["client"].plugins]
+        plugins = list(set(worker_plugins + client_plugins))
+
         # Create bridge worker last. We have empirically observed that if it is
         # created before an error is raised from the activity worker
         # constructor, a deadlock/hang will occur presumably while trying to
@@ -609,6 +619,8 @@ class Worker:
                 nexus_task_poller_behavior=config[
                     "nexus_task_poller_behavior"
                 ]._to_bridge(),
+                plugins=plugins,
+                skip_client_worker_set_check=config["skip_client_worker_set_check"],
             ),
         )
 
@@ -902,6 +914,8 @@ class WorkerConfig(TypedDict, total=False):
     workflow_task_poller_behavior: PollerBehavior
     activity_task_poller_behavior: PollerBehavior
     nexus_task_poller_behavior: PollerBehavior
+    plugins: Sequence[Plugin]
+    skip_client_worker_set_check: bool
 
 
 def _warn_if_activity_executor_max_workers_is_inconsistent(
