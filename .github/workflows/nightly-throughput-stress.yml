@@ -171,14 +171,3 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_SDK_ALERTS_WEBHOOK }}
-
-      - name: Report test results
-        if: always()
-        run: |
-          if [ "${{ job.status }}" = "success" ]; then
-            echo "✅ Throughput stress test completed successfully"
-          else
-            echo "❌ Throughput stress test failed"
-            echo "📦 Check the uploaded artifacts for detailed logs and state"
-            exit 1
-          fi
