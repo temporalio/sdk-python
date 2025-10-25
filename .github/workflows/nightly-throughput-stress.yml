@@ -1,0 +1,173 @@
+name: Nightly Throughput Stress
+
+on:
+  schedule:
+    # Run at 3 AM PST (11:00 UTC) - offset from existing nightly
+    - cron: '00 11 * * *'
+  push:
+    branches:
+      - add-nightly-throughput-stress-workflow
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Test duration (e.g., 6h, 1h)'
+        required: false
+        default: '5h'
+        type: string
+      timeout:
+        description: 'Scenario timeout (should always be greater than duration)'
+        required: false
+        default: '5h30m'
+        type: string
+      job_timeout_minutes:
+        description: 'GitHub Actions job timeout in minutes'
+        required: false
+        default: 360
+        type: number
+
+env:
+  # Workflow configuration
+  TEST_DURATION: ${{ inputs.duration || vars.NIGHTLY_TEST_DURATION || '5h' }}
+  TEST_TIMEOUT: ${{ inputs.timeout || vars.NIGHTLY_TEST_TIMEOUT || '5h30m' }}
+
+  # Logging and artifacts
+  WORKER_LOG_DIR: /tmp/throughput-stress-logs
+
+  # Omes configuration
+  OMES_REPO: temporalio/omes
+  OMES_REF: main
+  RUN_ID: ${{ github.run_id }}-throughput-stress
+
+jobs:
+  throughput-stress:
+    runs-on: ubuntu-latest-4-cores
+    timeout-minutes: ${{ fromJSON(inputs.job_timeout_minutes || vars.NIGHTLY_JOB_TIMEOUT_MINUTES || 360) }}
+
+    steps:
+      - name: Print test configuration
+        run: |
+          echo "=== Throughput Stress Test Configuration ==="
+          echo "Duration: $TEST_DURATION"
+          echo "Timeout: $TEST_TIMEOUT"
+          echo "Run ID: $RUN_ID"
+          echo "=========================================="
+
+      - name: Checkout SDK
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Checkout OMES
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.OMES_REPO }}
+          ref: ${{ env.OMES_REF }}
+          path: omes
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: omes/go.mod
+          cache-dependency-path: omes/go.sum
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: temporalio/bridge -> target
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: '23.x'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install poethepoet
+        run: uv tool install poethepoet
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Build SDK
+        run: poe build-develop
+
+      - name: Install Temporal CLI
+        uses: temporalio/setup-temporal@v0
+
+      - name: Setup log directory
+        run: mkdir -p $WORKER_LOG_DIR
+
+      - name: Start Temporal Server
+        run: |
+          temporal server start-dev \
+            --db-filename temporal-throughput-stress.sqlite \
+            --sqlite-pragma journal_mode=WAL \
+            --sqlite-pragma synchronous=OFF \
+            --headless &> $WORKER_LOG_DIR/temporal-server.log &
+
+      - name: Run throughput stress scenario with local SDK
+        working-directory: omes
+        run: |
+          # This makes the pipeline return the exit code of the first failing command
+          # Otherwise the output of the `tee` command will be used
+          # (which is troublesome when the scenario fails but the `tee` command succeeds)
+          set -o pipefail
+
+          # Use run-scenario-with-worker to build and run in one step
+          # Pass the SDK directory as --version for local testing
+          # Note: The hardcoded values below match OMES defaults, except:
+          # - visibility-count-timeout: 5m (vs 3m default)
+          # to give CI a bit more time for visibility consistency
+          go run ./cmd run-scenario-with-worker \
+            --scenario throughput_stress \
+            --language python \
+            --version $(pwd)/.. \
+            --run-id $RUN_ID \
+            --duration $TEST_DURATION \
+            --timeout $TEST_TIMEOUT \
+            --max-concurrent 10 \
+            --option internal-iterations=10 \
+            --option continue-as-new-after-iterations=3 \
+            --option sleep-time=1s \
+            --option visibility-count-timeout=5m \
+            --option min-throughput-per-hour=1000 \
+            2>&1 | tee $WORKER_LOG_DIR/scenario.log
+
+      - name: Upload logs on failure
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: throughput-stress-logs
+          path: ${{ env.WORKER_LOG_DIR }}
+          retention-days: 30
+
+      - name: Notify Slack on failure
+        if: failure() || cancelled()
+        uses: slackapi/slack-github-action@v2
+        with:
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "Nightly Python throughput stress test failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Nightly Throughput Stress Failed* :x:\n\n*Duration:* ${{ env.TEST_DURATION }}\n*Run:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Logs>\n*Triggered by:* ${{ github.event_name == 'schedule' && 'Scheduled' || github.actor }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_SDK_ALERTS_WEBHOOK }}
