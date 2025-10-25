@@ -175,7 +175,7 @@ jobs:
       - name: Report test results
         if: always()
         run: |
-          if [ "${{ steps.*.outcome }}" = "success" ]; then
+          if [ "${{ job.status }}" = "success" ]; then
             echo "✅ Throughput stress test completed successfully"
           else
             echo "❌ Throughput stress test failed"
