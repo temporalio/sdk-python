@@ -4,7 +4,6 @@ import asyncio
 import gc
 import logging
 import queue
-import sys
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -33,11 +32,6 @@ from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers import LogCapturer
-from tests.helpers.cache_eviction import (
-    CacheEvictionTearDownWorkflow,
-    WaitForeverWorkflow,
-    wait_forever_activity,
-)
 
 
 @dataclass
@@ -744,14 +738,11 @@ class ContextClearWorkflow:
         )
 
 
-EXPECT_FAILURE = True
-
-
 @pytest.mark.parametrize(
     "activity,expect_failure",
     [
-        (context_clear_noop_activity, not EXPECT_FAILURE),
-        (context_clear_exception_activity, EXPECT_FAILURE),
+        (context_clear_noop_activity, not True),
+        (context_clear_exception_activity, True),
     ],
 )
 async def test_opentelemetry_context_restored_after_activity(
