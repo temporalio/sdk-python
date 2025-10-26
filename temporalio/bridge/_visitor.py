@@ -74,6 +74,8 @@ class PayloadVisitor:
     async def _visit_temporal_api_failure_v1_Failure(self, fs, o):
         if o.HasField("encoded_attributes"):
             await self._visit_temporal_api_common_v1_Payload(fs, o.encoded_attributes)
+        if o.HasField("cause"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.cause)
         if o.HasField("application_failure_info"):
             await self._visit_temporal_api_failure_v1_ApplicationFailureInfo(
                 fs, o.application_failure_info
