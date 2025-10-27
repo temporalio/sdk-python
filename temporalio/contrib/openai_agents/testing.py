@@ -246,12 +246,11 @@ class AgentEnvironment:
            This API is experimental and may change in the future.
         """
         self._model_params = model_params
+        self._model_provider = None
         if model_provider is not None:
             self._model_provider = model_provider
         elif model is not None:
             self._model_provider = TestModelProvider(model)
-        else:
-            self._model_provider = None
         self._mcp_server_providers = mcp_server_providers
         self._register_activities = register_activities
         self._plugin: Optional[OpenAIAgentsPlugin] = None
