@@ -2706,7 +2706,6 @@ async def test_local_hello_world_agent(client: Client):
 async def test_split_workers(client: Client):
     new_config = client.config()
 
-    # Workflow worker
     workflow_plugin = openai_agents.OpenAIAgentsPlugin(
         model_params=ModelActivityParameters(
             start_to_close_timeout=timedelta(seconds=30)
@@ -2715,20 +2714,25 @@ async def test_split_workers(client: Client):
         register_activities=False,
     )
     new_config["plugins"] = [workflow_plugin]
-    plugin_client = Client(**new_config)
+    workflow_client = Client(**new_config)
 
-    async with new_worker(client, HelloWorldAgent, plugins=[workflow_plugin]) as worker:
-        # Activity Worker
+    # Workflow worker
+    async with new_worker(
+        workflow_client, HelloWorldAgent, no_remote_activities=True
+    ) as worker:
         activity_plugin = openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
             model_provider=TestModelProvider(TestHelloModel()),
         )
+        new_config["plugins"] = [activity_plugin]
+        activity_client = Client(**new_config)
+        # Activity Worker
         async with new_worker(
-            client, task_queue=worker.task_queue, plugins=[activity_plugin]
-        ):
-            result = await plugin_client.execute_workflow(
+            activity_client, task_queue=worker.task_queue
+        ) as activity_worker:
+            result = await activity_client.execute_workflow(
                 HelloWorldAgent.run,
                 "Tell me about recursion in programming.",
                 id=f"hello-workflow-{uuid.uuid4()}",
