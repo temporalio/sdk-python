@@ -29,6 +29,13 @@ from temporalio.contrib.openai_agents._mcp import (
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
 from temporalio.contrib.openai_agents._temporal_openai_agents import OpenAIAgentsPlugin
 
+__all__ = [
+    "AgentEnvironment",
+    "ResponseBuilders",
+    "TestModel",
+    "TestModelProvider",
+]
+
 
 class ResponseBuilders:
     """Builders for creating model responses for testing.
@@ -289,7 +296,7 @@ class AgentEnvironment:
         return Client(**new_config)
 
     @property
-    def plugin(self) -> OpenAIAgentsPlugin:
+    def openai_agents_plugin(self) -> OpenAIAgentsPlugin:
         """Get the underlying OpenAI agents plugin.
 
         .. warning::
