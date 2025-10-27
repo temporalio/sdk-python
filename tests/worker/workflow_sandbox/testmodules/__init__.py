@@ -2,6 +2,7 @@ from temporalio.worker.workflow_sandbox._restrictions import (
     SandboxMatcher,
     SandboxRestrictions,
 )
+from temporalio.workflow import SandboxImportNotificationPolicy
 
 restrictions = SandboxRestrictions(
     passthrough_modules=SandboxRestrictions.passthrough_modules_with_temporal
@@ -14,5 +15,5 @@ restrictions = SandboxRestrictions(
         "tests.worker.workflow_sandbox.testmodules.invalid_module_members".split("."),
         SandboxMatcher(use={"invalid_function"}),
     ),
-    import_notification_policy=SandboxRestrictions.import_notification_policy_default,
+    import_notification_policy=SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT,
 )

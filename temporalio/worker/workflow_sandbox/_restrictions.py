@@ -131,39 +131,6 @@ class SandboxRestrictions:
     The import notification policy to use when an import is triggered during workflow loading or execution. See :py:class:`temporalio.workflow.SandboxImportNotificationPolicy` for options.
     """
 
-    import_notification_policy_default: ClassVar[
-        temporalio.workflow.SandboxImportNotificationPolicy
-    ]
-    """
-    The default import notification policy. Equivalent to :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT`.
-    """
-
-    import_notification_policy_all_warnings: ClassVar[
-        temporalio.workflow.SandboxImportNotificationPolicy
-    ]
-    """
-    An import notification policy that enables warnings on dynamic imports during a 
-    workflow and imports that are unintentionally passed through to the sandbox.
-    Equivalent to :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT` | :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH` 
-    """
-
-    import_notification_policy_require_explicit_passthrough: ClassVar[
-        temporalio.workflow.SandboxImportNotificationPolicy
-    ]
-    """
-    An import notification policy that enables warnings on dynamic imports during a 
-    workflow and raises an error when imports are unintentionally passed through to the sandbox.
-    Equivalent to :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT` | :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_UNINTENTIONAL_PASSTHROUGH` 
-    """
-
-    import_notification_policy_silent: ClassVar[
-        temporalio.workflow.SandboxImportNotificationPolicy
-    ]
-    """
-    An import notification policy that disables all warnings and errors.
-    Equivalent to :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.SILENT`.
-    """
-
     passthrough_all_modules: bool = False
     """
     Pass through all modules, do not sandbox any modules. This is the equivalent
@@ -558,21 +525,6 @@ SandboxRestrictions.passthrough_modules_with_temporal = (
     }
 )
 
-SandboxRestrictions.import_notification_policy_default = (
-    temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT
-)
-SandboxRestrictions.import_notification_policy_all_warnings = (
-    temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT
-    | temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH
-)
-SandboxRestrictions.import_notification_policy_require_explicit_passthrough = (
-    temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT
-    | temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_UNINTENTIONAL_PASSTHROUGH
-)
-SandboxRestrictions.import_notification_policy_silent = (
-    temporalio.workflow.SandboxImportNotificationPolicy.SILENT
-)
-
 # sys.stdlib_module_names is only available on 3.10+, so we hardcode here. A
 # test will fail if this list doesn't match the latest Python version it was
 # generated against, spitting out the expected list. This is a string instead
@@ -875,7 +827,7 @@ SandboxRestrictions.default = SandboxRestrictions(
     passthrough_modules=SandboxRestrictions.passthrough_modules_default,
     invalid_modules=SandboxMatcher.none,
     invalid_module_members=SandboxRestrictions.invalid_module_members_default,
-    import_notification_policy=SandboxRestrictions.import_notification_policy_default,
+    import_notification_policy=temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT,
 )
 
 

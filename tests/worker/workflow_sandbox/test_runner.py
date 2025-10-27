@@ -31,6 +31,7 @@ from temporalio.worker.workflow_sandbox import (
     SandboxRestrictions,
     UnintentionalPassthroughError,
 )
+from temporalio.workflow import SandboxImportNotificationPolicy
 from tests.helpers import assert_eq_eventually
 from tests.worker.workflow_sandbox.testmodules import stateful_module
 from tests.worker.workflow_sandbox.testmodules.proto import SomeMessage
@@ -554,7 +555,8 @@ async def test_workflow_sandbox_import_default_warnings(client: Client):
 async def test_workflow_sandbox_import_all_warnings(client: Client):
     restrictions = dataclasses.replace(
         SandboxRestrictions.default,
-        import_notification_policy=SandboxRestrictions.import_notification_policy_all_warnings,
+        import_notification_policy=SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT
+        | SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH,
         # passthrough this test module to avoid a ton of noisy warnings
         passthrough_modules=SandboxRestrictions.passthrough_modules_default
         | {"tests.worker.workflow_sandbox.test_runner"},
@@ -587,7 +589,8 @@ async def test_workflow_sandbox_import_all_warnings(client: Client):
 async def test_workflow_sandbox_import_errors(client: Client):
     restrictions = dataclasses.replace(
         SandboxRestrictions.default,
-        import_notification_policy=SandboxRestrictions.import_notification_policy_require_explicit_passthrough,
+        import_notification_policy=SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT
+        | SandboxImportNotificationPolicy.RAISE_ON_UNINTENTIONAL_PASSTHROUGH,
         # passthrough this test module to avoid a ton of noisy warnings
         passthrough_modules=SandboxRestrictions.passthrough_modules_default
         | {"tests.worker.workflow_sandbox.test_runner"},
@@ -627,7 +630,7 @@ class SupressWarningsLazyImportWorkflow:
     @workflow.run
     async def run(self) -> None:
         with workflow.unsafe.sandbox_import_notification_policy(
-            SandboxRestrictions.import_notification_policy_silent
+            SandboxImportNotificationPolicy.SILENT
         ):
             try:
                 import tests.worker.workflow_sandbox.testmodules.lazy_module  # noqa: F401
