@@ -2687,7 +2687,6 @@ async def test_split_workers(client: Client):
     plugin_client = Client(**new_config)
 
     async with new_worker(client, HelloWorldAgent, plugins=[workflow_plugin]) as worker:
-
         # Activity Worker
         activity_plugin = openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(
@@ -2695,7 +2694,9 @@ async def test_split_workers(client: Client):
             ),
             model_provider=TestModelProvider(TestHelloModel()),
         )
-        async with new_worker(client, task_queue=worker.task_queue, plugins=[activity_plugin]):
+        async with new_worker(
+            client, task_queue=worker.task_queue, plugins=[activity_plugin]
+        ):
             result = await plugin_client.execute_workflow(
                 HelloWorldAgent.run,
                 "Tell me about recursion in programming.",
