@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 import sys
 import uuid
 from dataclasses import dataclass
@@ -102,6 +103,7 @@ from temporalio.contrib.openai_agents._temporal_model_stub import (
     _TemporalModelStub,
 )
 from temporalio.contrib.openai_agents.testing import (
+    AgentEnvironment,
     ResponseBuilders,
     TestModel,
     TestModelProvider,
@@ -137,29 +139,23 @@ class HelloWorldAgent:
 async def test_hello_world_agent(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
-    new_config = client.config()
-    new_config["plugins"] = [
-        openai_agents.OpenAIAgentsPlugin(
-            model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30)
-            ),
-            model_provider=TestModelProvider(hello_mock_model())
-            if use_local_model
-            else None,
-        )
-    ]
-    client = Client(**new_config)
+    
+    model = hello_mock_model() if use_local_model else None
+    async with AgentEnvironment(model=model, model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30),
+            )) as env:
+        client = env.applied_on_client(client)
 
-    async with new_worker(client, HelloWorldAgent) as worker:
-        result = await client.execute_workflow(
-            HelloWorldAgent.run,
-            "Tell me about recursion in programming.",
-            id=f"hello-workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=5),
-        )
-        if use_local_model:
-            assert result == "test"
+        async with new_worker(client, HelloWorldAgent) as worker:
+            result = await client.execute_workflow(
+                HelloWorldAgent.run,
+                "Tell me about recursion in programming.",
+                id=f"hello-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=5),
+            )
+            if use_local_model:
+                assert result == "test"
 
 
 @dataclass
@@ -596,62 +592,56 @@ class ResearchWorkflow:
 async def test_research_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
-    new_config = client.config()
-    new_config["plugins"] = [
-        openai_agents.OpenAIAgentsPlugin(
-            model_params=ModelActivityParameters(
+
+    model = research_mock_model() if use_local_model else None
+    async with AgentEnvironment(model=model, model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=120),
                 schedule_to_close_timeout=timedelta(seconds=120),
-            ),
-            model_provider=TestModelProvider(research_mock_model())
-            if use_local_model
-            else None,
-        )
-    ]
-    client = Client(**new_config)
+            )) as env:
+        client = env.applied_on_client(client)
 
-    async with new_worker(
-        client,
-        ResearchWorkflow,
-    ) as worker:
-        workflow_handle = await client.start_workflow(
-            ResearchWorkflow.run,
-            "Caribbean vacation spots in April, optimizing for surfing, hiking and water sports",
-            id=f"research-workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=120),
-        )
-        result = await workflow_handle.result()
-
-        if use_local_model:
-            assert result == "report"
-
-            events = []
-            async for e in workflow_handle.fetch_history_events():
-                if e.HasField("activity_task_completed_event_attributes"):
-                    events.append(e)
-
-            assert len(events) == 12
-            assert (
-                '"type":"output_text"'
-                in events[0]
-                .activity_task_completed_event_attributes.result.payloads[0]
-                .data.decode()
+        async with new_worker(
+            client,
+            ResearchWorkflow,
+        ) as worker:
+            workflow_handle = await client.start_workflow(
+                ResearchWorkflow.run,
+                "Caribbean vacation spots in April, optimizing for surfing, hiking and water sports",
+                id=f"research-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=120),
             )
-            for i in range(1, 11):
+            result = await workflow_handle.result()
+
+            if use_local_model:
+                assert result == "report"
+
+                events = []
+                async for e in workflow_handle.fetch_history_events():
+                    if e.HasField("activity_task_completed_event_attributes"):
+                        events.append(e)
+
+                assert len(events) == 12
                 assert (
-                    "web_search_call"
-                    in events[i]
+                    '"type":"output_text"'
+                    in events[0]
                     .activity_task_completed_event_attributes.result.payloads[0]
                     .data.decode()
                 )
+                for i in range(1, 11):
+                    assert (
+                        "web_search_call"
+                        in events[i]
+                        .activity_task_completed_event_attributes.result.payloads[0]
+                        .data.decode()
+                    )
 
-            assert (
-                '"type":"output_text"'
-                in events[11]
-                .activity_task_completed_event_attributes.result.payloads[0]
-                .data.decode()
-            )
+                assert (
+                    '"type":"output_text"'
+                    in events[11]
+                    .activity_task_completed_event_attributes.result.payloads[0]
+                    .data.decode()
+                )
 
 
 def orchestrator_agent() -> Agent:
@@ -2657,31 +2647,25 @@ async def test_model_conversion_loops():
     assert isinstance(triage_agent.model, _TemporalModelStub)
 
 async def test_local_hello_world_agent(client: Client):
-    new_config = client.config()
-    new_config["plugins"] = [
-        openai_agents.OpenAIAgentsPlugin(
-            model_params=ModelActivityParameters(
+    async with AgentEnvironment(model=hello_mock_model(), model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30),
                 use_local_activity=True,
-            ),
-            model_provider=TestModelProvider(TestHelloModel()),
-        )
-    ]
-    client = Client(**new_config)
+            )) as env:
+        client = env.applied_on_client(client)
 
-    async with new_worker(client, HelloWorldAgent) as worker:
-        handle = await client.start_workflow(
-            HelloWorldAgent.run,
-            "Tell me about recursion in programming.",
-            id=f"hello-workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=5),
-        )
-        result = await handle.result()
-        assert result == "test"
+        async with new_worker(client, HelloWorldAgent) as worker:
+            handle = await client.start_workflow(
+                HelloWorldAgent.run,
+                "Tell me about recursion in programming.",
+                id=f"hello-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=5),
+            )
+            result = await handle.result()
+            assert result == "test"
 
-        local_activity_found = False
-        async for e in handle.fetch_history_events():
-            if e.HasField("marker_recorded_event_attributes"):
-                local_activity_found = True
-        assert local_activity_found
+            local_activity_found = False
+            async for e in handle.fetch_history_events():
+                if e.HasField("marker_recorded_event_attributes"):
+                    local_activity_found = True
+            assert local_activity_found

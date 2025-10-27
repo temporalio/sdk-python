@@ -6,9 +6,8 @@ from agents import Span, Trace, TracingProcessor
 from agents.tracing import get_trace_provider
 
 from temporalio.client import Client
-from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents.testing import (
-    TestModelProvider,
+    AgentEnvironment,
 )
 from tests.contrib.openai_agents.test_openai import (
     ResearchWorkflow,
@@ -42,102 +41,97 @@ class MemoryTracingProcessor(TracingProcessor):
 
 
 async def test_tracing(client: Client):
-    new_config = client.config()
-    new_config["plugins"] = [
-        openai_agents.OpenAIAgentsPlugin(
-            model_provider=TestModelProvider(research_mock_model())
+    async with AgentEnvironment(model=research_mock_model()) as env:
+        client = env.applied_on_client(client)
+
+        provider = get_trace_provider()
+
+        processor = MemoryTracingProcessor()
+        provider.set_processors([processor])
+
+        async with new_worker(
+            client,
+            ResearchWorkflow,
+        ) as worker:
+            workflow_handle = await client.start_workflow(
+                ResearchWorkflow.run,
+                "Caribbean vacation spots in April, optimizing for surfing, hiking and water sports",
+                id=f"research-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=120),
+            )
+            result = await workflow_handle.result()
+
+        # There is one closed root trace
+        assert len(processor.trace_events) == 2
+        assert (
+            processor.trace_events[0][0].trace_id == processor.trace_events[1][0].trace_id
         )
-    ]
-    client = Client(**new_config)
+        assert processor.trace_events[0][1]
+        assert not processor.trace_events[1][1]
 
-    provider = get_trace_provider()
+        def paired_span(a: tuple[Span[Any], bool], b: tuple[Span[Any], bool]) -> None:
+            assert a[0].trace_id == b[0].trace_id
+            assert a[1]
+            assert not b[1]
 
-    processor = MemoryTracingProcessor()
-    provider.set_processors([processor])
+        # Initial planner spans - There are only 3 because we don't make an actual model call
+        paired_span(processor.span_events[0], processor.span_events[5])
+        assert processor.span_events[0][0].span_data.export().get("name") == "PlannerAgent"
 
-    async with new_worker(
-        client,
-        ResearchWorkflow,
-    ) as worker:
-        workflow_handle = await client.start_workflow(
-            ResearchWorkflow.run,
-            "Caribbean vacation spots in April, optimizing for surfing, hiking and water sports",
-            id=f"research-workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=120),
+        paired_span(processor.span_events[1], processor.span_events[4])
+        assert (
+            processor.span_events[1][0].span_data.export().get("name")
+            == "temporal:startActivity"
         )
-        result = await workflow_handle.result()
 
-    # There is one closed root trace
-    assert len(processor.trace_events) == 2
-    assert (
-        processor.trace_events[0][0].trace_id == processor.trace_events[1][0].trace_id
-    )
-    assert processor.trace_events[0][1]
-    assert not processor.trace_events[1][1]
+        paired_span(processor.span_events[2], processor.span_events[3])
+        assert (
+            processor.span_events[2][0].span_data.export().get("name")
+            == "temporal:executeActivity"
+        )
 
-    def paired_span(a: tuple[Span[Any], bool], b: tuple[Span[Any], bool]) -> None:
-        assert a[0].trace_id == b[0].trace_id
-        assert a[1]
-        assert not b[1]
+        for span, start in processor.span_events[6:-6]:
+            span_data = span.span_data.export()
 
-    # Initial planner spans - There are only 3 because we don't make an actual model call
-    paired_span(processor.span_events[0], processor.span_events[5])
-    assert processor.span_events[0][0].span_data.export().get("name") == "PlannerAgent"
+            # All spans should be closed
+            if start:
+                assert any(
+                    span.span_id == s.span_id and not s_start
+                    for (s, s_start) in processor.span_events
+                )
 
-    paired_span(processor.span_events[1], processor.span_events[4])
-    assert (
-        processor.span_events[1][0].span_data.export().get("name")
-        == "temporal:startActivity"
-    )
+            # Start activity is always parented to an agent
+            if span_data.get("name") == "temporal:startActivity":
+                parents = [
+                    s for (s, _) in processor.span_events if s.span_id == span.parent_id
+                ]
+                assert (
+                    len(parents) == 2 and parents[0].span_data.export()["type"] == "agent"
+                )
 
-    paired_span(processor.span_events[2], processor.span_events[3])
-    assert (
-        processor.span_events[2][0].span_data.export().get("name")
-        == "temporal:executeActivity"
-    )
+            # Execute is parented to start
+            if span_data.get("name") == "temporal:executeActivity":
+                parents = [
+                    s for (s, _) in processor.span_events if s.span_id == span.parent_id
+                ]
+                assert (
+                    len(parents) == 2
+                    and parents[0].span_data.export()["name"] == "temporal:startActivity"
+                )
 
-    for span, start in processor.span_events[6:-6]:
-        span_data = span.span_data.export()
+        # Final writer spans - There are only 3 because we don't make an actual model call
+        paired_span(processor.span_events[-6], processor.span_events[-1])
+        assert processor.span_events[-6][0].span_data.export().get("name") == "WriterAgent"
 
-        # All spans should be closed
-        if start:
-            assert any(
-                span.span_id == s.span_id and not s_start
-                for (s, s_start) in processor.span_events
-            )
+        paired_span(processor.span_events[-5], processor.span_events[-2])
+        assert (
+            processor.span_events[-5][0].span_data.export().get("name")
+            == "temporal:startActivity"
+        )
 
-        # Start activity is always parented to an agent
-        if span_data.get("name") == "temporal:startActivity":
-            parents = [
-                s for (s, _) in processor.span_events if s.span_id == span.parent_id
-            ]
-            assert (
-                len(parents) == 2 and parents[0].span_data.export()["type"] == "agent"
-            )
-
-        # Execute is parented to start
-        if span_data.get("name") == "temporal:executeActivity":
-            parents = [
-                s for (s, _) in processor.span_events if s.span_id == span.parent_id
-            ]
-            assert (
-                len(parents) == 2
-                and parents[0].span_data.export()["name"] == "temporal:startActivity"
-            )
-
-    # Final writer spans - There are only 3 because we don't make an actual model call
-    paired_span(processor.span_events[-6], processor.span_events[-1])
-    assert processor.span_events[-6][0].span_data.export().get("name") == "WriterAgent"
-
-    paired_span(processor.span_events[-5], processor.span_events[-2])
-    assert (
-        processor.span_events[-5][0].span_data.export().get("name")
-        == "temporal:startActivity"
-    )
-
-    paired_span(processor.span_events[-4], processor.span_events[-3])
-    assert (
-        processor.span_events[-4][0].span_data.export().get("name")
-        == "temporal:executeActivity"
-    )
+        paired_span(processor.span_events[-4], processor.span_events[-3])
+        assert (
+            processor.span_events[-4][0].span_data.export().get("name")
+            == "temporal:executeActivity"
+        )
