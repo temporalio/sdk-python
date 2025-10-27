@@ -2670,3 +2670,37 @@ async def test_model_conversion_loops():
     triage_agent = seat_booking_agent.handoffs[0]
     assert isinstance(triage_agent, Agent)
     assert isinstance(triage_agent.model, _TemporalModelStub)
+
+
+async def test_split_workers(client: Client):
+    new_config = client.config()
+
+    # Workflow worker
+    workflow_plugin = openai_agents.OpenAIAgentsPlugin(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30)
+        ),
+        model_provider=TestModelProvider(TestHelloModel()),
+        register_activities=False,
+    )
+    new_config["plugins"] = [workflow_plugin]
+    plugin_client = Client(**new_config)
+
+    async with new_worker(client, HelloWorldAgent, plugins=[workflow_plugin]) as worker:
+
+        # Activity Worker
+        activity_plugin = openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(TestHelloModel()),
+        )
+        async with new_worker(client, task_queue=worker.task_queue, plugins=[activity_plugin]):
+            result = await plugin_client.execute_workflow(
+                HelloWorldAgent.run,
+                "Tell me about recursion in programming.",
+                id=f"hello-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=120),
+            )
+            assert result == "test"
