@@ -1724,33 +1724,29 @@ async def test_file_search_tool(client: Client, use_local_model):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
 
-    new_config = client.config()
-    new_config["plugins"] = [
-        openai_agents.OpenAIAgentsPlugin(
-            model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30)
-            ),
-            model_provider=TestModelProvider(file_search_tool_mock_model())
-            if use_local_model
-            else None,
-        )
-    ]
-    client = Client(**new_config)
+    model = file_search_tool_mock_model() if use_local_model else None
+    async with AgentEnvironment(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30)
+        ),
+        model=model,
+    ) as env:
+        client = env.applied_on_client(client)
 
-    async with new_worker(
-        client,
-        FileSearchToolWorkflow,
-    ) as worker:
-        workflow_handle = await client.start_workflow(
-            FileSearchToolWorkflow.run,
-            "Tell me about a side character in the Iliad.",
-            id=f"file-search-tool-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
-        )
-        result = await workflow_handle.result()
-        if use_local_model:
-            assert result == "Patroclus"
+        async with new_worker(
+            client,
+            FileSearchToolWorkflow,
+        ) as worker:
+            workflow_handle = await client.start_workflow(
+                FileSearchToolWorkflow.run,
+                "Tell me about a side character in the Iliad.",
+                id=f"file-search-tool-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+            result = await workflow_handle.result()
+            if use_local_model:
+                assert result == "Patroclus"
 
 
 def image_generation_mock_model():
@@ -1802,31 +1798,27 @@ async def test_image_generation_tool(client: Client, use_local_model):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
 
-    new_config = client.config()
-    new_config["plugins"] = [
-        openai_agents.OpenAIAgentsPlugin(
-            model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30)
-            ),
-            model_provider=TestModelProvider(image_generation_mock_model())
-            if use_local_model
-            else None,
-        )
-    ]
-    client = Client(**new_config)
+    model = image_generation_mock_model() if use_local_model else None
+    async with AgentEnvironment(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30)
+        ),
+        model=model,
+    ) as env:
+        client = env.applied_on_client(client)
 
-    async with new_worker(
-        client,
-        ImageGenerationWorkflow,
-    ) as worker:
-        workflow_handle = await client.start_workflow(
-            ImageGenerationWorkflow.run,
-            "Create an image of a frog eating a pizza, comic book style.",
-            id=f"image-generation-tool-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
-        )
-        result = await workflow_handle.result()
+        async with new_worker(
+            client,
+            ImageGenerationWorkflow,
+        ) as worker:
+            workflow_handle = await client.start_workflow(
+                ImageGenerationWorkflow.run,
+                "Create an image of a frog eating a pizza, comic book style.",
+                id=f"image-generation-tool-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+            result = await workflow_handle.result()
 
 
 def code_interpreter_mock_model():
@@ -1968,30 +1960,27 @@ class HostedMCPWorkflow:
 
 
 async def test_hosted_mcp_tool(client: Client):
-    new_config = client.config()
-    new_config["plugins"] = [
-        openai_agents.OpenAIAgentsPlugin(
-            model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=120)
-            ),
-            model_provider=TestModelProvider(hosted_mcp_mock_model()),
-        )
-    ]
-    client = Client(**new_config)
+    async with AgentEnvironment(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=120)
+        ),
+        model=hosted_mcp_mock_model(),
+    ) as env:
+        client = env.applied_on_client(client)
 
-    async with new_worker(
-        client,
-        HostedMCPWorkflow,
-    ) as worker:
-        workflow_handle = await client.start_workflow(
-            HostedMCPWorkflow.run,
-            "Which language is this repo written in?",
-            id=f"hosted-mcp-tool-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=120),
-        )
-        result = await workflow_handle.result()
-        assert result == "Some language"
+        async with new_worker(
+            client,
+            HostedMCPWorkflow,
+        ) as worker:
+            workflow_handle = await client.start_workflow(
+                HostedMCPWorkflow.run,
+                "Which language is this repo written in?",
+                id=f"hosted-mcp-tool-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=120),
+            )
+            result = await workflow_handle.result()
+            assert result == "Some language"
 
 
 class AssertDifferentModelProvider(ModelProvider):
@@ -2042,60 +2031,54 @@ class MultipleModelWorkflow:
 
 async def test_multiple_models(client: Client):
     provider = AssertDifferentModelProvider(multiple_models_mock_model())
-    new_config = client.config()
-    new_config["plugins"] = [
-        openai_agents.OpenAIAgentsPlugin(
-            model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=120)
-            ),
-            model_provider=provider,
-        )
-    ]
-    client = Client(**new_config)
+    async with AgentEnvironment(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=120)
+        ),
+        model_provider=provider,
+    ) as env:
+        client = env.applied_on_client(client)
 
-    async with new_worker(
-        client,
-        MultipleModelWorkflow,
-    ) as worker:
-        workflow_handle = await client.start_workflow(
-            MultipleModelWorkflow.run,
-            False,
-            id=f"multiple-model-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
-        )
-        result = await workflow_handle.result()
-        assert provider.model_names == {None, "gpt-4o-mini"}
+        async with new_worker(
+            client,
+            MultipleModelWorkflow,
+        ) as worker:
+            workflow_handle = await client.start_workflow(
+                MultipleModelWorkflow.run,
+                False,
+                id=f"multiple-model-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=10),
+            )
+            result = await workflow_handle.result()
+            assert provider.model_names == {None, "gpt-4o-mini"}
 
 
 async def test_run_config_models(client: Client):
     provider = AssertDifferentModelProvider(multiple_models_mock_model())
-    new_config = client.config()
-    new_config["plugins"] = [
-        openai_agents.OpenAIAgentsPlugin(
-            model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=120)
-            ),
-            model_provider=provider,
-        )
-    ]
-    client = Client(**new_config)
+    async with AgentEnvironment(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=120)
+        ),
+        model_provider=provider,
+    ) as env:
+        client = env.applied_on_client(client)
 
-    async with new_worker(
-        client,
-        MultipleModelWorkflow,
-    ) as worker:
-        workflow_handle = await client.start_workflow(
-            MultipleModelWorkflow.run,
-            True,
-            id=f"run-config-model-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
-        )
-        result = await workflow_handle.result()
+        async with new_worker(
+            client,
+            MultipleModelWorkflow,
+        ) as worker:
+            workflow_handle = await client.start_workflow(
+                MultipleModelWorkflow.run,
+                True,
+                id=f"run-config-model-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=10),
+            )
+            result = await workflow_handle.result()
 
-        # Only the model from the runconfig override is used
-        assert provider.model_names == {"gpt-4o"}
+            # Only the model from the runconfig override is used
+            assert provider.model_names == {"gpt-4o"}
 
 
 async def test_summary_provider(client: Client):
@@ -2108,33 +2091,30 @@ async def test_summary_provider(client: Client):
         ) -> str:
             return "My summary"
 
-    new_config = client.config()
-    new_config["plugins"] = [
-        openai_agents.OpenAIAgentsPlugin(
-            model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=120),
-                summary_override=SummaryProvider(),
-            ),
-            model_provider=TestModelProvider(hello_mock_model()),
-        )
-    ]
-    client = Client(**new_config)
+    async with AgentEnvironment(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=120),
+            summary_override=SummaryProvider(),
+        ),
+        model=hello_mock_model(),
+    ) as env:
+        client = env.applied_on_client(client)
 
-    async with new_worker(
-        client,
-        HelloWorldAgent,
-    ) as worker:
-        workflow_handle = await client.start_workflow(
-            HelloWorldAgent.run,
-            "Prompt",
-            id=f"summary-provider-model-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
-        )
-        result = await workflow_handle.result()
-        async for e in workflow_handle.fetch_history_events():
-            if e.HasField("activity_task_scheduled_event_attributes"):
-                assert e.user_metadata.summary.data == b'"My summary"'
+        async with new_worker(
+            client,
+            HelloWorldAgent,
+        ) as worker:
+            workflow_handle = await client.start_workflow(
+                HelloWorldAgent.run,
+                "Prompt",
+                id=f"summary-provider-model-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=10),
+            )
+            result = await workflow_handle.result()
+            async for e in workflow_handle.fetch_history_events():
+                if e.HasField("activity_task_scheduled_event_attributes"):
+                    assert e.user_metadata.summary.data == b'"My summary"'
 
 
 class OutputType(pydantic.BaseModel):
@@ -2338,39 +2318,35 @@ async def test_mcp_server(
         else StatelessMCPServerProvider("HelloServer", lambda _: tracking_server)
     )
 
-    new_config = client.config()
-    new_config["plugins"] = [
-        openai_agents.OpenAIAgentsPlugin(
-            model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=120)
-            ),
-            model_provider=TestModelProvider(tracking_mcp_mock_model())
-            if use_local_model
-            else None,
-            mcp_server_providers=[server],
-        )
-    ]
-    client = Client(**new_config)
+    model = tracking_mcp_mock_model() if use_local_model else None
+    async with AgentEnvironment(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=120)
+        ),
+        model=model,
+        mcp_server_providers=[server],
+    ) as env:
+        client = env.applied_on_client(client)
 
-    async with new_worker(
-        client, McpServerStatefulWorkflow, McpServerWorkflow
-    ) as worker:
-        if stateful:
-            result = await client.execute_workflow(
-                McpServerStatefulWorkflow.run,
-                args=[timedelta(seconds=30), None],
-                id=f"mcp-server-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=30),
-            )
-        else:
-            result = await client.execute_workflow(
-                McpServerWorkflow.run,
-                args=[caching, None],
-                id=f"mcp-server-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=30),
-            )
+        async with new_worker(
+            client, McpServerStatefulWorkflow, McpServerWorkflow
+        ) as worker:
+            if stateful:
+                result = await client.execute_workflow(
+                    McpServerStatefulWorkflow.run,
+                    args=[timedelta(seconds=30), None],
+                    id=f"mcp-server-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    execution_timeout=timedelta(seconds=30),
+                )
+            else:
+                result = await client.execute_workflow(
+                    McpServerWorkflow.run,
+                    args=[caching, None],
+                    id=f"mcp-server-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    execution_timeout=timedelta(seconds=30),
+                )
         if use_local_model:
             assert result == "Hi Tom and Tim!"
     if use_local_model:
@@ -2435,38 +2411,35 @@ async def test_mcp_server_factory_argument(client: Client, stateful: bool):
         else StatelessMCPServerProvider("HelloServer", factory)
     )
 
-    new_config = client.config()
-    new_config["plugins"] = [
-        openai_agents.OpenAIAgentsPlugin(
-            model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=120)
-            ),
-            model_provider=TestModelProvider(tracking_mcp_mock_model()),
-            mcp_server_providers=[server],
-        )
-    ]
-    client = Client(**new_config)
+    async with AgentEnvironment(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=120)
+        ),
+        model=tracking_mcp_mock_model(),
+        mcp_server_providers=[server],
+    ) as env:
+        client = env.applied_on_client(client)
 
-    headers = {"user": "blah"}
-    async with new_worker(
-        client, McpServerStatefulWorkflow, McpServerWorkflow
-    ) as worker:
-        if stateful:
-            result = await client.execute_workflow(
-                McpServerStatefulWorkflow.run,
-                args=[timedelta(seconds=30), headers],
-                id=f"mcp-server-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=30),
-            )
-        else:
-            result = await client.execute_workflow(
-                McpServerWorkflow.run,
-                args=[False, headers],
-                id=f"mcp-server-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=30),
-            )
+        headers = {"user": "blah"}
+        async with new_worker(
+            client, McpServerStatefulWorkflow, McpServerWorkflow
+        ) as worker:
+            if stateful:
+                result = await client.execute_workflow(
+                    McpServerStatefulWorkflow.run,
+                    args=[timedelta(seconds=30), headers],
+                    id=f"mcp-server-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    execution_timeout=timedelta(seconds=30),
+                )
+            else:
+                result = await client.execute_workflow(
+                    McpServerWorkflow.run,
+                    args=[False, headers],
+                    id=f"mcp-server-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    execution_timeout=timedelta(seconds=30),
+                )
 
 
 async def test_stateful_mcp_server_no_worker(client: Client):
@@ -2495,36 +2468,33 @@ async def test_stateful_mcp_server_no_worker(client: Client):
 
     server.get_activities = override_get_activities  # type:ignore
 
-    new_config = client.config()
-    new_config["plugins"] = [
-        openai_agents.OpenAIAgentsPlugin(
-            model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=120)
-            ),
-            model_provider=TestModelProvider(tracking_mcp_mock_model()),
-            mcp_server_providers=[server],
-        )
-    ]
-    client = Client(**new_config)
+    async with AgentEnvironment(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=120)
+        ),
+        model=tracking_mcp_mock_model(),
+        mcp_server_providers=[server],
+    ) as env:
+        client = env.applied_on_client(client)
 
-    async with new_worker(
-        client,
-        McpServerStatefulWorkflow,
-    ) as worker:
-        workflow_handle = await client.start_workflow(
-            McpServerStatefulWorkflow.run,
-            args=[timedelta(seconds=1), None],
-            id=f"mcp-server-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
-        )
-        with pytest.raises(WorkflowFailureError) as err:
-            await workflow_handle.result()
-        assert isinstance(err.value.cause, ApplicationError)
-        assert (
-            err.value.cause.message
-            == "MCP Stateful Server Worker failed to schedule activity."
-        )
+        async with new_worker(
+            client,
+            McpServerStatefulWorkflow,
+        ) as worker:
+            workflow_handle = await client.start_workflow(
+                McpServerStatefulWorkflow.run,
+                args=[timedelta(seconds=1), None],
+                id=f"mcp-server-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+            with pytest.raises(WorkflowFailureError) as err:
+                await workflow_handle.result()
+            assert isinstance(err.value.cause, ApplicationError)
+            assert (
+                err.value.cause.message
+                == "MCP Stateful Server Worker failed to schedule activity."
+            )
 
 
 async def test_model_conversion_loops():
