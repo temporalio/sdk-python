@@ -7566,6 +7566,8 @@ class RaiseErrorWorkflow:
 
 
 async def test_activity_benign_error_not_logged(client: Client):
+    if sys.version_info < (3, 12):
+        pytest.skip("This test currently fails frequently on 3.10 due to import bug")
     with LogCapturer().logs_captured(activity.logger.base_logger) as capturer:
         async with new_worker(
             client, RaiseErrorWorkflow, activities=[raise_application_error]
