@@ -43,6 +43,7 @@ except ImportError:
     HAVE_PYDANTIC = False
 
 import temporalio.workflow
+import temporalio.exceptions
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +83,7 @@ class RestrictedWorkflowAccessError(temporalio.workflow.NondeterminismError):
         )
 
 
-# TODO(amazzeo): is NondeterminisimError appropriate as a subclass?
-class UnintentionalPassthroughError(temporalio.workflow.NondeterminismError):
+class UnintentionalPassthroughError(temporalio.exceptions.TemporalError):
     """Error that occurs when a workflow unintentionally passes an import to the sandbox when
     the import notification policy includes :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_NON_PASSTHROUGH`.
 
@@ -91,20 +91,11 @@ class UnintentionalPassthroughError(temporalio.workflow.NondeterminismError):
         qualified_name: Fully qualified name of what was passed through to the sandbox.
     """
 
-    def __init__(
-        self, qualified_name: str, *, override_message: Optional[str] = None
-    ) -> None:
+    def __init__(self, qualified_name: str) -> None:
         """Create an unintentional passthrough error."""
         super().__init__(
-            override_message
-            or UnintentionalPassthroughError.default_message(qualified_name)
+            f"Module {qualified_name} was not intentionally passed through to the sandbox."
         )
-        self.qualified_name = qualified_name
-
-    @staticmethod
-    def default_message(qualified_name: str) -> str:
-        """Get default message for unintentional passthrough."""
-        return f"Module {qualified_name} was not intentionally passed through to the sandbox."
 
 
 @dataclass(frozen=True)
