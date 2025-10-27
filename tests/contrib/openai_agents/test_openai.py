@@ -138,11 +138,14 @@ class HelloWorldAgent:
 async def test_hello_world_agent(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
-    
+
     model = hello_mock_model() if use_local_model else None
-    async with AgentEnvironment(model=model, model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30),
-            )) as env:
+    async with AgentEnvironment(
+        model=model,
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as env:
         client = env.applied_on_client(client)
 
         async with new_worker(client, HelloWorldAgent) as worker:
@@ -320,11 +323,14 @@ class NexusToolsWorkflow:
 async def test_tool_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
-    
+
     model = weather_mock_model() if use_local_model else None
-    async with AgentEnvironment(model=model, model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30),
-            )) as env:
+    async with AgentEnvironment(
+        model=model,
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as env:
         client = env.applied_on_client(client)
 
         async with new_worker(
@@ -441,9 +447,12 @@ def weather_failure_mock_model():
 
 
 async def test_tool_failure_workflow(client: Client):
-    async with AgentEnvironment(model=weather_failure_mock_model(), model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30),
-            )) as env:
+    async with AgentEnvironment(
+        model=weather_failure_mock_model(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as env:
         client = env.applied_on_client(client)
 
         async with new_worker(
@@ -478,9 +487,12 @@ async def test_nexus_tool_workflow(
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     model = nexus_weather_mock_model() if use_local_model else None
-    async with AgentEnvironment(model=model, model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30),
-            )) as agent_env:
+    async with AgentEnvironment(
+        model=model,
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as agent_env:
         client = agent_env.applied_on_client(client)
 
         async with new_worker(
@@ -504,9 +516,9 @@ async def test_nexus_tool_workflow(
 
                 events = []
                 async for e in workflow_handle.fetch_history_events():
-                    if e.HasField("activity_task_completed_event_attributes") or e.HasField(
-                        "nexus_operation_completed_event_attributes"
-                    ):
+                    if e.HasField(
+                        "activity_task_completed_event_attributes"
+                    ) or e.HasField("nexus_operation_completed_event_attributes"):
                         events.append(e)
 
                 assert len(events) == 3
@@ -574,10 +586,13 @@ async def test_research_workflow(client: Client, use_local_model: bool):
         pytest.skip("No openai API key")
 
     model = research_mock_model() if use_local_model else None
-    async with AgentEnvironment(model=model, model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=120),
-                schedule_to_close_timeout=timedelta(seconds=120),
-            )) as env:
+    async with AgentEnvironment(
+        model=model,
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=120),
+            schedule_to_close_timeout=timedelta(seconds=120),
+        ),
+    ) as env:
         client = env.applied_on_client(client)
 
         async with new_worker(
@@ -720,11 +735,14 @@ def agent_as_tools_mock_model():
 async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
-    
+
     model = agent_as_tools_mock_model() if use_local_model else None
-    async with AgentEnvironment(model=model, model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30),
-            )) as env:
+    async with AgentEnvironment(
+        model=model,
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as env:
         client = env.applied_on_client(client)
 
         async with new_worker(
@@ -981,11 +999,14 @@ class CustomerServiceWorkflow:
 async def test_customer_service_workflow(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
-    
+
     model = customer_service_mock_model() if use_local_model else None
-    async with AgentEnvironment(model=model, model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30),
-            )) as env:
+    async with AgentEnvironment(
+        model=model,
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as env:
         client = env.applied_on_client(client)
 
         questions = [
@@ -1205,11 +1226,18 @@ class InputGuardrailWorkflow:
 async def test_input_guardrail(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
-    
-    model = InputGuardrailModel("", openai_client=AsyncOpenAI(api_key="Fake key")) if use_local_model else None
-    async with AgentEnvironment(model=model, model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30),
-            )) as env:
+
+    model = (
+        InputGuardrailModel("", openai_client=AsyncOpenAI(api_key="Fake key"))
+        if use_local_model
+        else None
+    )
+    async with AgentEnvironment(
+        model=model,
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as env:
         client = env.applied_on_client(client)
 
         async with new_worker(
@@ -1298,11 +1326,14 @@ class OutputGuardrailWorkflow:
 async def test_output_guardrail(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
-    
+
     model = output_guardrail_mock_model() if use_local_model else None
-    async with AgentEnvironment(model=model, model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30),
-            )) as env:
+    async with AgentEnvironment(
+        model=model,
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as env:
         client = env.applied_on_client(client)
 
         async with new_worker(
@@ -1351,9 +1382,12 @@ class WorkflowToolWorkflow:
 
 
 async def test_workflow_method_tools(client: Client):
-    async with AgentEnvironment(model=workflow_tool_mock_model(), model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30),
-            )) as env:
+    async with AgentEnvironment(
+        model=workflow_tool_mock_model(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as env:
         client = env.applied_on_client(client)
 
     async with new_worker(
@@ -1400,9 +1434,12 @@ async def assert_status_retry_behavior(status: int, client: Client, should_retry
                 body=None,
             )
 
-    async with AgentEnvironment(model=TestModel(lambda: status_error(status)), model_params=ModelActivityParameters(
-                retry_policy=RetryPolicy(maximum_attempts=2),
-            )) as env:
+    async with AgentEnvironment(
+        model=TestModel(lambda: status_error(status)),
+        model_params=ModelActivityParameters(
+            retry_policy=RetryPolicy(maximum_attempts=2),
+        ),
+    ) as env:
         client = env.applied_on_client(client)
 
         async with new_worker(
@@ -1451,9 +1488,12 @@ async def test_chat_completions_model(client: Client):
     if not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
 
-    async with AgentEnvironment(model_provider=CustomModelProvider(), model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30),
-            )) as env:
+    async with AgentEnvironment(
+        model_provider=CustomModelProvider(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as env:
         client = env.applied_on_client(client)
 
         async with new_worker(
@@ -1520,9 +1560,12 @@ class CheckModelNameProvider(ModelProvider):
 
 
 async def test_alternative_model(client: Client):
-    async with AgentEnvironment(model_provider=CheckModelNameProvider(), model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30),
-            )) as env:
+    async with AgentEnvironment(
+        model_provider=CheckModelNameProvider(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as env:
         client = env.applied_on_client(client)
 
         async with new_worker(
@@ -1543,9 +1586,12 @@ async def test_heartbeat(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip("Relies on real timing, skip.")
 
-    async with AgentEnvironment(model=WaitModel(), model_params=ModelActivityParameters(
-                heartbeat_timeout=timedelta(seconds=0.5),
-            )) as agent_env:
+    async with AgentEnvironment(
+        model=WaitModel(),
+        model_params=ModelActivityParameters(
+            heartbeat_timeout=timedelta(seconds=0.5),
+        ),
+    ) as agent_env:
         client = agent_env.applied_on_client(client)
 
         async with new_worker(
@@ -1649,9 +1695,12 @@ async def test_lite_llm(client: Client, env: WorkflowEnvironment):
 
     from agents.extensions.models.litellm_provider import LitellmProvider
 
-    async with AgentEnvironment(model_provider=LitellmProvider(), model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30),
-            )) as agent_env:
+    async with AgentEnvironment(
+        model_provider=LitellmProvider(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as agent_env:
         client = agent_env.applied_on_client(client)
 
         async with new_worker(
@@ -1868,9 +1917,12 @@ class CodeInterpreterWorkflow:
 
 
 async def test_code_interpreter_tool(client: Client):
-    async with AgentEnvironment(model=code_interpreter_mock_model(), model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=60),
-            )) as env:
+    async with AgentEnvironment(
+        model=code_interpreter_mock_model(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=60),
+        ),
+    ) as env:
         client = env.applied_on_client(client)
 
         async with new_worker(
@@ -2148,9 +2200,12 @@ def output_type_mock_model():
 
 
 async def test_output_type(client: Client):
-    async with AgentEnvironment(model=output_type_mock_model(), model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=120),
-            )) as env:
+    async with AgentEnvironment(
+        model=output_type_mock_model(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=120),
+        ),
+    ) as env:
         client = env.applied_on_client(client)
 
         async with new_worker(
@@ -2517,11 +2572,15 @@ async def test_model_conversion_loops():
     assert isinstance(triage_agent, Agent)
     assert isinstance(triage_agent.model, _TemporalModelStub)
 
+
 async def test_local_hello_world_agent(client: Client):
-    async with AgentEnvironment(model=hello_mock_model(), model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(seconds=30),
-                use_local_activity=True,
-            )) as env:
+    async with AgentEnvironment(
+        model=hello_mock_model(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+            use_local_activity=True,
+        ),
+    ) as env:
         client = env.applied_on_client(client)
 
         async with new_worker(client, HelloWorldAgent) as worker:

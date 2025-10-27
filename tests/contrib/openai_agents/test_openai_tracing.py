@@ -65,7 +65,8 @@ async def test_tracing(client: Client):
         # There is one closed root trace
         assert len(processor.trace_events) == 2
         assert (
-            processor.trace_events[0][0].trace_id == processor.trace_events[1][0].trace_id
+            processor.trace_events[0][0].trace_id
+            == processor.trace_events[1][0].trace_id
         )
         assert processor.trace_events[0][1]
         assert not processor.trace_events[1][1]
@@ -77,7 +78,9 @@ async def test_tracing(client: Client):
 
         # Initial planner spans - There are only 3 because we don't make an actual model call
         paired_span(processor.span_events[0], processor.span_events[5])
-        assert processor.span_events[0][0].span_data.export().get("name") == "PlannerAgent"
+        assert (
+            processor.span_events[0][0].span_data.export().get("name") == "PlannerAgent"
+        )
 
         paired_span(processor.span_events[1], processor.span_events[4])
         assert (
@@ -107,7 +110,8 @@ async def test_tracing(client: Client):
                     s for (s, _) in processor.span_events if s.span_id == span.parent_id
                 ]
                 assert (
-                    len(parents) == 2 and parents[0].span_data.export()["type"] == "agent"
+                    len(parents) == 2
+                    and parents[0].span_data.export()["type"] == "agent"
                 )
 
             # Execute is parented to start
@@ -117,12 +121,15 @@ async def test_tracing(client: Client):
                 ]
                 assert (
                     len(parents) == 2
-                    and parents[0].span_data.export()["name"] == "temporal:startActivity"
+                    and parents[0].span_data.export()["name"]
+                    == "temporal:startActivity"
                 )
 
         # Final writer spans - There are only 3 because we don't make an actual model call
         paired_span(processor.span_events[-6], processor.span_events[-1])
-        assert processor.span_events[-6][0].span_data.export().get("name") == "WriterAgent"
+        assert (
+            processor.span_events[-6][0].span_data.export().get("name") == "WriterAgent"
+        )
 
         paired_span(processor.span_events[-5], processor.span_events[-2])
         assert (
