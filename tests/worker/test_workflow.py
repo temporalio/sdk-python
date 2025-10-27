@@ -15,7 +15,6 @@ import time
 import typing
 import uuid
 from abc import ABC, abstractmethod
-from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum
@@ -23,7 +22,6 @@ from functools import partial
 from typing import (
     Any,
     Awaitable,
-    Callable,
     Dict,
     List,
     Mapping,
@@ -8385,7 +8383,7 @@ async def test_search_attribute_codec(client: Client, env_type: str):
         result = await client.execute_workflow(
             SearchAttributeCodecParentWorkflow.run,
             "Temporal",
-            id=f"encryption-workflow-id",
+            id="encryption-workflow-id",
             task_queue=worker.task_queue,
             search_attributes=TypedSearchAttributes(
                 [
@@ -8395,3 +8393,56 @@ async def test_search_attribute_codec(client: Client, env_type: str):
                 ]
             ),
         )
+
+
+@activity.defn
+async def activity_that_fails_with_details() -> str:
+    """Activity that raises an ApplicationError with custom details."""
+    raise ApplicationError(
+        "Activity failed intentionally",
+        "detail1",
+        {"error_code": "NOT_FOUND", "id": "test-123"},
+        non_retryable=True,
+    )
+
+
+@workflow.defn
+class WorkflowWithFailingActivityAndCodec:
+    @workflow.run
+    async def run(self) -> str:
+        try:
+            return await workflow.execute_activity(
+                activity_that_fails_with_details,
+                schedule_to_close_timeout=timedelta(seconds=3),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        except ActivityError as err:
+            assert isinstance(err.cause, ApplicationError)
+            assert err.cause.message == "Activity failed intentionally"
+            assert len(err.cause.details) == 2
+            assert err.cause.details[0] == "detail1"
+            assert err.cause.details[1] == {"error_code": "NOT_FOUND", "id": "test-123"}
+            return "Handled encrypted failure successfully"
+
+
+async def test_activity_failure_with_encoded_payload_is_decoded_in_workflow(
+    client: Client,
+):
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        temporalio.converter.default(), payload_codec=EncryptionCodec()
+    )
+    client = Client(**config)
+
+    async with new_worker(
+        client,
+        WorkflowWithFailingActivityAndCodec,
+        activities=[activity_that_fails_with_details],
+    ) as worker:
+        result = await client.execute_workflow(
+            WorkflowWithFailingActivityAndCodec.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            run_timeout=timedelta(seconds=5),
+        )
+        assert result == "Handled encrypted failure successfully"
