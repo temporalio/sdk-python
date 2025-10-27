@@ -1,7 +1,6 @@
 import asyncio
 import json
 import os
-import re
 import sys
 import uuid
 from dataclasses import dataclass
