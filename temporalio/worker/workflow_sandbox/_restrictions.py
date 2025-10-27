@@ -224,7 +224,7 @@ class SandboxRestrictions:
         """
         return dataclasses.replace(self, passthrough_all_modules=True)
 
-    def with_import_policy(
+    def with_import_notification_policy(
         self, policy: temporalio.workflow.SandboxImportNotificationPolicy
     ) -> SandboxRestrictions:
         """Create a new restriction set with the given import notification policy as the :py:attr:`import_policy`."""

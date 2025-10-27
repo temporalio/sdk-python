@@ -209,7 +209,7 @@ class Importer:
                 )
             ):
                 warnings.warn(
-                    f"Module {name} was imported after initial workflow load."
+                    f"Module {full_name} was imported after initial workflow load."
                 )
 
             # Make sure not an entirely invalid module
@@ -297,11 +297,11 @@ class Importer:
     def _is_import_notification_policy_applied(
         self, policy: temporalio.workflow.SandboxImportNotificationPolicy
     ) -> bool:
-        applied_policy = (
-            temporalio.workflow.unsafe.current_sandbox_import_notification_policy()
+        override_policy = (
+            temporalio.workflow.unsafe.current_import_notification_policy_override()
         )
-        if applied_policy:
-            return policy in applied_policy
+        if override_policy:
+            return policy in override_policy
 
         return policy in self.restrictions.import_notification_policy
 

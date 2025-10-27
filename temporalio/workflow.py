@@ -1513,7 +1513,7 @@ class unsafe:
             _imports_passed_through.value = False
 
     @staticmethod
-    def current_sandbox_import_notification_policy() -> (
+    def current_import_notification_policy_override() -> (
         Optional[SandboxImportNotificationPolicy]
     ):
         """Gets the current import notification policy override if one is set."""
