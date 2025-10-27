@@ -171,8 +171,8 @@ class PayloadVisitor:
         if key in self.generated:
             return self.generated[key]
         if key in self.in_progress:
-            # Break cycles; if another path proves this node needed, we'll revisit
-            return False
+            # Break cycles; Assume the child will be needed (Used by Failure -> Cause)
+            return True
 
         has_payload = False
         self.in_progress.add(key)
