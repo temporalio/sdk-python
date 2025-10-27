@@ -10,3 +10,4 @@ temporalio/bridge/temporal_sdk_bridge*
 /sdk-python.iml
 /.zed
 *.DS_Store
+tags
