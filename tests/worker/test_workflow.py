@@ -15,7 +15,6 @@ import time
 import typing
 import uuid
 from abc import ABC, abstractmethod
-from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum
@@ -23,7 +22,6 @@ from functools import partial
 from typing import (
     Any,
     Awaitable,
-    Callable,
     Dict,
     List,
     Mapping,
@@ -131,6 +129,7 @@ from temporalio.worker import (
 )
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import (
+    LogCapturer,
     admitted_update_task,
     assert_eq_eventually,
     assert_eventually,
@@ -144,6 +143,11 @@ from tests.helpers import (
     pause_and_assert,
     unpause_and_assert,
     workflow_update_exists,
+)
+from tests.helpers.cache_eviction import (
+    CacheEvictionTearDownWorkflow,
+    WaitForeverWorkflow,
+    wait_forever_activity,
 )
 from tests.helpers.external_stack_trace import (
     ExternalStackTraceWorkflow,
@@ -1992,37 +1996,6 @@ class LoggingWorkflow:
         return self._last_signal
 
 
-class LogCapturer:
-    def __init__(self) -> None:
-        self.log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
-
-    @contextmanager
-    def logs_captured(self, *loggers: logging.Logger):
-        handler = logging.handlers.QueueHandler(self.log_queue)
-
-        prev_levels = [l.level for l in loggers]
-        for l in loggers:
-            l.setLevel(logging.INFO)
-            l.addHandler(handler)
-        try:
-            yield self
-        finally:
-            for i, l in enumerate(loggers):
-                l.removeHandler(handler)
-                l.setLevel(prev_levels[i])
-
-    def find_log(self, starts_with: str) -> Optional[logging.LogRecord]:
-        return self.find(lambda l: l.message.startswith(starts_with))
-
-    def find(
-        self, pred: Callable[[logging.LogRecord], bool]
-    ) -> Optional[logging.LogRecord]:
-        for record in cast(List[logging.LogRecord], self.log_queue.queue):
-            if pred(record):
-                return record
-        return None
-
-
 async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
     workflow.logger.full_workflow_info_on_extra = True
     with LogCapturer().logs_captured(
@@ -3736,70 +3709,6 @@ async def test_manual_result_type(client: Client):
         assert res3 == {"some_string": "from-query"}
         res4 = await handle.query("some_query", result_type=ManualResultType)
         assert res4 == ManualResultType(some_string="from-query")
-
-
-@activity.defn
-async def wait_forever_activity() -> None:
-    await asyncio.Future()
-
-
-@workflow.defn
-class WaitForeverWorkflow:
-    @workflow.run
-    async def run(self) -> None:
-        await asyncio.Future()
-
-
-@workflow.defn
-class CacheEvictionTearDownWorkflow:
-    def __init__(self) -> None:
-        self._signal_count = 0
-
-    @workflow.run
-    async def run(self) -> None:
-        # Start several things in background. This is just to show that eviction
-        # can work even with these things running.
-        tasks = [
-            asyncio.create_task(
-                workflow.execute_activity(
-                    wait_forever_activity, start_to_close_timeout=timedelta(hours=1)
-                )
-            ),
-            asyncio.create_task(
-                workflow.execute_child_workflow(WaitForeverWorkflow.run)
-            ),
-            asyncio.create_task(asyncio.sleep(1000)),
-            asyncio.shield(
-                workflow.execute_activity(
-                    wait_forever_activity, start_to_close_timeout=timedelta(hours=1)
-                )
-            ),
-            asyncio.create_task(workflow.wait_condition(lambda: False)),
-        ]
-        gather_fut = asyncio.gather(*tasks, return_exceptions=True)
-        # Let's also start something in the background that we never wait on
-        asyncio.create_task(asyncio.sleep(1000))
-        try:
-            # Wait for signal count to reach 2
-            await asyncio.sleep(0.01)
-            await workflow.wait_condition(lambda: self._signal_count > 1)
-        finally:
-            # This finally, on eviction, is actually called but the command
-            # should be ignored
-            await asyncio.sleep(0.01)
-            await workflow.wait_condition(lambda: self._signal_count > 2)
-            # Cancel gather tasks and wait on them, but ignore the errors
-            for task in tasks:
-                task.cancel()
-            await gather_fut
-
-    @workflow.signal
-    async def signal(self) -> None:
-        self._signal_count += 1
-
-    @workflow.query
-    def signal_count(self) -> int:
-        return self._signal_count
 
 
 async def test_cache_eviction_tear_down(client: Client):
@@ -8472,7 +8381,7 @@ async def test_search_attribute_codec(client: Client, env_type: str):
         result = await client.execute_workflow(
             SearchAttributeCodecParentWorkflow.run,
             "Temporal",
-            id=f"encryption-workflow-id",
+            id="encryption-workflow-id",
             task_queue=worker.task_queue,
             search_attributes=TypedSearchAttributes(
                 [
@@ -8482,3 +8391,56 @@ async def test_search_attribute_codec(client: Client, env_type: str):
                 ]
             ),
         )
+
+
+@activity.defn
+async def activity_that_fails_with_details() -> str:
+    """Activity that raises an ApplicationError with custom details."""
+    raise ApplicationError(
+        "Activity failed intentionally",
+        "detail1",
+        {"error_code": "NOT_FOUND", "id": "test-123"},
+        non_retryable=True,
+    )
+
+
+@workflow.defn
+class WorkflowWithFailingActivityAndCodec:
+    @workflow.run
+    async def run(self) -> str:
+        try:
+            return await workflow.execute_activity(
+                activity_that_fails_with_details,
+                schedule_to_close_timeout=timedelta(seconds=3),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        except ActivityError as err:
+            assert isinstance(err.cause, ApplicationError)
+            assert err.cause.message == "Activity failed intentionally"
+            assert len(err.cause.details) == 2
+            assert err.cause.details[0] == "detail1"
+            assert err.cause.details[1] == {"error_code": "NOT_FOUND", "id": "test-123"}
+            return "Handled encrypted failure successfully"
+
+
+async def test_activity_failure_with_encoded_payload_is_decoded_in_workflow(
+    client: Client,
+):
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        temporalio.converter.default(), payload_codec=EncryptionCodec()
+    )
+    client = Client(**config)
+
+    async with new_worker(
+        client,
+        WorkflowWithFailingActivityAndCodec,
+        activities=[activity_that_fails_with_details],
+    ) as worker:
+        result = await client.execute_workflow(
+            WorkflowWithFailingActivityAndCodec.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            run_timeout=timedelta(seconds=5),
+        )
+        assert result == "Handled encrypted failure successfully"

@@ -1,11 +1,25 @@
 import asyncio
+import logging
+import logging.handlers
+import queue
 import socket
 import time
 import uuid
-from contextlib import closing
+from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Awaitable, Callable, Optional, Sequence, Type, TypeVar, Union
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    List,
+    Optional,
+    Sequence,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from temporalio.api.common.v1 import WorkflowExecution
 from temporalio.api.enums.v1 import EventType as EventType
@@ -401,3 +415,34 @@ async def print_interleaved_histories(
                 padding = len(f" *: {elapsed_ms:>4} ")
             summary_row[col_idx] = f"{' ' * padding}[{summary}]"[: col_width - 3]
             print(_format_row(summary_row))
+
+
+class LogCapturer:
+    def __init__(self) -> None:
+        self.log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
+
+    @contextmanager
+    def logs_captured(self, *loggers: logging.Logger):
+        handler = logging.handlers.QueueHandler(self.log_queue)
+
+        prev_levels = [l.level for l in loggers]
+        for l in loggers:
+            l.setLevel(logging.INFO)
+            l.addHandler(handler)
+        try:
+            yield self
+        finally:
+            for i, l in enumerate(loggers):
+                l.removeHandler(handler)
+                l.setLevel(prev_levels[i])
+
+    def find_log(self, starts_with: str) -> Optional[logging.LogRecord]:
+        return self.find(lambda l: l.message.startswith(starts_with))
+
+    def find(
+        self, pred: Callable[[logging.LogRecord], bool]
+    ) -> Optional[logging.LogRecord]:
+        for record in cast(List[logging.LogRecord], self.log_queue.queue):
+            if pred(record):
+                return record
+        return None
