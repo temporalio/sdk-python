@@ -8423,7 +8423,9 @@ class WorkflowWithFailingActivityAndCodec:
             return "Handled encrypted failure successfully"
 
 
-async def test_activity_failure_with_encoded_payload_is_decoded_in_workflow(client: Client):
+async def test_activity_failure_with_encoded_payload_is_decoded_in_workflow(
+    client: Client,
+):
     config = client.config()
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(), payload_codec=EncryptionCodec()
