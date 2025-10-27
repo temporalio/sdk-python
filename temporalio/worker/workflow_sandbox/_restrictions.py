@@ -42,8 +42,8 @@ try:
 except ImportError:
     HAVE_PYDANTIC = False
 
-import temporalio.workflow
 import temporalio.exceptions
+import temporalio.workflow
 
 logger = logging.getLogger(__name__)
 
