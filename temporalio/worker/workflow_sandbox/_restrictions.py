@@ -126,7 +126,9 @@ class SandboxRestrictions:
     fully qualified path to the item.
     """
 
-    import_notification_policy: temporalio.workflow.SandboxImportNotificationPolicy
+    import_notification_policy: temporalio.workflow.SandboxImportNotificationPolicy = (
+        temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT
+    )
     """
     The import notification policy to use when an import is triggered during workflow loading or execution. See :py:class:`temporalio.workflow.SandboxImportNotificationPolicy` for options.
     """
@@ -827,7 +829,6 @@ SandboxRestrictions.default = SandboxRestrictions(
     passthrough_modules=SandboxRestrictions.passthrough_modules_default,
     invalid_modules=SandboxMatcher.none,
     invalid_module_members=SandboxRestrictions.invalid_module_members_default,
-    import_notification_policy=temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT,
 )
 
 
