@@ -2,9 +2,10 @@ import uuid
 from datetime import timedelta
 from typing import Any
 
-from agents import Span, Trace, TracingProcessor
+from agents import Span, Trace, TracingProcessor, trace
 from agents.tracing import get_trace_provider
 
+from temporalio import workflow
 from temporalio.client import Client
 from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents import (
@@ -36,6 +37,12 @@ class MemoryTracingProcessor(TracingProcessor):
 
     def force_flush(self) -> None:
         pass
+
+
+def paired_span(a: tuple[Span[Any], bool], b: tuple[Span[Any], bool]) -> None:
+    assert a[0].trace_id == b[0].trace_id
+    assert a[1]
+    assert not b[1]
 
 
 async def test_tracing(client: Client):
@@ -72,11 +79,6 @@ async def test_tracing(client: Client):
     )
     assert processor.trace_events[0][1]
     assert not processor.trace_events[1][1]
-
-    def paired_span(a: tuple[Span[Any], bool], b: tuple[Span[Any], bool]) -> None:
-        assert a[0].trace_id == b[0].trace_id
-        assert a[1]
-        assert not b[1]
 
     # Initial planner spans - There are only 3 because we don't make an actual model call
     paired_span(processor.span_events[0], processor.span_events[5])
@@ -137,4 +139,73 @@ async def test_tracing(client: Client):
     assert (
         processor.span_events[-4][0].span_data.export().get("name")
         == "temporal:executeActivity"
+    )
+
+
+@workflow.defn
+class ChildWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return "A"
+
+
+@workflow.defn
+class ParentWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        with trace("Parent trace"):
+            return await workflow.execute_child_workflow(ChildWorkflow.run)
+
+
+async def test_tracing_child_workflow(client: Client):
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_provider=TestModelProvider(TestResearchModel())
+        )
+    ]
+    client = Client(**new_config)
+
+    provider = get_trace_provider()
+
+    processor = MemoryTracingProcessor()
+    provider.set_processors([processor])
+
+    async with new_worker(
+        client,
+        ParentWorkflow,
+        ChildWorkflow,
+    ) as worker:
+        workflow_handle = await client.start_workflow(
+            ParentWorkflow.run,
+            id=f"openai-tracing-child-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=120),
+        )
+        result = await workflow_handle.result()
+
+    # There is one closed root trace
+    assert len(processor.trace_events) == 2
+    assert (
+        processor.trace_events[0][0].trace_id == processor.trace_events[1][0].trace_id
+    )
+    assert processor.trace_events[0][1]
+    assert not processor.trace_events[1][1]
+
+    for span, _ in processor.span_events:
+        print(
+            f"Span: {span.span_id}, parent: {span.parent_id}, data: {span.span_data.export()}"
+        )
+
+    # Two spans - startChildWorkflow > executeWorkflow
+    paired_span(processor.span_events[0], processor.span_events[3])
+    assert (
+        processor.span_events[0][0].span_data.export().get("name")
+        == "temporal:startChildWorkflow"
+    )
+
+    paired_span(processor.span_events[1], processor.span_events[2])
+    assert (
+        processor.span_events[1][0].span_data.export().get("name")
+        == "temporal:executeWorkflow"
     )
