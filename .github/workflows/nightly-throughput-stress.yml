@@ -25,6 +25,9 @@ on:
         default: 360
         type: number
 
+permissions:
+    contents: read
+
 env:
   # Workflow configuration
   TEST_DURATION: ${{ inputs.duration || vars.NIGHTLY_TEST_DURATION || '5h' }}
