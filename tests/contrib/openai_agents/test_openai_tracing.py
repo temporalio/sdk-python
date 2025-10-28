@@ -20,6 +20,10 @@ class MemoryTracingProcessor(TracingProcessor):
     trace_events: list[tuple[Trace, bool]] = []
     span_events: list[tuple[Span, bool]] = []
 
+    def __init__(self):
+        self.trace_events = []
+        self.span_events = []
+
     def on_trace_start(self, trace: Trace) -> None:
         self.trace_events.append((trace, True))
 
