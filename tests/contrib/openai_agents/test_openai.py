@@ -2701,3 +2701,42 @@ async def test_local_hello_world_agent(client: Client):
             if e.HasField("marker_recorded_event_attributes"):
                 local_activity_found = True
         assert local_activity_found
+
+
+async def test_split_workers(client: Client):
+    new_config = client.config()
+
+    workflow_plugin = openai_agents.OpenAIAgentsPlugin(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30)
+        ),
+        model_provider=TestModelProvider(TestHelloModel()),
+        register_activities=False,
+    )
+    new_config["plugins"] = [workflow_plugin]
+    workflow_client = Client(**new_config)
+
+    # Workflow worker
+    async with new_worker(
+        workflow_client, HelloWorldAgent, no_remote_activities=True
+    ) as worker:
+        activity_plugin = openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(TestHelloModel()),
+        )
+        new_config["plugins"] = [activity_plugin]
+        activity_client = Client(**new_config)
+        # Activity Worker
+        async with new_worker(
+            activity_client, task_queue=worker.task_queue
+        ) as activity_worker:
+            result = await activity_client.execute_workflow(
+                HelloWorldAgent.run,
+                "Tell me about recursion in programming.",
+                id=f"hello-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=120),
+            )
+            assert result == "test"
