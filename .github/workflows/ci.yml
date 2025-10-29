@@ -6,6 +6,9 @@ on:
       - main
       - "releases/*"
 
+permissions:
+  contents: read
+
 env:
   COLUMNS: 120
 

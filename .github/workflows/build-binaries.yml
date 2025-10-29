@@ -5,6 +5,9 @@ on:
       - main
       - "releases/*"
 
+permissions:
+  contents: read
+
 jobs:
   # Compile the binaries and upload artifacts
   compile-binaries:
