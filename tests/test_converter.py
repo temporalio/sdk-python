@@ -693,7 +693,7 @@ def test_value_to_type_literal_key():
 
     # A value that uses one of the literal keys:
     value_to_convert = {"Key1": {"Inner1": 123.45, "Inner2": 10}}
-    custom_converters = []
+    custom_converters: Sequence[JSONTypeConverter] = []
 
     # Function executes without error
     value_to_type(hint_with_bug, value_to_convert, custom_converters)
