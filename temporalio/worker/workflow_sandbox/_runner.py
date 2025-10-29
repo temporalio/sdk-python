@@ -159,6 +159,7 @@ class _Instance(WorkflowInstance):
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
         self.importer.restriction_context.is_runtime = True
+        self.importer.restriction_context.in_activation = True
         try:
             self._run_code(
                 "with __temporal_importer.applied():\n"
@@ -169,6 +170,7 @@ class _Instance(WorkflowInstance):
             return self.globals_and_locals.pop("__temporal_completion")  # type: ignore
         finally:
             self.importer.restriction_context.is_runtime = False
+            self.importer.restriction_context.in_activation = False
 
     def _run_code(self, code: str, **extra_globals: Any) -> None:
         for k, v in extra_globals.items():
