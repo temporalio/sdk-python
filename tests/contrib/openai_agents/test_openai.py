@@ -2670,3 +2670,73 @@ async def test_model_conversion_loops():
     triage_agent = seat_booking_agent.handoffs[0]
     assert isinstance(triage_agent, Agent)
     assert isinstance(triage_agent.model, _TemporalModelStub)
+
+
+async def test_local_hello_world_agent(client: Client):
+    new_config = client.config()
+    new_config["plugins"] = [
+        openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30),
+                use_local_activity=True,
+            ),
+            model_provider=TestModelProvider(TestHelloModel()),
+        )
+    ]
+    client = Client(**new_config)
+
+    async with new_worker(client, HelloWorldAgent) as worker:
+        handle = await client.start_workflow(
+            HelloWorldAgent.run,
+            "Tell me about recursion in programming.",
+            id=f"hello-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=5),
+        )
+        result = await handle.result()
+        assert result == "test"
+
+        local_activity_found = False
+        async for e in handle.fetch_history_events():
+            if e.HasField("marker_recorded_event_attributes"):
+                local_activity_found = True
+        assert local_activity_found
+
+
+async def test_split_workers(client: Client):
+    new_config = client.config()
+
+    workflow_plugin = openai_agents.OpenAIAgentsPlugin(
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30)
+        ),
+        model_provider=TestModelProvider(TestHelloModel()),
+        register_activities=False,
+    )
+    new_config["plugins"] = [workflow_plugin]
+    workflow_client = Client(**new_config)
+
+    # Workflow worker
+    async with new_worker(
+        workflow_client, HelloWorldAgent, no_remote_activities=True
+    ) as worker:
+        activity_plugin = openai_agents.OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
+            model_provider=TestModelProvider(TestHelloModel()),
+        )
+        new_config["plugins"] = [activity_plugin]
+        activity_client = Client(**new_config)
+        # Activity Worker
+        async with new_worker(
+            activity_client, task_queue=worker.task_queue
+        ) as activity_worker:
+            result = await activity_client.execute_workflow(
+                HelloWorldAgent.run,
+                "Tell me about recursion in programming.",
+                id=f"hello-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=120),
+            )
+            assert result == "test"

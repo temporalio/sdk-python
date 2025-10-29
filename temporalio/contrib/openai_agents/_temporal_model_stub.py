@@ -154,20 +154,32 @@ class _TemporalModelStub(Model):
         else:
             summary = None
 
-        return await workflow.execute_activity_method(
-            ModelActivity.invoke_model_activity,
-            activity_input,
-            summary=summary,
-            task_queue=self.model_params.task_queue,
-            schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
-            schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
-            start_to_close_timeout=self.model_params.start_to_close_timeout,
-            heartbeat_timeout=self.model_params.heartbeat_timeout,
-            retry_policy=self.model_params.retry_policy,
-            cancellation_type=self.model_params.cancellation_type,
-            versioning_intent=self.model_params.versioning_intent,
-            priority=self.model_params.priority,
-        )
+        if self.model_params.use_local_activity:
+            return await workflow.execute_local_activity_method(
+                ModelActivity.invoke_model_activity,
+                activity_input,
+                summary=summary,
+                schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
+                schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
+                start_to_close_timeout=self.model_params.start_to_close_timeout,
+                retry_policy=self.model_params.retry_policy,
+                cancellation_type=self.model_params.cancellation_type,
+            )
+        else:
+            return await workflow.execute_activity_method(
+                ModelActivity.invoke_model_activity,
+                activity_input,
+                summary=summary,
+                task_queue=self.model_params.task_queue,
+                schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
+                schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
+                start_to_close_timeout=self.model_params.start_to_close_timeout,
+                heartbeat_timeout=self.model_params.heartbeat_timeout,
+                retry_policy=self.model_params.retry_policy,
+                cancellation_type=self.model_params.cancellation_type,
+                versioning_intent=self.model_params.versioning_intent,
+                priority=self.model_params.priority,
+            )
 
     def stream_response(
         self,
