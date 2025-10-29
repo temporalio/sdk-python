@@ -42,6 +42,7 @@ try:
 except ImportError:
     HAVE_PYDANTIC = False
 
+import temporalio.exceptions
 import temporalio.workflow
 
 logger = logging.getLogger(__name__)
@@ -82,6 +83,21 @@ class RestrictedWorkflowAccessError(temporalio.workflow.NondeterminismError):
         )
 
 
+class UnintentionalPassthroughError(temporalio.exceptions.TemporalError):
+    """Error that occurs when a workflow unintentionally passes an import to the sandbox when
+    the import notification policy includes :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_NON_PASSTHROUGH`.
+
+    Attributes:
+        qualified_name: Fully qualified name of what was passed through to the sandbox.
+    """
+
+    def __init__(self, qualified_name: str) -> None:
+        """Create an unintentional passthrough error."""
+        super().__init__(
+            f"Module {qualified_name} was not intentionally passed through to the sandbox."
+        )
+
+
 @dataclass(frozen=True)
 class SandboxRestrictions:
     """Set of restrictions that can be applied to a sandbox."""
@@ -108,6 +124,13 @@ class SandboxRestrictions:
     Module members which cannot be accessed. This includes variables, functions,
     class methods (including __init__, etc). The check compares the against the
     fully qualified path to the item.
+    """
+
+    import_notification_policy: temporalio.workflow.SandboxImportNotificationPolicy = (
+        temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT
+    )
+    """
+    The import notification policy to use when an import is triggered during workflow loading or execution. See :py:class:`temporalio.workflow.SandboxImportNotificationPolicy` for options.
     """
 
     passthrough_all_modules: bool = False
@@ -169,6 +192,12 @@ class SandboxRestrictions:
         as true.
         """
         return dataclasses.replace(self, passthrough_all_modules=True)
+
+    def with_import_notification_policy(
+        self, policy: temporalio.workflow.SandboxImportNotificationPolicy
+    ) -> SandboxRestrictions:
+        """Create a new restriction set with the given import notification policy as the :py:attr:`import_policy`."""
+        return dataclasses.replace(self, import_notification_policy=policy)
 
 
 # We intentionally use specific fields instead of generic "matcher" callbacks
@@ -305,10 +334,12 @@ class SandboxMatcher:
             if not child_matcher:
                 return None
             matcher = child_matcher
+
         if not context.is_runtime and matcher.only_runtime:
             return None
         if not matcher.match_self:
             return None
+
         return matcher
 
     def match_access(
@@ -819,6 +850,7 @@ class RestrictionContext:
     def __init__(self) -> None:
         """Create a restriction context."""
         self.is_runtime = False
+        self.in_activation = False
 
 
 @dataclass

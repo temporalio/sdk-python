@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from enum import Enum, IntEnum
+from enum import Enum, Flag, IntEnum, auto
 from functools import partial
 from random import Random
 from typing import (
@@ -1410,6 +1410,20 @@ async def wait_condition(
 _sandbox_unrestricted = threading.local()
 _in_sandbox = threading.local()
 _imports_passed_through = threading.local()
+_sandbox_import_notification_policy_override = threading.local()
+
+
+class SandboxImportNotificationPolicy(Flag):
+    """Defines the behavior taken when modules are imported into the sandbox after the workflow is initially loaded or unintentionally missing from the passthrough list."""
+
+    SILENT = auto()
+    """Allow imports that do not violate sandbox restrictions and no warnings are generated."""
+    WARN_ON_DYNAMIC_IMPORT = auto()
+    """Allows dynamic imports that do not violate sandbox restrictions but issues a warning when an import is triggered in the sandbox after initial workflow load."""
+    WARN_ON_UNINTENTIONAL_PASSTHROUGH = auto()
+    """Allows imports that do not violate sandbox restrictions but issues a warning when an import is triggered in the sandbox that was unintentionally passed through."""
+    RAISE_ON_UNINTENTIONAL_PASSTHROUGH = auto()
+    """Raise an error when an import is triggered in the sandbox that was unintentionally passed through."""
 
 
 class unsafe:
@@ -1497,6 +1511,35 @@ class unsafe:
             yield None
         finally:
             _imports_passed_through.value = False
+
+    @staticmethod
+    def current_import_notification_policy_override() -> (
+        Optional[SandboxImportNotificationPolicy]
+    ):
+        """Gets the current import notification policy override if one is set."""
+        applied_policy = getattr(
+            _sandbox_import_notification_policy_override,
+            "value",
+            None,
+        )
+        return applied_policy
+
+    @staticmethod
+    @contextmanager
+    def sandbox_import_notification_policy(
+        policy: SandboxImportNotificationPolicy,
+    ) -> Iterator[None]:
+        """Context manager to apply the given import notification policy."""
+        original_policy = _sandbox_import_notification_policy_override.value = getattr(
+            _sandbox_import_notification_policy_override,
+            "value",
+            None,
+        )
+        _sandbox_import_notification_policy_override.value = policy
+        try:
+            yield None
+        finally:
+            _sandbox_import_notification_policy_override.value = original_policy
 
 
 class LoggerAdapter(logging.LoggerAdapter):
