@@ -1764,13 +1764,7 @@ def value_to_type(
                         elif key_type is type(None):
                             key = {"null": None}[key]
 
-                    # Can't call isinstance if key_type is a newtype
-                    is_newtype = getattr(key_type, "__supertype__", None)
-                    if (
-                        is_newtype
-                        or not isinstance(key_type, type)
-                        or not isinstance(key, key_type)
-                    ):
+                    if not isinstance(key_type, type) or not isinstance(key, key_type):
                         key = value_to_type(key_type, key, custom_converters)
                 except Exception as err:
                     raise TypeError(
