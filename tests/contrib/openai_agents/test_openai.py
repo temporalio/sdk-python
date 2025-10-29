@@ -2607,7 +2607,7 @@ async def test_split_workers(client: Client):
         model_params=ModelActivityParameters(
             start_to_close_timeout=timedelta(seconds=30)
         ),
-        model_provider=TestModelProvider(TestHelloModel()),
+        model_provider=TestModelProvider(hello_mock_model()),
         register_activities=False,
     )
     new_config["plugins"] = [workflow_plugin]
@@ -2621,7 +2621,7 @@ async def test_split_workers(client: Client):
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             ),
-            model_provider=TestModelProvider(TestHelloModel()),
+            model_provider=TestModelProvider(hello_mock_model()),
         )
         new_config["plugins"] = [activity_plugin]
         activity_client = Client(**new_config)
