@@ -112,8 +112,9 @@ class Client:
     Clients do not work across forks since runtimes do not work across forks.
     """
 
-    @staticmethod
+    @classmethod
     async def connect(
+        cls,
         target_host: str,
         *,
         namespace: str = "default",
@@ -133,7 +134,7 @@ class Client:
         runtime: Optional[temporalio.runtime.Runtime] = None,
         http_connect_proxy_config: Optional[HttpConnectProxyConfig] = None,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
-    ) -> Client:
+    ) -> Self:
         """Connect to a Temporal server.
 
         Args:
@@ -209,7 +210,7 @@ class Client:
 
         service_client = await next_function(connect_config)
 
-        return Client(
+        return cls(
             service_client,
             namespace=namespace,
             data_converter=data_converter,
