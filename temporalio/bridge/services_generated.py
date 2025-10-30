@@ -26,6 +26,24 @@ class WorkflowService:
         self._client = client
         self._service = "workflow"
 
+    async def count_activity_executions(
+        self,
+        req: temporalio.api.workflowservice.v1.CountActivityExecutionsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.CountActivityExecutionsResponse:
+        """Invokes the WorkflowService.count_activity_executions rpc method."""
+        return await self._client._rpc_call(
+            rpc="count_activity_executions",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.CountActivityExecutionsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def count_workflow_executions(
         self,
         req: temporalio.api.workflowservice.v1.CountWorkflowExecutionsRequest,
@@ -75,6 +93,24 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.CreateWorkflowRuleResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def delete_activity_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.DeleteActivityExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.DeleteActivityExecutionResponse:
+        """Invokes the WorkflowService.delete_activity_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="delete_activity_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.DeleteActivityExecutionResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -188,6 +224,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def describe_activity_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.DescribeActivityExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.DescribeActivityExecutionResponse:
+        """Invokes the WorkflowService.describe_activity_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="describe_activity_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.DescribeActivityExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def describe_batch_operation(
         self,
         req: temporalio.api.workflowservice.v1.DescribeBatchOperationRequest,
@@ -273,6 +327,24 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.DescribeTaskQueueResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def describe_worker(
+        self,
+        req: temporalio.api.workflowservice.v1.DescribeWorkerRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.DescribeWorkerResponse:
+        """Invokes the WorkflowService.describe_worker rpc method."""
+        return await self._client._rpc_call(
+            rpc="describe_worker",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.DescribeWorkerResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -381,6 +453,24 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.FetchWorkerConfigResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def get_activity_execution_result(
+        self,
+        req: temporalio.api.workflowservice.v1.GetActivityExecutionResultRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.GetActivityExecutionResultResponse:
+        """Invokes the WorkflowService.get_activity_execution_result rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_activity_execution_result",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.GetActivityExecutionResultResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -561,6 +651,24 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.GetWorkflowExecutionHistoryReverseResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def list_activity_executions(
+        self,
+        req: temporalio.api.workflowservice.v1.ListActivityExecutionsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.ListActivityExecutionsResponse:
+        """Invokes the WorkflowService.list_activity_executions rpc method."""
+        return await self._client._rpc_call(
+            rpc="list_activity_executions",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.ListActivityExecutionsResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -836,6 +944,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def pause_activity_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.PauseActivityExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.PauseActivityExecutionResponse:
+        """Invokes the WorkflowService.pause_activity_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="pause_activity_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.PauseActivityExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def poll_activity_task_queue(
         self,
         req: temporalio.api.workflowservice.v1.PollActivityTaskQueueRequest,
@@ -998,6 +1124,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def request_cancel_activity_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.RequestCancelActivityExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.RequestCancelActivityExecutionResponse:
+        """Invokes the WorkflowService.request_cancel_activity_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="request_cancel_activity_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.RequestCancelActivityExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def request_cancel_workflow_execution(
         self,
         req: temporalio.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest,
@@ -1029,6 +1173,24 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.ResetActivityResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def reset_activity_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.ResetActivityExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.ResetActivityExecutionResponse:
+        """Invokes the WorkflowService.reset_activity_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="reset_activity_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.ResetActivityExecutionResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -1322,6 +1484,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def set_worker_deployment_manager(
+        self,
+        req: temporalio.api.workflowservice.v1.SetWorkerDeploymentManagerRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.SetWorkerDeploymentManagerResponse:
+        """Invokes the WorkflowService.set_worker_deployment_manager rpc method."""
+        return await self._client._rpc_call(
+            rpc="set_worker_deployment_manager",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.SetWorkerDeploymentManagerResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def set_worker_deployment_ramping_version(
         self,
         req: temporalio.api.workflowservice.v1.SetWorkerDeploymentRampingVersionRequest,
@@ -1394,6 +1574,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def start_activity_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.StartActivityExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.StartActivityExecutionResponse:
+        """Invokes the WorkflowService.start_activity_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="start_activity_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.StartActivityExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def start_batch_operation(
         self,
         req: temporalio.api.workflowservice.v1.StartBatchOperationRequest,
@@ -1448,6 +1646,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def terminate_activity_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.TerminateActivityExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.TerminateActivityExecutionResponse:
+        """Invokes the WorkflowService.terminate_activity_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="terminate_activity_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.TerminateActivityExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def terminate_workflow_execution(
         self,
         req: temporalio.api.workflowservice.v1.TerminateWorkflowExecutionRequest,
@@ -1497,6 +1713,42 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.UnpauseActivityResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def unpause_activity_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.UnpauseActivityExecutionRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.UnpauseActivityExecutionResponse:
+        """Invokes the WorkflowService.unpause_activity_execution rpc method."""
+        return await self._client._rpc_call(
+            rpc="unpause_activity_execution",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.UnpauseActivityExecutionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def update_activity_execution_options(
+        self,
+        req: temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsResponse:
+        """Invokes the WorkflowService.update_activity_execution_options rpc method."""
+        return await self._client._rpc_call(
+            rpc="update_activity_execution_options",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
