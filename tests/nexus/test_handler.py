@@ -20,7 +20,7 @@ import pprint
 import uuid
 from collections.abc import Mapping
 from concurrent.futures.thread import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Callable, Optional, Union
 
@@ -313,7 +313,9 @@ UNSUCCESSFUL_RESPONSE_HEADERS = MappingProxyType(
 class SuccessfulResponse:
     status_code: int
     body_json: Optional[Union[dict[str, Any], Callable[[dict[str, Any]], bool]]] = None
-    headers: Mapping[str, str] = SUCCESSFUL_RESPONSE_HEADERS
+    headers: Mapping[str, str] = field(
+        default_factory=lambda: SUCCESSFUL_RESPONSE_HEADERS
+    )
 
 
 @dataclass
@@ -325,7 +327,9 @@ class UnsuccessfulResponse:
     # Expected value of inverse of non_retryable attribute of exception.
     retryable_exception: bool = True
     body_json: Optional[Callable[[dict[str, Any]], bool]] = None
-    headers: Mapping[str, str] = UNSUCCESSFUL_RESPONSE_HEADERS
+    headers: Mapping[str, str] = field(
+        default_factory=lambda: UNSUCCESSFUL_RESPONSE_HEADERS
+    )
 
 
 class _TestCase:
