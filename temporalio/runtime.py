@@ -37,8 +37,8 @@ class Runtime:
     Runtimes do not work across forks.
     """
 
-    @staticmethod
-    def default() -> Runtime:
+    @classmethod
+    def default(cls) -> Runtime:
         """Get the default runtime, creating if not already created.
 
         If the default runtime needs to be different, it should be done with
@@ -49,7 +49,7 @@ class Runtime:
         """
         global _default_runtime
         if not _default_runtime:
-            _default_runtime = Runtime(telemetry=TelemetryConfig())
+            _default_runtime = cls(telemetry=TelemetryConfig())
         return _default_runtime
 
     @staticmethod
