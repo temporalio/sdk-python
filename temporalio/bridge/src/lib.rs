@@ -82,8 +82,8 @@ fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<metric::MetricM
 }
 
 #[pyfunction]
-fn init_runtime(telemetry_config: runtime::TelemetryConfig) -> PyResult<runtime::RuntimeRef> {
-    runtime::init_runtime(telemetry_config)
+fn init_runtime(options: runtime::RuntimeOptions) -> PyResult<runtime::RuntimeRef> {
+    runtime::init_runtime(options)
 }
 
 #[pyfunction]

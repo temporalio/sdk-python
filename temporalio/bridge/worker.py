@@ -64,6 +64,8 @@ class WorkerConfig:
     nondeterminism_as_workflow_fail: bool
     nondeterminism_as_workflow_fail_for_types: Set[str]
     nexus_task_poller_behavior: PollerBehavior
+    plugins: Sequence[str]
+    skip_client_worker_set_check: bool
 
 
 @dataclass
