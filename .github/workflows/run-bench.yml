@@ -18,6 +18,9 @@ on:
           - "--sandbox"
           - "--no-sandbox"
 
+permissions:
+  contents: read
+
 jobs:
   run-bench:
     strategy:
