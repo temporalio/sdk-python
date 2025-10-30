@@ -5,6 +5,10 @@ on:
       - main
       - "releases/*"
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   omes-image-build:
     uses: temporalio/omes/.github/workflows/docker-images.yml@main
