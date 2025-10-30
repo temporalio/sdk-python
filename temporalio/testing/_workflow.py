@@ -20,6 +20,7 @@ from typing import (
 )
 
 import google.protobuf.empty_pb2
+from typing_extensions import Self
 
 import temporalio.api.testservice.v1
 import temporalio.bridge.testing
@@ -54,8 +55,8 @@ class WorkflowEnvironment:
     to have ``assert`` failures fail the workflow with the assertion error.
     """
 
-    @staticmethod
-    def from_client(client: temporalio.client.Client) -> WorkflowEnvironment:
+    @classmethod
+    def from_client(cls, client: temporalio.client.Client) -> Self:
         """Create a workflow environment from the given client.
 
         :py:attr:`supports_time_skipping` will always return ``False`` for this
@@ -69,12 +70,11 @@ class WorkflowEnvironment:
             The workflow environment that runs against the given client.
         """
         # Add the assertion interceptor
-        return WorkflowEnvironment(
-            _client_with_interceptors(client, _AssertionErrorInterceptor())
-        )
+        return cls(_client_with_interceptors(client, _AssertionErrorInterceptor()))
 
-    @staticmethod
+    @classmethod
     async def start_local(
+        cls,
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
@@ -234,8 +234,9 @@ class WorkflowEnvironment:
                 )
             raise
 
-    @staticmethod
+    @classmethod
     async def start_time_skipping(
+        cls,
         *,
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[temporalio.client.Interceptor] = [],
@@ -357,7 +358,8 @@ class WorkflowEnvironment:
     def __init__(self, client: temporalio.client.Client) -> None:
         """Create a workflow environment from a client.
 
-        Most users would use a static method instead.
+        Most users would use a factory methods instead.
+
         """
         self._client = client
 
