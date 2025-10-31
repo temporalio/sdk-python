@@ -32,12 +32,9 @@ from nexusrpc import (
     HandlerErrorType,
     OperationError,
     OperationErrorState,
-    OperationInfo,
 )
 from nexusrpc.handler import (
     CancelOperationContext,
-    FetchOperationInfoContext,
-    FetchOperationResultContext,
     OperationHandler,
     StartOperationContext,
     StartOperationResultSync,
@@ -260,16 +257,6 @@ class MyServiceHandler:
             # Invalid: start method must wrap result as StartOperationResultSync
             # or StartOperationResultAsync
             return Output(value="unwrapped result error")
-
-        async def fetch_info(
-            self, ctx: FetchOperationInfoContext, token: str
-        ) -> OperationInfo:
-            raise NotImplementedError
-
-        async def fetch_result(
-            self, ctx: FetchOperationResultContext, token: str
-        ) -> Output:
-            raise NotImplementedError
 
         async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
             raise NotImplementedError
@@ -885,14 +872,6 @@ class SyncCancelHandler:
         def cancel(self, ctx: CancelOperationContext, token: str) -> None:
             return None  # type: ignore
 
-        def fetch_info(
-            self, ctx: FetchOperationInfoContext, token: str
-        ) -> OperationInfo:
-            raise NotImplementedError
-
-        def fetch_result(self, ctx: FetchOperationResultContext, token: str) -> Output:
-            raise NotImplementedError
-
     @operation_handler
     def echo(self) -> OperationHandler[Input, Output]:
         return SyncCancelHandler.SyncCancel()
@@ -1084,7 +1063,9 @@ async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnviron
                 assert status_code == 201
                 op_info = resp.json()
                 assert op_info["token"]
-                assert op_info["state"] == nexusrpc.OperationState.RUNNING.value
+                assert (
+                    op_info["state"] == "running"
+                )  # nexusrpc.OperationState.RUNNING.value <--- this doesn't exist anymore
             else:
                 assert status_code >= 400
                 failure = Failure(**resp.json())

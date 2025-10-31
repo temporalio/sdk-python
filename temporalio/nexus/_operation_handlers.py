@@ -10,13 +10,10 @@ from nexusrpc import (
     HandlerError,
     HandlerErrorType,
     InputT,
-    OperationInfo,
     OutputT,
 )
 from nexusrpc.handler import (
     CancelOperationContext,
-    FetchOperationInfoContext,
-    FetchOperationResultContext,
     OperationHandler,
     StartOperationContext,
     StartOperationResultAsync,
@@ -80,22 +77,6 @@ class WorkflowRunOperationHandler(OperationHandler[InputT, OutputT]):
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
         """Cancel the operation, by cancelling the workflow."""
         await _cancel_workflow(token)
-
-    async def fetch_info(
-        self, ctx: FetchOperationInfoContext, token: str
-    ) -> OperationInfo:
-        """Fetch operation info (not supported for Temporal Nexus operations)."""
-        raise NotImplementedError(
-            "Temporal Nexus operation handlers do not support fetching operation info."
-        )
-
-    async def fetch_result(
-        self, ctx: FetchOperationResultContext, token: str
-    ) -> OutputT:
-        """Fetch operation result (not supported for Temporal Nexus operations)."""
-        raise NotImplementedError(
-            "Temporal Nexus operation handlers do not support fetching the operation result."
-        )
 
 
 async def _cancel_workflow(
