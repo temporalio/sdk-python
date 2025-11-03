@@ -575,7 +575,6 @@ class _NexusTaskCancellation(nexusrpc.handler.OperationTaskCancellation):
         self._aysnc_evt = asyncio.Event()
         self._lock = threading.Lock()
         self._reason: Optional[str] = None
-        self._thread_ident: Optional[int] = None
 
     def is_cancelled(self) -> bool:
         return self._thread_evt.is_set()
