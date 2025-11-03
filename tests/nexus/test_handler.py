@@ -764,7 +764,7 @@ async def test_start_operation_without_type_annotations(
 def test_operation_without_type_annotations_without_service_definition_raises_validation_error():
     with pytest.raises(
         ValueError,
-        match=r"has no input type",  # TODO(amazzeo): the previous implementation gathered validation errors. Are we okay dropping that? ".+has no output type",
+        match=r"has no input type",
     ):
         service_handler(MyServiceHandlerWithOperationsWithoutTypeAnnotations)
 
@@ -1061,9 +1061,7 @@ async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnviron
                 assert status_code == 201
                 op_info = resp.json()
                 assert op_info["token"]
-                assert (
-                    op_info["state"] == "running"
-                )  # nexusrpc.OperationState.RUNNING.value <--- this doesn't exist anymore
+                assert op_info["state"] == "running"
             else:
                 assert status_code >= 400
                 failure = Failure(**resp.json())

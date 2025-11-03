@@ -16,9 +16,9 @@ from nexusrpc.handler import (
     OperationHandler,
     StartOperationContext,
     StartOperationResultAsync,
+    operation_handler,
     service_handler,
     sync_operation,
-    operation_handler,
 )
 
 from temporalio import nexus, workflow

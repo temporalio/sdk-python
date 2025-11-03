@@ -241,12 +241,14 @@ class CallerWorkflow:
         request_cancel: bool,
         task_queue: str,
     ) -> None:
-        self.nexus_client = workflow.create_nexus_client(
-            service={
-                CallerReference.IMPL_WITH_INTERFACE: ServiceImpl,
-                CallerReference.INTERFACE: ServiceInterface,
-            }[input.op_input.caller_reference],
-            endpoint=make_nexus_endpoint_name(task_queue),
+        self.nexus_client: workflow.NexusClient[ServiceInterface] = (
+            workflow.create_nexus_client(
+                service={
+                    CallerReference.IMPL_WITH_INTERFACE: ServiceImpl,
+                    CallerReference.INTERFACE: ServiceInterface,
+                }[input.op_input.caller_reference],
+                endpoint=make_nexus_endpoint_name(task_queue),
+            )
         )
         self._nexus_operation_start_resolved = False
         self._proceed = False

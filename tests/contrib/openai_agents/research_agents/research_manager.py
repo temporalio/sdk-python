@@ -4,6 +4,7 @@ import asyncio
 
 from agents import Runner, custom_span, gen_trace_id, trace
 
+import temporalio.workflow
 from tests.contrib.openai_agents.research_agents.planner_agent import (
     WebSearchItem,
     WebSearchPlan,
@@ -14,7 +15,6 @@ from tests.contrib.openai_agents.research_agents.writer_agent import (
     ReportData,
     new_writer_agent,
 )
-import temporalio.workflow
 
 
 class ResearchManager:

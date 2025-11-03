@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import json
-from dataclasses import dataclass
 import threading
+from dataclasses import dataclass
 from typing import (
     Any,
     Callable,
@@ -561,12 +561,6 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
                 f"Unhandled RPC error status: {err.status}",
                 type=nexusrpc.HandlerErrorType.INTERNAL,
             )
-    elif isinstance(err, asyncio.CancelledError):
-        # TODO(amazzeo): What type should we use? a new type?
-        handler_err = nexusrpc.HandlerError(
-            "Cancelled",
-            type=nexusrpc.HandlerErrorType.RESOURCE_EXHAUSTED,
-        )
     else:
         handler_err = nexusrpc.HandlerError(
             str(err), type=nexusrpc.HandlerErrorType.INTERNAL
