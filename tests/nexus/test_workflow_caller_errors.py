@@ -251,7 +251,7 @@ class StartTimeoutTestService:
         if not cancelled:
             raise ApplicationError("expected cancel", non_retryable=True)
         reason = ctx.task_cancellation.cancellation_reason()
-        if reason != "timeout":
+        if reason != "TIMED_OUT":
             raise ApplicationError("expected cancel details", non_retryable=True)
 
 
