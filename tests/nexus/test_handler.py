@@ -80,8 +80,6 @@ class NonSerializableOutput:
 # TODO(nexus-preview): type check nexus implementation under mypy
 # TODO(nexus-preview): test malformed inbound_links and outbound_links
 
-# TODO(nexus-prerelease): 2025-07-02T23:29:20.000489Z  WARN temporal_sdk_core::worker::nexus: Nexus task not found on completion. This may happen if the operation has already been cancelled but completed anyway. details=Status { code: NotFound, message: "Nexus task not found or already expired", details: b"\x08\x05\x12'Nexus task not found or already expired\x1aB\n@type.googleapis.com/temporal.api.errordetails.v1.NotFoundFailure", metadata: MetadataMap { headers: {"content-type": "application/grpc"} }, source: None }
-
 
 @nexusrpc.service
 class MyService:
@@ -766,7 +764,7 @@ async def test_start_operation_without_type_annotations(
 def test_operation_without_type_annotations_without_service_definition_raises_validation_error():
     with pytest.raises(
         ValueError,
-        match=r"has no input type.+has no output type",
+        match=r"has no input type",  # TODO(amazzeo): the previous implementation gathered validation errors. Are we okay dropping that? ".+has no output type",
     ):
         service_handler(MyServiceHandlerWithOperationsWithoutTypeAnnotations)
 

@@ -36,7 +36,6 @@ import temporalio.nexus
 from temporalio.exceptions import (
     ApplicationError,
     WorkflowAlreadyStartedError,
-    CancelledError,
 )
 from temporalio.nexus import Info, logger
 from temporalio.service import RPCError, RPCStatusCode
@@ -105,30 +104,30 @@ class _NexusWorker:
                 if nexus_task.HasField("task"):
                     task = nexus_task.task
                     if task.request.HasField("start_operation"):
-                        cancellation = _NexusTaskCancellation()
+                        task_cancellation = _NexusTaskCancellation()
                         start_op_task = asyncio.create_task(
                             self._handle_start_operation_task(
                                 task.task_token,
                                 task.request.start_operation,
                                 dict(task.request.header),
-                                cancellation,
+                                task_cancellation,
                             )
                         )
                         self._running_tasks[task.task_token] = _RunningNexusTask(
-                            start_op_task, cancellation
+                            start_op_task, task_cancellation
                         )
                     elif task.request.HasField("cancel_operation"):
-                        cancellation = _NexusTaskCancellation()
+                        task_cancellation = _NexusTaskCancellation()
                         cancel_op_task = asyncio.create_task(
                             self._handle_cancel_operation_task(
                                 task.task_token,
                                 task.request.cancel_operation,
                                 dict(task.request.header),
-                                cancellation,
+                                task_cancellation,
                             )
                         )
                         self._running_tasks[task.task_token] = _RunningNexusTask(
-                            cancel_op_task, cancellation
+                            cancel_op_task, task_cancellation
                         )
                     else:
                         raise NotImplementedError(
@@ -138,9 +137,12 @@ class _NexusWorker:
                     if running_task := self._running_tasks.get(
                         nexus_task.cancel_task.task_token
                     ):
-                        # TODO(nexus-prerelease): when do we remove the entry from _running_operations?
-                        # TODO(amazzeo): put real reason here?
-                        running_task.cancel("timeout")
+                        reason = (
+                            temporalio.bridge.proto.nexus.NexusTaskCancelReason.Name(
+                                nexus_task.cancel_task.reason
+                            )
+                        )
+                        running_task.cancel(reason)
                     else:
                         logger.debug(
                             f"Received cancel_task but no running task exists for "
@@ -208,6 +210,11 @@ class _NexusWorker:
         try:
             try:
                 await self._handler.cancel_operation(ctx, request.operation_token)
+            except asyncio.CancelledError:
+                completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                    task_token=task_token,
+                    ack_cancel=task_cancellation.is_cancelled(),
+                )
             except BaseException as err:
                 logger.warning("Failed to execute Nexus cancel operation method")
                 completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
@@ -215,7 +222,6 @@ class _NexusWorker:
                     error=await self._handler_error_to_proto(
                         _exception_to_handler_error(err)
                     ),
-                    ack_cancel=task_cancellation.is_cancelled(),
                 )
             else:
                 completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(

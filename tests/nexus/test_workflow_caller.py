@@ -491,21 +491,14 @@ async def test_workflow_run_operation_happy_path(
 # TODO(nexus-preview): cross-namespace tests
 # TODO(nexus-preview): nexus endpoint pytest fixture?
 # TODO(nexus-prerelease): test headers
-# @pytest.mark.parametrize("exception_in_operation_start", [False, True])
-@pytest.mark.parametrize("exception_in_operation_start", [True])
-# @pytest.mark.parametrize("request_cancel", [False, True])
-@pytest.mark.parametrize("request_cancel", [False])
-# @pytest.mark.parametrize(
-#     "op_definition_type", [OpDefinitionType.SHORTHAND, OpDefinitionType.LONGHAND]
-# )
-@pytest.mark.parametrize("op_definition_type", [OpDefinitionType.SHORTHAND])
-# @pytest.mark.parametrize(
-#     "caller_reference",
-#     [CallerReference.IMPL_WITH_INTERFACE, CallerReference.INTERFACE],
-# )
+@pytest.mark.parametrize("exception_in_operation_start", [False, True])
+@pytest.mark.parametrize("request_cancel", [False, True])
+@pytest.mark.parametrize(
+    "op_definition_type", [OpDefinitionType.SHORTHAND, OpDefinitionType.LONGHAND]
+)
 @pytest.mark.parametrize(
     "caller_reference",
-    [CallerReference.IMPL_WITH_INTERFACE],
+    [CallerReference.IMPL_WITH_INTERFACE, CallerReference.INTERFACE],
 )
 async def test_sync_response(
     client: Client,

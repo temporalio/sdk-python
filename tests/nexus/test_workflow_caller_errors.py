@@ -6,6 +6,7 @@ import uuid
 from collections import Counter
 from dataclasses import dataclass
 from datetime import timedelta
+from logging import getLogger
 
 import nexusrpc
 import nexusrpc.handler
@@ -17,6 +18,7 @@ from nexusrpc.handler import (
     StartOperationResultAsync,
     service_handler,
     sync_operation,
+    operation_handler,
 )
 
 from temporalio import nexus, workflow
@@ -29,13 +31,14 @@ from temporalio.exceptions import (
     NexusOperationError,
     TimeoutError,
 )
-import temporalio.exceptions
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers import assert_eq_eventually
+from tests.helpers import LogCapturer, assert_eq_eventually
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 operation_invocation_counts = Counter[str]()
+
+logger = getLogger(__name__)
 
 
 @dataclass
@@ -232,17 +235,16 @@ async def test_nexus_operation_fails_without_retry_as_handler_error(
 @service_handler
 class StartTimeoutTestService:
     @sync_operation
-    async def op_handler_that_never_returns(
+    async def expect_timeout_cancellation_async(
         self, ctx: StartOperationContext, input: None
     ) -> None:
         try:
             await asyncio.wait_for(ctx.task_cancellation.wait_until_cancelled(), 1)
         except asyncio.TimeoutError:
-            print("timeout")
             raise ApplicationError("expected cancel", non_retryable=True)
 
     @sync_operation
-    def op_handler_that_never_returns_but_sync(
+    def expect_timeout_cancellation_sync(
         self, ctx: StartOperationContext, input: None
     ) -> None:
         cancelled = ctx.task_cancellation.wait_until_cancelled_sync(1)
@@ -254,37 +256,18 @@ class StartTimeoutTestService:
 
 
 @workflow.defn
-class StartTimeoutTestCallerWorkflowSync:
-    @workflow.init
-    def __init__(self):
-        self.nexus_client = workflow.create_nexus_client(
-            service=StartTimeoutTestService,
-            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
-        )
-
-    @workflow.run
-    async def run(self) -> None:
-        await self.nexus_client.execute_operation(
-            StartTimeoutTestService.op_handler_that_never_returns_but_sync,  # type: ignore[arg-type] # mypy can't infer OutputT=None in Union type
-            None,
-            output_type=None,
-            schedule_to_close_timeout=timedelta(seconds=0.1),
-        )
-
-
-@workflow.defn
 class StartTimeoutTestCallerWorkflow:
     @workflow.init
-    def __init__(self):
+    def __init__(self, operation: str):
         self.nexus_client = workflow.create_nexus_client(
             service=StartTimeoutTestService,
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
         )
 
     @workflow.run
-    async def run(self) -> None:
+    async def run(self, operation: str) -> None:
         await self.nexus_client.execute_operation(
-            StartTimeoutTestService.op_handler_that_never_returns,  # type: ignore[arg-type] # mypy can't infer OutputT=None in Union type
+            operation,
             None,
             output_type=None,
             schedule_to_close_timeout=timedelta(seconds=0.1),
@@ -301,7 +284,7 @@ async def test_error_raised_by_timeout_of_nexus_start_operation(
     async with Worker(
         client,
         nexus_service_handlers=[StartTimeoutTestService()],
-        workflows=[StartTimeoutTestCallerWorkflow, StartTimeoutTestCallerWorkflowSync],
+        workflows=[StartTimeoutTestCallerWorkflow],
         task_queue=task_queue,
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ):
@@ -309,6 +292,7 @@ async def test_error_raised_by_timeout_of_nexus_start_operation(
         try:
             await client.execute_workflow(
                 StartTimeoutTestCallerWorkflow.run,
+                "expect_timeout_cancellation_async",
                 id=str(uuid.uuid4()),
                 task_queue=task_queue,
             )
@@ -321,7 +305,8 @@ async def test_error_raised_by_timeout_of_nexus_start_operation(
 
         try:
             await client.execute_workflow(
-                StartTimeoutTestCallerWorkflowSync.run,
+                StartTimeoutTestCallerWorkflow.run,
+                "expect_timeout_cancellation_sync",
                 id=str(uuid.uuid4()),
                 task_queue=task_queue,
             )
@@ -336,7 +321,7 @@ async def test_error_raised_by_timeout_of_nexus_start_operation(
 # Cancellation timeout test
 
 
-class OperationWithCancelMethodThatNeverReturns(OperationHandler[None, None]):
+class OperationWithCancelMethodThatExpectsCancel(OperationHandler[None, None]):
     async def start(
         self, ctx: StartOperationContext, input: None
     ) -> StartOperationResultAsync:
@@ -346,16 +331,17 @@ class OperationWithCancelMethodThatNeverReturns(OperationHandler[None, None]):
         try:
             await asyncio.wait_for(ctx.task_cancellation.wait_until_cancelled(), 10)
         except asyncio.TimeoutError:
-            raise RuntimeError("expected cancellation")
+            logger.error("expected cancellation")
+            raise ApplicationError("expected cancellation", non_retryable=True)
 
 
 @service_handler
 class CancellationTimeoutTestService:
-    @nexusrpc.handler._decorators.operation_handler
-    def op_with_cancel_method_that_never_returns(
+    @operation_handler
+    def op_with_cancel_method_that_expects_cancel(
         self,
     ) -> OperationHandler[None, None]:
-        return OperationWithCancelMethodThatNeverReturns()
+        return OperationWithCancelMethodThatExpectsCancel()
 
 
 @workflow.defn
@@ -369,13 +355,8 @@ class CancellationTimeoutTestCallerWorkflow:
 
     @workflow.run
     async def run(self) -> None:
-        # TODO(nexus-prerelease)
         op_handle = await self.nexus_client.start_operation(
-            # Although the tests are making use of it, we are not exposing operation
-            # factory methods to users as a way to write nexus operations, and so the
-            # types on NexusClient start_operation/execute_operation do not currently
-            # permit it.
-            CancellationTimeoutTestService.op_with_cancel_method_that_never_returns,  # type: ignore
+            CancellationTimeoutTestService.op_with_cancel_method_that_expects_cancel,
             None,
             schedule_to_close_timeout=timedelta(seconds=0.1),
         )
@@ -396,16 +377,21 @@ async def test_error_raised_by_timeout_of_nexus_cancel_operation(
         workflows=[CancellationTimeoutTestCallerWorkflow],
         task_queue=task_queue,
     ):
-        await create_nexus_endpoint(task_queue, client)
-        try:
-            await client.execute_workflow(
-                CancellationTimeoutTestCallerWorkflow.run,
-                id=str(uuid.uuid4()),
-                task_queue=task_queue,
-            )
-        except Exception as err:
-            assert isinstance(err, WorkflowFailureError)
-            assert isinstance(err.__cause__, NexusOperationError)
-            assert isinstance(err.__cause__.__cause__, TimeoutError)
-        else:
-            pytest.fail("Expected exception due to timeout of nexus cancel operation")
+        with LogCapturer().logs_captured(logger) as capturer:
+            await create_nexus_endpoint(task_queue, client)
+            try:
+                await client.execute_workflow(
+                    CancellationTimeoutTestCallerWorkflow.run,
+                    id=str(uuid.uuid4()),
+                    task_queue=task_queue,
+                )
+            except Exception as err:
+                assert isinstance(err, WorkflowFailureError)
+                assert isinstance(err.__cause__, NexusOperationError)
+                assert isinstance(err.__cause__.__cause__, TimeoutError)
+            else:
+                pytest.fail(
+                    "Expected exception due to timeout of nexus cancel operation"
+                )
+
+            assert capturer.find_log("expected cancellation") is None
