@@ -496,7 +496,7 @@ class TypedSearchAttributes(Collection[SearchAttributePair]):
 
         This uses key equality so the key must be the same name and type.
         """
-        return any(v for k, v in self if k == key)
+        return any(k == key for k, v in self)
 
     @overload
     def get(
