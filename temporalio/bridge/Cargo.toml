@@ -10,7 +10,6 @@ documentation = "https://docs.temporal.io/dev-guide/python"
 [package.metadata.maturin]
 module-name = "temporalio.bridge.temporal_sdk_bridge"
 
-
 [lib]
 name = "temporal_sdk_bridge"
 crate-type = ["cdylib"]
@@ -31,6 +30,7 @@ pythonize = "0.25"
 temporal-client = { version = "0.1.0", path = "./sdk-core/client" }
 temporal-sdk-core = { version = "0.1.0", path = "./sdk-core/core", features = [
     "ephemeral-server",
+    "antithesis_assertions",
 ] }
 temporal-sdk-core-api = { version = "0.1.0", path = "./sdk-core/core-api", features = [
     "envconfig",
