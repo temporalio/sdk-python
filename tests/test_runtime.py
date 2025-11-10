@@ -7,6 +7,8 @@ from datetime import timedelta
 from typing import List, cast
 from urllib.request import urlopen
 
+import pytest
+
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.runtime import (
@@ -16,6 +18,7 @@ from temporalio.runtime import (
     Runtime,
     TelemetryConfig,
     TelemetryFilter,
+    _RuntimeRef,
 )
 from temporalio.worker import Worker
 from tests.helpers import assert_eq_eventually, assert_eventually, find_free_port
@@ -254,3 +257,34 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
 
     # Wait for metrics to appear and match the expected buckets
     await assert_eventually(check_metrics)
+
+
+def test_runtime_ref_creates_default():
+    ref = _RuntimeRef()
+    assert not ref._default_created
+    ref.default()
+    assert ref._default_created
+
+
+def test_runtime_ref_prevents_default():
+    ref = _RuntimeRef()
+    ref.prevent_default()
+    with pytest.raises(RuntimeError):
+        ref.default()
+
+
+def test_runtime_ref_prevent_default_errors_after_default():
+    ref = _RuntimeRef()
+    ref.default()
+    with pytest.raises(RuntimeError):
+        ref.prevent_default()
+
+
+def test_runtime_ref_set_default_allowed():
+    ref = _RuntimeRef()
+    ref.prevent_default()
+    explicit_runtime = Runtime(telemetry=TelemetryConfig())
+    ref.set_default(explicit_runtime)
+
+    new_default = ref.default()
+    assert new_default is explicit_runtime
