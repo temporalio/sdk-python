@@ -87,7 +87,6 @@ class Runtime:
         Returns:
             The default runtime.
         """
-
         global _runtime_ref
         return _runtime_ref.default()
 
