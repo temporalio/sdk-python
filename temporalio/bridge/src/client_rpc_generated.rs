@@ -15,6 +15,7 @@ impl ClientRef {
         py: Python<'p>,
         call: RpcCall,
     ) -> PyResult<Bound<'p, PyAny>> {
+        self.runtime.assert_same_process("use client")?;
         use temporal_client::WorkflowService;
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
@@ -566,6 +567,7 @@ impl ClientRef {
         py: Python<'p>,
         call: RpcCall,
     ) -> PyResult<Bound<'p, PyAny>> {
+        self.runtime.assert_same_process("use client")?;
         use temporal_client::OperatorService;
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
@@ -628,6 +630,7 @@ impl ClientRef {
     }
 
     fn call_cloud_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<Bound<'p, PyAny>> {
+        self.runtime.assert_same_process("use client")?;
         use temporal_client::CloudService;
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
@@ -842,6 +845,7 @@ impl ClientRef {
     }
 
     fn call_test_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<Bound<'p, PyAny>> {
+        self.runtime.assert_same_process("use client")?;
         use temporal_client::TestService;
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
@@ -881,6 +885,7 @@ impl ClientRef {
     }
 
     fn call_health_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<Bound<'p, PyAny>> {
+        self.runtime.assert_same_process("use client")?;
         use temporal_client::HealthService;
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {

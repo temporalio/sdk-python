@@ -1,9 +1,11 @@
 import dataclasses
 import json
+import multiprocessing
+import multiprocessing.context
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Mapping, Optional, Tuple, Union, cast
+from typing import Any, List, Mapping, Optional, Self, Tuple, Union, cast
 from unittest import mock
 
 import google.protobuf.any_pb2
@@ -90,6 +92,7 @@ from tests.helpers import (
     new_worker,
     worker_versioning_enabled,
 )
+from tests.helpers.fork import _ForkTestResult, _TestFork
 from tests.helpers.worker import (
     ExternalWorker,
     KSAction,
@@ -1541,3 +1544,39 @@ async def test_schedule_last_completion_result(
         )
 
         await handle.delete()
+
+
+class TestForkCreateClient(_TestFork):
+    async def coro(self):
+        await Client.connect(
+            self._env.client.config()["service_client"].config.target_host
+        )
+
+    def test_fork_create_client(
+        self,
+        env: WorkflowEnvironment,
+        mp_fork_ctx: multiprocessing.context.ForkContext | None,
+    ):
+        self._expected = _ForkTestResult.assertion_error(
+            "Cannot create client across forks"
+        )
+        self._env = env
+        self.run(mp_fork_ctx)
+
+
+class TestForkUseClient(_TestFork):
+    async def coro(self):
+        await self._client.start_workflow(
+            "some-workflow",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=f"tq-{uuid.uuid4()}",
+        )
+
+    def test_fork_use_client(
+        self, client: Client, mp_fork_ctx: multiprocessing.context.ForkContext | None
+    ):
+        self._expected = _ForkTestResult.assertion_error(
+            "Cannot use client across forks"
+        )
+        self._client = client
+        self.run(mp_fork_ctx)
