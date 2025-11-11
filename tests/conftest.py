@@ -139,7 +139,7 @@ def mp_fork_ctx() -> Iterator[multiprocessing.context.BaseContext | None]:
     mp_ctx = None
     try:
         mp_ctx = multiprocessing.get_context("fork")
-    except KeyError:
+    except ValueError:
         pass
 
     try:
