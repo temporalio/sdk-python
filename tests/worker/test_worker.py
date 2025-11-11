@@ -1287,7 +1287,7 @@ class TestForkCreateWorker(_TestFork):
         )
 
     def test_fork_create_worker(
-        self, client: Client, mp_fork_ctx: multiprocessing.context.ForkContext | None
+        self, client: Client, mp_fork_ctx: multiprocessing.context.BaseContext | None
     ):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot create worker across forks"
@@ -1301,7 +1301,7 @@ class TestForkUseWorker(_TestFork):
         await self._pre_fork_worker.run()
 
     def test_fork_use_worker(
-        self, client: Client, mp_fork_ctx: multiprocessing.context.ForkContext | None
+        self, client: Client, mp_fork_ctx: multiprocessing.context.BaseContext | None
     ):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot use worker across forks"

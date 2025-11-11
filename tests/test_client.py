@@ -1555,7 +1555,7 @@ class TestForkCreateClient(_TestFork):
     def test_fork_create_client(
         self,
         env: WorkflowEnvironment,
-        mp_fork_ctx: multiprocessing.context.ForkContext | None,
+        mp_fork_ctx: multiprocessing.context.BaseContext | None,
     ):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot create client across forks"
@@ -1573,7 +1573,7 @@ class TestForkUseClient(_TestFork):
         )
 
     def test_fork_use_client(
-        self, client: Client, mp_fork_ctx: multiprocessing.context.ForkContext | None
+        self, client: Client, mp_fork_ctx: multiprocessing.context.BaseContext | None
     ):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot use client across forks"

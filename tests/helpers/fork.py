@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import multiprocessing
 import multiprocessing.context
+import sys
 from dataclasses import dataclass
 from typing import Any
 
@@ -59,15 +60,15 @@ class _TestFork:
         self._child_conn.send(payload)
         self._child_conn.close()
 
-    def run(self, mp_fork_context: multiprocessing.context.ForkContext | None):
-        if not mp_fork_context:
+    def run(self, mp_fork_context: multiprocessing.context.BaseContext | None):
+        process_factory = getattr(mp_fork_context, "Process", None)
+
+        if not mp_fork_context or not process_factory:
             pytest.skip("fork context not available")
 
         self._parent_conn, self._child_conn = mp_fork_context.Pipe(duplex=False)
         # start fork
-        child_process = mp_fork_context.Process(
-            target=self.entry, args=(), daemon=False
-        )
+        child_process = process_factory(target=self.entry, args=(), daemon=False)
         child_process.start()
         # close parent's handle on child_conn
         self._child_conn.close()

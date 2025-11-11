@@ -135,17 +135,20 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
 
 
 @pytest.fixture(scope="session")
-def mp_fork_ctx() -> Generator[multiprocessing.context.ForkContext | None]:
-    # ForkContext is not available on Windows
-    if sys.platform == "win32":
-        yield None
-        return
+def mp_fork_ctx() -> Generator[multiprocessing.context.BaseContext | None]:
+    mp_ctx = None
+    try:
+        mp_ctx = multiprocessing.get_context("fork")
+    except KeyError:
+        pass
 
-    mp_ctx = multiprocessing.get_context("fork")
-    yield mp_ctx
-    for p in mp_ctx.active_children():
-        p.terminate()
-        p.join()
+    try:
+        yield mp_ctx
+    finally:
+        if mp_ctx:
+            for p in mp_ctx.active_children():
+                p.terminate()
+                p.join()
 
 
 @pytest_asyncio.fixture
