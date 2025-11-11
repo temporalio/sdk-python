@@ -5,7 +5,7 @@ import multiprocessing.context
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Mapping, Optional, Self, Tuple, Union, cast
+from typing import Any, List, Mapping, Optional, Tuple, Union, cast
 from unittest import mock
 
 import google.protobuf.any_pb2

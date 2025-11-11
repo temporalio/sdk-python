@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import asyncio
 import multiprocessing
 import multiprocessing.context
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Any
 
 import pytest
 
@@ -30,9 +32,11 @@ class _ForkTestResult:
             and valid_err_msg
         )
 
-    @classmethod
-    def assertion_error(cls, message: str) -> Self:
-        return cls(status="error", err_name="AssertionError", err_msg=message)
+    @staticmethod
+    def assertion_error(message: str) -> _ForkTestResult:
+        return _ForkTestResult(
+            status="error", err_name="AssertionError", err_msg=message
+        )
 
 
 class _TestFork:
