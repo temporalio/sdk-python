@@ -266,6 +266,16 @@ class ServiceClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def unsafe_close(self) -> None:
+        """Force disconnect of the client.
+        Only advanced users should consider using this.
+
+        Any use of clients or objects that rely on clients is
+        undefined after this call.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     async def _rpc_call(
         self,
         rpc: str,
@@ -345,6 +355,10 @@ class _BridgeServiceClient(ServiceClient):
         self._bridge_config.api_key = api_key
         if self._bridge_client:
             self._bridge_client.update_api_key(api_key)
+
+    def unsafe_close(self) -> None:
+        if self._bridge_client:
+            self._bridge_client.unsafe_close()
 
     async def _rpc_call(
         self,

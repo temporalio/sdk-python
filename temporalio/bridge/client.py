@@ -116,6 +116,13 @@ class Client:
         """Update underlying API key on Core client."""
         self._ref.update_api_key(api_key)
 
+    def unsafe_close(self) -> None:
+        """Force Core client to drop the underlying Grpc client.
+
+        Client behavior after this call is undefined.
+        """
+        self._ref.drop_client()
+
     async def call(
         self,
         *,

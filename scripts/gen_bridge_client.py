@@ -172,7 +172,7 @@ fn call_${service_name}<'p>(
     call: RpcCall,
   ) -> PyResult<Bound<'p, PyAny>> {
     use temporal_client::${descriptor_name};
-    let mut retry_client = self.retry_client.clone();
+    let mut retry_client = self.retry_client()?.clone();
     self.runtime.future_into_py(py, async move {
         let bytes = match call.rpc.as_str() {
 $match_arms

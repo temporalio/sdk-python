@@ -479,7 +479,7 @@ pub fn new_worker(
     let worker = temporal_sdk_core::init_worker(
         &runtime_ref.runtime.core,
         config,
-        client.retry_client.clone().into_inner(),
+        client.retry_client()?.clone().into_inner(),
     )
     .context("Failed creating worker")?;
     Ok(WorkerRef {
@@ -648,7 +648,13 @@ impl WorkerRef {
         self.worker
             .as_ref()
             .expect("missing worker")
-            .replace_client(client.retry_client.clone().into_inner());
+            .replace_client(
+                client
+                    .retry_client()
+                    .expect("client ref had no client")
+                    .clone()
+                    .into_inner(),
+            );
     }
 
     fn initiate_shutdown(&self) -> PyResult<()> {

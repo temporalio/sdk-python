@@ -7,6 +7,7 @@ from typing import Any, List, Mapping, Optional, Tuple, Union, cast
 from unittest import mock
 
 import google.protobuf.any_pb2
+import psutil
 import pytest
 from google.protobuf import json_format
 
@@ -1541,3 +1542,42 @@ async def test_schedule_last_completion_result(
         )
 
         await handle.delete()
+
+
+async def test_unsafe_close(env: WorkflowEnvironment):
+    proc = psutil.Process()
+    # proc.connections() is deprecated in newer versions, but uv resolved to a version
+    # that doesn't have the recommended proc.net_connections(). This future proofs
+    # against an upgrade
+    list_conns = getattr(proc, "net_connections", proc.connections)
+
+    target_host = env.client.config()["service_client"].config.target_host
+    target_ip = target_host.split(":")[0]
+
+    def sum_connections() -> int:
+        return sum(1 for p in list_conns() if p.raddr[0] == target_ip)
+
+    # get the number of connections to the target host.
+    num_conn = sum_connections()
+
+    # create new client that has a connection
+    client = await Client.connect(target_host)
+
+    # get number of connections now that we have a second one.
+    num_conn_after_client = sum_connections()
+    assert num_conn_after_client > num_conn
+
+    # force drop our connection via bridge
+    client.service_client.unsafe_close()
+
+    # now that we've forced our connection to drop, bridge will raise a RuntimeError
+    # if you do anything that uses the client.
+    with pytest.raises(RuntimeError) as dropped_err:
+        await client.start_workflow(
+            "some-workflow", id=f"wf-{uuid.uuid4()}", task_queue=f"tq-{uuid.uuid4()}"
+        )
+    assert dropped_err.match("client has been dropped")
+
+    # get number of connections now that we've closed the one we opened.
+    num_conn_after_close = sum_connections()
+    assert num_conn_after_close < num_conn_after_client
