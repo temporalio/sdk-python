@@ -1370,7 +1370,6 @@ async def _execute_workflow_with_activity(
     worker_config["task_queue"] = str(uuid.uuid4())
     worker_config["activities"] = [fn] + additional_activities
     worker_config["shared_state_manager"] = _default_shared_state_manager
-    worker_config["skip_client_worker_set_check"] = True
     if not worker_config.get("max_concurrent_activities"):
         worker_config["max_concurrent_activities"] = default_max_concurrent_activities
     async with Worker(**worker_config):

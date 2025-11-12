@@ -9,13 +9,13 @@ use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
-use temporal_sdk_core::telemetry::{
+use temporalio_sdk_core::telemetry::{
     build_otlp_metric_exporter, start_prometheus_metric_exporter, CoreLogStreamConsumer,
     MetricsCallBuffer,
 };
-use temporal_sdk_core::{CoreRuntime, RuntimeOptionsBuilder, TokioRuntimeBuilder};
-use temporal_sdk_core_api::telemetry::metrics::{CoreMeter, MetricCallBufferer};
-use temporal_sdk_core_api::telemetry::{
+use temporalio_sdk_core::{CoreRuntime, RuntimeOptionsBuilder, TokioRuntimeBuilder};
+use temporalio_common::telemetry::metrics::{CoreMeter, MetricCallBufferer};
+use temporalio_common::telemetry::{
     CoreLog, Logger, MetricTemporality, OtelCollectorOptionsBuilder, OtlpProtocol,
     PrometheusExporterOptionsBuilder, TelemetryOptionsBuilder,
 };
@@ -369,7 +369,7 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
             }
             if let Some(overrides) = prom_conf.histogram_bucket_overrides {
                 build.histogram_bucket_overrides(
-                    temporal_sdk_core_api::telemetry::HistogramBucketOverrides { overrides },
+                    temporalio_common::telemetry::HistogramBucketOverrides { overrides },
                 );
             }
             let prom_options = build.build().map_err(|err| {
