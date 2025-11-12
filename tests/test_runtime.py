@@ -269,22 +269,41 @@ def test_runtime_ref_creates_default():
 def test_runtime_ref_prevents_default():
     ref = _RuntimeRef()
     ref.prevent_default()
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError) as exc_info:
         ref.default()
+    assert exc_info.match(
+        "Cannot create default Runtime after Runtime.prevent_default has been called"
+    )
+
+    # explicitly setting a default runtime will allow future calls to `default()``
+    explicit_runtime = Runtime(telemetry=TelemetryConfig())
+    ref.set_default(explicit_runtime)
+
+    assert ref.default() is explicit_runtime
 
 
 def test_runtime_ref_prevent_default_errors_after_default():
     ref = _RuntimeRef()
     ref.default()
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError) as exc_info:
         ref.prevent_default()
 
+    assert exc_info.match(
+        "Runtime.prevent_default called after default runtime has been created"
+    )
 
-def test_runtime_ref_set_default_allowed():
+
+def test_runtime_ref_set_default():
     ref = _RuntimeRef()
-    ref.prevent_default()
     explicit_runtime = Runtime(telemetry=TelemetryConfig())
     ref.set_default(explicit_runtime)
+    assert ref.default() is explicit_runtime
 
-    new_default = ref.default()
-    assert new_default is explicit_runtime
+    new_runtime = Runtime(telemetry=TelemetryConfig())
+
+    with pytest.raises(RuntimeError) as exc_info:
+        ref.set_default(new_runtime)
+    assert exc_info.match("Runtime default already set")
+
+    ref.set_default(new_runtime, error_if_already_set=False)
+    assert ref.default() is new_runtime
