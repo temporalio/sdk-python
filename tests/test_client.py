@@ -88,6 +88,7 @@ from temporalio.exceptions import WorkflowAlreadyStartedError
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     assert_eq_eventually,
+    assert_eventually,
     ensure_search_attributes_present,
     new_worker,
     worker_versioning_enabled,
@@ -1579,9 +1580,9 @@ async def test_unsafe_close(env: WorkflowEnvironment):
         )
     assert dropped_err.match("client has been dropped")
 
-    # sleep for a short bit to help ensure the connection is actually cleaned up
-    await asyncio.sleep(0.2)
+    async def assert_less_connections():
+        # get number of connections now that we've closed the one we opened.
+        num_conn_after_close = sum_connections()
+        assert num_conn_after_close < num_conn_after_client
 
-    # get number of connections now that we've closed the one we opened.
-    num_conn_after_close = sum_connections()
-    assert num_conn_after_close < num_conn_after_client
+    await assert_eventually(assert_less_connections, timeout=timedelta(seconds=1))
