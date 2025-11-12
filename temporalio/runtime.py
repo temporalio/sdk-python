@@ -97,7 +97,7 @@ class Runtime:
         Raises a RuntimeError if a default :py:class:`Runtime` has already been created.
 
         Explicitly setting a default runtime with :py:meth:`set_default` bypasses this setting and
-        future calls to :py:meth:`default` will return provided runtime.
+        future calls to :py:meth:`default` will return the provided runtime.
         """
         global _runtime_ref
         _runtime_ref.prevent_default()
