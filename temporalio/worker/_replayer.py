@@ -294,7 +294,6 @@ class Replayer:
                         1
                     ),
                     plugins=[plugin.name() for plugin in self.plugins],
-                    skip_client_worker_set_check=True,
                 ),
             )
             # Start worker

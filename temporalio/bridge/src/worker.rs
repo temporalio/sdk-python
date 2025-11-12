@@ -65,7 +65,6 @@ pub struct WorkerConfig {
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
     nexus_task_poller_behavior: PollerBehavior,
     plugins: Vec<String>,
-    skip_client_worker_set_check: bool,
 }
 
 #[derive(FromPyObject)]
@@ -735,7 +734,6 @@ fn convert_worker_config(
                 })
                 .collect::<Vec<_>>(),
         )
-        .skip_client_worker_set_check(conf.skip_client_worker_set_check)
         .build()
         .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {err}")))
 }

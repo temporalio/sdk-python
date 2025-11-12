@@ -59,18 +59,6 @@ def pytest_addoption(parser):
     )
 
 
-@pytest.fixture(autouse=True)
-def _skip_client_worker_set_check(monkeypatch):
-    original_init = temporalio.worker.Worker.__init__
-
-    def patched_init(self, *args, **kwargs):
-        kwargs.setdefault("skip_client_worker_set_check", True)
-        return original_init(self, *args, **kwargs)
-
-    monkeypatch.setattr(temporalio.worker.Worker, "__init__", patched_init)
-    yield
-
-
 @pytest.fixture(scope="session")
 def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
