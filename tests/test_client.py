@@ -1,3 +1,4 @@
+import asyncio
 import dataclasses
 import json
 import os
@@ -1577,6 +1578,9 @@ async def test_unsafe_close(env: WorkflowEnvironment):
             "some-workflow", id=f"wf-{uuid.uuid4()}", task_queue=f"tq-{uuid.uuid4()}"
         )
     assert dropped_err.match("client has been dropped")
+
+    # sleep for a short bit to help ensure the connection is actually cleaned up
+    await asyncio.sleep(0.2)
 
     # get number of connections now that we've closed the one we opened.
     num_conn_after_close = sum_connections()
