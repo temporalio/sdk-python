@@ -293,6 +293,7 @@ class Replayer:
                     nexus_task_poller_behavior=temporalio.bridge.worker.PollerBehaviorSimpleMaximum(
                         1
                     ),
+                    plugins=[plugin.name() for plugin in self.plugins],
                 ),
             )
             # Start worker

@@ -7,6 +7,8 @@ from datetime import timedelta
 from typing import List, cast
 from urllib.request import urlopen
 
+import pytest
+
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.runtime import (
@@ -18,7 +20,12 @@ from temporalio.runtime import (
     TelemetryFilter,
 )
 from temporalio.worker import Worker
-from tests.helpers import assert_eq_eventually, assert_eventually, find_free_port
+from tests.helpers import (
+    assert_eq_eventually,
+    assert_eventually,
+    find_free_port,
+    worker_versioning_enabled,
+)
 
 
 @workflow.defn
@@ -254,3 +261,27 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
 
     # Wait for metrics to appear and match the expected buckets
     await assert_eventually(check_metrics)
+
+
+def test_runtime_options_to_bridge_config() -> None:
+    runtime = Runtime(telemetry=TelemetryConfig())
+    assert runtime._heartbeat_millis == 60_000
+
+    runtime = Runtime(
+        telemetry=TelemetryConfig(),
+        worker_heartbeat_interval=timedelta(seconds=10),
+    )
+    assert runtime._heartbeat_millis == 10_000
+
+    runtime = Runtime(
+        telemetry=TelemetryConfig(),
+        worker_heartbeat_interval=None,
+    )
+    assert runtime._heartbeat_millis is None
+
+
+def test_runtime_options_invalid_heartbeat() -> None:
+    with pytest.raises(ValueError):
+        Runtime(
+            telemetry=TelemetryConfig(), worker_heartbeat_interval=timedelta(seconds=-5)
+        )
