@@ -1565,7 +1565,8 @@ class MediumPlugin(SimplePlugin):
 
 #### Advanced Plugin Implementations
 
-`SimplePlugin` doesn't cover all possible uses of plugins. For more unusual use cases, an implementor can 
+`SimplePlugin` doesn't cover all possible uses of plugins. For more unusual use cases, an implementor can implement
+the underlying plugin interfaces directly.
 
 A single plugin class can implement both client and worker plugin interfaces to share common logic between both
 contexts. When used with a client, it will automatically be propagated to any workers created with that client.
