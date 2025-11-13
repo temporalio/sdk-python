@@ -17,11 +17,12 @@ use crate::runtime;
 
 pyo3::create_exception!(temporal_sdk_bridge, RPCError, PyException);
 
-type Client = RetryClient<ConfiguredClient<TemporalServiceClientWithMetrics>>;
+type TemporalClient = ConfiguredClient<TemporalServiceClientWithMetrics>;
+type Client = RetryClient<TemporalClient>;
 
 #[pyclass]
 pub struct ClientRef {
-    pub(crate) retry_client: Client,
+    retry_client: Option<Client>,
     pub(crate) runtime: runtime::Runtime,
 }
 
@@ -95,10 +96,13 @@ pub fn connect_client<'a>(
     let runtime = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
         Ok(ClientRef {
-            retry_client: opts
-                .connect_no_namespace(runtime.core.telemetry().get_temporal_metric_meter())
-                .await
-                .map_err(|err| PyRuntimeError::new_err(format!("Failed client connect: {err}")))?,
+            retry_client: Some(
+                opts.connect_no_namespace(runtime.core.telemetry().get_temporal_metric_meter())
+                    .await
+                    .map_err(|err| {
+                        PyRuntimeError::new_err(format!("Failed client connect: {err}"))
+                    })?,
+            ),
             runtime,
         })
     })
@@ -117,15 +121,18 @@ macro_rules! rpc_call {
 
 #[pymethods]
 impl ClientRef {
+    fn drop_client(&mut self) {
+        self.retry_client = None
+    }
+
     fn update_metadata(&self, headers: HashMap<String, RpcMetadataValue>) -> PyResult<()> {
         let (ascii_headers, binary_headers) = partition_headers(headers);
+        let client = self.configured_client()?;
 
-        self.retry_client
-            .get_client()
+        client
             .set_headers(ascii_headers)
             .map_err(|err| PyValueError::new_err(err.to_string()))?;
-        self.retry_client
-            .get_client()
+        client
             .set_binary_headers(binary_headers)
             .map_err(|err| PyValueError::new_err(err.to_string()))?;
 
@@ -133,7 +140,24 @@ impl ClientRef {
     }
 
     fn update_api_key(&self, api_key: Option<String>) {
-        self.retry_client.get_client().set_api_key(api_key);
+        if let Ok(client) = self.configured_client() {
+            client.set_api_key(api_key);
+        }
+    }
+}
+
+impl ClientRef {
+    pub(crate) fn retry_client(&self) -> Result<&Client, PyErr> {
+        self.retry_client
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("client has been dropped"))
+    }
+
+    fn configured_client(&self) -> Result<&TemporalClient, PyErr> {
+        self.retry_client
+            .as_ref()
+            .map(RetryClient::get_client)
+            .ok_or_else(|| PyRuntimeError::new_err("client has been dropped"))
     }
 }
 

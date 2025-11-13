@@ -16,7 +16,7 @@ impl ClientRef {
         call: RpcCall,
     ) -> PyResult<Bound<'p, PyAny>> {
         use temporal_client::WorkflowService;
-        let mut retry_client = self.retry_client.clone();
+        let mut retry_client = self.retry_client()?.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
                 "count_workflow_executions" => {
@@ -567,7 +567,7 @@ impl ClientRef {
         call: RpcCall,
     ) -> PyResult<Bound<'p, PyAny>> {
         use temporal_client::OperatorService;
-        let mut retry_client = self.retry_client.clone();
+        let mut retry_client = self.retry_client()?.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
                 "add_or_update_remote_cluster" => {
@@ -629,7 +629,7 @@ impl ClientRef {
 
     fn call_cloud_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<Bound<'p, PyAny>> {
         use temporal_client::CloudService;
-        let mut retry_client = self.retry_client.clone();
+        let mut retry_client = self.retry_client()?.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
                 "add_namespace_region" => {
@@ -843,7 +843,7 @@ impl ClientRef {
 
     fn call_test_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<Bound<'p, PyAny>> {
         use temporal_client::TestService;
-        let mut retry_client = self.retry_client.clone();
+        let mut retry_client = self.retry_client()?.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
                 "get_current_time" => {
@@ -882,7 +882,7 @@ impl ClientRef {
 
     fn call_health_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<Bound<'p, PyAny>> {
         use temporal_client::HealthService;
-        let mut retry_client = self.retry_client.clone();
+        let mut retry_client = self.retry_client()?.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
                 "check" => {
