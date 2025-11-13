@@ -3155,8 +3155,8 @@ class WorkflowExecutionStatus(IntEnum):
             Formatted string for ExecutionStatus search attribute
         """
         # Convert "TIMED_OUT" -> "TimedOut", "CONTINUED_AS_NEW" -> "ContinuedAsNew", etc.
-        parts = self.name.split("_")
-        return "".join(part.capitalize() for part in parts)
+        return "".join(word.capitalize() for word in self.name.split("_"))
+
 
 
 @dataclass
