@@ -410,6 +410,26 @@ async def test_query_rejected(client: Client, worker: ExternalWorker):
     assert err.value.status == WorkflowExecutionStatus.COMPLETED
 
 
+def test_workflow_execution_status_search_attribute_value():
+    """Test that WorkflowExecutionStatus.to_pascal_case converts to PascalCase correctly."""
+    test_cases = [
+        (WorkflowExecutionStatus.RUNNING, "Running"),
+        (WorkflowExecutionStatus.COMPLETED, "Completed"),
+        (WorkflowExecutionStatus.FAILED, "Failed"),
+        (WorkflowExecutionStatus.CANCELED, "Canceled"),
+        (WorkflowExecutionStatus.TERMINATED, "Terminated"),
+        (WorkflowExecutionStatus.TIMED_OUT, "TimedOut"),
+        (WorkflowExecutionStatus.CONTINUED_AS_NEW, "ContinuedAsNew"),
+    ]
+    
+    for status, expected in test_cases:
+        actual = status.to_pascal_case
+        assert actual == expected, (
+            f"WorkflowExecutionStatus.{status.name}.to_pascal_case "
+            f"returned '{actual}', expected '{expected}'"
+        )
+
+
 async def test_signal(client: Client, worker: ExternalWorker):
     handle = await client.start_workflow(
         "kitchen_sink",
