@@ -31,7 +31,6 @@ class _RuntimeRef:
     ) -> None:
         self._default_runtime: Runtime | None = None
         self._prevent_default = False
-        self._default_created = False
 
     def default(self) -> Runtime:
         if not self._default_runtime:
@@ -44,9 +43,9 @@ class _RuntimeRef:
         return self._default_runtime
 
     def prevent_default(self):
-        if self._default_created:
+        if self._default_runtime:
             raise RuntimeError(
-                "Runtime.prevent_default called after default runtime has been created"
+                "Runtime.prevent_default called after default runtime has been created or set"
             )
         self._prevent_default = True
 
@@ -117,7 +116,6 @@ class Runtime:
         """
         global _runtime_ref
         _runtime_ref.set_default(runtime, error_if_already_set=error_if_already_set)
-        return
 
     def __init__(self, *, telemetry: TelemetryConfig) -> None:
         """Create a default runtime with the given telemetry config.

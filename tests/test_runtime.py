@@ -261,9 +261,9 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
 
 def test_runtime_ref_creates_default():
     ref = _RuntimeRef()
-    assert not ref._default_created
+    assert not ref._default_runtime
     ref.default()
-    assert ref._default_created
+    assert ref._default_runtime
 
 
 def test_runtime_ref_prevents_default():
