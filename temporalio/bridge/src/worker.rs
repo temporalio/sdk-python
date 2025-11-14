@@ -474,6 +474,7 @@ pub fn new_worker(
     config: WorkerConfig,
 ) -> PyResult<WorkerRef> {
     enter_sync!(runtime_ref.runtime);
+    runtime_ref.runtime.assert_same_process("create worker")?;
     let event_loop_task_locals = Arc::new(OnceLock::new());
     let config = convert_worker_config(config, event_loop_task_locals.clone())?;
     let worker = temporal_sdk_core::init_worker(
@@ -495,6 +496,9 @@ pub fn new_replay_worker<'a>(
     config: WorkerConfig,
 ) -> PyResult<Bound<'a, PyTuple>> {
     enter_sync!(runtime_ref.runtime);
+    runtime_ref
+        .runtime
+        .assert_same_process("create replay worker")?;
     let event_loop_task_locals = Arc::new(OnceLock::new());
     let config = convert_worker_config(config, event_loop_task_locals.clone())?;
     let (history_pusher, stream) = HistoryPusher::new(runtime_ref.runtime.clone());
@@ -519,6 +523,7 @@ pub fn new_replay_worker<'a>(
 #[pymethods]
 impl WorkerRef {
     fn validate<'p>(&self, py: Python<'p>) -> PyResult<Bound<PyAny, 'p>> {
+        self.runtime.assert_same_process("use worker")?;
         let worker = self.worker.as_ref().unwrap().clone();
         // Set custom slot supplier task locals so they can run futures.
         // Event loop is assumed to be running at this point.
@@ -538,6 +543,7 @@ impl WorkerRef {
     }
 
     fn poll_workflow_activation<'p>(&self, py: Python<'p>) -> PyResult<Bound<'p, PyAny>> {
+        self.runtime.assert_same_process("use worker")?;
         let worker = self.worker.as_ref().unwrap().clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match worker.poll_workflow_activation().await {
@@ -550,6 +556,7 @@ impl WorkerRef {
     }
 
     fn poll_activity_task<'p>(&self, py: Python<'p>) -> PyResult<Bound<'p, PyAny>> {
+        self.runtime.assert_same_process("use worker")?;
         let worker = self.worker.as_ref().unwrap().clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match worker.poll_activity_task().await {
@@ -562,6 +569,7 @@ impl WorkerRef {
     }
 
     fn poll_nexus_task<'p>(&self, py: Python<'p>) -> PyResult<Bound<'p, PyAny>> {
+        self.runtime.assert_same_process("use worker")?;
         let worker = self.worker.as_ref().unwrap().clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match worker.poll_nexus_task().await {

@@ -92,6 +92,7 @@ pub fn connect_client<'a>(
     config: ClientConfig,
 ) -> PyResult<Bound<'a, PyAny>> {
     let opts: ClientOptions = config.try_into()?;
+    runtime_ref.runtime.assert_same_process("create client")?;
     let runtime = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
         Ok(ClientRef {
