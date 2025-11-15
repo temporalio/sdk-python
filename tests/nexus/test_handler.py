@@ -32,12 +32,9 @@ from nexusrpc import (
     HandlerErrorType,
     OperationError,
     OperationErrorState,
-    OperationInfo,
 )
 from nexusrpc.handler import (
     CancelOperationContext,
-    FetchOperationInfoContext,
-    FetchOperationResultContext,
     OperationHandler,
     StartOperationContext,
     StartOperationResultSync,
@@ -82,8 +79,6 @@ class NonSerializableOutput:
 # TODO(nexus-prelease): Test attaching multiple callers to the same operation.
 # TODO(nexus-preview): type check nexus implementation under mypy
 # TODO(nexus-preview): test malformed inbound_links and outbound_links
-
-# TODO(nexus-prerelease): 2025-07-02T23:29:20.000489Z  WARN temporal_sdk_core::worker::nexus: Nexus task not found on completion. This may happen if the operation has already been cancelled but completed anyway. details=Status { code: NotFound, message: "Nexus task not found or already expired", details: b"\x08\x05\x12'Nexus task not found or already expired\x1aB\n@type.googleapis.com/temporal.api.errordetails.v1.NotFoundFailure", metadata: MetadataMap { headers: {"content-type": "application/grpc"} }, source: None }
 
 
 @nexusrpc.service
@@ -260,16 +255,6 @@ class MyServiceHandler:
             # Invalid: start method must wrap result as StartOperationResultSync
             # or StartOperationResultAsync
             return Output(value="unwrapped result error")
-
-        async def fetch_info(
-            self, ctx: FetchOperationInfoContext, token: str
-        ) -> OperationInfo:
-            raise NotImplementedError
-
-        async def fetch_result(
-            self, ctx: FetchOperationResultContext, token: str
-        ) -> Output:
-            raise NotImplementedError
 
         async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
             raise NotImplementedError
@@ -779,7 +764,7 @@ async def test_start_operation_without_type_annotations(
 def test_operation_without_type_annotations_without_service_definition_raises_validation_error():
     with pytest.raises(
         ValueError,
-        match=r"has no input type.+has no output type",
+        match=r"has no input type",
     ):
         service_handler(MyServiceHandlerWithOperationsWithoutTypeAnnotations)
 
@@ -884,14 +869,6 @@ class SyncCancelHandler:
 
         def cancel(self, ctx: CancelOperationContext, token: str) -> None:
             return None  # type: ignore
-
-        def fetch_info(
-            self, ctx: FetchOperationInfoContext, token: str
-        ) -> OperationInfo:
-            raise NotImplementedError
-
-        def fetch_result(self, ctx: FetchOperationResultContext, token: str) -> Output:
-            raise NotImplementedError
 
     @operation_handler
     def echo(self) -> OperationHandler[Input, Output]:
@@ -1084,7 +1061,7 @@ async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnviron
                 assert status_code == 201
                 op_info = resp.json()
                 assert op_info["token"]
-                assert op_info["state"] == nexusrpc.OperationState.RUNNING.value
+                assert op_info["state"] == "running"
             else:
                 assert status_code >= 400
                 failure = Failure(**resp.json())

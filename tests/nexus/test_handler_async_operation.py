@@ -12,14 +12,9 @@ from collections.abc import Coroutine
 from dataclasses import dataclass, field
 from typing import Any, Type, Union
 
-import nexusrpc
-import nexusrpc.handler
 import pytest
-from nexusrpc import OperationInfo
 from nexusrpc.handler import (
     CancelOperationContext,
-    FetchOperationInfoContext,
-    FetchOperationResultContext,
     OperationHandler,
     StartOperationContext,
     StartOperationResultAsync,
@@ -57,23 +52,6 @@ class AsyncOperationWithAsyncDefs(OperationHandler[Input, Output]):
         await self.executor.add_task(task_id, task())
         return StartOperationResultAsync(token=task_id)
 
-    async def fetch_info(
-        self, ctx: FetchOperationInfoContext, token: str
-    ) -> OperationInfo:
-        # status = self.executor.get_task_status(task_id=token)
-        # return OperationInfo(token=token, status=status)
-        raise NotImplementedError(
-            "Not possible to test this currently since the server's Nexus implementation does not support fetch_info"
-        )
-
-    async def fetch_result(
-        self, ctx: FetchOperationResultContext, token: str
-    ) -> Output:
-        # return await self.executor.get_task_result(task_id=token)
-        raise NotImplementedError(
-            "Not possible to test this currently since the server's Nexus implementation does not support fetch_result"
-        )
-
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
         self.executor.request_cancel_task(task_id=token)
 
@@ -92,19 +70,6 @@ class AsyncOperationWithNonAsyncDefs(OperationHandler[Input, Output]):
         task_id = str(uuid.uuid4())
         self.executor.add_task_sync(task_id, task())
         return StartOperationResultAsync(token=task_id)
-
-    def fetch_info(self, ctx: FetchOperationInfoContext, token: str) -> OperationInfo:
-        # status = self.executor.get_task_status(task_id=token)
-        # return OperationInfo(token=token, status=status)
-        raise NotImplementedError(
-            "Not possible to test this currently since the server's Nexus implementation does not support fetch_info"
-        )
-
-    def fetch_result(self, ctx: FetchOperationResultContext, token: str) -> Output:
-        # return self.executor.get_task_result_sync(task_id=token)
-        raise NotImplementedError(
-            "Not possible to test this currently since the server's Nexus implementation does not support fetch_result"
-        )
 
     def cancel(self, ctx: CancelOperationContext, token: str) -> None:
         self.executor.request_cancel_task(task_id=token)
@@ -212,17 +177,6 @@ class TaskExecutor:
         asyncio.run_coroutine_threadsafe(
             self.add_task(task_id, coro), self.event_loop
         ).result()
-
-    def get_task_status(self, task_id: str) -> nexusrpc.OperationState:
-        task = self.tasks[task_id]
-        if not task.done():
-            return nexusrpc.OperationState.RUNNING
-        elif task.cancelled():
-            return nexusrpc.OperationState.CANCELED
-        elif task.exception():
-            return nexusrpc.OperationState.FAILED
-        else:
-            return nexusrpc.OperationState.SUCCEEDED
 
     async def get_task_result(self, task_id: str) -> Any:
         """

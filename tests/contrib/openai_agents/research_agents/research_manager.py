@@ -4,6 +4,7 @@ import asyncio
 
 from agents import Runner, custom_span, gen_trace_id, trace
 
+import temporalio.workflow
 from tests.contrib.openai_agents.research_agents.planner_agent import (
     WebSearchItem,
     WebSearchPlan,
@@ -45,7 +46,7 @@ class ResearchManager:
                 asyncio.create_task(self._search(item)) for item in search_plan.searches
             ]
             results = []
-            for task in asyncio.as_completed(tasks):
+            for task in temporalio.workflow.as_completed(tasks):
                 result = await task
                 if result is not None:
                     results.append(result)

@@ -11,8 +11,6 @@ import nexusrpc.handler
 import pytest
 from nexusrpc.handler import (
     CancelOperationContext,
-    FetchOperationInfoContext,
-    FetchOperationResultContext,
     OperationHandler,
     StartOperationContext,
     StartOperationResultAsync,
@@ -174,16 +172,6 @@ class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
         return await temporalio.nexus._operation_handlers._cancel_workflow(token)
 
-    async def fetch_info(
-        self, ctx: FetchOperationInfoContext, token: str
-    ) -> nexusrpc.OperationInfo:
-        raise NotImplementedError
-
-    async def fetch_result(
-        self, ctx: FetchOperationResultContext, token: str
-    ) -> OpOutput:
-        raise NotImplementedError
-
 
 @service_handler(service=ServiceInterface)
 class ServiceImpl:
@@ -253,12 +241,14 @@ class CallerWorkflow:
         request_cancel: bool,
         task_queue: str,
     ) -> None:
-        self.nexus_client = workflow.create_nexus_client(
-            service={
-                CallerReference.IMPL_WITH_INTERFACE: ServiceImpl,
-                CallerReference.INTERFACE: ServiceInterface,
-            }[input.op_input.caller_reference],
-            endpoint=make_nexus_endpoint_name(task_queue),
+        self.nexus_client: workflow.NexusClient[ServiceInterface] = (
+            workflow.create_nexus_client(
+                service={
+                    CallerReference.IMPL_WITH_INTERFACE: ServiceImpl,
+                    CallerReference.INTERFACE: ServiceInterface,
+                }[input.op_input.caller_reference],
+                endpoint=make_nexus_endpoint_name(task_queue),
+            )
         )
         self._nexus_operation_start_resolved = False
         self._proceed = False
