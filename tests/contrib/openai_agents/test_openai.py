@@ -2615,7 +2615,7 @@ async def test_split_workers(client: Client):
 
     # Workflow worker
     async with new_worker(
-        workflow_client, HelloWorldAgent, no_remote_activities=True
+        workflow_client, HelloWorldAgent,
     ) as worker:
         activity_plugin = openai_agents.OpenAIAgentsPlugin(
             model_params=ModelActivityParameters(

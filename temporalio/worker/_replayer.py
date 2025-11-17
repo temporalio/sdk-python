@@ -9,6 +9,7 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type
 
+from temporalio.bridge.worker import WorkerTaskTypes
 from typing_extensions import TypedDict
 
 import temporalio.api.history.v1
@@ -273,7 +274,7 @@ class Replayer:
                         ),
                     ),
                     nonsticky_to_sticky_poll_ratio=1,
-                    no_remote_activities=True,
+                    task_types=WorkerTaskTypes(True, False, False),
                     sticky_queue_schedule_to_start_timeout_millis=1000,
                     max_heartbeat_throttle_interval_millis=1000,
                     default_heartbeat_throttle_interval_millis=1000,

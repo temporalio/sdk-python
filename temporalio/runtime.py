@@ -140,7 +140,15 @@ class TelemetryFilter:
         """Return a formatted form of this filter."""
         # We intentionally aren't using __str__ or __format__ so they can keep
         # their original dataclass impls
-        return f"{self.other_level},temporalio_sdk_core={self.core_level},temporalio_client={self.core_level},temporalio_sdk={self.core_level}"
+        targets = [
+            "temporal_sdk_core",
+            "temporal_sdk_bridge",
+            "temporal_client",
+            "temporalio_sdk",
+        ]
+        parts = [self.other_level]
+        parts.extend(f"{target}={self.core_level}" for target in targets)
+        return ",".join(parts)
 
 
 @dataclass(frozen=True)

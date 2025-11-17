@@ -54,7 +54,7 @@ pub struct WorkerConfig {
     workflow_task_poller_behavior: PollerBehavior,
     nonsticky_to_sticky_poll_ratio: f32,
     activity_task_poller_behavior: PollerBehavior,
-    no_remote_activities: bool,
+    task_types: WorkerTaskTypes,
     sticky_queue_schedule_to_start_timeout_millis: u64,
     max_heartbeat_throttle_interval_millis: u64,
     default_heartbeat_throttle_interval_millis: u64,
@@ -173,6 +173,23 @@ pub struct ResourceBasedSlotSupplier {
     // Need pyo3 0.21+ for this to be std Duration
     ramp_throttle_ms: u64,
     tuner_config: ResourceBasedTunerConfig,
+}
+
+#[derive(FromPyObject)]
+pub struct WorkerTaskTypes {
+     enable_workflows: bool,
+     enable_activities: bool,
+     enable_nexus: bool,
+}
+
+impl From<&WorkerTaskTypes> for temporalio_common::worker::WorkerTaskTypes {
+    fn from(t: &WorkerTaskTypes) -> Self {
+        Self {
+            enable_workflows: t.enable_workflows,
+            enable_activities: t.enable_activities,
+            enable_nexus: t.enable_nexus,
+        }
+    }
 }
 
 #[pyclass]
@@ -692,7 +709,7 @@ fn convert_worker_config(
         .tuner(Arc::new(converted_tuner))
         .nonsticky_to_sticky_poll_ratio(conf.nonsticky_to_sticky_poll_ratio)
         .activity_task_poller_behavior(conf.activity_task_poller_behavior)
-        .no_remote_activities(conf.no_remote_activities)
+        .task_types(&conf.task_types)
         .sticky_queue_schedule_to_start_timeout(Duration::from_millis(
             conf.sticky_queue_schedule_to_start_timeout_millis,
         ))
