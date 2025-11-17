@@ -50,7 +50,7 @@ class _RunningNexusTask:
     task: asyncio.Task[Any]
     cancellation: _NexusTaskCancellation
 
-    def cancel(self, reason: Optional[str] = None):
+    def cancel(self, reason: str):
         self.cancellation.cancel(reason)
         self.task.cancel()
 
@@ -572,7 +572,7 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
 class _NexusTaskCancellation(nexusrpc.handler.OperationTaskCancellation):
     def __init__(self):
         self._thread_evt = threading.Event()
-        self._aysnc_evt = asyncio.Event()
+        self._async_evt = asyncio.Event()
         self._lock = threading.Lock()
         self._reason: Optional[str] = None
 
@@ -587,16 +587,13 @@ class _NexusTaskCancellation(nexusrpc.handler.OperationTaskCancellation):
         return self._thread_evt.wait(timeout)
 
     async def wait_until_cancelled(self) -> None:
-        await self._aysnc_evt.wait()
+        await self._async_evt.wait()
 
-    def cancel(self, reason: Optional[str] = None) -> bool:
-        if self._thread_evt.is_set():
-            return False
-
+    def cancel(self, reason: str) -> bool:
         with self._lock:
             if self._thread_evt.is_set():
                 return False
             self._reason = reason
             self._thread_evt.set()
-            self._aysnc_evt.set()
+            self._async_evt.set()
             return True
