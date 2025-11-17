@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import multiprocessing
+import multiprocessing.context
 import uuid
 from datetime import timedelta
 from typing import Any, Awaitable, Callable, Optional, Sequence
@@ -58,6 +60,7 @@ from tests.helpers import (
     new_worker,
     worker_versioning_enabled,
 )
+from tests.helpers.fork import _ForkTestResult, _TestFork
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 
@@ -1271,3 +1274,43 @@ class PollFailureInjector:
         if self.next_exception_task:
             self.next_exception_task.cancel()
         setattr(self.worker._bridge_worker, self.attr, self.orig_poll_call)
+
+
+class TestForkCreateWorker(_TestFork):
+    async def coro(self):
+        self._worker = Worker(
+            self._client,
+            task_queue=f"task-queue-{uuid.uuid4()}",
+            activities=[never_run_activity],
+            workflows=[],
+            nexus_service_handlers=[],
+        )
+
+    def test_fork_create_worker(
+        self, client: Client, mp_fork_ctx: multiprocessing.context.BaseContext | None
+    ):
+        self._expected = _ForkTestResult.assertion_error(
+            "Cannot create worker across forks"
+        )
+        self._client = client
+        self.run(mp_fork_ctx)
+
+
+class TestForkUseWorker(_TestFork):
+    async def coro(self):
+        await self._pre_fork_worker.run()
+
+    def test_fork_use_worker(
+        self, client: Client, mp_fork_ctx: multiprocessing.context.BaseContext | None
+    ):
+        self._expected = _ForkTestResult.assertion_error(
+            "Cannot use worker across forks"
+        )
+        self._pre_fork_worker = Worker(
+            client,
+            task_queue=f"task-queue-{uuid.uuid4()}",
+            activities=[never_run_activity],
+            workflows=[],
+            nexus_service_handlers=[],
+        )
+        self.run(mp_fork_ctx)
