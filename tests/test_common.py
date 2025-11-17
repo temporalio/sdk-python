@@ -99,6 +99,25 @@ def test_typed_search_attribute_duplicates():
         )
 
 
+def test_typed_search_attributes_contains_with_falsy_value():
+    int_key = SearchAttributeKey.for_int("my-int")
+    attrs = TypedSearchAttributes([SearchAttributePair(int_key, 0)])
+    assert int_key in attrs
+
+
+def test_typed_search_attributes_contains_with_truthy_value():
+    int_key = SearchAttributeKey.for_int("my-int")
+    attrs = TypedSearchAttributes([SearchAttributePair(int_key, 42)])
+    assert int_key in attrs
+
+
+def test_typed_search_attributes_contains_missing_key():
+    int_key = SearchAttributeKey.for_int("my-int")
+    missing_key = SearchAttributeKey.for_keyword("missing")
+    attrs = TypedSearchAttributes([SearchAttributePair(int_key, 42)])
+    assert missing_key not in attrs
+
+
 def test_cant_construct_bad_priority():
     with pytest.raises(TypeError):
         Priority(priority_key=1.1)  # type: ignore
