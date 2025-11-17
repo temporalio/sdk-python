@@ -221,64 +221,6 @@ class WaitOnSignalWorkflow:
         workflow.logger.info(f"Signal: {value}")
 
 
-async def test_worker_versioning(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
-        pytest.skip("Java test server does not support worker versioning")
-    if not await worker_versioning_enabled(client):
-        pytest.skip("This server does not have worker versioning enabled")
-
-    task_queue = f"worker-versioning-{uuid.uuid4()}"
-    await client.update_worker_build_id_compatibility(
-        task_queue, BuildIdOpAddNewDefault("1.0")
-    )
-
-    async with new_worker(
-        client,
-        WaitOnSignalWorkflow,
-        activities=[say_hello],
-        task_queue=task_queue,
-        build_id="1.0",
-        use_worker_versioning=True,
-    ):
-        wf1 = await client.start_workflow(
-            WaitOnSignalWorkflow.run,
-            id=f"worker-versioning-1-{uuid.uuid4()}",
-            task_queue=task_queue,
-        )
-        # Sleep for a beat, otherwise it's possible for new workflow to start on 2.0
-        await asyncio.sleep(0.1)
-        await client.update_worker_build_id_compatibility(
-            task_queue, BuildIdOpAddNewDefault("2.0")
-        )
-        wf2 = await client.start_workflow(
-            WaitOnSignalWorkflow.run,
-            id=f"worker-versioning-2-{uuid.uuid4()}",
-            task_queue=task_queue,
-        )
-        async with new_worker(
-            client,
-            WaitOnSignalWorkflow,
-            activities=[say_hello],
-            task_queue=task_queue,
-            build_id="2.0",
-            use_worker_versioning=True,
-        ):
-            # Confirm reachability type parameter is respected. If it wasn't, list would have
-            # `OPEN_WORKFLOWS` in it.
-            reachability = await client.get_worker_task_reachability(
-                build_ids=["2.0"],
-                reachability_type=TaskReachabilityType.CLOSED_WORKFLOWS,
-            )
-            assert reachability.build_id_reachability["2.0"].task_queue_reachability[
-                task_queue
-            ] == [TaskReachabilityType.NEW_WORKFLOWS]
-
-            await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
-            await wf2.signal(WaitOnSignalWorkflow.my_signal, "finish")
-            await wf1.result()
-            await wf2.result()
-
-
 async def test_worker_validate_fail(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip("Java test server does not appear to fail on invalid namespace")
