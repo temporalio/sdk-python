@@ -5417,6 +5417,22 @@ class NexusClient(ABC, Generic[ServiceT]):
         headers: Optional[Mapping[str, str]] = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
+    # Overload for operation_handler
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: Callable[
+            [ServiceHandlerT], nexusrpc.handler.OperationHandler[InputT, OutputT]
+        ],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
     @abstractmethod
     async def start_operation(
         self,
@@ -5518,6 +5534,23 @@ class NexusClient(ABC, Generic[ServiceT]):
         operation: Callable[
             [ServiceT, nexusrpc.handler.StartOperationContext, InputT],
             OutputT,
+        ],
+        input: InputT,
+        *,
+        output_type: Optional[Type[OutputT]] = None,
+        schedule_to_close_timeout: Optional[timedelta] = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Optional[Mapping[str, str]] = None,
+    ) -> OutputT: ...
+
+    # Overload for operation_handler
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: Callable[
+            [ServiceT],
+            nexusrpc.handler.OperationHandler[InputT, OutputT],
         ],
         input: InputT,
         *,
