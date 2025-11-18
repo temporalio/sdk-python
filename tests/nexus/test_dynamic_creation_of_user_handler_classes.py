@@ -44,20 +44,6 @@ class MyIncrementOperationHandler(nexusrpc.handler.OperationHandler[int, int]):
     ) -> None:
         raise NotImplementedError
 
-    async def fetch_info(
-        self,
-        ctx: nexusrpc.handler.FetchOperationInfoContext,
-        token: str,
-    ) -> nexusrpc.OperationInfo:
-        raise NotImplementedError
-
-    async def fetch_result(
-        self,
-        ctx: nexusrpc.handler.FetchOperationResultContext,
-        token: str,
-    ) -> int:
-        raise NotImplementedError
-
 
 @nexusrpc.handler.service_handler
 class MyServiceHandlerWithWorkflowRunOperation:
@@ -78,8 +64,8 @@ async def test_run_nexus_service_from_programmatically_created_service_handler(
     service_handler = nexusrpc.handler._core.ServiceHandler(
         service=nexusrpc.ServiceDefinition(
             name="MyService",
-            operations={
-                "increment": nexusrpc.Operation[int, int](
+            operation_definitions={
+                "increment": nexusrpc.OperationDefinition[int, int](
                     name="increment",
                     method_name="increment",
                     input_type=int,

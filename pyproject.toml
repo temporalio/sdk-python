@@ -1,6 +1,6 @@
 [project]
 name = "temporalio"
-version = "1.18.1"
+version = "1.19.0"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.10"
@@ -9,7 +9,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["temporal", "workflow"]
 dependencies = [
-  "nexus-rpc==1.1.0",
+  "nexus-rpc==1.2.0",
   "protobuf>=3.20,<7.0.0",
   "python-dateutil>=2.8.2,<3 ; python_version < '3.11'",
   "types-protobuf>=3.20",
@@ -28,10 +28,7 @@ classifiers = [
 grpc = ["grpcio>=1.48.2,<2"]
 opentelemetry = ["opentelemetry-api>=1.11.1,<2", "opentelemetry-sdk>=1.11.1,<2"]
 pydantic = ["pydantic>=2.0.0,<3"]
-openai-agents = [
-  "openai-agents>=0.3,<0.5",
-  "mcp>=1.9.4, <2",
-]
+openai-agents = ["openai-agents>=0.3,<0.5", "mcp>=1.9.4, <2"]
 
 [project.urls]
 Homepage = "https://github.com/temporalio/sdk-python"

@@ -24,22 +24,61 @@ import temporalio.bridge.metric
 import temporalio.bridge.runtime
 import temporalio.common
 
-_default_runtime: Optional[Runtime] = None
+
+class _RuntimeRef:
+    def __init__(
+        self,
+    ) -> None:
+        self._default_runtime: Runtime | None = None
+        self._prevent_default = False
+
+    def default(self) -> Runtime:
+        if not self._default_runtime:
+            if self._prevent_default:
+                raise RuntimeError(
+                    "Cannot create default Runtime after Runtime.prevent_default has been called"
+                )
+            self._default_runtime = Runtime(telemetry=TelemetryConfig())
+            self._default_created = True
+        return self._default_runtime
+
+    def prevent_default(self):
+        if self._default_runtime:
+            raise RuntimeError(
+                "Runtime.prevent_default called after default runtime has been created or set"
+            )
+        self._prevent_default = True
+
+    def set_default(
+        self, runtime: Runtime, *, error_if_already_set: bool = True
+    ) -> None:
+        if self._default_runtime and error_if_already_set:
+            raise RuntimeError("Runtime default already set")
+
+        self._default_runtime = runtime
+
+
+_runtime_ref: _RuntimeRef = _RuntimeRef()
 
 
 class Runtime:
     """Runtime for Temporal Python SDK.
 
-    Users are encouraged to use :py:meth:`default`. It can be set with
+    Most users are encouraged to use :py:meth:`default`. It can be set with
     :py:meth:`set_default`. Every time a new runtime is created, a new internal
     thread pool is created.
 
-    Runtimes do not work across forks.
+    Runtimes do not work across forks. Advanced users should consider using
+    :py:meth:`prevent_default` and `:py:meth`set_default` to ensure each
+    fork creates it's own runtime.
+
     """
 
     @classmethod
     def default(cls) -> Runtime:
-        """Get the default runtime, creating if not already created.
+        """Get the default runtime, creating if not already created. If :py:meth:`prevent_default`
+        is called before this method it will raise a RuntimeError instead of creating a default
+        runtime.
 
         If the default runtime needs to be different, it should be done with
         :py:meth:`set_default` before this is called or ever used.
@@ -47,10 +86,20 @@ class Runtime:
         Returns:
             The default runtime.
         """
-        global _default_runtime
-        if not _default_runtime:
-            _default_runtime = cls(telemetry=TelemetryConfig())
-        return _default_runtime
+        global _runtime_ref
+        return _runtime_ref.default()
+
+    @classmethod
+    def prevent_default(cls):
+        """Prevent :py:meth:`default` from lazily creating a :py:class:`Runtime`.
+
+        Raises a RuntimeError if a default :py:class:`Runtime` has already been created.
+
+        Explicitly setting a default runtime with :py:meth:`set_default` bypasses this setting and
+        future calls to :py:meth:`default` will return the provided runtime.
+        """
+        global _runtime_ref
+        _runtime_ref.prevent_default()
 
     @staticmethod
     def set_default(runtime: Runtime, *, error_if_already_set: bool = True) -> None:
@@ -65,10 +114,8 @@ class Runtime:
             error_if_already_set: If True and default is already set, this will
                 raise a RuntimeError.
         """
-        global _default_runtime
-        if _default_runtime and error_if_already_set:
-            raise RuntimeError("Runtime default already set")
-        _default_runtime = runtime
+        global _runtime_ref
+        _runtime_ref.set_default(runtime, error_if_already_set=error_if_already_set)
 
     def __init__(
         self,
