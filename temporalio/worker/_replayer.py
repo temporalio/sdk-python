@@ -9,7 +9,6 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type
 
-from temporalio.bridge.worker import WorkerTaskTypes
 from typing_extensions import TypedDict
 
 import temporalio.api.history.v1
@@ -19,6 +18,7 @@ import temporalio.client
 import temporalio.converter
 import temporalio.runtime
 import temporalio.workflow
+from temporalio.bridge.worker import WorkerTaskTypes
 
 from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor

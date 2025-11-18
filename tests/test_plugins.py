@@ -150,7 +150,8 @@ async def test_worker_plugin_basic_config(client: Client) -> None:
         activities=[never_run_activity],
         plugins=[MyWorkerPlugin()],
     )
-    assert worker.config().get("task_queue").startswith("replaced_queue")
+    task_queue = worker.config().get("task_queue")
+    assert task_queue is not None and task_queue.startswith("replaced_queue")
     assert [p.name() for p in worker.config().get("plugins", [])] == [
         MyWorkerPlugin().name()
     ]
@@ -159,8 +160,11 @@ async def test_worker_plugin_basic_config(client: Client) -> None:
     new_config = client.config()
     new_config["plugins"] = [MyCombinedPlugin()]
     client = Client(**new_config)
-    worker = Worker(client, task_queue="queue" + str(uuid.uuid4()), activities=[never_run_activity])
-    assert worker.config().get("task_queue").startswith("combined")
+    worker = Worker(
+        client, task_queue="queue" + str(uuid.uuid4()), activities=[never_run_activity]
+    )
+    task_queue = worker.config().get("task_queue")
+    assert task_queue is not None and task_queue.startswith("combined")
     assert [p.name() for p in worker.config().get("plugins", [])] == [
         MyCombinedPlugin().name()
     ]
@@ -172,7 +176,8 @@ async def test_worker_plugin_basic_config(client: Client) -> None:
         activities=[never_run_activity],
         plugins=[MyWorkerPlugin()],
     )
-    assert worker.config().get("task_queue").startswith("replaced_queue")
+    task_queue = worker.config().get("task_queue")
+    assert task_queue is not None and task_queue.startswith("replaced_queue")
     assert [p.name() for p in worker.config().get("plugins", [])] == [
         MyCombinedPlugin().name(),
         MyWorkerPlugin().name(),
@@ -401,6 +406,10 @@ class MediumPlugin(SimplePlugin):
 async def test_medium_plugin(client: Client) -> None:
     plugin = MediumPlugin()
     worker = Worker(
-        client, task_queue="queue" + str(uuid.uuid4()), plugins=[plugin], workflows=[HelloWorkflow]
+        client,
+        task_queue="queue" + str(uuid.uuid4()),
+        plugins=[plugin],
+        workflows=[HelloWorkflow],
     )
-    assert worker.config().get("task_queue").startswith("override")
+    task_queue = worker.config().get("task_queue")
+    assert task_queue is not None and task_queue.startswith("override")

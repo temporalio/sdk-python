@@ -189,7 +189,9 @@ async def test_runtime_task_fail_log_forwarding(client: Client):
     # Check record
     record = next((l for l in log_queue_list if "Failing workflow task" in l.message))
     assert record.levelno == logging.WARNING
-    assert record.name == f"{logger.name}-sdk_core::temporalio_sdk_core::worker::workflow"
+    assert (
+        record.name == f"{logger.name}-sdk_core::temporalio_sdk_core::worker::workflow"
+    )
     assert record.temporal_log.fields["run_id"] == handle.result_run_id  # type: ignore
 
 
@@ -286,6 +288,8 @@ def test_runtime_options_invalid_heartbeat() -> None:
         Runtime(
             telemetry=TelemetryConfig(), worker_heartbeat_interval=timedelta(seconds=-5)
         )
+
+
 def test_runtime_ref_creates_default():
     ref = _RuntimeRef()
     assert not ref._default_runtime
