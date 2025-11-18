@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use temporal_sdk_core::ephemeral_server;
+use temporalio_sdk_core::ephemeral_server;
 
 use crate::runtime;
 

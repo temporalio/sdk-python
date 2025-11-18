@@ -4,7 +4,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use pyo3::prelude::*;
 use pyo3::{exceptions::PyTypeError, types::PyDict};
-use temporal_sdk_core_api::telemetry::metrics::{
+use temporalio_common::telemetry::metrics::{
     self, BufferInstrumentRef, CustomMetricAttributes, MetricEvent, NewAttributes,
 };
 

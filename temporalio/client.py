@@ -350,6 +350,11 @@ class Client:
         self.service_client.config.api_key = value
         self.service_client.update_api_key(value)
 
+    @property
+    def plugins(self) -> Sequence[Plugin]:
+        """Plugins used by this client."""
+        return self._config["plugins"]
+
     # Overload for no-param workflow
     @overload
     async def start_workflow(
