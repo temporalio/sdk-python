@@ -18,6 +18,7 @@ from temporalio.runtime import (
     Runtime,
     TelemetryConfig,
     TelemetryFilter,
+    _RuntimeRef,
 )
 from temporalio.worker import Worker
 from tests.helpers import (
@@ -285,3 +286,51 @@ def test_runtime_options_invalid_heartbeat() -> None:
         Runtime(
             telemetry=TelemetryConfig(), worker_heartbeat_interval=timedelta(seconds=-5)
         )
+def test_runtime_ref_creates_default():
+    ref = _RuntimeRef()
+    assert not ref._default_runtime
+    ref.default()
+    assert ref._default_runtime
+
+
+def test_runtime_ref_prevents_default():
+    ref = _RuntimeRef()
+    ref.prevent_default()
+    with pytest.raises(RuntimeError) as exc_info:
+        ref.default()
+    assert exc_info.match(
+        "Cannot create default Runtime after Runtime.prevent_default has been called"
+    )
+
+    # explicitly setting a default runtime will allow future calls to `default()``
+    explicit_runtime = Runtime(telemetry=TelemetryConfig())
+    ref.set_default(explicit_runtime)
+
+    assert ref.default() is explicit_runtime
+
+
+def test_runtime_ref_prevent_default_errors_after_default():
+    ref = _RuntimeRef()
+    ref.default()
+    with pytest.raises(RuntimeError) as exc_info:
+        ref.prevent_default()
+
+    assert exc_info.match(
+        "Runtime.prevent_default called after default runtime has been created"
+    )
+
+
+def test_runtime_ref_set_default():
+    ref = _RuntimeRef()
+    explicit_runtime = Runtime(telemetry=TelemetryConfig())
+    ref.set_default(explicit_runtime)
+    assert ref.default() is explicit_runtime
+
+    new_runtime = Runtime(telemetry=TelemetryConfig())
+
+    with pytest.raises(RuntimeError) as exc_info:
+        ref.set_default(new_runtime)
+    assert exc_info.match("Runtime default already set")
+
+    ref.set_default(new_runtime, error_if_already_set=False)
+    assert ref.default() is new_runtime

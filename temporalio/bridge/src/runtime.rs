@@ -1,5 +1,5 @@
 use futures::channel::mpsc::Receiver;
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::{PyAssertionError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pythonize::pythonize;
 use std::collections::HashMap;
@@ -33,6 +33,7 @@ pub struct RuntimeRef {
 
 #[derive(Clone)]
 pub(crate) struct Runtime {
+    pub(crate) pid: u32,
     pub(crate) core: Arc<CoreRuntime>,
     metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>>,
     log_forwarder_handle: Option<Arc<JoinHandle<()>>>,
@@ -189,6 +190,7 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
 
     Ok(RuntimeRef {
         runtime: Runtime {
+            pid: std::process::id(),
             core: Arc::new(core),
             metrics_call_buffer,
             log_forwarder_handle,
@@ -212,6 +214,18 @@ impl Runtime {
     {
         let _guard = self.core.tokio_handle().enter();
         pyo3_async_runtimes::generic::future_into_py::<TokioRuntime, _, T>(py, fut)
+    }
+
+    pub(crate) fn assert_same_process(&self, action: &'static str) -> PyResult<()> {
+        let current_pid = std::process::id();
+        if self.pid != current_pid {
+            Err(PyAssertionError::new_err(format!(
+                "Cannot {} across forks (original runtime PID is {}, current is {})",
+                action, self.pid, current_pid,
+            )))
+        } else {
+            Ok(())
+        }
     }
 }
 
