@@ -2234,7 +2234,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if warnable_updates:
             warnings.warn(
                 temporalio.workflow.UnfinishedUpdateHandlersWarning(
-                    _make_unfinished_update_handler_message(warnable_updates)
+                    _make_unfinished_update_handler_message(
+                        warnable_updates, self._info.workflow_id, self._info.run_id
+                    )
                 )
             )
 
@@ -2242,7 +2244,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if warnable_signals:
             warnings.warn(
                 temporalio.workflow.UnfinishedSignalHandlersWarning(
-                    _make_unfinished_signal_handler_message(warnable_signals)
+                    _make_unfinished_signal_handler_message(
+                        warnable_signals, self._info.workflow_id, self._info.run_id
+                    )
                 )
             )
 
@@ -3592,6 +3596,8 @@ class HandlerExecution:
 
 def _make_unfinished_update_handler_message(
     handler_executions: List[HandlerExecution],
+    workflow_id: str,
+    run_id: str,
 ) -> str:
     message = """
 [TMPRL1102] Workflow finished while update handlers are still running. This may have interrupted work that the
@@ -3605,12 +3611,18 @@ receive errors, then you can disable this warning via the update handler decorat
 """.replace("\n", " ").strip()
     return (
         f"{message} The following updates were unfinished (and warnings were not disabled for their handler): "
-        + json.dumps([{"name": ex.name, "id": ex.id} for ex in handler_executions])
+        + json.dumps({
+            "workflow_id": workflow_id,
+            "run_id": run_id,
+            "unfinished_handlers": [{"name": ex.name, "id": ex.id} for ex in handler_executions]
+        })
     )
 
 
 def _make_unfinished_signal_handler_message(
     handler_executions: List[HandlerExecution],
+    workflow_id: str,
+    run_id: str,
 ) -> str:
     message = """
 [TMPRL1102] Workflow finished while signal handlers are still running. This may have interrupted work that the
@@ -3623,9 +3635,11 @@ finishes, then you can disable this warning via the signal handler decorator:
     names = collections.Counter(ex.name for ex in handler_executions)
     return (
         f"{message} The following signals were unfinished (and warnings were not disabled for their handler): "
-        + json.dumps(
-            [{"name": name, "count": count} for name, count in names.most_common()]
-        )
+        + json.dumps({
+            "workflow_id": workflow_id,
+            "run_id": run_id,
+            "unfinished_handlers": [{"name": name, "count": count} for name, count in names.most_common()]
+        })
     )
 
 
