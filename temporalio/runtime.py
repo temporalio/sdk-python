@@ -141,9 +141,9 @@ class TelemetryFilter:
         # We intentionally aren't using __str__ or __format__ so they can keep
         # their original dataclass impls
         targets = [
-            "temporal_sdk_core",
-            "temporal_sdk_bridge",
-            "temporal_client",
+            "temporalio_sdk_core",
+            # "temporal_sdk_bridge",
+            "temporalio_client",
             "temporalio_sdk",
         ]
         parts = [self.other_level]
