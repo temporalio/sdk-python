@@ -11,19 +11,19 @@ use std::marker::PhantomData;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use temporalio_common::errors::PollError;
-use temporalio_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use temporalio_common::errors::WorkflowErrorType;
-use temporalio_common::worker::{
-    SlotInfo, SlotInfoTrait, SlotKind, SlotKindType, SlotMarkUsedContext, SlotReleaseContext,
-    SlotReservationContext, SlotSupplier as SlotSupplierTrait, SlotSupplierPermit,
-};
-use temporalio_common::Worker;
 use temporalio_common::protos::coresdk::workflow_completion::WorkflowActivationCompletion;
 use temporalio_common::protos::coresdk::{
     nexus::NexusTaskCompletion, ActivityHeartbeat, ActivityTaskCompletion,
 };
 use temporalio_common::protos::temporal::api::history::v1::History;
 use temporalio_common::protos::temporal::api::worker::v1::PluginInfo;
+use temporalio_common::worker::{
+    SlotInfo, SlotInfoTrait, SlotKind, SlotKindType, SlotMarkUsedContext, SlotReleaseContext,
+    SlotReservationContext, SlotSupplier as SlotSupplierTrait, SlotSupplierPermit,
+};
+use temporalio_common::Worker;
+use temporalio_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::error;
@@ -177,9 +177,9 @@ pub struct ResourceBasedSlotSupplier {
 
 #[derive(FromPyObject)]
 pub struct WorkerTaskTypes {
-     enable_workflows: bool,
-     enable_activities: bool,
-     enable_nexus: bool,
+    enable_workflows: bool,
+    enable_activities: bool,
+    enable_nexus: bool,
 }
 
 impl From<&WorkerTaskTypes> for temporalio_common::worker::WorkerTaskTypes {
@@ -523,9 +523,10 @@ pub fn new_replay_worker<'a>(
     let (history_pusher, stream) = HistoryPusher::new(runtime_ref.runtime.clone());
     let worker = WorkerRef {
         worker: Some(Arc::new(
-            temporalio_sdk_core::init_replay_worker(ReplayWorkerInput::new(config, stream)).map_err(
-                |err| PyValueError::new_err(format!("Failed creating replay worker: {err}")),
-            )?,
+            temporalio_sdk_core::init_replay_worker(ReplayWorkerInput::new(config, stream))
+                .map_err(|err| {
+                    PyValueError::new_err(format!("Failed creating replay worker: {err}"))
+                })?,
         )),
         event_loop_task_locals: Default::default(),
         runtime: runtime_ref.runtime.clone(),
@@ -860,13 +861,15 @@ fn convert_slot_supplier<SK: SlotKind + Send + Sync + 'static>(
                 Duration::from_millis(ss.ramp_throttle_ms),
             ),
         ),
-        SlotSupplier::Custom(cs) => temporalio_sdk_core::SlotSupplierOptions::Custom(Arc::new(
-            CustomSlotSupplierOfType::<SK> {
+        SlotSupplier::Custom(cs) => {
+            temporalio_sdk_core::SlotSupplierOptions::Custom(Arc::new(CustomSlotSupplierOfType::<
+                SK,
+            > {
                 inner: cs.inner,
                 event_loop_task_locals: task_locals,
                 _phantom: PhantomData,
-            },
-        )),
+            }))
+        }
     })
 }
 

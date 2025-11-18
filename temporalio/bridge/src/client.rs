@@ -3,14 +3,14 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::Duration;
-use temporalio_client::{
-    ClientKeepAliveConfig as CoreClientKeepAliveConfig, ClientOptions, ClientOptionsBuilder,
-    ConfiguredClient, HttpConnectProxyOptions, RetryClient, RetryConfig,
-    TlsConfig, TemporalServiceClient,
-};
 use temporalio_client::tonic::{
     self,
     metadata::{AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataKey, BinaryMetadataValue},
+};
+use temporalio_client::{
+    ClientKeepAliveConfig as CoreClientKeepAliveConfig, ClientOptions, ClientOptionsBuilder,
+    ConfiguredClient, HttpConnectProxyOptions, RetryClient, RetryConfig, TemporalServiceClient,
+    TlsConfig,
 };
 use url::Url;
 
