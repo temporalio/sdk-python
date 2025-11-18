@@ -22,7 +22,6 @@ from typing import (
     cast,
 )
 
-from temporalio.bridge.worker import WorkerTaskTypes
 from typing_extensions import TypeAlias, TypedDict
 
 import temporalio.bridge.worker
@@ -30,6 +29,7 @@ import temporalio.client
 import temporalio.common
 import temporalio.runtime
 import temporalio.service
+from temporalio.bridge.worker import WorkerTaskTypes
 from temporalio.common import (
     HeaderCodecBehavior,
     VersioningBehavior,
