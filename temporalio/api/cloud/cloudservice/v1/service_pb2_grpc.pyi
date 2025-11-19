@@ -219,6 +219,11 @@ class CloudServiceStub:
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountResponse,
     ]
     """Update a service account."""
+    SetServiceAccountNamespaceAccess: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessResponse,
+    ]
+    """Set a service account's access to a namespace."""
     DeleteServiceAccount: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountResponse,
@@ -298,6 +303,13 @@ class CloudServiceStub:
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse,
     ]
     """Deletes a connectivity rule by id"""
+    ValidateAccountAuditLogSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkResponse,
+    ]
+    """Validate customer audit log sink is accessible from Temporal's workflow by delivering an empty file to the specified sink.
+    The operation verifies that the sink is correctly configured, accessible and ready to receive audit logs.
+    """
 
 class CloudServiceServicer(metaclass=abc.ABCMeta):
     """WARNING: This service is currently experimental and may change in
@@ -595,6 +607,13 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountResponse:
         """Update a service account."""
     @abc.abstractmethod
+    def SetServiceAccountNamespaceAccess(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessResponse:
+        """Set a service account's access to a namespace."""
+    @abc.abstractmethod
     def DeleteServiceAccount(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountRequest,
@@ -705,6 +724,15 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse:
         """Deletes a connectivity rule by id"""
+    @abc.abstractmethod
+    def ValidateAccountAuditLogSink(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkResponse:
+        """Validate customer audit log sink is accessible from Temporal's workflow by delivering an empty file to the specified sink.
+        The operation verifies that the sink is correctly configured, accessible and ready to receive audit logs.
+        """
 
 def add_CloudServiceServicer_to_server(
     servicer: CloudServiceServicer, server: grpc.Server

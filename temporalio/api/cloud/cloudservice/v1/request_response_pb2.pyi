@@ -557,7 +557,7 @@ class GetNamespacesRequest(google.protobuf.message.Message):
     NAME_FIELD_NUMBER: builtins.int
     page_size: builtins.int
     """The requested size of the page to retrieve.
-    Cannot exceed 1000. 
+    Cannot exceed 1000.
     Optional, defaults to 100.
     """
     page_token: builtins.str
@@ -2655,6 +2655,88 @@ class UpdateServiceAccountResponse(google.protobuf.message.Message):
 
 global___UpdateServiceAccountResponse = UpdateServiceAccountResponse
 
+class SetServiceAccountNamespaceAccessRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SERVICE_ACCOUNT_ID_FIELD_NUMBER: builtins.int
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    ACCESS_FIELD_NUMBER: builtins.int
+    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
+    ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
+    service_account_id: builtins.str
+    """The ID of the service account to update."""
+    namespace: builtins.str
+    """The namespace to set permissions for."""
+    @property
+    def access(self) -> temporalio.api.cloud.identity.v1.message_pb2.NamespaceAccess:
+        """The namespace access to assign the service account."""
+    resource_version: builtins.str
+    """The version of the service account for which this update is intended for.
+    The latest version can be found in the GetServiceAccount response.
+    """
+    async_operation_id: builtins.str
+    """The ID to use for this async operation - optional."""
+    def __init__(
+        self,
+        *,
+        service_account_id: builtins.str = ...,
+        namespace: builtins.str = ...,
+        access: temporalio.api.cloud.identity.v1.message_pb2.NamespaceAccess
+        | None = ...,
+        resource_version: builtins.str = ...,
+        async_operation_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["access", b"access"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "access",
+            b"access",
+            "async_operation_id",
+            b"async_operation_id",
+            "namespace",
+            b"namespace",
+            "resource_version",
+            b"resource_version",
+            "service_account_id",
+            b"service_account_id",
+        ],
+    ) -> None: ...
+
+global___SetServiceAccountNamespaceAccessRequest = (
+    SetServiceAccountNamespaceAccessRequest
+)
+
+class SetServiceAccountNamespaceAccessResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ASYNC_OPERATION_FIELD_NUMBER: builtins.int
+    @property
+    def async_operation(
+        self,
+    ) -> temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation:
+        """The async operation."""
+    def __init__(
+        self,
+        *,
+        async_operation: temporalio.api.cloud.operation.v1.message_pb2.AsyncOperation
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["async_operation", b"async_operation"],
+    ) -> None: ...
+
+global___SetServiceAccountNamespaceAccessResponse = (
+    SetServiceAccountNamespaceAccessResponse
+)
+
 class DeleteServiceAccountRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3605,3 +3687,33 @@ class DeleteConnectivityRuleResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___DeleteConnectivityRuleResponse = DeleteConnectivityRuleResponse
+
+class ValidateAccountAuditLogSinkRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SPEC_FIELD_NUMBER: builtins.int
+    @property
+    def spec(self) -> temporalio.api.cloud.account.v1.message_pb2.AuditLogSinkSpec:
+        """The audit log sink spec that will be validated"""
+    def __init__(
+        self,
+        *,
+        spec: temporalio.api.cloud.account.v1.message_pb2.AuditLogSinkSpec | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["spec", b"spec"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["spec", b"spec"]
+    ) -> None: ...
+
+global___ValidateAccountAuditLogSinkRequest = ValidateAccountAuditLogSinkRequest
+
+class ValidateAccountAuditLogSinkResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___ValidateAccountAuditLogSinkResponse = ValidateAccountAuditLogSinkResponse

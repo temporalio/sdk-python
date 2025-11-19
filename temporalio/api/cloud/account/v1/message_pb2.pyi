@@ -10,6 +10,7 @@ import google.protobuf.descriptor
 import google.protobuf.message
 
 import temporalio.api.cloud.resource.v1.message_pb2
+import temporalio.api.cloud.sink.v1.message_pb2
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -140,3 +141,62 @@ class Account(google.protobuf.message.Message):
     ) -> None: ...
 
 global___Account = Account
+
+class AuditLogSinkSpec(google.protobuf.message.Message):
+    """AuditLogSinkSpec is only used by Audit Log"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAME_FIELD_NUMBER: builtins.int
+    KINESIS_SINK_FIELD_NUMBER: builtins.int
+    PUB_SUB_SINK_FIELD_NUMBER: builtins.int
+    ENABLED_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    """Name of the sink e.g. "audit_log_01" """
+    @property
+    def kinesis_sink(self) -> temporalio.api.cloud.sink.v1.message_pb2.KinesisSpec:
+        """The KinesisSpec when destination_type is Kinesis"""
+    @property
+    def pub_sub_sink(self) -> temporalio.api.cloud.sink.v1.message_pb2.PubSubSpec:
+        """The PubSubSpec when destination_type is PubSub"""
+    enabled: builtins.bool
+    """Enabled indicates whether the sink is enabled or not."""
+    def __init__(
+        self,
+        *,
+        name: builtins.str = ...,
+        kinesis_sink: temporalio.api.cloud.sink.v1.message_pb2.KinesisSpec | None = ...,
+        pub_sub_sink: temporalio.api.cloud.sink.v1.message_pb2.PubSubSpec | None = ...,
+        enabled: builtins.bool = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "kinesis_sink",
+            b"kinesis_sink",
+            "pub_sub_sink",
+            b"pub_sub_sink",
+            "sink_type",
+            b"sink_type",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "enabled",
+            b"enabled",
+            "kinesis_sink",
+            b"kinesis_sink",
+            "name",
+            b"name",
+            "pub_sub_sink",
+            b"pub_sub_sink",
+            "sink_type",
+            b"sink_type",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["sink_type", b"sink_type"]
+    ) -> typing_extensions.Literal["kinesis_sink", "pub_sub_sink"] | None: ...
+
+global___AuditLogSinkSpec = AuditLogSinkSpec

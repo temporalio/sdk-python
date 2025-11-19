@@ -368,6 +368,11 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionMetadataRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionMetadataResponse.FromString,
         )
+        self.SetWorkerDeploymentManager = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/SetWorkerDeploymentManager",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentManagerRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentManagerResponse.FromString,
+        )
         self.UpdateWorkflowExecution = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkflowExecution",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionRequest.SerializeToString,
@@ -487,6 +492,11 @@ class WorkflowServiceStub(object):
             "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerConfig",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerConfigRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerConfigResponse.FromString,
+        )
+        self.DescribeWorker = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeWorker",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerResponse.FromString,
         )
 
 
@@ -857,7 +867,8 @@ class WorkflowServiceServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def ScanWorkflowExecutions(self, request, context):
-        """ScanWorkflowExecutions is a visibility API to list large amount of workflow executions in a specific namespace without order.
+        """ScanWorkflowExecutions _was_ a visibility API to list large amount of workflow executions in a specific namespace without order.
+        It has since been deprecated in favor of `ListWorkflowExecutions` and rewritten to use `ListWorkflowExecutions` internally.
 
         Deprecated: Replaced with `ListWorkflowExecutions`.
         (-- api-linter: core::0127::http-annotation=disabled
@@ -1233,6 +1244,14 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def SetWorkerDeploymentManager(self, request, context):
+        """Set/unset the ManagerIdentity of a Worker Deployment.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def UpdateWorkflowExecution(self, request, context):
         """Invokes the specified Update function on user Workflow code."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1455,6 +1474,12 @@ class WorkflowServiceServicer(object):
         Can be used to partially update the worker configuration.
         Can be used to update the configuration of multiple workers.
         """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DescribeWorker(self, request, context):
+        """DescribeWorker returns information about the specified worker."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -1802,6 +1827,11 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionMetadataRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerDeploymentVersionMetadataResponse.SerializeToString,
         ),
+        "SetWorkerDeploymentManager": grpc.unary_unary_rpc_method_handler(
+            servicer.SetWorkerDeploymentManager,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentManagerRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentManagerResponse.SerializeToString,
+        ),
         "UpdateWorkflowExecution": grpc.unary_unary_rpc_method_handler(
             servicer.UpdateWorkflowExecution,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkflowExecutionRequest.FromString,
@@ -1921,6 +1951,11 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             servicer.UpdateWorkerConfig,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerConfigRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerConfigResponse.SerializeToString,
+        ),
+        "DescribeWorker": grpc.unary_unary_rpc_method_handler(
+            servicer.DescribeWorker,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -3917,6 +3952,35 @@ class WorkflowService(object):
         )
 
     @staticmethod
+    def SetWorkerDeploymentManager(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/SetWorkerDeploymentManager",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentManagerRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.SetWorkerDeploymentManagerResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
     def UpdateWorkflowExecution(
         request,
         target,
@@ -4602,6 +4666,35 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerConfig",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerConfigRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerConfigResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DescribeWorker(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/DescribeWorker",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerResponse.FromString,
             options,
             channel_credentials,
             insecure,

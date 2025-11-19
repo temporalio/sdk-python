@@ -224,6 +224,11 @@ class CloudServiceStub(object):
             request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateServiceAccountRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateServiceAccountResponse.FromString,
         )
+        self.SetServiceAccountNamespaceAccess = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/SetServiceAccountNamespaceAccess",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetServiceAccountNamespaceAccessRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetServiceAccountNamespaceAccessResponse.FromString,
+        )
         self.DeleteServiceAccount = channel.unary_unary(
             "/temporal.api.cloud.cloudservice.v1.CloudService/DeleteServiceAccount",
             request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteServiceAccountRequest.SerializeToString,
@@ -298,6 +303,11 @@ class CloudServiceStub(object):
             "/temporal.api.cloud.cloudservice.v1.CloudService/DeleteConnectivityRule",
             request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteConnectivityRuleRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteConnectivityRuleResponse.FromString,
+        )
+        self.ValidateAccountAuditLogSink = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/ValidateAccountAuditLogSink",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateAccountAuditLogSinkRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateAccountAuditLogSinkResponse.FromString,
         )
 
 
@@ -552,6 +562,12 @@ class CloudServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def SetServiceAccountNamespaceAccess(self, request, context):
+        """Set a service account's access to a namespace."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def DeleteServiceAccount(self, request, context):
         """Delete a service account."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -642,6 +658,14 @@ class CloudServiceServicer(object):
 
     def DeleteConnectivityRule(self, request, context):
         """Deletes a connectivity rule by id"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def ValidateAccountAuditLogSink(self, request, context):
+        """Validate customer audit log sink is accessible from Temporal's workflow by delivering an empty file to the specified sink.
+        The operation verifies that the sink is correctly configured, accessible and ready to receive audit logs.
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -854,6 +878,11 @@ def add_CloudServiceServicer_to_server(servicer, server):
             request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateServiceAccountRequest.FromString,
             response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateServiceAccountResponse.SerializeToString,
         ),
+        "SetServiceAccountNamespaceAccess": grpc.unary_unary_rpc_method_handler(
+            servicer.SetServiceAccountNamespaceAccess,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetServiceAccountNamespaceAccessRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetServiceAccountNamespaceAccessResponse.SerializeToString,
+        ),
         "DeleteServiceAccount": grpc.unary_unary_rpc_method_handler(
             servicer.DeleteServiceAccount,
             request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteServiceAccountRequest.FromString,
@@ -928,6 +957,11 @@ def add_CloudServiceServicer_to_server(servicer, server):
             servicer.DeleteConnectivityRule,
             request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteConnectivityRuleRequest.FromString,
             response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteConnectivityRuleResponse.SerializeToString,
+        ),
+        "ValidateAccountAuditLogSink": grpc.unary_unary_rpc_method_handler(
+            servicer.ValidateAccountAuditLogSink,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateAccountAuditLogSinkRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateAccountAuditLogSinkResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -2132,6 +2166,35 @@ class CloudService(object):
         )
 
     @staticmethod
+    def SetServiceAccountNamespaceAccess(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/SetServiceAccountNamespaceAccess",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetServiceAccountNamespaceAccessRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetServiceAccountNamespaceAccessResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
     def DeleteServiceAccount(
         request,
         target,
@@ -2556,6 +2619,35 @@ class CloudService(object):
             "/temporal.api.cloud.cloudservice.v1.CloudService/DeleteConnectivityRule",
             temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteConnectivityRuleRequest.SerializeToString,
             temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteConnectivityRuleResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def ValidateAccountAuditLogSink(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/ValidateAccountAuditLogSink",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateAccountAuditLogSinkRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateAccountAuditLogSinkResponse.FromString,
             options,
             channel_credentials,
             insecure,

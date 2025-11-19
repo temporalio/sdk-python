@@ -4,7 +4,7 @@ use pyo3::{
     types::{PyBytes, PyDict},
 };
 use std::collections::HashMap;
-use temporal_sdk_core_api::envconfig::{
+use temporalio_common::envconfig::{
     load_client_config as core_load_client_config,
     load_client_config_profile as core_load_client_config_profile,
     ClientConfig as CoreClientConfig, ClientConfigCodec,
