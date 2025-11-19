@@ -6,15 +6,13 @@ from typing import Any, Callable, List, NoReturn, Optional, Tuple, Type
 import nexusrpc
 import pytest
 from nexusrpc.handler._common import (
-    CancelOperationContext,
-    StartOperationContext,
     StartOperationResultAsync,
     StartOperationResultSync,
 )
 
-from temporalio import activity, workflow
+from temporalio import activity, nexus, workflow
 from temporalio.client import Client, WorkflowUpdateFailedError
-from temporalio.exceptions import ApplicationError
+from temporalio.exceptions import ApplicationError, NexusOperationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     ActivityInboundInterceptor,
@@ -164,21 +162,27 @@ class TracingNexusInboundInterceptor(NexusOperationInboundInterceptor):
         return await super().cancel_operation(input)
 
 
-class InterceptedOperationHandler(nexusrpc.handler.OperationHandler[str, str]):
-    async def start(
-        self, ctx: StartOperationContext, input: str
-    ) -> StartOperationResultAsync:
-        return StartOperationResultAsync(input)
-
-    async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
-        pass
+@workflow.defn
+class ExpectCancelNexusWorkflow:
+    @workflow.run
+    async def run(self, input: str):
+        try:
+            await asyncio.wait_for(asyncio.Future(), 2)
+        except asyncio.TimeoutError:
+            raise ApplicationError("expected cancellation")
 
 
 @nexusrpc.handler.service_handler
 class InterceptedNexusService:
-    @nexusrpc.handler.operation_handler
-    def intercepted_operation(self) -> nexusrpc.handler.OperationHandler[str, str]:
-        return InterceptedOperationHandler()
+    @nexus.workflow_run_operation
+    async def intercepted_operation(
+        self, ctx: nexus.WorkflowRunOperationContext, input: str
+    ) -> nexus.WorkflowHandle[None]:
+        return await ctx.start_workflow(
+            ExpectCancelNexusWorkflow.run,
+            input,
+            id=f"wf-{uuid.uuid4()}-{ctx.request_id}",
+        )
 
 
 @activity.defn
@@ -229,15 +233,13 @@ class InterceptedWorkflow:
 
         nexus_handle = await nexus_client.start_operation(
             operation=InterceptedNexusService.intercepted_operation,
-            input="hello",
+            input="nexus-workflow",
         )
         nexus_handle.cancel()
 
-        # in order for the cancel to make progress, the handle must be awaited
-        # but it hangs indefinitely, so I'm using this temp workaround
         try:
-            await asyncio.wait_for(asyncio.shield(nexus_handle), 0.1)
-        except asyncio.TimeoutError:
+            await nexus_handle
+        except NexusOperationError:
             pass
 
         await self.finish.wait()
@@ -277,7 +279,7 @@ async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
     async with Worker(
         client,
         task_queue=task_queue,
-        workflows=[InterceptedWorkflow],
+        workflows=[InterceptedWorkflow, ExpectCancelNexusWorkflow],
         activities=[intercepted_activity],
         interceptors=[TracingWorkerInterceptor()],
         nexus_service_handlers=[InterceptedNexusService()],
@@ -361,11 +363,11 @@ async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
         )
         assert pop_trace(
             "nexus.start_operation.InterceptedNexusService.intercepted_operation",
-            lambda v: v.input == "hello",
+            lambda v: v.input == "nexus-workflow",
         )
+        assert pop_trace("workflow.execute", lambda v: v.args[0] == "nexus-workflow")
         assert pop_trace(
             "nexus.cancel_operation.InterceptedNexusService.intercepted_operation",
-            lambda v: v.token == "hello",
         )
 
         # Confirm no unexpected traces
