@@ -40,7 +40,7 @@ from temporalio.exceptions import (
 from temporalio.nexus import Info, logger
 from temporalio.service import RPCError, RPCStatusCode
 
-from ._interceptor import Interceptor
+from ._interceptor import Interceptor, _NexusMiddlewareForInterceptors
 
 _TEMPORAL_FAILURE_PROTO_TYPE = "temporal.api.failure.v1.Failure"
 
@@ -73,10 +73,11 @@ class _NexusWorker:
         self._bridge_worker = bridge_worker
         self._client = client
         self._task_queue = task_queue
-        self._handler = Handler(service_handlers, executor)
+
+        middleware = _NexusMiddlewareForInterceptors(interceptors)
+
+        self._handler = Handler(service_handlers, executor, interceptors=[middleware])
         self._data_converter = data_converter
-        # TODO(nexus-preview): interceptors
-        self._interceptors = interceptors
         # TODO(nexus-preview): metric_meter
         self._metric_meter = metric_meter
         self._running_tasks: dict[bytes, _RunningNexusTask] = {}

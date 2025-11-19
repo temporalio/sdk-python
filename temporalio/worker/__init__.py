@@ -11,6 +11,9 @@ from ._interceptor import (
     HandleSignalInput,
     HandleUpdateInput,
     Interceptor,
+    NexusOperationCancelInput,
+    NexusOperationInboundInterceptor,
+    NexusOperationStartInput,
     SignalChildWorkflowInput,
     SignalExternalWorkflowInput,
     StartActivityInput,
@@ -80,6 +83,7 @@ __all__ = [
     "ActivityOutboundInterceptor",
     "WorkflowInboundInterceptor",
     "WorkflowOutboundInterceptor",
+    "NexusOperationInboundInterceptor",
     "Plugin",
     # Interceptor input
     "ContinueAsNewInput",
@@ -95,6 +99,8 @@ __all__ = [
     "StartLocalActivityInput",
     "StartNexusOperationInput",
     "WorkflowInterceptorClassInput",
+    "NexusOperationStartInput",
+    "NexusOperationCancelInput",
     # Advanced activity classes
     "SharedStateManager",
     "SharedHeartbeatSender",

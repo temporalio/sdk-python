@@ -6,6 +6,7 @@ import concurrent.futures
 from collections.abc import Callable, Mapping, MutableMapping
 from dataclasses import dataclass
 from datetime import timedelta
+from functools import reduce
 from typing import (
     Any,
     Awaitable,
@@ -16,6 +17,7 @@ from typing import (
     Sequence,
     Type,
     Union,
+    cast,
 )
 
 import nexusrpc.handler
@@ -67,6 +69,112 @@ class Interceptor:
             The class to construct to intercept each workflow.
         """
         return None
+
+    def intercept_nexus_operation(
+        self, next: NexusOperationInboundInterceptor
+    ) -> NexusOperationInboundInterceptor:
+        """Method called for intercepting a Nexus operation.
+
+        Args:
+            next: The underlying inbound this interceptor
+            should delegate to.
+
+        Returns:
+            The new interceptor that should be used for the Nexus operation.
+        """
+        return next
+
+
+@dataclass
+class NexusOperationStartInput:
+    ctx: nexusrpc.handler.StartOperationContext
+    input: Any
+
+
+@dataclass
+class NexusOperationCancelInput:
+    ctx: nexusrpc.handler.CancelOperationContext
+    token: str
+
+
+class NexusOperationInboundInterceptor:
+    def __init__(self, next: NexusOperationInboundInterceptor) -> None:
+        self.next = next
+
+    async def start_operation(
+        self, input: NexusOperationStartInput
+    ) -> (
+        nexusrpc.handler.StartOperationResultSync[Any]
+        | nexusrpc.handler.StartOperationResultAsync
+    ):
+        return await self.next.start_operation(input)
+
+    async def cancel_operation(self, input: NexusOperationCancelInput) -> None:
+        return await self.next.cancel_operation(input)
+
+
+class _NexusOperationHandlerForInterceptor(
+    nexusrpc.handler.MiddlewareSafeOperationHandler[Any, Any]
+):
+    def __init__(self, next_interceptor: NexusOperationInboundInterceptor):
+        self._next_interceptor = next_interceptor
+
+    async def start(
+        self, ctx: nexusrpc.handler.StartOperationContext, input: Any
+    ) -> (
+        nexusrpc.handler.StartOperationResultSync[Any]
+        | nexusrpc.handler.StartOperationResultAsync
+    ):
+        return await self._next_interceptor.start_operation(
+            NexusOperationStartInput(ctx, input)
+        )
+
+    async def cancel(
+        self, ctx: nexusrpc.handler.CancelOperationContext, token: str
+    ) -> None:
+        return await self._next_interceptor.cancel_operation(
+            NexusOperationCancelInput(ctx, token)
+        )
+
+
+class _NexusOperationInboundInterceptorImpl(NexusOperationInboundInterceptor):
+    def __init__(
+        self,
+        handler: nexusrpc.handler.MiddlewareSafeOperationHandler[Any, Any],
+    ):
+        self._handler = handler
+
+    async def start_operation(
+        self, input: NexusOperationStartInput
+    ) -> (
+        nexusrpc.handler.StartOperationResultSync[Any]
+        | nexusrpc.handler.StartOperationResultAsync
+    ):
+        return await self._handler.start(input.ctx, input.input)
+
+    async def cancel_operation(self, input: NexusOperationCancelInput) -> None:
+        return await self._handler.cancel(input.ctx, input.token)
+
+
+class _NexusMiddlewareForInterceptors(nexusrpc.handler.OperationHandlerMiddleware):
+    def __init__(self, interceptors: Sequence[Interceptor]) -> None:
+        self._interceptors = interceptors
+
+    def intercept(
+        self,
+        ctx: nexusrpc.handler.OperationContext,
+        next: nexusrpc.handler.MiddlewareSafeOperationHandler[Any, Any],
+    ) -> nexusrpc.handler.MiddlewareSafeOperationHandler[Any, Any]:
+        inbound = reduce(
+            lambda impl, _next: _next.intercept_nexus_operation(impl),
+            reversed(self._interceptors),
+            cast(
+                NexusOperationInboundInterceptor,
+                _NexusOperationInboundInterceptorImpl(next),
+            ),
+        )
+
+        return _NexusOperationHandlerForInterceptor(inbound)
 
 
 @dataclass(frozen=True)
