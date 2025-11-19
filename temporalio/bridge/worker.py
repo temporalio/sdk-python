@@ -54,6 +54,7 @@ class WorkerConfig:
     workflow_task_poller_behavior: PollerBehavior
     nonsticky_to_sticky_poll_ratio: float
     activity_task_poller_behavior: PollerBehavior
+    no_remote_activities: bool
     task_types: WorkerTaskTypes
     sticky_queue_schedule_to_start_timeout_millis: int
     max_heartbeat_throttle_interval_millis: int
@@ -175,7 +176,8 @@ class WorkerTaskTypes:
     """Python representation of the Rust struct for worker task types"""
 
     enable_workflows: bool
-    enable_activities: bool
+    enable_local_activities: bool
+    enable_remote_activities: bool
     enable_nexus: bool
 
 

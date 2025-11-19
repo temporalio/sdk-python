@@ -178,7 +178,8 @@ pub struct ResourceBasedSlotSupplier {
 #[derive(FromPyObject)]
 pub struct WorkerTaskTypes {
     enable_workflows: bool,
-    enable_activities: bool,
+    enable_local_activities: bool,
+    enable_remote_activities: bool,
     enable_nexus: bool,
 }
 

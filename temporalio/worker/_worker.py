@@ -29,7 +29,6 @@ import temporalio.client
 import temporalio.common
 import temporalio.runtime
 import temporalio.service
-from temporalio.bridge.worker import WorkerTaskTypes
 from temporalio.common import (
     HeaderCodecBehavior,
     VersioningBehavior,
@@ -125,6 +124,7 @@ class Worker:
         max_concurrent_workflow_task_polls: Optional[int] = None,
         nonsticky_to_sticky_poll_ratio: float = 0.2,
         max_concurrent_activity_task_polls: Optional[int] = None,
+        no_remote_activities: bool = False,
         sticky_queue_schedule_to_start_timeout: timedelta = timedelta(seconds=10),
         max_heartbeat_throttle_interval: timedelta = timedelta(seconds=60),
         default_heartbeat_throttle_interval: timedelta = timedelta(seconds=30),
@@ -251,6 +251,8 @@ class Worker:
                 If set, will override any value passed to ``activity_task_poller_behavior``.
 
                 WARNING: Deprecated, use ``activity_task_poller_behavior`` instead
+            no_remote_activities: If true, this worker will only handle workflow
+                tasks and local activities, it will not poll for activity tasks.
             sticky_queue_schedule_to_start_timeout: How long a workflow task is
                 allowed to sit on the sticky queue before it is timed out and
                 moved to the non-sticky queue where it may be picked up by any
@@ -344,6 +346,7 @@ class Worker:
             max_concurrent_workflow_task_polls=max_concurrent_workflow_task_polls,
             nonsticky_to_sticky_poll_ratio=nonsticky_to_sticky_poll_ratio,
             max_concurrent_activity_task_polls=max_concurrent_activity_task_polls,
+            no_remote_activities=no_remote_activities,
             sticky_queue_schedule_to_start_timeout=sticky_queue_schedule_to_start_timeout,
             max_heartbeat_throttle_interval=max_heartbeat_throttle_interval,
             default_heartbeat_throttle_interval=default_heartbeat_throttle_interval,
@@ -573,9 +576,15 @@ class Worker:
                 max_cached_workflows=config["max_cached_workflows"],
                 tuner=bridge_tuner,
                 nonsticky_to_sticky_poll_ratio=config["nonsticky_to_sticky_poll_ratio"],
-                task_types=WorkerTaskTypes(
+                # We have to disable remote activities if a user asks _or_ if we
+                # are not running an activity worker at all. Otherwise shutdown
+                # will not proceed properly.
+                no_remote_activities=config["no_remote_activities"]
+                or not config["activities"],
+                task_types=temporalio.bridge.worker.WorkerTaskTypes(
                     enable_workflows=self._workflow_worker is not None,
-                    enable_activities=self._activity_worker is not None,
+                    enable_local_activities=self._activity_worker is not None and config["no_remote_activities"],
+                    enable_remote_activities=self._activity_worker is not None and not config["no_remote_activities"],
                     enable_nexus=self._nexus_worker is not None,
                 ),
                 sticky_queue_schedule_to_start_timeout_millis=int(
@@ -887,6 +896,7 @@ class WorkerConfig(TypedDict, total=False):
     max_concurrent_workflow_task_polls: Optional[int]
     nonsticky_to_sticky_poll_ratio: float
     max_concurrent_activity_task_polls: Optional[int]
+    no_remote_activities: bool
     sticky_queue_schedule_to_start_timeout: timedelta
     max_heartbeat_throttle_interval: timedelta
     default_heartbeat_throttle_interval: timedelta

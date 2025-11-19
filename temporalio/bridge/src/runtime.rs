@@ -144,7 +144,7 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
 
     // Create core runtime which starts tokio multi-thread runtime
     let mut core = CoreRuntime::new(runtime_options, TokioRuntimeBuilder::default())
-        .map_err(|err| PyRuntimeError::new_err(format!("Failed initializing telemetry: {err}")))?;
+        .map_err(|err| PyRuntimeError::new_err(format!("Failed initializing runtime: {err}")))?;
 
     // We late-bind the metrics after core runtime is created since it needs
     // the Tokio handle

@@ -7,8 +7,6 @@ from typing import AsyncGenerator, Iterator
 import pytest
 import pytest_asyncio
 
-import temporalio.worker
-
 from . import DEV_SERVER_DOWNLOAD_VERSION
 
 # If there is an integration test environment variable set, we must remove the
