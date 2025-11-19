@@ -1,5 +1,4 @@
-from .health_pb2 import HealthCheckRequest
-from .health_pb2 import HealthCheckResponse
+from .health_pb2 import HealthCheckRequest, HealthCheckResponse
 
 __all__ = [
     "HealthCheckRequest",

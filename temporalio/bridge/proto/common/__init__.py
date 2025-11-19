@@ -1,6 +1,8 @@
-from .common_pb2 import VersioningIntent
-from .common_pb2 import NamespacedWorkflowExecution
-from .common_pb2 import WorkerDeploymentVersion
+from .common_pb2 import (
+    NamespacedWorkflowExecution,
+    VersioningIntent,
+    WorkerDeploymentVersion,
+)
 
 __all__ = [
     "NamespacedWorkflowExecution",
