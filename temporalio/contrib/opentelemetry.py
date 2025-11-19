@@ -142,6 +142,9 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
     def intercept_nexus_operation(
         self, next: temporalio.worker.NexusOperationInboundInterceptor
     ) -> temporalio.worker.NexusOperationInboundInterceptor:
+        """Implementation of
+        :py:meth:`temporalio.worker.Interceptor.intercept_nexus_operation`.
+        """
         return _TracingNexusOperationInboundInterceptor(next, self)
 
     def _context_to_headers(
