@@ -5,10 +5,6 @@ from typing import Any, Callable, List, NoReturn, Optional, Tuple, Type
 
 import nexusrpc
 import pytest
-from nexusrpc.handler._common import (
-    StartOperationResultAsync,
-    StartOperationResultSync,
-)
 
 from temporalio import activity, nexus, workflow
 from temporalio.client import Client, WorkflowUpdateFailedError
@@ -19,25 +15,25 @@ from temporalio.worker import (
     ActivityOutboundInterceptor,
     ContinueAsNewInput,
     ExecuteActivityInput,
+    ExecuteNexusOperationCancelInput,
+    ExecuteNexusOperationStartInput,
     ExecuteWorkflowInput,
     HandleQueryInput,
     HandleSignalInput,
     HandleUpdateInput,
     Interceptor,
-    NexusOperationCancelInput,
     NexusOperationInboundInterceptor,
-    NexusOperationStartInput,
     SignalChildWorkflowInput,
     SignalExternalWorkflowInput,
     StartActivityInput,
     StartChildWorkflowInput,
     StartLocalActivityInput,
+    StartNexusOperationInput,
     Worker,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
-from temporalio.worker._interceptor import StartNexusOperationInput
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 interceptor_traces: List[Tuple[str, Any]] = []
@@ -147,19 +143,24 @@ class TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
 
 
 class TracingNexusInboundInterceptor(NexusOperationInboundInterceptor):
-    async def start_operation(
-        self, input: NexusOperationStartInput
-    ) -> StartOperationResultSync[Any] | StartOperationResultAsync:
+    async def execute_nexus_operation_start(
+        self, input: ExecuteNexusOperationStartInput
+    ) -> (
+        nexusrpc.handler.StartOperationResultSync[Any]
+        | nexusrpc.handler.StartOperationResultAsync
+    ):
         interceptor_traces.append(
             (f"nexus.start_operation.{input.ctx.service}.{input.ctx.operation}", input)
         )
-        return await super().start_operation(input)
+        return await super().execute_nexus_operation_start(input)
 
-    async def cancel_operation(self, input: NexusOperationCancelInput) -> None:
+    async def execute_nexus_operation_cancel(
+        self, input: ExecuteNexusOperationCancelInput
+    ) -> None:
         interceptor_traces.append(
             (f"nexus.cancel_operation.{input.ctx.service}.{input.ctx.operation}", input)
         )
-        return await super().cancel_operation(input)
+        return await super().execute_nexus_operation_cancel(input)
 
 
 @workflow.defn
