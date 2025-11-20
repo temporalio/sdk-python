@@ -295,11 +295,11 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
 
     endpoint: str
     service: str
-    operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]]
+    operation: nexusrpc.Operation[InputT, OutputT] | str | Callable[..., Any]
     input: InputT
     schedule_to_close_timeout: timedelta | None
     cancellation_type: temporalio.workflow.NexusOperationCancellationType
-    headers: Optional[Mapping[str, str]]
+    headers: Mapping[str, str] | None
     summary: str | None
     output_type: Type[OutputT] | None = None
 

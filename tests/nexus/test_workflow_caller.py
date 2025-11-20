@@ -24,7 +24,6 @@ import temporalio.api
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.history.v1
-from temporalio.converter import PayloadConverter
 import temporalio.nexus._operation_handlers
 from temporalio import nexus, workflow
 from temporalio.client import (
@@ -35,7 +34,8 @@ from temporalio.client import (
     WorkflowHandle,
 )
 from temporalio.common import WorkflowIDConflictPolicy
-from temporalio.exceptions import CancelledError, NexusOperationError, ApplicationError
+from temporalio.converter import PayloadConverter
+from temporalio.exceptions import ApplicationError, CancelledError, NexusOperationError
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
