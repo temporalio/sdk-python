@@ -396,9 +396,7 @@ class _TracingNexusOperationInboundInterceptor(
         with self._root._start_as_current_span(
             f"RunStartNexusOperationHandler:{input.ctx.service}/{input.ctx.operation}",
             context=self._context_from_nexus_headers(input.ctx.headers),
-            attributes={
-                "temporalNexusRequestId": input.ctx.request_id,
-            },
+            attributes={},
             input_with_ctx=input,
             kind=opentelemetry.trace.SpanKind.SERVER,
         ):
