@@ -1581,12 +1581,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self,
         endpoint: str,
         service: str,
-        operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]],
+        operation: nexusrpc.Operation[InputT, OutputT] | str | Callable[..., Any],
         input: Any,
-        output_type: Optional[Type[OutputT]],
-        schedule_to_close_timeout: Optional[timedelta],
+        output_type: Type[OutputT] | None,
+        schedule_to_close_timeout: timedelta | None,
         cancellation_type: temporalio.workflow.NexusOperationCancellationType,
-        headers: Optional[Mapping[str, str]],
+        headers: Mapping[str, str] | None,
+        summary: str | None,
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
         # start_nexus_operation
         return await self._outbound.start_nexus_operation(
@@ -1599,6 +1600,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 schedule_to_close_timeout=schedule_to_close_timeout,
                 cancellation_type=cancellation_type,
                 headers=headers,
+                summary=summary,
             )
         )
 
@@ -3329,6 +3331,11 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         if self._input.headers:
             for key, val in self._input.headers.items():
                 v.nexus_header[key] = val
+
+        if self._input.summary:
+            command.user_metadata.summary.CopyFrom(
+                self._payload_converter.to_payload(self._input.summary)
+            )
 
     def _apply_cancel_command(
         self,
