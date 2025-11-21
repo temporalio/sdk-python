@@ -171,6 +171,7 @@ fn call_${service_name}<'p>(
     py: Python<'p>,
     call: RpcCall,
   ) -> PyResult<Bound<'p, PyAny>> {
+    self.runtime.assert_same_process("use client")?;
     use temporal_client::${descriptor_name};
     let mut retry_client = self.retry_client.clone();
     self.runtime.future_into_py(py, async move {

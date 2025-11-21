@@ -129,12 +129,12 @@ def get_operation_factory(
 
     ``obj`` should be a decorated operation start method.
     """
-    op_defn = nexusrpc.get_operation_definition(obj)
+    op_defn = nexusrpc.get_operation(obj)
     if op_defn:
         factory = obj
     else:
         if factory := getattr(obj, "__nexus_operation_factory__", None):
-            op_defn = nexusrpc.get_operation_definition(factory)
+            op_defn = nexusrpc.get_operation(factory)
     if not isinstance(op_defn, nexusrpc.Operation):
         return None, None
     return factory, op_defn

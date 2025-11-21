@@ -1,7 +1,8 @@
 import asyncio
+import multiprocessing.context
 import os
 import sys
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Iterator
 
 import pytest
 import pytest_asyncio
@@ -131,6 +132,23 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
 
     yield env
     await env.shutdown()
+
+
+@pytest.fixture(scope="session")
+def mp_fork_ctx() -> Iterator[multiprocessing.context.BaseContext | None]:
+    mp_ctx = None
+    try:
+        mp_ctx = multiprocessing.get_context("fork")
+    except ValueError:
+        pass
+
+    try:
+        yield mp_ctx
+    finally:
+        if mp_ctx:
+            for p in mp_ctx.active_children():
+                p.terminate()
+                p.join()
 
 
 @pytest_asyncio.fixture
