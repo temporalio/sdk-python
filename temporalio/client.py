@@ -2088,7 +2088,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             )
         )
 
-    # Overload for no-param signal
+    # Overloads for no-param signal
     @overload
     async def signal(
         self,
@@ -2098,6 +2098,15 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         rpc_timeout: Optional[timedelta] = None,
     ) -> None: ...
 
+    @overload
+    async def signal(
+        self,
+        signal: Callable[SelfType, None],
+        *,
+        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
+        rpc_timeout: Optional[timedelta] = None,
+    ) -> None: ...
+    
     # Overload for single-param signal
     @overload
     async def signal(
