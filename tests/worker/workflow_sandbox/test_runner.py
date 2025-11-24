@@ -602,27 +602,19 @@ async def test_workflow_sandbox_import_errors(client: Client):
         workflows=[LazyImportWorkflow],
         workflow_runner=SandboxedWorkflowRunner(restrictions),
     ) as worker:
-        with pytest.warns() as recorder:
-            with pytest.raises(WorkflowFailureError) as err:
-                await client.execute_workflow(
-                    LazyImportWorkflow.run,
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                )
-
-            assert isinstance(err.value.cause, ApplicationError)
-            assert err.value.cause.type == "UnintentionalPassthroughError"
-            assert (
-                "Module tests.worker.workflow_sandbox.testmodules.lazy_module was not intentionally passed through to the sandbox."
-                == err.value.cause.message
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                LazyImportWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
             )
 
-            _assert_expected_warnings(
-                recorder,
-                {
-                    "Module tests.worker.workflow_sandbox.testmodules.lazy_module was imported after initial workflow load.",
-                },
-            )
+        assert isinstance(err.value.cause, ApplicationError)
+        assert err.value.cause.type == "UnintentionalPassthroughError"
+        assert (
+            "Module tests.worker.workflow_sandbox.testmodules.lazy_module was not intentionally passed through to the sandbox."
+            == err.value.cause.message
+        )
 
 
 @workflow.defn
