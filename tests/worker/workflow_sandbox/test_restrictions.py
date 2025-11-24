@@ -13,7 +13,6 @@ from temporalio.worker.workflow_sandbox._restrictions import (
     SandboxMatcher,
     SandboxRestrictions,
     _RestrictedProxy,
-    _stdlib_module_names,
 )
 
 
@@ -31,8 +30,8 @@ def test_workflow_sandbox_stdlib_module_names():
         code_lines[-1] += mod_name
     code = '_stdlib_module_names = (\n    "' + '"\n    "'.join(code_lines) + '"\n)'
     # TODO(cretz): Point releases may add modules :-(
-    assert (
-        actual_names == _stdlib_module_names
+    assert actual_names == ",".join(
+        sys.stdlib_module_names
     ), f"Expecting names as {actual_names}. In code as:\n{code}"
 
 

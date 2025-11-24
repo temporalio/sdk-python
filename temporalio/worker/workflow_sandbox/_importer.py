@@ -201,17 +201,6 @@ class Importer:
 
         # Check module restrictions and passthrough modules
         if full_name not in sys.modules:
-            # Issue a warning if appropriate
-            if (
-                self.restriction_context.in_activation
-                and self._is_import_notification_policy_applied(
-                    temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT
-                )
-            ):
-                warnings.warn(
-                    f"Module {full_name} was imported after initial workflow load."
-                )
-
             # Make sure not an entirely invalid module
             self._assert_valid_module(full_name)
 
@@ -237,6 +226,17 @@ class Importer:
                     setattr(sys.modules[parent], child, sys.modules[full_name])
                 # All children of this module that are on the original sys
                 # modules but not here and are passthrough
+            else:
+                # Issue a warning if appropriate
+                if (
+                    self.restriction_context.in_activation
+                    and self._is_import_notification_policy_applied(
+                        temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT
+                    )
+                ):
+                    warnings.warn(
+                        f"Module {full_name} was imported after initial workflow load."
+                    )
 
             # If the module is __temporal_main__ and not already in sys.modules,
             # we load it from whatever file __main__ was originally in
