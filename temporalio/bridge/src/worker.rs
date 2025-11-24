@@ -187,7 +187,8 @@ impl From<&WorkerTaskTypes> for temporalio_common::worker::WorkerTaskTypes {
     fn from(t: &WorkerTaskTypes) -> Self {
         Self {
             enable_workflows: t.enable_workflows,
-            enable_activities: t.enable_activities,
+            enable_local_activities: t.enable_local_activities,
+            enable_remote_activities: t.enable_remote_activities,
             enable_nexus: t.enable_nexus,
         }
     }

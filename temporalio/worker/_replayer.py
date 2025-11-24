@@ -273,7 +273,9 @@ class Replayer:
                         ),
                     ),
                     nonsticky_to_sticky_poll_ratio=1,
-                    task_types=temporalio.bridge.worker.WorkerTaskTypes(True, False, False, False),
+                    task_types=temporalio.bridge.worker.WorkerTaskTypes(
+                        True, False, False, False
+                    ),
                     sticky_queue_schedule_to_start_timeout_millis=1000,
                     max_heartbeat_throttle_interval_millis=1000,
                     default_heartbeat_throttle_interval_millis=1000,

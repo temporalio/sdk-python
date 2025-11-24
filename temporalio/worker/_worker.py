@@ -583,8 +583,9 @@ class Worker:
                 or not config["activities"],
                 task_types=temporalio.bridge.worker.WorkerTaskTypes(
                     enable_workflows=self._workflow_worker is not None,
-                    enable_local_activities=self._activity_worker is not None and config["no_remote_activities"],
-                    enable_remote_activities=self._activity_worker is not None and not config["no_remote_activities"],
+                    enable_local_activities=self._activity_worker is not None,
+                    enable_remote_activities=self._activity_worker is not None
+                    and not config["no_remote_activities"],
                     enable_nexus=self._nexus_worker is not None,
                 ),
                 sticky_queue_schedule_to_start_timeout_millis=int(
