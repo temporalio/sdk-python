@@ -583,7 +583,8 @@ class Worker:
                 or not config["activities"],
                 task_types=temporalio.bridge.worker.WorkerTaskTypes(
                     enable_workflows=self._workflow_worker is not None,
-                    enable_local_activities=self._activity_worker is not None,
+                    enable_local_activities=self._activity_worker is not None
+                    and self._workflow_worker is not None,
                     enable_remote_activities=self._activity_worker is not None
                     and not config["no_remote_activities"],
                     enable_nexus=self._nexus_worker is not None,
@@ -885,6 +886,7 @@ class WorkerConfig(TypedDict, total=False):
     nexus_task_executor: Optional[concurrent.futures.Executor]
     workflow_runner: WorkflowRunner
     unsandboxed_workflow_runner: WorkflowRunner
+    plugins: Sequence[Plugin]
     interceptors: Sequence[Interceptor]
     build_id: Optional[str]
     identity: Optional[str]
@@ -915,7 +917,6 @@ class WorkerConfig(TypedDict, total=False):
     workflow_task_poller_behavior: PollerBehavior
     activity_task_poller_behavior: PollerBehavior
     nexus_task_poller_behavior: PollerBehavior
-    plugins: Sequence[Plugin]
 
 
 def _warn_if_activity_executor_max_workers_is_inconsistent(

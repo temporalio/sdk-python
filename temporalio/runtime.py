@@ -131,7 +131,7 @@ class Runtime:
             telemetry: Telemetry configuration when not supplying
                 ``runtime_options``.
             worker_heartbeat_interval: Interval for worker heartbeats. ``None``
-                disables heartbeating.
+                disables heartbeating. Interval must be between 1s and 60s.
 
         Raises:
             ValueError: If both ```runtime_options`` is a negative value.
@@ -142,10 +142,6 @@ class Runtime:
             if worker_heartbeat_interval <= timedelta(0):
                 raise ValueError("worker_heartbeat_interval must be positive")
             heartbeat_millis = int(worker_heartbeat_interval.total_seconds() * 1000)
-            if heartbeat_millis == 0:
-                heartbeat_millis = 1
-
-        self._heartbeat_millis = heartbeat_millis
 
         runtime_options = temporalio.bridge.runtime.RuntimeOptions(
             telemetry=telemetry._to_bridge_config(),

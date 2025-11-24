@@ -675,6 +675,7 @@ impl WorkerRef {
     }
 
     fn replace_client(&self, client: &client::ClientRef) -> PyResult<()> {
+        enter_sync!(self.runtime);
         self.worker
             .as_ref()
             .expect("missing worker")
