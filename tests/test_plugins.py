@@ -152,9 +152,6 @@ async def test_worker_plugin_basic_config(client: Client) -> None:
     )
     task_queue = worker.config().get("task_queue")
     assert task_queue is not None and task_queue.startswith("replaced_queue")
-    assert [p.name() for p in worker.config().get("plugins", [])] == [
-        MyWorkerPlugin().name()
-    ]
 
     # Test client plugin propagation to worker plugins
     new_config = client.config()
@@ -165,9 +162,6 @@ async def test_worker_plugin_basic_config(client: Client) -> None:
     )
     task_queue = worker.config().get("task_queue")
     assert task_queue is not None and task_queue.startswith("combined")
-    assert [p.name() for p in worker.config().get("plugins", [])] == [
-        MyCombinedPlugin().name()
-    ]
 
     # Test both. Client propagated plugins are called first, so the worker plugin overrides in this case
     worker = Worker(
@@ -178,10 +172,6 @@ async def test_worker_plugin_basic_config(client: Client) -> None:
     )
     task_queue = worker.config().get("task_queue")
     assert task_queue is not None and task_queue.startswith("replaced_queue")
-    assert [p.name() for p in worker.config().get("plugins", [])] == [
-        MyCombinedPlugin().name(),
-        MyWorkerPlugin().name(),
-    ]
 
 
 async def test_worker_duplicated_plugin(client: Client) -> None:

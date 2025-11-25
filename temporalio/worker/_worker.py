@@ -376,7 +376,6 @@ class Worker:
                     f"The same plugin type {type(client_plugin)} is present from both client and worker. It may run twice and may not be the intended behavior."
                 )
         plugins = plugins_from_client + list(plugins)
-        config["plugins"] = plugins
 
         self.plugins = plugins
         for plugin in plugins:
@@ -557,7 +556,9 @@ class Worker:
             )
 
         worker_plugins = [plugin.name() for plugin in config.get("plugins", [])]
-        client_plugins = [plugin.name() for plugin in config["client"].plugins]
+        client_plugins = [
+            plugin.name() for plugin in config["client"].config()["plugins"]
+        ]
         plugins = list(set(worker_plugins + client_plugins))
 
         # Create bridge worker last. We have empirically observed that if it is
