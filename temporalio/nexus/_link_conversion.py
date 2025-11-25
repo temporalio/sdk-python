@@ -32,7 +32,7 @@ REQUEST_ID_REFERENCE_TYPE = "RequestIdReference"
 
 
 def workflow_execution_started_event_link_from_workflow_handle(
-    handle: temporalio.client.WorkflowHandle[Any, Any],
+    handle: temporalio.client.WorkflowHandle[Any, Any], request_id: str
 ) -> temporalio.api.common.v1.Link.WorkflowEvent:
     """Create a WorkflowEvent link corresponding to a started workflow"""
     if handle.first_execution_run_id is None:
@@ -40,15 +40,15 @@ def workflow_execution_started_event_link_from_workflow_handle(
             f"Workflow handle {handle} has no first execution run ID. "
             f"Cannot create WorkflowExecutionStarted event link."
         )
+
     return temporalio.api.common.v1.Link.WorkflowEvent(
         namespace=handle._client.namespace,
         workflow_id=handle.id,
         run_id=handle.first_execution_run_id,
-        event_ref=temporalio.api.common.v1.Link.WorkflowEvent.EventReference(
-            event_id=1,
+        request_id_ref=temporalio.api.common.v1.Link.WorkflowEvent.RequestIdReference(
+            request_id=request_id,
             event_type=temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED,
         ),
-        # TODO(nexus-preview): RequestIdReference
     )
 
 
@@ -66,14 +66,14 @@ def workflow_event_to_nexus_link(
     run_id = urllib.parse.quote(workflow_event.run_id)
     path = f"/namespaces/{namespace}/workflows/{workflow_id}/{run_id}/history"
 
-    if workflow_event.HasField("event_ref"):
-        query_params = _event_reference_to_query_params(workflow_event.event_ref)
-    elif workflow_event.HasField("request_id_ref"):
-        query_params = _request_id_reference_to_query_params(
-            workflow_event.request_id_ref
-        )
-    else:
-        query_params = None
+    query_params = None
+    match workflow_event.WhichOneof("reference"):
+        case "event_ref":
+            query_params = _event_reference_to_query_params(workflow_event.event_ref)
+        case "request_id_ref":
+            query_params = _request_id_reference_to_query_params(
+                workflow_event.request_id_ref
+            )
 
     # urllib will omit '//' from the url if netloc is empty so we add the scheme manually
     url = f"{scheme}://{urllib.parse.urlunparse(('', '', path, '', query_params, ''))}"
@@ -102,13 +102,12 @@ def nexus_link_to_workflow_event(
     try:
         query_params = urllib.parse.parse_qs(url.query)
 
+        request_id_ref = None
+        event_ref = None
         match query_params.get(LINK_REFERENCE_TYPE_PARAM_NAME):
             case ["EventReference"]:
-                print("event reference")
                 event_ref = _query_params_to_event_reference(query_params)
-                request_id_ref = None
             case ["RequestIdReference"]:
-                event_ref = None
                 request_id_ref = _query_params_to_request_id_reference(query_params)
             case _:
                 raise ValueError(
@@ -172,7 +171,6 @@ def _query_params_to_event_reference(
     query_params: dict[str, list[str]],
 ) -> temporalio.api.common.v1.Link.WorkflowEvent.EventReference:
     """Return an EventReference from the query params or raise ValueError."""
-
     [reference_type] = query_params.get(LINK_REFERENCE_TYPE_PARAM_NAME) or [""]
     if reference_type != EVENT_REFERENCE_TYPE:
         raise ValueError(
@@ -214,7 +212,6 @@ def _query_params_to_request_id_reference(
     query_params: dict[str, list[str]],
 ) -> temporalio.api.common.v1.Link.WorkflowEvent.RequestIdReference:
     """Return an EventReference from the query params or raise ValueError."""
-
     # event type
     match query_params.get(LINK_EVENT_TYPE_PARAM_NAME):
         case None:
