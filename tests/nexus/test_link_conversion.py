@@ -174,7 +174,7 @@ def test_request_id_reference_to_query_params(
         ),
     ],
 )
-def test_link_conversion_worfklow_event_to_link_and_back(
+def test_link_conversion_workflow_event_to_link_and_back(
     event: temporalio.api.common.v1.Link.WorkflowEvent, expected_link: nexusrpc.Link
 ):
     actual_link = temporalio.nexus._link_conversion.workflow_event_to_nexus_link(event)
