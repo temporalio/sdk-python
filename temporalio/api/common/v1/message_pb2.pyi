@@ -937,7 +937,7 @@ class Priority(google.protobuf.message.Message):
     configuration, and defaults to 5.
 
     If priority is not present (or zero), then the effective priority will be
-    the default priority, which is is calculated by (min+max)/2. With the
+    the default priority, which is calculated by (min+max)/2. With the
     default max of 5, and min of 1, that comes out to 3.
     """
     fairness_key: builtins.str

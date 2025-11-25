@@ -7,6 +7,8 @@ from datetime import timedelta
 from typing import List, cast
 from urllib.request import urlopen
 
+import pytest
+
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.runtime import (
@@ -16,9 +18,15 @@ from temporalio.runtime import (
     Runtime,
     TelemetryConfig,
     TelemetryFilter,
+    _RuntimeRef,
 )
 from temporalio.worker import Worker
-from tests.helpers import assert_eq_eventually, assert_eventually, find_free_port
+from tests.helpers import (
+    assert_eq_eventually,
+    assert_eventually,
+    find_free_port,
+    worker_versioning_enabled,
+)
 
 
 @workflow.defn
@@ -181,7 +189,9 @@ async def test_runtime_task_fail_log_forwarding(client: Client):
     # Check record
     record = next((l for l in log_queue_list if "Failing workflow task" in l.message))
     assert record.levelno == logging.WARNING
-    assert record.name == f"{logger.name}-sdk_core::temporal_sdk_core::worker::workflow"
+    assert (
+        record.name == f"{logger.name}-sdk_core::temporalio_sdk_core::worker::workflow"
+    )
     assert record.temporal_log.fields["run_id"] == handle.result_run_id  # type: ignore
 
 
@@ -254,3 +264,60 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
 
     # Wait for metrics to appear and match the expected buckets
     await assert_eventually(check_metrics)
+
+
+def test_runtime_options_invalid_heartbeat() -> None:
+    with pytest.raises(ValueError):
+        Runtime(
+            telemetry=TelemetryConfig(), worker_heartbeat_interval=timedelta(seconds=-5)
+        )
+
+
+def test_runtime_ref_creates_default():
+    ref = _RuntimeRef()
+    assert not ref._default_runtime
+    ref.default()
+    assert ref._default_runtime
+
+
+def test_runtime_ref_prevents_default():
+    ref = _RuntimeRef()
+    ref.prevent_default()
+    with pytest.raises(RuntimeError) as exc_info:
+        ref.default()
+    assert exc_info.match(
+        "Cannot create default Runtime after Runtime.prevent_default has been called"
+    )
+
+    # explicitly setting a default runtime will allow future calls to `default()``
+    explicit_runtime = Runtime(telemetry=TelemetryConfig())
+    ref.set_default(explicit_runtime)
+
+    assert ref.default() is explicit_runtime
+
+
+def test_runtime_ref_prevent_default_errors_after_default():
+    ref = _RuntimeRef()
+    ref.default()
+    with pytest.raises(RuntimeError) as exc_info:
+        ref.prevent_default()
+
+    assert exc_info.match(
+        "Runtime.prevent_default called after default runtime has been created"
+    )
+
+
+def test_runtime_ref_set_default():
+    ref = _RuntimeRef()
+    explicit_runtime = Runtime(telemetry=TelemetryConfig())
+    ref.set_default(explicit_runtime)
+    assert ref.default() is explicit_runtime
+
+    new_runtime = Runtime(telemetry=TelemetryConfig())
+
+    with pytest.raises(RuntimeError) as exc_info:
+        ref.set_default(new_runtime)
+    assert exc_info.match("Runtime default already set")
+
+    ref.set_default(new_runtime, error_if_already_set=False)
+    assert ref.default() is new_runtime

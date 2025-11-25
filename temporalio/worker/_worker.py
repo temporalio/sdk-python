@@ -555,6 +555,8 @@ class Worker:
                 maximum=config["max_concurrent_activity_task_polls"]
             )
 
+        deduped_plugin_names = list(set([plugin.name() for plugin in self._plugins]))
+
         # Create bridge worker last. We have empirically observed that if it is
         # created before an error is raised from the activity worker
         # constructor, a deadlock/hang will occur presumably while trying to
@@ -576,6 +578,14 @@ class Worker:
                 # will not proceed properly.
                 no_remote_activities=config["no_remote_activities"]
                 or not config["activities"],
+                task_types=temporalio.bridge.worker.WorkerTaskTypes(
+                    enable_workflows=self._workflow_worker is not None,
+                    enable_local_activities=self._activity_worker is not None
+                    and self._workflow_worker is not None,
+                    enable_remote_activities=self._activity_worker is not None
+                    and not config["no_remote_activities"],
+                    enable_nexus=self._nexus_worker is not None,
+                ),
                 sticky_queue_schedule_to_start_timeout_millis=int(
                     1000
                     * config["sticky_queue_schedule_to_start_timeout"].total_seconds()
@@ -609,6 +619,7 @@ class Worker:
                 nexus_task_poller_behavior=config[
                     "nexus_task_poller_behavior"
                 ]._to_bridge(),
+                plugins=deduped_plugin_names,
             ),
         )
 
@@ -876,6 +887,7 @@ class WorkerConfig(TypedDict, total=False):
     nexus_task_executor: Optional[concurrent.futures.Executor]
     workflow_runner: WorkflowRunner
     unsandboxed_workflow_runner: WorkflowRunner
+    plugins: Sequence[Plugin]
     interceptors: Sequence[Interceptor]
     build_id: Optional[str]
     identity: Optional[str]

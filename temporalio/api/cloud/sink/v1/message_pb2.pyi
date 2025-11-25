@@ -99,3 +99,69 @@ class GCSSpec(google.protobuf.message.Message):
     ) -> None: ...
 
 global___GCSSpec = GCSSpec
+
+class KinesisSpec(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ROLE_NAME_FIELD_NUMBER: builtins.int
+    DESTINATION_URI_FIELD_NUMBER: builtins.int
+    REGION_FIELD_NUMBER: builtins.int
+    role_name: builtins.str
+    """The role Temporal Cloud assumes when writing records to Kinesis"""
+    destination_uri: builtins.str
+    """Destination Kinesis endpoint arn for temporal to send data to."""
+    region: builtins.str
+    """The sink's region."""
+    def __init__(
+        self,
+        *,
+        role_name: builtins.str = ...,
+        destination_uri: builtins.str = ...,
+        region: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "destination_uri",
+            b"destination_uri",
+            "region",
+            b"region",
+            "role_name",
+            b"role_name",
+        ],
+    ) -> None: ...
+
+global___KinesisSpec = KinesisSpec
+
+class PubSubSpec(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SERVICE_ACCOUNT_ID_FIELD_NUMBER: builtins.int
+    TOPIC_NAME_FIELD_NUMBER: builtins.int
+    GCP_PROJECT_ID_FIELD_NUMBER: builtins.int
+    service_account_id: builtins.str
+    """The customer service account id that Temporal Cloud impersonates for writing records to customer's pubsub topic"""
+    topic_name: builtins.str
+    """Destination pubsub topic name for us"""
+    gcp_project_id: builtins.str
+    """The gcp project id of pubsub topic and service account"""
+    def __init__(
+        self,
+        *,
+        service_account_id: builtins.str = ...,
+        topic_name: builtins.str = ...,
+        gcp_project_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "gcp_project_id",
+            b"gcp_project_id",
+            "service_account_id",
+            b"service_account_id",
+            "topic_name",
+            b"topic_name",
+        ],
+    ) -> None: ...
+
+global___PubSubSpec = PubSubSpec

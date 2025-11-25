@@ -15,7 +15,8 @@ impl ClientRef {
         py: Python<'p>,
         call: RpcCall,
     ) -> PyResult<Bound<'p, PyAny>> {
-        use temporal_client::WorkflowService;
+        self.runtime.assert_same_process("use client")?;
+        use temporalio_client::WorkflowService;
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
@@ -85,6 +86,9 @@ impl ClientRef {
                 }
                 "describe_task_queue" => {
                     rpc_call!(retry_client, call, WorkflowService, describe_task_queue)
+                }
+                "describe_worker" => {
+                    rpc_call!(retry_client, call, WorkflowService, describe_worker)
                 }
                 "describe_worker_deployment" => {
                     rpc_call!(
@@ -435,6 +439,14 @@ impl ClientRef {
                         set_worker_deployment_current_version
                     )
                 }
+                "set_worker_deployment_manager" => {
+                    rpc_call!(
+                        retry_client,
+                        call,
+                        WorkflowService,
+                        set_worker_deployment_manager
+                    )
+                }
                 "set_worker_deployment_ramping_version" => {
                     rpc_call!(
                         retry_client,
@@ -566,7 +578,8 @@ impl ClientRef {
         py: Python<'p>,
         call: RpcCall,
     ) -> PyResult<Bound<'p, PyAny>> {
-        use temporal_client::OperatorService;
+        self.runtime.assert_same_process("use client")?;
+        use temporalio_client::OperatorService;
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
@@ -628,7 +641,8 @@ impl ClientRef {
     }
 
     fn call_cloud_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<Bound<'p, PyAny>> {
-        use temporal_client::CloudService;
+        self.runtime.assert_same_process("use client")?;
+        use temporalio_client::CloudService;
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
@@ -779,6 +793,14 @@ impl ClientRef {
                         rename_custom_search_attribute
                     )
                 }
+                "set_service_account_namespace_access" => {
+                    rpc_call!(
+                        retry_client,
+                        call,
+                        CloudService,
+                        set_service_account_namespace_access
+                    )
+                }
                 "set_user_group_namespace_access" => {
                     rpc_call!(
                         retry_client,
@@ -822,6 +844,14 @@ impl ClientRef {
                 "update_user_group" => {
                     rpc_call!(retry_client, call, CloudService, update_user_group)
                 }
+                "validate_account_audit_log_sink" => {
+                    rpc_call!(
+                        retry_client,
+                        call,
+                        CloudService,
+                        validate_account_audit_log_sink
+                    )
+                }
                 "validate_namespace_export_sink" => {
                     rpc_call!(
                         retry_client,
@@ -842,7 +872,8 @@ impl ClientRef {
     }
 
     fn call_test_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<Bound<'p, PyAny>> {
-        use temporal_client::TestService;
+        self.runtime.assert_same_process("use client")?;
+        use temporalio_client::TestService;
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
@@ -881,7 +912,8 @@ impl ClientRef {
     }
 
     fn call_health_service<'p>(&self, py: Python<'p>, call: RpcCall) -> PyResult<Bound<'p, PyAny>> {
-        use temporal_client::HealthService;
+        self.runtime.assert_same_process("use client")?;
+        use temporalio_client::HealthService;
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {

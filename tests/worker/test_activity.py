@@ -1589,3 +1589,40 @@ async def test_activity_reset_history(
         e.value.cause.cause.message
         == "Unhandled activity cancel error produced by activity reset"
     )
+
+
+@activity.defn
+async def local_activity_for_no_remote_test(name: str) -> str:
+    assert activity.info().is_local
+    return f"Hello from local activity, {name}!"
+
+
+@workflow.defn(sandboxed=False)
+class LocalActivityWithNoRemoteActivitiesWorkflow:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        return await workflow.execute_local_activity(
+            local_activity_for_no_remote_test,
+            name,
+            schedule_to_close_timeout=timedelta(seconds=5),
+        )
+
+
+async def test_local_activities_with_no_remote_activities_option(client: Client):
+    task_queue = f"tq-{uuid.uuid4()}"
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        activities=[local_activity_for_no_remote_test],
+        workflows=[LocalActivityWithNoRemoteActivitiesWorkflow],
+        no_remote_activities=True,
+    ):
+        result = await client.execute_workflow(
+            LocalActivityWithNoRemoteActivitiesWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+
+        assert result == "Hello from local activity, Temporal!"

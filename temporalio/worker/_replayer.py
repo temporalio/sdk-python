@@ -279,6 +279,12 @@ class Replayer:
                     ),
                     nonsticky_to_sticky_poll_ratio=1,
                     no_remote_activities=True,
+                    task_types=temporalio.bridge.worker.WorkerTaskTypes(
+                        enable_workflows=True,
+                        enable_local_activities=False,
+                        enable_remote_activities=False,
+                        enable_nexus=False,
+                    ),
                     sticky_queue_schedule_to_start_timeout_millis=1000,
                     max_heartbeat_throttle_interval_millis=1000,
                     default_heartbeat_throttle_interval_millis=1000,
@@ -298,6 +304,7 @@ class Replayer:
                     nexus_task_poller_behavior=temporalio.bridge.worker.PollerBehaviorSimpleMaximum(
                         1
                     ),
+                    plugins=[plugin.name() for plugin in self.plugins],
                 ),
             )
             # Start worker

@@ -11,8 +11,6 @@ import nexusrpc.handler
 import pytest
 from nexusrpc.handler import (
     CancelOperationContext,
-    FetchOperationInfoContext,
-    FetchOperationResultContext,
     OperationHandler,
     StartOperationContext,
     StartOperationResultAsync,
@@ -36,10 +34,8 @@ from temporalio.client import (
     WorkflowHandle,
 )
 from temporalio.common import WorkflowIDConflictPolicy
-from temporalio.exceptions import (
-    CancelledError,
-    NexusOperationError,
-)
+from temporalio.converter import PayloadConverter
+from temporalio.exceptions import ApplicationError, CancelledError, NexusOperationError
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
@@ -174,16 +170,6 @@ class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
         return await temporalio.nexus._operation_handlers._cancel_workflow(token)
 
-    async def fetch_info(
-        self, ctx: FetchOperationInfoContext, token: str
-    ) -> nexusrpc.OperationInfo:
-        raise NotImplementedError
-
-    async def fetch_result(
-        self, ctx: FetchOperationResultContext, token: str
-    ) -> OpOutput:
-        raise NotImplementedError
-
 
 @service_handler(service=ServiceInterface)
 class ServiceImpl:
@@ -253,12 +239,14 @@ class CallerWorkflow:
         request_cancel: bool,
         task_queue: str,
     ) -> None:
-        self.nexus_client = workflow.create_nexus_client(
-            service={
-                CallerReference.IMPL_WITH_INTERFACE: ServiceImpl,
-                CallerReference.INTERFACE: ServiceInterface,
-            }[input.op_input.caller_reference],
-            endpoint=make_nexus_endpoint_name(task_queue),
+        self.nexus_client: workflow.NexusClient[ServiceInterface] = (
+            workflow.create_nexus_client(
+                service={
+                    CallerReference.IMPL_WITH_INTERFACE: ServiceImpl,
+                    CallerReference.INTERFACE: ServiceInterface,
+                }[input.op_input.caller_reference],
+                endpoint=make_nexus_endpoint_name(task_queue),
+            )
         )
         self._nexus_operation_start_resolved = False
         self._proceed = False
@@ -1069,6 +1057,73 @@ async def test_workflow_run_operation_can_execute_workflow_before_starting_backi
             task_queue=task_queue,
         )
         assert result == "result-1-result-2"
+
+
+@service_handler
+class SimpleSyncService:
+    @sync_operation
+    async def sync_op(self, ctx: StartOperationContext, input: str) -> str:
+        return input
+
+
+@workflow.defn
+class ExecuteNexusOperationWithSummaryWorkflow:
+    @workflow.run
+    async def run(self, input: str, task_queue: str) -> str:
+        nexus_client = workflow.create_nexus_client(
+            service=SimpleSyncService,
+            endpoint=make_nexus_endpoint_name(task_queue),
+        )
+
+        op_result = await nexus_client.execute_operation(
+            SimpleSyncService.sync_op, input, summary="nexus operation summary"
+        )
+
+        if op_result != input:
+            raise ApplicationError("expected nexus operation to echo input")
+
+        return op_result
+
+
+async def test_nexus_operation_summary(
+    client: Client,
+    env: WorkflowEnvironment,
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    task_queue = f"task-queue-{uuid.uuid4()}"
+    async with Worker(
+        client,
+        workflows=[ExecuteNexusOperationWithSummaryWorkflow],
+        nexus_service_handlers=[
+            SimpleSyncService(),
+        ],
+        task_queue=task_queue,
+    ):
+        await create_nexus_endpoint(task_queue, client)
+        wf_id = f"wf-{uuid.uuid4()}"
+        handle = await client.start_workflow(
+            ExecuteNexusOperationWithSummaryWorkflow.run,
+            args=("success", task_queue),
+            id=wf_id,
+            task_queue=task_queue,
+        )
+        result = await handle.result()
+        assert result == "success"
+
+        history = await handle.fetch_history()
+
+        nexus_events = [
+            event
+            for event in history.events
+            if event.HasField("nexus_operation_scheduled_event_attributes")
+        ]
+        assert len(nexus_events) == 1
+        summary_value = PayloadConverter.default.from_payload(
+            nexus_events[0].user_metadata.summary
+        )
+        assert summary_value == "nexus operation summary"
 
 
 # TODO(nexus-prerelease): test invalid service interface implementations

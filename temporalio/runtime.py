@@ -24,22 +24,61 @@ import temporalio.bridge.metric
 import temporalio.bridge.runtime
 import temporalio.common
 
-_default_runtime: Optional[Runtime] = None
+
+class _RuntimeRef:
+    def __init__(
+        self,
+    ) -> None:
+        self._default_runtime: Runtime | None = None
+        self._prevent_default = False
+
+    def default(self) -> Runtime:
+        if not self._default_runtime:
+            if self._prevent_default:
+                raise RuntimeError(
+                    "Cannot create default Runtime after Runtime.prevent_default has been called"
+                )
+            self._default_runtime = Runtime(telemetry=TelemetryConfig())
+            self._default_created = True
+        return self._default_runtime
+
+    def prevent_default(self):
+        if self._default_runtime:
+            raise RuntimeError(
+                "Runtime.prevent_default called after default runtime has been created or set"
+            )
+        self._prevent_default = True
+
+    def set_default(
+        self, runtime: Runtime, *, error_if_already_set: bool = True
+    ) -> None:
+        if self._default_runtime and error_if_already_set:
+            raise RuntimeError("Runtime default already set")
+
+        self._default_runtime = runtime
+
+
+_runtime_ref: _RuntimeRef = _RuntimeRef()
 
 
 class Runtime:
     """Runtime for Temporal Python SDK.
 
-    Users are encouraged to use :py:meth:`default`. It can be set with
+    Most users are encouraged to use :py:meth:`default`. It can be set with
     :py:meth:`set_default`. Every time a new runtime is created, a new internal
     thread pool is created.
 
-    Runtimes do not work across forks.
+    Runtimes do not work across forks. Advanced users should consider using
+    :py:meth:`prevent_default` and `:py:meth`set_default` to ensure each
+    fork creates it's own runtime.
+
     """
 
     @classmethod
     def default(cls) -> Runtime:
-        """Get the default runtime, creating if not already created.
+        """Get the default runtime, creating if not already created. If :py:meth:`prevent_default`
+        is called before this method it will raise a RuntimeError instead of creating a default
+        runtime.
 
         If the default runtime needs to be different, it should be done with
         :py:meth:`set_default` before this is called or ever used.
@@ -47,10 +86,20 @@ class Runtime:
         Returns:
             The default runtime.
         """
-        global _default_runtime
-        if not _default_runtime:
-            _default_runtime = cls(telemetry=TelemetryConfig())
-        return _default_runtime
+        global _runtime_ref
+        return _runtime_ref.default()
+
+    @classmethod
+    def prevent_default(cls):
+        """Prevent :py:meth:`default` from lazily creating a :py:class:`Runtime`.
+
+        Raises a RuntimeError if a default :py:class:`Runtime` has already been created.
+
+        Explicitly setting a default runtime with :py:meth:`set_default` bypasses this setting and
+        future calls to :py:meth:`default` will return the provided runtime.
+        """
+        global _runtime_ref
+        _runtime_ref.prevent_default()
 
     @staticmethod
     def set_default(runtime: Runtime, *, error_if_already_set: bool = True) -> None:
@@ -65,19 +114,41 @@ class Runtime:
             error_if_already_set: If True and default is already set, this will
                 raise a RuntimeError.
         """
-        global _default_runtime
-        if _default_runtime and error_if_already_set:
-            raise RuntimeError("Runtime default already set")
-        _default_runtime = runtime
+        global _runtime_ref
+        _runtime_ref.set_default(runtime, error_if_already_set=error_if_already_set)
 
-    def __init__(self, *, telemetry: TelemetryConfig) -> None:
-        """Create a default runtime with the given telemetry config.
+    def __init__(
+        self,
+        *,
+        telemetry: TelemetryConfig,
+        worker_heartbeat_interval: Optional[timedelta] = timedelta(seconds=60),
+    ) -> None:
+        """Create a runtime with the provided configuration.
 
         Each new runtime creates a new internal thread pool, so use sparingly.
+
+        Args:
+            telemetry: Telemetry configuration when not supplying
+                ``runtime_options``.
+            worker_heartbeat_interval: Interval for worker heartbeats. ``None``
+                disables heartbeating. Interval must be between 1s and 60s.
+
+        Raises:
+            ValueError: If both ```runtime_options`` is a negative value.
         """
-        self._core_runtime = temporalio.bridge.runtime.Runtime(
-            telemetry=telemetry._to_bridge_config()
+        if worker_heartbeat_interval is None:
+            heartbeat_millis = None
+        else:
+            if worker_heartbeat_interval <= timedelta(0):
+                raise ValueError("worker_heartbeat_interval must be positive")
+            heartbeat_millis = int(worker_heartbeat_interval.total_seconds() * 1000)
+
+        runtime_options = temporalio.bridge.runtime.RuntimeOptions(
+            telemetry=telemetry._to_bridge_config(),
+            worker_heartbeat_interval_millis=heartbeat_millis,
         )
+
+        self._core_runtime = temporalio.bridge.runtime.Runtime(options=runtime_options)
         if isinstance(telemetry.metrics, MetricBuffer):
             telemetry.metrics._runtime = self
         core_meter = temporalio.bridge.metric.MetricMeter.create(self._core_runtime)
@@ -112,7 +183,15 @@ class TelemetryFilter:
         """Return a formatted form of this filter."""
         # We intentionally aren't using __str__ or __format__ so they can keep
         # their original dataclass impls
-        return f"{self.other_level},temporal_sdk_core={self.core_level},temporal_client={self.core_level},temporal_sdk={self.core_level}"
+        targets = [
+            "temporalio_sdk_core",
+            "temporalio_client",
+            "temporalio_sdk",
+            "temporal_sdk_bridge",
+        ]
+        parts = [self.other_level]
+        parts.extend(f"{target}={self.core_level}" for target in targets)
+        return ",".join(parts)
 
 
 @dataclass(frozen=True)
