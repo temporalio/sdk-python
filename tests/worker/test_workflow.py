@@ -5221,7 +5221,8 @@ async def test_workflow_replace_worker_client(client: Client, env: WorkflowEnvir
     # poller to force a quick re-poll to recognize our client change quickly (as
     # opposed to just waiting the minute for poll timeout).
     async with await WorkflowEnvironment.start_local(
-        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION
+        runtime=client.service_client.config.runtime,
+        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
     ) as other_env:
         # Start both workflows on different servers
         task_queue = f"tq-{uuid.uuid4()}"
@@ -5250,17 +5251,29 @@ async def test_workflow_replace_worker_client(client: Client, env: WorkflowEnvir
             # the second
             await assert_eq_eventually(True, lambda: any_task_completed(handle1))
             assert not await any_task_completed(handle2)
-
             # Now replace the client, which should be used fairly quickly
             # because we should have timer-done poll completions every 100ms
             worker.client = other_env.client
-
             # Now confirm the other workflow has started
             await assert_eq_eventually(True, lambda: any_task_completed(handle2))
-
             # Terminate both
             await handle1.terminate()
             await handle2.terminate()
+
+
+async def test_workflow_replace_worker_client_diff_runtimes_fail(client: Client):
+    other_runtime = Runtime(telemetry=TelemetryConfig())
+    other_client = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        runtime=other_runtime,
+    )
+    async with new_worker(client, HelloWorkflow) as worker:
+        with pytest.raises(
+            ValueError,
+            match="New client is not on the same runtime as the existing client",
+        ):
+            worker.client = other_client
 
 
 @activity.defn(dynamic=True)

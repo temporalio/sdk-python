@@ -549,6 +549,7 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     VERSIONING_OVERRIDE_FIELD_NUMBER: builtins.int
     ON_CONFLICT_OPTIONS_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    EAGER_WORKER_DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     workflow_id: builtins.str
     @property
@@ -665,6 +666,11 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """Priority metadata"""
+    @property
+    def eager_worker_deployment_options(
+        self,
+    ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
+        """Deployment Options of the worker who will process the eager task. Passed when `request_eager_execution=true`."""
     def __init__(
         self,
         *,
@@ -704,12 +710,16 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
         on_conflict_options: temporalio.api.workflow.v1.message_pb2.OnConflictOptions
         | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        eager_worker_deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "continued_failure",
             b"continued_failure",
+            "eager_worker_deployment_options",
+            b"eager_worker_deployment_options",
             "header",
             b"header",
             "input",
@@ -753,6 +763,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"continued_failure",
             "cron_schedule",
             b"cron_schedule",
+            "eager_worker_deployment_options",
+            b"eager_worker_deployment_options",
             "header",
             b"header",
             "identity",
@@ -4820,6 +4832,8 @@ class GetClusterInfoResponse(google.protobuf.message.Message):
     HISTORY_SHARD_COUNT_FIELD_NUMBER: builtins.int
     PERSISTENCE_STORE_FIELD_NUMBER: builtins.int
     VISIBILITY_STORE_FIELD_NUMBER: builtins.int
+    INITIAL_FAILOVER_VERSION_FIELD_NUMBER: builtins.int
+    FAILOVER_VERSION_INCREMENT_FIELD_NUMBER: builtins.int
     @property
     def supported_clients(
         self,
@@ -4835,6 +4849,8 @@ class GetClusterInfoResponse(google.protobuf.message.Message):
     history_shard_count: builtins.int
     persistence_store: builtins.str
     visibility_store: builtins.str
+    initial_failover_version: builtins.int
+    failover_version_increment: builtins.int
     def __init__(
         self,
         *,
@@ -4847,6 +4863,8 @@ class GetClusterInfoResponse(google.protobuf.message.Message):
         history_shard_count: builtins.int = ...,
         persistence_store: builtins.str = ...,
         visibility_store: builtins.str = ...,
+        initial_failover_version: builtins.int = ...,
+        failover_version_increment: builtins.int = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["version_info", b"version_info"]
@@ -4858,8 +4876,12 @@ class GetClusterInfoResponse(google.protobuf.message.Message):
             b"cluster_id",
             "cluster_name",
             b"cluster_name",
+            "failover_version_increment",
+            b"failover_version_increment",
             "history_shard_count",
             b"history_shard_count",
+            "initial_failover_version",
+            b"initial_failover_version",
             "persistence_store",
             b"persistence_store",
             "server_version",
@@ -7641,7 +7663,9 @@ class PauseActivityRequest(google.protobuf.message.Message):
     id: builtins.str
     """Only the activity with this ID will be paused."""
     type: builtins.str
-    """Pause all running activities of this type."""
+    """Pause all running activities of this type.
+    Note: Experimental - the behavior of pause by activity type might change in a future release.
+    """
     reason: builtins.str
     """Reason to pause the activity."""
     def __init__(
@@ -8487,6 +8511,7 @@ class SetWorkerDeploymentCurrentVersionRequest(google.protobuf.message.Message):
     CONFLICT_TOKEN_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     IGNORE_MISSING_TASK_QUEUES_FIELD_NUMBER: builtins.int
+    ALLOW_NO_POLLERS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     deployment_name: builtins.str
     version: builtins.str
@@ -8519,6 +8544,11 @@ class SetWorkerDeploymentCurrentVersionRequest(google.protobuf.message.Message):
     pollers have not reached to the server yet. Only set this if you expect those pollers to
     never arrive.
     """
+    allow_no_pollers: builtins.bool
+    """Optional. By default this request will be rejected if no pollers have been seen for the proposed
+    Current Version, in order to protect users from routing tasks to pollers that do not exist, leading
+    to possible timeouts. Pass `true` here to bypass this protection.
+    """
     def __init__(
         self,
         *,
@@ -8529,10 +8559,13 @@ class SetWorkerDeploymentCurrentVersionRequest(google.protobuf.message.Message):
         conflict_token: builtins.bytes = ...,
         identity: builtins.str = ...,
         ignore_missing_task_queues: builtins.bool = ...,
+        allow_no_pollers: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "allow_no_pollers",
+            b"allow_no_pollers",
             "build_id",
             b"build_id",
             "conflict_token",
@@ -8615,6 +8648,7 @@ class SetWorkerDeploymentRampingVersionRequest(google.protobuf.message.Message):
     CONFLICT_TOKEN_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     IGNORE_MISSING_TASK_QUEUES_FIELD_NUMBER: builtins.int
+    ALLOW_NO_POLLERS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     deployment_name: builtins.str
     version: builtins.str
@@ -8652,6 +8686,11 @@ class SetWorkerDeploymentRampingVersionRequest(google.protobuf.message.Message):
     that the percentage changes. Also note that the check is against the deployment's Current
     Version, not the previous Ramping Version.
     """
+    allow_no_pollers: builtins.bool
+    """Optional. By default this request will be rejected if no pollers have been seen for the proposed
+    Current Version, in order to protect users from routing tasks to pollers that do not exist, leading
+    to possible timeouts. Pass `true` here to bypass this protection.
+    """
     def __init__(
         self,
         *,
@@ -8663,10 +8702,13 @@ class SetWorkerDeploymentRampingVersionRequest(google.protobuf.message.Message):
         conflict_token: builtins.bytes = ...,
         identity: builtins.str = ...,
         ignore_missing_task_queues: builtins.bool = ...,
+        allow_no_pollers: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "allow_no_pollers",
+            b"allow_no_pollers",
             "build_id",
             b"build_id",
             "conflict_token",
@@ -9125,6 +9167,113 @@ class UpdateWorkerDeploymentVersionMetadataResponse(google.protobuf.message.Mess
 global___UpdateWorkerDeploymentVersionMetadataResponse = (
     UpdateWorkerDeploymentVersionMetadataResponse
 )
+
+class SetWorkerDeploymentManagerRequest(google.protobuf.message.Message):
+    """Update the ManagerIdentity of a Worker Deployment."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    DEPLOYMENT_NAME_FIELD_NUMBER: builtins.int
+    MANAGER_IDENTITY_FIELD_NUMBER: builtins.int
+    SELF_FIELD_NUMBER: builtins.int
+    CONFLICT_TOKEN_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    deployment_name: builtins.str
+    manager_identity: builtins.str
+    """Arbitrary value for `manager_identity`.
+    Empty will unset the field.
+    """
+    self: builtins.bool
+    """True will set `manager_identity` to `identity`."""
+    conflict_token: builtins.bytes
+    """Optional. This can be the value of conflict_token from a Describe, or another Worker
+    Deployment API. Passing a non-nil conflict token will cause this request to fail if the
+    Deployment's configuration has been modified between the API call that generated the
+    token and this one.
+    """
+    identity: builtins.str
+    """Required. The identity of the client who initiated this request."""
+    def __init__(
+        # pyright: reportSelfClsParameterName=false
+        self_,
+        *,
+        namespace: builtins.str = ...,
+        deployment_name: builtins.str = ...,
+        manager_identity: builtins.str = ...,
+        self: builtins.bool = ...,
+        conflict_token: builtins.bytes = ...,
+        identity: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "manager_identity",
+            b"manager_identity",
+            "new_manager_identity",
+            b"new_manager_identity",
+            "self",
+            b"self",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "conflict_token",
+            b"conflict_token",
+            "deployment_name",
+            b"deployment_name",
+            "identity",
+            b"identity",
+            "manager_identity",
+            b"manager_identity",
+            "namespace",
+            b"namespace",
+            "new_manager_identity",
+            b"new_manager_identity",
+            "self",
+            b"self",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self,
+        oneof_group: typing_extensions.Literal[
+            "new_manager_identity", b"new_manager_identity"
+        ],
+    ) -> typing_extensions.Literal["manager_identity", "self"] | None: ...
+
+global___SetWorkerDeploymentManagerRequest = SetWorkerDeploymentManagerRequest
+
+class SetWorkerDeploymentManagerResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONFLICT_TOKEN_FIELD_NUMBER: builtins.int
+    PREVIOUS_MANAGER_IDENTITY_FIELD_NUMBER: builtins.int
+    conflict_token: builtins.bytes
+    """This value is returned so that it can be optionally passed to APIs
+    that write to the Worker Deployment state to ensure that the state
+    did not change between this API call and a future write.
+    """
+    previous_manager_identity: builtins.str
+    """What the `manager_identity` field was before this change."""
+    def __init__(
+        self,
+        *,
+        conflict_token: builtins.bytes = ...,
+        previous_manager_identity: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "conflict_token",
+            b"conflict_token",
+            "previous_manager_identity",
+            b"previous_manager_identity",
+        ],
+    ) -> None: ...
+
+global___SetWorkerDeploymentManagerResponse = SetWorkerDeploymentManagerResponse
 
 class GetCurrentDeploymentRequest(google.protobuf.message.Message):
     """Returns the Current Deployment of a deployment series.
@@ -9959,3 +10108,47 @@ class UpdateWorkerConfigResponse(google.protobuf.message.Message):
     ) -> typing_extensions.Literal["worker_config"] | None: ...
 
 global___UpdateWorkerConfigResponse = UpdateWorkerConfigResponse
+
+class DescribeWorkerRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKER_INSTANCE_KEY_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Namespace this worker belongs to."""
+    worker_instance_key: builtins.str
+    """Worker instance key to describe."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        worker_instance_key: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "namespace", b"namespace", "worker_instance_key", b"worker_instance_key"
+        ],
+    ) -> None: ...
+
+global___DescribeWorkerRequest = DescribeWorkerRequest
+
+class DescribeWorkerResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    WORKER_INFO_FIELD_NUMBER: builtins.int
+    @property
+    def worker_info(self) -> temporalio.api.worker.v1.message_pb2.WorkerInfo: ...
+    def __init__(
+        self,
+        *,
+        worker_info: temporalio.api.worker.v1.message_pb2.WorkerInfo | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["worker_info", b"worker_info"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["worker_info", b"worker_info"]
+    ) -> None: ...
+
+global___DescribeWorkerResponse = DescribeWorkerResponse

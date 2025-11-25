@@ -9,16 +9,16 @@ use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
-use temporal_sdk_core::telemetry::{
-    build_otlp_metric_exporter, start_prometheus_metric_exporter, CoreLogStreamConsumer,
-    MetricsCallBuffer,
-};
-use temporal_sdk_core::{CoreRuntime, TokioRuntimeBuilder};
-use temporal_sdk_core_api::telemetry::metrics::{CoreMeter, MetricCallBufferer};
-use temporal_sdk_core_api::telemetry::{
+use temporalio_common::telemetry::metrics::{CoreMeter, MetricCallBufferer};
+use temporalio_common::telemetry::{
     CoreLog, Logger, MetricTemporality, OtelCollectorOptionsBuilder, OtlpProtocol,
     PrometheusExporterOptionsBuilder, TelemetryOptionsBuilder,
 };
+use temporalio_sdk_core::telemetry::{
+    build_otlp_metric_exporter, start_prometheus_metric_exporter, CoreLogStreamConsumer,
+    MetricsCallBuffer,
+};
+use temporalio_sdk_core::{CoreRuntime, RuntimeOptionsBuilder, TokioRuntimeBuilder};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tracing::Level;
@@ -87,16 +87,27 @@ pub struct PrometheusConfig {
     histogram_bucket_overrides: Option<HashMap<String, Vec<f64>>>,
 }
 
+#[derive(FromPyObject)]
+pub struct RuntimeOptions {
+    telemetry: TelemetryConfig,
+    worker_heartbeat_interval_millis: Option<u64>,
+}
+
 const FORWARD_LOG_BUFFER_SIZE: usize = 2048;
 const FORWARD_LOG_MAX_FREQ_MS: u64 = 10;
 
-pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
+pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
+    let RuntimeOptions {
+        telemetry: TelemetryConfig { logging, metrics },
+        worker_heartbeat_interval_millis,
+    } = options;
+
     // Have to build/start telemetry config pieces
     let mut telemetry_build = TelemetryOptionsBuilder::default();
 
     // Build logging config, capturing forwarding info to start later
     let mut log_forwarding: Option<(Receiver<CoreLog>, PyObject)> = None;
-    if let Some(logging_conf) = telemetry_config.logging {
+    if let Some(logging_conf) = logging {
         telemetry_build.logging(if let Some(forward_to) = logging_conf.forward_to {
             // Note, actual log forwarding is started later
             let (consumer, stream) = CoreLogStreamConsumer::new(FORWARD_LOG_BUFFER_SIZE);
@@ -114,26 +125,31 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
 
     // Build metric config, but actual metrics instance is late-bound after
     // CoreRuntime is created since it needs Tokio runtime
-    if let Some(metrics_conf) = telemetry_config.metrics.as_ref() {
+    if let Some(metrics_conf) = metrics.as_ref() {
         telemetry_build.attach_service_name(metrics_conf.attach_service_name);
         if let Some(prefix) = &metrics_conf.metric_prefix {
             telemetry_build.metric_prefix(prefix.to_string());
         }
     }
 
+    let runtime_options = RuntimeOptionsBuilder::default()
+        .telemetry_options(
+            telemetry_build
+                .build()
+                .map_err(|err| PyValueError::new_err(format!("Invalid telemetry config: {err}")))?,
+        )
+        .heartbeat_interval(worker_heartbeat_interval_millis.map(Duration::from_millis))
+        .build()
+        .map_err(|err| PyValueError::new_err(format!("Invalid runtime options: {err}")))?;
+
     // Create core runtime which starts tokio multi-thread runtime
-    let mut core = CoreRuntime::new(
-        telemetry_build
-            .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid telemetry config: {err}")))?,
-        TokioRuntimeBuilder::default(),
-    )
-    .map_err(|err| PyRuntimeError::new_err(format!("Failed initializing telemetry: {err}")))?;
+    let mut core = CoreRuntime::new(runtime_options, TokioRuntimeBuilder::default())
+        .map_err(|err| PyRuntimeError::new_err(format!("Failed initializing runtime: {err}")))?;
 
     // We late-bind the metrics after core runtime is created since it needs
     // the Tokio handle
     let mut metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>> = None;
-    if let Some(metrics_conf) = telemetry_config.metrics {
+    if let Some(metrics_conf) = metrics {
         let _guard = core.tokio_handle().enter();
         // If they want buffered, cannot have Prom/OTel and we make buffered
         if metrics_conf.buffered_with_size > 0 {
@@ -367,7 +383,7 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
             }
             if let Some(overrides) = prom_conf.histogram_bucket_overrides {
                 build.histogram_bucket_overrides(
-                    temporal_sdk_core_api::telemetry::HistogramBucketOverrides { overrides },
+                    temporalio_common::telemetry::HistogramBucketOverrides { overrides },
                 );
             }
             let prom_options = build.build().map_err(|err| {
