@@ -19,7 +19,7 @@ crate-type = ["cdylib"]
 anyhow = "1.0"
 async-trait = "0.1"
 futures = "0.3"
-prost = "0.13"
+prost = "0.14"
 pyo3 = { version = "0.25", features = [
     "extension-module",
     "abi3-py310",
@@ -28,17 +28,16 @@ pyo3 = { version = "0.25", features = [
 ] }
 pyo3-async-runtimes = { version = "0.25", features = ["tokio-runtime"] }
 pythonize = "0.25"
-temporal-client = { version = "0.1.0", path = "./sdk-core/client" }
-temporal-sdk-core = { version = "0.1.0", path = "./sdk-core/core", features = [
+temporalio-client = { version = "0.1.0", path = "./sdk-core/crates/client" }
+temporalio-common = { version = "0.1.0", path = "./sdk-core/crates/common", features = [
+    "envconfig",
+]}
+temporalio-sdk-core = { version = "0.1.0", path = "./sdk-core/crates/sdk-core", features = [
     "ephemeral-server",
 ] }
-temporal-sdk-core-api = { version = "0.1.0", path = "./sdk-core/core-api", features = [
-    "envconfig",
-] }
-temporal-sdk-core-protos = { version = "0.1.0", path = "./sdk-core/sdk-core-protos" }
 tokio = "1.26"
 tokio-stream = "0.1"
-tonic = "0.13"
+tonic = "0.14"
 tracing = "0.1"
 url = "2.2"
 

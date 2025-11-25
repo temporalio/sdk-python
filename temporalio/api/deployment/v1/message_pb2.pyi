@@ -716,6 +716,7 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
     CREATE_TIME_FIELD_NUMBER: builtins.int
     ROUTING_CONFIG_FIELD_NUMBER: builtins.int
     LAST_MODIFIER_IDENTITY_FIELD_NUMBER: builtins.int
+    MANAGER_IDENTITY_FIELD_NUMBER: builtins.int
     name: builtins.str
     """Identifies a Worker Deployment. Must be unique within the namespace."""
     @property
@@ -739,6 +740,12 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
     `identity` value sent by APIs such as `SetWorkerDeploymentCurrentVersion` and
     `SetWorkerDeploymentRampingVersion`.
     """
+    manager_identity: builtins.str
+    """Identity of the client that has the exclusive right to make changes to this Worker Deployment.
+    Empty by default.
+    If this is set, clients whose identity does not match `manager_identity` will not be able to make changes
+    to this Worker Deployment. They can either set their own identity as the manager or unset the field to proceed.
+    """
     def __init__(
         self,
         *,
@@ -750,6 +757,7 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
         create_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         routing_config: global___RoutingConfig | None = ...,
         last_modifier_identity: builtins.str = ...,
+        manager_identity: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -764,6 +772,8 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
             b"create_time",
             "last_modifier_identity",
             b"last_modifier_identity",
+            "manager_identity",
+            b"manager_identity",
             "name",
             b"name",
             "routing_config",

@@ -21,7 +21,12 @@ from temporalio.runtime import (
     _RuntimeRef,
 )
 from temporalio.worker import Worker
-from tests.helpers import assert_eq_eventually, assert_eventually, find_free_port
+from tests.helpers import (
+    assert_eq_eventually,
+    assert_eventually,
+    find_free_port,
+    worker_versioning_enabled,
+)
 
 
 @workflow.defn
@@ -184,7 +189,9 @@ async def test_runtime_task_fail_log_forwarding(client: Client):
     # Check record
     record = next((l for l in log_queue_list if "Failing workflow task" in l.message))
     assert record.levelno == logging.WARNING
-    assert record.name == f"{logger.name}-sdk_core::temporal_sdk_core::worker::workflow"
+    assert (
+        record.name == f"{logger.name}-sdk_core::temporalio_sdk_core::worker::workflow"
+    )
     assert record.temporal_log.fields["run_id"] == handle.result_run_id  # type: ignore
 
 
@@ -257,6 +264,13 @@ async def test_prometheus_histogram_bucket_overrides(client: Client):
 
     # Wait for metrics to appear and match the expected buckets
     await assert_eventually(check_metrics)
+
+
+def test_runtime_options_invalid_heartbeat() -> None:
+    with pytest.raises(ValueError):
+        Runtime(
+            telemetry=TelemetryConfig(), worker_heartbeat_interval=timedelta(seconds=-5)
+        )
 
 
 def test_runtime_ref_creates_default():

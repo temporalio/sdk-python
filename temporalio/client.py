@@ -242,10 +242,10 @@ class Client:
             service_client=service_client,
             namespace=namespace,
             data_converter=data_converter,
+            plugins=plugins,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
             header_codec_behavior=header_codec_behavior,
-            plugins=plugins,
         )
 
         for plugin in plugins:
@@ -1555,12 +1555,12 @@ class ClientConfig(TypedDict, total=False):
     service_client: Required[temporalio.service.ServiceClient]
     namespace: Required[str]
     data_converter: Required[temporalio.converter.DataConverter]
+    plugins: Required[Sequence[Plugin]]
     interceptors: Required[Sequence[Interceptor]]
     default_workflow_query_reject_condition: Required[
         Optional[temporalio.common.QueryRejectCondition]
     ]
     header_codec_behavior: Required[HeaderCodecBehavior]
-    plugins: Required[Sequence[Plugin]]
 
 
 class WorkflowHistoryEventFilterType(IntEnum):

@@ -278,6 +278,24 @@ class WorkflowService:
             timeout=timeout,
         )
 
+    async def describe_worker(
+        self,
+        req: temporalio.api.workflowservice.v1.DescribeWorkerRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.DescribeWorkerResponse:
+        """Invokes the WorkflowService.describe_worker rpc method."""
+        return await self._client._rpc_call(
+            rpc="describe_worker",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.DescribeWorkerResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def describe_worker_deployment(
         self,
         req: temporalio.api.workflowservice.v1.DescribeWorkerDeploymentRequest,
@@ -1317,6 +1335,24 @@ class WorkflowService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.workflowservice.v1.SetWorkerDeploymentCurrentVersionResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def set_worker_deployment_manager(
+        self,
+        req: temporalio.api.workflowservice.v1.SetWorkerDeploymentManagerRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.workflowservice.v1.SetWorkerDeploymentManagerResponse:
+        """Invokes the WorkflowService.set_worker_deployment_manager rpc method."""
+        return await self._client._rpc_call(
+            rpc="set_worker_deployment_manager",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.SetWorkerDeploymentManagerResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -2710,6 +2746,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def set_service_account_namespace_access(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.SetServiceAccountNamespaceAccessRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.SetServiceAccountNamespaceAccessResponse:
+        """Invokes the CloudService.set_service_account_namespace_access rpc method."""
+        return await self._client._rpc_call(
+            rpc="set_service_account_namespace_access",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.SetServiceAccountNamespaceAccessResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def set_user_group_namespace_access(
         self,
         req: temporalio.api.cloud.cloudservice.v1.SetUserGroupNamespaceAccessRequest,
@@ -2903,6 +2957,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.UpdateUserGroupResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def validate_account_audit_log_sink(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.ValidateAccountAuditLogSinkRequest,
+        retry: bool = False,
+        metadata: Mapping[str, Union[str, bytes]] = {},
+        timeout: Optional[timedelta] = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.ValidateAccountAuditLogSinkResponse:
+        """Invokes the CloudService.validate_account_audit_log_sink rpc method."""
+        return await self._client._rpc_call(
+            rpc="validate_account_audit_log_sink",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.ValidateAccountAuditLogSinkResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
