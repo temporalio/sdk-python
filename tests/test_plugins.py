@@ -269,8 +269,8 @@ async def test_replay(client: Client) -> None:
         )
         await handle.result()
     replayer = Replayer(workflows=[], plugins=[plugin])
-    assert len(replayer.config().get("workflows") or []) == 1
-    assert replayer.config().get("data_converter") == pydantic_data_converter
+    assert len(replayer.config(True).get("workflows") or []) == 1
+    assert replayer.config(True).get("data_converter") == pydantic_data_converter
 
     await replayer.replay_workflow(await handle.fetch_history())
 
@@ -307,8 +307,8 @@ async def test_simple_plugins(client: Client) -> None:
     assert worker.config(True).get("workflows") == [HelloWorkflow2]
 
     replayer = Replayer(workflows=[HelloWorkflow], plugins=[plugin])
-    assert replayer.config().get("data_converter") == pydantic_data_converter
-    assert replayer.config().get("workflows") == [HelloWorkflow, HelloWorkflow2]
+    assert replayer.config(True).get("data_converter") == pydantic_data_converter
+    assert replayer.config(True).get("workflows") == [HelloWorkflow, HelloWorkflow2]
 
 
 async def test_simple_plugins_callables(client: Client) -> None:
