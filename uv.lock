@@ -1761,7 +1761,7 @@ wheels = [
 [[package]]
 name = "nexus-rpc"
 version = "1.2.0"
-source = { git = "https://github.com/nexus-rpc/sdk-python?rev=interceptors#e8806579a7050fc076bb14861aeec7208d521534" }
+source = { git = "https://github.com/nexus-rpc/sdk-python?rev=interceptors#875e2eafc1dcbb39eb2c31c17d89741c58ddb02d" }
 dependencies = [
     { name = "typing-extensions" },
 ]

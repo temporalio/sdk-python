@@ -83,7 +83,7 @@ class _NexusWorker:
 
         middleware = _NexusMiddlewareForInterceptors(interceptors)
 
-        self._handler = Handler(service_handlers, executor, interceptors=[middleware])
+        self._handler = Handler(service_handlers, executor, middleware=[middleware])
         self._data_converter = data_converter
         # TODO(nexus-preview): metric_meter
         self._metric_meter = metric_meter

@@ -9,7 +9,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["temporal", "workflow"]
 dependencies = [
-  "nexus-rpc @ git+https://github.com/nexus-rpc/sdk-python@interceptors",
+  "nexus-rpc",
   "protobuf>=3.20,<7.0.0",
   "python-dateutil>=2.8.2,<3 ; python_version < '3.11'",
   "types-protobuf>=3.20",
@@ -246,3 +246,6 @@ exclude = ["temporalio/bridge/target/**/*"]
 [tool.uv]
 # Prevent uv commands from building the package by default
 package = false
+
+[tool.uv.sources]
+nexus-rpc = { git = "https://github.com/nexus-rpc/sdk-python", rev = "interceptors" }
