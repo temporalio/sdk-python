@@ -309,12 +309,13 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
 
     endpoint: str
     service: str
-    operation: Union[nexusrpc.Operation[InputT, OutputT], str, Callable[..., Any]]
+    operation: nexusrpc.Operation[InputT, OutputT] | str | Callable[..., Any]
     input: InputT
-    schedule_to_close_timeout: Optional[timedelta]
+    schedule_to_close_timeout: timedelta | None
     cancellation_type: temporalio.workflow.NexusOperationCancellationType
-    headers: Optional[Mapping[str, str]]
-    output_type: Optional[Type[OutputT]] = None
+    headers: Mapping[str, str] | None
+    summary: str | None
+    output_type: Type[OutputT] | None = None
 
     def __post_init__(self) -> None:
         """Initialize operation-specific attributes after dataclass creation."""
