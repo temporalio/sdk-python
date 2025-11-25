@@ -555,11 +555,7 @@ class Worker:
                 maximum=config["max_concurrent_activity_task_polls"]
             )
 
-        worker_plugins = [plugin.name() for plugin in config.get("plugins", [])]
-        client_plugins = [
-            plugin.name() for plugin in config["client"].config()["plugins"]
-        ]
-        plugins = list(set(worker_plugins + client_plugins))
+        deduped_plugin_names = list(set([plugin.name() for plugin in self.plugins]))
 
         # Create bridge worker last. We have empirically observed that if it is
         # created before an error is raised from the activity worker
@@ -623,7 +619,7 @@ class Worker:
                 nexus_task_poller_behavior=config[
                     "nexus_task_poller_behavior"
                 ]._to_bridge(),
-                plugins=plugins,
+                plugins=deduped_plugin_names,
             ),
         )
 
