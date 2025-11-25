@@ -117,14 +117,38 @@ class Runtime:
         global _runtime_ref
         _runtime_ref.set_default(runtime, error_if_already_set=error_if_already_set)
 
-    def __init__(self, *, telemetry: TelemetryConfig) -> None:
-        """Create a default runtime with the given telemetry config.
+    def __init__(
+        self,
+        *,
+        telemetry: TelemetryConfig,
+        worker_heartbeat_interval: Optional[timedelta] = timedelta(seconds=60),
+    ) -> None:
+        """Create a runtime with the provided configuration.
 
         Each new runtime creates a new internal thread pool, so use sparingly.
+
+        Args:
+            telemetry: Telemetry configuration when not supplying
+                ``runtime_options``.
+            worker_heartbeat_interval: Interval for worker heartbeats. ``None``
+                disables heartbeating. Interval must be between 1s and 60s.
+
+        Raises:
+            ValueError: If both ```runtime_options`` is a negative value.
         """
-        self._core_runtime = temporalio.bridge.runtime.Runtime(
-            telemetry=telemetry._to_bridge_config()
+        if worker_heartbeat_interval is None:
+            heartbeat_millis = None
+        else:
+            if worker_heartbeat_interval <= timedelta(0):
+                raise ValueError("worker_heartbeat_interval must be positive")
+            heartbeat_millis = int(worker_heartbeat_interval.total_seconds() * 1000)
+
+        runtime_options = temporalio.bridge.runtime.RuntimeOptions(
+            telemetry=telemetry._to_bridge_config(),
+            worker_heartbeat_interval_millis=heartbeat_millis,
         )
+
+        self._core_runtime = temporalio.bridge.runtime.Runtime(options=runtime_options)
         if isinstance(telemetry.metrics, MetricBuffer):
             telemetry.metrics._runtime = self
         core_meter = temporalio.bridge.metric.MetricMeter.create(self._core_runtime)
@@ -159,7 +183,15 @@ class TelemetryFilter:
         """Return a formatted form of this filter."""
         # We intentionally aren't using __str__ or __format__ so they can keep
         # their original dataclass impls
-        return f"{self.other_level},temporal_sdk_core={self.core_level},temporal_client={self.core_level},temporal_sdk={self.core_level}"
+        targets = [
+            "temporalio_sdk_core",
+            "temporalio_client",
+            "temporalio_sdk",
+            "temporal_sdk_bridge",
+        ]
+        parts = [self.other_level]
+        parts.extend(f"{target}={self.core_level}" for target in targets)
+        return ",".join(parts)
 
 
 @dataclass(frozen=True)

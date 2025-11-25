@@ -55,6 +55,7 @@ class WorkerConfig:
     nonsticky_to_sticky_poll_ratio: float
     activity_task_poller_behavior: PollerBehavior
     no_remote_activities: bool
+    task_types: WorkerTaskTypes
     sticky_queue_schedule_to_start_timeout_millis: int
     max_heartbeat_throttle_interval_millis: int
     default_heartbeat_throttle_interval_millis: int
@@ -64,6 +65,7 @@ class WorkerConfig:
     nondeterminism_as_workflow_fail: bool
     nondeterminism_as_workflow_fail_for_types: Set[str]
     nexus_task_poller_behavior: PollerBehavior
+    plugins: Sequence[str]
 
 
 @dataclass
@@ -167,6 +169,16 @@ class TunerHolder:
     activity_slot_supplier: SlotSupplier
     local_activity_slot_supplier: SlotSupplier
     nexus_slot_supplier: SlotSupplier
+
+
+@dataclass
+class WorkerTaskTypes:
+    """Python representation of the Rust struct for worker task types"""
+
+    enable_workflows: bool
+    enable_local_activities: bool
+    enable_remote_activities: bool
+    enable_nexus: bool
 
 
 class Worker:

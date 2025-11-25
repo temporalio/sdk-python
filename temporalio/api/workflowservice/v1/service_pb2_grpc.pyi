@@ -100,8 +100,8 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkflowExecutionHistoryReverseResponse,
     ]
-    """GetWorkflowExecutionHistoryReverse returns the history of specified workflow execution in reverse 
-    order (starting from last event). Fails with`NotFound` if the specified workflow execution is 
+    """GetWorkflowExecutionHistoryReverse returns the history of specified workflow execution in reverse
+    order (starting from last event). Fails with`NotFound` if the specified workflow execution is
     unknown to the service.
     """
     PollWorkflowTaskQueue: grpc.UnaryUnaryMultiCallable[
@@ -349,7 +349,8 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse,
     ]
-    """ScanWorkflowExecutions is a visibility API to list large amount of workflow executions in a specific namespace without order.
+    """ScanWorkflowExecutions _was_ a visibility API to list large amount of workflow executions in a specific namespace without order.
+    It has since been deprecated in favor of `ListWorkflowExecutions` and rewritten to use `ListWorkflowExecutions` internally.
 
     Deprecated: Replaced with `ListWorkflowExecutions`.
     (-- api-linter: core::0127::http-annotation=disabled
@@ -502,7 +503,7 @@ class WorkflowServiceStub:
     members are compatible with one another.
 
     A single build id may be mapped to multiple task queues using this API for cases where a single process hosts
-    multiple workers. 
+    multiple workers.
 
     To query which workers can be retired, use the `GetWorkerTaskReachability` API.
 
@@ -683,6 +684,13 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataResponse,
     ]
     """Updates the user-given metadata attached to a Worker Deployment Version.
+    Experimental. This API might significantly change or be removed in a future release.
+    """
+    SetWorkerDeploymentManager: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerResponse,
+    ]
+    """Set/unset the ManagerIdentity of a Worker Deployment.
     Experimental. This API might significantly change or be removed in a future release.
     """
     UpdateWorkflowExecution: grpc.UnaryUnaryMultiCallable[
@@ -887,6 +895,11 @@ class WorkflowServiceStub:
     Can be used to partially update the worker configuration.
     Can be used to update the configuration of multiple workers.
     """
+    DescribeWorker: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse,
+    ]
+    """DescribeWorker returns information about the specified worker."""
 
 class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     """WorkflowService API defines how Temporal SDKs and other clients interact with the Temporal server
@@ -1295,7 +1308,8 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         request: temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.ScanWorkflowExecutionsResponse:
-        """ScanWorkflowExecutions is a visibility API to list large amount of workflow executions in a specific namespace without order.
+        """ScanWorkflowExecutions _was_ a visibility API to list large amount of workflow executions in a specific namespace without order.
+        It has since been deprecated in favor of `ListWorkflowExecutions` and rewritten to use `ListWorkflowExecutions` internally.
 
         Deprecated: Replaced with `ListWorkflowExecutions`.
         (-- api-linter: core::0127::http-annotation=disabled
@@ -1708,6 +1722,15 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         Experimental. This API might significantly change or be removed in a future release.
         """
     @abc.abstractmethod
+    def SetWorkerDeploymentManager(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerResponse:
+        """Set/unset the ManagerIdentity of a Worker Deployment.
+        Experimental. This API might significantly change or be removed in a future release.
+        """
+    @abc.abstractmethod
     def UpdateWorkflowExecution(
         self,
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionRequest,
@@ -1961,6 +1984,13 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         Can be used to partially update the worker configuration.
         Can be used to update the configuration of multiple workers.
         """
+    @abc.abstractmethod
+    def DescribeWorker(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse:
+        """DescribeWorker returns information about the specified worker."""
 
 def add_WorkflowServiceServicer_to_server(
     servicer: WorkflowServiceServicer, server: grpc.Server

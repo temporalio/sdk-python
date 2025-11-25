@@ -3,13 +3,14 @@ use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::Duration;
-use temporal_client::{
-    ClientKeepAliveConfig as CoreClientKeepAliveConfig, ClientOptions, ClientOptionsBuilder,
-    ConfiguredClient, HttpConnectProxyOptions, RetryClient, RetryConfig,
-    TemporalServiceClientWithMetrics, TlsConfig,
+use temporalio_client::tonic::{
+    self,
+    metadata::{AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataKey, BinaryMetadataValue},
 };
-use tonic::metadata::{
-    AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataKey, BinaryMetadataValue,
+use temporalio_client::{
+    ClientKeepAliveConfig as CoreClientKeepAliveConfig, ClientOptions, ClientOptionsBuilder,
+    ConfiguredClient, HttpConnectProxyOptions, RetryClient, RetryConfig, TemporalServiceClient,
+    TlsConfig,
 };
 use url::Url;
 
@@ -17,7 +18,7 @@ use crate::runtime;
 
 pyo3::create_exception!(temporal_sdk_bridge, RPCError, PyException);
 
-type Client = RetryClient<ConfiguredClient<TemporalServiceClientWithMetrics>>;
+type Client = RetryClient<ConfiguredClient<TemporalServiceClient>>;
 
 #[pyclass]
 pub struct ClientRef {
@@ -258,7 +259,7 @@ impl TryFrom<ClientConfig> for ClientOptions {
     }
 }
 
-impl TryFrom<ClientTlsConfig> for temporal_client::TlsConfig {
+impl TryFrom<ClientTlsConfig> for temporalio_client::TlsConfig {
     type Error = PyErr;
 
     fn try_from(conf: ClientTlsConfig) -> PyResult<Self> {
@@ -268,7 +269,7 @@ impl TryFrom<ClientTlsConfig> for temporal_client::TlsConfig {
             client_tls_config: match (conf.client_cert, conf.client_private_key) {
                 (None, None) => None,
                 (Some(client_cert), Some(client_private_key)) => {
-                    Some(temporal_client::ClientTlsConfig {
+                    Some(temporalio_client::ClientTlsConfig {
                         client_cert,
                         client_private_key,
                     })
