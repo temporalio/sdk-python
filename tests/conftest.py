@@ -7,6 +7,11 @@ from typing import AsyncGenerator, Iterator
 import pytest
 import pytest_asyncio
 
+from temporalio.client import Client
+from temporalio.testing import WorkflowEnvironment
+from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
+from temporalio.worker import SharedStateManager
+
 from . import DEV_SERVER_DOWNLOAD_VERSION
 
 # If there is an integration test environment variable set, we must remove the
@@ -37,10 +42,6 @@ else:
         or protobuf_version.startswith("5.")
         or protobuf_version.startswith("6.")
     ), f"Expected protobuf 4.x/5.x/6.x, got {protobuf_version}"
-
-from temporalio.client import Client
-from temporalio.testing import WorkflowEnvironment
-from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
 
 def pytest_runtest_setup(item):
@@ -132,6 +133,17 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
 
     yield env
     await env.shutdown()
+
+
+@pytest.fixture(scope="session")
+def shared_state_manager() -> Iterator[SharedStateManager]:
+    mp_mgr = multiprocessing.Manager()
+    mgr = SharedStateManager.create_from_multiprocessing(mp_mgr)
+
+    try:
+        yield mgr
+    finally:
+        mp_mgr.shutdown()
 
 
 @pytest.fixture(scope="session")
