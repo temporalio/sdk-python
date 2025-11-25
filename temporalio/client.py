@@ -247,6 +247,7 @@ class Client:
             header_codec_behavior=header_codec_behavior,
             plugins=plugins,
         )
+        self._initial_config = config.copy()
 
         for plugin in plugins:
             config = plugin.configure_client(config)
@@ -261,12 +262,16 @@ class Client:
         for interceptor in reversed(list(self._config["interceptors"])):
             self._impl = interceptor.intercept_client(self._impl)
 
-    def config(self) -> ClientConfig:
+    def config(self, active_config: bool = False) -> ClientConfig:
         """Config, as a dictionary, used to create this client.
+
+        Args:
+            active_config: If true, return the modified configuration in use rather than the initial one
+                provided to the client.
 
         This makes a shallow copy of the config each call.
         """
-        config = self._config.copy()
+        config = self._config.copy() if active_config else self._initial_config.copy()
         config["interceptors"] = list(config["interceptors"])
         return config
 

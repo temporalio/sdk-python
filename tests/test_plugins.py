@@ -148,14 +148,14 @@ async def test_worker_plugin_basic_config(client: Client) -> None:
         activities=[never_run_activity],
         plugins=[MyWorkerPlugin()],
     )
-    assert worker.config().get("task_queue") == "replaced_queue"
+    assert worker.config(True).get("task_queue") == "replaced_queue"
 
     # Test client plugin propagation to worker plugins
     new_config = client.config()
     new_config["plugins"] = [MyCombinedPlugin()]
     client = Client(**new_config)
     worker = Worker(client, task_queue="queue", activities=[never_run_activity])
-    assert worker.config().get("task_queue") == "combined"
+    assert worker.config(True).get("task_queue") == "combined"
 
     # Test both. Client propagated plugins are called first, so the worker plugin overrides in this case
     worker = Worker(
@@ -164,7 +164,7 @@ async def test_worker_plugin_basic_config(client: Client) -> None:
         activities=[never_run_activity],
         plugins=[MyWorkerPlugin()],
     )
-    assert worker.config().get("task_queue") == "replaced_queue"
+    assert worker.config(True).get("task_queue") == "replaced_queue"
 
 
 async def test_worker_duplicated_plugin(client: Client) -> None:
@@ -195,7 +195,7 @@ async def test_worker_sandbox_restrictions(client: Client) -> None:
     assert (
         "my_module"
         in cast(
-            SandboxedWorkflowRunner, worker.config().get("workflow_runner")
+            SandboxedWorkflowRunner, worker.config(True).get("workflow_runner")
         ).restrictions.passthrough_modules
     )
 
@@ -296,7 +296,7 @@ async def test_simple_plugins(client: Client) -> None:
         plugins=[plugin],
     )
     # On a sequence, a value is appended
-    assert worker.config().get("workflows") == [HelloWorkflow, HelloWorkflow2]
+    assert worker.config(True).get("workflows") == [HelloWorkflow, HelloWorkflow2]
 
     # Test with plugin registered in client
     worker = Worker(
@@ -304,7 +304,7 @@ async def test_simple_plugins(client: Client) -> None:
         task_queue="queue",
         activities=[never_run_activity],
     )
-    assert worker.config().get("workflows") == [HelloWorkflow2]
+    assert worker.config(True).get("workflows") == [HelloWorkflow2]
 
     replayer = Replayer(workflows=[HelloWorkflow], plugins=[plugin])
     assert replayer.config().get("data_converter") == pydantic_data_converter
@@ -343,7 +343,7 @@ async def test_simple_plugins_callables(client: Client) -> None:
         activities=[never_run_activity],
         plugins=[plugin],
     )
-    assert worker.config().get("workflows") == []
+    assert worker.config(True).get("workflows") == []
 
 
 class MediumPlugin(SimplePlugin):
@@ -361,4 +361,4 @@ async def test_medium_plugin(client: Client) -> None:
     worker = Worker(
         client, task_queue="queue", plugins=[plugin], workflows=[HelloWorkflow]
     )
-    assert worker.config().get("task_queue") == "override"
+    assert worker.config(True).get("task_queue") == "override"
