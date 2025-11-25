@@ -9,8 +9,8 @@ import pytest_asyncio
 
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
-from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 from temporalio.worker import SharedStateManager
+from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
 from . import DEV_SERVER_DOWNLOAD_VERSION
 
