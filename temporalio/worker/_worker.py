@@ -409,7 +409,7 @@ class Worker:
             )
 
         # Prepend applicable client interceptors to the given ones
-        client_config = config["client"].config()
+        client_config = config["client"].config(True)
         interceptors_from_client = cast(
             List[Interceptor],
             [i for i in client_config["interceptors"] if isinstance(i, Interceptor)],

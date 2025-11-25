@@ -4295,7 +4295,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             await _apply_headers(
                 self.headers,
                 action.start_workflow.header.fields,
-                client.config()["header_codec_behavior"] == HeaderCodecBehavior.CODEC
+                client.config(True)["header_codec_behavior"]
+                == HeaderCodecBehavior.CODEC
                 and not self._from_raw,
                 client.data_converter.payload_codec,
             )
@@ -6922,7 +6923,8 @@ class _ClientImpl(OutboundInterceptor):
         await _apply_headers(
             source,
             dest,
-            self._client.config()["header_codec_behavior"] == HeaderCodecBehavior.CODEC,
+            self._client.config(True)["header_codec_behavior"]
+            == HeaderCodecBehavior.CODEC,
             self._client.data_converter.payload_codec,
         )
 
