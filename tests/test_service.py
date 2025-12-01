@@ -171,6 +171,51 @@ async def test_grpc_status(client: Client, env: WorkflowEnvironment):
     )
 
 
+def test_connect_config_tls_enabled_by_default_when_api_key_provided():
+    """Test that TLS is enabled by default when API key is provided and tls is not configured."""
+    config = temporalio.service.ConnectConfig(
+        target_host="localhost:7233",
+        api_key="test-api-key",
+    )
+    # TLS should be auto-enabled when api_key is provided and tls not explicitly set
+    assert config.tls is True
+
+
+def test_connect_config_tls_can_be_explicitly_disabled_even_when_api_key_provided():
+    """Test that TLS can be explicitly disabled even when API key is provided."""
+    config = temporalio.service.ConnectConfig(
+        target_host="localhost:7233",
+        api_key="test-api-key",
+        tls=False,
+    )
+    # TLS should remain disabled when explicitly set to False
+    assert config.tls is False
+
+
+def test_connect_config_tls_disabled_by_default_when_no_api_key():
+    """Test that TLS is disabled by default when no API key is provided."""
+    config = temporalio.service.ConnectConfig(
+        target_host="localhost:7233",
+    )
+    # TLS should remain None->False when no api_key is provided
+    assert config.tls is False
+
+
+def test_connect_config_tls_explicit_config_preserved():
+    """Test that explicit TLS configuration is preserved regardless of API key."""
+    tls_config = temporalio.service.TLSConfig(
+        server_root_ca_cert=b"test-cert",
+        domain="test-domain",
+    )
+    config = temporalio.service.ConnectConfig(
+        target_host="localhost:7233",
+        api_key="test-api-key",
+        tls=tls_config,
+    )
+    # Explicit TLS config should be preserved
+    assert config.tls == tls_config
+
+
 async def test_rpc_execution_not_unknown(client: Client):
     """
     Execute each rpc method and expect a failure, but ensure the failure is not that the rpc method is unknown

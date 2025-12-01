@@ -136,7 +136,7 @@ class ConnectConfig:
 
     target_host: str
     api_key: Optional[str] = None
-    tls: Union[bool, TLSConfig] = False
+    tls: Union[bool, TLSConfig, None] = None
     retry_config: Optional[RetryConfig] = None
     keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default
     rpc_metadata: Mapping[str, Union[str, bytes]] = field(default_factory=dict)
@@ -149,6 +149,9 @@ class ConnectConfig:
         """Set extra defaults on unset properties."""
         if not self.identity:
             self.identity = f"{os.getpid()}@{socket.gethostname()}"
+        # Enable TLS by default when API key is provided and tls not explicitly set
+        if self.tls is None:
+            self.tls = self.api_key is not None
 
     def _to_bridge_config(self) -> temporalio.bridge.client.ClientConfig:
         # Need to create the URL from the host:port. We allowed scheme in the
