@@ -262,7 +262,7 @@ class Client:
         for interceptor in reversed(list(self._config["interceptors"])):
             self._impl = interceptor.intercept_client(self._impl)
 
-    def config(self, active_config: bool = False) -> ClientConfig:
+    def config(self, *, active_config: bool = False) -> ClientConfig:
         """Config, as a dictionary, used to create this client.
 
         Args:
@@ -4295,7 +4295,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             await _apply_headers(
                 self.headers,
                 action.start_workflow.header.fields,
-                client.config(True)["header_codec_behavior"]
+                client.config(active_config=True)["header_codec_behavior"]
                 == HeaderCodecBehavior.CODEC
                 and not self._from_raw,
                 client.data_converter.payload_codec,
@@ -6923,7 +6923,7 @@ class _ClientImpl(OutboundInterceptor):
         await _apply_headers(
             source,
             dest,
-            self._client.config(True)["header_codec_behavior"]
+            self._client.config(active_config=True)["header_codec_behavior"]
             == HeaderCodecBehavior.CODEC,
             self._client.data_converter.payload_codec,
         )

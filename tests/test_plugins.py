@@ -150,7 +150,7 @@ async def test_worker_plugin_basic_config(client: Client) -> None:
         activities=[never_run_activity],
         plugins=[MyWorkerPlugin()],
     )
-    task_queue = worker.config(True).get("task_queue")
+    task_queue = worker.config(active_config=True).get("task_queue")
     assert task_queue is not None and task_queue.startswith("replaced_queue")
 
     # Test client plugin propagation to worker plugins
@@ -160,7 +160,7 @@ async def test_worker_plugin_basic_config(client: Client) -> None:
     worker = Worker(
         client, task_queue="queue" + str(uuid.uuid4()), activities=[never_run_activity]
     )
-    task_queue = worker.config(True).get("task_queue")
+    task_queue = worker.config(active_config=True).get("task_queue")
     assert task_queue is not None and task_queue.startswith("combined")
 
     # Test both. Client propagated plugins are called first, so the worker plugin overrides in this case
@@ -170,7 +170,7 @@ async def test_worker_plugin_basic_config(client: Client) -> None:
         activities=[never_run_activity],
         plugins=[MyWorkerPlugin()],
     )
-    task_queue = worker.config(True).get("task_queue")
+    task_queue = worker.config(active_config=True).get("task_queue")
     assert task_queue is not None and task_queue.startswith("replaced_queue")
 
 
@@ -202,7 +202,8 @@ async def test_worker_sandbox_restrictions(client: Client) -> None:
     assert (
         "my_module"
         in cast(
-            SandboxedWorkflowRunner, worker.config(True).get("workflow_runner")
+            SandboxedWorkflowRunner,
+            worker.config(active_config=True).get("workflow_runner"),
         ).restrictions.passthrough_modules
     )
 
@@ -276,8 +277,11 @@ async def test_replay(client: Client) -> None:
         )
         await handle.result()
     replayer = Replayer(workflows=[], plugins=[plugin])
-    assert len(replayer.config(True).get("workflows") or []) == 1
-    assert replayer.config(True).get("data_converter") == pydantic_data_converter
+    assert len(replayer.config(active_config=True).get("workflows") or []) == 1
+    assert (
+        replayer.config(active_config=True).get("data_converter")
+        == pydantic_data_converter
+    )
 
     await replayer.replay_workflow(await handle.fetch_history())
 
@@ -303,7 +307,10 @@ async def test_simple_plugins(client: Client) -> None:
         plugins=[plugin],
     )
     # On a sequence, a value is appended
-    assert worker.config(True).get("workflows") == [HelloWorkflow, HelloWorkflow2]
+    assert worker.config(active_config=True).get("workflows") == [
+        HelloWorkflow,
+        HelloWorkflow2,
+    ]
 
     # Test with plugin registered in client
     worker = Worker(
@@ -311,11 +318,17 @@ async def test_simple_plugins(client: Client) -> None:
         task_queue="queue" + str(uuid.uuid4()),
         activities=[never_run_activity],
     )
-    assert worker.config(True).get("workflows") == [HelloWorkflow2]
+    assert worker.config(active_config=True).get("workflows") == [HelloWorkflow2]
 
     replayer = Replayer(workflows=[HelloWorkflow], plugins=[plugin])
-    assert replayer.config(True).get("data_converter") == pydantic_data_converter
-    assert replayer.config(True).get("workflows") == [HelloWorkflow, HelloWorkflow2]
+    assert (
+        replayer.config(active_config=True).get("data_converter")
+        == pydantic_data_converter
+    )
+    assert replayer.config(active_config=True).get("workflows") == [
+        HelloWorkflow,
+        HelloWorkflow2,
+    ]
 
 
 async def test_simple_plugins_callables(client: Client) -> None:
@@ -350,7 +363,7 @@ async def test_simple_plugins_callables(client: Client) -> None:
         activities=[never_run_activity],
         plugins=[plugin],
     )
-    assert worker.config(True).get("workflows") == []
+    assert worker.config(active_config=True).get("workflows") == []
 
 
 class MediumPlugin(SimplePlugin):
@@ -371,5 +384,5 @@ async def test_medium_plugin(client: Client) -> None:
         plugins=[plugin],
         workflows=[HelloWorkflow],
     )
-    task_queue = worker.config(True).get("task_queue")
+    task_queue = worker.config(active_config=True).get("task_queue")
     assert task_queue is not None and task_queue.startswith("override")

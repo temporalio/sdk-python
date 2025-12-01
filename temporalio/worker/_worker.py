@@ -409,7 +409,7 @@ class Worker:
             )
 
         # Prepend applicable client interceptors to the given ones
-        client_config = config["client"].config(True)
+        client_config = config["client"].config(active_config=True)
         interceptors_from_client = cast(
             List[Interceptor],
             [i for i in client_config["interceptors"] if isinstance(i, Interceptor)],
@@ -623,7 +623,7 @@ class Worker:
             ),
         )
 
-    def config(self, active_config: bool = False) -> WorkerConfig:
+    def config(self, *, active_config: bool = False) -> WorkerConfig:
         """Config, as a dictionary, used to create this worker.
 
         Args:

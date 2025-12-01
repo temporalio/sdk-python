@@ -92,7 +92,7 @@ class Replayer:
         if not self._config["workflows"]:
             raise ValueError("At least one workflow must be specified")
 
-    def config(self, active_config: bool = False) -> ReplayerConfig:
+    def config(self, *, active_config: bool = False) -> ReplayerConfig:
         """Config, as a dictionary, used to create this replayer.
 
         Args:
