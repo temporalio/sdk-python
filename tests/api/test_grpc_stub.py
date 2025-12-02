@@ -129,6 +129,7 @@ async def test_grpc_metadata():
         f"localhost:{port}",
         api_key="my-api-key",
         rpc_metadata={"my-meta-key": "my-meta-val"},
+        tls=False,
     )
     workflow_server.assert_last_metadata(
         {

@@ -178,7 +178,9 @@ def test_connect_config_tls_enabled_by_default_when_api_key_provided():
         api_key="test-api-key",
     )
     # TLS should be auto-enabled when api_key is provided and tls not explicitly set
-    assert config.tls is True
+    bridge_config = config._to_bridge_config()
+    assert bridge_config.target_url == "https://localhost:7233"
+    assert bridge_config.tls_config is not None
 
 
 def test_connect_config_tls_can_be_explicitly_disabled_even_when_api_key_provided():
@@ -197,8 +199,10 @@ def test_connect_config_tls_disabled_by_default_when_no_api_key():
     config = temporalio.service.ConnectConfig(
         target_host="localhost:7233",
     )
-    # TLS should remain None->False when no api_key is provided
-    assert config.tls is False
+    # TLS should remain disabled when no api_key is provided
+    bridge_config = config._to_bridge_config()
+    assert bridge_config.target_url == "http://localhost:7233"
+    assert bridge_config.tls_config is None
 
 
 def test_connect_config_tls_explicit_config_preserved():

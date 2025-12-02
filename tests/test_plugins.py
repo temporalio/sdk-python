@@ -56,6 +56,7 @@ class MyClientPlugin(temporalio.client.Plugin):
         next: Callable[[ConnectConfig], Awaitable[ServiceClient]],
     ) -> ServiceClient:
         config.api_key = "replaced key"
+        config.tls = False
         return await next(config)
 
 
