@@ -173,8 +173,9 @@ class ConnectConfig:
             target_url = f"https://{self.target_host}"
             tls_config = TLSConfig()._to_bridge_config()
         # Enable TLS by default when API key is provided and tls not explicitly set
-        elif self.tls is None:
-            self.tls = self.api_key is not None
+        elif self.tls is None and self.api_key is not None:
+            target_url = f"https://{self.target_host}"
+            tls_config = TLSConfig()._to_bridge_config()
         else:
             target_url = f"http://{self.target_host}"
             tls_config = None
