@@ -376,8 +376,9 @@ class Worker:
                     f"The same plugin type {type(client_plugin)} is present from both client and worker. It may run twice and may not be the intended behavior."
                 )
         plugins = plugins_from_client + list(plugins)
+        self._initial_config = config.copy()
 
-        self.plugins = plugins
+        self._plugins = plugins
         for plugin in plugins:
             config = plugin.configure_worker(config)
 
@@ -388,7 +389,6 @@ class Worker:
         Client is safe to take separately since it can't be modified by worker plugins.
         """
         self._config = config
-
         if not (
             config["activities"]
             or config["nexus_service_handlers"]
@@ -409,7 +409,7 @@ class Worker:
             )
 
         # Prepend applicable client interceptors to the given ones
-        client_config = config["client"].config()
+        client_config = config["client"].config(active_config=True)
         interceptors_from_client = cast(
             List[Interceptor],
             [i for i in client_config["interceptors"] if isinstance(i, Interceptor)],
@@ -555,7 +555,7 @@ class Worker:
                 maximum=config["max_concurrent_activity_task_polls"]
             )
 
-        deduped_plugin_names = list(set([plugin.name() for plugin in self.plugins]))
+        deduped_plugin_names = list(set([plugin.name() for plugin in self._plugins]))
 
         # Create bridge worker last. We have empirically observed that if it is
         # created before an error is raised from the activity worker
@@ -623,13 +623,17 @@ class Worker:
             ),
         )
 
-    def config(self) -> WorkerConfig:
+    def config(self, *, active_config: bool = False) -> WorkerConfig:
         """Config, as a dictionary, used to create this worker.
+
+        Args:
+            active_config: If true, return the modified configuration in use rather than the initial one
+                provided to the worker.
 
         Returns:
             Configuration, shallow-copied.
         """
-        config = self._config.copy()
+        config = self._config.copy() if active_config else self._initial_config.copy()
         config["activities"] = list(config.get("activities", []))
         config["workflows"] = list(config.get("workflows", []))
         return config
@@ -703,7 +707,7 @@ class Worker:
             return lambda w: plugin.run_worker(w, next)
 
         next_function = lambda w: w._run()
-        for plugin in reversed(self.plugins):
+        for plugin in reversed(self._plugins):
             next_function = make_lambda(plugin, next_function)
 
         await next_function(self)

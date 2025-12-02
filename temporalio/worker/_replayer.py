@@ -81,6 +81,7 @@ class Replayer:
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
             header_codec_behavior=header_codec_behavior,
         )
+        self._initial_config = self._config.copy()
 
         # Apply plugin configuration
         self.plugins = plugins
@@ -91,13 +92,17 @@ class Replayer:
         if not self._config["workflows"]:
             raise ValueError("At least one workflow must be specified")
 
-    def config(self) -> ReplayerConfig:
+    def config(self, *, active_config: bool = False) -> ReplayerConfig:
         """Config, as a dictionary, used to create this replayer.
+
+        Args:
+            active_config: If true, return the modified configuration in use rather than the initial one
+                provided to the client.
 
         Returns:
             Configuration, shallow-copied.
         """
-        config = self._config.copy()
+        config = self._config.copy() if active_config else self._initial_config.copy()
         config["workflows"] = list(config["workflows"])
         return config
 
