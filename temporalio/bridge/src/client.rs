@@ -8,9 +8,9 @@ use temporalio_client::tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataKey, BinaryMetadataValue},
 };
 use temporalio_client::{
-    ClientKeepAliveConfig as CoreClientKeepAliveConfig, ClientOptions, ClientOptionsBuilder,
-    ConfiguredClient, HttpConnectProxyOptions, RetryClient, RetryConfig, TemporalServiceClient,
-    TlsConfig,
+    ClientKeepAliveOptions, ClientOptions,
+    ConfiguredClient, HttpConnectProxyOptions, RetryClient, RetryOptions, TemporalServiceClient,
+    TlsOptions,
 };
 use url::Url;
 
@@ -229,9 +229,12 @@ impl TryFrom<ClientConfig> for ClientOptions {
     type Error = PyErr;
 
     fn try_from(opts: ClientConfig) -> PyResult<Self> {
-        let mut gateway_opts = ClientOptionsBuilder::default();
+        let gateway_opts = ClientOptions::builder();
         let (ascii_headers, binary_headers) = partition_headers(opts.metadata);
-        gateway_opts
+        let tls_options = if let Some(tls_config) = opts.tls_config {
+                Some(tls_config.try_into()?)
+            } else { None };
+        let gateway_opts = gateway_opts
             .target_url(
                 Url::parse(&opts.target_url)
                     .map_err(|err| PyValueError::new_err(format!("invalid target URL: {err}")))?,
@@ -239,37 +242,33 @@ impl TryFrom<ClientConfig> for ClientOptions {
             .client_name(opts.client_name)
             .client_version(opts.client_version)
             .identity(opts.identity)
-            .retry_config(
+            .retry_options(
                 opts.retry_config
-                    .map_or(RetryConfig::default(), |c| c.into()),
+                    .map_or(RetryOptions::default(), |c| c.into()),
             )
             .keep_alive(opts.keep_alive_config.map(Into::into))
-            .http_connect_proxy(opts.http_connect_proxy_config.map(Into::into))
-            .headers(Some(ascii_headers))
-            .binary_headers(Some(binary_headers))
-            .api_key(opts.api_key);
-        // Builder does not allow us to set option here, so we have to make
-        // a conditional to even call it
-        if let Some(tls_config) = opts.tls_config {
-            gateway_opts.tls_cfg(tls_config.try_into()?);
-        }
-        gateway_opts
-            .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid client config: {err}")))
+            .maybe_http_connect_proxy(opts.http_connect_proxy_config.map(Into::into))
+            .headers(ascii_headers)
+            .binary_headers(binary_headers)
+            .maybe_api_key(opts.api_key)
+            .maybe_tls_options(tls_options);
+            
+        Ok(gateway_opts
+            .build())
     }
 }
 
-impl TryFrom<ClientTlsConfig> for temporalio_client::TlsConfig {
+impl TryFrom<ClientTlsConfig> for temporalio_client::TlsOptions {
     type Error = PyErr;
 
     fn try_from(conf: ClientTlsConfig) -> PyResult<Self> {
-        Ok(TlsConfig {
+        Ok(TlsOptions {
             server_root_ca_cert: conf.server_root_ca_cert,
             domain: conf.domain,
-            client_tls_config: match (conf.client_cert, conf.client_private_key) {
+            client_tls_options: match (conf.client_cert, conf.client_private_key) {
                 (None, None) => None,
                 (Some(client_cert), Some(client_private_key)) => {
-                    Some(temporalio_client::ClientTlsConfig {
+                    Some(temporalio_client::ClientTlsOptions {
                         client_cert,
                         client_private_key,
                     })
@@ -284,9 +283,9 @@ impl TryFrom<ClientTlsConfig> for temporalio_client::TlsConfig {
     }
 }
 
-impl From<ClientRetryConfig> for RetryConfig {
+impl From<ClientRetryConfig> for RetryOptions {
     fn from(conf: ClientRetryConfig) -> Self {
-        RetryConfig {
+        RetryOptions {
             initial_interval: Duration::from_millis(conf.initial_interval_millis),
             randomization_factor: conf.randomization_factor,
             multiplier: conf.multiplier,
@@ -297,9 +296,9 @@ impl From<ClientRetryConfig> for RetryConfig {
     }
 }
 
-impl From<ClientKeepAliveConfig> for CoreClientKeepAliveConfig {
+impl From<ClientKeepAliveConfig> for ClientKeepAliveOptions {
     fn from(conf: ClientKeepAliveConfig) -> Self {
-        CoreClientKeepAliveConfig {
+        ClientKeepAliveOptions {
             interval: Duration::from_millis(conf.interval_millis),
             timeout: Duration::from_millis(conf.timeout_millis),
         }
