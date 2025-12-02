@@ -8,9 +8,8 @@ use temporalio_client::tonic::{
     metadata::{AsciiMetadataKey, AsciiMetadataValue, BinaryMetadataKey, BinaryMetadataValue},
 };
 use temporalio_client::{
-    ClientKeepAliveOptions, ClientOptions,
-    ConfiguredClient, HttpConnectProxyOptions, RetryClient, RetryOptions, TemporalServiceClient,
-    TlsOptions,
+    ClientKeepAliveOptions, ClientOptions, ConfiguredClient, HttpConnectProxyOptions, RetryClient,
+    RetryOptions, TemporalServiceClient, TlsOptions,
 };
 use url::Url;
 
@@ -232,8 +231,10 @@ impl TryFrom<ClientConfig> for ClientOptions {
         let gateway_opts = ClientOptions::builder();
         let (ascii_headers, binary_headers) = partition_headers(opts.metadata);
         let tls_options = if let Some(tls_config) = opts.tls_config {
-                Some(tls_config.try_into()?)
-            } else { None };
+            Some(tls_config.try_into()?)
+        } else {
+            None
+        };
         let gateway_opts = gateway_opts
             .target_url(
                 Url::parse(&opts.target_url)
@@ -252,9 +253,8 @@ impl TryFrom<ClientConfig> for ClientOptions {
             .binary_headers(binary_headers)
             .maybe_api_key(opts.api_key)
             .maybe_tls_options(tls_options);
-            
-        Ok(gateway_opts
-            .build())
+
+        Ok(gateway_opts.build())
     }
 }
 
