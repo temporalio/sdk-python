@@ -10,7 +10,7 @@ from typing import List, Mapping
 
 base_dir = Path(__file__).parent.parent
 proto_dir = (
-    base_dir / "temporalio" / "bridge" / "sdk-core" / "sdk-core-protos" / "protos"
+    base_dir / "temporalio" / "bridge" / "sdk-core" / "crates" / "common" / "protos"
 )
 api_proto_dir = proto_dir / "api_upstream"
 api_cloud_proto_dir = proto_dir / "api_cloud_upstream"

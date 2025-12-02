@@ -242,11 +242,12 @@ class Client:
             service_client=service_client,
             namespace=namespace,
             data_converter=data_converter,
+            plugins=plugins,
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
             header_codec_behavior=header_codec_behavior,
-            plugins=plugins,
         )
+        self._initial_config = config.copy()
 
         for plugin in plugins:
             config = plugin.configure_client(config)
@@ -261,12 +262,16 @@ class Client:
         for interceptor in reversed(list(self._config["interceptors"])):
             self._impl = interceptor.intercept_client(self._impl)
 
-    def config(self) -> ClientConfig:
+    def config(self, *, active_config: bool = False) -> ClientConfig:
         """Config, as a dictionary, used to create this client.
+
+        Args:
+            active_config: If true, return the modified configuration in use rather than the initial one
+                provided to the client.
 
         This makes a shallow copy of the config each call.
         """
-        config = self._config.copy()
+        config = self._config.copy() if active_config else self._initial_config.copy()
         config["interceptors"] = list(config["interceptors"])
         return config
 
@@ -1555,12 +1560,12 @@ class ClientConfig(TypedDict, total=False):
     service_client: Required[temporalio.service.ServiceClient]
     namespace: Required[str]
     data_converter: Required[temporalio.converter.DataConverter]
+    plugins: Required[Sequence[Plugin]]
     interceptors: Required[Sequence[Interceptor]]
     default_workflow_query_reject_condition: Required[
         Optional[temporalio.common.QueryRejectCondition]
     ]
     header_codec_behavior: Required[HeaderCodecBehavior]
-    plugins: Required[Sequence[Plugin]]
 
 
 class WorkflowHistoryEventFilterType(IntEnum):
@@ -4290,7 +4295,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             await _apply_headers(
                 self.headers,
                 action.start_workflow.header.fields,
-                client.config()["header_codec_behavior"] == HeaderCodecBehavior.CODEC
+                client.config(active_config=True)["header_codec_behavior"]
+                == HeaderCodecBehavior.CODEC
                 and not self._from_raw,
                 client.data_converter.payload_codec,
             )
@@ -6917,7 +6923,8 @@ class _ClientImpl(OutboundInterceptor):
         await _apply_headers(
             source,
             dest,
-            self._client.config()["header_codec_behavior"] == HeaderCodecBehavior.CODEC,
+            self._client.config(active_config=True)["header_codec_behavior"]
+            == HeaderCodecBehavior.CODEC,
             self._client.data_converter.payload_codec,
         )
 
