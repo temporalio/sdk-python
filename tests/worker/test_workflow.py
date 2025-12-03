@@ -35,8 +35,6 @@ from typing import (
 )
 from urllib.request import urlopen
 
-import nexusrpc
-import nexusrpc.handler
 import pydantic
 import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -49,7 +47,7 @@ import temporalio.converter
 import temporalio.worker
 import temporalio.worker._command_aware_visitor
 import temporalio.workflow
-from temporalio import activity, nexus, workflow
+from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.failure.v1 import Failure
@@ -155,7 +153,7 @@ from tests.helpers.external_stack_trace import (
     ExternalStackTraceWorkflow,
     external_wait_cancel,
 )
-from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+from tests.helpers.metrics import PromMetricMatcher
 
 
 @workflow.defn
@@ -3933,35 +3931,10 @@ async def custom_metrics_activity() -> None:
     counter.add(34, {"my-activity-extra-attr": 12.34})
 
 
-@nexusrpc.handler.service_handler
-class CustomMetricsService:
-    @nexusrpc.handler.sync_operation
-    async def custom_metric_op(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: None
-    ) -> None:
-        counter = nexus.metric_meter().create_counter(
-            "my-operation-counter", "my-operation-description", "my-operation-unit"
-        )
-        counter.add(12)
-        counter.add(30, {"my-operation-extra-attr": 12.34})
-
-    @nexusrpc.handler.sync_operation
-    def custom_metric_op_executor(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: None
-    ) -> None:
-        counter = nexus.metric_meter().create_counter(
-            "my-executor-operation-counter",
-            "my-executor-operation-description",
-            "my-executor-operation-unit",
-        )
-        counter.add(12)
-        counter.add(30, {"my-executor-operation-extra-attr": 12.34})
-
-
 @workflow.defn
 class CustomMetricsWorkflow:
     @workflow.run
-    async def run(self, task_queue: str) -> None:
+    async def run(self) -> None:
         await workflow.execute_activity(
             custom_metrics_activity, schedule_to_close_timeout=timedelta(seconds=30)
         )
@@ -3974,39 +3947,15 @@ class CustomMetricsWorkflow:
             78
         )
 
-        nexus_client = workflow.create_nexus_client(
-            service=CustomMetricsService, endpoint=make_nexus_endpoint_name(task_queue)
-        )
-
-        try:
-            await nexus_client.execute_operation(
-                CustomMetricsService.custom_metric_op, None
-            )
-            await nexus_client.execute_operation(
-                CustomMetricsService.custom_metric_op_executor, None
-            )
-        except RuntimeError as err:
-            raise ApplicationError(
-                "Could not execute nexus custom metrics functions", non_retryable=True
-            ) from err
-
 
 async def test_workflow_custom_metrics(client: Client):
     # Run worker with default runtime which is noop meter just to confirm it
     # doesn't fail
-    task_queue = str(uuid.uuid4())
-    await create_nexus_endpoint(task_queue, client)
     async with new_worker(
-        client,
-        CustomMetricsWorkflow,
-        task_queue=task_queue,
-        activities=[custom_metrics_activity],
-        nexus_service_handlers=[CustomMetricsService()],
-        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+        client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
     ) as worker:
         await client.execute_workflow(
             CustomMetricsWorkflow.run,
-            worker.task_queue,
             id=f"wf-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
@@ -4032,12 +3981,7 @@ async def test_workflow_custom_metrics(client: Client):
     )
 
     async with new_worker(
-        client,
-        CustomMetricsWorkflow,
-        task_queue=task_queue,
-        activities=[custom_metrics_activity],
-        nexus_service_handlers=[CustomMetricsService()],
-        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+        client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
     ) as worker:
         # Record a gauge at runtime level
         gauge = runtime.metric_meter.with_additional_attributes(
@@ -4048,7 +3992,6 @@ async def test_workflow_custom_metrics(client: Client):
         # Run workflow
         await client.execute_workflow(
             CustomMetricsWorkflow.run,
-            worker.task_queue,
             id=f"wf-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
@@ -4058,33 +4001,13 @@ async def test_workflow_custom_metrics(client: Client):
             prom_str: str = f.read().decode("utf-8")
             prom_lines = prom_str.splitlines()
 
-        # Intentionally naive metric checker
-        def matches_metric_line(
-            line: str, name: str, at_least_labels: Mapping[str, str], value: int
-        ) -> bool:
-            # Must have metric name
-            if not line.startswith(name + "{"):
-                return False
-            # Must have labels (don't escape for this test)
-            for k, v in at_least_labels.items():
-                if f'{k}="{v}"' not in line:
-                    return False
-            return line.endswith(f" {value}")
-
-        def assert_metric_exists(
-            name: str, at_least_labels: Mapping[str, str], value: int
-        ) -> None:
-            assert any(
-                matches_metric_line(line, name, at_least_labels, value)
-                for line in prom_lines
-            )
-
-        def assert_description_exists(name: str, description: str) -> None:
-            assert f"# HELP {name} {description}" in prom_lines
+        prom_matcher = PromMetricMatcher(prom_lines)
 
         # Check some metrics are as we expect
-        assert_description_exists("my_runtime_gauge", "my-runtime-description")
-        assert_metric_exists(
+        prom_matcher.assert_description_exists(
+            "my_runtime_gauge", "my-runtime-description"
+        )
+        prom_matcher.assert_metric_exists(
             "my_runtime_gauge",
             {
                 "my_runtime_extra_attr1": "val1",
@@ -4094,9 +4017,11 @@ async def test_workflow_custom_metrics(client: Client):
             },
             90,
         )
-        assert_description_exists("my_workflow_histogram", "my-workflow-description")
-        assert_metric_exists("my_workflow_histogram_sum", {}, 56)
-        assert_metric_exists(
+        prom_matcher.assert_description_exists(
+            "my_workflow_histogram", "my-workflow-description"
+        )
+        prom_matcher.assert_metric_exists("my_workflow_histogram_sum", {}, 56)
+        prom_matcher.assert_metric_exists(
             "my_workflow_histogram_sum",
             {
                 "my_workflow_extra_attr": "1234",
@@ -4107,9 +4032,11 @@ async def test_workflow_custom_metrics(client: Client):
             },
             78,
         )
-        assert_description_exists("my_activity_counter", "my-activity-description")
-        assert_metric_exists("my_activity_counter", {}, 12)
-        assert_metric_exists(
+        prom_matcher.assert_description_exists(
+            "my_activity_counter", "my-activity-description"
+        )
+        prom_matcher.assert_metric_exists("my_activity_counter", {}, 12)
+        prom_matcher.assert_metric_exists(
             "my_activity_counter",
             {
                 "my_activity_extra_attr": "12.34",
@@ -4120,36 +4047,8 @@ async def test_workflow_custom_metrics(client: Client):
             },
             34,
         )
-        assert_description_exists("my_operation_counter", "my-operation-description")
-        assert_metric_exists("my_operation_counter", {}, 12)
-        assert_metric_exists(
-            "my_operation_counter",
-            {
-                "my_operation_extra_attr": "12.34",
-                # Also confirm some nexus operation labels
-                "nexus_service": CustomMetricsService.__name__,
-                "nexus_operation": CustomMetricsService.custom_metric_op.__name__,
-                "task_queue": worker.task_queue,
-            },
-            30,
-        )
-        assert_description_exists(
-            "my_executor_operation_counter", "my-executor-operation-description"
-        )
-        assert_metric_exists("my_executor_operation_counter", {}, 12)
-        assert_metric_exists(
-            "my_executor_operation_counter",
-            {
-                "my_executor_operation_extra_attr": "12.34",
-                # Also confirm some nexus operation labels
-                "nexus_service": CustomMetricsService.__name__,
-                "nexus_operation": CustomMetricsService.custom_metric_op_executor.__name__,
-                "task_queue": worker.task_queue,
-            },
-            30,
-        )
         # Also check Temporal metric got its prefix
-        assert_metric_exists(
+        prom_matcher.assert_metric_exists(
             "foo_workflow_completed", {"workflow_type": "CustomMetricsWorkflow"}, 1
         )
 
@@ -4220,19 +4119,11 @@ async def test_workflow_buffered_metrics(client: Client):
         namespace=client.namespace,
         runtime=runtime,
     )
-    task_queue = str(uuid.uuid4())
-    await create_nexus_endpoint(task_queue, client)
     async with new_worker(
-        client,
-        CustomMetricsWorkflow,
-        task_queue=task_queue,
-        activities=[custom_metrics_activity],
-        nexus_service_handlers=[CustomMetricsService()],
-        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+        client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
     ) as worker:
         await client.execute_workflow(
             CustomMetricsWorkflow.run,
-            worker.task_queue,
             id=f"wf-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
@@ -4282,43 +4173,6 @@ async def test_workflow_buffered_metrics(client: Client):
         update.metric.name == "some_prefix_workflow_completed"
         and update.attributes["workflow_type"] == "CustomMetricsWorkflow"
         and update.value == 1
-        for update in updates
-    )
-    # Check for Nexus metrics too
-    assert any(
-        update.metric.name == "my-operation-counter"
-        and update.metric.kind == BUFFERED_METRIC_KIND_COUNTER
-        and update.metric.description == "my-operation-description"
-        and update.attributes["nexus_service"] == CustomMetricsService.__name__
-        and update.attributes["nexus_operation"]
-        == CustomMetricsService.custom_metric_op.__name__
-        and update.attributes["task_queue"] == worker.task_queue
-        and "my-operation-extra-attr" not in update.attributes
-        and update.value == 12
-        for update in updates
-    )
-    assert any(
-        update.metric.name == "my-operation-counter"
-        and update.attributes.get("my-operation-extra-attr") == 12.34
-        and update.value == 30
-        for update in updates
-    )
-    assert any(
-        update.metric.name == "my-executor-operation-counter"
-        and update.metric.description == "my-executor-operation-description"
-        and update.metric.kind == BUFFERED_METRIC_KIND_COUNTER
-        and update.attributes["nexus_service"] == CustomMetricsService.__name__
-        and update.attributes["nexus_operation"]
-        == CustomMetricsService.custom_metric_op_executor.__name__
-        and update.attributes["task_queue"] == worker.task_queue
-        and "my-executor-operation-extra-attr" not in update.attributes
-        and update.value == 12
-        for update in updates
-    )
-    assert any(
-        update.metric.name == "my-executor-operation-counter"
-        and update.attributes.get("my-executor-operation-extra-attr") == 12.34
-        and update.value == 30
         for update in updates
     )
 

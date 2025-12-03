@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import uuid
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Any, Awaitable, Callable, Union
+from urllib.request import urlopen
 
 import nexusrpc
 import nexusrpc.handler
@@ -37,9 +39,18 @@ from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.converter import PayloadConverter
 from temporalio.exceptions import ApplicationError, CancelledError, NexusOperationError
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
+from temporalio.runtime import (
+    BUFFERED_METRIC_KIND_COUNTER,
+    MetricBuffer,
+    PrometheusConfig,
+    Runtime,
+    TelemetryConfig,
+)
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
+from tests.helpers import find_free_port, new_worker
+from tests.helpers.metrics import PromMetricMatcher
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 # TODO(nexus-prerelease): test availability of Temporal client etc in async context set by worker
@@ -239,7 +250,7 @@ class CallerWorkflow:
         request_cancel: bool,
         task_queue: str,
     ) -> None:
-        self.nexus_client: workflow.NexusClient[ServiceInterface] = (
+        self.nexus_client: workflow.NexusClient[ServiceInterface | ServiceImpl] = (
             workflow.create_nexus_client(
                 service={
                     CallerReference.IMPL_WITH_INTERFACE: ServiceImpl,
@@ -890,7 +901,7 @@ class ServiceInterfaceAndImplCallerWorkflow:
                 f"Invalid combination of caller_reference ({caller_reference}) and name_override ({name_override})"
             )
 
-        nexus_client = workflow.create_nexus_client(
+        nexus_client: workflow.NexusClient[Any] = workflow.create_nexus_client(
             service=service_cls,
             endpoint=make_nexus_endpoint_name(task_queue),
         )
@@ -1409,3 +1420,200 @@ async def test_workflow_run_operation_overloads(
             if op != "no_param"
             else OverloadTestValue(value=0)
         )
+
+
+@nexusrpc.handler.service_handler
+class CustomMetricsService:
+    @nexusrpc.handler.sync_operation
+    async def custom_metric_op(
+        self, ctx: nexusrpc.handler.StartOperationContext, input: None
+    ) -> None:
+        counter = nexus.metric_meter().create_counter(
+            "my-operation-counter", "my-operation-description", "my-operation-unit"
+        )
+        counter.add(12)
+        counter.add(30, {"my-operation-extra-attr": 12.34})
+
+    @nexusrpc.handler.sync_operation
+    def custom_metric_op_executor(
+        self, ctx: nexusrpc.handler.StartOperationContext, input: None
+    ) -> None:
+        counter = nexus.metric_meter().create_counter(
+            "my-executor-operation-counter",
+            "my-executor-operation-description",
+            "my-executor-operation-unit",
+        )
+        counter.add(12)
+        counter.add(30, {"my-executor-operation-extra-attr": 12.34})
+
+
+@workflow.defn
+class CustomMetricsWorkflow:
+    @workflow.run
+    async def run(self, task_queue: str) -> None:
+        nexus_client = workflow.create_nexus_client(
+            service=CustomMetricsService, endpoint=make_nexus_endpoint_name(task_queue)
+        )
+
+        await nexus_client.execute_operation(
+            CustomMetricsService.custom_metric_op, None
+        )
+        await nexus_client.execute_operation(
+            CustomMetricsService.custom_metric_op_executor, None
+        )
+
+
+async def test_workflow_caller_custom_metrics(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    # Run worker with default runtime which is noop meter just to confirm it
+    # doesn't fail
+    task_queue = str(uuid.uuid4())
+    await create_nexus_endpoint(task_queue, client)
+
+    # Create new runtime with Prom server
+    prom_addr = f"127.0.0.1:{find_free_port()}"
+    runtime = Runtime(
+        telemetry=TelemetryConfig(
+            metrics=PrometheusConfig(bind_address=prom_addr), metric_prefix="foo_"
+        )
+    )
+
+    # New client with the runtime
+    client = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        runtime=runtime,
+    )
+
+    async with new_worker(
+        client,
+        CustomMetricsWorkflow,
+        task_queue=task_queue,
+        nexus_service_handlers=[CustomMetricsService()],
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+    ) as worker:
+        # Run workflow
+        await client.execute_workflow(
+            CustomMetricsWorkflow.run,
+            worker.task_queue,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Get Prom dump
+        with urlopen(url=f"http://{prom_addr}/metrics") as f:
+            prom_str: str = f.read().decode("utf-8")
+            prom_lines = prom_str.splitlines()
+
+        prom_matcher = PromMetricMatcher(prom_lines)
+
+        prom_matcher.assert_description_exists(
+            "my_operation_counter", "my-operation-description"
+        )
+        prom_matcher.assert_metric_exists("my_operation_counter", {}, 12)
+        prom_matcher.assert_metric_exists(
+            "my_operation_counter",
+            {
+                "my_operation_extra_attr": "12.34",
+                # Also confirm some nexus operation labels
+                "nexus_service": CustomMetricsService.__name__,
+                "nexus_operation": CustomMetricsService.custom_metric_op.__name__,
+                "task_queue": worker.task_queue,
+            },
+            30,
+        )
+        prom_matcher.assert_description_exists(
+            "my_executor_operation_counter", "my-executor-operation-description"
+        )
+        prom_matcher.assert_metric_exists("my_executor_operation_counter", {}, 12)
+        prom_matcher.assert_metric_exists(
+            "my_executor_operation_counter",
+            {
+                "my_executor_operation_extra_attr": "12.34",
+                # Also confirm some nexus operation labels
+                "nexus_service": CustomMetricsService.__name__,
+                "nexus_operation": CustomMetricsService.custom_metric_op_executor.__name__,
+                "task_queue": worker.task_queue,
+            },
+            30,
+        )
+
+
+async def test_workflow_caller_buffered_metrics(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    # Create runtime with metric buffer
+    buffer = MetricBuffer(10000)
+    runtime = Runtime(
+        telemetry=TelemetryConfig(metrics=buffer, metric_prefix="some_prefix_")
+    )
+
+    # Confirm no updates yet
+    assert not buffer.retrieve_updates()
+
+    # Create a new client on the runtime and execute the custom metric workflow
+    client = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        runtime=runtime,
+    )
+    task_queue = str(uuid.uuid4())
+    await create_nexus_endpoint(task_queue, client)
+    async with new_worker(
+        client,
+        CustomMetricsWorkflow,
+        task_queue=task_queue,
+        nexus_service_handlers=[CustomMetricsService()],
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+    ) as worker:
+        await client.execute_workflow(
+            CustomMetricsWorkflow.run,
+            worker.task_queue,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+    # Drain updates and confirm updates exist as expected
+    updates = buffer.retrieve_updates()
+    # Check for Nexus metrics
+    assert any(
+        update.metric.name == "my-operation-counter"
+        and update.metric.kind == BUFFERED_METRIC_KIND_COUNTER
+        and update.metric.description == "my-operation-description"
+        and update.attributes["nexus_service"] == CustomMetricsService.__name__
+        and update.attributes["nexus_operation"]
+        == CustomMetricsService.custom_metric_op.__name__
+        and update.attributes["task_queue"] == worker.task_queue
+        and "my-operation-extra-attr" not in update.attributes
+        and update.value == 12
+        for update in updates
+    )
+    assert any(
+        update.metric.name == "my-operation-counter"
+        and update.attributes.get("my-operation-extra-attr") == 12.34
+        and update.value == 30
+        for update in updates
+    )
+    assert any(
+        update.metric.name == "my-executor-operation-counter"
+        and update.metric.description == "my-executor-operation-description"
+        and update.metric.kind == BUFFERED_METRIC_KIND_COUNTER
+        and update.attributes["nexus_service"] == CustomMetricsService.__name__
+        and update.attributes["nexus_operation"]
+        == CustomMetricsService.custom_metric_op_executor.__name__
+        and update.attributes["task_queue"] == worker.task_queue
+        and "my-executor-operation-extra-attr" not in update.attributes
+        and update.value == 12
+        for update in updates
+    )
+    assert any(
+        update.metric.name == "my-executor-operation-counter"
+        and update.attributes.get("my-executor-operation-extra-attr") == 12.34
+        and update.value == 30
+        for update in updates
+    )
