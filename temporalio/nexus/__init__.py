@@ -17,4 +17,5 @@ from ._operation_context import client as client
 from ._operation_context import in_operation as in_operation
 from ._operation_context import info as info
 from ._operation_context import logger as logger
+from ._operation_context import metric_meter as metric_meter
 from ._token import WorkflowHandle as WorkflowHandle

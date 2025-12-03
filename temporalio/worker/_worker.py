@@ -108,7 +108,7 @@ class Worker:
         workflows: Sequence[Type] = [],
         activity_executor: Optional[concurrent.futures.Executor] = None,
         workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
-        nexus_task_executor: Optional[concurrent.futures.Executor] = None,
+        nexus_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
         workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
         unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         plugins: Sequence[Plugin] = [],
@@ -187,8 +187,7 @@ class Worker:
                 the worker is shut down.
             nexus_task_executor: Executor to use for non-async
                 Nexus operations. This is required if any operation start methods
-                are non-`async def`. :py:class:`concurrent.futures.ThreadPoolExecutor`
-                is recommended.
+                are non-`async def`.
 
                 .. warning::
                     This parameter is experimental and unstable.
@@ -880,7 +879,7 @@ class WorkerConfig(TypedDict, total=False):
     workflows: Sequence[Type]
     activity_executor: Optional[concurrent.futures.Executor]
     workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
-    nexus_task_executor: Optional[concurrent.futures.Executor]
+    nexus_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
     workflow_runner: WorkflowRunner
     unsandboxed_workflow_runner: WorkflowRunner
     plugins: Sequence[Plugin]
