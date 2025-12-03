@@ -1,6 +1,7 @@
 import re
+from collections.abc import Mapping
 from datetime import timedelta
-from typing import Any, Mapping, Union, cast
+from typing import Any, Union, cast
 
 import pytest
 from google.protobuf.empty_pb2 import Empty
@@ -38,9 +39,9 @@ def assert_time_remaining(context: ServicerContext, expected: int) -> None:
 class SimpleWorkflowServer(WorkflowServiceServicer):
     def __init__(self) -> None:
         super().__init__()
-        self.last_metadata: Mapping[str, Union[str, bytes]] = {}
+        self.last_metadata: Mapping[str, str | bytes] = {}
 
-    def assert_last_metadata(self, expected: Mapping[str, Union[str, bytes]]) -> None:
+    def assert_last_metadata(self, expected: Mapping[str, str | bytes]) -> None:
         for k, v in expected.items():
             assert self.last_metadata.get(k) == v
 

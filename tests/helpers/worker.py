@@ -9,9 +9,10 @@ from __future__ import annotations
 import asyncio
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, Sequence, Tuple
+from typing import Any, Optional, Tuple
 
 import temporalio.converter
 from temporalio import workflow
@@ -23,32 +24,32 @@ from temporalio.worker import Worker
 
 @dataclass
 class KSWorkflowParams:
-    actions: Optional[Sequence[KSAction]] = None
-    action_signal: Optional[str] = None
+    actions: Sequence[KSAction] | None = None
+    action_signal: str | None = None
 
 
 @dataclass
 class KSAction:
-    result: Optional[KSResultAction] = None
-    error: Optional[KSErrorAction] = None
-    continue_as_new: Optional[KSContinueAsNewAction] = None
-    sleep: Optional[KSSleepAction] = None
-    query_handler: Optional[KSQueryHandlerAction] = None
-    signal: Optional[KSSignalAction] = None
-    execute_activity: Optional[KSExecuteActivityAction] = None
+    result: KSResultAction | None = None
+    error: KSErrorAction | None = None
+    continue_as_new: KSContinueAsNewAction | None = None
+    sleep: KSSleepAction | None = None
+    query_handler: KSQueryHandlerAction | None = None
+    signal: KSSignalAction | None = None
+    execute_activity: KSExecuteActivityAction | None = None
 
 
 @dataclass
 class KSResultAction:
-    value: Optional[Any] = None
-    run_id: Optional[bool] = None
+    value: Any | None = None
+    run_id: bool | None = None
 
 
 @dataclass
 class KSErrorAction:
-    message: Optional[str] = None
-    details: Optional[Any] = None
-    attempt: Optional[bool] = None
+    message: str | None = None
+    details: Any | None = None
+    attempt: bool | None = None
 
 
 @dataclass
@@ -74,18 +75,18 @@ class KSSignalAction:
 @dataclass
 class KSExecuteActivityAction:
     name: str
-    task_queue: Optional[str] = None
-    args: Optional[Sequence[Any]] = None
-    count: Optional[int] = None
-    index_as_arg: Optional[bool] = None
-    schedule_to_close_timeout_ms: Optional[int] = None
-    start_to_close_timeout_ms: Optional[int] = None
-    schedule_to_start_timeout_ms: Optional[int] = None
-    cancel_after_ms: Optional[int] = None
-    wait_for_cancellation: Optional[bool] = None
-    heartbeat_timeout_ms: Optional[int] = None
-    retry_max_attempts: Optional[int] = None
-    non_retryable_error_types: Optional[Sequence[str]] = None
+    task_queue: str | None = None
+    args: Sequence[Any] | None = None
+    count: int | None = None
+    index_as_arg: bool | None = None
+    schedule_to_close_timeout_ms: int | None = None
+    start_to_close_timeout_ms: int | None = None
+    schedule_to_start_timeout_ms: int | None = None
+    cancel_after_ms: int | None = None
+    wait_for_cancellation: bool | None = None
+    heartbeat_timeout_ms: int | None = None
+    retry_max_attempts: int | None = None
+    non_retryable_error_types: Sequence[str] | None = None
 
 
 @workflow.defn(name="kitchen_sink")
@@ -110,7 +111,7 @@ class KitchenSinkWorkflow:
 
     async def handle_action(
         self, params: KSWorkflowParams, action: KSAction
-    ) -> Tuple[bool, Any]:
+    ) -> tuple[bool, Any]:
         if action.result:
             if action.result.run_id:
                 return (True, workflow.info().run_id)
@@ -131,7 +132,7 @@ class KitchenSinkWorkflow:
         elif action.signal:
             signal_event = asyncio.Event()
 
-            def signal_handler(arg: Optional[Any] = None) -> None:
+            def signal_handler(arg: Any | None = None) -> None:
                 signal_event.set()
 
             workflow.set_signal_handler(action.signal.name, signal_handler)
@@ -205,8 +206,8 @@ class KitchenSinkWorkflow:
 
 
 def kitchen_sink_retry_policy(
-    maximum_attempts: Optional[int] = None,
-    non_retryable_error_types: Optional[Sequence[str]] = None,
+    maximum_attempts: int | None = None,
+    non_retryable_error_types: Sequence[str] | None = None,
 ) -> RetryPolicy:
     return RetryPolicy(
         initial_interval=timedelta(milliseconds=1),

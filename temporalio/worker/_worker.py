@@ -8,21 +8,20 @@ import hashlib
 import logging
 import sys
 import warnings
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
     Any,
-    Awaitable,
-    Callable,
     List,
     Optional,
-    Sequence,
     Type,
+    TypeAlias,
     Union,
     cast,
 )
 
-from typing_extensions import TypeAlias, TypedDict
+from typing_extensions import TypedDict
 
 import temporalio.bridge.worker
 import temporalio.client
@@ -105,40 +104,40 @@ class Worker:
         task_queue: str,
         activities: Sequence[Callable] = [],
         nexus_service_handlers: Sequence[Any] = [],
-        workflows: Sequence[Type] = [],
-        activity_executor: Optional[concurrent.futures.Executor] = None,
-        workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
-        nexus_task_executor: Optional[concurrent.futures.Executor] = None,
+        workflows: Sequence[type] = [],
+        activity_executor: concurrent.futures.Executor | None = None,
+        workflow_task_executor: concurrent.futures.ThreadPoolExecutor | None = None,
+        nexus_task_executor: concurrent.futures.Executor | None = None,
         workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
         unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         plugins: Sequence[Plugin] = [],
         interceptors: Sequence[Interceptor] = [],
-        build_id: Optional[str] = None,
-        identity: Optional[str] = None,
+        build_id: str | None = None,
+        identity: str | None = None,
         max_cached_workflows: int = 1000,
-        max_concurrent_workflow_tasks: Optional[int] = None,
-        max_concurrent_activities: Optional[int] = None,
-        max_concurrent_local_activities: Optional[int] = None,
-        max_concurrent_nexus_tasks: Optional[int] = None,
-        tuner: Optional[WorkerTuner] = None,
-        max_concurrent_workflow_task_polls: Optional[int] = None,
+        max_concurrent_workflow_tasks: int | None = None,
+        max_concurrent_activities: int | None = None,
+        max_concurrent_local_activities: int | None = None,
+        max_concurrent_nexus_tasks: int | None = None,
+        tuner: WorkerTuner | None = None,
+        max_concurrent_workflow_task_polls: int | None = None,
         nonsticky_to_sticky_poll_ratio: float = 0.2,
-        max_concurrent_activity_task_polls: Optional[int] = None,
+        max_concurrent_activity_task_polls: int | None = None,
         no_remote_activities: bool = False,
         sticky_queue_schedule_to_start_timeout: timedelta = timedelta(seconds=10),
         max_heartbeat_throttle_interval: timedelta = timedelta(seconds=60),
         default_heartbeat_throttle_interval: timedelta = timedelta(seconds=30),
-        max_activities_per_second: Optional[float] = None,
-        max_task_queue_activities_per_second: Optional[float] = None,
+        max_activities_per_second: float | None = None,
+        max_task_queue_activities_per_second: float | None = None,
         graceful_shutdown_timeout: timedelta = timedelta(),
-        workflow_failure_exception_types: Sequence[Type[BaseException]] = [],
-        shared_state_manager: Optional[SharedStateManager] = None,
+        workflow_failure_exception_types: Sequence[type[BaseException]] = [],
+        shared_state_manager: SharedStateManager | None = None,
         debug_mode: bool = False,
         disable_eager_activity_execution: bool = False,
-        on_fatal_error: Optional[Callable[[BaseException], Awaitable[None]]] = None,
+        on_fatal_error: Callable[[BaseException], Awaitable[None]] | None = None,
         use_worker_versioning: bool = False,
         disable_safe_workflow_eviction: bool = False,
-        deployment_config: Optional[WorkerDeploymentConfig] = None,
+        deployment_config: WorkerDeploymentConfig | None = None,
         workflow_task_poller_behavior: PollerBehavior = PollerBehaviorSimpleMaximum(
             maximum=5
         ),
@@ -367,7 +366,7 @@ class Worker:
         )
 
         plugins_from_client = cast(
-            List[Plugin],
+            list[Plugin],
             [p for p in client.config()["plugins"] if isinstance(p, Plugin)],
         )
         for client_plugin in plugins_from_client:
@@ -411,7 +410,7 @@ class Worker:
         # Prepend applicable client interceptors to the given ones
         client_config = config["client"].config(active_config=True)
         interceptors_from_client = cast(
-            List[Interceptor],
+            list[Interceptor],
             [i for i in client_config["interceptors"] if isinstance(i, Interceptor)],
         )
         interceptors = interceptors_from_client + list(config["interceptors"])
@@ -422,11 +421,11 @@ class Worker:
         self._started = False
         self._shutdown_event = asyncio.Event()
         self._shutdown_complete_event = asyncio.Event()
-        self._async_context_inner_task: Optional[asyncio.Task] = None
-        self._async_context_run_task: Optional[asyncio.Task] = None
-        self._async_context_run_exception: Optional[BaseException] = None
+        self._async_context_inner_task: asyncio.Task | None = None
+        self._async_context_run_task: asyncio.Task | None = None
+        self._async_context_run_exception: BaseException | None = None
 
-        self._activity_worker: Optional[_ActivityWorker] = None
+        self._activity_worker: _ActivityWorker | None = None
         self._runtime = (
             bridge_client.config.runtime or temporalio.runtime.Runtime.default()
         )
@@ -446,7 +445,7 @@ class Worker:
                     client_config["header_codec_behavior"] == HeaderCodecBehavior.CODEC
                 ),
             )
-        self._nexus_worker: Optional[_NexusWorker] = None
+        self._nexus_worker: _NexusWorker | None = None
         if config["nexus_service_handlers"]:
             _warn_if_nexus_task_executor_max_workers_is_inconsistent(config)
             self._nexus_worker = _NexusWorker(
@@ -459,7 +458,7 @@ class Worker:
                 metric_meter=self._runtime.metric_meter,
                 executor=config["nexus_task_executor"],
             )
-        self._workflow_worker: Optional[_WorkflowWorker] = None
+        self._workflow_worker: _WorkflowWorker | None = None
         if config["workflows"]:
             should_enforce_versioning_behavior = (
                 config["deployment_config"] is not None
@@ -555,7 +554,7 @@ class Worker:
                 maximum=config["max_concurrent_activity_task_polls"]
             )
 
-        deduped_plugin_names = list(set([plugin.name() for plugin in self._plugins]))
+        deduped_plugin_names = list({plugin.name() for plugin in self._plugins})
 
         # Create bridge worker last. We have empirically observed that if it is
         # created before an error is raised from the activity worker
@@ -729,7 +728,7 @@ class Worker:
                 pass
 
         tasks: dict[
-            Union[None, _ActivityWorker, _WorkflowWorker, _NexusWorker], asyncio.Task
+            None | _ActivityWorker | _WorkflowWorker | _NexusWorker, asyncio.Task
         ] = {None: asyncio.create_task(raise_on_shutdown())}
         # Create tasks for workers
         if self._activity_worker:
@@ -857,7 +856,7 @@ class Worker:
         self._async_context_run_task = asyncio.create_task(run())
         return self
 
-    async def __aexit__(self, exc_type: Optional[Type[BaseException]], *args) -> None:
+    async def __aexit__(self, exc_type: type[BaseException] | None, *args) -> None:
         """Same as :py:meth:`shutdown` for use by ``async with``.
 
         Note, this will raise the worker fatal error if one occurred and the
@@ -881,40 +880,40 @@ class WorkerConfig(TypedDict, total=False):
     task_queue: str
     activities: Sequence[Callable]
     nexus_service_handlers: Sequence[Any]
-    workflows: Sequence[Type]
-    activity_executor: Optional[concurrent.futures.Executor]
-    workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
-    nexus_task_executor: Optional[concurrent.futures.Executor]
+    workflows: Sequence[type]
+    activity_executor: concurrent.futures.Executor | None
+    workflow_task_executor: concurrent.futures.ThreadPoolExecutor | None
+    nexus_task_executor: concurrent.futures.Executor | None
     workflow_runner: WorkflowRunner
     unsandboxed_workflow_runner: WorkflowRunner
     plugins: Sequence[Plugin]
     interceptors: Sequence[Interceptor]
-    build_id: Optional[str]
-    identity: Optional[str]
+    build_id: str | None
+    identity: str | None
     max_cached_workflows: int
-    max_concurrent_workflow_tasks: Optional[int]
-    max_concurrent_activities: Optional[int]
-    max_concurrent_local_activities: Optional[int]
-    max_concurrent_nexus_tasks: Optional[int]
-    tuner: Optional[WorkerTuner]
-    max_concurrent_workflow_task_polls: Optional[int]
+    max_concurrent_workflow_tasks: int | None
+    max_concurrent_activities: int | None
+    max_concurrent_local_activities: int | None
+    max_concurrent_nexus_tasks: int | None
+    tuner: WorkerTuner | None
+    max_concurrent_workflow_task_polls: int | None
     nonsticky_to_sticky_poll_ratio: float
-    max_concurrent_activity_task_polls: Optional[int]
+    max_concurrent_activity_task_polls: int | None
     no_remote_activities: bool
     sticky_queue_schedule_to_start_timeout: timedelta
     max_heartbeat_throttle_interval: timedelta
     default_heartbeat_throttle_interval: timedelta
-    max_activities_per_second: Optional[float]
-    max_task_queue_activities_per_second: Optional[float]
+    max_activities_per_second: float | None
+    max_task_queue_activities_per_second: float | None
     graceful_shutdown_timeout: timedelta
-    workflow_failure_exception_types: Sequence[Type[BaseException]]
-    shared_state_manager: Optional[SharedStateManager]
+    workflow_failure_exception_types: Sequence[type[BaseException]]
+    shared_state_manager: SharedStateManager | None
     debug_mode: bool
     disable_eager_activity_execution: bool
-    on_fatal_error: Optional[Callable[[BaseException], Awaitable[None]]]
+    on_fatal_error: Callable[[BaseException], Awaitable[None]] | None
     use_worker_versioning: bool
     disable_safe_workflow_eviction: bool
-    deployment_config: Optional[WorkerDeploymentConfig]
+    deployment_config: WorkerDeploymentConfig | None
     workflow_task_poller_behavior: PollerBehavior
     activity_task_poller_behavior: PollerBehavior
     nexus_task_poller_behavior: PollerBehavior
@@ -974,7 +973,7 @@ class WorkerDeploymentConfig:
         )
 
 
-_default_build_id: Optional[str] = None
+_default_build_id: str | None = None
 
 
 def load_default_build_id(*, memoize: bool = True) -> str:
@@ -1008,10 +1007,7 @@ def load_default_build_id(*, memoize: bool = True) -> str:
     # * Using the loader's get_code in rare cases can cause a compile()
 
     got_temporal_code = False
-    if sys.version_info < (3, 9):
-        m = hashlib.md5()
-    else:
-        m = hashlib.md5(usedforsecurity=False)
+    m = hashlib.md5(usedforsecurity=False)
     for mod_name in sorted(sys.modules):
         # Try to read code
         code = _get_module_code(mod_name)
@@ -1036,7 +1032,7 @@ def load_default_build_id(*, memoize: bool = True) -> str:
     return digest
 
 
-def _get_module_code(mod_name: str) -> Optional[bytes]:
+def _get_module_code(mod_name: str) -> bytes | None:
     # First try the module's loader and if that fails, try __cached__ file
     try:
         loader: Any = sys.modules[mod_name].__loader__
