@@ -19,6 +19,8 @@ from typing import Any, Callable, List, NoReturn, Optional, Sequence, Type
 
 import pytest
 
+import temporalio.api.common.v1
+import temporalio.exceptions
 import temporalio.api.workflowservice.v1
 from temporalio import activity, workflow
 from temporalio.client import (
