@@ -25,7 +25,6 @@ import google.protobuf.json_format
 import nexusrpc.handler
 from nexusrpc import LazyValue
 from nexusrpc.handler import CancelOperationContext, Handler, StartOperationContext
-from typing_extensions import Self
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
