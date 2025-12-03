@@ -91,7 +91,7 @@ class NoEventLoopPolicy(asyncio.AbstractEventLoopPolicy):  # type: ignore[name-d
 
 @pytest.fixture(scope="session")
 def env_type(request: pytest.FixtureRequest) -> str:
-    return request.config.getoption("--workflow-environment")
+    return request.config.getoption("--workflow-environment")  # type: ignore[reportReturnType]
 
 
 @pytest_asyncio.fixture(scope="session")
