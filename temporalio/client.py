@@ -125,7 +125,7 @@ class Client:
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
-        tls: Union[bool, TLSConfig] = False,
+        tls: Union[bool, TLSConfig, None] = None,
         retry_config: Optional[RetryConfig] = None,
         keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default,
         rpc_metadata: Mapping[str, Union[str, bytes]] = {},
@@ -166,9 +166,11 @@ class Client:
                 condition for workflow queries if not set during query. See
                 :py:meth:`WorkflowHandle.query` for details on the rejection
                 condition.
-            tls: If false, the default, do not use TLS. If true, use system
-                default TLS configuration. If TLS configuration present, that
-                TLS configuration will be used.
+            tls: If ``None``, the default, TLS will be enabled automatically
+                when ``api_key`` is provided, otherwise TLS is disabled. If
+                ``False``, do not use TLS. If ``True``, use system default TLS
+                configuration. If TLS configuration present, that TLS
+                configuration will be used.
             retry_config: Retry configuration for direct service calls (when
                 opted in) or all high-level calls made by this client (which all
                 opt-in to retries by default). If unset, a default retry
@@ -247,6 +249,7 @@ class Client:
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
             header_codec_behavior=header_codec_behavior,
         )
+        self._initial_config = config.copy()
 
         for plugin in plugins:
             config = plugin.configure_client(config)
@@ -261,12 +264,16 @@ class Client:
         for interceptor in reversed(list(self._config["interceptors"])):
             self._impl = interceptor.intercept_client(self._impl)
 
-    def config(self) -> ClientConfig:
+    def config(self, *, active_config: bool = False) -> ClientConfig:
         """Config, as a dictionary, used to create this client.
+
+        Args:
+            active_config: If true, return the modified configuration in use rather than the initial one
+                provided to the client.
 
         This makes a shallow copy of the config each call.
         """
-        config = self._config.copy()
+        config = self._config.copy() if active_config else self._initial_config.copy()
         config["interceptors"] = list(config["interceptors"])
         return config
 
@@ -4290,7 +4297,8 @@ class ScheduleActionStartWorkflow(ScheduleAction):
             await _apply_headers(
                 self.headers,
                 action.start_workflow.header.fields,
-                client.config()["header_codec_behavior"] == HeaderCodecBehavior.CODEC
+                client.config(active_config=True)["header_codec_behavior"]
+                == HeaderCodecBehavior.CODEC
                 and not self._from_raw,
                 client.data_converter.payload_codec,
             )
@@ -6917,7 +6925,8 @@ class _ClientImpl(OutboundInterceptor):
         await _apply_headers(
             source,
             dest,
-            self._client.config()["header_codec_behavior"] == HeaderCodecBehavior.CODEC,
+            self._client.config(active_config=True)["header_codec_behavior"]
+            == HeaderCodecBehavior.CODEC,
             self._client.data_converter.payload_codec,
         )
 
