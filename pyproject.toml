@@ -202,7 +202,6 @@ exclude = [
   "temporalio/api",
   "temporalio/bridge/proto",
   "tests/worker/workflow_sandbox/testmodules/proto",
-  "tests/contrib/test_opentelemetry.py",
   "tests/contrib/pydantic/models.py",
   "tests/contrib/pydantic/models_2.py",
   "tests/contrib/pydantic/test_pydantic.py",
