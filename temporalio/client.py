@@ -125,7 +125,7 @@ class Client:
         default_workflow_query_reject_condition: Optional[
             temporalio.common.QueryRejectCondition
         ] = None,
-        tls: Union[bool, TLSConfig] = False,
+        tls: Union[bool, TLSConfig, None] = None,
         retry_config: Optional[RetryConfig] = None,
         keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default,
         rpc_metadata: Mapping[str, Union[str, bytes]] = {},
@@ -166,9 +166,11 @@ class Client:
                 condition for workflow queries if not set during query. See
                 :py:meth:`WorkflowHandle.query` for details on the rejection
                 condition.
-            tls: If false, the default, do not use TLS. If true, use system
-                default TLS configuration. If TLS configuration present, that
-                TLS configuration will be used.
+            tls: If ``None``, the default, TLS will be enabled automatically
+                when ``api_key`` is provided, otherwise TLS is disabled. If
+                ``False``, do not use TLS. If ``True``, use system default TLS
+                configuration. If TLS configuration present, that TLS
+                configuration will be used.
             retry_config: Retry configuration for direct service calls (when
                 opted in) or all high-level calls made by this client (which all
                 opt-in to retries by default). If unset, a default retry
