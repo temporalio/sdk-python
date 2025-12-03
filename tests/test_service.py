@@ -130,8 +130,6 @@ class CallCollectingChannel(grpc.Channel):
 CallCollectingChannel.__abstractmethods__ = set()  # type: ignore[reportAttributeAccessIssue]
 
 
-
-
 def test_version():
     # Extract version from pyproject.toml
     with open(

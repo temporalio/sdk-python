@@ -199,6 +199,7 @@ reportUnnecessaryTypeIgnoreComment = "none"
 reportUnusedCallResult = "none"
 include = ["temporalio", "tests"]
 exclude = [
+  # Exclude auto generated files
   "temporalio/api",
   "temporalio/bridge/proto",
   "tests/worker/workflow_sandbox/testmodules/proto",
