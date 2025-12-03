@@ -183,7 +183,8 @@ class _TemporalStartOperationContext:
             if not wf_event_links:
                 wf_event_links = [
                     _link_conversion.workflow_execution_started_event_link_from_workflow_handle(
-                        workflow_handle
+                        workflow_handle,
+                        self.nexus_context.request_id,
                     )
                 ]
             self.nexus_context.outbound_links.extend(
