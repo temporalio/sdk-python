@@ -53,10 +53,10 @@ from typing_extensions import (
 
 import temporalio.api.common.v1
 import temporalio.bridge.proto.child_workflow
-import temporalio.bridge.proto.workflow_commands
 import temporalio.bridge.proto.common
 import temporalio.bridge.proto.nexus
 import temporalio.bridge.proto.workflow_activation
+import temporalio.bridge.proto.workflow_commands
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
@@ -1350,9 +1350,9 @@ def update(
     if not fn:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
-        return partial(decorator, name, unfinished_policy) # type: ignore[reportReturnType]
+        return partial(decorator, name, unfinished_policy)  # type: ignore[reportReturnType, return-value]
     else:
-        return decorator(fn.__name__, unfinished_policy, fn) # type: ignore[reportReturnType]
+        return decorator(fn.__name__, unfinished_policy, fn)  # type: ignore[reportReturnType, return-value]
 
 
 def _update_validator(

@@ -17,8 +17,8 @@ import temporalio.bridge.worker
 import temporalio.client
 import temporalio.converter
 import temporalio.runtime
-import temporalio.workflow
 import temporalio.worker
+import temporalio.workflow
 
 from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor
@@ -196,7 +196,7 @@ class Replayer:
         pusher = None
         workflow_worker_task = None
         bridge_worker_scope = None
-        
+
         try:
             last_replay_failure: Optional[Exception]
             last_replay_complete = asyncio.Event()
@@ -230,7 +230,9 @@ class Replayer:
             # Create worker referencing bridge worker
             bridge_worker: temporalio.bridge.worker.Worker
             task_queue = f"replay-{self._config.get('build_id')}"
-            runtime = self._config.get("runtime") or temporalio.runtime.Runtime.default()
+            runtime = (
+                self._config.get("runtime") or temporalio.runtime.Runtime.default()
+            )
             workflow_worker = _WorkflowWorker(
                 bridge_worker=lambda: bridge_worker,
                 namespace=self._config.get("namespace", "ReplayNamespace"),
@@ -238,9 +240,14 @@ class Replayer:
                 workflows=self._config.get("workflows", []),
                 workflow_task_executor=self._config.get("workflow_task_executor"),
                 max_concurrent_workflow_tasks=5,
-                workflow_runner=self._config.get("workflow_runner") or SandboxedWorkflowRunner(),
-                unsandboxed_workflow_runner=self._config.get("unsandboxed_workflow_runner") or UnsandboxedWorkflowRunner(),
-                data_converter=self._config.get("data_converter") or temporalio.converter.DataConverter.default,
+                workflow_runner=self._config.get("workflow_runner")
+                or SandboxedWorkflowRunner(),
+                unsandboxed_workflow_runner=self._config.get(
+                    "unsandboxed_workflow_runner"
+                )
+                or UnsandboxedWorkflowRunner(),
+                data_converter=self._config.get("data_converter")
+                or temporalio.converter.DataConverter.default,
                 interceptors=self._config.get("interceptors", []),
                 workflow_failure_exception_types=self._config.get(
                     "workflow_failure_exception_types", []
@@ -249,10 +256,14 @@ class Replayer:
                 metric_meter=runtime.metric_meter,
                 on_eviction_hook=on_eviction_hook,
                 disable_eager_activity_execution=False,
-                disable_safe_eviction=self._config.get("disable_safe_workflow_eviction", False),
+                disable_safe_eviction=self._config.get(
+                    "disable_safe_workflow_eviction", False
+                ),
                 should_enforce_versioning_behavior=False,
                 assert_local_activity_valid=lambda a: None,
-                encode_headers=self._config.get("header_codec_behavior", HeaderCodecBehavior.NO_CODEC)
+                encode_headers=self._config.get(
+                    "header_codec_behavior", HeaderCodecBehavior.NO_CODEC
+                )
                 != HeaderCodecBehavior.NO_CODEC,
             )
             # Create bridge worker

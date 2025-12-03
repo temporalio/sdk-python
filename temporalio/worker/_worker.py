@@ -487,21 +487,23 @@ class Worker:
                 task_queue=config["task_queue"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 workflows=workflows,
                 workflow_task_executor=config.get("workflow_task_executor"),
-                max_concurrent_workflow_tasks=config.get("max_concurrent_workflow_tasks"),
-                workflow_runner=config.get("workflow_runner"),  # type: ignore[reportArgumentType]
-                unsandboxed_workflow_runner=config.get("unsandboxed_workflow_runner"),  # type: ignore[reportArgumentType]
+                max_concurrent_workflow_tasks=config.get(
+                    "max_concurrent_workflow_tasks"
+                ),
+                workflow_runner=config["workflow_runner"],  # type: ignore[reportTypedDictNotRequiredAccess]
+                unsandboxed_workflow_runner=config["unsandboxed_workflow_runner"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 data_converter=client_config["data_converter"],
                 interceptors=interceptors,
-                workflow_failure_exception_types=config.get(
+                workflow_failure_exception_types=config[
                     "workflow_failure_exception_types"
-                ),  # type: ignore[reportArgumentType]
-                debug_mode=config.get("debug_mode"),  # type: ignore[reportArgumentType]
-                disable_eager_activity_execution=config.get(
+                ],  # type: ignore[reportTypedDictNotRequiredAccess]
+                debug_mode=config["debug_mode"],  # type: ignore[reportTypedDictNotRequiredAccess]
+                disable_eager_activity_execution=config[
                     "disable_eager_activity_execution"
-                ),  # type: ignore[reportArgumentType]
+                ],  # type: ignore[reportTypedDictNotRequiredAccess]
                 metric_meter=self._runtime.metric_meter,
                 on_eviction_hook=None,
-                disable_safe_eviction=config.get("disable_safe_workflow_eviction"),  # type: ignore[reportArgumentType]
+                disable_safe_eviction=config["disable_safe_workflow_eviction"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 should_enforce_versioning_behavior=should_enforce_versioning_behavior,
                 assert_local_activity_valid=check_activity,
                 encode_headers=client_config["header_codec_behavior"]
@@ -534,7 +536,9 @@ class Worker:
         versioning_strategy: temporalio.bridge.worker.WorkerVersioningStrategy
         deployment_config = config.get("deployment_config")
         if deployment_config:
-            versioning_strategy = deployment_config._to_bridge_worker_deployment_options()
+            versioning_strategy = (
+                deployment_config._to_bridge_worker_deployment_options()
+            )
         elif config.get("use_worker_versioning"):
             build_id = config.get("build_id") or load_default_build_id()
             versioning_strategy = (
@@ -548,13 +552,13 @@ class Worker:
                 build_id_no_versioning=build_id
             )
 
-        workflow_task_poller_behavior = config.get("workflow_task_poller_behavior")
+        workflow_task_poller_behavior = config["workflow_task_poller_behavior"]  # type: ignore[reportTypedDictNotRequiredAccess]
         max_workflow_polls = config.get("max_concurrent_workflow_task_polls")
         if max_workflow_polls:
             workflow_task_poller_behavior = PollerBehaviorSimpleMaximum(
                 maximum=max_workflow_polls
             )
-        activity_task_poller_behavior = config.get("activity_task_poller_behavior")
+        activity_task_poller_behavior = config["activity_task_poller_behavior"]  # type: ignore[reportTypedDictNotRequiredAccess]
         max_activity_polls = config.get("max_concurrent_activity_task_polls")
         if max_activity_polls:
             activity_task_poller_behavior = PollerBehaviorSimpleMaximum(
@@ -576,9 +580,9 @@ class Worker:
                 namespace=config["client"].namespace,  # type: ignore[reportTypedDictNotRequiredAccess]
                 task_queue=config["task_queue"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 identity_override=config.get("identity"),
-                max_cached_workflows=config.get("max_cached_workflows"),  # type: ignore[reportArgumentType]
+                max_cached_workflows=config["max_cached_workflows"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 tuner=bridge_tuner,
-                nonsticky_to_sticky_poll_ratio=config.get("nonsticky_to_sticky_poll_ratio"),  # type: ignore[reportArgumentType]
+                nonsticky_to_sticky_poll_ratio=config["nonsticky_to_sticky_poll_ratio"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 # We have to disable remote activities if a user asks _or_ if we
                 # are not running an activity worker at all. Otherwise shutdown
                 # will not proceed properly.
@@ -620,8 +624,8 @@ class Worker:
                     else set()
                 ),
                 versioning_strategy=versioning_strategy,
-                workflow_task_poller_behavior=workflow_task_poller_behavior._to_bridge(),  # type: ignore[reportOptionalMemberAccess]
-                activity_task_poller_behavior=activity_task_poller_behavior._to_bridge(),  # type: ignore[reportOptionalMemberAccess]
+                workflow_task_poller_behavior=workflow_task_poller_behavior._to_bridge(),
+                activity_task_poller_behavior=activity_task_poller_behavior._to_bridge(),
                 nexus_task_poller_behavior=config[
                     "nexus_task_poller_behavior"
                 ]._to_bridge(),  # type: ignore[reportTypedDictNotRequiredAccess,reportOptionalMemberAccess]

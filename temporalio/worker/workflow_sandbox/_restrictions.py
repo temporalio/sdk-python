@@ -877,6 +877,7 @@ class _RestrictedProxyLookup:
 
             def _bind_func(instance: _RestrictedProxy, obj: Any) -> Callable:
                 return access_func.__get__(obj, type(obj))  # type: ignore
+
             bind_func = _bind_func
 
         elif access_func is not None:
@@ -884,6 +885,7 @@ class _RestrictedProxyLookup:
 
             def _bind_func(instance: _RestrictedProxy, obj: Any) -> Callable:
                 return functools.partial(access_func, obj)  # type: ignore
+
             bind_func = _bind_func
 
         else:
