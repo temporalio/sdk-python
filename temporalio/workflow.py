@@ -54,6 +54,9 @@ from typing_extensions import (
 import temporalio.api.common.v1
 import temporalio.bridge.proto.child_workflow
 import temporalio.bridge.proto.workflow_commands
+import temporalio.bridge.proto.common
+import temporalio.bridge.proto.nexus
+import temporalio.bridge.proto.workflow_activation
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
@@ -117,7 +120,7 @@ def defn(
     dynamic: bool = False,
     failure_exception_types: Sequence[Type[BaseException]] = [],
     versioning_behavior: temporalio.common.VersioningBehavior = temporalio.common.VersioningBehavior.UNSPECIFIED,
-):
+) -> Callable[[ClassType], ClassType]:
     """Decorator for workflow classes.
 
     This must be set on any registered workflow class (it is ignored if on a
@@ -274,6 +277,9 @@ def signal(
     dynamic: Optional[bool] = False,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
     description: Optional[str] = None,
+) -> (
+    Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]
+    | CallableSyncOrAsyncReturnNoneType
 ):
     """Decorator for a workflow signal method.
 
@@ -1284,6 +1290,12 @@ def update(
     dynamic: Optional[bool] = False,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
     description: Optional[str] = None,
+) -> (
+    UpdateMethodMultiParam[MultiParamSpec, ReturnType]
+    | Callable[
+        [Callable[MultiParamSpec, ReturnType]],
+        UpdateMethodMultiParam[MultiParamSpec, ReturnType],
+    ]
 ):
     """Decorator for a workflow update handler method.
 
@@ -1338,9 +1350,9 @@ def update(
     if not fn:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
-        return partial(decorator, name, unfinished_policy)
+        return partial(decorator, name, unfinished_policy) # type: ignore[reportReturnType]
     else:
-        return decorator(fn.__name__, unfinished_policy, fn)
+        return decorator(fn.__name__, unfinished_policy, fn) # type: ignore[reportReturnType]
 
 
 def _update_validator(
@@ -1648,7 +1660,7 @@ class _Definition:
     dynamic_config_fn: Optional[Callable[..., DynamicWorkflowConfig]] = None
 
     @staticmethod
-    def from_class(cls: Type) -> Optional[_Definition]:
+    def from_class(cls: Type) -> Optional[_Definition]:  # type: ignore[reportSelfClsParameterName]
         # We make sure to only return it if it's on _this_ class
         defn = getattr(cls, "__temporal_workflow_definition", None)
         if defn and defn.cls == cls:
@@ -1656,7 +1668,7 @@ class _Definition:
         return None
 
     @staticmethod
-    def must_from_class(cls: Type) -> _Definition:
+    def must_from_class(cls: Type) -> _Definition:  # type: ignore[reportSelfClsParameterName]
         ret = _Definition.from_class(cls)
         if ret:
             return ret
@@ -1695,7 +1707,7 @@ class _Definition:
 
     @staticmethod
     def _apply_to_class(
-        cls: Type,
+        cls: Type,  # type: ignore[reportSelfClsParameterName]
         *,
         workflow_name: Optional[str],
         sandboxed: bool,
