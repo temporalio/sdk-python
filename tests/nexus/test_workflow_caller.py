@@ -1467,8 +1467,6 @@ async def test_workflow_caller_custom_metrics(client: Client, env: WorkflowEnvir
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    # Run worker with default runtime which is noop meter just to confirm it
-    # doesn't fail
     task_queue = str(uuid.uuid4())
     await create_nexus_endpoint(task_queue, client)
 
