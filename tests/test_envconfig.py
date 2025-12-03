@@ -1024,7 +1024,7 @@ async def test_e2e_multi_profile_different_client_connections(client: Client):
     assert dev_client.service_client.config.target_host == target_host
     assert dev_client.namespace == "dev"
     assert dev_client.service_client.config.api_key is None
-    assert dev_client.service_client.config.tls is False
+    assert dev_client.service_client.config.tls is None
 
     assert prod_client.service_client.config.target_host == target_host
     assert prod_client.namespace == "prod"

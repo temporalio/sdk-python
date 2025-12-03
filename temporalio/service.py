@@ -136,7 +136,7 @@ class ConnectConfig:
 
     target_host: str
     api_key: Optional[str] = None
-    tls: Union[bool, TLSConfig] = False
+    tls: Union[bool, TLSConfig, None] = None
     retry_config: Optional[RetryConfig] = None
     keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default
     rpc_metadata: Mapping[str, Union[str, bytes]] = field(default_factory=dict)
@@ -170,6 +170,10 @@ class ConnectConfig:
             target_url = f"https://{self.target_host}"
             tls_config = self.tls._to_bridge_config()
         elif self.tls:
+            target_url = f"https://{self.target_host}"
+            tls_config = TLSConfig()._to_bridge_config()
+        # Enable TLS by default when API key is provided and tls not explicitly set
+        elif self.tls is None and self.api_key is not None:
             target_url = f"https://{self.target_host}"
             tls_config = TLSConfig()._to_bridge_config()
         else:
