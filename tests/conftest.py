@@ -79,7 +79,7 @@ class NoEventLoopPolicy(asyncio.AbstractEventLoopPolicy):  # type: ignore[name-d
     def set_event_loop(self, loop):
         return self._underlying.set_event_loop(loop)
 
-    def new_event_loop(self):
+    def new_event_loop(self):  # type: ignore[reportIncompatibleMethodOverride]
         return None
 
     def get_child_watcher(self):
