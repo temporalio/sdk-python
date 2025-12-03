@@ -442,7 +442,7 @@ def test_json_type_hints():
     ok(dict[bool, str], {True: "1"})
 
     # On a 3.10+ dict type, None isn't returned from a key. This is potentially a bug
-    ok(dict[None, str], {'null': "1"})
+    ok(dict[None, str], {"null": "1"})
 
     # Dict has a different value for None keys
     ok(Dict[None, str], {None: "1"})

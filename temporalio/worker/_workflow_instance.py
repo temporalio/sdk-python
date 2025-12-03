@@ -2185,7 +2185,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if not self._workflow_input:
             raise RuntimeError("Expected workflow input. This is a Python SDK bug.")
 
-        if hasattr(self._defn.cls.__init__, "__temporal_workflow_init"): # type:ignore[misc]
+        if hasattr(self._defn.cls.__init__, "__temporal_workflow_init"):  # type:ignore[misc]
             workflow_instance = self._defn.cls(*self._workflow_input.args)
         else:
             workflow_instance = self._defn.cls()
