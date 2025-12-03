@@ -3994,14 +3994,16 @@ class CustomMetricsWorkflow:
 async def test_workflow_custom_metrics(client: Client):
     # Run worker with default runtime which is noop meter just to confirm it
     # doesn't fail
+    task_queue = str(uuid.uuid4())
+    await create_nexus_endpoint(task_queue, client)
     async with new_worker(
         client,
         CustomMetricsWorkflow,
+        task_queue=task_queue,
         activities=[custom_metrics_activity],
         nexus_service_handlers=[CustomMetricsService()],
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ) as worker:
-        await create_nexus_endpoint(worker.task_queue, client)
         await client.execute_workflow(
             CustomMetricsWorkflow.run,
             worker.task_queue,
@@ -4032,12 +4034,11 @@ async def test_workflow_custom_metrics(client: Client):
     async with new_worker(
         client,
         CustomMetricsWorkflow,
+        task_queue=task_queue,
         activities=[custom_metrics_activity],
         nexus_service_handlers=[CustomMetricsService()],
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ) as worker:
-        await create_nexus_endpoint(worker.task_queue, client)
-
         # Record a gauge at runtime level
         gauge = runtime.metric_meter.with_additional_attributes(
             {"my-runtime-extra-attr1": "val1", "my-runtime-extra-attr2": True}
@@ -4219,14 +4220,16 @@ async def test_workflow_buffered_metrics(client: Client):
         namespace=client.namespace,
         runtime=runtime,
     )
+    task_queue = str(uuid.uuid4())
+    await create_nexus_endpoint(task_queue, client)
     async with new_worker(
         client,
         CustomMetricsWorkflow,
+        task_queue=task_queue,
         activities=[custom_metrics_activity],
         nexus_service_handlers=[CustomMetricsService()],
         nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
     ) as worker:
-        await create_nexus_endpoint(worker.task_queue, client)
         await client.execute_workflow(
             CustomMetricsWorkflow.run,
             worker.task_queue,
@@ -4290,7 +4293,13 @@ async def test_workflow_buffered_metrics(client: Client):
         and update.attributes["nexus_operation"]
         == CustomMetricsService.custom_metric_op.__name__
         and update.attributes["task_queue"] == worker.task_queue
-        # and update.attributes["my-operation-extra-attr"] == "12.34"
+        and "my-operation-extra-attr" not in update.attributes
+        and update.value == 12
+        for update in updates
+    )
+    assert any(
+        update.metric.name == "my-operation-counter"
+        and update.attributes.get("my-operation-extra-attr") == 12.34
         and update.value == 30
         for update in updates
     )
@@ -4298,11 +4307,17 @@ async def test_workflow_buffered_metrics(client: Client):
         update.metric.name == "my-executor-operation-counter"
         and update.metric.description == "my-executor-operation-description"
         and update.metric.kind == BUFFERED_METRIC_KIND_COUNTER
-        # and update.attributes["my_operation_extra_attr"] == "12.34"
         and update.attributes["nexus_service"] == CustomMetricsService.__name__
         and update.attributes["nexus_operation"]
         == CustomMetricsService.custom_metric_op_executor.__name__
         and update.attributes["task_queue"] == worker.task_queue
+        and "my-executor-operation-extra-attr" not in update.attributes
+        and update.value == 12
+        for update in updates
+    )
+    assert any(
+        update.metric.name == "my-executor-operation-counter"
+        and update.attributes.get("my-executor-operation-extra-attr") == 12.34
         and update.value == 30
         for update in updates
     )
