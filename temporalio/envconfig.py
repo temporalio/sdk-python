@@ -184,7 +184,7 @@ class ClientConfigProfile:
     """Represents a client configuration profile.
 
     This class holds the configuration as loaded from a file or environment.
-    See `to_connect_config` to transform the profile to `ClientConnectConfig`,
+    See `to_client_connect_config` to transform the profile to `ClientConnectConfig`,
     which can be used to create a client.
 
     .. warning::
@@ -304,8 +304,8 @@ class ClientConfig:
     """Client configuration loaded from TOML and environment variables.
 
     This contains a mapping of profile names to client profiles. Use
-    `ClientConfigProfile.to_connect_config` to create a `ClientConnectConfig`
-    from a profile. See `load_profile` to load an individual profile.
+    `ClientConfigProfile.to_client_connect_config` to create a `ClientConnectConfig`
+    from a profile. See `ClientConfigProfile.load` to load an individual profile.
 
     .. warning::
         Experimental API.

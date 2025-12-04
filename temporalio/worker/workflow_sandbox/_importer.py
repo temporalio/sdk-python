@@ -339,7 +339,6 @@ class Importer:
     def _maybe_restrict_module(
         self, mod: types.ModuleType
     ) -> Optional[types.ModuleType]:
-        """Implements :py:meth:`_Environment.maybe_restrict_module`."""
         matcher = self.restrictions.invalid_module_members.child_matcher(
             *mod.__name__.split(".")
         )

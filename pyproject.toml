@@ -158,6 +158,7 @@ intersphinx = [
   "https://docs.python.org/3/objects.inv",
   "https://googleapis.dev/python/protobuf/latest/objects.inv",
   "https://opentelemetry-python.readthedocs.io/en/latest/objects.inv",
+  "https://nexus-rpc.github.io/sdk-python/objects.inv",
 ]
 privacy = [
   "PRIVATE:temporalio.bridge",
@@ -177,6 +178,7 @@ privacy = [
 ]
 project-name = "Temporal Python"
 sidebar-expand-depth = 2
+warnings-as-errors = true
 
 [tool.pyright]
 enableTypeIgnoreComments = true

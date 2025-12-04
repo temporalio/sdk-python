@@ -60,11 +60,13 @@ def activity_as_tool(
     of inputs and outputs between the agent and the activity. Note that if you take a context,
     mutation will not be persisted, as the activity may not be running in the same location.
 
+    For undocumented arguments, refer to :py:mod:`workflow` and :py:meth:`start_activity`
+
     Args:
         fn: A Temporal activity function to convert to a tool.
         strict_json_schema: Whether the tool should follow a strict schema.
             See https://openai.github.io/openai-agents-python/ref/tool/#agents.tool.FunctionTool.strict_json_schema
-        For other arguments, refer to :py:mod:`workflow` :py:meth:`start_activity`
+
 
     Returns:
         An OpenAI agent tool that wraps the provided activity.
@@ -178,7 +180,7 @@ def nexus_operation_as_tool(
     of inputs and outputs between the agent and the operation.
 
     Args:
-        fn: A Nexus operation to convert into a tool.
+        operation: A Nexus operation to convert into a tool.
         service: The Nexus service class that contains the operation.
         endpoint: The Nexus endpoint to use for the operation.
         strict_json_schema: Whether the tool should follow a strict schema

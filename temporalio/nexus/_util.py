@@ -39,7 +39,7 @@ def get_workflow_run_start_method_input_and_output_type_annotations(
 ]:
     """Return operation input and output types.
 
-    `start` must be a type-annotated start method that returns a
+    ``start`` must be a type-annotated start method that returns a
     :py:class:`temporalio.nexus.WorkflowHandle`.
     """
     input_type, output_type = _get_start_method_input_and_output_type_annotations(start)
@@ -125,7 +125,7 @@ def get_operation_factory(
     Optional[Callable[[Any], Any]],
     Optional[nexusrpc.Operation[Any, Any]],
 ]:
-    """Return the :py:class:`Operation` for the object along with the factory function.
+    """Return the :py:class:`nexusrpc.Operation` for the object along with the factory function.
 
     ``obj`` should be a decorated operation start method.
     """
@@ -145,7 +145,7 @@ def set_operation_factory(
     obj: Any,
     operation_factory: Callable[[Any], Any],
 ) -> None:
-    """Set the :py:class:`OperationHandler` factory for this object.
+    """Set the :py:class:`nexusrpc.handler.OperationHandler` factory for this object.
 
     ``obj`` should be an operation start method.
     """
@@ -158,7 +158,7 @@ def set_operation_factory(
 #
 # This file is licensed under the MIT License.
 def is_async_callable(obj: Any) -> bool:
-    """Return True if `obj` is an async callable.
+    """Return True if ``obj`` is an async callable.
 
     Supports partials of async callable class instances.
     """
