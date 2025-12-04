@@ -9,14 +9,10 @@ from datetime import timedelta
 from typing import (
     Any,
     Generic,
-    List,
     NoReturn,
-    Optional,
-    Type,
-    Union,
 )
 
-import nexusrpc.handler
+import nexusrpc
 from nexusrpc import InputT, OutputT
 
 import temporalio.activity
@@ -49,7 +45,8 @@ class Interceptor:
         return next
 
     def workflow_interceptor_class(
-        self, input: WorkflowInterceptorClassInput
+        self,
+        input: WorkflowInterceptorClassInput,  # type:ignore[reportUnusedParameter]
     ) -> type[WorkflowInboundInterceptor] | None:
         """Class that will be instantiated and used to intercept workflows.
 

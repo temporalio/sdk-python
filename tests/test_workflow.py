@@ -1,7 +1,7 @@
 import inspect
 import itertools
 from collections.abc import Callable, Sequence
-from typing import Any, Set, Type, get_type_hints
+from typing import Any, get_type_hints
 
 import pytest
 
@@ -11,7 +11,7 @@ from temporalio.common import RawValue, VersioningBehavior
 
 class GoodDefnBase:
     @workflow.run
-    async def run(self, name: str) -> str:
+    async def run(self, _name: str) -> str:
         raise NotImplementedError
 
     @workflow.signal
@@ -30,7 +30,7 @@ class GoodDefnBase:
 @workflow.defn(name="workflow-custom")
 class GoodDefn(GoodDefnBase):
     @workflow.run
-    async def run(self, name: str) -> str:
+    async def run(self, _name: str) -> str:
         raise NotImplementedError
 
     @workflow.signal
@@ -42,7 +42,7 @@ class GoodDefn(GoodDefnBase):
         pass
 
     @workflow.signal(dynamic=True, description="boo")
-    def signal3(self, name: str, args: Sequence[RawValue]):
+    def signal3(self, _name: str, _args: Sequence[RawValue]):
         pass
 
     @workflow.query
@@ -54,7 +54,7 @@ class GoodDefn(GoodDefnBase):
         pass
 
     @workflow.query(dynamic=True, description="dqd")
-    def query3(self, name: str, args: Sequence[RawValue]):
+    def query3(self, _name: str, _args: Sequence[RawValue]):
         pass
 
     @workflow.update
@@ -66,7 +66,7 @@ class GoodDefn(GoodDefnBase):
         pass
 
     @workflow.update(dynamic=True, description="dud")
-    def update3(self, name: str, args: Sequence[RawValue]):
+    def update3(self, _name: str, _args: Sequence[RawValue]):
         pass
 
 
@@ -138,7 +138,7 @@ def test_workflow_defn_good():
 @workflow.defn(versioning_behavior=VersioningBehavior.PINNED)
 class VersioningBehaviorDefn:
     @workflow.run
-    async def run(self, name: str) -> str:
+    async def run(self, _name: str) -> str:
         raise NotImplementedError
 
 
@@ -183,11 +183,11 @@ class BadDefn(BadDefnBase):
         pass
 
     @workflow.signal(dynamic=True)
-    def signal3(self, name: str, args: Sequence[RawValue]):
+    def signal3(self, _name: str, _args: Sequence[RawValue]):
         pass
 
     @workflow.signal(dynamic=True)
-    def signal4(self, name: str, args: Sequence[RawValue]):
+    def signal4(self, _name: str, _args: Sequence[RawValue]):
         pass
 
     # Intentionally missing decorator
@@ -203,11 +203,11 @@ class BadDefn(BadDefnBase):
         pass
 
     @workflow.query(dynamic=True)
-    def query3(self, name: str, args: Sequence[RawValue]):
+    def query3(self, _name: str, _args: Sequence[RawValue]):
         pass
 
     @workflow.query(dynamic=True)
-    def query4(self, name: str, args: Sequence[RawValue]):
+    def query4(self, _name: str, _args: Sequence[RawValue]):
         pass
 
     # Intentionally missing decorator
@@ -215,11 +215,11 @@ class BadDefn(BadDefnBase):
         pass
 
     @workflow.update
-    def update1(self, arg1: str):
+    def update1(self, _arg1: str):
         pass
 
     @workflow.update(name="update1")
-    def update2(self, arg1: str):
+    def update2(self, _arg1: str):
         pass
 
     # Intentionally missing decorator
@@ -271,7 +271,7 @@ def test_workflow_defn_local_class():
     with pytest.raises(ValueError) as err:
 
         @workflow.defn
-        class LocalClass:
+        class LocalClass:  # type:ignore[reportUnusedClass]
             @workflow.run
             async def run(self):
                 pass
@@ -387,31 +387,31 @@ class _TestParametersIdenticalUpToNaming:
     def a2(self, b):  # type: ignore[reportMissingParameterType]
         pass
 
-    def b1(self, a: int):
+    def b1(self, _a: int):
         pass
 
-    def b2(self, b: int) -> str:
+    def b2(self, _b: int) -> str:
         return ""
 
-    def c1(self, a1: int, a2: str) -> str:
+    def c1(self, _a1: int, _a2: str) -> str:
         return ""
 
-    def c2(self, b1: int, b2: str) -> int:
+    def c2(self, _b1: int, _b2: str) -> int:
         return 0
 
-    def d1(self, a1, a2: str) -> None:  # type: ignore[reportMissingParameterType]
+    def d1(self, _a1, _a2: str) -> None:  # type: ignore[reportMissingParameterType]
         pass
 
-    def d2(self, b1, b2: str) -> str:  # type: ignore[reportMissingParameterType]
+    def d2(self, _b1, _b2: str) -> str:  # type: ignore[reportMissingParameterType]
         return ""
 
-    def e1(self, a1, a2: str = "") -> None:  # type: ignore[reportMissingParameterType]
+    def e1(self, _a1, _a2: str = "") -> None:  # type: ignore[reportMissingParameterType]
         return None
 
-    def e2(self, b1, b2: str = "") -> str:  # type: ignore[reportMissingParameterType]
+    def e2(self, _b1, _b2: str = "") -> str:  # type: ignore[reportMissingParameterType]
         return ""
 
-    def f1(self, a1, a2: str = "a") -> None:  # type: ignore[reportMissingParameterType]
+    def f1(self, _a1, _a2: str = "a") -> None:  # type: ignore[reportMissingParameterType]
         return None
 
 
@@ -447,12 +447,12 @@ def test_workflow_init_not__init__():
 
 class BadUpdateValidator:
     @workflow.update
-    def my_update(self, a: str):
+    def my_update(self, _a: str):
         pass
 
     # assert-type-error-pyright: "Argument of type .+ cannot be assigned to parameter"
     @my_update.validator  # type: ignore
-    def my_validator(self, a: int):
+    def my_validator(self, _a: int):
         pass
 
     @workflow.run
@@ -474,7 +474,6 @@ def _assert_config_function_parity(
     config_class: type[Any],
     excluded_params: set[str],
 ) -> None:
-    function_name = function_obj.__name__
     config_name = config_class.__name__
 
     # Get the signature and type hints

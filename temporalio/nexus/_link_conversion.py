@@ -6,7 +6,6 @@ import urllib.parse
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
 )
 
 import nexusrpc
@@ -74,6 +73,8 @@ def workflow_event_to_nexus_link(
             query_params = _request_id_reference_to_query_params(
                 workflow_event.request_id_ref
             )
+        case _:
+            pass
 
     # urllib will omit '//' from the url if netloc is empty so we add the scheme manually
     url = f"{scheme}://{urllib.parse.urlunparse(('', '', path, '', query_params, ''))}"

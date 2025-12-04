@@ -11,11 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
-    List,
-    Optional,
-    Type,
     TypeVar,
-    Union,
     cast,
 )
 
@@ -53,7 +49,7 @@ def new_worker(
     workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
     max_cached_workflows: int = 1000,
     workflow_failure_exception_types: Sequence[type[BaseException]] = [],
-    **kwargs,
+    **kwargs,  # type:ignore[reportMissingParameterType]
 ) -> Worker:
     return Worker(
         client,
@@ -187,7 +183,7 @@ async def admitted_update_task(
     handle: WorkflowHandle,
     update_method: UpdateMethodMultiParam,
     id: str,
-    **kwargs,
+    **kwargs,  # type:ignore[reportMissingParameterType]
 ) -> asyncio.Task:
     """
     Return an asyncio.Task for an update after waiting for it to be admitted.

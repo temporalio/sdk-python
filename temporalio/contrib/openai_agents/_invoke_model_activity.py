@@ -4,10 +4,9 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 """
 
 import enum
-import json
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, Union
+from typing import Any
 
 from agents import (
     AgentOutputSchemaBase,
@@ -33,10 +32,9 @@ from openai import (
     AsyncOpenAI,
 )
 from openai.types.responses.tool_param import Mcp
-from pydantic_core import to_json
 from typing_extensions import Required, TypedDict
 
-from temporalio import activity, workflow
+from temporalio import activity
 from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbeater
 from temporalio.exceptions import ApplicationError
 
@@ -75,14 +73,14 @@ class HostedMCPToolInput:
     tool_config: Mcp
 
 
-ToolInput = Union[
-    FunctionToolInput,
-    FileSearchTool,
-    WebSearchTool,
-    ImageGenerationTool,
-    CodeInterpreterTool,
-    HostedMCPToolInput,
-]
+ToolInput = (
+    FunctionToolInput
+    | FileSearchTool
+    | WebSearchTool
+    | ImageGenerationTool
+    | CodeInterpreterTool
+    | HostedMCPToolInput
+)
 
 
 @dataclass
@@ -165,11 +163,13 @@ class ModelActivity:
         """Activity that invokes a model with the given input."""
         model = self._model_provider.get_model(input.get("model_name"))
 
-        async def empty_on_invoke_tool(ctx: RunContextWrapper[Any], input: str) -> str:
+        async def empty_on_invoke_tool(
+            _ctx: RunContextWrapper[Any], _input: str
+        ) -> str:
             return ""
 
         async def empty_on_invoke_handoff(
-            ctx: RunContextWrapper[Any], input: str
+            _ctx: RunContextWrapper[Any], _input: str
         ) -> Any:
             return None
 
@@ -197,7 +197,7 @@ class ModelActivity:
                     strict_json_schema=tool.strict_json_schema,
                 )
             else:
-                raise UserError(f"Unknown tool type: {tool.name}")
+                raise UserError(f"Unknown tool type: {tool.name}")  # type:ignore[reportUnreachable]
 
         tools = [make_tool(x) for x in input.get("tools", [])]
         handoffs: list[Handoff[Any, Any]] = [

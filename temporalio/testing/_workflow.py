@@ -9,10 +9,6 @@ from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
-    List,
-    Optional,
-    Type,
-    Union,
     cast,
 )
 
@@ -27,7 +23,6 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.runtime
 import temporalio.service
-import temporalio.types
 import temporalio.worker
 
 logger = logging.getLogger(__name__)
@@ -79,10 +74,10 @@ class WorkflowEnvironment:
         plugins: Sequence[temporalio.client.Plugin] = [],
         default_workflow_query_reject_condition: None
         | (temporalio.common.QueryRejectCondition) = None,
-        retry_config: temporalio.client.RetryConfig | None = None,
+        retry_config: temporalio.service.RetryConfig | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         identity: str | None = None,
-        tls: bool | temporalio.client.TLSConfig = False,
+        tls: bool | temporalio.service.TLSConfig = False,
         ip: str = "127.0.0.1",
         port: int | None = None,
         download_dest_dir: str | None = None,
@@ -224,7 +219,7 @@ class WorkflowEnvironment:
             try:
                 await server.shutdown()
             except:
-                logger.warn(
+                logger.warning(
                     "Failed stopping local server on client connection failure",
                     exc_info=True,
                 )
@@ -239,7 +234,7 @@ class WorkflowEnvironment:
         plugins: Sequence[temporalio.client.Plugin] = [],
         default_workflow_query_reject_condition: None
         | (temporalio.common.QueryRejectCondition) = None,
-        retry_config: temporalio.client.RetryConfig | None = None,
+        retry_config: temporalio.service.RetryConfig | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         identity: str | None = None,
         port: int | None = None,
@@ -344,7 +339,7 @@ class WorkflowEnvironment:
             try:
                 await server.shutdown()
             except:
-                logger.warn(
+                logger.warning(
                     "Failed stopping test server on client connection failure",
                     exc_info=True,
                 )
@@ -362,7 +357,7 @@ class WorkflowEnvironment:
         """Noop for ``async with`` support."""
         return self
 
-    async def __aexit__(self, *args) -> None:
+    async def __aexit__(self, *args: Any) -> None:
         """For ``async with`` support to just call :py:meth:`shutdown`."""
         await self.shutdown()
 

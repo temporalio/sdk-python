@@ -60,7 +60,7 @@ async def test_tracing(client: Client):
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=120),
             )
-            result = await workflow_handle.result()
+            await workflow_handle.result()
 
         # There is one closed root trace
         assert len(processor.trace_events) == 2

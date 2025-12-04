@@ -1,7 +1,7 @@
 import dataclasses
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 import temporalio.api.failure.v1
@@ -122,7 +122,7 @@ class Failure:
             )
 
     def _instantiate_exception(
-        self, error_type: str, details: dict[str, Any] | None
+        self, error_type: str, _details: dict[str, Any] | None
     ) -> BaseException:
         proto = {
             "temporal.api.failure.v1.Failure": temporalio.api.failure.v1.Failure,

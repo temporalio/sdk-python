@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from collections.abc import Callable
 from datetime import timedelta
-from typing import Any, List, NoReturn, Optional, Tuple, Type
+from typing import Any, NoReturn
 
 import pytest
 
@@ -201,7 +201,7 @@ class InterceptedWorkflow:
         return f"query: {param}"
 
     @workflow.signal
-    def signal(self, param: str) -> None:
+    def signal(self, _param: str) -> None:
         self.finish.set()
 
     @workflow.update
