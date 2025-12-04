@@ -3,9 +3,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from datetime import timedelta
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Mapping
 
 import google.protobuf.empty_pb2
 
