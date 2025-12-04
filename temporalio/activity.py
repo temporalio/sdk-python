@@ -288,7 +288,7 @@ class _CompositeEvent:
 def client() -> Client:
     """Return a Temporal Client for use in the current activity.
 
-    The client is only available in `async def` activities.
+    The client is only available in ``async def`` activities.
 
     In tests it is not available automatically, but you can pass a client when creating a
     :py:class:`temporalio.testing.ActivityEnvironment`.

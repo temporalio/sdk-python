@@ -44,7 +44,7 @@ dev = [
   "mypy-protobuf>=3.3.0,<4",
   "psutil>=5.9.3,<6",
   "pydocstyle>=6.3.0,<7",
-  "pydoctor>=24.11.1,<25",
+  "pydoctor>=25.10.1,<26",
   "pyright==1.1.403",
   "pytest~=7.4",
   "pytest-asyncio>=0.21,<0.22",
@@ -158,6 +158,7 @@ intersphinx = [
   "https://docs.python.org/3/objects.inv",
   "https://googleapis.dev/python/protobuf/latest/objects.inv",
   "https://opentelemetry-python.readthedocs.io/en/latest/objects.inv",
+  "https://nexus-rpc.github.io/sdk-python/objects.inv",
 ]
 privacy = [
   "PRIVATE:temporalio.bridge",
@@ -177,6 +178,7 @@ privacy = [
 ]
 project-name = "Temporal Python"
 sidebar-expand-depth = 2
+warnings-as-errors = true
 
 [tool.pyright]
 enableTypeIgnoreComments = true
