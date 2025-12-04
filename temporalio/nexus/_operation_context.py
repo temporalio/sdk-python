@@ -23,12 +23,6 @@ from typing_extensions import Concatenate
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
-from ._link_conversion import (
-    nexus_link_to_workflow_event,
-    workflow_execution_started_event_link_from_workflow_handle,
-    workflow_event_to_nexus_link,
-)
-from ._token import WorkflowHandle
 from temporalio.types import (
     MethodAsyncNoParam,
     MethodAsyncSingleParam,
@@ -37,6 +31,13 @@ from temporalio.types import (
     ReturnType,
     SelfType,
 )
+
+from ._link_conversion import (
+    nexus_link_to_workflow_event,
+    workflow_event_to_nexus_link,
+    workflow_execution_started_event_link_from_workflow_handle,
+)
+from ._token import WorkflowHandle
 
 if TYPE_CHECKING:
     import temporalio.client
