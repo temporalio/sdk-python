@@ -202,34 +202,10 @@ reportUnnecessaryTypeIgnoreComment = "none"
 reportUnusedCallResult = "none"
 include = ["temporalio", "tests"]
 exclude = [
+  # Exclude auto generated files
   "temporalio/api",
   "temporalio/bridge/proto",
   "tests/worker/workflow_sandbox/testmodules/proto",
-  "temporalio/bridge/worker.py",
-  "temporalio/worker/_replayer.py",
-  "temporalio/worker/_worker.py",
-  "temporalio/worker/workflow_sandbox/_importer.py",
-  "temporalio/worker/workflow_sandbox/_restrictions.py",
-  "temporalio/workflow.py",
-  "tests/api/test_grpc_stub.py",
-  "tests/conftest.py",
-  "tests/contrib/test_opentelemetry.py",
-  "tests/contrib/pydantic/models.py",
-  "tests/contrib/pydantic/models_2.py",
-  "tests/contrib/pydantic/test_pydantic.py",
-  "tests/contrib/pydantic/workflows.py",
-  "tests/test_converter.py",
-  "tests/test_service.py",
-  "tests/worker/test_activity.py",
-  "tests/worker/workflow_sandbox/test_importer.py",
-  "tests/worker/workflow_sandbox/test_restrictions.py",
-  # TODO: these pass locally but fail in CI with
-  # error: Import "temporalio.bridge.temporal_sdk_bridge" could not be resolved
-  "temporalio/bridge/client.py",
-  "temporalio/bridge/metric.py",
-  "temporalio/bridge/runtime.py",
-  "temporalio/bridge/testing.py",
-  "temporalio/envconfig.py",
 ]
 
 [tool.ruff]

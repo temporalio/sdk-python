@@ -119,7 +119,7 @@ async def test_converter_default():
             expected_data = expected_data.encode()
         assert payloads[0].data == expected_data
         # Decode and check
-        actual_inputs = await DataConverter().decode(payloads, [type_hint])
+        actual_inputs = await DataConverter().decode(payloads, [type_hint])  # type: ignore[reportArgumentType]
         assert len(actual_inputs) == 1
         if expected_decoded_input is None:
             expected_decoded_input = input
