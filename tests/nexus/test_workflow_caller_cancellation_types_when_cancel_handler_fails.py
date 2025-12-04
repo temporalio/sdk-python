@@ -79,7 +79,7 @@ class Service:
 class WorkflowOpHandler(
     temporalio.nexus._operation_handlers.WorkflowRunOperationHandler
 ):
-    def __init__(self):
+    def __init__(self):  # type:ignore[reportMissingSuperCall]
         pass
 
     async def start(

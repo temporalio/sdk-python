@@ -30,6 +30,7 @@ class _RuntimeRef:
     ) -> None:
         self._default_runtime: Runtime | None = None
         self._prevent_default = False
+        self._default_created = False
 
     def default(self) -> Runtime:
         if not self._default_runtime:

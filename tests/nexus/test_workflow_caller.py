@@ -237,7 +237,7 @@ class CallerWorkflow:
         request_cancel: bool,
         task_queue: str,
     ) -> None:
-        self.nexus_client: workflow.NexusClient[ServiceInterface] = (
+        self.nexus_client: workflow.NexusClient[ServiceInterface] = (  # type:ignore[reportAttributeAccessIssue]
             workflow.create_nexus_client(
                 service={
                     CallerReference.IMPL_WITH_INTERFACE: ServiceImpl,

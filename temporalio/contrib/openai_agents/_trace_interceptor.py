@@ -138,6 +138,7 @@ class OpenAIAgentsTracingInterceptor(
             payload_converter: The payload converter to use for serializing/deserializing
                 trace context. Defaults to the default Temporal payload converter.
         """
+        super().__init__()
         self._payload_converter = payload_converter
 
     def intercept_client(

@@ -1228,7 +1228,7 @@ class PollFailureInjector:
 
 class TestForkCreateWorker(_TestFork):
     async def coro(self):
-        self._worker = Worker(
+        self._worker = Worker(  # type:ignore[reportUninitializedInstanceVariable]
             self._client,
             task_queue=f"task-queue-{uuid.uuid4()}",
             activities=[never_run_activity],
@@ -1242,7 +1242,7 @@ class TestForkCreateWorker(_TestFork):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot create worker across forks"
         )
-        self._client = client
+        self._client = client  # type:ignore[reportUninitializedInstanceVariable]
         self.run(mp_fork_ctx)
 
 
@@ -1256,7 +1256,7 @@ class TestForkUseWorker(_TestFork):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot use worker across forks"
         )
-        self._pre_fork_worker = Worker(
+        self._pre_fork_worker = Worker(  # type:ignore[reportUninitializedInstanceVariable]
             client,
             task_queue=f"task-queue-{uuid.uuid4()}",
             activities=[never_run_activity],

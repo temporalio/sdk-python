@@ -1561,7 +1561,7 @@ class TestForkCreateClient(_TestFork):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot create client across forks"
         )
-        self._env = env
+        self._env = env  # type:ignore[reportUninitializedInstanceVariable]
         self.run(mp_fork_ctx)
 
 
@@ -1579,5 +1579,5 @@ class TestForkUseClient(_TestFork):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot use client across forks"
         )
-        self._client = client
+        self._client = client  # type:ignore[reportUninitializedInstanceVariable]
         self.run(mp_fork_ctx)

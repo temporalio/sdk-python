@@ -41,7 +41,7 @@ class _ForkTestResult:
 
 
 class _TestFork:
-    _expected: _ForkTestResult
+    _expected: _ForkTestResult  # type:ignore[reportUninitializedInstanceVariable]
 
     async def coro(self) -> Any:
         raise NotImplementedError()
@@ -66,7 +66,7 @@ class _TestFork:
         if not mp_fork_context or not process_factory:
             pytest.skip("fork context not available")
 
-        self._parent_conn, self._child_conn = mp_fork_context.Pipe(duplex=False)
+        self._parent_conn, self._child_conn = mp_fork_context.Pipe(duplex=False)  # type:ignore[reportUninitializedInstanceVariable]
         # start fork
         child_process = process_factory(target=self.entry, args=(), daemon=False)
         child_process.start()

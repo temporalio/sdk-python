@@ -318,11 +318,11 @@ class UnsuccessfulResponse:
 
 
 class _TestCase:
-    operation: str
+    operation: str  # type:ignore[reportUninitializedInstanceVariable]
     service_defn: str = "MyService"
     input: Input = Input("")
     headers: dict[str, str] = {}
-    expected: SuccessfulResponse
+    expected: SuccessfulResponse  # type:ignore[reportUninitializedInstanceVariable]
     expected_without_service_definition: SuccessfulResponse | None = None
     skip = ""
 
