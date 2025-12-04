@@ -59,6 +59,7 @@ dev = [
   "openai-agents>=0.3,<0.5; python_version >= '3.14'",
   "openai-agents[litellm]>=0.3,<0.4; python_version < '3.14'",
   "googleapis-common-protos==1.70.0",
+  "pytest-rerunfailures>=16.1",
 ]
 
 [tool.poe.tasks]
