@@ -12,9 +12,7 @@ from typing import (
     ClassVar,
     Generic,
     NewType,
-    Optional,
     TypeVar,
-    Union,
 )
 
 from typing_extensions import Protocol, Self

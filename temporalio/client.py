@@ -28,14 +28,7 @@ from enum import Enum, IntEnum
 from typing import (
     Any,
     Concatenate,
-    Dict,
-    FrozenSet,
     Generic,
-    Optional,
-    Text,
-    Tuple,
-    Type,
-    Union,
     cast,
     overload,
 )
@@ -205,7 +198,9 @@ class Client:
             http_connect_proxy_config=http_connect_proxy_config,
         )
 
-        def make_lambda(plugin, next):
+        def make_lambda(
+            plugin: Plugin, next: Callable[[ConnectConfig], Awaitable[ServiceClient]]
+        ):
             return lambda config: plugin.connect_service_client(config, next)
 
         next_function = ServiceClient.connect
@@ -1335,8 +1330,8 @@ class Client:
         | (
             temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
         ) = None,
-        static_summary: str | None = None,
-        static_details: str | None = None,
+        static_summary: str | None = None,  # type:ignore[reportUnusedParameter] #  https://github.com/temporalio/sdk-python/issues/1238
+        static_details: str | None = None,  # type:ignore[reportUnusedParameter]
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ScheduleHandle:
@@ -3405,7 +3400,7 @@ class WorkflowHistoryEventAsyncIterator:
         """Token for the next page request if any."""
         return self._next_page_token
 
-    async def fetch_next_page(self, *, page_size: int | None = None) -> None:
+    async def fetch_next_page(self, *, page_size: int | None = None) -> None:  # type:ignore[reportUnusedParameter] # https://github.com/temporalio/sdk-python/issues/1239
         """Fetch the next page if any.
 
         Args:
@@ -4156,7 +4151,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                     raise ValueError("Cannot schedule dynamic workflow explicitly")
                 workflow = defn.name
             elif not isinstance(workflow, str):
-                raise TypeError("Workflow must be a string or callable")
+                raise TypeError("Workflow must be a string or callable")  # type:ignore[reportUnreachable]
             self.workflow = workflow
             self.args = temporalio.common._arg_or_args(arg, args)
             self.id = id
@@ -6040,9 +6035,9 @@ class _ClientImpl(OutboundInterceptor):
             req.user_metadata.CopyFrom(metadata)
         if input.start_delay is not None:
             req.workflow_start_delay.FromTimedelta(input.start_delay)
-        if input.headers is not None:
+        if input.headers is not None:  # type:ignore[reportUnnecessaryComparison]
             await self._apply_headers(input.headers, req.header.fields)
-        if input.priority is not None:
+        if input.priority is not None:  # type:ignore[reportUnnecessaryComparison]
             req.priority.CopyFrom(input.priority._to_proto())
         if input.versioning_override is not None:
             req.versioning_override.CopyFrom(input.versioning_override._to_proto())
@@ -6138,7 +6133,7 @@ class _ClientImpl(OutboundInterceptor):
             req.query.query_args.payloads.extend(
                 await data_converter.encode(input.args)
             )
-        if input.headers is not None:
+        if input.headers is not None:  # type:ignore[reportUnnecessaryComparison]
             await self._apply_headers(input.headers, req.query.header.fields)
         try:
             resp = await self._client.workflow_service.query_workflow(
@@ -6186,7 +6181,7 @@ class _ClientImpl(OutboundInterceptor):
         )
         if input.args:
             req.input.payloads.extend(await data_converter.encode(input.args))
-        if input.headers is not None:
+        if input.headers is not None:  # type:ignore[reportUnnecessaryComparison]
             await self._apply_headers(input.headers, req.header.fields)
         await self._client.workflow_service.signal_workflow_execution(
             req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
@@ -6307,7 +6302,7 @@ class _ClientImpl(OutboundInterceptor):
             req.request.input.args.payloads.extend(
                 await data_converter.encode(input.args)
             )
-        if input.headers is not None:
+        if input.headers is not None:  # type:ignore[reportUnnecessaryComparison]
             await self._apply_headers(input.headers, req.request.input.header.fields)
         return req
 

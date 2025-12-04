@@ -6,7 +6,7 @@
 
 import dataclasses
 import logging
-from typing import Any, Optional, Type
+from typing import Any
 
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion

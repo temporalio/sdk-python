@@ -1,5 +1,6 @@
 """Worker for processing Temporal workflows and/or activities."""
 
+from ..common import WorkerDeploymentVersion
 from ._activity import SharedHeartbeatSender, SharedStateManager
 from ._interceptor import (
     ActivityInboundInterceptor,
@@ -52,7 +53,6 @@ from ._worker import (
     Worker,
     WorkerConfig,
     WorkerDeploymentConfig,
-    WorkerDeploymentVersion,
 )
 from ._workflow_instance import (
     UnsandboxedWorkflowRunner,

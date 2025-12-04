@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 import pytest
 

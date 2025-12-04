@@ -22,7 +22,7 @@ from collections.abc import Callable, Mapping
 from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 import nexusrpc
@@ -146,13 +146,13 @@ class MyServiceHandler:
         return await self.echo(ctx, input)
 
     @sync_operation
-    async def hang(self, ctx: StartOperationContext, input: Input) -> Output:
+    async def hang(self, _ctx: StartOperationContext, _input: Input) -> Output:
         await asyncio.Future()
         return Output(value="won't reach here")
 
     @sync_operation
     async def non_retryable_application_error(
-        self, ctx: StartOperationContext, input: Input
+        self, _ctx: StartOperationContext, _input: Input
     ) -> Output:
         raise ApplicationError(
             "non-retryable application error",
@@ -164,7 +164,7 @@ class MyServiceHandler:
 
     @sync_operation
     async def retryable_application_error(
-        self, ctx: StartOperationContext, input: Input
+        self, _ctx: StartOperationContext, _input: Input
     ) -> Output:
         raise ApplicationError(
             "retryable application error",
@@ -175,7 +175,7 @@ class MyServiceHandler:
 
     @sync_operation
     async def handler_error_internal(
-        self, ctx: StartOperationContext, input: Input
+        self, _ctx: StartOperationContext, _input: Input
     ) -> Output:
         raise HandlerError(
             message="deliberate internal handler error",
@@ -185,7 +185,7 @@ class MyServiceHandler:
 
     @sync_operation
     async def operation_error_failed(
-        self, ctx: StartOperationContext, input: Input
+        self, _ctx: StartOperationContext, _input: Input
     ) -> Output:
         raise OperationError(
             message="deliberate operation error",
@@ -202,7 +202,7 @@ class MyServiceHandler:
         )
 
     @sync_operation
-    async def log(self, ctx: StartOperationContext, input: Input) -> Output:
+    async def log(self, _ctx: StartOperationContext, input: Input) -> Output:
         nexus.logger.info(
             "Logging from start method", extra={"input_value": input.value}
         )
@@ -222,7 +222,7 @@ class MyServiceHandler:
 
     @sync_operation
     async def sync_operation_with_non_async_def(
-        self, ctx: StartOperationContext, input: Input
+        self, _ctx: StartOperationContext, input: Input
     ) -> Output:
         return Output(
             value=f"from start method on {self.__class__.__name__}: {input.value}"
@@ -267,13 +267,13 @@ class MyServiceHandler:
 
     @sync_operation
     async def idempotency_check(
-        self, ctx: StartOperationContext, input: None
+        self, ctx: StartOperationContext, _input: None
     ) -> Output:
         return Output(value=f"request_id: {ctx.request_id}")
 
     @sync_operation
     async def non_serializable_output(
-        self, ctx: StartOperationContext, input: Input
+        self, _ctx: StartOperationContext, _input: Input
     ) -> NonSerializableOutput:
         return NonSerializableOutput()
 
@@ -677,7 +677,7 @@ class MyServiceWithOperationsWithoutTypeAnnotations:
 
 class MyServiceHandlerWithOperationsWithoutTypeAnnotations:
     @sync_operation
-    async def sync_operation_without_type_annotations(self, ctx, input):
+    async def sync_operation_without_type_annotations(self, ctx, input):  # type:ignore[reportMissingParameterType]
         # Despite the lack of type annotations, the input type from the op definition in
         # the service definition is used to deserialize the input.
         return Output(
@@ -685,7 +685,7 @@ class MyServiceHandlerWithOperationsWithoutTypeAnnotations:
         )
 
     @workflow_run_operation
-    async def workflow_run_operation_without_type_annotations(self, ctx, input):
+    async def workflow_run_operation_without_type_annotations(self, ctx, input):  # type:ignore[reportMissingParameterType]
         return await ctx.start_workflow(
             WorkflowWithoutTypeAnnotations.run,
             input,
@@ -847,7 +847,7 @@ class SyncStartHandler:
 @service_handler(service=EchoService)
 class DefaultCancelHandler:
     @sync_operation
-    async def echo(self, ctx: StartOperationContext, input: Input) -> Output:
+    async def echo(self, _ctx: StartOperationContext, input: Input) -> Output:
         return Output(
             value=f"from start method on {self.__class__.__name__}: {input.value}"
         )

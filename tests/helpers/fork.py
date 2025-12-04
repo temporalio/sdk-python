@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import multiprocessing
 import multiprocessing.context
-import sys
 from dataclasses import dataclass
 from typing import Any
 
@@ -40,7 +39,7 @@ class _ForkTestResult:
         )
 
 
-class _TestFork:
+class _TestFork:  # type:ignore[reportUnusedClass]
     _expected: _ForkTestResult  # type:ignore[reportUninitializedInstanceVariable]
 
     async def coro(self) -> Any:

@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, Tuple
+from typing import Any
 
 import temporalio.converter
 from temporalio import workflow
@@ -132,7 +132,7 @@ class KitchenSinkWorkflow:
         elif action.signal:
             signal_event = asyncio.Event()
 
-            def signal_handler(arg: Any | None = None) -> None:
+            def signal_handler(_arg: Any | None = None) -> None:
                 signal_event.set()
 
             workflow.set_signal_handler(action.signal.name, signal_handler)

@@ -6,7 +6,7 @@ import random
 import uuid
 from collections.abc import Mapping
 from contextlib import contextmanager
-from typing import Any, Optional, Protocol, Type
+from typing import Any, Protocol
 
 from agents import CustomSpanData, custom_span, get_current_span, trace
 from agents.tracing import (

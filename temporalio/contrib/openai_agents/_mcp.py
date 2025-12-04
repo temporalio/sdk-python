@@ -1,4 +1,3 @@
-import abc
 import asyncio
 import dataclasses
 import functools
@@ -7,7 +6,8 @@ import logging
 from collections.abc import Callable, Sequence
 from contextlib import AbstractAsyncContextManager
 from datetime import timedelta
-from typing import Any, Optional, Union, cast
+from types import TracebackType
+from typing import Any, cast
 
 from agents import AgentBase, RunContextWrapper
 from agents.mcp import MCPServer
@@ -23,7 +23,6 @@ from temporalio.api.enums.v1.workflow_pb2 import (
 from temporalio.exceptions import (
     ActivityError,
     ApplicationError,
-    CancelledError,
     is_cancelled_exception,
 )
 from temporalio.worker import PollerBehaviorSimpleMaximum, Worker
@@ -56,7 +55,7 @@ class _StatelessGetPromptArguments:
     factory_argument: Any | None
 
 
-class _StatelessMCPServerReference(MCPServer):
+class _StatelessMCPServerReference(MCPServer):  # type:ignore[reportUnusedClass]
     def __init__(
         self,
         server: str,
@@ -163,7 +162,7 @@ class StatelessMCPServerProvider:
 
     def _create_server(self, factory_argument: Any | None) -> MCPServer:
         if self._server_accepts_arguments:
-            return cast(Callable[[Optional[Any]], MCPServer], self._server_factory)(
+            return cast(Callable[[Any | None], MCPServer], self._server_factory)(
                 factory_argument
             )
         else:
@@ -241,9 +240,9 @@ class StatelessMCPServerProvider:
         )
 
 
-def _handle_worker_failure(func):
+def _handle_worker_failure(func: Callable) -> Callable:
     @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args: Any, **kwargs: Any):
         try:
             return await func(*args, **kwargs)
         except ActivityError as e:
@@ -289,7 +288,7 @@ class _StatefulServerSessionArguments:
     factory_argument: Any | None
 
 
-class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
+class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):  # type:ignore[reportUnusedClass]
     def __init__(
         self,
         server: str,
@@ -336,7 +335,12 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
         await self.connect()
         return self
 
-    async def __aexit__(self, exc_type, exc_value, traceback):
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         await self.cleanup()
 
     @_handle_worker_failure

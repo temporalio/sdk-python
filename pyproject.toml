@@ -198,10 +198,12 @@ reportUnknownVariableType = "none"
 reportUnnecessaryIsInstance = "none"
 reportUnnecessaryTypeIgnoreComment = "none"
 reportUnusedCallResult = "none"
+reportUnknownLambdaType = "none"
 include = ["temporalio", "tests"]
 exclude = [
   "temporalio/api",
   "temporalio/bridge/proto",
+  "temporalio/bridge/_visitor.py",
   "tests/worker/workflow_sandbox/testmodules/proto",
   "temporalio/bridge/worker.py",
   "temporalio/worker/_replayer.py",

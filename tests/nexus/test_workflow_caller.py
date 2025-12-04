@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any, Union
+from typing import Any
 
 import nexusrpc
 import nexusrpc.handler
@@ -80,7 +80,7 @@ class AsyncResponse:
 # The order of the two types in this union is critical since the data converter matches
 # eagerly, ignoring unknown fields, and so would identify an AsyncResponse as a
 # SyncResponse if SyncResponse came first.
-ResponseType = Union[AsyncResponse, SyncResponse]
+ResponseType = AsyncResponse | SyncResponse
 
 # -----------------------------------------------------------------------------
 # Service interface
@@ -179,7 +179,7 @@ class ServiceImpl:
 
     @sync_operation
     async def sync_operation(
-        self, ctx: StartOperationContext, input: OpInput
+        self, _ctx: StartOperationContext, input: OpInput
     ) -> OpOutput:
         assert isinstance(input.response_type, SyncResponse)
         if input.response_type.exception_in_operation_start:
@@ -234,7 +234,7 @@ class CallerWorkflow:
     def __init__(
         self,
         input: CallerWfInput,
-        request_cancel: bool,
+        _request_cancel: bool,
         task_queue: str,
     ) -> None:
         self.nexus_client: workflow.NexusClient[ServiceInterface] = (  # type:ignore[reportAttributeAccessIssue]
@@ -254,7 +254,7 @@ class CallerWorkflow:
         self,
         input: CallerWfInput,
         request_cancel: bool,
-        task_queue: str,
+        _task_queue: str,
     ) -> CallerWfOutput:
         op_input = input.op_input
         try:
@@ -375,7 +375,7 @@ class UntypedCallerWorkflow:
 
     @workflow.run
     async def run(
-        self, input: CallerWfInput, request_cancel: bool, task_queue: str
+        self, input: CallerWfInput, _request_cancel: bool, _task_queue: str
     ) -> CallerWfOutput:
         op_input = input.op_input
         if op_input.response_type.op_definition_type == OpDefinitionType.LONGHAND:
@@ -750,7 +750,7 @@ async def test_untyped_caller(
         task_queue=task_queue,
         workflow_failure_exception_types=[Exception],
     ):
-        if response_type == SyncResponse:
+        if type(response_type) == SyncResponse:
             response_type = SyncResponse(
                 op_definition_type=op_definition_type,
                 use_async_def=True,
@@ -823,7 +823,7 @@ class ServiceInterfaceWithNameOverride:
 class ServiceImplInterfaceWithNeitherInterfaceNorNameOverride:
     @sync_operation
     async def op(
-        self, ctx: StartOperationContext, input: None
+        self, _ctx: StartOperationContext, _input: None
     ) -> ServiceClassNameOutput:
         return ServiceClassNameOutput(self.__class__.__name__)
 
@@ -832,7 +832,7 @@ class ServiceImplInterfaceWithNeitherInterfaceNorNameOverride:
 class ServiceImplInterfaceWithoutNameOverride:
     @sync_operation
     async def op(
-        self, ctx: StartOperationContext, input: None
+        self, _ctx: StartOperationContext, _input: None
     ) -> ServiceClassNameOutput:
         return ServiceClassNameOutput(self.__class__.__name__)
 
@@ -841,7 +841,7 @@ class ServiceImplInterfaceWithoutNameOverride:
 class ServiceImplInterfaceWithNameOverride:
     @sync_operation
     async def op(
-        self, ctx: StartOperationContext, input: None
+        self, _ctx: StartOperationContext, _input: None
     ) -> ServiceClassNameOutput:
         return ServiceClassNameOutput(self.__class__.__name__)
 
@@ -850,7 +850,7 @@ class ServiceImplInterfaceWithNameOverride:
 class ServiceImplWithNameOverride:
     @sync_operation
     async def op(
-        self, ctx: StartOperationContext, input: None
+        self, _ctx: StartOperationContext, _input: None
     ) -> ServiceClassNameOutput:
         return ServiceClassNameOutput(self.__class__.__name__)
 
@@ -994,7 +994,7 @@ class EchoWorkflow:
 class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
     @workflow_run_operation
     async def my_workflow_run_operation(
-        self, ctx: WorkflowRunOperationContext, input: None
+        self, ctx: WorkflowRunOperationContext, _input: None
     ) -> nexus.WorkflowHandle[str]:
         result_1 = await nexus.client().execute_workflow(
             EchoWorkflow.run,
@@ -1015,7 +1015,7 @@ class ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow:
 @workflow.defn
 class WorkflowCallingNexusOperationThatExecutesWorkflowBeforeStartingBackingWorkflow:
     @workflow.run
-    async def run(self, input: str, task_queue: str) -> str:
+    async def run(self, _input: str, task_queue: str) -> str:
         nexus_client = workflow.create_nexus_client(
             service=ServiceImplWithOperationsThatExecuteWorkflowBeforeStartingBackingWorkflow,
             endpoint=make_nexus_endpoint_name(task_queue),
@@ -1059,7 +1059,7 @@ async def test_workflow_run_operation_can_execute_workflow_before_starting_backi
 @service_handler
 class SimpleSyncService:
     @sync_operation
-    async def sync_op(self, ctx: StartOperationContext, input: str) -> str:
+    async def sync_op(self, _ctx: StartOperationContext, input: str) -> str:
         return input
 
 
