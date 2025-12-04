@@ -4,14 +4,11 @@ This module provides plugin functionality that allows customization of both clie
 and worker behavior in the Temporal SDK through configurable parameters.
 """
 
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import (
     Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
     Optional,
-    Sequence,
     Type,
     TypeVar,
     Union,
@@ -52,15 +49,15 @@ class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         ] = None,
         activities: PluginParameter[Sequence[Callable]] = None,
         nexus_service_handlers: PluginParameter[Sequence[Any]] = None,
-        workflows: PluginParameter[Sequence[Type]] = None,
+        workflows: PluginParameter[Sequence[type]] = None,
         workflow_runner: PluginParameter[WorkflowRunner] = None,
         worker_interceptors: PluginParameter[
             Sequence[temporalio.worker.Interceptor]
         ] = None,
         workflow_failure_exception_types: PluginParameter[
-            Sequence[Type[BaseException]]
+            Sequence[type[BaseException]]
         ] = None,
-        run_context: Optional[Callable[[], AbstractAsyncContextManager[None]]] = None,
+        run_context: Callable[[], AbstractAsyncContextManager[None]] | None = None,
     ) -> None:
         """Create a simple plugin with configurable parameters. Each of the parameters will be applied to any
             component for which they are applicable. All arguments are optional, and all but run_context can also
@@ -233,9 +230,7 @@ class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
                 yield results
 
 
-def _resolve_parameter(
-    existing: Optional[T], parameter: PluginParameter[T]
-) -> Optional[T]:
+def _resolve_parameter(existing: T | None, parameter: PluginParameter[T]) -> T | None:
     if parameter is None:
         return existing
     elif callable(parameter):
@@ -245,8 +240,8 @@ def _resolve_parameter(
 
 
 def _resolve_append_parameter(
-    existing: Optional[Sequence[T]], parameter: PluginParameter[Sequence[T]]
-) -> Optional[Sequence[T]]:
+    existing: Sequence[T] | None, parameter: PluginParameter[Sequence[T]]
+) -> Sequence[T] | None:
     if parameter is None:
         return existing
     elif callable(parameter):

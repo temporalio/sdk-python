@@ -220,7 +220,7 @@ async def test_workflow_env_assert(client: Client):
     client_config["interceptors"] = [interceptor]
     client = Client(**client_config)
 
-    def assert_proper_error(err: Optional[BaseException]) -> None:
+    def assert_proper_error(err: BaseException | None) -> None:
         assert isinstance(err, ApplicationError)
         # In unsandboxed workflows, this message has extra diff info appended
         # due to pytest's custom loader that does special assert tricks. But in
@@ -319,7 +319,7 @@ async def test_search_attributes_on_dev_server(
 
 
 def assert_timestamp_from_now(
-    ts: Union[datetime, float], expected_from_now: float, max_delta: float = 30
+    ts: datetime | float, expected_from_now: float, max_delta: float = 30
 ) -> None:
     if isinstance(ts, datetime):
         ts = ts.timestamp()

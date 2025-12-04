@@ -1,6 +1,7 @@
 import asyncio
+from collections.abc import Awaitable, Callable
 from functools import wraps
-from typing import Any, Awaitable, Callable, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 from temporalio import activity
 

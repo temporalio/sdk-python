@@ -1,5 +1,6 @@
 import dataclasses
 import uuid
+from collections.abc import Sequence
 from datetime import date, datetime, time, timedelta, timezone
 from ipaddress import IPv4Address
 from pathlib import Path
@@ -9,7 +10,6 @@ from typing import (
     Dict,
     Generic,
     List,
-    Sequence,
     Tuple,
     TypeVar,
     Union,
@@ -114,7 +114,7 @@ class ChildModel(BaseModel):
 
 class ParentModel(BaseModel):
     child: ChildModel
-    children: List[ChildModel]
+    children: list[ChildModel]
 
     def _check_instance(self) -> None:
         assert isinstance(self.child, ChildModel)
@@ -166,7 +166,7 @@ def make_field_features_object() -> FieldFeaturesModel:
 
 class AnnotatedFieldsModel(BaseModel):
     max_length_str: Annotated[str, Len(max_length=10)]
-    custom_json: Annotated[Dict[str, Any], WithJsonSchema({"extra": "data"})]
+    custom_json: Annotated[dict[str, Any], WithJsonSchema({"extra": "data"})]
 
     def _check_instance(self) -> None:
         assert isinstance(self.max_length_str, str)
@@ -188,7 +188,7 @@ T = TypeVar("T")
 
 class GenericModel(BaseModel, Generic[T]):
     value: T
-    values: List[T]
+    values: list[T]
 
     def _check_instance(self) -> None:
         assert isinstance(self.value, str)
@@ -206,8 +206,8 @@ def make_generic_string_object() -> GenericModel[str]:
 
 
 class UnionModel(BaseModel):
-    simple_union_field: Union[str, int]
-    proxied_union_field: Union[datetime, Path]
+    simple_union_field: str | int
+    proxied_union_field: datetime | Path
 
     def _check_instance(self) -> None:
         assert isinstance(self.simple_union_field, str)
@@ -231,9 +231,9 @@ class PydanticDatetimeModel(BaseModel):
     )
     annotated_datetime: Annotated[datetime, Field(), WithJsonSchema({"extra": "data"})]
     annotated_list_of_datetime: Annotated[
-        List[datetime], Field(), WithJsonSchema({"extra": "data"})
+        list[datetime], Field(), WithJsonSchema({"extra": "data"})
     ]
-    datetime_short_sequence: ShortSequence[List[datetime]]
+    datetime_short_sequence: ShortSequence[list[datetime]]
 
     def _check_instance(self):
         _assert_datetime_validity(self.datetime_field)
@@ -275,9 +275,9 @@ class PydanticDateModel(BaseModel):
     date_field_with_default: date = Field(default_factory=lambda: date(2000, 1, 2))
     annotated_date: Annotated[date, Field(), WithJsonSchema({"extra": "data"})]
     annotated_list_of_date: Annotated[
-        List[date], Field(), WithJsonSchema({"extra": "data"})
+        list[date], Field(), WithJsonSchema({"extra": "data"})
     ]
-    date_short_sequence: ShortSequence[List[date]]
+    date_short_sequence: ShortSequence[list[date]]
 
     def _check_instance(self):
         _assert_date_validity(self.date_field)
@@ -317,9 +317,9 @@ class PydanticTimedeltaModel(BaseModel):
         timedelta, Field(), WithJsonSchema({"extra": "data"})
     ]
     annotated_list_of_timedelta: Annotated[
-        List[timedelta], Field(), WithJsonSchema({"extra": "data"})
+        list[timedelta], Field(), WithJsonSchema({"extra": "data"})
     ]
-    timedelta_short_sequence: ShortSequence[List[timedelta]]
+    timedelta_short_sequence: ShortSequence[list[timedelta]]
 
     def _check_instance(self):
         _assert_timedelta_validity(self.timedelta_field)
@@ -387,7 +387,7 @@ PydanticModels = Union[
 ]
 
 
-def make_list_of_pydantic_objects() -> List[PydanticModels]:
+def make_list_of_pydantic_objects() -> list[PydanticModels]:
     objects = [
         make_standard_types_object(),
         make_strict_standard_types_object(),
@@ -414,12 +414,12 @@ class MyDataClass:
     data_class_int_field: int
 
 
-def make_dataclass_objects() -> List[MyDataClass]:
+def make_dataclass_objects() -> list[MyDataClass]:
     return [MyDataClass(data_class_int_field=7)]
 
 
-ComplexCustomType = Tuple[List[MyDataClass], List[PydanticModels]]
-ComplexCustomUnionType = List[Union[MyDataClass, PydanticModels]]
+ComplexCustomType = tuple[list[MyDataClass], list[PydanticModels]]
+ComplexCustomUnionType = list[Union[MyDataClass, PydanticModels]]
 
 
 class PydanticModelWithStrictField(BaseModel):

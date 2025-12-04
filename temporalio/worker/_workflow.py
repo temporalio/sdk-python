@@ -8,17 +8,14 @@ import logging
 import os
 import sys
 import threading
+from collections.abc import Awaitable, Callable, MutableMapping, Sequence
 from dataclasses import dataclass
 from datetime import timezone
 from types import TracebackType
 from typing import (
-    Awaitable,
-    Callable,
     Dict,
     List,
-    MutableMapping,
     Optional,
-    Sequence,
     Set,
     Type,
 )
@@ -63,22 +60,23 @@ class _WorkflowWorker:
         bridge_worker: Callable[[], temporalio.bridge.worker.Worker],
         namespace: str,
         task_queue: str,
-        workflows: Sequence[Type],
-        workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor],
-        max_concurrent_workflow_tasks: Optional[int],
+        workflows: Sequence[type],
+        workflow_task_executor: concurrent.futures.ThreadPoolExecutor | None,
+        max_concurrent_workflow_tasks: int | None,
         workflow_runner: WorkflowRunner,
         unsandboxed_workflow_runner: WorkflowRunner,
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
-        workflow_failure_exception_types: Sequence[Type[BaseException]],
+        workflow_failure_exception_types: Sequence[type[BaseException]],
         debug_mode: bool,
         disable_eager_activity_execution: bool,
         metric_meter: temporalio.common.MetricMeter,
-        on_eviction_hook: Optional[
+        on_eviction_hook: None
+        | (
             Callable[
                 [str, temporalio.bridge.proto.workflow_activation.RemoveFromCache], None
             ]
-        ],
+        ),
         disable_safe_eviction: bool,
         should_enforce_versioning_behavior: bool,
         assert_local_activity_valid: Callable[[str], None],
@@ -100,7 +98,7 @@ class _WorkflowWorker:
         self._data_converter = data_converter
         # Build the interceptor classes and collect extern functions
         self._extern_functions: MutableMapping[str, Callable] = {}
-        self._interceptor_classes: List[Type[WorkflowInboundInterceptor]] = []
+        self._interceptor_classes: list[type[WorkflowInboundInterceptor]] = []
         interceptor_class_input = WorkflowInterceptorClassInput(
             unsafe_extern_functions=self._extern_functions
         )
@@ -116,12 +114,12 @@ class _WorkflowWorker:
         )
 
         self._workflow_failure_exception_types = workflow_failure_exception_types
-        self._running_workflows: Dict[str, _RunningWorkflow] = {}
+        self._running_workflows: dict[str, _RunningWorkflow] = {}
         self._disable_eager_activity_execution = disable_eager_activity_execution
         self._on_eviction_hook = on_eviction_hook
         self._disable_safe_eviction = disable_safe_eviction
         self._encode_headers = encode_headers
-        self._throw_after_activation: Optional[Exception] = None
+        self._throw_after_activation: Exception | None = None
 
         # If there's a debug mode or a truthy TEMPORAL_DEBUG env var, disable
         # deadlock detection, otherwise set to 2 seconds
@@ -138,8 +136,8 @@ class _WorkflowWorker:
         )
 
         # Validate and build workflow dict
-        self._workflows: Dict[str, temporalio.workflow._Definition] = {}
-        self._dynamic_workflow: Optional[temporalio.workflow._Definition] = None
+        self._workflows: dict[str, temporalio.workflow._Definition] = {}
+        self._dynamic_workflow: temporalio.workflow._Definition | None = None
         for workflow in workflows:
             defn = temporalio.workflow._Definition.must_from_class(workflow)
             # Confirm name unique
@@ -439,7 +437,7 @@ class _WorkflowWorker:
             # swallowed. Any error or timeout of eviction causes us to retry
             # forever because something in users code is preventing eviction.
             seen_fail = False
-            handle_eviction_task: Optional[asyncio.Future] = None
+            handle_eviction_task: asyncio.Future | None = None
             while True:
                 try:
                     # We only create the eviction task if we haven't already or
@@ -532,8 +530,8 @@ class _WorkflowWorker:
             )
 
         # Build info
-        parent: Optional[temporalio.workflow.ParentInfo] = None
-        root: Optional[temporalio.workflow.RootInfo] = None
+        parent: temporalio.workflow.ParentInfo | None = None
+        root: temporalio.workflow.RootInfo | None = None
         if init.HasField("parent_workflow_info"):
             parent = temporalio.workflow.ParentInfo(
                 namespace=init.parent_workflow_info.namespace,
@@ -611,21 +609,21 @@ class _WorkflowWorker:
             for typ in self._workflow_failure_exception_types
         )
 
-    def nondeterminism_as_workflow_fail_for_types(self) -> Set[str]:
-        return set(
+    def nondeterminism_as_workflow_fail_for_types(self) -> set[str]:
+        return {
             k
             for k, v in self._workflows.items()
             if any(
                 issubclass(temporalio.workflow.NondeterminismError, typ)
                 for typ in v.failure_exception_types
             )
-        )
+        }
 
 
 class _DeadlockError(Exception):
     """Exception class for deadlocks. Contains functionality to swap the default traceback for another."""
 
-    def __init__(self, message: str, replacement_tb: Optional[TracebackType] = None):
+    def __init__(self, message: str, replacement_tb: TracebackType | None = None):
         """Create a new DeadlockError, with message `message` and optionally a traceback `replacement_tb` to be swapped in later.
 
         Args:
@@ -646,9 +644,7 @@ class _DeadlockError(Exception):
             self._new_tb = None
 
     @classmethod
-    def from_deadlocked_workflow(
-        cls, workflow: WorkflowInstance, timeout: Optional[int]
-    ):
+    def from_deadlocked_workflow(cls, workflow: WorkflowInstance, timeout: int | None):
         msg = f"[TMPRL1101] Potential deadlock detected: workflow didn't yield within {timeout} second(s)."
         tid = workflow.get_thread_id()
         if not tid:
@@ -665,7 +661,7 @@ class _DeadlockError(Exception):
     @staticmethod
     def _gen_tb_helper(
         tid: int,
-    ) -> Optional[TracebackType]:
+    ) -> TracebackType | None:
         """Take a thread id and construct a stack trace.
 
         Returns:
@@ -700,7 +696,7 @@ class _RunningWorkflow:
     def __init__(self, instance: WorkflowInstance, workflow_id: str):
         self.instance = instance
         self.workflow_id = workflow_id
-        self.deadlocked_activation_task: Optional[Awaitable] = None
+        self.deadlocked_activation_task: Awaitable | None = None
         self._deadlock_can_be_interrupted_lock = threading.Lock()
         self._deadlock_can_be_interrupted = False
 
@@ -745,13 +741,13 @@ class _CommandAwarePayloadCodec(temporalio.converter.PayloadCodec):
     async def encode(
         self,
         payloads: Sequence[temporalio.api.common.v1.Payload],
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         return await self._get_current_command_codec().encode(payloads)
 
     async def decode(
         self,
         payloads: Sequence[temporalio.api.common.v1.Payload],
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         return await self._get_current_command_codec().decode(payloads)
 
     def _get_current_command_codec(self) -> temporalio.converter.PayloadCodec:

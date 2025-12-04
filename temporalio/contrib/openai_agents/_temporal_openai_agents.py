@@ -2,9 +2,10 @@
 
 import dataclasses
 import typing
+from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from datetime import timedelta
-from typing import AsyncIterator, Callable, Optional, Sequence, Union
+from typing import Optional, Union
 
 from agents import ModelProvider, set_trace_provider
 from agents.run import get_default_agent_runner, set_default_agent_runner
@@ -93,7 +94,7 @@ class OpenAIPayloadConverter(PydanticPayloadConverter):
         super().__init__(ToJsonOptions(exclude_unset=True))
 
 
-def _data_converter(converter: Optional[DataConverter]) -> DataConverter:
+def _data_converter(converter: DataConverter | None) -> DataConverter:
     if converter is None:
         return DataConverter(payload_converter_class=OpenAIPayloadConverter)
     elif converter.payload_converter_class is DefaultPayloadConverter:
@@ -175,8 +176,8 @@ class OpenAIAgentsPlugin(SimplePlugin):
 
     def __init__(
         self,
-        model_params: Optional[ModelActivityParameters] = None,
-        model_provider: Optional[ModelProvider] = None,
+        model_params: ModelActivityParameters | None = None,
+        model_provider: ModelProvider | None = None,
         mcp_server_providers: Sequence[
             Union["StatelessMCPServerProvider", "StatefulMCPServerProvider"]
         ] = (),
@@ -215,7 +216,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
 
         # Delay activity construction until they are actually needed
         def add_activities(
-            activities: Optional[Sequence[Callable]],
+            activities: Sequence[Callable] | None,
         ) -> Sequence[Callable]:
             if not register_activities:
                 return activities or []
@@ -232,7 +233,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 new_activities.extend(mcp_server._get_activities())
             return list(activities or []) + new_activities
 
-        def workflow_runner(runner: Optional[WorkflowRunner]) -> WorkflowRunner:
+        def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
             if not runner:
                 raise ValueError("No WorkflowRunner provided to the OpenAI plugin.")
 

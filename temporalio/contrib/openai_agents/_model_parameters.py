@@ -1,9 +1,10 @@
 """Parameters for configuring Temporal activity execution for model calls."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Callable, Optional, Union
+from typing import Any, Optional, Union
 
 from agents import Agent, TResponseInputItem
 
@@ -19,9 +20,9 @@ class ModelSummaryProvider(ABC):
     @abstractmethod
     def provide(
         self,
-        agent: Optional[Agent[Any]],
-        instructions: Optional[str],
-        input: Union[str, list[TResponseInputItem]],
+        agent: Agent[Any] | None,
+        instructions: str | None,
+        input: str | list[TResponseInputItem],
     ) -> str:
         """Given the provided information, produce a summary for the model invocation activity."""
         pass
@@ -36,36 +37,31 @@ class ModelActivityParameters:
     OpenAI Agents integration.
     """
 
-    task_queue: Optional[str] = None
+    task_queue: str | None = None
     """Specific task queue to use for model activities."""
 
-    schedule_to_close_timeout: Optional[timedelta] = None
+    schedule_to_close_timeout: timedelta | None = None
     """Maximum time from scheduling to completion."""
 
-    schedule_to_start_timeout: Optional[timedelta] = None
+    schedule_to_start_timeout: timedelta | None = None
     """Maximum time from scheduling to starting."""
 
-    start_to_close_timeout: Optional[timedelta] = timedelta(seconds=60)
+    start_to_close_timeout: timedelta | None = timedelta(seconds=60)
     """Maximum time for the activity to complete."""
 
-    heartbeat_timeout: Optional[timedelta] = None
+    heartbeat_timeout: timedelta | None = None
     """Maximum time between heartbeats."""
 
-    retry_policy: Optional[RetryPolicy] = None
+    retry_policy: RetryPolicy | None = None
     """Policy for retrying failed activities."""
 
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL
     """How the activity handles cancellation."""
 
-    versioning_intent: Optional[VersioningIntent] = None
+    versioning_intent: VersioningIntent | None = None
     """Versioning intent for the activity."""
 
-    summary_override: Optional[
-        Union[
-            str,
-            ModelSummaryProvider,
-        ]
-    ] = None
+    summary_override: None | (str | ModelSummaryProvider) = None
     """Summary for the activity execution."""
 
     priority: Priority = Priority.default

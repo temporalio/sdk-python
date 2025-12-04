@@ -11,7 +11,7 @@ class SomeException(Exception):
 
 def test_bridge_runtime_raise_in_thread():
     waiting = Event()
-    exc_in_thread: Optional[BaseException] = None
+    exc_in_thread: BaseException | None = None
 
     def wait_forever():
         try:

@@ -88,7 +88,7 @@ class SubclassingNoInputOutputTypeAnnotationsWithServiceDefinition:
 )
 async def test_workflow_run_operation(
     env: WorkflowEnvironment,
-    service_handler_cls: Type[Any],
+    service_handler_cls: type[Any],
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")

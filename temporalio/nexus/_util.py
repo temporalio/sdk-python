@@ -4,10 +4,9 @@ import functools
 import inspect
 import typing
 import warnings
+from collections.abc import Awaitable, Callable
 from typing import (
     Any,
-    Awaitable,
-    Callable,
     Optional,
     Type,
     TypeVar,
@@ -34,8 +33,8 @@ def get_workflow_run_start_method_input_and_output_type_annotations(
         Awaitable[WorkflowHandle[OutputT]],
     ],
 ) -> tuple[
-    Optional[Type[InputT]],
-    Optional[Type[OutputT]],
+    type[InputT] | None,
+    type[OutputT] | None,
 ]:
     """Return operation input and output types.
 
@@ -73,8 +72,8 @@ def _get_start_method_input_and_output_type_annotations(
         Awaitable[WorkflowHandle[OutputT]],
     ],
 ) -> tuple[
-    Optional[Type[InputT]],
-    Optional[Type[OutputT]],
+    type[InputT] | None,
+    type[OutputT] | None,
 ]:
     try:
         type_annotations = typing.get_type_hints(start)
@@ -122,8 +121,8 @@ def get_callable_name(fn: Callable[..., Any]) -> str:
 def get_operation_factory(
     obj: Any,
 ) -> tuple[
-    Optional[Callable[[Any], Any]],
-    Optional[nexusrpc.Operation[Any, Any]],
+    Callable[[Any], Any] | None,
+    nexusrpc.Operation[Any, Any] | None,
 ]:
     """Return the :py:class:`Operation` for the object along with the factory function.
 

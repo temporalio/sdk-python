@@ -53,7 +53,7 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
     See https://docs.pydantic.dev/latest/api/standard_library_types/
     """
 
-    def __init__(self, to_json_options: Optional[ToJsonOptions] = None):
+    def __init__(self, to_json_options: ToJsonOptions | None = None):
         """Create a new payload converter."""
         self._schema_serializer = SchemaSerializer(any_schema())
         self._to_json_options = to_json_options
@@ -63,7 +63,7 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
         """See base class."""
         return "json/plain"
 
-    def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
+    def to_payload(self, value: Any) -> temporalio.api.common.v1.Payload | None:
         """See base class.
 
         Uses ``pydantic_core.to_json`` to serialize ``value`` to JSON.
@@ -85,7 +85,7 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
     def from_payload(
         self,
         payload: temporalio.api.common.v1.Payload,
-        type_hint: Optional[Type] = None,
+        type_hint: type | None = None,
     ) -> Any:
         """See base class.
 
@@ -106,7 +106,7 @@ class PydanticPayloadConverter(CompositePayloadConverter):
     :py:class:`PydanticJSONPlainPayloadConverter`.
     """
 
-    def __init__(self, to_json_options: Optional[ToJsonOptions] = None) -> None:
+    def __init__(self, to_json_options: ToJsonOptions | None = None) -> None:
         """Initialize object"""
         json_payload_converter = PydanticJSONPlainPayloadConverter(to_json_options)
         super().__init__(

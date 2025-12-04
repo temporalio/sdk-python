@@ -27,7 +27,7 @@ from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 def _convert_agent(
     model_params: ModelActivityParameters,
     agent: Agent[Any],
-    seen: Optional[dict[int, Agent]],
+    seen: dict[int, Agent] | None,
 ) -> Agent[Any]:
     if seen is None:
         seen = dict()
@@ -46,7 +46,7 @@ def _convert_agent(
 
     name = _model_name(agent)
 
-    new_handoffs: list[Union[Agent, Handoff]] = []
+    new_handoffs: list[Agent | Handoff] = []
     for handoff in agent.handoffs:
         if isinstance(handoff, Agent):
             new_handoffs.append(_convert_agent(model_params, handoff, seen))
@@ -87,7 +87,7 @@ class TemporalOpenAIRunner(AgentRunner):
     async def run(
         self,
         starting_agent: Agent[TContext],
-        input: Union[str, list[TResponseInputItem]],
+        input: str | list[TResponseInputItem],
         **kwargs: Any,
     ) -> RunResult:
         """Run the agent in a Temporal workflow."""
@@ -174,7 +174,7 @@ class TemporalOpenAIRunner(AgentRunner):
     def run_sync(
         self,
         starting_agent: Agent[TContext],
-        input: Union[str, list[TResponseInputItem]],
+        input: str | list[TResponseInputItem],
         **kwargs: Any,
     ) -> RunResult:
         """Run the agent synchronously (not supported in Temporal workflows)."""
@@ -189,7 +189,7 @@ class TemporalOpenAIRunner(AgentRunner):
     def run_streamed(
         self,
         starting_agent: Agent[TContext],
-        input: Union[str, list[TResponseInputItem]],
+        input: str | list[TResponseInputItem],
         **kwargs: Any,
     ) -> RunResultStreaming:
         """Run the agent with streaming responses (not supported in Temporal workflows)."""
@@ -202,7 +202,7 @@ class TemporalOpenAIRunner(AgentRunner):
         raise RuntimeError("Temporal workflows do not support streaming.")
 
 
-def _model_name(agent: Agent[Any]) -> Optional[str]:
+def _model_name(agent: Agent[Any]) -> str | None:
     name = agent.model
     if name is not None and not isinstance(name, str):
         raise ValueError(

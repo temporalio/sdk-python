@@ -8,8 +8,8 @@ from tests.contrib.pydantic.models import PydanticModels
 
 @activity.defn
 async def pydantic_objects_activity(
-    models: List[PydanticModels],
-) -> List[PydanticModels]:
+    models: list[PydanticModels],
+) -> list[PydanticModels]:
     return models
 
 

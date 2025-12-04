@@ -44,7 +44,7 @@ def emit_loop(
 
 
 def emit_singular(
-    field_name: str, access_expr: str, child_method: str, presence_word: Optional[str]
+    field_name: str, access_expr: str, child_method: str, presence_word: str | None
 ) -> str:
     # Helper to emit a singular field visit with presence check and optional headers guard
     if presence_word:
@@ -152,7 +152,7 @@ class PayloadVisitor:
     """,
         ]
 
-    def check_repeated(self, child_desc, field, iter_expr) -> Optional[str]:
+    def check_repeated(self, child_desc, field, iter_expr) -> str | None:
         # Special case for repeated payloads, handle them directly
         if child_desc.full_name == Payload.DESCRIPTOR.full_name:
             return emit_singular(field.name, iter_expr, "payload_container", None)

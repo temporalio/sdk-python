@@ -5,16 +5,14 @@ import queue
 import socket
 import time
 import uuid
+from collections.abc import Awaitable, Callable, Sequence
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
-    Awaitable,
-    Callable,
     List,
     Optional,
-    Sequence,
     Type,
     TypeVar,
     Union,
@@ -49,12 +47,12 @@ from temporalio.workflow import (
 
 def new_worker(
     client: Client,
-    *workflows: Type,
+    *workflows: type,
     activities: Sequence[Callable] = [],
-    task_queue: Optional[str] = None,
+    task_queue: str | None = None,
     workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
     max_cached_workflows: int = 1000,
-    workflow_failure_exception_types: Sequence[Type[BaseException]] = [],
+    workflow_failure_exception_types: Sequence[type[BaseException]] = [],
     **kwargs,
 ) -> Worker:
     return Worker(
@@ -103,7 +101,7 @@ async def assert_eq_eventually(
 
 
 async def assert_task_fail_eventually(
-    handle: WorkflowHandle, *, message_contains: Optional[str] = None
+    handle: WorkflowHandle, *, message_contains: str | None = None
 ) -> None:
     async def check() -> None:
         async for evt in handle.fetch_history_events():
@@ -139,7 +137,7 @@ async def ensure_search_attributes_present(
     resp = await client.operator_service.list_search_attributes(
         ListSearchAttributesRequest(namespace=client.namespace)
     )
-    if not set(key.name for key in keys).issubset(resp.custom_attributes.keys()):
+    if not {key.name for key in keys}.issubset(resp.custom_attributes.keys()):
         await client.operator_service.add_search_attributes(
             AddSearchAttributesRequest(
                 namespace=client.namespace,
@@ -153,7 +151,7 @@ async def ensure_search_attributes_present(
         resp = await client.operator_service.list_search_attributes(
             ListSearchAttributesRequest(namespace=client.namespace)
         )
-        assert set(key.name for key in keys).issubset(resp.custom_attributes.keys())
+        assert {key.name for key in keys}.issubset(resp.custom_attributes.keys())
 
 
 def find_free_port() -> int:
@@ -256,7 +254,7 @@ async def assert_pending_activity_exists_eventually(
 async def get_pending_activity_info(
     handle: WorkflowHandle,
     activity_id: str,
-) -> Optional[PendingActivityInfo]:
+) -> PendingActivityInfo | None:
     """Get pending activity info by ID, or None if not found."""
     desc = await handle.describe()
     for act in desc.raw_description.pending_activities:
@@ -318,14 +316,14 @@ async def print_history(handle: WorkflowHandle):
 @dataclass
 class InterleavedHistoryEvent:
     handle: WorkflowHandle
-    event: Union[HistoryEvent, str]
-    number: Optional[int]
+    event: HistoryEvent | str
+    number: int | None
     time: datetime
 
 
 async def print_interleaved_histories(
     handles: list[WorkflowHandle],
-    extra_events: Optional[list[tuple[WorkflowHandle, str, datetime]]] = None,
+    extra_events: list[tuple[WorkflowHandle, str, datetime]] | None = None,
 ) -> None:
     """
     Print the interleaved history events from multiple workflow handles in columns.
@@ -436,13 +434,13 @@ class LogCapturer:
                 l.removeHandler(handler)
                 l.setLevel(prev_levels[i])
 
-    def find_log(self, starts_with: str) -> Optional[logging.LogRecord]:
+    def find_log(self, starts_with: str) -> logging.LogRecord | None:
         return self.find(lambda l: l.message.startswith(starts_with))
 
     def find(
         self, pred: Callable[[logging.LogRecord], bool]
-    ) -> Optional[logging.LogRecord]:
-        for record in cast(List[logging.LogRecord], self.log_queue.queue):
+    ) -> logging.LogRecord | None:
+        for record in cast(list[logging.LogRecord], self.log_queue.queue):
             if pred(record):
                 return record
         return None

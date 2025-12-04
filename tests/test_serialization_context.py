@@ -12,9 +12,10 @@ import dataclasses
 import json
 import uuid
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any, List, Literal, Optional, Sequence, Type
+from typing import Any, List, Literal, Optional, Type
 
 import nexusrpc
 import pytest
@@ -75,20 +76,20 @@ class SerializationContextPayloadConverter(
     EncodingPayloadConverter, WithSerializationContext
 ):
     def __init__(self):
-        self.context: Optional[SerializationContext] = None
+        self.context: SerializationContext | None = None
 
     @property
     def encoding(self) -> str:
         return "test-serialization-context"
 
     def with_context(
-        self, context: Optional[SerializationContext]
+        self, context: SerializationContext | None
     ) -> SerializationContextPayloadConverter:
         converter = SerializationContextPayloadConverter()
         converter.context = context
         return converter
 
-    def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
+    def to_payload(self, value: Any) -> temporalio.api.common.v1.Payload | None:
         if not isinstance(value, TraceData):
             return None
         if isinstance(self.context, WorkflowSerializationContext):
@@ -115,7 +116,7 @@ class SerializationContextPayloadConverter(
     def from_payload(
         self,
         payload: temporalio.api.common.v1.Payload,
-        type_hint: Optional[Type] = None,
+        type_hint: type | None = None,
     ) -> Any:
         value = JSONPlainPayloadConverter().from_payload(payload, TraceData)
         assert isinstance(value, TraceData)
@@ -685,7 +686,7 @@ def test_subclassed_async_activity_handle(client: Client):
 @workflow.defn(sandboxed=False)  # so that we can use isinstance
 class SignalSerializationContextTestWorkflow:
     def __init__(self) -> None:
-        self.signal_received: Optional[TraceData] = None
+        self.signal_received: TraceData | None = None
 
     @workflow.run
     async def run(self) -> TraceData:
@@ -833,7 +834,7 @@ class UpdateSerializationContextTestWorkflow:
     @workflow.init
     def __init__(self, pass_validation: bool) -> None:
         self.pass_validation = pass_validation
-        self.input: Optional[TraceData] = None
+        self.input: TraceData | None = None
 
     @workflow.run
     async def run(self, pass_validation: bool) -> TraceData:
@@ -927,7 +928,7 @@ async def test_update_payload_conversion(
 @workflow.defn
 class ExternalWorkflowTarget:
     def __init__(self) -> None:
-        self.signal_received: Optional[TraceData] = None
+        self.signal_received: TraceData | None = None
 
     @workflow.run
     async def run(self) -> TraceData:
@@ -1068,10 +1069,10 @@ test_traces: dict[str, list[TraceItem]] = defaultdict(list)
 class FailureConverterWithContext(DefaultFailureConverter, WithSerializationContext):
     def __init__(self):
         super().__init__(encode_common_attributes=False)
-        self.context: Optional[SerializationContext] = None
+        self.context: SerializationContext | None = None
 
     def with_context(
-        self, context: Optional[SerializationContext]
+        self, context: SerializationContext | None
     ) -> FailureConverterWithContext:
         converter = FailureConverterWithContext()
         converter.context = context
@@ -1198,12 +1199,12 @@ async def test_failure_converter_with_context(client: Client):
 
 class PayloadCodecWithContext(PayloadCodec, WithSerializationContext):
     def __init__(self):
-        self.context: Optional[SerializationContext] = None
+        self.context: SerializationContext | None = None
         self.encode_called_with_context = False
         self.decode_called_with_context = False
 
     def with_context(
-        self, context: Optional[SerializationContext]
+        self, context: SerializationContext | None
     ) -> PayloadCodecWithContext:
         codec = PayloadCodecWithContext()
         codec.context = context
@@ -1211,7 +1212,7 @@ class PayloadCodecWithContext(PayloadCodec, WithSerializationContext):
 
     async def encode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         assert self.context
         if isinstance(self.context, ActivitySerializationContext):
             test_traces[self.context.workflow_id].append(
@@ -1232,7 +1233,7 @@ class PayloadCodecWithContext(PayloadCodec, WithSerializationContext):
 
     async def decode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         assert self.context
         if isinstance(self.context, ActivitySerializationContext):
             test_traces[self.context.workflow_id].append(
@@ -1506,10 +1507,10 @@ class PayloadEncryptionCodec(PayloadCodec, WithSerializationContext):
     """
 
     def __init__(self):
-        self.context: Optional[SerializationContext] = None
+        self.context: SerializationContext | None = None
 
     def with_context(
-        self, context: Optional[SerializationContext]
+        self, context: SerializationContext | None
     ) -> PayloadEncryptionCodec:
         codec = PayloadEncryptionCodec()
         codec.context = context
@@ -1517,7 +1518,7 @@ class PayloadEncryptionCodec(PayloadCodec, WithSerializationContext):
 
     async def encode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         [payload] = payloads
         return [
             temporalio.api.common.v1.Payload(
@@ -1528,7 +1529,7 @@ class PayloadEncryptionCodec(PayloadCodec, WithSerializationContext):
 
     async def decode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         [payload] = payloads
         assert json.loads(payload.data.decode()) == self._get_encryption_key()
         metadata = dict(payload.metadata)
@@ -1684,7 +1685,7 @@ class AssertNexusLacksContextPayloadCodec(PayloadCodec, WithSerializationContext
 
     async def _assert_context_iff_not_nexus(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         [payload] = payloads
         assert bool(self.context) == (payload.data.decode() != '"nexus-data"')
         return list(payloads)
@@ -1750,7 +1751,7 @@ async def test_nexus_payload_codec_operations_lack_context(
 
 class PydanticData(BaseModel):
     value: str
-    trace: List[str] = []
+    trace: list[str] = []
 
 
 class PydanticJSONConverterWithContext(
@@ -1758,16 +1759,16 @@ class PydanticJSONConverterWithContext(
 ):
     def __init__(self):
         super().__init__()
-        self.context: Optional[SerializationContext] = None
+        self.context: SerializationContext | None = None
 
     def with_context(
-        self, context: Optional[SerializationContext]
+        self, context: SerializationContext | None
     ) -> PydanticJSONConverterWithContext:
         converter = PydanticJSONConverterWithContext()
         converter.context = context
         return converter
 
-    def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
+    def to_payload(self, value: Any) -> temporalio.api.common.v1.Payload | None:
         if isinstance(value, PydanticData) and self.context:
             if isinstance(self.context, WorkflowSerializationContext):
                 value.trace.append(f"wf_{self.context.workflow_id}")
@@ -1784,7 +1785,7 @@ class PydanticConverterWithContext(CompositePayloadConverter, WithSerializationC
                 for c in DefaultPayloadConverter.default_encoding_payload_converters
             )
         )
-        self.context: Optional[SerializationContext] = None
+        self.context: SerializationContext | None = None
 
 
 @workflow.defn
@@ -1841,10 +1842,10 @@ class CustomEncodingPayloadConverter(
 
     def __init__(self):
         super().__init__()
-        self.context: Optional[SerializationContext] = None
+        self.context: SerializationContext | None = None
 
     def with_context(
-        self, context: Optional[SerializationContext]
+        self, context: SerializationContext | None
     ) -> CustomEncodingPayloadConverter:
         converter = CustomEncodingPayloadConverter()
         converter.context = context
@@ -1862,14 +1863,14 @@ class CustomPayloadConverter(CompositePayloadConverter):
 
     def to_payloads(
         self, values: Sequence[Any]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         raise UserMethodCalledError
 
     def from_payloads(
         self,
         payloads: Sequence[temporalio.api.common.v1.Payload],
-        type_hints: Optional[List[Type]] = None,
-    ) -> List[Any]:
+        type_hints: list[type] | None = None,
+    ) -> list[Any]:
         raise NotImplementedError
 
 

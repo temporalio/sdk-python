@@ -18,11 +18,11 @@ import concurrent.futures
 import logging
 import pprint
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, Callable, Optional, Union
+from typing import Any, Optional, Union
 
 import httpx
 import nexusrpc
@@ -297,7 +297,7 @@ UNSUCCESSFUL_RESPONSE_HEADERS = MappingProxyType(
 @dataclass
 class SuccessfulResponse:
     status_code: int
-    body_json: Optional[Union[dict[str, Any], Callable[[dict[str, Any]], bool]]] = None
+    body_json: dict[str, Any] | Callable[[dict[str, Any]], bool] | None = None
     headers: Mapping[str, str] = field(
         default_factory=lambda: SUCCESSFUL_RESPONSE_HEADERS
     )
@@ -306,12 +306,12 @@ class SuccessfulResponse:
 @dataclass
 class UnsuccessfulResponse:
     status_code: int
-    failure_message: Union[str, Callable[[str], bool]]
+    failure_message: str | Callable[[str], bool]
     # Is the Nexus Failure expected to have the details field populated?
     failure_details: bool = True
     # Expected value of inverse of non_retryable attribute of exception.
     retryable_exception: bool = True
-    body_json: Optional[Callable[[dict[str, Any]], bool]] = None
+    body_json: Callable[[dict[str, Any]], bool] | None = None
     headers: Mapping[str, str] = field(
         default_factory=lambda: UNSUCCESSFUL_RESPONSE_HEADERS
     )
@@ -323,7 +323,7 @@ class _TestCase:
     input: Input = Input("")
     headers: dict[str, str] = {}
     expected: SuccessfulResponse
-    expected_without_service_definition: Optional[SuccessfulResponse] = None
+    expected_without_service_definition: SuccessfulResponse | None = None
     skip = ""
 
     @classmethod
@@ -824,8 +824,8 @@ async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: A
 class _InstantiationCase:
     executor: bool
     handler: Callable[..., Any]
-    exception: Optional[type[Exception]]
-    match: Optional[str]
+    exception: type[Exception] | None
+    match: str | None
 
 
 @nexusrpc.service

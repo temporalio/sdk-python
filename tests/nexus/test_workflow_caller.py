@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any, Awaitable, Callable, Union
+from typing import Any, Union
 
 import nexusrpc
 import nexusrpc.handler
@@ -141,10 +142,7 @@ class HandlerWorkflow:
 class SyncOrAsyncOperation(OperationHandler[OpInput, OpOutput]):
     async def start(  # type: ignore[override]
         self, ctx: StartOperationContext, input: OpInput
-    ) -> Union[
-        StartOperationResultSync[OpOutput],
-        StartOperationResultAsync,
-    ]:
+    ) -> StartOperationResultSync[OpOutput] | StartOperationResultAsync:
         if input.response_type.exception_in_operation_start:
             raise RPCError(
                 "RPCError INVALID_ARGUMENT in Nexus operation",
@@ -291,15 +289,14 @@ class CallerWorkflow:
     @staticmethod
     def _get_operation(
         op_input: OpInput,
-    ) -> Union[
-        nexusrpc.Operation[OpInput, OpOutput],
-        Callable[..., Awaitable[OpOutput]],
+    ) -> (
+        nexusrpc.Operation[OpInput, OpOutput] | Callable[..., Awaitable[OpOutput]]
         # We are not exposing operation factory methods to users as a way to write nexus
         # operations, and accordingly the types on NexusClient
         # start_operation/execute_operation to not permit it. We fake the type by
         # pretending that this function doesn't return such operations.
         # Callable[[Any], OperationHandler[OpInput, OpOutput]],
-    ]:
+    ):
         return {  # type: ignore[return-value]
             (
                 SyncResponse,

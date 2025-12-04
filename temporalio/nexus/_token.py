@@ -30,12 +30,12 @@ class WorkflowHandle(Generic[OutputT]):
     workflow_id: str
     # Version of the token. Treated as v1 if missing. This field is not included in the
     # serialized token; it's only used to reject newer token versions on load.
-    version: Optional[int] = None
+    version: int | None = None
 
     def _to_client_workflow_handle(
         self,
         client: temporalio.client.Client,
-        result_type: Optional[type[OutputT]] = None,
+        result_type: type[OutputT] | None = None,
     ) -> temporalio.client.WorkflowHandle[Any, OutputT]:
         """Create a :py:class:`temporalio.client.WorkflowHandle` from the token."""
         if client.namespace != self.namespace:

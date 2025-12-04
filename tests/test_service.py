@@ -1,8 +1,9 @@
 import inspect
 import os
 import re
+from collections.abc import Callable, Mapping
 from datetime import timedelta
-from typing import Any, Callable, Dict, Mapping, Tuple, Type
+from typing import Any, Dict, Tuple, Type
 
 import google.protobuf.empty_pb2
 import google.protobuf.message
@@ -38,9 +39,9 @@ def test_all_grpc_calls_present(client: Client):
         new_stub: Callable[[grpc.Channel], Any],
         custom_req_resp: Mapping[
             str,
-            Tuple[
-                Type[google.protobuf.message.Message],
-                Type[google.protobuf.message.Message],
+            tuple[
+                type[google.protobuf.message.Message],
+                type[google.protobuf.message.Message],
             ],
         ] = {},
     ) -> None:
@@ -104,16 +105,16 @@ class CallCollectingChannel(grpc.Channel):
         package: Any,
         custom_req_resp: Mapping[
             str,
-            Tuple[
-                Type[google.protobuf.message.Message],
-                Type[google.protobuf.message.Message],
+            tuple[
+                type[google.protobuf.message.Message],
+                type[google.protobuf.message.Message],
             ],
         ],
     ) -> None:
         super().__init__()
         self.package = package
         self.custom_req_resp = custom_req_resp
-        self.calls: Dict[str, Tuple[Type, Type]] = {}
+        self.calls: dict[str, tuple[type, type]] = {}
 
     def unary_unary(self, method, request_serializer, response_deserializer):
         # Last part after slash
@@ -132,9 +133,7 @@ CallCollectingChannel.__abstractmethods__ = set()
 
 def test_version():
     # Extract version from pyproject.toml
-    with open(
-        os.path.join(os.path.dirname(__file__), "..", "pyproject.toml"), "r"
-    ) as f:
+    with open(os.path.join(os.path.dirname(__file__), "..", "pyproject.toml")) as f:
         pyproject = f.read()
     version = pyproject[pyproject.find('version = "') + 11 :]
     version = version[: version.find('"')]

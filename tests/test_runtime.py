@@ -80,7 +80,7 @@ async def test_different_runtimes(client: Client):
 async def test_runtime_log_forwarding():
     # Create logger with record capture
     log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
-    log_queue_list = cast(List[logging.LogRecord], log_queue.queue)
+    log_queue_list = cast(list[logging.LogRecord], log_queue.queue)
     logger = logging.getLogger(f"log-{uuid.uuid4()}")
     logger.addHandler(logging.handlers.QueueHandler(log_queue))
 
@@ -152,7 +152,7 @@ class TaskFailWorkflow:
 async def test_runtime_task_fail_log_forwarding(client: Client):
     # Client with lo capturing runtime
     log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
-    log_queue_list = cast(List[logging.LogRecord], log_queue.queue)
+    log_queue_list = cast(list[logging.LogRecord], log_queue.queue)
     logger = logging.getLogger(f"log-{uuid.uuid4()}")
     logger.addHandler(logging.handlers.QueueHandler(log_queue))
     logger.setLevel(logging.WARN)
@@ -187,7 +187,7 @@ async def test_runtime_task_fail_log_forwarding(client: Client):
         await assert_eq_eventually(True, has_log)
 
     # Check record
-    record = next((l for l in log_queue_list if "Failing workflow task" in l.message))
+    record = next(l for l in log_queue_list if "Failing workflow task" in l.message)
     assert record.levelno == logging.WARNING
     assert (
         record.name == f"{logger.name}-sdk_core::temporalio_sdk_core::worker::workflow"

@@ -2,7 +2,7 @@ import asyncio
 import multiprocessing.context
 import os
 import sys
-from typing import AsyncGenerator, Iterator
+from collections.abc import AsyncGenerator, Iterator
 
 import pytest
 import pytest_asyncio

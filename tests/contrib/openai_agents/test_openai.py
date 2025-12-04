@@ -3,14 +3,12 @@ import json
 import os
 import sys
 import uuid
+from collections.abc import AsyncIterator, Callable, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
     Any,
-    AsyncIterator,
-    Callable,
     Optional,
-    Sequence,
     Union,
     cast,
 )
@@ -794,10 +792,10 @@ async def test_agents_as_tools_workflow(client: Client, use_local_model: bool):
 
 
 class AirlineAgentContext(BaseModel):
-    passenger_name: Optional[str] = None
-    confirmation_number: Optional[str] = None
-    seat_number: Optional[str] = None
-    flight_number: Optional[str] = None
+    passenger_name: str | None = None
+    confirmation_number: str | None = None
+    seat_number: str | None = None
+    flight_number: str | None = None
 
 
 @function_tool(
@@ -1131,16 +1129,16 @@ class InputGuardrailModel(OpenAIResponsesModel):
 
     async def get_response(
         self,
-        system_instructions: Union[str, None],
-        input: Union[str, list[TResponseInputItem]],
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: Union[AgentOutputSchemaBase, None],
+        output_schema: AgentOutputSchemaBase | None,
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        previous_response_id: Optional[str] = None,
-        conversation_id: Optional[str] = None,
-        prompt: Optional[ResponsePromptParam] = None,
+        previous_response_id: str | None = None,
+        conversation_id: str | None = None,
+        prompt: ResponsePromptParam | None = None,
     ) -> ModelResponse:
         if (
             system_instructions
@@ -1169,7 +1167,7 @@ guardrail_agent: Agent = Agent(
 async def math_guardrail(
     context: RunContextWrapper[None],
     agent: Agent,
-    input: Union[str, list[TResponseInputItem]],
+    input: str | list[TResponseInputItem],
 ) -> GuardrailFunctionOutput:
     """This is an input guardrail function, which happens to call an agent to check if the input
     is a math homework question.
@@ -1278,7 +1276,7 @@ class MessageOutput(BaseModel):
         description="Thoughts on how to respond to the user's message"
     )
     response: str = Field(description="The response to the user's message")
-    user_name: Optional[str] = Field(
+    user_name: str | None = Field(
         description="The name of the user who sent the message, if known"
     )
     model_config = ConfigDict(extra="forbid")
@@ -1479,7 +1477,7 @@ async def test_exception_handling(client: Client):
 
 
 class CustomModelProvider(ModelProvider):
-    def get_model(self, model_name: Optional[str]) -> Model:
+    def get_model(self, model_name: str | None) -> Model:
         client = AsyncOpenAI(base_url="https://api.openai.com/v1")
         return OpenAIChatCompletionsModel(model="gpt-4o", openai_client=client)
 
@@ -1512,11 +1510,11 @@ async def test_chat_completions_model(client: Client):
 class WaitModel(Model):
     async def get_response(
         self,
-        system_instructions: Union[str, None],
-        input: Union[str, list[TResponseInputItem]],
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: Union[AgentOutputSchemaBase, None],
+        output_schema: AgentOutputSchemaBase | None,
         handoffs: list[Handoff],
         tracing: ModelTracing,
         **kwargs,
@@ -1528,11 +1526,11 @@ class WaitModel(Model):
 
     def stream_response(
         self,
-        system_instructions: Optional[str],
-        input: Union[str, list[TResponseInputItem]],
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: Optional[AgentOutputSchemaBase],
+        output_schema: AgentOutputSchemaBase | None,
         handoffs: list[Handoff],
         tracing: ModelTracing,
         **kwargs,
@@ -1554,7 +1552,7 @@ class AlternateModelAgent:
 
 
 class CheckModelNameProvider(ModelProvider):
-    def get_model(self, model_name: Optional[str]) -> Model:
+    def get_model(self, model_name: str | None) -> Model:
         assert model_name == "test_model"
         return hello_mock_model()
 
@@ -2035,13 +2033,13 @@ async def test_hosted_mcp_tool(client: Client):
 
 
 class AssertDifferentModelProvider(ModelProvider):
-    model_names: set[Optional[str]]
+    model_names: set[str | None]
 
     def __init__(self, model: Model):
         self._model = model
         self.model_names = set()
 
-    def get_model(self, model_name: Union[str, None]) -> Model:
+    def get_model(self, model_name: str | None) -> Model:
         self.model_names.add(model_name)
         return self._model
 
@@ -2136,9 +2134,9 @@ async def test_summary_provider(client: Client):
     class SummaryProvider(ModelSummaryProvider):
         def provide(
             self,
-            agent: Optional[Agent[Any]],
-            instructions: Optional[str],
-            input: Union[str, list[TResponseInputItem]],
+            agent: Agent[Any] | None,
+            instructions: str | None,
+            input: str | list[TResponseInputItem],
         ) -> str:
             return "My summary"
 
@@ -2226,7 +2224,7 @@ async def test_output_type(client: Client):
 @workflow.defn
 class McpServerWorkflow:
     @workflow.run
-    async def run(self, caching: bool, factory_argument: Optional[Any]) -> str:
+    async def run(self, caching: bool, factory_argument: Any | None) -> str:
         from agents.mcp import MCPServer
 
         server: MCPServer = openai_agents.workflow.stateless_mcp_server(
@@ -2246,7 +2244,7 @@ class McpServerWorkflow:
 @workflow.defn
 class McpServerStatefulWorkflow:
     @workflow.run
-    async def run(self, timeout: timedelta, factory_argument: Optional[Any]) -> str:
+    async def run(self, timeout: timedelta, factory_argument: Any | None) -> str:
         async with openai_agents.workflow.stateful_mcp_server(
             "HelloServer",
             config=ActivityConfig(
@@ -2308,8 +2306,8 @@ def get_tracking_server(name: str):
 
         async def list_tools(
             self,
-            run_context: Optional[RunContextWrapper[Any]] = None,
-            agent: Optional[AgentBase] = None,
+            run_context: RunContextWrapper[Any] | None = None,
+            agent: AgentBase | None = None,
         ) -> list[MCPTool]:
             self.calls.append("list_tools")
             return [
@@ -2327,7 +2325,7 @@ def get_tracking_server(name: str):
             ]
 
         async def call_tool(
-            self, tool_name: str, arguments: Optional[dict[str, Any]]
+            self, tool_name: str, arguments: dict[str, Any] | None
         ) -> CallToolResult:
             self.calls.append("call_tool")
             name = (arguments or {}).get("name") or "John Doe"
@@ -2339,7 +2337,7 @@ def get_tracking_server(name: str):
             raise NotImplementedError()
 
         async def get_prompt(
-            self, name: str, arguments: Optional[dict[str, Any]] = None
+            self, name: str, arguments: dict[str, Any] | None = None
         ) -> GetPromptResult:
             raise NotImplementedError()
 
@@ -2366,7 +2364,7 @@ async def test_mcp_server(
     )
 
     tracking_server = get_tracking_server(name="HelloServer")
-    server: Union[StatefulMCPServerProvider, StatelessMCPServerProvider] = (
+    server: StatefulMCPServerProvider | StatelessMCPServerProvider = (
         StatefulMCPServerProvider("HelloServer", lambda _: tracking_server)
         if stateful
         else StatelessMCPServerProvider("HelloServer", lambda _: tracking_server)
@@ -2451,7 +2449,7 @@ async def test_mcp_server(
 
 @pytest.mark.parametrize("stateful", [True, False])
 async def test_mcp_server_factory_argument(client: Client, stateful: bool):
-    def factory(args: Optional[Any]) -> MCPServer:
+    def factory(args: Any | None) -> MCPServer:
         print("Invoking factory: ", args)
         if args is not None:
             assert args is not None
@@ -2459,7 +2457,7 @@ async def test_mcp_server_factory_argument(client: Client, stateful: bool):
 
         return get_tracking_server("HelloServer")
 
-    server: Union[StatefulMCPServerProvider, StatelessMCPServerProvider] = (
+    server: StatefulMCPServerProvider | StatelessMCPServerProvider = (
         StatefulMCPServerProvider("HelloServer", factory)
         if stateful
         else StatelessMCPServerProvider("HelloServer", factory)

@@ -22,7 +22,7 @@ from tests.contrib.pydantic.models import (
 )
 
 
-def clone_objects(objects: List[PydanticModels]) -> List[PydanticModels]:
+def clone_objects(objects: list[PydanticModels]) -> list[PydanticModels]:
     new_objects = []
     for o in objects:
         fields = {}
@@ -45,7 +45,7 @@ class InstantiateModelsWorkflow:
 @workflow.defn
 class RoundTripPydanticObjectsWorkflow:
     @workflow.run
-    async def run(self, objects: List[PydanticModels]) -> List[PydanticModels]:
+    async def run(self, objects: list[PydanticModels]) -> list[PydanticModels]:
         return await workflow.execute_activity(
             pydantic_objects_activity,
             objects,
@@ -86,7 +86,7 @@ class RoundTripMiscObjectsWorkflow:
 @workflow.defn
 class CloneObjectsWorkflow:
     @workflow.run
-    async def run(self, objects: List[PydanticModels]) -> List[PydanticModels]:
+    async def run(self, objects: list[PydanticModels]) -> list[PydanticModels]:
         return clone_objects(objects)
 
 
@@ -98,7 +98,7 @@ class ComplexCustomUnionTypeWorkflow:
         input: ComplexCustomUnionType,
     ) -> ComplexCustomUnionType:
         data_classes = []
-        pydantic_objects: List[PydanticModels] = []
+        pydantic_objects: list[PydanticModels] = []
         for o in input:
             if dataclasses.is_dataclass(o):
                 data_classes.append(o)

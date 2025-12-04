@@ -8,10 +8,11 @@ import os
 import sys
 import time
 import uuid
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import IntEnum
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Type
+from typing import Any, Dict, List, Optional, Set, Type
 
 import pytest
 
@@ -68,7 +69,7 @@ class GlobalStateWorkflow:
         self.append("inited")
 
     @workflow.run
-    async def run(self, params: GlobalStateWorkflowParams) -> Dict[str, List[str]]:
+    async def run(self, params: GlobalStateWorkflowParams) -> dict[str, list[str]]:
         self.append("started")
         if params.fail_on_first_attempt:
             raise ApplicationError("Failing first attempt")
@@ -82,7 +83,7 @@ class GlobalStateWorkflow:
         stateful_module.module_state.append(str)
 
     @workflow.query
-    def state(self) -> Dict[str, List[str]]:
+    def state(self) -> dict[str, list[str]]:
         return {"global": global_state, "module": stateful_module.module_state}
 
 
@@ -97,7 +98,7 @@ class GlobalStateWorkflow:
 )
 async def test_workflow_sandbox_global_state(
     client: Client,
-    sandboxed_passthrough_modules: Set[str],
+    sandboxed_passthrough_modules: set[str],
 ):
     global global_state
     async with new_worker(
@@ -107,7 +108,7 @@ async def test_workflow_sandbox_global_state(
     ) as worker:
         # Start several workflows in the sandbox and make sure none of it
         # clashes
-        handles: List[WorkflowHandle] = []
+        handles: list[WorkflowHandle] = []
         for _ in range(10):
             handles.append(
                 await client.start_workflow(
@@ -429,7 +430,7 @@ async def test_workflow_sandbox_known_issues(client: Client):
 @workflow.defn
 class BadAsyncioWorkflow:
     @workflow.run
-    async def run(self) -> List[str]:
+    async def run(self) -> list[str]:
         # Two known bad asyncio task calls, as_completed and wait
         async def return_value(value: str) -> str:
             return value
@@ -468,11 +469,11 @@ async def test_workflow_sandbox_bad_asyncio(client: Client):
 
 def new_worker(
     client: Client,
-    *workflows: Type,
+    *workflows: type,
     activities: Sequence[Callable] = [],
-    task_queue: Optional[str] = None,
-    sandboxed_passthrough_modules: Set[str] = set(),
-    sandboxed_invalid_module_members: Optional[SandboxMatcher] = None,
+    task_queue: str | None = None,
+    sandboxed_passthrough_modules: set[str] = set(),
+    sandboxed_invalid_module_members: SandboxMatcher | None = None,
 ) -> Worker:
     restrictions = SandboxRestrictions.default
     if sandboxed_passthrough_modules:
@@ -507,7 +508,7 @@ class _TestWorkflowInboundInterceptor(WorkflowInboundInterceptor):
 class _TestInterceptor(Interceptor):
     def workflow_interceptor_class(
         self, input: WorkflowInterceptorClassInput
-    ) -> Type[_TestWorkflowInboundInterceptor]:
+    ) -> type[_TestWorkflowInboundInterceptor]:
         return _TestWorkflowInboundInterceptor
 
 
@@ -654,7 +655,7 @@ async def test_workflow_sandbox_import_suppress_warnings(client: Client):
 
 
 def _assert_expected_warnings(
-    recorder: pytest.WarningsRecorder, expected_warnings: Set[str]
+    recorder: pytest.WarningsRecorder, expected_warnings: set[str]
 ):
     actual_warnings = {str(w.message) for w in recorder}
     assert expected_warnings <= actual_warnings

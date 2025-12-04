@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum, IntEnum
-from typing import Any, Mapping, Optional, Union
+from typing import Any, Optional, Union
 from unittest.mock import patch
 
 import pytest
@@ -814,8 +815,8 @@ async def test_start_update_with_start_empty_details(client: Client):
             req: temporalio.api.workflowservice.v1.ExecuteMultiOperationRequest,
             *,
             retry: bool = False,
-            metadata: Mapping[str, Union[str, bytes]] = {},
-            timeout: Optional[timedelta] = None,
+            metadata: Mapping[str, str | bytes] = {},
+            timeout: timedelta | None = None,
         ) -> temporalio.api.workflowservice.v1.ExecuteMultiOperationResponse:
             raise self.empty_details_err
 

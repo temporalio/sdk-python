@@ -1,6 +1,7 @@
 import inspect
 import itertools
-from typing import Any, Callable, Sequence, Set, Type, get_type_hints
+from collections.abc import Callable, Sequence
+from typing import Any, Set, Type, get_type_hints
 
 import pytest
 
@@ -470,8 +471,8 @@ def test_workflow_update_validator_not_update():
 
 def _assert_config_function_parity(
     function_obj: Callable[..., Any],
-    config_class: Type[Any],
-    excluded_params: Set[str],
+    config_class: type[Any],
+    excluded_params: set[str],
 ) -> None:
     function_name = function_obj.__name__
     config_name = config_class.__name__
@@ -481,14 +482,14 @@ def _assert_config_function_parity(
     config_hints = get_type_hints(config_class)
 
     # Get parameter names from function (excluding excluded ones and applying mappings)
-    expected_config_params = set(
-        [name for name in function_sig.parameters.keys() if name not in excluded_params]
-    )
+    expected_config_params = {
+        name for name in function_sig.parameters.keys() if name not in excluded_params
+    }
 
     # Get parameter names from config
-    actual_config_params = set(
-        [name for name in config_hints.keys() if name not in excluded_params]
-    )
+    actual_config_params = {
+        name for name in config_hints.keys() if name not in excluded_params
+    }
 
     # Check for missing and extra parameters
     missing_in_config = expected_config_params - actual_config_params

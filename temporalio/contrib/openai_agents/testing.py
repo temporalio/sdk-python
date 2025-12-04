@@ -1,6 +1,7 @@
 """Testing utilities for OpenAI agents."""
 
-from typing import AsyncIterator, Callable, Optional, Sequence, Union
+from collections.abc import AsyncIterator, Callable, Sequence
+from typing import Optional, Union
 
 from agents import (
     AgentOutputSchemaBase,
@@ -125,7 +126,7 @@ class TestModelProvider(ModelProvider):
         """
         self._model = model
 
-    def get_model(self, model_name: Union[str, None]) -> Model:
+    def get_model(self, model_name: str | None) -> Model:
         """Get a model from the model provider.
 
         .. warning::
@@ -153,11 +154,11 @@ class TestModel(Model):
 
     async def get_response(
         self,
-        system_instructions: Union[str, None],
-        input: Union[str, list[TResponseInputItem]],
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: Union[AgentOutputSchemaBase, None],
+        output_schema: AgentOutputSchemaBase | None,
         handoffs: list[Handoff],
         tracing: ModelTracing,
         **kwargs,
@@ -167,11 +168,11 @@ class TestModel(Model):
 
     def stream_response(
         self,
-        system_instructions: Optional[str],
-        input: Union[str, list[TResponseInputItem]],
+        system_instructions: str | None,
+        input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
         tools: list[Tool],
-        output_schema: Optional[AgentOutputSchemaBase],
+        output_schema: AgentOutputSchemaBase | None,
         handoffs: list[Handoff],
         tracing: ModelTracing,
         **kwargs,
@@ -218,11 +219,11 @@ class AgentEnvironment:
 
     def __init__(
         self,
-        model_params: Optional[ModelActivityParameters] = None,
-        model_provider: Optional[ModelProvider] = None,
-        model: Optional[Model] = None,
+        model_params: ModelActivityParameters | None = None,
+        model_provider: ModelProvider | None = None,
+        model: Model | None = None,
         mcp_server_providers: Sequence[
-            Union[StatelessMCPServerProvider, StatefulMCPServerProvider]
+            StatelessMCPServerProvider | StatefulMCPServerProvider
         ] = (),
         register_activities: bool = True,
     ) -> None:
@@ -253,7 +254,7 @@ class AgentEnvironment:
             self._model_provider = TestModelProvider(model)
         self._mcp_server_providers = mcp_server_providers
         self._register_activities = register_activities
-        self._plugin: Optional[OpenAIAgentsPlugin] = None
+        self._plugin: OpenAIAgentsPlugin | None = None
 
     async def __aenter__(self) -> "AgentEnvironment":
         """Enter the async context manager."""

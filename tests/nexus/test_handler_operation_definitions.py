@@ -26,7 +26,7 @@ class Output:
 
 @dataclass
 class _TestCase:
-    Service: Type[Any]
+    Service: type[Any]
     expected_operations: dict[str, nexusrpc.Operation]
 
 
@@ -90,7 +90,7 @@ class CalledWithNameOverride(_TestCase):
 )
 @pytest.mark.asyncio
 async def test_collected_operation_names(
-    test_case: Type[_TestCase],
+    test_case: type[_TestCase],
 ):
     service_defn = nexusrpc.get_service_definition(test_case.Service)
     assert isinstance(service_defn, nexusrpc.ServiceDefinition)

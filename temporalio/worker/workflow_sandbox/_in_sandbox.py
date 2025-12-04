@@ -32,8 +32,8 @@ class InSandbox:
     def __init__(
         self,
         instance_details: temporalio.worker._workflow_instance.WorkflowInstanceDetails,
-        runner_class: Type[temporalio.worker._workflow_instance.WorkflowRunner],
-        workflow_class: Type,
+        runner_class: type[temporalio.worker._workflow_instance.WorkflowRunner],
+        workflow_class: type,
     ) -> None:
         """Create in-sandbox instance."""
         _trace("Initializing workflow %s in sandbox", workflow_class)
@@ -84,7 +84,7 @@ class InSandbox:
 
     def get_serialization_context(
         self,
-        command_info: Optional[_command_aware_visitor.CommandInfo],
-    ) -> Optional[temporalio.converter.SerializationContext]:
+        command_info: _command_aware_visitor.CommandInfo | None,
+    ) -> temporalio.converter.SerializationContext | None:
         """Get serialization context."""
         return self.instance.get_serialization_context(command_info)

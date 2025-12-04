@@ -5,7 +5,8 @@ Nothing in this module should be considered stable. The API may change.
 
 from __future__ import annotations
 
-from typing import Mapping, Optional, Union
+from collections.abc import Mapping
+from typing import Optional, Union
 
 import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
@@ -15,7 +16,7 @@ class MetricMeter:
     """Metric meter using SDK Core."""
 
     @staticmethod
-    def create(runtime: temporalio.bridge.runtime.Runtime) -> Optional[MetricMeter]:
+    def create(runtime: temporalio.bridge.runtime.Runtime) -> MetricMeter | None:
         """Create optional metric meter."""
         ref = temporalio.bridge.temporal_sdk_bridge.new_metric_meter(runtime._ref)
         if not ref:
@@ -42,8 +43,8 @@ class MetricCounter:
         self,
         meter: MetricMeter,
         name: str,
-        description: Optional[str],
-        unit: Optional[str],
+        description: str | None,
+        unit: str | None,
     ) -> None:
         """Initialize counter metric."""
         self._ref = meter._ref.new_counter(name, description, unit)
@@ -62,8 +63,8 @@ class MetricHistogram:
         self,
         meter: MetricMeter,
         name: str,
-        description: Optional[str],
-        unit: Optional[str],
+        description: str | None,
+        unit: str | None,
     ) -> None:
         """Initialize histogram."""
         self._ref = meter._ref.new_histogram(name, description, unit)
@@ -82,8 +83,8 @@ class MetricHistogramFloat:
         self,
         meter: MetricMeter,
         name: str,
-        description: Optional[str],
-        unit: Optional[str],
+        description: str | None,
+        unit: str | None,
     ) -> None:
         """Initialize histogram."""
         self._ref = meter._ref.new_histogram_float(name, description, unit)
@@ -102,8 +103,8 @@ class MetricHistogramDuration:
         self,
         meter: MetricMeter,
         name: str,
-        description: Optional[str],
-        unit: Optional[str],
+        description: str | None,
+        unit: str | None,
     ) -> None:
         """Initialize histogram."""
         self._ref = meter._ref.new_histogram_duration(name, description, unit)
@@ -122,8 +123,8 @@ class MetricGauge:
         self,
         meter: MetricMeter,
         name: str,
-        description: Optional[str],
-        unit: Optional[str],
+        description: str | None,
+        unit: str | None,
     ) -> None:
         """Initialize gauge."""
         self._ref = meter._ref.new_gauge(name, description, unit)
@@ -142,8 +143,8 @@ class MetricGaugeFloat:
         self,
         meter: MetricMeter,
         name: str,
-        description: Optional[str],
-        unit: Optional[str],
+        description: str | None,
+        unit: str | None,
     ) -> None:
         """Initialize gauge."""
         self._ref = meter._ref.new_gauge_float(name, description, unit)
@@ -168,7 +169,7 @@ class MetricAttributes:
         self._ref = ref
 
     def with_additional_attributes(
-        self, new_attrs: Mapping[str, Union[str, int, float, bool]]
+        self, new_attrs: Mapping[str, str | int | float | bool]
     ) -> MetricAttributes:
         """Create new attributes with new attributes appended."""
         return MetricAttributes(

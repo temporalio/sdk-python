@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import inspect
 import threading
+from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Optional, Set, TypeVar
+from typing import Any, Optional, Set, TypeVar
 
 from typing_extensions import ParamSpec
 
@@ -65,7 +66,7 @@ class ActivityEnvironment:
             take effect. Default is noop.
     """
 
-    def __init__(self, client: Optional[Client] = None) -> None:
+    def __init__(self, client: Client | None = None) -> None:
         """Create an ActivityEnvironment for running activity code."""
         self.info = _default_info
         self.on_heartbeat: Callable[..., None] = lambda *args: None
@@ -75,7 +76,7 @@ class ActivityEnvironment:
         self.metric_meter = temporalio.common.MetricMeter.noop
         self._cancelled = False
         self._worker_shutdown = False
-        self._activities: Set[_Activity] = set()
+        self._activities: set[_Activity] = set()
         self._client = client
         self._cancellation_details = (
             temporalio.activity._ActivityCancellationDetailsHolder()
@@ -139,16 +140,16 @@ class _Activity:
         self,
         env: ActivityEnvironment,
         fn: Callable,
-        client: Optional[Client],
+        client: Client | None,
     ) -> None:
         self.env = env
         self.fn = fn
         self.is_async = inspect.iscoroutinefunction(fn) or inspect.iscoroutinefunction(
             fn.__call__  # type: ignore
         )
-        self.cancel_thread_raiser: Optional[
+        self.cancel_thread_raiser: None | (
             temporalio.worker._activity._ThreadExceptionRaiser
-        ] = None
+        ) = None
         if not self.is_async:
             # If there is a definition and they disable thread raising, don't
             # set
@@ -179,7 +180,7 @@ class _Activity:
             client=client if self.is_async else None,
             cancellation_details=env._cancellation_details,
         )
-        self.task: Optional[asyncio.Task] = None
+        self.task: asyncio.Task | None = None
 
     def run(self, *args, **kwargs) -> Any:
         if self.cancel_thread_raiser:

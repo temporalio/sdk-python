@@ -86,7 +86,7 @@ def workflow_event_to_nexus_link(
 
 def nexus_link_to_workflow_event(
     link: nexusrpc.Link,
-) -> Optional[temporalio.api.common.v1.Link.WorkflowEvent]:
+) -> temporalio.api.common.v1.Link.WorkflowEvent | None:
     """Convert a nexus link into a WorkflowEvent link
 
     This is used when propagating links from a Nexus start operation request to a

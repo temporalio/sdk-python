@@ -5,8 +5,9 @@ Nothing in this module should be considered stable. The API may change.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Optional, Sequence
+from typing import Optional
 
 import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
@@ -16,16 +17,16 @@ import temporalio.bridge.temporal_sdk_bridge
 class DevServerConfig:
     """Python representation of the Rust struct for configuring dev server."""
 
-    existing_path: Optional[str]
+    existing_path: str | None
     sdk_name: str
     sdk_version: str
     download_version: str
-    download_dest_dir: Optional[str]
-    download_ttl_ms: Optional[int]
+    download_dest_dir: str | None
+    download_ttl_ms: int | None
     namespace: str
     ip: str
-    port: Optional[int]
-    database_filename: Optional[str]
+    port: int | None
+    database_filename: str | None
     ui: bool
     log_format: str
     log_level: str
@@ -36,13 +37,13 @@ class DevServerConfig:
 class TestServerConfig:
     """Python representation of the Rust struct for configuring test server."""
 
-    existing_path: Optional[str]
+    existing_path: str | None
     sdk_name: str
     sdk_version: str
     download_version: str
-    download_dest_dir: Optional[str]
-    download_ttl_ms: Optional[int]
-    port: Optional[int]
+    download_dest_dir: str | None
+    download_ttl_ms: int | None
+    port: int | None
     extra_args: Sequence[str]
 
 

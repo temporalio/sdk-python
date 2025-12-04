@@ -4,8 +4,9 @@ import multiprocessing
 import multiprocessing.context
 import os
 import uuid
+from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Mapping, Optional, Tuple, Union, cast
+from typing import Any, List, Optional, Tuple, Union, cast
 from unittest import mock
 
 import google.protobuf.any_pb2
@@ -310,8 +311,8 @@ async def test_rpc_already_exists_error_is_raised(client: Client):
             req: temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
             *,
             retry: bool = False,
-            metadata: Mapping[str, Union[str, bytes]] = {},
-            timeout: Optional[timedelta] = None,
+            metadata: Mapping[str, str | bytes] = {},
+            timeout: timedelta | None = None,
         ) -> temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse:
             raise self.already_exists_err
 
@@ -661,7 +662,7 @@ async def test_count_workflows(client: Client, env: WorkflowEnvironment):
         resp = await client.count_workflows(
             f"TaskQueue = '{worker.task_queue}' GROUP BY ExecutionStatus"
         )
-        cast(List[WorkflowExecutionCountAggregationGroup], resp.groups).sort(
+        cast(list[WorkflowExecutionCountAggregationGroup], resp.groups).sort(
             key=lambda g: g.count
         )
         return resp
@@ -992,7 +993,7 @@ async def test_schedule_basics(
         )
         expected_ids.append(new_handle.id)
 
-    async def list_ids() -> List[str]:
+    async def list_ids() -> list[str]:
         return sorted(
             [
                 list_desc.id
@@ -1222,7 +1223,7 @@ async def test_schedule_workflow_search_attribute_update(
     # Do update of typed attrs
     def update_schedule_typed_attrs(
         input: ScheduleUpdateInput,
-    ) -> Optional[ScheduleUpdate]:
+    ) -> ScheduleUpdate | None:
         assert isinstance(
             input.description.schedule.action, ScheduleActionStartWorkflow
         )
@@ -1329,7 +1330,7 @@ async def test_schedule_search_attribute_update(
 
     def update_search_attributes(
         input: ScheduleUpdateInput,
-    ) -> Optional[ScheduleUpdate]:
+    ) -> ScheduleUpdate | None:
         # Make sure the initial search attributes are present
         assert input.description.search_attributes[key_1.name] == [val_1]
         assert input.description.search_attributes[key_2.name] == [val_2]
@@ -1522,7 +1523,7 @@ async def test_schedule_last_completion_result(
         )
         await handle.trigger()
 
-        async def get_schedule_result() -> Tuple[int, Optional[str]]:
+        async def get_schedule_result() -> tuple[int, str | None]:
             desc = await handle.describe()
             length = len(desc.info.recent_actions)
             if length == 0:

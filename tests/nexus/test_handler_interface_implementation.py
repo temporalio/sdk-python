@@ -14,7 +14,7 @@ from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 class _InterfaceImplementationTestCase:
     Interface: type[Any]
     Impl: type[Any]
-    error_message: Optional[str]
+    error_message: str | None
 
 
 class ValidImpl(_InterfaceImplementationTestCase):

@@ -8,10 +8,11 @@ import os
 import socket
 import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import IntEnum
-from typing import ClassVar, Mapping, Optional, Tuple, Type, TypeVar, Union
+from typing import ClassVar, Optional, Tuple, Type, TypeVar, Union
 
 import google.protobuf.message
 
@@ -37,18 +38,18 @@ LOG_PROTOS = False
 class TLSConfig:
     """TLS configuration for connecting to Temporal server."""
 
-    server_root_ca_cert: Optional[bytes] = None
+    server_root_ca_cert: bytes | None = None
     """Root CA to validate the server certificate against."""
 
-    domain: Optional[str] = None
+    domain: str | None = None
     """TLS domain."""
 
-    client_cert: Optional[bytes] = None
+    client_cert: bytes | None = None
     """Client certificate for mTLS.
 
     This must be combined with :py:attr:`client_private_key`."""
 
-    client_private_key: Optional[bytes] = None
+    client_private_key: bytes | None = None
     """Client private key for mTLS.
 
     This must be combined with :py:attr:`client_cert`."""
@@ -74,7 +75,7 @@ class RetryConfig:
     """Backoff multiplier."""
     max_interval_millis: int = 5000
     """Maximum backoff interval."""
-    max_elapsed_time_millis: Optional[int] = 10000
+    max_elapsed_time_millis: int | None = 10000
     """Maximum total time."""
     max_retries: int = 10
     """Maximum number of retries."""
@@ -118,7 +119,7 @@ class HttpConnectProxyConfig:
 
     target_host: str
     """Target host:port for the HTTP CONNECT proxy."""
-    basic_auth: Optional[Tuple[str, str]] = None
+    basic_auth: tuple[str, str] | None = None
     """Basic auth for the HTTP CONNECT proxy if any as a user/pass tuple."""
 
     def _to_bridge_config(
@@ -135,15 +136,15 @@ class ConnectConfig:
     """Config for connecting to the server."""
 
     target_host: str
-    api_key: Optional[str] = None
-    tls: Union[bool, TLSConfig, None] = None
-    retry_config: Optional[RetryConfig] = None
-    keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default
-    rpc_metadata: Mapping[str, Union[str, bytes]] = field(default_factory=dict)
+    api_key: str | None = None
+    tls: bool | TLSConfig | None = None
+    retry_config: RetryConfig | None = None
+    keep_alive_config: KeepAliveConfig | None = KeepAliveConfig.default
+    rpc_metadata: Mapping[str, str | bytes] = field(default_factory=dict)
     identity: str = ""
     lazy: bool = False
-    runtime: Optional[temporalio.runtime.Runtime] = None
-    http_connect_proxy_config: Optional[HttpConnectProxyConfig] = None
+    runtime: temporalio.runtime.Runtime | None = None
+    http_connect_proxy_config: HttpConnectProxyConfig | None = None
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
@@ -155,7 +156,7 @@ class ConnectConfig:
         # past so we'll leave it for only one more version with a warning.
         # Otherwise we'll prepend the scheme.
         target_url: str
-        tls_config: Optional[temporalio.bridge.client.ClientTlsConfig]
+        tls_config: temporalio.bridge.client.ClientTlsConfig | None
         if "://" in self.target_host:
             warnings.warn(
                 "Target host as URL with scheme no longer supported. This will be an error in future versions."
@@ -227,8 +228,8 @@ class ServiceClient(ABC):
         *,
         service: str = "temporal.api.workflowservice.v1.WorkflowService",
         retry: bool = False,
-        metadata: Mapping[str, Union[str, bytes]] = {},
-        timeout: Optional[timedelta] = None,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
     ) -> bool:
         """Check whether the WorkflowService is up.
 
@@ -260,12 +261,12 @@ class ServiceClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def update_rpc_metadata(self, metadata: Mapping[str, Union[str, bytes]]) -> None:
+    def update_rpc_metadata(self, metadata: Mapping[str, str | bytes]) -> None:
         """Update service client's RPC metadata."""
         raise NotImplementedError
 
     @abstractmethod
-    def update_api_key(self, api_key: Optional[str]) -> None:
+    def update_api_key(self, api_key: str | None) -> None:
         """Update service client's API key."""
         raise NotImplementedError
 
@@ -274,12 +275,12 @@ class ServiceClient(ABC):
         self,
         rpc: str,
         req: google.protobuf.message.Message,
-        resp_type: Type[ServiceResponse],
+        resp_type: type[ServiceResponse],
         *,
         service: str,
         retry: bool,
-        metadata: Mapping[str, Union[str, bytes]],
-        timeout: Optional[timedelta],
+        metadata: Mapping[str, str | bytes],
+        timeout: timedelta | None,
     ) -> ServiceResponse:
         raise NotImplementedError
 
@@ -316,7 +317,7 @@ class _BridgeServiceClient(ServiceClient):
     def __init__(self, config: ConnectConfig) -> None:
         super().__init__(config)
         self._bridge_config = config._to_bridge_config()
-        self._bridge_client: Optional[temporalio.bridge.client.Client] = None
+        self._bridge_client: temporalio.bridge.client.Client | None = None
         self._bridge_client_connect_lock = asyncio.Lock()
 
     async def _connected_client(self) -> temporalio.bridge.client.Client:
@@ -334,7 +335,7 @@ class _BridgeServiceClient(ServiceClient):
         """Underlying service client."""
         return self
 
-    def update_rpc_metadata(self, metadata: Mapping[str, Union[str, bytes]]) -> None:
+    def update_rpc_metadata(self, metadata: Mapping[str, str | bytes]) -> None:
         """Update Core client metadata."""
         # Mutate the bridge config and then only mutate the running client
         # metadata if already connected
@@ -342,7 +343,7 @@ class _BridgeServiceClient(ServiceClient):
         if self._bridge_client:
             self._bridge_client.update_metadata(metadata)
 
-    def update_api_key(self, api_key: Optional[str]) -> None:
+    def update_api_key(self, api_key: str | None) -> None:
         """Update Core client API key."""
         # Mutate the bridge config and then only mutate the running client
         # metadata if already connected
@@ -354,12 +355,12 @@ class _BridgeServiceClient(ServiceClient):
         self,
         rpc: str,
         req: google.protobuf.message.Message,
-        resp_type: Type[ServiceResponse],
+        resp_type: type[ServiceResponse],
         *,
         service: str,
         retry: bool,
-        metadata: Mapping[str, Union[str, bytes]],
-        timeout: Optional[timedelta],
+        metadata: Mapping[str, str | bytes],
+        timeout: timedelta | None,
     ) -> ServiceResponse:
         global LOG_PROTOS
         if LOG_PROTOS:
@@ -417,7 +418,7 @@ class RPCError(temporalio.exceptions.TemporalError):
         self._message = message
         self._status = status
         self._raw_grpc_status = raw_grpc_status
-        self._grpc_status: Optional[temporalio.api.common.v1.GrpcStatus] = None
+        self._grpc_status: temporalio.api.common.v1.GrpcStatus | None = None
 
     @property
     def message(self) -> str:

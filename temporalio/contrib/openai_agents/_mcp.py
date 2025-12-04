@@ -4,9 +4,10 @@ import dataclasses
 import functools
 import inspect
 import logging
+from collections.abc import Callable, Sequence
 from contextlib import AbstractAsyncContextManager
 from datetime import timedelta
-from typing import Any, Callable, Optional, Sequence, Union, cast
+from typing import Any, Optional, Union, cast
 
 from agents import AgentBase, RunContextWrapper
 from agents.mcp import MCPServer
@@ -33,35 +34,35 @@ logger = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class _StatelessListToolsArguments:
-    factory_argument: Optional[Any]
+    factory_argument: Any | None
 
 
 @dataclasses.dataclass
 class _StatelessCallToolsArguments:
     tool_name: str
-    arguments: Optional[dict[str, Any]]
-    factory_argument: Optional[Any]
+    arguments: dict[str, Any] | None
+    factory_argument: Any | None
 
 
 @dataclasses.dataclass
 class _StatelessListPromptsArguments:
-    factory_argument: Optional[Any]
+    factory_argument: Any | None
 
 
 @dataclasses.dataclass
 class _StatelessGetPromptArguments:
     name: str
-    arguments: Optional[dict[str, Any]]
-    factory_argument: Optional[Any]
+    arguments: dict[str, Any] | None
+    factory_argument: Any | None
 
 
 class _StatelessMCPServerReference(MCPServer):
     def __init__(
         self,
         server: str,
-        config: Optional[ActivityConfig],
+        config: ActivityConfig | None,
         cache_tools_list: bool,
-        factory_argument: Optional[Any] = None,
+        factory_argument: Any | None = None,
     ):
         self._name = server + "-stateless"
         self._config = config or ActivityConfig(
@@ -84,8 +85,8 @@ class _StatelessMCPServerReference(MCPServer):
 
     async def list_tools(
         self,
-        run_context: Optional[RunContextWrapper[Any]] = None,
-        agent: Optional[AgentBase] = None,
+        run_context: RunContextWrapper[Any] | None = None,
+        agent: AgentBase | None = None,
     ) -> list[MCPTool]:
         if self._tools:
             return self._tools
@@ -100,7 +101,7 @@ class _StatelessMCPServerReference(MCPServer):
         return tools
 
     async def call_tool(
-        self, tool_name: str, arguments: Optional[dict[str, Any]]
+        self, tool_name: str, arguments: dict[str, Any] | None
     ) -> CallToolResult:
         return await workflow.execute_activity(
             self.name + "-call-tool-v2",
@@ -118,7 +119,7 @@ class _StatelessMCPServerReference(MCPServer):
         )
 
     async def get_prompt(
-        self, name: str, arguments: Optional[dict[str, Any]] = None
+        self, name: str, arguments: dict[str, Any] | None = None
     ) -> GetPromptResult:
         return await workflow.execute_activity(
             self.name + "-get-prompt-v2",
@@ -142,9 +143,7 @@ class StatelessMCPServerProvider:
     def __init__(
         self,
         name: str,
-        server_factory: Union[
-            Callable[[], MCPServer], Callable[[Optional[Any]], MCPServer]
-        ],
+        server_factory: (Callable[[], MCPServer] | Callable[[Any | None], MCPServer]),
     ):
         """Initialize the stateless temporal MCP server.
 
@@ -162,7 +161,7 @@ class StatelessMCPServerProvider:
         self._name = name + "-stateless"
         super().__init__()
 
-    def _create_server(self, factory_argument: Optional[Any]) -> MCPServer:
+    def _create_server(self, factory_argument: Any | None) -> MCPServer:
         if self._server_accepts_arguments:
             return cast(Callable[[Optional[Any]], MCPServer], self._server_factory)(
                 factory_argument
@@ -178,7 +177,7 @@ class StatelessMCPServerProvider:
     def _get_activities(self) -> Sequence[Callable]:
         @activity.defn(name=self.name + "-list-tools")
         async def list_tools(
-            args: Optional[_StatelessListToolsArguments] = None,
+            args: _StatelessListToolsArguments | None = None,
         ) -> list[MCPTool]:
             server = self._create_server(args.factory_argument if args else None)
             try:
@@ -198,7 +197,7 @@ class StatelessMCPServerProvider:
 
         @activity.defn(name=self.name + "-list-prompts")
         async def list_prompts(
-            args: Optional[_StatelessListPromptsArguments] = None,
+            args: _StatelessListPromptsArguments | None = None,
         ) -> ListPromptsResult:
             server = self._create_server(args.factory_argument if args else None)
             try:
@@ -219,7 +218,7 @@ class StatelessMCPServerProvider:
         @activity.defn(name=self.name + "-call-tool")
         async def call_tool_deprecated(
             tool_name: str,
-            arguments: Optional[dict[str, Any]],
+            arguments: dict[str, Any] | None,
         ) -> CallToolResult:
             return await call_tool(
                 _StatelessCallToolsArguments(tool_name, arguments, None)
@@ -228,7 +227,7 @@ class StatelessMCPServerProvider:
         @activity.defn(name=self.name + "-get-prompt")
         async def get_prompt_deprecated(
             name: str,
-            arguments: Optional[dict[str, Any]],
+            arguments: dict[str, Any] | None,
         ) -> GetPromptResult:
             return await get_prompt(_StatelessGetPromptArguments(name, arguments, None))
 
@@ -276,27 +275,27 @@ def _handle_worker_failure(func):
 @dataclasses.dataclass
 class _StatefulCallToolsArguments:
     tool_name: str
-    arguments: Optional[dict[str, Any]]
+    arguments: dict[str, Any] | None
 
 
 @dataclasses.dataclass
 class _StatefulGetPromptArguments:
     name: str
-    arguments: Optional[dict[str, Any]]
+    arguments: dict[str, Any] | None
 
 
 @dataclasses.dataclass
 class _StatefulServerSessionArguments:
-    factory_argument: Optional[Any]
+    factory_argument: Any | None
 
 
 class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
     def __init__(
         self,
         server: str,
-        config: Optional[ActivityConfig],
-        server_session_config: Optional[ActivityConfig],
-        factory_argument: Optional[Any],
+        config: ActivityConfig | None,
+        server_session_config: ActivityConfig | None,
+        factory_argument: Any | None,
     ):
         self._name = server + "-stateful"
         self._config = config or ActivityConfig(
@@ -306,7 +305,7 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
         self._server_session_config = server_session_config or ActivityConfig(
             start_to_close_timeout=timedelta(hours=1),
         )
-        self._connect_handle: Optional[ActivityHandle] = None
+        self._connect_handle: ActivityHandle | None = None
         self._factory_argument = factory_argument
         super().__init__()
 
@@ -343,8 +342,8 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
     @_handle_worker_failure
     async def list_tools(
         self,
-        run_context: Optional[RunContextWrapper[Any]] = None,
-        agent: Optional[AgentBase] = None,
+        run_context: RunContextWrapper[Any] | None = None,
+        agent: AgentBase | None = None,
     ) -> list[MCPTool]:
         if not self._connect_handle:
             raise ApplicationError(
@@ -359,7 +358,7 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
 
     @_handle_worker_failure
     async def call_tool(
-        self, tool_name: str, arguments: Optional[dict[str, Any]]
+        self, tool_name: str, arguments: dict[str, Any] | None
     ) -> CallToolResult:
         if not self._connect_handle:
             raise ApplicationError(
@@ -387,7 +386,7 @@ class _StatefulMCPServerReference(MCPServer, AbstractAsyncContextManager):
 
     @_handle_worker_failure
     async def get_prompt(
-        self, name: str, arguments: Optional[dict[str, Any]] = None
+        self, name: str, arguments: dict[str, Any] | None = None
     ) -> GetPromptResult:
         if not self._connect_handle:
             raise ApplicationError(
@@ -420,7 +419,7 @@ class StatefulMCPServerProvider:
     def __init__(
         self,
         name: str,
-        server_factory: Callable[[Optional[Any]], MCPServer],
+        server_factory: Callable[[Any | None], MCPServer],
     ):
         """Initialize the stateful temporal MCP server.
 
@@ -431,7 +430,7 @@ class StatefulMCPServerProvider:
         """
         self._server_factory = server_factory
         self._name = name + "-stateful"
-        self._connect_handle: Optional[ActivityHandle] = None
+        self._connect_handle: ActivityHandle | None = None
         self._servers: dict[str, MCPServer] = {}
         super().__init__()
 
@@ -450,7 +449,7 @@ class StatefulMCPServerProvider:
 
         @activity.defn(name=self.name + "-call-tool")
         async def call_tool_deprecated(
-            tool_name: str, arguments: Optional[dict[str, Any]]
+            tool_name: str, arguments: dict[str, Any] | None
         ) -> CallToolResult:
             return await self._servers[_server_id()].call_tool(tool_name, arguments)
 
@@ -466,7 +465,7 @@ class StatefulMCPServerProvider:
 
         @activity.defn(name=self.name + "-get-prompt")
         async def get_prompt_deprecated(
-            name: str, arguments: Optional[dict[str, Any]]
+            name: str, arguments: dict[str, Any] | None
         ) -> GetPromptResult:
             return await self._servers[_server_id()].get_prompt(name, arguments)
 
@@ -484,7 +483,7 @@ class StatefulMCPServerProvider:
 
         @activity.defn(name=self.name + "-server-session")
         async def connect(
-            args: Optional[_StatefulServerSessionArguments] = None,
+            args: _StatefulServerSessionArguments | None = None,
         ) -> None:
             heartbeat_task = asyncio.create_task(heartbeat_every(30))
 

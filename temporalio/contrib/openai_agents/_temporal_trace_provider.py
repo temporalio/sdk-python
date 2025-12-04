@@ -27,10 +27,10 @@ class ActivitySpanData(SpanData):
         activity_id: str,
         activity_type: str,
         task_queue: str,
-        schedule_to_close_timeout: Optional[float] = None,
-        schedule_to_start_timeout: Optional[float] = None,
-        start_to_close_timeout: Optional[float] = None,
-        heartbeat_timeout: Optional[float] = None,
+        schedule_to_close_timeout: float | None = None,
+        schedule_to_start_timeout: float | None = None,
+        start_to_close_timeout: float | None = None,
+        heartbeat_timeout: float | None = None,
     ):
         """Initialize an ActivitySpanData instance."""
         self.activity_id = activity_id
