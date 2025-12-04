@@ -27,7 +27,9 @@ def generate_python_services(
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Mapping, TYPE_CHECKING
+from typing import TYPE_CHECKING
+from collections.abc import Mapping
+
 import google.protobuf.empty_pb2
 
 $service_imports
