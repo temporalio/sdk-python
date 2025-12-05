@@ -4,9 +4,6 @@ on:
   schedule:
     # Run at 3 AM PST (11:00 UTC) - offset from existing nightly
     - cron: '00 11 * * *'
-  push:
-    branches:
-      - add-nightly-throughput-stress-workflow
   workflow_dispatch:
     inputs:
       duration:
@@ -32,6 +29,9 @@ env:
   # Workflow configuration
   TEST_DURATION: ${{ inputs.duration || vars.NIGHTLY_TEST_DURATION || '5h' }}
   TEST_TIMEOUT: ${{ inputs.timeout || vars.NIGHTLY_TEST_TIMEOUT || '5h30m' }}
+
+  # AWS S3 metrics upload ARN
+  AWS_S3_METRICS_UPLOAD_ROLE_ARN: ${{ vars.AWS_S3_METRICS_UPLOAD_ROLE_ARN }}
 
   # Logging and artifacts
   WORKER_LOG_DIR: /tmp/throughput-stress-logs
@@ -107,6 +107,14 @@ jobs:
       - name: Install Temporal CLI
         uses: temporalio/setup-temporal@v0
 
+      - name: Install Prometheus
+        run: |
+          PROM_VERSION="3.8.0"
+          wget -q https://github.com/prometheus/prometheus/releases/download/v${PROM_VERSION}/prometheus-${PROM_VERSION}.linux-amd64.tar.gz
+          tar xzf prometheus-${PROM_VERSION}.linux-amd64.tar.gz
+          sudo mv prometheus-${PROM_VERSION}.linux-amd64/prometheus /usr/local/bin/
+          prometheus --version
+
       - name: Setup log directory
         run: mkdir -p $WORKER_LOG_DIR
 
@@ -139,12 +147,36 @@ jobs:
             --duration $TEST_DURATION \
             --timeout $TEST_TIMEOUT \
             --max-concurrent 10 \
+            --prom-listen-address 127.0.0.1:9091 \
+            --worker-prom-listen-address 127.0.0.1:9092 \
+            --prom-instance-addr 127.0.0.1:9090 \
+            --prom-instance-config \
+            --prom-export-worker-metrics $RUN_ID.parquet \
             --option internal-iterations=10 \
             --option continue-as-new-after-iterations=3 \
             --option sleep-time=1s \
             --option visibility-count-timeout=5m \
             --option min-throughput-per-hour=1000 \
             2>&1 | tee $WORKER_LOG_DIR/scenario.log
+
+      - name: Configure AWS credentials
+        if: always()
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_S3_METRICS_UPLOAD_ROLE_ARN }}
+          aws-region: us-west-2
+  
+      - name: Upload metrics to S3
+        if: always()
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          # Use test/ prefix on non-main branches
+          PREFIX="language=python/date=$DATE"
+          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
+            PREFIX="test/$PREFIX"
+          fi
+          aws s3 cp omes/$RUN_ID.parquet \
+            "s3://cloud-data-ingest-prod/github/sdk_load_test/$PREFIX/$RUN_ID.parquet"
 
       - name: Upload logs on failure
         if: failure() || cancelled()
