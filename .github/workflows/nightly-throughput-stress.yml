@@ -21,9 +21,15 @@ on:
         required: false
         default: 360
         type: number
+      is_experiment:
+        description: 'Mark this run as an experiment (excluded from nightly dashboards)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   # Workflow configuration
@@ -40,6 +46,12 @@ env:
   OMES_REPO: temporalio/omes
   OMES_REF: main
   RUN_ID: ${{ github.run_id }}-throughput-stress
+
+  # Prometheus version
+  PROM_VERSION: "3.8.0"
+
+  # Language
+  SDK_LANG: "python"
 
 jobs:
   throughput-stress:
@@ -109,7 +121,6 @@ jobs:
 
       - name: Install Prometheus
         run: |
-          PROM_VERSION="3.8.0"
           wget -q https://github.com/prometheus/prometheus/releases/download/v${PROM_VERSION}/prometheus-${PROM_VERSION}.linux-amd64.tar.gz
           tar xzf prometheus-${PROM_VERSION}.linux-amd64.tar.gz
           sudo mv prometheus-${PROM_VERSION}.linux-amd64/prometheus /usr/local/bin/
@@ -141,7 +152,7 @@ jobs:
           # to give CI a bit more time for visibility consistency
           go run ./cmd run-scenario-with-worker \
             --scenario throughput_stress \
-            --language python \
+            --language $SDK_LANG \
             --version $(pwd)/.. \
             --run-id $RUN_ID \
             --duration $TEST_DURATION \
@@ -170,13 +181,14 @@ jobs:
         if: always()
         run: |
           DATE=$(date +%Y-%m-%d)
-          # Use test/ prefix on non-main branches
-          PREFIX="language=python/date=$DATE"
-          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
-            PREFIX="test/$PREFIX"
+          IS_EXPERIMENT="false"
+          # Set as an experiment if we are not on the main branch or input as an experiment
+          if [[ "$GH_REF" != "refs/heads/main" || "$IS_EXPERIMENT_INPUT" == "true" ]]; then
+            IS_EXPERIMENT="true"
           fi
+          echo "Uploading metrics: is_experiment=$IS_EXPERIMENT, language=$SDK_LANG, date=$DATE"
           aws s3 cp omes/$RUN_ID.parquet \
-            "s3://cloud-data-ingest-prod/github/sdk_load_test/$PREFIX/$RUN_ID.parquet"
+            "s3://cloud-data-ingest-prod/github/sdk_load_test/is_experiment=$IS_EXPERIMENT/language=$SDK_LANG/date=$DATE/$RUN_ID.parquet"
 
       - name: Upload logs on failure
         if: failure() || cancelled()
