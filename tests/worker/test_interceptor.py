@@ -1,7 +1,8 @@
 import asyncio
 import uuid
+from collections.abc import Callable
 from datetime import timedelta
-from typing import Any, Callable, List, NoReturn, Optional, Tuple, Type
+from typing import Any, List, NoReturn, Optional, Tuple, Type
 
 import pytest
 
@@ -32,7 +33,7 @@ from temporalio.worker import (
 from temporalio.worker._interceptor import StartNexusOperationInput
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
-interceptor_traces: List[Tuple[str, Any]] = []
+interceptor_traces: list[tuple[str, Any]] = []
 
 
 class TracingWorkerInterceptor(Interceptor):
@@ -43,7 +44,7 @@ class TracingWorkerInterceptor(Interceptor):
 
     def workflow_interceptor_class(
         self, input: WorkflowInterceptorClassInput
-    ) -> Optional[Type[WorkflowInboundInterceptor]]:
+    ) -> type[WorkflowInboundInterceptor] | None:
         return TracingWorkflowInboundInterceptor
 
 
@@ -254,7 +255,7 @@ async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
         await handle.result()
 
         # Check traces
-        def pop_trace(name: str, filter: Optional[Callable[[Any], bool]] = None) -> Any:
+        def pop_trace(name: str, filter: Callable[[Any], bool] | None = None) -> Any:
             index = next(
                 (
                     i
@@ -318,7 +319,7 @@ async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
 class WorkflowInstanceAccessInterceptor(Interceptor):
     def workflow_interceptor_class(
         self, input: WorkflowInterceptorClassInput
-    ) -> Optional[Type[WorkflowInboundInterceptor]]:
+    ) -> type[WorkflowInboundInterceptor] | None:
         return WorkflowInstanceAccessInboundInterceptor
 
 

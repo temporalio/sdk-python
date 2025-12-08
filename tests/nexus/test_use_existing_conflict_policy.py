@@ -25,7 +25,7 @@ class OpInput:
 @workflow.defn
 class HandlerWorkflow:
     def __init__(self) -> None:
-        self.result: Optional[str] = None
+        self.result: str | None = None
 
     @workflow.run
     async def run(self) -> str:

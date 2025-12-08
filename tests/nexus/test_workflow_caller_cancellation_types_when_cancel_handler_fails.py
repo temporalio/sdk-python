@@ -120,15 +120,15 @@ class ServiceHandler:
 @dataclass
 class Input:
     endpoint: str
-    cancellation_type: Optional[workflow.NexusOperationCancellationType]
+    cancellation_type: workflow.NexusOperationCancellationType | None
 
 
 @dataclass
 class CancellationResult:
     operation_token: str
     caller_op_future_resolved: datetime
-    error_type: Optional[str] = None
-    error_cause_type: Optional[str] = None
+    error_type: str | None = None
+    error_cause_type: str | None = None
 
 
 @workflow.defn(sandboxed=False)
@@ -140,7 +140,7 @@ class CallerWorkflow:
             endpoint=input.endpoint,
         )
         self.released = False
-        self.operation_token: Optional[str] = None
+        self.operation_token: str | None = None
         self.caller_op_future_resolved: asyncio.Future[datetime] = asyncio.Future()
 
     @workflow.signal

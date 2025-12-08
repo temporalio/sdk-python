@@ -5,8 +5,9 @@ import concurrent.futures
 import multiprocessing
 import multiprocessing.context
 import uuid
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import timedelta
-from typing import Any, Awaitable, Callable, Optional, Sequence
+from typing import Any, Optional
 from urllib.request import urlopen
 
 import nexusrpc
@@ -170,7 +171,7 @@ async def test_worker_fatal_error_with(client: Client):
 
 
 async def test_worker_fatal_error_callback(client: Client):
-    callback_err: Optional[BaseException] = None
+    callback_err: BaseException | None = None
 
     async def on_fatal_error(exc: BaseException) -> None:
         nonlocal callback_err
@@ -417,7 +418,7 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
             self.reserves += 1
             return MyPermit(self.reserves)
 
-        def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+        def try_reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit | None:
             self.reserve_asserts(ctx)
             return None
 
@@ -514,7 +515,7 @@ async def test_throwing_slot_supplier(client: Client, env: WorkflowEnvironment):
                 return SlotPermit()
             raise ValueError("I always throw")
 
-        def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+        def try_reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit | None:
             raise ValueError("I always throw")
 
         def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
@@ -553,7 +554,7 @@ async def test_blocking_slot_supplier(client: Client, env: WorkflowEnvironment):
             await asyncio.get_event_loop().create_future()
             raise ValueError("Should be unreachable")
 
-        def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+        def try_reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit | None:
             return None
 
         def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
@@ -1160,7 +1161,7 @@ async def set_ramping_version(
 
 def create_worker(
     client: Client,
-    on_fatal_error: Optional[Callable[[BaseException], Awaitable[None]]] = None,
+    on_fatal_error: Callable[[BaseException], Awaitable[None]] | None = None,
 ) -> Worker:
     return Worker(
         client,
@@ -1192,8 +1193,8 @@ class PollFailureInjector:
         self.poll_fail_queue: asyncio.Queue[Exception] = asyncio.Queue()
         self.orig_poll_call = getattr(worker._bridge_worker, attr)
         setattr(worker._bridge_worker, attr, self.patched_poll_call)
-        self.next_poll_task: Optional[asyncio.Task] = None
-        self.next_exception_task: Optional[asyncio.Task] = None
+        self.next_poll_task: asyncio.Task | None = None
+        self.next_exception_task: asyncio.Task | None = None
 
     async def patched_poll_call(self) -> Any:
         if not self.next_poll_task:
