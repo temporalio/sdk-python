@@ -85,7 +85,7 @@ class RestrictedWorkflowAccessError(temporalio.workflow.NondeterminismError):
 
 class UnintentionalPassthroughError(temporalio.exceptions.TemporalError):
     """Error that occurs when a workflow unintentionally passes an import to the sandbox when
-    the import notification policy includes :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_NON_PASSTHROUGH`.
+    the import notification policy includes :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_UNINTENTIONAL_PASSTHROUGH`.
 
     Attributes:
         qualified_name: Fully qualified name of what was passed through to the sandbox.
@@ -196,7 +196,7 @@ class SandboxRestrictions:
     def with_import_notification_policy(
         self, policy: temporalio.workflow.SandboxImportNotificationPolicy
     ) -> SandboxRestrictions:
-        """Create a new restriction set with the given import notification policy as the :py:attr:`import_policy`."""
+        """Create a new restriction set with the given import notification policy as the :py:attr:`import_notification_policy`."""
         return dataclasses.replace(self, import_notification_policy=policy)
 
 
@@ -875,14 +875,18 @@ class _RestrictedProxyLookup:
         if hasattr(access_func, "__get__"):
             # A Python function, can be turned into a bound method.
 
-            def bind_func(instance: _RestrictedProxy, obj: Any) -> Callable:
+            def _bind_func(instance: _RestrictedProxy, obj: Any) -> Callable:
                 return access_func.__get__(obj, type(obj))  # type: ignore
+
+            bind_func = _bind_func
 
         elif access_func is not None:
             # A C function, use partial to bind the first argument.
 
-            def bind_func(instance: _RestrictedProxy, obj: Any) -> Callable:
+            def _bind_func(instance: _RestrictedProxy, obj: Any) -> Callable:
                 return functools.partial(access_func, obj)  # type: ignore
+
+            bind_func = _bind_func
 
         else:
             # Use getattr, which will produce a bound method.
