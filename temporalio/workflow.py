@@ -55,6 +55,9 @@ from typing_extensions import (
 
 import temporalio.api.common.v1
 import temporalio.bridge.proto.child_workflow
+import temporalio.bridge.proto.common
+import temporalio.bridge.proto.nexus
+import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_commands
 import temporalio.common
 import temporalio.converter
@@ -119,7 +122,7 @@ def defn(
     dynamic: bool = False,
     failure_exception_types: Sequence[type[BaseException]] = [],
     versioning_behavior: temporalio.common.VersioningBehavior = temporalio.common.VersioningBehavior.UNSPECIFIED,
-):
+) -> Callable[[ClassType], ClassType]:
     """Decorator for workflow classes.
 
     This must be set on any registered workflow class (it is ignored if on a
@@ -276,6 +279,9 @@ def signal(
     dynamic: bool | None = False,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
     description: str | None = None,
+) -> (
+    Callable[[CallableSyncOrAsyncReturnNoneType], CallableSyncOrAsyncReturnNoneType]
+    | CallableSyncOrAsyncReturnNoneType
 ):
     """Decorator for a workflow signal method.
 
@@ -353,7 +359,7 @@ def query(*, description: str) -> Callable[[CallableType], CallableType]: ...
 
 
 def query(
-    fn: CallableType | None = None,
+    fn: CallableType | None = None,  # type: ignore[reportInvalidTypeVarUse]
     *,
     name: str | None = None,
     dynamic: bool | None = False,
@@ -1266,12 +1272,18 @@ def update(
 
 
 def update(
-    fn: CallableSyncOrAsyncType | None = None,
+    fn: CallableSyncOrAsyncType | None = None,  # type: ignore[reportInvalidTypeVarUse]
     *,
     name: str | None = None,
     dynamic: bool | None = False,
     unfinished_policy: HandlerUnfinishedPolicy = HandlerUnfinishedPolicy.WARN_AND_ABANDON,
     description: str | None = None,
+) -> (
+    UpdateMethodMultiParam[MultiParamSpec, ReturnType]
+    | Callable[
+        [Callable[MultiParamSpec, ReturnType]],
+        UpdateMethodMultiParam[MultiParamSpec, ReturnType],
+    ]
 ):
     """Decorator for a workflow update handler method.
 
@@ -1326,9 +1338,9 @@ def update(
     if not fn:
         if name is not None and dynamic:
             raise RuntimeError("Cannot provide name and dynamic boolean")
-        return partial(decorator, name, unfinished_policy)
+        return partial(decorator, name, unfinished_policy)  # type: ignore[reportReturnType, return-value]
     else:
-        return decorator(fn.__name__, unfinished_policy, fn)
+        return decorator(fn.__name__, unfinished_policy, fn)  # type: ignore[reportReturnType, return-value]
 
 
 def _update_validator(
@@ -1632,7 +1644,7 @@ class _Definition:
     dynamic_config_fn: Callable[..., DynamicWorkflowConfig] | None = None
 
     @staticmethod
-    def from_class(cls: type) -> _Definition | None:
+    def from_class(cls: type) -> _Definition | None:  # type: ignore[reportSelfClsParameterName]
         # We make sure to only return it if it's on _this_ class
         defn = getattr(cls, "__temporal_workflow_definition", None)
         if defn and defn.cls == cls:
@@ -1640,7 +1652,7 @@ class _Definition:
         return None
 
     @staticmethod
-    def must_from_class(cls: type) -> _Definition:
+    def must_from_class(cls: type) -> _Definition:  # type: ignore[reportSelfClsParameterName]
         ret = _Definition.from_class(cls)
         if ret:
             return ret
@@ -1679,7 +1691,7 @@ class _Definition:
 
     @staticmethod
     def _apply_to_class(
-        cls: type,
+        cls: type,  # type: ignore[reportSelfClsParameterName]
         *,
         workflow_name: str | None,
         sandboxed: bool,
@@ -2513,7 +2525,7 @@ async def execute_activity(
 # Overload for async no-param activity
 @overload
 def start_activity_class(
-    activity: type[CallableAsyncNoParam[ReturnType]],
+    activity: Type[CallableAsyncNoParam[ReturnType]],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -2532,7 +2544,7 @@ def start_activity_class(
 # Overload for sync no-param activity
 @overload
 def start_activity_class(
-    activity: type[CallableSyncNoParam[ReturnType]],
+    activity: Type[CallableSyncNoParam[ReturnType]],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -2551,7 +2563,7 @@ def start_activity_class(
 # Overload for async single-param activity
 @overload
 def start_activity_class(
-    activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
+    activity: Type[CallableAsyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
     task_queue: str | None = None,
@@ -2571,7 +2583,7 @@ def start_activity_class(
 # Overload for sync single-param activity
 @overload
 def start_activity_class(
-    activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
+    activity: Type[CallableSyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
     task_queue: str | None = None,
@@ -2591,7 +2603,7 @@ def start_activity_class(
 # Overload for async multi-param activity
 @overload
 def start_activity_class(
-    activity: type[Callable[..., Awaitable[ReturnType]]],
+    activity: Type[Callable[..., Awaitable[ReturnType]]],
     *,
     args: Sequence[Any],
     task_queue: str | None = None,
@@ -2611,7 +2623,7 @@ def start_activity_class(
 # Overload for sync multi-param activity
 @overload
 def start_activity_class(
-    activity: type[Callable[..., ReturnType]],
+    activity: Type[Callable[..., ReturnType]],
     *,
     args: Sequence[Any],
     task_queue: str | None = None,
@@ -2629,7 +2641,7 @@ def start_activity_class(
 
 
 def start_activity_class(
-    activity: type[Callable],
+    activity: Type[Callable],
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
@@ -2670,7 +2682,7 @@ def start_activity_class(
 # Overload for async no-param activity
 @overload
 async def execute_activity_class(
-    activity: type[CallableAsyncNoParam[ReturnType]],
+    activity: type[CallableAsyncNoParam[ReturnType]],  # type:ignore[reportInvalidTypeForm]
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -2689,7 +2701,7 @@ async def execute_activity_class(
 # Overload for sync no-param activity
 @overload
 async def execute_activity_class(
-    activity: type[CallableSyncNoParam[ReturnType]],
+    activity: type[CallableSyncNoParam[ReturnType]],  # type:ignore[reportInvalidTypeForm]
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -2708,7 +2720,7 @@ async def execute_activity_class(
 # Overload for async single-param activity
 @overload
 async def execute_activity_class(
-    activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
+    activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],  # type:ignore[reportInvalidTypeForm]
     arg: ParamType,
     *,
     task_queue: str | None = None,
@@ -2728,7 +2740,7 @@ async def execute_activity_class(
 # Overload for sync single-param activity
 @overload
 async def execute_activity_class(
-    activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
+    activity: Type[CallableSyncSingleParam[ParamType, ReturnType]],  # type:ignore[reportInvalidTypeForm]
     arg: ParamType,
     *,
     task_queue: str | None = None,
@@ -2748,7 +2760,7 @@ async def execute_activity_class(
 # Overload for async multi-param activity
 @overload
 async def execute_activity_class(
-    activity: type[Callable[..., Awaitable[ReturnType]]],
+    activity: Type[Callable[..., Awaitable[ReturnType]]],
     *,
     args: Sequence[Any],
     task_queue: str | None = None,
@@ -2768,7 +2780,7 @@ async def execute_activity_class(
 # Overload for sync multi-param activity
 @overload
 async def execute_activity_class(
-    activity: type[Callable[..., ReturnType]],
+    activity: Type[Callable[..., ReturnType]],
     *,
     args: Sequence[Any],
     task_queue: str | None = None,
@@ -2786,7 +2798,7 @@ async def execute_activity_class(
 
 
 async def execute_activity_class(
-    activity: type[Callable],
+    activity: Type[Callable],
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
@@ -3555,7 +3567,7 @@ def start_local_activity_class(
 # Overload for async multi-param activity
 @overload
 def start_local_activity_class(
-    activity: type[Callable[..., Awaitable[ReturnType]]],
+    activity: Type[Callable[..., Awaitable[ReturnType]]],
     *,
     args: Sequence[Any],
     schedule_to_close_timeout: timedelta | None = None,
@@ -3571,7 +3583,7 @@ def start_local_activity_class(
 # Overload for sync multi-param activity
 @overload
 def start_local_activity_class(
-    activity: type[Callable[..., ReturnType]],
+    activity: Type[Callable[..., ReturnType]],
     *,
     args: Sequence[Any],
     schedule_to_close_timeout: timedelta | None = None,
@@ -3585,7 +3597,7 @@ def start_local_activity_class(
 
 
 def start_local_activity_class(
-    activity: type[Callable],
+    activity: Type[Callable],
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
@@ -3620,7 +3632,7 @@ def start_local_activity_class(
 # Overload for async no-param activity
 @overload
 async def execute_local_activity_class(
-    activity: type[CallableAsyncNoParam[ReturnType]],
+    activity: Type[CallableAsyncNoParam[ReturnType]],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -3636,7 +3648,7 @@ async def execute_local_activity_class(
 # Overload for sync no-param activity
 @overload
 async def execute_local_activity_class(
-    activity: type[CallableSyncNoParam[ReturnType]],
+    activity: Type[CallableSyncNoParam[ReturnType]],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -3652,7 +3664,7 @@ async def execute_local_activity_class(
 # Overload for async single-param activity
 @overload
 async def execute_local_activity_class(
-    activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
+    activity: Type[CallableAsyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
     schedule_to_close_timeout: timedelta | None = None,
@@ -3669,7 +3681,7 @@ async def execute_local_activity_class(
 # Overload for sync single-param activity
 @overload
 async def execute_local_activity_class(
-    activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
+    activity: Type[CallableSyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
     schedule_to_close_timeout: timedelta | None = None,
@@ -3686,7 +3698,7 @@ async def execute_local_activity_class(
 # Overload for async multi-param activity
 @overload
 async def execute_local_activity_class(
-    activity: type[Callable[..., Awaitable[ReturnType]]],
+    activity: Type[Callable[..., Awaitable[ReturnType]]],
     *,
     args: Sequence[Any],
     schedule_to_close_timeout: timedelta | None = None,
@@ -3703,7 +3715,7 @@ async def execute_local_activity_class(
 # Overload for sync multi-param activity
 @overload
 async def execute_local_activity_class(
-    activity: type[Callable[..., ReturnType]],
+    activity: Type[Callable[..., ReturnType]],
     *,
     args: Sequence[Any],
     schedule_to_close_timeout: timedelta | None = None,
@@ -3718,7 +3730,7 @@ async def execute_local_activity_class(
 
 
 async def execute_local_activity_class(
-    activity: type[Callable],
+    activity: Type[Callable],
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],

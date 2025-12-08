@@ -53,7 +53,7 @@ def test_all_grpc_calls_present(client: Client):
                 service_calls.add(name)
 
         # Collect gRPC service calls with a fake channel
-        channel = CallCollectingChannel(package, custom_req_resp)
+        channel = CallCollectingChannel(package, custom_req_resp)  # type: ignore
         new_stub(channel)
 
         # Confirm they are the same
@@ -116,7 +116,7 @@ class CallCollectingChannel(grpc.Channel):
         self.custom_req_resp = custom_req_resp
         self.calls: dict[str, tuple[type, type]] = {}
 
-    def unary_unary(self, method, request_serializer, response_deserializer):
+    def unary_unary(self, method, request_serializer, response_deserializer):  # type: ignore[reportIncompatibleMethodOverride]
         # Last part after slash
         name = method.rsplit("/", 1)[-1]
         req_resp = self.custom_req_resp.get(name, None) or (
@@ -128,7 +128,7 @@ class CallCollectingChannel(grpc.Channel):
         self.calls[name] = req_resp
 
 
-CallCollectingChannel.__abstractmethods__ = set()
+CallCollectingChannel.__abstractmethods__ = set()  # type: ignore[reportAttributeAccessIssue]
 
 
 def test_version():
