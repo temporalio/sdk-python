@@ -225,6 +225,3 @@ exclude = ["temporalio/bridge/target/**/*"]
 [tool.uv]
 # Prevent uv commands from building the package by default
 package = false
-
-[tool.uv.sources]
-nexus-rpc = { git = "https://github.com/nexus-rpc/sdk-python", rev = "interceptors" }
