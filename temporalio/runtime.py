@@ -68,7 +68,7 @@ class Runtime:
     thread pool is created.
 
     Runtimes do not work across forks. Advanced users should consider using
-    :py:meth:`prevent_default` and `:py:meth`set_default` to ensure each
+    :py:meth:`prevent_default` and :py:meth:`set_default` to ensure each
     fork creates it's own runtime.
 
     """

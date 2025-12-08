@@ -624,7 +624,7 @@ class _DeadlockError(Exception):
     """Exception class for deadlocks. Contains functionality to swap the default traceback for another."""
 
     def __init__(self, message: str, replacement_tb: TracebackType | None = None):
-        """Create a new DeadlockError, with message `message` and optionally a traceback `replacement_tb` to be swapped in later.
+        """Create a new DeadlockError, with message ``message`` and optionally a traceback ``replacement_tb`` to be swapped in later.
 
         Args:
             message: Message to be presented through exception.

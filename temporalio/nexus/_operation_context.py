@@ -28,8 +28,6 @@ from nexusrpc.handler import CancelOperationContext, StartOperationContext
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
-from temporalio.nexus import _link_conversion
-from temporalio.nexus._token import WorkflowHandle
 from temporalio.types import (
     MethodAsyncNoParam,
     MethodAsyncSingleParam,
@@ -38,6 +36,13 @@ from temporalio.types import (
     ReturnType,
     SelfType,
 )
+
+from ._link_conversion import (
+    nexus_link_to_workflow_event,
+    workflow_event_to_nexus_link,
+    workflow_execution_started_event_link_from_workflow_handle,
+)
+from ._token import WorkflowHandle
 
 if TYPE_CHECKING:
     import temporalio.client
@@ -167,7 +172,7 @@ class _TemporalStartOperationContext:
     ) -> list[temporalio.api.common.v1.Link.WorkflowEvent]:
         event_links = []
         for inbound_link in self.nexus_context.inbound_links:
-            if link := _link_conversion.nexus_link_to_workflow_event(inbound_link):
+            if link := nexus_link_to_workflow_event(inbound_link):
                 event_links.append(link)
         return event_links
 
@@ -187,14 +192,13 @@ class _TemporalStartOperationContext:
                             wf_event_links.append(link.workflow_event)
             if not wf_event_links:
                 wf_event_links = [
-                    _link_conversion.workflow_execution_started_event_link_from_workflow_handle(
+                    workflow_execution_started_event_link_from_workflow_handle(
                         workflow_handle,
                         self.nexus_context.request_id,
                     )
                 ]
             self.nexus_context.outbound_links.extend(
-                _link_conversion.workflow_event_to_nexus_link(link)
-                for link in wf_event_links
+                workflow_event_to_nexus_link(link) for link in wf_event_links
             )
         except Exception as e:
             logger.warning(

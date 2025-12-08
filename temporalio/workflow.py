@@ -4330,7 +4330,7 @@ async def start_child_workflow(
         static_details: General fixed details for this child workflow execution that may appear in
             UI/CLI. This can be in Temporal markdown format and can span multiple lines. This is
             a fixed value on the workflow that cannot be updated. For details that can be
-            updated, use :py:meth:`Workflow.get_current_details` within the workflow.
+            updated, use :py:meth:`get_current_details` within the workflow.
         priority: Priority to use for this workflow.
 
     Returns:
@@ -5264,7 +5264,7 @@ class NexusOperationCancellationType(IntEnum):
     Pass one of these values to :py:meth:`NexusClient.start_operation` to define cancellation
     behavior.
 
-    To initiate cancellation, use :py:meth:`NexusOperationHandle.cancel` and then `await` the
+    To initiate cancellation, use :py:meth:`NexusOperationHandle.cancel` and then ``await`` the
     operation handle. This will result in a :py:class:`exceptions.NexusOperationError`. The values
     of this enum define what is guaranteed to have happened by that point.
     """

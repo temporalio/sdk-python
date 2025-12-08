@@ -161,7 +161,7 @@ class Worker:
                 :py:func:`@activity.defn<temporalio.activity.defn>`. Activities
                 may be async functions or non-async functions.
             nexus_service_handlers: Instances of Nexus service handler classes
-                decorated with :py:func:`@nexusrpc.handler.service_handler`.
+                decorated with :py:func:`@nexusrpc.handler.service_handler<nexusrpc.handler.service_handler>`.
 
                 .. warning::
                     This parameter is experimental and unstable.
@@ -186,7 +186,7 @@ class Worker:
                 the worker is shut down.
             nexus_task_executor: Executor to use for non-async
                 Nexus operations. This is required if any operation start methods
-                are non-`async def`. :py:class:`concurrent.futures.ThreadPoolExecutor`
+                are non-``async def``. :py:class:`concurrent.futures.ThreadPoolExecutor`
                 is recommended.
 
                 .. warning::
@@ -297,14 +297,14 @@ class Worker:
             on_fatal_error: An async function that can handle a failure before
                 the worker shutdown commences. This cannot stop the shutdown and
                 any exception raised is logged and ignored.
-            use_worker_versioning: If true, the `build_id` argument must be
+            use_worker_versioning: If true, the ``build_id`` argument must be
                 specified, and this worker opts into the worker versioning
                 feature. This ensures it only receives workflow tasks for
                 workflows which it claims to be compatible with. For more
                 information, see
                 https://docs.temporal.io/workers#worker-versioning.
-                Exclusive with `deployment_config`.
-                WARNING: Deprecated. Use `deployment_config` instead.
+                Exclusive with ``deployment_config``.
+                WARNING: Deprecated. Use ``deployment_config`` instead.
             disable_safe_workflow_eviction: If true, instead of letting the
                 workflow collect its tasks properly, the worker will simply let
                 the Python garbage collector collect the tasks. WARNING: Users
@@ -312,8 +312,8 @@ class Worker:
                 throw ``GeneratorExit`` in coroutines causing them to wake up
                 in different threads and run ``finally`` and other code in the
                 wrong workflow environment.
-            deployment_config: Deployment config for the worker. Exclusive with `build_id` and
-                `use_worker_versioning`.
+            deployment_config: Deployment config for the worker. Exclusive with ``build_id`` and
+                ``use_worker_versioning``.
                 WARNING: This is an experimental feature and may change in the future.
             workflow_task_poller_behavior: Specify the behavior of workflow task polling.
                 Defaults to a 5-poller maximum.

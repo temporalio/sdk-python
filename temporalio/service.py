@@ -231,11 +231,8 @@ class ServiceClient(ABC):
         metadata: Mapping[str, str | bytes] = {},
         timeout: timedelta | None = None,
     ) -> bool:
-        """Check whether the WorkflowService is up.
-
-        In addition to accepting which service to check health on, this accepts
-        some of the same parameters as other RPC calls. See
-        :py:meth:`ServiceCall.__call__`.
+        """Check whether the provided service is up. If no service is specified,
+         the WorkflowService is used.
 
         Returns:
             True when available, false if the server is running but the service
