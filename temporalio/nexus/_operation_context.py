@@ -149,13 +149,13 @@ class _TemporalOperationCtx(Generic[_OperationCtxT]):
     nexus_context: _OperationCtxT
     """Nexus-specific start operation context."""
 
-    runtime_metric_meter: temporalio.common.MetricMeter
+    _runtime_metric_meter: temporalio.common.MetricMeter
     _metric_meter: temporalio.common.MetricMeter | None = None
 
     @property
     def metric_meter(self) -> temporalio.common.MetricMeter:
         if not self._metric_meter:
-            self._metric_meter = self.runtime_metric_meter.with_additional_attributes(
+            self._metric_meter = self._runtime_metric_meter.with_additional_attributes(
                 {
                     "nexus_service": self.nexus_context.service,
                     "nexus_operation": self.nexus_context.operation,

@@ -215,7 +215,7 @@ class _NexusWorker:
             info=lambda: Info(task_queue=self._task_queue),
             nexus_context=ctx,
             client=self._client,
-            runtime_metric_meter=self._metric_meter,
+            _runtime_metric_meter=self._metric_meter,
         ).set()
         try:
             try:
@@ -333,7 +333,7 @@ class _NexusWorker:
             nexus_context=ctx,
             client=self._client,
             info=lambda: Info(task_queue=self._task_queue),
-            runtime_metric_meter=self._metric_meter,
+            _runtime_metric_meter=self._metric_meter,
         ).set()
         input = LazyValue(
             serializer=_DummyPayloadSerializer(
