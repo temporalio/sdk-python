@@ -2682,7 +2682,7 @@ def start_activity_class(
 # Overload for async no-param activity
 @overload
 async def execute_activity_class(
-    activity: type[CallableAsyncNoParam[ReturnType]],  # type:ignore[reportInvalidTypeForm]
+    activity: Type[CallableAsyncNoParam[ReturnType]],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -2701,7 +2701,7 @@ async def execute_activity_class(
 # Overload for sync no-param activity
 @overload
 async def execute_activity_class(
-    activity: type[CallableSyncNoParam[ReturnType]],  # type:ignore[reportInvalidTypeForm]
+    activity: Type[CallableSyncNoParam[ReturnType]],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -2720,7 +2720,7 @@ async def execute_activity_class(
 # Overload for async single-param activity
 @overload
 async def execute_activity_class(
-    activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],  # type:ignore[reportInvalidTypeForm]
+    activity: Type[CallableAsyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
     task_queue: str | None = None,
@@ -2740,7 +2740,7 @@ async def execute_activity_class(
 # Overload for sync single-param activity
 @overload
 async def execute_activity_class(
-    activity: Type[CallableSyncSingleParam[ParamType, ReturnType]],  # type:ignore[reportInvalidTypeForm]
+    activity: Type[CallableSyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
     task_queue: str | None = None,
