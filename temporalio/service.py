@@ -136,7 +136,7 @@ class ConnectConfig:
 
     target_host: str
     api_key: Optional[str] = None
-    tls: Union[bool, TLSConfig] = False
+    tls: Union[bool, TLSConfig, None] = None
     retry_config: Optional[RetryConfig] = None
     keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default
     rpc_metadata: Mapping[str, Union[str, bytes]] = field(default_factory=dict)
@@ -170,6 +170,10 @@ class ConnectConfig:
             target_url = f"https://{self.target_host}"
             tls_config = self.tls._to_bridge_config()
         elif self.tls:
+            target_url = f"https://{self.target_host}"
+            tls_config = TLSConfig()._to_bridge_config()
+        # Enable TLS by default when API key is provided and tls not explicitly set
+        elif self.tls is None and self.api_key is not None:
             target_url = f"https://{self.target_host}"
             tls_config = TLSConfig()._to_bridge_config()
         else:
@@ -226,11 +230,8 @@ class ServiceClient(ABC):
         metadata: Mapping[str, Union[str, bytes]] = {},
         timeout: Optional[timedelta] = None,
     ) -> bool:
-        """Check whether the WorkflowService is up.
-
-        In addition to accepting which service to check health on, this accepts
-        some of the same parameters as other RPC calls. See
-        :py:meth:`ServiceCall.__call__`.
+        """Check whether the provided service is up. If no service is specified,
+         the WorkflowService is used.
 
         Returns:
             True when available, false if the server is running but the service
