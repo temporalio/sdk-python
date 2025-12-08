@@ -5,20 +5,16 @@ Nothing in this module should be considered stable. The API may change.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, MutableSequence, Sequence
 from dataclasses import dataclass
 from typing import (
-    Awaitable,
-    Callable,
     List,
-    MutableSequence,
     Optional,
-    Sequence,
     Set,
     Tuple,
+    TypeAlias,
     Union,
 )
-
-from typing_extensions import TypeAlias
 
 import temporalio.api.common.v1
 import temporalio.api.history.v1
@@ -48,7 +44,7 @@ class WorkerConfig:
     namespace: str
     task_queue: str
     versioning_strategy: WorkerVersioningStrategy
-    identity_override: Optional[str]
+    identity_override: str | None
     max_cached_workflows: int
     tuner: TunerHolder
     workflow_task_poller_behavior: PollerBehavior
@@ -59,11 +55,11 @@ class WorkerConfig:
     sticky_queue_schedule_to_start_timeout_millis: int
     max_heartbeat_throttle_interval_millis: int
     default_heartbeat_throttle_interval_millis: int
-    max_activities_per_second: Optional[float]
-    max_task_queue_activities_per_second: Optional[float]
+    max_activities_per_second: float | None
+    max_task_queue_activities_per_second: float | None
     graceful_shutdown_period_millis: int
     nondeterminism_as_workflow_fail: bool
-    nondeterminism_as_workflow_fail_for_types: Set[str]
+    nondeterminism_as_workflow_fail_for_types: set[str]
     nexus_task_poller_behavior: PollerBehavior
     plugins: Sequence[str]
 
@@ -197,7 +193,7 @@ class Worker:
     def for_replay(
         runtime: temporalio.bridge.runtime.Runtime,
         config: WorkerConfig,
-    ) -> Tuple[Worker, temporalio.bridge.temporal_sdk_bridge.HistoryPusher]:
+    ) -> tuple[Worker, temporalio.bridge.temporal_sdk_bridge.HistoryPusher]:
         """Create a bridge replay worker."""
         [
             replay_worker,
@@ -290,7 +286,7 @@ class Worker:
 
 
 class _Visitor(VisitorFunctions):
-    def __init__(self, f: Callable[[Sequence[Payload]], Awaitable[List[Payload]]]):
+    def __init__(self, f: Callable[[Sequence[Payload]], Awaitable[list[Payload]]]):
         self._f = f
 
     async def visit_payload(self, payload: Payload) -> None:

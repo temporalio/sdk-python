@@ -1,8 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import (
-    Awaitable,
-    Callable,
     Optional,
     TypeVar,
     Union,
@@ -43,7 +42,7 @@ def workflow_run_operation(
 @overload
 def workflow_run_operation(
     *,
-    name: Optional[str] = None,
+    name: str | None = None,
 ) -> Callable[
     [
         Callable[
@@ -59,20 +58,21 @@ def workflow_run_operation(
 
 
 def workflow_run_operation(
-    start: Optional[
+    start: None
+    | (
         Callable[
             [ServiceHandlerT, WorkflowRunOperationContext, InputT],
             Awaitable[WorkflowHandle[OutputT]],
         ]
-    ] = None,
+    ) = None,
     *,
-    name: Optional[str] = None,
-) -> Union[
+    name: str | None = None,
+) -> (
     Callable[
         [ServiceHandlerT, WorkflowRunOperationContext, InputT],
         Awaitable[WorkflowHandle[OutputT]],
-    ],
-    Callable[
+    ]
+    | Callable[
         [
             Callable[
                 [ServiceHandlerT, WorkflowRunOperationContext, InputT],
@@ -83,8 +83,8 @@ def workflow_run_operation(
             [ServiceHandlerT, WorkflowRunOperationContext, InputT],
             Awaitable[WorkflowHandle[OutputT]],
         ],
-    ],
-]:
+    ]
+):
     """Decorator marking a method as the start method for a workflow-backed operation."""
 
     def decorator(

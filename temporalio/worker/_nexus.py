@@ -7,18 +7,13 @@ import concurrent.futures
 import contextvars
 import json
 import threading
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import (
     Any,
-    Callable,
-    Mapping,
     NoReturn,
-    Optional,
     ParamSpec,
-    Sequence,
-    Type,
     TypeVar,
-    Union,
 )
 
 import google.protobuf.json_format
@@ -379,7 +374,7 @@ class _NexusWorker:
 
     async def _nexus_error_to_nexus_failure_proto(
         self,
-        error: Union[nexusrpc.HandlerError, nexusrpc.OperationError],
+        error: nexusrpc.HandlerError | nexusrpc.OperationError,
     ) -> temporalio.api.nexus.v1.Failure:
         """Serialize ``error`` as a Nexus Failure proto.
 
@@ -463,7 +458,7 @@ class _DummyPayloadSerializer:
     async def deserialize(
         self,
         content: nexusrpc.Content,
-        as_type: Optional[Type[Any]] = None,
+        as_type: type[Any] | None = None,
     ) -> Any:
         try:
             [input] = await self.data_converter.decode(
@@ -585,12 +580,12 @@ class _NexusTaskCancellation(nexusrpc.handler.OperationTaskCancellation):
         self._thread_evt = threading.Event()
         self._async_evt = asyncio.Event()
         self._lock = threading.Lock()
-        self._reason: Optional[str] = None
+        self._reason: str | None = None
 
     def is_cancelled(self) -> bool:
         return self._thread_evt.is_set()
 
-    def cancellation_reason(self) -> Optional[str]:
+    def cancellation_reason(self) -> str | None:
         with self._lock:
             return self._reason
 

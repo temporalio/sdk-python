@@ -27,7 +27,9 @@ def generate_python_services(
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Mapping, Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING
+from collections.abc import Mapping
+
 import google.protobuf.empty_pb2
 
 $service_imports
@@ -110,8 +112,8 @@ def generate_python_method_call(
         self,
         req: $request_type,
         retry: bool = False,
-        metadata: Mapping[str, Union[str, bytes]] = {},
-        timeout: Optional[timedelta] = None,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
     ) -> $response_type:
         """Invokes the $service_name.$method_name rpc method."""
         return await self._client._rpc_call(
