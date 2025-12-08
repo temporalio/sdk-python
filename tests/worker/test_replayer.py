@@ -293,7 +293,7 @@ async def test_replayer_multiple_from_client(
     # workflow ID so we can query it using standard visibility.
     workflow_id = f"workflow-{uuid.uuid4()}"
     async with new_say_hello_worker(client) as worker:
-        expected_runs_and_non_det: Dict[str, bool] = {}
+        expected_runs_and_non_det: dict[str, bool] = {}
         for i in range(5):
             should_cause_nondeterminism = i == 1 or i == 3
             handle = await client.start_workflow(
@@ -415,7 +415,7 @@ test_replayer_workflow_res = None
 class WorkerWorkflowResultInterceptor(Interceptor):
     def workflow_interceptor_class(
         self, input: WorkflowInterceptorClassInput
-    ) -> Optional[Type[WorkflowInboundInterceptor]]:
+    ) -> type[WorkflowInboundInterceptor] | None:
         return WorkflowResultInterceptor
 
 

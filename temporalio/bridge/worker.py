@@ -5,20 +5,16 @@ Nothing in this module should be considered stable. The API may change.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, MutableSequence, Sequence
 from dataclasses import dataclass
 from typing import (
-    Awaitable,
-    Callable,
     List,
-    MutableSequence,
     Optional,
-    Sequence,
     Set,
     Tuple,
+    TypeAlias,
     Union,
 )
-
-from typing_extensions import TypeAlias
 
 import temporalio.api.common.v1
 import temporalio.api.history.v1
@@ -48,7 +44,7 @@ class WorkerConfig:
     namespace: str
     task_queue: str
     versioning_strategy: WorkerVersioningStrategy
-    identity_override: Optional[str]
+    identity_override: str | None
     max_cached_workflows: int
     tuner: TunerHolder
     workflow_task_poller_behavior: PollerBehavior
@@ -59,11 +55,11 @@ class WorkerConfig:
     sticky_queue_schedule_to_start_timeout_millis: int
     max_heartbeat_throttle_interval_millis: int
     default_heartbeat_throttle_interval_millis: int
-    max_activities_per_second: Optional[float]
-    max_task_queue_activities_per_second: Optional[float]
+    max_activities_per_second: float | None
+    max_task_queue_activities_per_second: float | None
     graceful_shutdown_period_millis: int
     nondeterminism_as_workflow_fail: bool
-    nondeterminism_as_workflow_fail_for_types: Set[str]
+    nondeterminism_as_workflow_fail_for_types: set[str]
     nexus_task_poller_behavior: PollerBehavior
     plugins: Sequence[str]
 
@@ -197,7 +193,7 @@ class Worker:
     def for_replay(
         runtime: temporalio.bridge.runtime.Runtime,
         config: WorkerConfig,
-    ) -> Tuple[Worker, temporalio.bridge.temporal_sdk_bridge.HistoryPusher]:
+    ) -> tuple[Worker, temporalio.bridge.temporal_sdk_bridge.HistoryPusher]:
         """Create a bridge replay worker."""
         [
             replay_worker,
@@ -213,7 +209,7 @@ class Worker:
 
     async def validate(self) -> None:
         """Validate the bridge worker."""
-        await self._ref.validate()
+        await self._ref.validate()  # type: ignore[reportOptionalMemberAccess]
 
     async def poll_workflow_activation(
         self,
@@ -221,7 +217,7 @@ class Worker:
         """Poll for a workflow activation."""
         return (
             temporalio.bridge.proto.workflow_activation.WorkflowActivation.FromString(
-                await self._ref.poll_workflow_activation()
+                await self._ref.poll_workflow_activation()  # type: ignore[reportOptionalMemberAccess]
             )
         )
 
@@ -230,7 +226,7 @@ class Worker:
     ) -> temporalio.bridge.proto.activity_task.ActivityTask:
         """Poll for an activity task."""
         return temporalio.bridge.proto.activity_task.ActivityTask.FromString(
-            await self._ref.poll_activity_task()
+            await self._ref.poll_activity_task()  # type: ignore[reportOptionalMemberAccess]
         )
 
     async def poll_nexus_task(
@@ -238,7 +234,7 @@ class Worker:
     ) -> temporalio.bridge.proto.nexus.NexusTask:
         """Poll for a nexus task."""
         return temporalio.bridge.proto.nexus.NexusTask.FromString(
-            await self._ref.poll_nexus_task()
+            await self._ref.poll_nexus_task()  # type: ignore[reportOptionalMemberAccess]
         )
 
     async def complete_workflow_activation(
@@ -246,37 +242,37 @@ class Worker:
         comp: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
     ) -> None:
         """Complete a workflow activation."""
-        await self._ref.complete_workflow_activation(comp.SerializeToString())
+        await self._ref.complete_workflow_activation(comp.SerializeToString())  # type: ignore[reportOptionalMemberAccess]
 
     async def complete_activity_task(
         self, comp: temporalio.bridge.proto.ActivityTaskCompletion
     ) -> None:
         """Complete an activity task."""
-        await self._ref.complete_activity_task(comp.SerializeToString())
+        await self._ref.complete_activity_task(comp.SerializeToString())  # type: ignore[reportOptionalMemberAccess]
 
     async def complete_nexus_task(
         self, comp: temporalio.bridge.proto.nexus.NexusTaskCompletion
     ) -> None:
         """Complete a nexus task."""
-        await self._ref.complete_nexus_task(comp.SerializeToString())
+        await self._ref.complete_nexus_task(comp.SerializeToString())  # type: ignore[reportOptionalMemberAccess]
 
     def record_activity_heartbeat(
         self, comp: temporalio.bridge.proto.ActivityHeartbeat
     ) -> None:
         """Record an activity heartbeat."""
-        self._ref.record_activity_heartbeat(comp.SerializeToString())
+        self._ref.record_activity_heartbeat(comp.SerializeToString())  # type: ignore[reportOptionalMemberAccess]
 
     def request_workflow_eviction(self, run_id: str) -> None:
         """Request a workflow be evicted."""
-        self._ref.request_workflow_eviction(run_id)
+        self._ref.request_workflow_eviction(run_id)  # type: ignore[reportOptionalMemberAccess]
 
     def replace_client(self, client: temporalio.bridge.client.Client) -> None:
         """Replace the worker client."""
-        self._ref.replace_client(client._ref)
+        self._ref.replace_client(client._ref)  # type: ignore[reportOptionalMemberAccess]
 
     def initiate_shutdown(self) -> None:
         """Start shutdown of the worker."""
-        self._ref.initiate_shutdown()
+        self._ref.initiate_shutdown()  # type: ignore[reportOptionalMemberAccess]
 
     async def finalize_shutdown(self) -> None:
         """Finalize the worker.
@@ -286,11 +282,11 @@ class Worker:
         """
         ref = self._ref
         self._ref = None
-        await ref.finalize_shutdown()
+        await ref.finalize_shutdown()  # type: ignore[reportOptionalMemberAccess]
 
 
 class _Visitor(VisitorFunctions):
-    def __init__(self, f: Callable[[Sequence[Payload]], Awaitable[List[Payload]]]):
+    def __init__(self, f: Callable[[Sequence[Payload]], Awaitable[list[Payload]]]):
         self._f = f
 
     async def visit_payload(self, payload: Payload) -> None:

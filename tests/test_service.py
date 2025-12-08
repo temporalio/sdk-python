@@ -1,8 +1,9 @@
 import inspect
 import os
 import re
+from collections.abc import Callable, Mapping
 from datetime import timedelta
-from typing import Any, Callable, Dict, Mapping, Tuple, Type
+from typing import Any, Dict, Tuple, Type
 
 import google.protobuf.empty_pb2
 import google.protobuf.message
@@ -38,9 +39,9 @@ def test_all_grpc_calls_present(client: Client):
         new_stub: Callable[[grpc.Channel], Any],
         custom_req_resp: Mapping[
             str,
-            Tuple[
-                Type[google.protobuf.message.Message],
-                Type[google.protobuf.message.Message],
+            tuple[
+                type[google.protobuf.message.Message],
+                type[google.protobuf.message.Message],
             ],
         ] = {},
     ) -> None:
@@ -52,7 +53,7 @@ def test_all_grpc_calls_present(client: Client):
                 service_calls.add(name)
 
         # Collect gRPC service calls with a fake channel
-        channel = CallCollectingChannel(package, custom_req_resp)
+        channel = CallCollectingChannel(package, custom_req_resp)  # type: ignore
         new_stub(channel)
 
         # Confirm they are the same
@@ -104,18 +105,18 @@ class CallCollectingChannel(grpc.Channel):
         package: Any,
         custom_req_resp: Mapping[
             str,
-            Tuple[
-                Type[google.protobuf.message.Message],
-                Type[google.protobuf.message.Message],
+            tuple[
+                type[google.protobuf.message.Message],
+                type[google.protobuf.message.Message],
             ],
         ],
     ) -> None:
         super().__init__()
         self.package = package
         self.custom_req_resp = custom_req_resp
-        self.calls: Dict[str, Tuple[Type, Type]] = {}
+        self.calls: dict[str, tuple[type, type]] = {}
 
-    def unary_unary(self, method, request_serializer, response_deserializer):
+    def unary_unary(self, method, request_serializer, response_deserializer):  # type: ignore[reportIncompatibleMethodOverride]
         # Last part after slash
         name = method.rsplit("/", 1)[-1]
         req_resp = self.custom_req_resp.get(name, None) or (
@@ -127,14 +128,12 @@ class CallCollectingChannel(grpc.Channel):
         self.calls[name] = req_resp
 
 
-CallCollectingChannel.__abstractmethods__ = set()
+CallCollectingChannel.__abstractmethods__ = set()  # type: ignore[reportAttributeAccessIssue]
 
 
 def test_version():
     # Extract version from pyproject.toml
-    with open(
-        os.path.join(os.path.dirname(__file__), "..", "pyproject.toml"), "r"
-    ) as f:
+    with open(os.path.join(os.path.dirname(__file__), "..", "pyproject.toml")) as f:
         pyproject = f.read()
     version = pyproject[pyproject.find('version = "') + 11 :]
     version = version[: version.find('"')]
@@ -169,6 +168,55 @@ async def test_grpc_status(client: Client, env: WorkflowEnvironment):
     assert err.value.grpc_status.details[0].Is(
         temporalio.api.errordetails.v1.NamespaceNotFoundFailure.DESCRIPTOR
     )
+
+
+def test_connect_config_tls_enabled_by_default_when_api_key_provided():
+    """Test that TLS is enabled by default when API key is provided and tls is not configured."""
+    config = temporalio.service.ConnectConfig(
+        target_host="localhost:7233",
+        api_key="test-api-key",
+    )
+    # TLS should be auto-enabled when api_key is provided and tls not explicitly set
+    bridge_config = config._to_bridge_config()
+    assert bridge_config.target_url == "https://localhost:7233"
+    assert bridge_config.tls_config is not None
+
+
+def test_connect_config_tls_can_be_explicitly_disabled_even_when_api_key_provided():
+    """Test that TLS can be explicitly disabled even when API key is provided."""
+    config = temporalio.service.ConnectConfig(
+        target_host="localhost:7233",
+        api_key="test-api-key",
+        tls=False,
+    )
+    # TLS should remain disabled when explicitly set to False
+    assert config.tls is False
+
+
+def test_connect_config_tls_disabled_by_default_when_no_api_key():
+    """Test that TLS is disabled by default when no API key is provided."""
+    config = temporalio.service.ConnectConfig(
+        target_host="localhost:7233",
+    )
+    # TLS should remain disabled when no api_key is provided
+    bridge_config = config._to_bridge_config()
+    assert bridge_config.target_url == "http://localhost:7233"
+    assert bridge_config.tls_config is None
+
+
+def test_connect_config_tls_explicit_config_preserved():
+    """Test that explicit TLS configuration is preserved regardless of API key."""
+    tls_config = temporalio.service.TLSConfig(
+        server_root_ca_cert=b"test-cert",
+        domain="test-domain",
+    )
+    config = temporalio.service.ConnectConfig(
+        target_host="localhost:7233",
+        api_key="test-api-key",
+        tls=tls_config,
+    )
+    # Explicit TLS config should be preserved
+    assert config.tls == tls_config
 
 
 async def test_rpc_execution_not_unknown(client: Client):

@@ -2,8 +2,9 @@ import dataclasses
 import uuid
 import warnings
 from collections import Counter
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from typing import AsyncIterator, Awaitable, Callable, Optional, cast
+from typing import Optional, cast
 
 import pytest
 
@@ -56,6 +57,7 @@ class MyClientPlugin(temporalio.client.Plugin):
         next: Callable[[ConnectConfig], Awaitable[ServiceClient]],
     ) -> ServiceClient:
         config.api_key = "replaced key"
+        config.tls = False
         return await next(config)
 
 
@@ -332,7 +334,7 @@ async def test_simple_plugins(client: Client) -> None:
 
 
 async def test_simple_plugins_callables(client: Client) -> None:
-    def converter(old: Optional[DataConverter]):
+    def converter(old: DataConverter | None):
         if old != temporalio.converter.default():
             raise ValueError("Can't override non-default converter")
         return pydantic_data_converter

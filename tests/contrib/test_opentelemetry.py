@@ -6,11 +6,12 @@ import logging
 import queue
 import threading
 import uuid
+from collections.abc import Callable, Generator, Iterable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Callable, Dict, Generator, Iterable, List, Optional, cast
+from typing import Dict, List, Optional, cast
 
 import nexusrpc
 import opentelemetry.context
@@ -43,7 +44,7 @@ from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 @dataclass
 class TracingActivityParam:
     heartbeat: bool = True
-    fail_until_attempt: Optional[int] = None
+    fail_until_attempt: int | None = None
 
 
 @activity.defn
@@ -56,15 +57,15 @@ async def tracing_activity(param: TracingActivityParam) -> None:
 
 @dataclass
 class TracingWorkflowParam:
-    actions: List[TracingWorkflowAction]
+    actions: list[TracingWorkflowAction]
 
 
 @dataclass
 class TracingWorkflowAction:
     fail_on_non_replay: bool = False
-    child_workflow: Optional[TracingWorkflowActionChildWorkflow] = None
-    activity: Optional[TracingWorkflowActionActivity] = None
-    continue_as_new: Optional[TracingWorkflowActionContinueAsNew] = None
+    child_workflow: TracingWorkflowActionChildWorkflow | None = None
+    activity: TracingWorkflowActionActivity | None = None
+    continue_as_new: TracingWorkflowActionContinueAsNew | None = None
     wait_until_signal_count: int = 0
     wait_and_do_update: bool = False
     wait_and_do_start_with_update: bool = False
@@ -520,11 +521,11 @@ async def test_opentelemetry_tracing_nexus(client: Client, env: WorkflowEnvironm
 def dump_spans(
     spans: Iterable[ReadableSpan],
     *,
-    parent_id: Optional[int] = None,
+    parent_id: int | None = None,
     with_attributes: bool = True,
     indent_depth: int = 0,
-) -> List[str]:
-    ret: List[str] = []
+) -> list[str]:
+    ret: list[str] = []
     for span in spans:
         if (not span.parent and parent_id is None) or (
             span.parent and span.parent.span_id == parent_id
@@ -534,7 +535,7 @@ def dump_spans(
                 span_str += f" (attributes: {dict(span.attributes or {})})"
             # Add links
             if span.links:
-                span_links: List[str] = []
+                span_links: list[str] = []
                 for link in span.links:
                     for link_span in spans:
                         if (
@@ -662,7 +663,7 @@ async def test_opentelemetry_benign_exception(client: Client):
 
 
 @contextmanager
-def baggage_values(values: Dict[str, str]) -> Generator[None, None, None]:
+def baggage_values(values: dict[str, str]) -> Generator[None]:
     ctx = context.get_current()
     for key, value in values.items():
         ctx = baggage.set_baggage(key, value, context=ctx)
@@ -687,7 +688,7 @@ def get_baggage_value(key: str) -> str:
 
 
 @activity.defn
-async def read_baggage_activity() -> Dict[str, str]:
+async def read_baggage_activity() -> dict[str, str]:
     return {
         "user_id": get_baggage_value("user.id"),
         "tenant_id": get_baggage_value("tenant.id"),
@@ -697,7 +698,7 @@ async def read_baggage_activity() -> Dict[str, str]:
 @workflow.defn
 class ReadBaggageTestWorkflow:
     @workflow.run
-    async def run(self) -> Dict[str, str]:
+    async def run(self) -> dict[str, str]:
         return await workflow.execute_activity(
             read_baggage_activity,
             start_to_close_timeout=timedelta(seconds=10),
@@ -730,9 +731,9 @@ async def test_opentelemetry_baggage_propagation_basic(
 
 
 @activity.defn
-async def read_baggage_local_activity() -> Dict[str, str]:
+async def read_baggage_local_activity() -> dict[str, str]:
     return cast(
-        Dict[str, str],
+        dict[str, str],
         {
             "user_id": get_baggage_value("user.id"),
             "tenant_id": get_baggage_value("tenant.id"),
@@ -743,7 +744,7 @@ async def read_baggage_local_activity() -> Dict[str, str]:
 @workflow.defn
 class LocalActivityBaggageTestWorkflow:
     @workflow.run
-    async def run(self) -> Dict[str, str]:
+    async def run(self) -> dict[str, str]:
         return await workflow.execute_local_activity(
             read_baggage_local_activity,
             start_to_close_timeout=timedelta(seconds=10),
@@ -776,7 +777,7 @@ async def test_opentelemetry_baggage_propagation_local_activity(
         assert result["tenant_id"] == "local-corp"
 
 
-retry_attempt_baggage_values: List[str] = []
+retry_attempt_baggage_values: list[str] = []
 
 
 @activity.defn

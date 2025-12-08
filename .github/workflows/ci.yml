@@ -32,6 +32,8 @@ jobs:
           - os: ubuntu-latest
             python: "3.10"
             protoCheckTarget: true
+          - python: "3.10"
+            pytestExtraArgs: "--reruns 3 --only-rerun \"RuntimeError: Failed validating workflow\""
           - os: ubuntu-arm
             runsOn: ubuntu-24.04-arm64-2-core
           - os: macos-intel

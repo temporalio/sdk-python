@@ -7,6 +7,7 @@ import logging
 import sys
 import traceback
 from collections import deque
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum, IntEnum
@@ -14,14 +15,10 @@ from typing import (
     Any,
     Deque,
     Dict,
-    Iterable,
     List,
     Literal,
-    Mapping,
-    MutableMapping,
     NewType,
     Optional,
-    Sequence,
     Set,
     Text,
     Tuple,
@@ -119,7 +116,7 @@ async def test_converter_default():
             expected_data = expected_data.encode()
         assert payloads[0].data == expected_data
         # Decode and check
-        actual_inputs = await DataConverter().decode(payloads, [type_hint])
+        actual_inputs = await DataConverter().decode(payloads, [type_hint])  # type: ignore[reportArgumentType]
         assert len(actual_inputs) == 1
         if expected_decoded_input is None:
             expected_decoded_input = input
@@ -308,9 +305,9 @@ MyDataClassAlias = MyDataClass
 @dataclass
 class NestedDataClass:
     foo: str
-    bar: List[NestedDataClass] = dataclasses.field(default_factory=list)
-    baz: Optional[NestedDataClass] = None
-    qux: Optional[UUID] = None
+    bar: list[NestedDataClass] = dataclasses.field(default_factory=list)
+    baz: NestedDataClass | None = None
+    qux: UUID | None = None
 
 
 class MyTypedDict(TypedDict):
@@ -328,8 +325,8 @@ if sys.version_info <= (3, 12, 3):
 
     class MyPydanticClass(pydantic.BaseModel):
         foo: str
-        bar: List[MyPydanticClass]
-        baz: Optional[UUID] = None
+        bar: list[MyPydanticClass]
+        baz: UUID | None = None
 
 
 def test_json_type_hints():
@@ -359,7 +356,7 @@ def test_json_type_hints():
     ok(float, 5.5)
     ok(bool, True)
     ok(str, "foo")
-    ok(Text, "foo")
+    ok(str, "foo")
     ok(bytes, b"foo")
     fail(int, "1")
     fail(float, "1")
@@ -398,35 +395,34 @@ def test_json_type_hints():
     ok(Union[int, str], "foo")
     ok(Union[MyDataClass, NestedDataClass], MyDataClass("foo", 5, SerializableEnum.FOO))
     ok(Union[MyDataClass, NestedDataClass], NestedDataClass("foo"))
-    if sys.version_info >= (3, 10):
-        ok(int | None, None)
-        ok(int | None, 5)
-        fail(int | None, "1")
-        ok(MyDataClass | NestedDataClass, MyDataClass("foo", 5, SerializableEnum.FOO))
-        ok(MyDataClass | NestedDataClass, NestedDataClass("foo"))
+    ok(int | None, None)
+    ok(int | None, 5)
+    fail(int | None, "1")
+    ok(MyDataClass | NestedDataClass, MyDataClass("foo", 5, SerializableEnum.FOO))
+    ok(MyDataClass | NestedDataClass, NestedDataClass("foo"))
 
     # NewType
     ok(NewIntType, 5)
 
     # List-like
-    ok(List, [5])
-    ok(List[int], [5])
-    ok(List[MyDataClass], [MyDataClass("foo", 5, SerializableEnum.FOO)])
+    ok(list, [5])
+    ok(list[int], [5])
+    ok(list[MyDataClass], [MyDataClass("foo", 5, SerializableEnum.FOO)])
     ok(Iterable[int], [5, 6])
-    ok(Tuple[int, str], (5, "6"))
-    ok(Tuple[int, ...], (5, 6, 7))
-    ok(Set[int], set([5, 6]))
-    ok(Set, set([5, 6]))
-    ok(List, ["foo"])
+    ok(tuple[int, str], (5, "6"))
+    ok(tuple[int, ...], (5, 6, 7))
+    ok(set[int], {5, 6})
+    ok(set, {5, 6})
+    ok(list, ["foo"])
     ok(Deque[int], deque([5, 6]))
     ok(Sequence[int], [5, 6])
-    fail(List[int], [1, 2, "3"])
+    fail(list[int], [1, 2, "3"])
 
     # Dict-like
-    ok(Dict[str, MyDataClass], {"foo": MyDataClass("foo", 5, SerializableEnum.FOO)})
-    ok(Dict, {"foo": 123})
-    ok(Dict[str, Any], {"foo": 123})
-    ok(Dict[Any, int], {"foo": 123})
+    ok(dict[str, MyDataClass], {"foo": MyDataClass("foo", 5, SerializableEnum.FOO)})
+    ok(dict, {"foo": 123})
+    ok(dict[str, Any], {"foo": 123})
+    ok(dict[Any, int], {"foo": 123})
     ok(Mapping, {"foo": 123})
     ok(Mapping[str, int], {"foo": 123})
     ok(MutableMapping[str, int], {"foo": 123})
@@ -441,9 +437,14 @@ def test_json_type_hints():
     ok(MyTypedDict, {"foo": "bar", "blah": "meh"})
 
     # Non-string dict keys are supported
-    ok(Dict[int, str], {1: "1"})
-    ok(Dict[float, str], {1.0: "1"})
-    ok(Dict[bool, str], {True: "1"})
+    ok(dict[int, str], {1: "1"})
+    ok(dict[float, str], {1.0: "1"})
+    ok(dict[bool, str], {True: "1"})
+
+    # On a 3.10+ dict type, None isn't returned from a key. This is potentially a bug
+    ok(dict[None, str], {"null": "1"})
+
+    # Dict has a different value for None keys
     ok(Dict[None, str], {None: "1"})
 
     # Alias
@@ -451,26 +452,20 @@ def test_json_type_hints():
 
     # IntEnum
     ok(SerializableEnum, SerializableEnum.FOO)
-    ok(List[SerializableEnum], [SerializableEnum.FOO, SerializableEnum.FOO])
+    ok(list[SerializableEnum], [SerializableEnum.FOO, SerializableEnum.FOO])
 
     # UUID
     ok(UUID, uuid4())
-    ok(List[UUID], [uuid4(), uuid4()])
+    ok(list[UUID], [uuid4(), uuid4()])
 
     # StrEnum is available in 3.11+
     if sys.version_info >= (3, 11):
         # StrEnum
         ok(SerializableStrEnum, SerializableStrEnum.FOO)
         ok(
-            List[SerializableStrEnum],
+            list[SerializableStrEnum],
             [SerializableStrEnum.FOO, SerializableStrEnum.FOO],
         )
-
-    # 3.10+ checks
-    if sys.version_info >= (3, 10):
-        ok(list[int], [1, 2])
-        ok(dict[str, int], {"1": 2})
-        ok(tuple[int, str], (1, "2"))
 
     # Pydantic
     # TODO(cretz): Fix when https://github.com/pydantic/pydantic/pull/9612 tagged
@@ -481,12 +476,12 @@ def test_json_type_hints():
                 foo="foo", bar=[MyPydanticClass(foo="baz", bar=[])], baz=uuid4()
             ),
         )
-        ok(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[])])
-        fail(List[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[]), 5])
+        ok(list[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[])])
+        fail(list[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[]), 5])
 
 
 # This is an example of appending the stack to every Temporal failure error
-def append_temporal_stack(exc: Optional[BaseException]) -> None:
+def append_temporal_stack(exc: BaseException | None) -> None:
     while exc:
         # Only append if it doesn't appear already there
         if (
@@ -541,7 +536,7 @@ async def test_exception_format():
 
 # Just serializes in a "payloads" wrapper
 class SimpleCodec(PayloadCodec):
-    async def encode(self, payloads: Sequence[Payload]) -> List[Payload]:
+    async def encode(self, payloads: Sequence[Payload]) -> list[Payload]:
         wrapper = Payloads(payloads=payloads)
         return [
             Payload(
@@ -549,7 +544,7 @@ class SimpleCodec(PayloadCodec):
             )
         ]
 
-    async def decode(self, payloads: Sequence[Payload]) -> List[Payload]:
+    async def decode(self, payloads: Sequence[Payload]) -> list[Payload]:
         payloads = list(payloads)
         if len(payloads) != 1:
             raise RuntimeError("Expected only a single payload")
@@ -633,8 +628,8 @@ class IPv4AddressJSONEncoder(AdvancedJSONEncoder):
 
 class IPv4AddressJSONTypeConverter(JSONTypeConverter):
     def to_typed_value(
-        self, hint: Type, value: Any
-    ) -> Union[Optional[Any], _JSONTypeConverterUnhandled]:
+        self, hint: type, value: Any
+    ) -> Any | None | _JSONTypeConverterUnhandled:
         if inspect.isclass(hint) and issubclass(hint, ipaddress.IPv4Address):
             return ipaddress.IPv4Address(value)
         return JSONTypeConverter.Unhandled
@@ -663,13 +658,13 @@ async def test_json_type_converter():
         await DataConverter.default.decode([payload], [ipaddress.IPv4Address])
     with pytest.raises(TypeError):
         await DataConverter.default.decode(
-            [list_payload], [List[ipaddress.IPv4Address]]
+            [list_payload], [list[ipaddress.IPv4Address]]
         )
 
     # But decodes with custom
     assert addr == (await custom_conv.decode([payload], [ipaddress.IPv4Address]))[0]
     assert [addr, addr] == (
-        await custom_conv.decode([list_payload], [List[ipaddress.IPv4Address]])
+        await custom_conv.decode([list_payload], [list[ipaddress.IPv4Address]])
     )[0]
 
 

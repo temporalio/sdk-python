@@ -2,10 +2,15 @@ import asyncio
 import multiprocessing.context
 import os
 import sys
-from typing import AsyncGenerator, Iterator
+from collections.abc import AsyncGenerator, Iterator
 
 import pytest
 import pytest_asyncio
+
+from temporalio.client import Client
+from temporalio.testing import WorkflowEnvironment
+from temporalio.worker import SharedStateManager
+from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
 from . import DEV_SERVER_DOWNLOAD_VERSION
 
@@ -37,10 +42,6 @@ else:
         or protobuf_version.startswith("5.")
         or protobuf_version.startswith("6.")
     ), f"Expected protobuf 4.x/5.x/6.x, got {protobuf_version}"
-
-from temporalio.client import Client
-from temporalio.testing import WorkflowEnvironment
-from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
 
 def pytest_runtest_setup(item):
@@ -79,7 +80,7 @@ class NoEventLoopPolicy(asyncio.AbstractEventLoopPolicy):  # type: ignore[name-d
     def set_event_loop(self, loop):
         return self._underlying.set_event_loop(loop)
 
-    def new_event_loop(self):
+    def new_event_loop(self):  # type: ignore[reportIncompatibleMethodOverride]
         return None
 
     def get_child_watcher(self):
@@ -91,7 +92,7 @@ class NoEventLoopPolicy(asyncio.AbstractEventLoopPolicy):  # type: ignore[name-d
 
 @pytest.fixture(scope="session")
 def env_type(request: pytest.FixtureRequest) -> str:
-    return request.config.getoption("--workflow-environment")
+    return request.config.getoption("--workflow-environment")  # type: ignore[reportReturnType]
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -132,6 +133,17 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
 
     yield env
     await env.shutdown()
+
+
+@pytest.fixture(scope="session")
+def shared_state_manager() -> Iterator[SharedStateManager]:
+    mp_mgr = multiprocessing.Manager()
+    mgr = SharedStateManager.create_from_multiprocessing(mp_mgr)
+
+    try:
+        yield mgr
+    finally:
+        mp_mgr.shutdown()
 
 
 @pytest.fixture(scope="session")

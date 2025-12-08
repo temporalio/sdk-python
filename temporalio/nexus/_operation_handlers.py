@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import (
     Any,
-    Awaitable,
-    Callable,
 )
 
 from nexusrpc import (
@@ -91,7 +90,7 @@ async def _cancel_workflow(
 
     Args:
         token: The token of the workflow to cancel. kwargs: Additional keyword arguments
-        to pass to the workflow cancel method.
+         to pass to the workflow cancel method.
     """
     try:
         nexus_workflow_handle = WorkflowHandle[Any].from_token(token)

@@ -2293,7 +2293,7 @@ wheels = [
 
 [[package]]
 name = "pydoctor"
-version = "24.11.2"
+version = "25.10.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
@@ -2303,13 +2303,13 @@ dependencies = [
     { name = "lunr" },
     { name = "platformdirs" },
     { name = "requests" },
-    { name = "toml", marker = "python_full_version < '3.11'" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "twisted" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7a/7c/c3491dd1666b9fdede4bddb2ebf9a1bc31ff8e0536ee6572ad5a028e109b/pydoctor-24.11.2.tar.gz", hash = "sha256:d52c13caa17b870da1a245981c15cda88406eb73a863dbe23db3fbc43e3b3fc3", size = 946366, upload-time = "2025-01-08T20:04:41.584Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/26/4b49eab9203a0f6939711f6a62a06c04d6e11fbf01e7b2cd9f9dece97686/pydoctor-25.10.1.tar.gz", hash = "sha256:489ec8b96f1e477df8f1892e2c7990836f32481a633ed13abb5e24a3488c83fb", size = 981473, upload-time = "2025-09-29T22:06:49.712Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f4/c2/016a296de5eb70478c65cc58722f11aedd858bf248431486b0dff479016c/pydoctor-24.11.2-py3-none-any.whl", hash = "sha256:69004e7b4a2b4db6425f1a46869adf7ebcd7c4fd0340515538134a4df181ab82", size = 1584835, upload-time = "2025-01-08T20:04:39.394Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/ae/1ae23968390bfd71678c1cd752e66a9823e2fe45ba34a6740f76e84011ab/pydoctor-25.10.1-py3-none-any.whl", hash = "sha256:2aa85f8d64e11c065d71a2317b82724a58361173d945290509367681665bdc7c", size = 1637603, upload-time = "2025-09-29T22:06:47.349Z" },
 ]
 
 [[package]]
@@ -2388,6 +2388,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ba/d7/c699e0be5401fe9ccad484562f0af9350b4e48c05acf39fb3dab1932128f/pytest_pretty-1.3.0.tar.gz", hash = "sha256:97e9921be40f003e40ae78db078d4a0c1ea42bf73418097b5077970c2cc43bf3", size = 219297, upload-time = "2025-06-04T12:54:37.322Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ab/85/2f97a1b65178b0f11c9c77c35417a4cc5b99a80db90dad4734a129844ea5/pytest_pretty-1.3.0-py3-none-any.whl", hash = "sha256:074b9d5783cef9571494543de07e768a4dda92a3e85118d6c7458c67297159b7", size = 5620, upload-time = "2025-06-04T12:54:36.229Z" },
+]
+
+[[package]]
+name = "pytest-rerunfailures"
+version = "16.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/de/04/71e9520551fc8fe2cf5c1a1842e4e600265b0815f2016b7c27ec85688682/pytest_rerunfailures-16.1.tar.gz", hash = "sha256:c38b266db8a808953ebd71ac25c381cb1981a78ff9340a14bcb9f1b9bff1899e", size = 30889, upload-time = "2025-10-10T07:06:01.238Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/54/60eabb34445e3db3d3d874dc1dfa72751bfec3265bd611cb13c8b290adea/pytest_rerunfailures-16.1-py3-none-any.whl", hash = "sha256:5d11b12c0ca9a1665b5054052fcc1084f8deadd9328962745ef6b04e26382e86", size = 14093, upload-time = "2025-10-10T07:06:00.019Z" },
 ]
 
 [[package]]
@@ -2993,6 +3006,7 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-pretty" },
+    { name = "pytest-rerunfailures" },
     { name = "pytest-timeout" },
     { name = "ruff" },
     { name = "toml" },
@@ -3028,12 +3042,13 @@ dev = [
     { name = "openai-agents", extras = ["litellm"], marker = "python_full_version < '3.14'", specifier = ">=0.3,<0.4" },
     { name = "psutil", specifier = ">=5.9.3,<6" },
     { name = "pydocstyle", specifier = ">=6.3.0,<7" },
-    { name = "pydoctor", specifier = ">=24.11.1,<25" },
+    { name = "pydoctor", specifier = ">=25.10.1,<26" },
     { name = "pyright", specifier = "==1.1.403" },
     { name = "pytest", specifier = "~=7.4" },
     { name = "pytest-asyncio", specifier = ">=0.21,<0.22" },
     { name = "pytest-cov", specifier = ">=6.1.1" },
     { name = "pytest-pretty", specifier = ">=1.3.0" },
+    { name = "pytest-rerunfailures", specifier = ">=16.1" },
     { name = "pytest-timeout", specifier = "~=2.2" },
     { name = "ruff", specifier = ">=0.5.0,<0.6" },
     { name = "toml", specifier = ">=0.10.2,<0.11" },

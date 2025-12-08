@@ -6,31 +6,29 @@ import inspect
 import types
 import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import IntEnum
 from typing import (
     Any,
-    Callable,
     ClassVar,
-    Collection,
     Generic,
-    Iterator,
     List,
-    Mapping,
     Optional,
-    Sequence,
     Text,
     Tuple,
     Type,
+    TypeAlias,
     TypeVar,
     Union,
+    get_origin,
     get_type_hints,
     overload,
 )
 
 import google.protobuf.internal.containers
-from typing_extensions import NamedTuple, Self, TypeAlias, get_origin
+from typing_extensions import NamedTuple, Self
 
 import temporalio.api.common.v1
 import temporalio.api.deployment.v1
@@ -51,7 +49,7 @@ class RetryPolicy:
     interval. Default 2.0.
     """
 
-    maximum_interval: Optional[timedelta] = None
+    maximum_interval: timedelta | None = None
     """Maximum backoff interval between retries. Default 100x
     :py:attr:`initial_interval`.
     """
@@ -62,7 +60,7 @@ class RetryPolicy:
     If 0, the default, there is no maximum.
     """
 
-    non_retryable_error_types: Optional[Sequence[str]] = None
+    non_retryable_error_types: Sequence[str] | None = None
     """List of error types that are not retryable."""
 
     @staticmethod
@@ -201,7 +199,7 @@ class RawValue:
 # are not sending lists each time but maybe accidentally sending a string (which
 # is a sequence)
 SearchAttributeValues: TypeAlias = Union[
-    List[str], List[int], List[float], List[bool], List[datetime]
+    list[str], list[int], list[float], list[bool], list[datetime]
 ]
 
 SearchAttributes: TypeAlias = Mapping[str, SearchAttributeValues]
@@ -247,7 +245,7 @@ class SearchAttributeKey(ABC, Generic[SearchAttributeValueType]):
 
     @property
     @abstractmethod
-    def value_type(self) -> Type[SearchAttributeValueType]:
+    def value_type(self) -> type[SearchAttributeValueType]:
         """Get the Python type of value for the key.
 
         This may contain generics which cannot be used in ``isinstance``.
@@ -256,7 +254,7 @@ class SearchAttributeKey(ABC, Generic[SearchAttributeValueType]):
         ...
 
     @property
-    def origin_value_type(self) -> Type:
+    def origin_value_type(self) -> type:
         """Get the Python type of value for the key without generics."""
         return get_origin(self.value_type) or self.value_type
 
@@ -340,9 +338,7 @@ class SearchAttributeKey(ABC, Generic[SearchAttributeValueType]):
         )
 
     @staticmethod
-    def _from_metadata_type(
-        name: str, metadata_type: str
-    ) -> Optional[SearchAttributeKey]:
+    def _from_metadata_type(name: str, metadata_type: str) -> SearchAttributeKey | None:
         if metadata_type == "Text":
             return SearchAttributeKey.for_text(name)
         elif metadata_type == "Keyword":
@@ -362,7 +358,7 @@ class SearchAttributeKey(ABC, Generic[SearchAttributeValueType]):
     @staticmethod
     def _guess_from_untyped_values(
         name: str, vals: SearchAttributeValues
-    ) -> Optional[SearchAttributeKey]:
+    ) -> SearchAttributeKey | None:
         if not vals:
             return None
         elif len(vals) > 1:
@@ -386,7 +382,7 @@ class _SearchAttributeKey(SearchAttributeKey[SearchAttributeValueType]):
     _name: str
     _indexed_value_type: SearchAttributeIndexedValueType
     # No supported way in Python to derive this, so we're setting manually
-    _value_type: Type[SearchAttributeValueType]
+    _value_type: type[SearchAttributeValueType]
 
     @property
     def name(self) -> str:
@@ -397,7 +393,7 @@ class _SearchAttributeKey(SearchAttributeKey[SearchAttributeValueType]):
         return self._indexed_value_type
 
     @property
-    def value_type(self) -> Type[SearchAttributeValueType]:
+    def value_type(self) -> type[SearchAttributeValueType]:
         return self._value_type
 
 
@@ -419,7 +415,7 @@ class SearchAttributeUpdate(ABC, Generic[SearchAttributeValueType]):
 
     @property
     @abstractmethod
-    def value(self) -> Optional[SearchAttributeValueType]:
+    def value(self) -> SearchAttributeValueType | None:
         """Value that is being set or ``None`` if being unset."""
         ...
 
@@ -427,14 +423,14 @@ class SearchAttributeUpdate(ABC, Generic[SearchAttributeValueType]):
 @dataclass(frozen=True)
 class _SearchAttributeUpdate(SearchAttributeUpdate[SearchAttributeValueType]):
     _key: SearchAttributeKey[SearchAttributeValueType]
-    _value: Optional[SearchAttributeValueType]
+    _value: SearchAttributeValueType | None
 
     @property
     def key(self) -> SearchAttributeKey[SearchAttributeValueType]:
         return self._key
 
     @property
-    def value(self) -> Optional[SearchAttributeValueType]:
+    def value(self) -> SearchAttributeValueType | None:
         return self._value
 
 
@@ -501,19 +497,19 @@ class TypedSearchAttributes(Collection[SearchAttributePair]):
     @overload
     def get(
         self, key: SearchAttributeKey[SearchAttributeValueType]
-    ) -> Optional[SearchAttributeValueType]: ...
+    ) -> SearchAttributeValueType | None: ...
 
     @overload
     def get(
         self,
         key: SearchAttributeKey[SearchAttributeValueType],
         default: temporalio.types.AnyType,
-    ) -> Union[SearchAttributeValueType, temporalio.types.AnyType]: ...
+    ) -> SearchAttributeValueType | temporalio.types.AnyType: ...
 
     def get(
         self,
         key: SearchAttributeKey[SearchAttributeValueType],
-        default: Optional[Any] = None,
+        default: Any | None = None,
     ) -> Any:
         """Get an attribute value for a key (or default). This is similar to
         dict.get.
@@ -549,7 +545,7 @@ TypedSearchAttributes.empty = TypedSearchAttributes(search_attributes=[])
 
 
 def _warn_on_deprecated_search_attributes(
-    attributes: Optional[Union[SearchAttributes, Any]],
+    attributes: SearchAttributes | Any | None,
     stack_level: int = 2,
 ) -> None:
     if attributes and isinstance(attributes, Mapping):
@@ -571,7 +567,7 @@ class MetricMeter(ABC):
 
     @abstractmethod
     def create_counter(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricCounter:
         """Create a counter metric for adding values.
 
@@ -587,7 +583,7 @@ class MetricMeter(ABC):
 
     @abstractmethod
     def create_histogram(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricHistogram:
         """Create a histogram metric for recording values.
 
@@ -603,7 +599,7 @@ class MetricMeter(ABC):
 
     @abstractmethod
     def create_histogram_float(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricHistogramFloat:
         """Create a histogram metric for recording values.
 
@@ -619,7 +615,7 @@ class MetricMeter(ABC):
 
     @abstractmethod
     def create_histogram_timedelta(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricHistogramTimedelta:
         """Create a histogram metric for recording values.
 
@@ -638,7 +634,7 @@ class MetricMeter(ABC):
 
     @abstractmethod
     def create_gauge(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricGauge:
         """Create a gauge metric for setting values.
 
@@ -654,7 +650,7 @@ class MetricMeter(ABC):
 
     @abstractmethod
     def create_gauge_float(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricGaugeFloat:
         """Create a gauge metric for setting values.
 
@@ -699,13 +695,13 @@ class MetricCommon(ABC):
 
     @property
     @abstractmethod
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         """Description for the metric if any."""
         ...
 
     @property
     @abstractmethod
-    def unit(self) -> Optional[str]:
+    def unit(self) -> str | None:
         """Unit for the metric if any."""
         ...
 
@@ -734,7 +730,7 @@ class MetricCounter(MetricCommon):
 
     @abstractmethod
     def add(
-        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+        self, value: int, additional_attributes: MetricAttributes | None = None
     ) -> None:
         """Add a value to the counter.
 
@@ -755,7 +751,7 @@ class MetricHistogram(MetricCommon):
 
     @abstractmethod
     def record(
-        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+        self, value: int, additional_attributes: MetricAttributes | None = None
     ) -> None:
         """Record a value on the histogram.
 
@@ -776,7 +772,7 @@ class MetricHistogramFloat(MetricCommon):
 
     @abstractmethod
     def record(
-        self, value: float, additional_attributes: Optional[MetricAttributes] = None
+        self, value: float, additional_attributes: MetricAttributes | None = None
     ) -> None:
         """Record a value on the histogram.
 
@@ -797,7 +793,7 @@ class MetricHistogramTimedelta(MetricCommon):
 
     @abstractmethod
     def record(
-        self, value: timedelta, additional_attributes: Optional[MetricAttributes] = None
+        self, value: timedelta, additional_attributes: MetricAttributes | None = None
     ) -> None:
         """Record a value on the histogram.
 
@@ -820,7 +816,7 @@ class MetricGauge(MetricCommon):
 
     @abstractmethod
     def set(
-        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+        self, value: int, additional_attributes: MetricAttributes | None = None
     ) -> None:
         """Set a value on the gauge.
 
@@ -841,7 +837,7 @@ class MetricGaugeFloat(MetricCommon):
 
     @abstractmethod
     def set(
-        self, value: float, additional_attributes: Optional[MetricAttributes] = None
+        self, value: float, additional_attributes: MetricAttributes | None = None
     ) -> None:
         """Set a value on the gauge.
 
@@ -859,32 +855,32 @@ class MetricGaugeFloat(MetricCommon):
 
 class _NoopMetricMeter(MetricMeter):
     def create_counter(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricCounter:
         return _NoopMetricCounter(name, description, unit)
 
     def create_histogram(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricHistogram:
         return _NoopMetricHistogram(name, description, unit)
 
     def create_histogram_float(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricHistogramFloat:
         return _NoopMetricHistogramFloat(name, description, unit)
 
     def create_histogram_timedelta(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricHistogramTimedelta:
         return _NoopMetricHistogramTimedelta(name, description, unit)
 
     def create_gauge(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricGauge:
         return _NoopMetricGauge(name, description, unit)
 
     def create_gauge_float(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricGaugeFloat:
         return _NoopMetricGaugeFloat(name, description, unit)
 
@@ -895,9 +891,7 @@ class _NoopMetricMeter(MetricMeter):
 
 
 class _NoopMetric(MetricCommon):
-    def __init__(
-        self, name: str, description: Optional[str], unit: Optional[str]
-    ) -> None:
+    def __init__(self, name: str, description: str | None, unit: str | None) -> None:
         self._name = name
         self._description = description
         self._unit = unit
@@ -907,11 +901,11 @@ class _NoopMetric(MetricCommon):
         return self._name
 
     @property
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         return self._description
 
     @property
-    def unit(self) -> Optional[str]:
+    def unit(self) -> str | None:
         return self._unit
 
     def with_additional_attributes(
@@ -922,42 +916,42 @@ class _NoopMetric(MetricCommon):
 
 class _NoopMetricCounter(MetricCounter, _NoopMetric):
     def add(
-        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+        self, value: int, additional_attributes: MetricAttributes | None = None
     ) -> None:
         pass
 
 
 class _NoopMetricHistogram(MetricHistogram, _NoopMetric):
     def record(
-        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+        self, value: int, additional_attributes: MetricAttributes | None = None
     ) -> None:
         pass
 
 
 class _NoopMetricHistogramFloat(MetricHistogramFloat, _NoopMetric):
     def record(
-        self, value: float, additional_attributes: Optional[MetricAttributes] = None
+        self, value: float, additional_attributes: MetricAttributes | None = None
     ) -> None:
         pass
 
 
 class _NoopMetricHistogramTimedelta(MetricHistogramTimedelta, _NoopMetric):
     def record(
-        self, value: timedelta, additional_attributes: Optional[MetricAttributes] = None
+        self, value: timedelta, additional_attributes: MetricAttributes | None = None
     ) -> None:
         pass
 
 
 class _NoopMetricGauge(MetricGauge, _NoopMetric):
     def set(
-        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+        self, value: int, additional_attributes: MetricAttributes | None = None
     ) -> None:
         pass
 
 
 class _NoopMetricGaugeFloat(MetricGaugeFloat, _NoopMetric):
     def set(
-        self, value: float, additional_attributes: Optional[MetricAttributes] = None
+        self, value: float, additional_attributes: MetricAttributes | None = None
     ) -> None:
         pass
 
@@ -982,7 +976,7 @@ class Priority:
     2. Then consider "fairness_key" and "fairness_weight" for fairness balancing.
     """
 
-    priority_key: Optional[int] = None
+    priority_key: int | None = None
     """Priority key is a positive integer from 1 to n, where smaller integers correspond to higher
     priorities (tasks run sooner). In general, tasks in a queue should be processed in close to
     priority order, although small deviations are possible.
@@ -994,7 +988,7 @@ class Priority:
     3.
     """
 
-    fairness_key: Optional[str] = None
+    fairness_key: str | None = None
     """A short string (max 64 bytes) that is used as a key for a fairness balancing mechanism.
     This can correspond to a tenant id or even fixed strings like "high", "low", etc.
 
@@ -1005,7 +999,7 @@ class Priority:
     Default is an empty string.
     """
 
-    fairness_weight: Optional[float] = None
+    fairness_weight: float | None = None
     """A float that represents the weight for task dispatch for the associated fairness key.
     Tasks for a fairness key are dispatched in proportion to their weight.
 
@@ -1088,7 +1082,7 @@ class WorkerDeploymentVersion:
     @staticmethod
     def from_canonical_string(canonical: str) -> WorkerDeploymentVersion:
         """Parse a version from a canonical string, which must be in the format
-        `<deployment_name>.<build_id>`. Deployment name must not have a `.` in it.
+        `<deployment_name>.<build_id>`. Deployment name must not have a ``.`` in it.
         """
         parts = canonical.split(".", maxsplit=1)
         if len(parts) != 2:
@@ -1172,9 +1166,9 @@ def _arg_or_args(arg: Any, args: Sequence[Any]) -> Sequence[Any]:
 
 
 def _apply_headers(
-    source: Optional[Mapping[str, temporalio.api.common.v1.Payload]],
+    source: Mapping[str, temporalio.api.common.v1.Payload] | None,
     dest: google.protobuf.internal.containers.MessageMap[
-        Text, temporalio.api.common.v1.Payload
+        str, temporalio.api.common.v1.Payload
     ],
 ) -> None:
     if source is None:
@@ -1200,7 +1194,7 @@ _non_user_defined_callables = (
 
 def _type_hints_from_func(
     func: Callable,
-) -> Tuple[Optional[List[Type]], Optional[Type]]:
+) -> tuple[list[type] | None, type | None]:
     """Extracts the type hints from the function.
 
     Args:
@@ -1236,7 +1230,7 @@ def _type_hints_from_func(
     hints = get_type_hints(func)
     ret_hint = hints.get("return")
     ret = ret_hint if ret_hint is not inspect.Signature.empty else None
-    args: List[Type] = []
+    args: list[type] = []
     for index, value in enumerate(sig.parameters.values()):
         # Ignore self on methods
         if (

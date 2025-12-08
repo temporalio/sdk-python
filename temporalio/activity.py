@@ -15,20 +15,16 @@ import dataclasses
 import inspect
 import logging
 import threading
+from collections.abc import Callable, Iterator, Mapping, MutableMapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Iterator,
     List,
-    Mapping,
-    MutableMapping,
     NoReturn,
     Optional,
-    Sequence,
     Tuple,
     Type,
     Union,
@@ -53,7 +49,7 @@ def defn(fn: CallableType) -> CallableType: ...
 
 @overload
 def defn(
-    *, name: Optional[str] = None, no_thread_cancel_exception: bool = False
+    *, name: str | None = None, no_thread_cancel_exception: bool = False
 ) -> Callable[[CallableType], CallableType]: ...
 
 
@@ -64,9 +60,9 @@ def defn(
 
 
 def defn(
-    fn: Optional[CallableType] = None,
+    fn: CallableType | None = None,  # type: ignore[reportInvalidTypeVarUse]
     *,
-    name: Optional[str] = None,
+    name: str | None = None,
     no_thread_cancel_exception: bool = False,
     dynamic: bool = False,
 ):
@@ -111,11 +107,11 @@ class Info:
     attempt: int
     current_attempt_scheduled_time: datetime
     heartbeat_details: Sequence[Any]
-    heartbeat_timeout: Optional[timedelta]
+    heartbeat_timeout: timedelta | None
     is_local: bool
-    schedule_to_close_timeout: Optional[timedelta]
+    schedule_to_close_timeout: timedelta | None
     scheduled_time: datetime
-    start_to_close_timeout: Optional[timedelta]
+    start_to_close_timeout: timedelta | None
     started_time: datetime
     task_queue: str
     task_token: bytes
@@ -124,7 +120,7 @@ class Info:
     workflow_run_id: str
     workflow_type: str
     priority: temporalio.common.Priority
-    retry_policy: Optional[temporalio.common.RetryPolicy]
+    retry_policy: temporalio.common.RetryPolicy | None
     """The retry policy of this activity.
 
     Note that the server may have set a different policy than the one provided when scheduling the activity.
@@ -151,7 +147,7 @@ _current_context: contextvars.ContextVar[_Context] = contextvars.ContextVar("act
 
 @dataclass
 class _ActivityCancellationDetailsHolder:
-    details: Optional[ActivityCancellationDetails] = None
+    details: ActivityCancellationDetails | None = None
 
 
 @dataclass(frozen=True)
@@ -183,20 +179,20 @@ class ActivityCancellationDetails:
 class _Context:
     info: Callable[[], Info]
     # This is optional because during interceptor init it is not present
-    heartbeat: Optional[Callable[..., None]]
+    heartbeat: Callable[..., None] | None
     cancelled_event: _CompositeEvent
     worker_shutdown_event: _CompositeEvent
-    shield_thread_cancel_exception: Optional[Callable[[], AbstractContextManager]]
-    payload_converter_class_or_instance: Union[
-        Type[temporalio.converter.PayloadConverter],
-        temporalio.converter.PayloadConverter,
-    ]
-    runtime_metric_meter: Optional[temporalio.common.MetricMeter]
-    client: Optional[Client]
+    shield_thread_cancel_exception: Callable[[], AbstractContextManager] | None
+    payload_converter_class_or_instance: (
+        type[temporalio.converter.PayloadConverter]
+        | temporalio.converter.PayloadConverter
+    )
+    runtime_metric_meter: temporalio.common.MetricMeter | None
+    client: Client | None
     cancellation_details: _ActivityCancellationDetailsHolder
-    _logger_details: Optional[Mapping[str, Any]] = None
-    _payload_converter: Optional[temporalio.converter.PayloadConverter] = None
-    _metric_meter: Optional[temporalio.common.MetricMeter] = None
+    _logger_details: Mapping[str, Any] | None = None
+    _payload_converter: temporalio.converter.PayloadConverter | None = None
+    _metric_meter: temporalio.common.MetricMeter | None = None
 
     @staticmethod
     def current() -> _Context:
@@ -258,9 +254,9 @@ class _Context:
 @dataclass
 class _CompositeEvent:
     # This should always be present, but is sometimes lazily set internally
-    thread_event: Optional[threading.Event]
+    thread_event: threading.Event | None
     # Async event only for async activities
-    async_event: Optional[asyncio.Event]
+    async_event: asyncio.Event | None
 
     def set(self) -> None:
         if not self.thread_event:
@@ -279,7 +275,7 @@ class _CompositeEvent:
             raise RuntimeError("not in async activity")
         await self.async_event.wait()
 
-    def wait_sync(self, timeout: Optional[float] = None) -> None:
+    def wait_sync(self, timeout: float | None = None) -> None:
         if not self.thread_event:
             raise RuntimeError("Missing event")
         self.thread_event.wait(timeout)
@@ -288,7 +284,7 @@ class _CompositeEvent:
 def client() -> Client:
     """Return a Temporal Client for use in the current activity.
 
-    The client is only available in `async def` activities.
+    The client is only available in ``async def`` activities.
 
     In tests it is not available automatically, but you can pass a client when creating a
     :py:class:`temporalio.testing.ActivityEnvironment`.
@@ -330,7 +326,7 @@ def info() -> Info:
     return _Context.current().info()
 
 
-def cancellation_details() -> Optional[ActivityCancellationDetails]:
+def cancellation_details() -> ActivityCancellationDetails | None:
     """Cancellation details of the current activity, if any. Once set, cancellation details do not change."""
     return _Context.current().cancellation_details.details
 
@@ -398,7 +394,7 @@ async def wait_for_cancelled() -> None:
     await _Context.current().cancelled_event.wait()
 
 
-def wait_for_cancelled_sync(timeout: Optional[Union[timedelta, float]] = None) -> None:
+def wait_for_cancelled_sync(timeout: timedelta | float | None = None) -> None:
     """Synchronously block while waiting for a cancellation request on this
     activity.
 
@@ -437,7 +433,7 @@ async def wait_for_worker_shutdown() -> None:
 
 
 def wait_for_worker_shutdown_sync(
-    timeout: Optional[Union[timedelta, float]] = None,
+    timeout: timedelta | float | None = None,
 ) -> None:
     """Synchronously block while waiting for shutdown to be called on the
     worker.
@@ -511,9 +507,7 @@ class LoggerAdapter(logging.LoggerAdapter):
             use by others. Default is False.
     """
 
-    def __init__(
-        self, logger: logging.Logger, extra: Optional[Mapping[str, Any]]
-    ) -> None:
+    def __init__(self, logger: logging.Logger, extra: Mapping[str, Any] | None) -> None:
         """Create the logger adapter."""
         super().__init__(logger, extra or {})
         self.activity_info_on_message = True
@@ -522,7 +516,7 @@ class LoggerAdapter(logging.LoggerAdapter):
 
     def process(
         self, msg: Any, kwargs: MutableMapping[str, Any]
-    ) -> Tuple[Any, MutableMapping[str, Any]]:
+    ) -> tuple[Any, MutableMapping[str, Any]]:
         """Override to add activity details."""
         if (
             self.activity_info_on_message
@@ -559,16 +553,16 @@ logger = LoggerAdapter(logging.getLogger(__name__), None)
 
 @dataclass(frozen=True)
 class _Definition:
-    name: Optional[str]
+    name: str | None
     fn: Callable
     is_async: bool
     no_thread_cancel_exception: bool
     # Types loaded on post init if both are None
-    arg_types: Optional[List[Type]] = None
-    ret_type: Optional[Type] = None
+    arg_types: list[type] | None = None
+    ret_type: type | None = None
 
     @staticmethod
-    def from_callable(fn: Callable) -> Optional[_Definition]:
+    def from_callable(fn: Callable) -> _Definition | None:
         defn = getattr(fn, "__temporal_activity_definition", None)
         if isinstance(defn, _Definition):
             # We have to replace the function with the given callable here
@@ -592,7 +586,7 @@ class _Definition:
     def _apply_to_callable(
         fn: Callable,
         *,
-        activity_name: Optional[str],
+        activity_name: str | None,
         no_thread_cancel_exception: bool = False,
     ) -> None:
         # Validate the activity

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import random
 import uuid
+from collections.abc import Mapping
 from contextlib import contextmanager
-from typing import Any, Mapping, Optional, Protocol, Type
+from typing import Any, Optional, Protocol, Type
 
 from agents import CustomSpanData, custom_span, get_current_span, trace
 from agents.tracing import (
@@ -169,7 +170,7 @@ class OpenAIAgentsTracingInterceptor(
 
     def workflow_interceptor_class(
         self, input: temporalio.worker.WorkflowInterceptorClassInput
-    ) -> Type[_ContextPropagationWorkflowInboundInterceptor]:
+    ) -> type[_ContextPropagationWorkflowInboundInterceptor]:
         """Returns the workflow interceptor class to propagate trace context.
 
         Args:
@@ -401,7 +402,7 @@ class _ContextPropagationWorkflowOutboundInterceptor(
         self, input: temporalio.worker.StartActivityInput
     ) -> temporalio.workflow.ActivityHandle:
         trace = get_trace_provider().get_current_trace()
-        span: Optional[Span] = None
+        span: Span | None = None
         if trace:
             span = custom_span(
                 name="temporal:startActivity", data={"activity": input.activity}
@@ -418,7 +419,7 @@ class _ContextPropagationWorkflowOutboundInterceptor(
         self, input: temporalio.worker.StartChildWorkflowInput
     ) -> temporalio.workflow.ChildWorkflowHandle:
         trace = get_trace_provider().get_current_trace()
-        span: Optional[Span] = None
+        span: Span | None = None
         if trace:
             span = custom_span(
                 name="temporal:startChildWorkflow", data={"workflow": input.workflow}
@@ -434,7 +435,7 @@ class _ContextPropagationWorkflowOutboundInterceptor(
         self, input: temporalio.worker.StartLocalActivityInput
     ) -> temporalio.workflow.ActivityHandle:
         trace = get_trace_provider().get_current_trace()
-        span: Optional[Span] = None
+        span: Span | None = None
         if trace:
             span = custom_span(
                 name="temporal:startLocalActivity", data={"activity": input.activity}
