@@ -187,7 +187,7 @@ class Worker:
                 the worker is shut down.
             nexus_task_executor: Executor to use for non-async
                 Nexus operations. This is required if any operation start methods
-                are non-`async def`.
+                are non-``async def``.
 
                 .. warning::
                     This parameter is experimental and unstable.
