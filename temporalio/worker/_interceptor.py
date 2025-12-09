@@ -73,7 +73,7 @@ class Interceptor:
 
         Args:
             next: The underlying inbound this interceptor
-            should delegate to.
+             should delegate to.
 
         Returns:
             The new interceptor that should be used for the Nexus operation.
