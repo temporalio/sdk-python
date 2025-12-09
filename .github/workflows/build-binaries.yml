@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - "releases/*"
+      - build-binaries-install-whl
 
 permissions:
   contents: read
@@ -69,7 +70,7 @@ jobs:
             bindir=Scripts
           fi
           ./.venv/$bindir/pip install pytest pytest_asyncio grpcio pydantic opentelemetry-api opentelemetry-sdk python-dateutil 'openai-agents>=0.2.3,<=0.2.9' 'googleapis-common-protos==1.70.0'
-          ./.venv/$bindir/pip install ../dist/*.whl
+          ./.venv/$bindir/pip install --prefer-binary ../dist/*.whl
           ./.venv/$bindir/python -m pytest -s -k test_workflow_hello
 
       # Upload dist
