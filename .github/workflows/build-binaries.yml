@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - "releases/*"
+      - build-binaries-install-whl
 
 permissions:
   contents: read
@@ -35,7 +36,7 @@ jobs:
           submodules: recursive
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.14"
 
       # Install Rust locally for non-Linux (Linux uses an internal docker
       # command to build with cibuildwheel which uses rustup install defined
@@ -68,8 +69,8 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then
             bindir=Scripts
           fi
-          ./.venv/$bindir/pip install 'protobuf>=3.20,<6' 'types-protobuf>=3.20,<6' 'typing-extensions>=4.2.0,<5' pytest pytest_asyncio grpcio 'nexus-rpc>=1.1.0' pydantic opentelemetry-api opentelemetry-sdk python-dateutil 'openai-agents>=0.2.3,<=0.2.9' 'googleapis-common-protos==1.70.0'
-          ./.venv/$bindir/pip install --no-index --find-links=../dist temporalio
+          ./.venv/$bindir/pip install pytest pytest_asyncio grpcio pydantic opentelemetry-api opentelemetry-sdk python-dateutil 'openai-agents>=0.2.3,<=0.2.9' 'googleapis-common-protos==1.70.0'
+          ./.venv/$bindir/pip install ../dist/*.whl
           ./.venv/$bindir/python -m pytest -s -k test_workflow_hello
 
       # Upload dist
