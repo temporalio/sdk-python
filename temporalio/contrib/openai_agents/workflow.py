@@ -4,9 +4,10 @@ import functools
 import inspect
 import json
 import typing
+from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 from datetime import timedelta
-from typing import Any, Callable, Optional, Type
+from typing import Any, Optional, Type
 
 import nexusrpc
 from agents import (
@@ -35,16 +36,16 @@ if typing.TYPE_CHECKING:
 def activity_as_tool(
     fn: Callable,
     *,
-    task_queue: Optional[str] = None,
-    schedule_to_close_timeout: Optional[timedelta] = None,
-    schedule_to_start_timeout: Optional[timedelta] = None,
-    start_to_close_timeout: Optional[timedelta] = None,
-    heartbeat_timeout: Optional[timedelta] = None,
-    retry_policy: Optional[RetryPolicy] = None,
+    task_queue: str | None = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    retry_policy: RetryPolicy | None = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
-    activity_id: Optional[str] = None,
-    versioning_intent: Optional[VersioningIntent] = None,
-    summary: Optional[str] = None,
+    activity_id: str | None = None,
+    versioning_intent: VersioningIntent | None = None,
+    summary: str | None = None,
     priority: Priority = Priority.default,
     strict_json_schema: bool = True,
 ) -> Tool:
@@ -163,9 +164,9 @@ def activity_as_tool(
 def nexus_operation_as_tool(
     operation: nexusrpc.Operation[Any, Any],
     *,
-    service: Type[Any],
+    service: type[Any],
     endpoint: str,
-    schedule_to_close_timeout: Optional[timedelta] = None,
+    schedule_to_close_timeout: timedelta | None = None,
     strict_json_schema: bool = True,
 ) -> Tool:
     """Convert a Nexus operation into an OpenAI agent tool.
@@ -250,9 +251,9 @@ def nexus_operation_as_tool(
 
 def stateless_mcp_server(
     name: str,
-    config: Optional[ActivityConfig] = None,
+    config: ActivityConfig | None = None,
     cache_tools_list: bool = False,
-    factory_argument: Optional[Any] = None,
+    factory_argument: Any | None = None,
 ) -> "MCPServer":
     """A stateless MCP server implementation for Temporal workflows.
 
@@ -285,9 +286,9 @@ def stateless_mcp_server(
 
 def stateful_mcp_server(
     name: str,
-    config: Optional[ActivityConfig] = None,
-    server_session_config: Optional[ActivityConfig] = None,
-    factory_argument: Optional[Any] = None,
+    config: ActivityConfig | None = None,
+    server_session_config: ActivityConfig | None = None,
+    factory_argument: Any | None = None,
 ) -> AbstractAsyncContextManager["MCPServer"]:
     """A stateful MCP server implementation for Temporal workflows.
 

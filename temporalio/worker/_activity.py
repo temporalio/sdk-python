@@ -14,13 +14,12 @@ import queue
 import threading
 import warnings
 from abc import ABC, abstractmethod
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
-    Callable,
     NoReturn,
     Optional,
     Union,
@@ -54,8 +53,8 @@ class _ActivityWorker:
         bridge_worker: Callable[[], temporalio.bridge.worker.Worker],
         task_queue: str,
         activities: Sequence[Callable],
-        activity_executor: Optional[concurrent.futures.Executor],
-        shared_state_manager: Optional[SharedStateManager],
+        activity_executor: concurrent.futures.Executor | None,
+        shared_state_manager: SharedStateManager | None,
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         metric_meter: temporalio.common.MetricMeter,
@@ -73,15 +72,13 @@ class _ActivityWorker:
         self._encode_headers = encode_headers
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
         # Lazily created on first activity
-        self._worker_shutdown_event: Optional[temporalio.activity._CompositeEvent] = (
-            None
-        )
+        self._worker_shutdown_event: temporalio.activity._CompositeEvent | None = None
         self._seen_sync_activity = False
         self._client = client
 
         # Validate and build activity dict
         self._activities: dict[str, temporalio.activity._Definition] = {}
-        self._dynamic_activity: Optional[temporalio.activity._Definition] = None
+        self._dynamic_activity: temporalio.activity._Definition | None = None
         for activity in activities:
             # Get definition
             defn = temporalio.activity._Definition.must_from_callable(activity)
@@ -246,7 +243,7 @@ class _ActivityWorker:
         task_token: bytes,
     ) -> None:
         # Drain the queue, only taking the last value to actually heartbeat
-        details: Optional[Sequence[Any]] = None
+        details: Sequence[Any] | None = None
         while not activity.pending_heartbeats.empty():
             details = activity.pending_heartbeats.get_nowait()
         if details is None:
@@ -646,15 +643,15 @@ class _ActivityWorker:
 class _RunningActivity:
     pending_heartbeats: asyncio.Queue[Sequence[Any]]
     # Most of these optional values are set before use
-    info: Optional[temporalio.activity.Info] = None
-    task: Optional[asyncio.Task] = None
-    cancelled_event: Optional[temporalio.activity._CompositeEvent] = None
-    last_heartbeat_task: Optional[asyncio.Task] = None
-    cancel_thread_raiser: Optional[_ThreadExceptionRaiser] = None
+    info: temporalio.activity.Info | None = None
+    task: asyncio.Task | None = None
+    cancelled_event: temporalio.activity._CompositeEvent | None = None
+    last_heartbeat_task: asyncio.Task | None = None
+    cancel_thread_raiser: _ThreadExceptionRaiser | None = None
     sync: bool = False
     done: bool = False
     cancelled_by_request: bool = False
-    cancelled_due_to_heartbeat_error: Optional[Exception] = None
+    cancelled_due_to_heartbeat_error: Exception | None = None
     cancellation_details: temporalio.activity._ActivityCancellationDetailsHolder = (
         field(default_factory=temporalio.activity._ActivityCancellationDetailsHolder)
     )
@@ -663,7 +660,7 @@ class _RunningActivity:
         self,
         *,
         cancelled_by_request: bool = False,
-        cancelled_due_to_heartbeat_error: Optional[Exception] = None,
+        cancelled_due_to_heartbeat_error: Exception | None = None,
     ) -> None:
         self.cancelled_by_request = cancelled_by_request
         self.cancelled_due_to_heartbeat_error = cancelled_due_to_heartbeat_error
@@ -684,8 +681,8 @@ class _RunningActivity:
 class _ThreadExceptionRaiser:
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._thread_id: Optional[int] = None
-        self._pending_exception: Optional[type[Exception]] = None
+        self._thread_id: int | None = None
+        self._pending_exception: type[Exception] | None = None
         self._shield_depth = 0
 
     def set_thread_id(self, thread_id: int) -> None:
@@ -771,8 +768,8 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
 
             # For heartbeats, we use the existing heartbeat callable for thread
             # pool executors or a multiprocessing queue for others
-            heartbeat: Union[Callable[..., None], SharedHeartbeatSender] = ctx.heartbeat
-            shared_manager: Optional[SharedStateManager] = None
+            heartbeat: Callable[..., None] | SharedHeartbeatSender = ctx.heartbeat
+            shared_manager: SharedStateManager | None = None
             if not isinstance(input.executor, concurrent.futures.ThreadPoolExecutor):
                 # Should always be present in worker, pre-checked on init
                 shared_manager = self._worker._shared_state_manager
@@ -842,16 +839,16 @@ class _ActivityOutboundImpl(ActivityOutboundInterceptor):
 # This has to be defined at the top-level to be picklable for process executors
 def _execute_sync_activity(
     info: temporalio.activity.Info,
-    heartbeat: Union[Callable[..., None], SharedHeartbeatSender],
+    heartbeat: Callable[..., None] | SharedHeartbeatSender,
     # This is only set for threaded activities
-    cancel_thread_raiser: Optional[_ThreadExceptionRaiser],
+    cancel_thread_raiser: _ThreadExceptionRaiser | None,
     cancelled_event: threading.Event,
     worker_shutdown_event: threading.Event,
-    payload_converter_class_or_instance: Union[
-        type[temporalio.converter.PayloadConverter],
-        temporalio.converter.PayloadConverter,
-    ],
-    runtime_metric_meter: Optional[temporalio.common.MetricMeter],
+    payload_converter_class_or_instance: (
+        type[temporalio.converter.PayloadConverter]
+        | temporalio.converter.PayloadConverter
+    ),
+    runtime_metric_meter: temporalio.common.MetricMeter | None,
     cancellation_details: temporalio.activity._ActivityCancellationDetailsHolder,
     fn: Callable[..., Any],
     *args: Any,
@@ -900,7 +897,7 @@ class SharedStateManager(ABC):
     @staticmethod
     def create_from_multiprocessing(
         mgr: multiprocessing.managers.SyncManager,
-        queue_poller_executor: Optional[concurrent.futures.Executor] = None,
+        queue_poller_executor: concurrent.futures.Executor | None = None,
     ) -> SharedStateManager:
         """Create a shared state manager from a multiprocessing manager.
 
@@ -1056,7 +1053,7 @@ def _proto_to_datetime(
 
 def _proto_to_non_zero_timedelta(
     dur: google.protobuf.duration_pb2.Duration,
-) -> Optional[timedelta]:
+) -> timedelta | None:
     if dur.nanos == 0 and dur.seconds == 0:
         return None
     return dur.ToTimedelta()

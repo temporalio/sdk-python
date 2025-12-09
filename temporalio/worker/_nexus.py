@@ -4,18 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import contextvars
 import json
 import threading
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import (
     Any,
-    Callable,
-    Mapping,
     NoReturn,
-    Optional,
-    Sequence,
-    Type,
-    Union,
+    ParamSpec,
+    TypeVar,
 )
 
 import google.protobuf.json_format
@@ -66,19 +64,25 @@ class _NexusWorker:
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         metric_meter: temporalio.common.MetricMeter,
-        executor: Optional[concurrent.futures.Executor],
+        executor: concurrent.futures.ThreadPoolExecutor | None,
     ) -> None:
         # TODO: make it possible to query task queue of bridge worker instead of passing
         # unused task_queue into _NexusWorker, _ActivityWorker, etc?
         self._bridge_worker = bridge_worker
         self._client = client
         self._task_queue = task_queue
-        self._handler = Handler(service_handlers, executor)
+
+        self._metric_meter = metric_meter
+
+        # If an executor is provided, we wrap the executor with one that will
+        # copy the contextvars.Context to the thread on submit
+        handler_executor = _ContextPropagatingExecutor(executor) if executor else None
+
+        self._handler = Handler(service_handlers, handler_executor)
         self._data_converter = data_converter
         # TODO(nexus-preview): interceptors
         self._interceptors = interceptors
-        # TODO(nexus-preview): metric_meter
-        self._metric_meter = metric_meter
+
         self._running_tasks: dict[bytes, _RunningNexusTask] = {}
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
 
@@ -206,6 +210,7 @@ class _NexusWorker:
             info=lambda: Info(task_queue=self._task_queue),
             nexus_context=ctx,
             client=self._client,
+            _runtime_metric_meter=self._metric_meter,
         ).set()
         try:
             try:
@@ -323,6 +328,7 @@ class _NexusWorker:
             nexus_context=ctx,
             client=self._client,
             info=lambda: Info(task_queue=self._task_queue),
+            _runtime_metric_meter=self._metric_meter,
         ).set()
         input = LazyValue(
             serializer=_DummyPayloadSerializer(
@@ -368,7 +374,7 @@ class _NexusWorker:
 
     async def _nexus_error_to_nexus_failure_proto(
         self,
-        error: Union[nexusrpc.HandlerError, nexusrpc.OperationError],
+        error: nexusrpc.HandlerError | nexusrpc.OperationError,
     ) -> temporalio.api.nexus.v1.Failure:
         """Serialize ``error`` as a Nexus Failure proto.
 
@@ -452,7 +458,7 @@ class _DummyPayloadSerializer:
     async def deserialize(
         self,
         content: nexusrpc.Content,
-        as_type: Optional[Type[Any]] = None,
+        as_type: type[Any] | None = None,
     ) -> Any:
         try:
             [input] = await self.data_converter.decode(
@@ -574,12 +580,12 @@ class _NexusTaskCancellation(nexusrpc.handler.OperationTaskCancellation):
         self._thread_evt = threading.Event()
         self._async_evt = asyncio.Event()
         self._lock = threading.Lock()
-        self._reason: Optional[str] = None
+        self._reason: str | None = None
 
     def is_cancelled(self) -> bool:
         return self._thread_evt.is_set()
 
-    def cancellation_reason(self) -> Optional[str]:
+    def cancellation_reason(self) -> str | None:
         with self._lock:
             return self._reason
 
@@ -597,3 +603,25 @@ class _NexusTaskCancellation(nexusrpc.handler.OperationTaskCancellation):
             self._thread_evt.set()
             self._async_evt.set()
             return True
+
+
+_P = ParamSpec("_P")
+_T = TypeVar("_T")
+
+
+class _ContextPropagatingExecutor(concurrent.futures.Executor):
+    def __init__(self, executor: concurrent.futures.ThreadPoolExecutor) -> None:
+        self._executor = executor
+
+    def submit(
+        self, fn: Callable[_P, _T], /, *args: _P.args, **kwargs: _P.kwargs
+    ) -> concurrent.futures.Future[_T]:
+        ctx = contextvars.copy_context()
+
+        def wrapped(*a: _P.args, **k: _P.kwargs) -> _T:
+            return ctx.run(fn, *a, **k)
+
+        return self._executor.submit(wrapped, *args, **kwargs)
+
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
+        return self._executor.shutdown(wait=wait, cancel_futures=cancel_futures)

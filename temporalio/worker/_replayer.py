@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import logging
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator, Dict, Mapping, Optional, Sequence, Type
+from typing import Dict, Optional, Type
 
 from typing_extensions import TypedDict
 
@@ -36,19 +37,19 @@ class Replayer:
     def __init__(
         self,
         *,
-        workflows: Sequence[Type],
-        workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
+        workflows: Sequence[type],
+        workflow_task_executor: concurrent.futures.ThreadPoolExecutor | None = None,
         workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
         unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
         namespace: str = "ReplayNamespace",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[Interceptor] = [],
         plugins: Sequence[temporalio.worker.Plugin] = [],
-        build_id: Optional[str] = None,
-        identity: Optional[str] = None,
-        workflow_failure_exception_types: Sequence[Type[BaseException]] = [],
+        build_id: str | None = None,
+        identity: str | None = None,
+        workflow_failure_exception_types: Sequence[type[BaseException]] = [],
         debug_mode: bool = False,
-        runtime: Optional[temporalio.runtime.Runtime] = None,
+        runtime: temporalio.runtime.Runtime | None = None,
         disable_safe_workflow_eviction: bool = False,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
     ) -> None:
@@ -155,7 +156,7 @@ class Replayer:
             Aggregated results.
         """
         async with self.workflow_replay_iterator(histories) as replay_iterator:
-            replay_failures: Dict[str, Exception] = {}
+            replay_failures: dict[str, Exception] = {}
             async for result in replay_iterator:
                 if result.replay_failure:
                     if raise_on_replay_failure:
@@ -198,7 +199,7 @@ class Replayer:
         bridge_worker_scope = None
 
         try:
-            last_replay_failure: Optional[Exception]
+            last_replay_failure: Exception | None
             last_replay_complete = asyncio.Event()
 
             # Create eviction hook
@@ -387,18 +388,18 @@ class Replayer:
 class ReplayerConfig(TypedDict, total=False):
     """TypedDict of config originally passed to :py:class:`Replayer`."""
 
-    workflows: Sequence[Type]
-    workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor]
+    workflows: Sequence[type]
+    workflow_task_executor: concurrent.futures.ThreadPoolExecutor | None
     workflow_runner: WorkflowRunner
     unsandboxed_workflow_runner: WorkflowRunner
     namespace: str
     data_converter: temporalio.converter.DataConverter
     interceptors: Sequence[Interceptor]
-    build_id: Optional[str]
-    identity: Optional[str]
-    workflow_failure_exception_types: Sequence[Type[BaseException]]
+    build_id: str | None
+    identity: str | None
+    workflow_failure_exception_types: Sequence[type[BaseException]]
     debug_mode: bool
-    runtime: Optional[temporalio.runtime.Runtime]
+    runtime: temporalio.runtime.Runtime | None
     disable_safe_workflow_eviction: bool
     header_codec_behavior: HeaderCodecBehavior
 
@@ -410,7 +411,7 @@ class WorkflowReplayResult:
     history: temporalio.client.WorkflowHistory
     """History originally passed for this workflow replay."""
 
-    replay_failure: Optional[Exception]
+    replay_failure: Exception | None
     """Failure during replay if any.
 
     This does not mean your workflow exited by raising an error, but rather that

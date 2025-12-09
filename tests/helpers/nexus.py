@@ -1,6 +1,7 @@
 import dataclasses
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional
+from typing import Any, Optional
 from urllib.parse import urlparse
 
 import temporalio.api.failure.v1
@@ -51,7 +52,7 @@ class ServiceClient:
     async def start_operation(
         self,
         operation: str,
-        body: Optional[dict[str, Any]] = None,
+        body: dict[str, Any] | None = None,
         headers: Mapping[str, str] = {},
     ) -> httpx.Response:
         """
@@ -107,10 +108,10 @@ class Failure:
     """
 
     message: str = ""
-    metadata: Optional[dict[str, str]] = None
-    details: Optional[dict[str, Any]] = None
+    metadata: dict[str, str] | None = None
+    details: dict[str, Any] | None = None
 
-    exception_from_details: Optional[BaseException] = dataclasses.field(
+    exception_from_details: BaseException | None = dataclasses.field(
         init=False, default=None
     )
 
@@ -121,7 +122,7 @@ class Failure:
             )
 
     def _instantiate_exception(
-        self, error_type: str, details: Optional[dict[str, Any]]
+        self, error_type: str, details: dict[str, Any] | None
     ) -> BaseException:
         proto = {
             "temporal.api.failure.v1.Failure": temporalio.api.failure.v1.Failure,

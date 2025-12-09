@@ -104,10 +104,9 @@ class MyServiceHandlerWithNonAsyncDefs:
 )
 async def test_async_operation_lifecycle(
     env: WorkflowEnvironment,
-    service_handler_cls: Union[
-        Type[MyServiceHandlerWithAsyncDefs],
-        Type[MyServiceHandlerWithNonAsyncDefs],
-    ],
+    service_handler_cls: (
+        type[MyServiceHandlerWithAsyncDefs] | type[MyServiceHandlerWithNonAsyncDefs]
+    ),
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")

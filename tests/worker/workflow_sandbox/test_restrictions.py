@@ -45,12 +45,12 @@ def test_workflow_sandbox_restrictions_add_passthrough_modules():
 
 @dataclass
 class RestrictableObject:
-    foo: Optional[RestrictableObject] = None
+    foo: RestrictableObject | None = None
     bar: int = 42
     baz: ClassVar[int] = 57
     qux: ClassVar[RestrictableObject]
 
-    some_dict: Optional[Dict] = None
+    some_dict: dict | None = None
 
 
 RestrictableObject.qux = RestrictableObject(foo=RestrictableObject(bar=70), bar=80)

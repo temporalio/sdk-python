@@ -4,9 +4,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Mapping
 from functools import partial
 from pathlib import Path
-from typing import List, Mapping
+from typing import List
 
 base_dir = Path(__file__).parent.parent
 proto_dir = (
@@ -64,7 +65,7 @@ def fix_generated_output(base_path: Path):
     - protoc doesn't generate the correct import paths
         (https://github.com/protocolbuffers/protobuf/issues/1491)
     """
-    imports: Mapping[str, List[str]] = collections.defaultdict(list)
+    imports: Mapping[str, list[str]] = collections.defaultdict(list)
     for p in base_path.iterdir():
         if p.is_dir():
             fix_generated_output(p)
