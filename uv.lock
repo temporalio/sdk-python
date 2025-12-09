@@ -209,6 +209,18 @@ wheels = [
 ]
 
 [[package]]
+name = "basedpyright"
+version = "1.34.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "nodejs-wheel-binaries" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a3/77/ded02ba2b400807b291fa2b9d29ac7f473e86a45d1f5212d8276e9029107/basedpyright-1.34.0.tar.gz", hash = "sha256:7ae3b06f644fac15fdd14a00d0d1f12f92a8205ae1609aabd5a0799b1a68be1d", size = 22803348, upload-time = "2025-11-19T14:48:16.38Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/9e/ced31964ed49f06be6197bd530958b6ddca9a079a8d7ee0ee7429cae9e27/basedpyright-1.34.0-py3-none-any.whl", hash = "sha256:e76015c1ebb671d2c6d7fef8a12bc0f1b9d15d74e17847b7b95a3a66e187c70f", size = 11865958, upload-time = "2025-11-19T14:48:13.724Z" },
+]
+
+[[package]]
 name = "bashlex"
 version = "0.18"
 source = { registry = "https://pypi.org/simple" }
@@ -1813,6 +1825,22 @@ wheels = [
 ]
 
 [[package]]
+name = "nodejs-wheel-binaries"
+version = "24.11.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e4/89/da307731fdbb05a5f640b26de5b8ac0dc463fef059162accfc89e32f73bc/nodejs_wheel_binaries-24.11.1.tar.gz", hash = "sha256:413dfffeadfb91edb4d8256545dea797c237bba9b3faefea973cde92d96bb922", size = 8059, upload-time = "2025-11-18T18:21:58.207Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e4/5f/be5a4112e678143d4c15264d918f9a2dc086905c6426eb44515cf391a958/nodejs_wheel_binaries-24.11.1-py2.py3-none-macosx_13_0_arm64.whl", hash = "sha256:0e14874c3579def458245cdbc3239e37610702b0aa0975c1dc55e2cb80e42102", size = 55114309, upload-time = "2025-11-18T18:21:21.697Z" },
+    { url = "https://files.pythonhosted.org/packages/fa/1c/2e9d6af2ea32b65928c42b3e5baa7a306870711d93c3536cb25fc090a80d/nodejs_wheel_binaries-24.11.1-py2.py3-none-macosx_13_0_x86_64.whl", hash = "sha256:c2741525c9874b69b3e5a6d6c9179a6fe484ea0c3d5e7b7c01121c8e5d78b7e2", size = 55285957, upload-time = "2025-11-18T18:21:27.177Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/79/35696d7ba41b1bd35ef8682f13d46ba38c826c59e58b86b267458eb53d87/nodejs_wheel_binaries-24.11.1-py2.py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:5ef598101b0fb1c2bf643abb76dfbf6f76f1686198ed17ae46009049ee83c546", size = 59645875, upload-time = "2025-11-18T18:21:33.004Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/98/2a9694adee0af72bc602a046b0632a0c89e26586090c558b1c9199b187cc/nodejs_wheel_binaries-24.11.1-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:cde41d5e4705266688a8d8071debf4f8a6fcea264c61292782672ee75a6905f9", size = 60140941, upload-time = "2025-11-18T18:21:37.228Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/d6/573e5e2cba9d934f5f89d0beab00c3315e2e6604eb4df0fcd1d80c5a07a8/nodejs_wheel_binaries-24.11.1-py2.py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:78bc5bb889313b565df8969bb7423849a9c7fc218bf735ff0ce176b56b3e96f0", size = 61644243, upload-time = "2025-11-18T18:21:43.325Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/e6/643234d5e94067df8ce8d7bba10f3804106668f7a1050aeb10fdd226ead4/nodejs_wheel_binaries-24.11.1-py2.py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:c79a7e43869ccecab1cae8183778249cceb14ca2de67b5650b223385682c6239", size = 62225657, upload-time = "2025-11-18T18:21:47.708Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/1c/2fb05127102a80225cab7a75c0e9edf88a0a1b79f912e1e36c7c1aaa8f4e/nodejs_wheel_binaries-24.11.1-py2.py3-none-win_amd64.whl", hash = "sha256:10197b1c9c04d79403501766f76508b0dac101ab34371ef8a46fcf51773497d0", size = 41322308, upload-time = "2025-11-18T18:21:51.347Z" },
+    { url = "https://files.pythonhosted.org/packages/ad/b7/bc0cdbc2cc3a66fcac82c79912e135a0110b37b790a14c477f18e18d90cd/nodejs_wheel_binaries-24.11.1-py2.py3-none-win_arm64.whl", hash = "sha256:376b9ea1c4bc1207878975dfeb604f7aa5668c260c6154dcd2af9d42f7734116", size = 39026497, upload-time = "2025-11-18T18:21:54.634Z" },
+]
+
+[[package]]
 name = "openai"
 version = "1.109.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2993,6 +3021,7 @@ pydantic = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "basedpyright" },
     { name = "cibuildwheel" },
     { name = "googleapis-common-protos" },
     { name = "grpcio-tools" },
@@ -3035,6 +3064,7 @@ provides-extras = ["grpc", "opentelemetry", "pydantic", "openai-agents"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "basedpyright", specifier = "==1.34.0" },
     { name = "cibuildwheel", specifier = ">=2.22.0,<3" },
     { name = "googleapis-common-protos", specifier = "==1.70.0" },
     { name = "grpcio-tools", specifier = ">=1.48.2,<2" },

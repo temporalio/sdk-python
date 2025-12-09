@@ -16,6 +16,10 @@ from temporalio.worker.workflow_sandbox._restrictions import (
     SandboxMatcher,
     _RestrictedProxy,
 )
+from tests.contrib.pydantic.activities import (
+    misc_objects_activity,
+    pydantic_objects_activity,
+)
 from tests.contrib.pydantic.models import (
     PydanticModels,
     PydanticModelWithStrictField,
@@ -35,8 +39,6 @@ from tests.contrib.pydantic.workflows import (
     RoundTripPydanticObjectsWorkflow,
     _test_pydantic_model_with_strict_field,
     clone_objects,
-    misc_objects_activity,
-    pydantic_objects_activity,
 )
 
 

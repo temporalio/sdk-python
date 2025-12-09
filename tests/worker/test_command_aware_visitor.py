@@ -1,7 +1,7 @@
 """Test that CommandAwarePayloadVisitor handles all commands with seq fields that have payloads."""
 
 from collections.abc import Iterator
-from typing import Any, Type
+from typing import Any
 
 from temporalio.bridge._visitor import PayloadVisitor
 from temporalio.bridge.proto.workflow_activation import workflow_activation_pb2
@@ -15,8 +15,6 @@ def test_command_aware_visitor_has_methods_for_all_seq_protos_with_payloads():
     We only override methods when the base class has a visitor method (i.e., there are payloads to visit).
     Commands without payloads don't need overrides since there's nothing to visit.
     """
-    visitor = CommandAwarePayloadVisitor()
-
     # Find all protos with seq
     command_protos = list(_get_workflow_command_protos_with_seq())
     job_protos = list(_get_workflow_activation_job_protos_with_seq())

@@ -20,7 +20,7 @@ from .testmodules import restrictions
 def test_workflow_sandbox_importer_invalid_module():
     with pytest.raises(RestrictedWorkflowAccessError) as err:
         with Importer(restrictions, RestrictionContext()).applied():
-            import tests.worker.workflow_sandbox.testmodules.invalid_module
+            import tests.worker.workflow_sandbox.testmodules.invalid_module  # type:ignore[reportUnusedImport]
     assert (
         err.value.qualified_name
         == "tests.worker.workflow_sandbox.testmodules.invalid_module"
@@ -116,8 +116,8 @@ def test_workflow_sandbox_importer_invalid_module_members():
 
 def test_workflow_sandbox_importer_sys_module():
     # Import outside to make sure this is in sys.modules
-    import tests.worker.workflow_sandbox.testmodules.passthrough_module
-    import tests.worker.workflow_sandbox.testmodules.stateful_module
+    import tests.worker.workflow_sandbox.testmodules.passthrough_module  # type:ignore[reportUnusedImport]
+    import tests.worker.workflow_sandbox.testmodules.stateful_module  # type:ignore[reportUnusedImport]
 
     with Importer(restrictions, RestrictionContext()).applied():
         # Passthrough should be there but not non-passthrough

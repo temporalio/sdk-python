@@ -6,7 +6,6 @@ Nothing in this module should be considered stable. The API may change.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Optional, Union
 
 import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge

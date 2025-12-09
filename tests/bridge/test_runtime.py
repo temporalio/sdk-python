@@ -1,6 +1,5 @@
 from threading import Event, Thread
 from time import sleep
-from typing import Optional
 
 from temporalio.bridge.runtime import Runtime
 

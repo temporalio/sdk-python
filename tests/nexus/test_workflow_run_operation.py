@@ -1,7 +1,7 @@
 import re
 import uuid
 from dataclasses import dataclass
-from typing import Any, Type
+from typing import Any
 
 import nexusrpc
 import pytest

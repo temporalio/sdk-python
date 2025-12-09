@@ -15,7 +15,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from time import sleep
-from typing import Any, List, NoReturn, Optional, Type
+from typing import Any, NoReturn
 
 import pytest
 
@@ -101,7 +101,7 @@ async def test_activity_custom_name(
     shared_state_manager: SharedStateManager,
 ):
     @activity.defn(name="my custom activity name!")
-    async def get_name(name: str) -> str:
+    async def get_name(_name: str) -> str:
         return f"Name: {activity.info().activity_type}"
 
     result = await _execute_workflow_with_activity(
@@ -202,7 +202,7 @@ async def test_activity_info(
     )
 
     assert info
-    assert info.activity_id
+    assert info.activity_id  # type:ignore[reportUnreachable]
     assert info.activity_type == "capture_info"
     assert info.attempt == 1
     assert abs(
@@ -364,7 +364,7 @@ async def test_activity_kwonly_params():
     with pytest.raises(TypeError) as err:
 
         @activity.defn
-        async def say_hello(*, name: str) -> str:
+        async def say_hello(*, name: str) -> str:  # type:ignore[reportUnusedFunction]
             return f"Hello, {name}!"
 
     assert str(err.value).endswith("cannot have keyword-only arguments")
@@ -1045,7 +1045,6 @@ async def test_activity_logging(
 async def test_activity_worker_shutdown(
     client: Client,
     worker: ExternalWorker,
-    shared_state_manager: SharedStateManager,
 ):
     activity_started = asyncio.Event()
 
@@ -1541,11 +1540,11 @@ async def test_activity_dynamic_duplicate(
     shared_state_manager: SharedStateManager,
 ):
     @activity.defn(dynamic=True)
-    async def dyn_activity_1(args: Sequence[RawValue]) -> None:
+    async def dyn_activity_1(_args: Sequence[RawValue]) -> None:
         pass
 
     @activity.defn(dynamic=True)
-    async def dyn_activity_2(args: Sequence[RawValue]) -> None:
+    async def dyn_activity_2(_args: Sequence[RawValue]) -> None:
         pass
 
     with pytest.raises(TypeError) as err:
@@ -1823,7 +1822,7 @@ async def test_activity_reset_history(
             activity.heartbeat()
 
     with pytest.raises(WorkflowFailureError) as e:
-        result = await _execute_workflow_with_activity(
+        await _execute_workflow_with_activity(
             client,
             worker,
             wait_cancel,

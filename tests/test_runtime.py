@@ -4,7 +4,7 @@ import queue
 import re
 import uuid
 from datetime import timedelta
-from typing import List, cast
+from typing import cast
 from urllib.request import urlopen
 
 import pytest
@@ -25,7 +25,6 @@ from tests.helpers import (
     assert_eq_eventually,
     assert_eventually,
     find_free_port,
-    worker_versioning_enabled,
 )
 
 

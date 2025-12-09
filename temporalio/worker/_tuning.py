@@ -6,11 +6,10 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Literal, Optional, Protocol, TypeAlias, Union, runtime_checkable
-
-from typing_extensions import Self
+from typing import Any, Literal, Protocol, TypeAlias, runtime_checkable
 
 import temporalio.bridge.worker
+from temporalio.bridge.worker import BridgeCustomSlotSupplier
 from temporalio.common import WorkerDeploymentVersion
 
 _DEFAULT_RESOURCE_SLOTS_MAX = 500
@@ -131,9 +130,9 @@ class NexusSlotInfo(Protocol):
     operation: str
 
 
-SlotInfo: TypeAlias = Union[
-    WorkflowSlotInfo, ActivitySlotInfo, LocalActivitySlotInfo, NexusSlotInfo
-]
+SlotInfo: TypeAlias = (
+    WorkflowSlotInfo | ActivitySlotInfo | LocalActivitySlotInfo | NexusSlotInfo
+)
 
 
 # WARNING: This must match Rust worker::SlotMarkUsedCtx
@@ -222,9 +221,9 @@ class CustomSlotSupplier(ABC):
         ...
 
 
-SlotSupplier: TypeAlias = Union[
-    FixedSizeSlotSupplier, ResourceBasedSlotSupplier, CustomSlotSupplier
-]
+SlotSupplier: TypeAlias = (
+    FixedSizeSlotSupplier | ResourceBasedSlotSupplier | CustomSlotSupplier
+)
 
 
 class _BridgeSlotSupplierWrapper:
@@ -301,11 +300,9 @@ def _to_bridge_slot_supplier(
             ),
         )
     elif isinstance(slot_supplier, CustomSlotSupplier):
-        return temporalio.bridge.worker.BridgeCustomSlotSupplier(
-            _BridgeSlotSupplierWrapper(slot_supplier)
-        )
+        return BridgeCustomSlotSupplier(_BridgeSlotSupplierWrapper(slot_supplier))
     else:
-        raise TypeError(f"Unknown slot supplier type: {slot_supplier}")
+        raise TypeError(f"Unknown slot supplier type: {slot_supplier}")  # type:ignore[reportUnreachable]
 
 
 class WorkerTuner(ABC):
