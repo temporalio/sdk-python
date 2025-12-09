@@ -1076,7 +1076,7 @@ class WorkerDeploymentVersion:
     @staticmethod
     def from_canonical_string(canonical: str) -> WorkerDeploymentVersion:
         """Parse a version from a canonical string, which must be in the format
-        `<deployment_name>.<build_id>`. Deployment name must not have a `.` in it.
+        `<deployment_name>.<build_id>`. Deployment name must not have a ``.`` in it.
         """
         parts = canonical.split(".", maxsplit=1)
         if len(parts) != 2:

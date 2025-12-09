@@ -333,7 +333,6 @@ class Importer:
                 _trace_depth -= 1
 
     def _maybe_restrict_module(self, mod: types.ModuleType) -> types.ModuleType | None:
-        """Implements :py:meth:`_Environment.maybe_restrict_module`."""
         matcher = self.restrictions.invalid_module_members.child_matcher(
             *mod.__name__.split(".")
         )

@@ -27,7 +27,7 @@ class FixedSizeSlotSupplier:
 
 @dataclass(frozen=True)
 class ResourceBasedTunerConfig:
-    """Options for a :py:class:`ResourceBasedTuner` or a :py:class:`ResourceBasedSlotSupplier`."""
+    """Options for a :py:class:`ResourceBasedSlotSupplier`."""
 
     target_memory_usage: float
     """A value between 0 and 1 that represents the target (system) memory usage. It's not recommended
@@ -62,7 +62,7 @@ class ResourceBasedSlotSupplier:
     slot_config: ResourceBasedSlotConfig
     tuner_config: ResourceBasedTunerConfig
     """Options for the tuner that will be used to adjust the number of slots. When used with a
-    :py:class:`CompositeTuner`, all resource-based slot suppliers must use the same tuner options."""
+    :py:class:`_CompositeTuner`, all resource-based slot suppliers must use the same tuner options."""
 
 
 class SlotPermit:

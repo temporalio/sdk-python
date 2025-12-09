@@ -2325,7 +2325,7 @@ wheels = [
 
 [[package]]
 name = "pydoctor"
-version = "24.11.2"
+version = "25.10.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
@@ -2335,13 +2335,13 @@ dependencies = [
     { name = "lunr" },
     { name = "platformdirs" },
     { name = "requests" },
-    { name = "toml", marker = "python_full_version < '3.11'" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "twisted" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7a/7c/c3491dd1666b9fdede4bddb2ebf9a1bc31ff8e0536ee6572ad5a028e109b/pydoctor-24.11.2.tar.gz", hash = "sha256:d52c13caa17b870da1a245981c15cda88406eb73a863dbe23db3fbc43e3b3fc3", size = 946366, upload-time = "2025-01-08T20:04:41.584Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/26/4b49eab9203a0f6939711f6a62a06c04d6e11fbf01e7b2cd9f9dece97686/pydoctor-25.10.1.tar.gz", hash = "sha256:489ec8b96f1e477df8f1892e2c7990836f32481a633ed13abb5e24a3488c83fb", size = 981473, upload-time = "2025-09-29T22:06:49.712Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f4/c2/016a296de5eb70478c65cc58722f11aedd858bf248431486b0dff479016c/pydoctor-24.11.2-py3-none-any.whl", hash = "sha256:69004e7b4a2b4db6425f1a46869adf7ebcd7c4fd0340515538134a4df181ab82", size = 1584835, upload-time = "2025-01-08T20:04:39.394Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/ae/1ae23968390bfd71678c1cd752e66a9823e2fe45ba34a6740f76e84011ab/pydoctor-25.10.1-py3-none-any.whl", hash = "sha256:2aa85f8d64e11c065d71a2317b82724a58361173d945290509367681665bdc7c", size = 1637603, upload-time = "2025-09-29T22:06:47.349Z" },
 ]
 
 [[package]]
@@ -3076,7 +3076,7 @@ dev = [
     { name = "openai-agents", extras = ["litellm"], marker = "python_full_version < '3.14'", specifier = ">=0.3,<0.4" },
     { name = "psutil", specifier = ">=5.9.3,<6" },
     { name = "pydocstyle", specifier = ">=6.3.0,<7" },
-    { name = "pydoctor", specifier = ">=24.11.1,<25" },
+    { name = "pydoctor", specifier = ">=25.10.1,<26" },
     { name = "pyright", specifier = "==1.1.403" },
     { name = "pytest", specifier = "~=7.4" },
     { name = "pytest-asyncio", specifier = ">=0.21,<0.22" },
