@@ -4,9 +4,6 @@ on:
   schedule:
     # Run at 3 AM PST (11:00 UTC) - offset from existing nightly
     - cron: '00 11 * * *'
-  push:
-    branches:
-      - add-nightly-throughput-stress-workflow
   workflow_dispatch:
     inputs:
       duration:
@@ -24,14 +21,23 @@ on:
         required: false
         default: 360
         type: number
+      is_experiment:
+        description: 'Mark this run as an experiment (excluded from nightly dashboards)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   # Workflow configuration
   TEST_DURATION: ${{ inputs.duration || vars.NIGHTLY_TEST_DURATION || '5h' }}
   TEST_TIMEOUT: ${{ inputs.timeout || vars.NIGHTLY_TEST_TIMEOUT || '5h30m' }}
+
+  # AWS S3 metrics upload ARN
+  AWS_S3_METRICS_UPLOAD_ROLE_ARN: ${{ vars.AWS_S3_METRICS_UPLOAD_ROLE_ARN }}
 
   # Logging and artifacts
   WORKER_LOG_DIR: /tmp/throughput-stress-logs
@@ -40,6 +46,12 @@ env:
   OMES_REPO: temporalio/omes
   OMES_REF: main
   RUN_ID: ${{ github.run_id }}-throughput-stress
+
+  # Prometheus version
+  PROM_VERSION: "3.8.0"
+
+  # Language
+  SDK_LANG: "python"
 
 jobs:
   throughput-stress:
@@ -107,6 +119,13 @@ jobs:
       - name: Install Temporal CLI
         uses: temporalio/setup-temporal@v0
 
+      - name: Install Prometheus
+        run: |
+          wget -q https://github.com/prometheus/prometheus/releases/download/v${PROM_VERSION}/prometheus-${PROM_VERSION}.linux-amd64.tar.gz
+          tar xzf prometheus-${PROM_VERSION}.linux-amd64.tar.gz
+          sudo mv prometheus-${PROM_VERSION}.linux-amd64/prometheus /usr/local/bin/
+          prometheus --version
+
       - name: Setup log directory
         run: mkdir -p $WORKER_LOG_DIR
 
@@ -133,18 +152,43 @@ jobs:
           # to give CI a bit more time for visibility consistency
           go run ./cmd run-scenario-with-worker \
             --scenario throughput_stress \
-            --language python \
+            --language $SDK_LANG \
             --version $(pwd)/.. \
             --run-id $RUN_ID \
             --duration $TEST_DURATION \
             --timeout $TEST_TIMEOUT \
             --max-concurrent 10 \
+            --prom-listen-address 127.0.0.1:9091 \
+            --worker-prom-listen-address 127.0.0.1:9092 \
+            --prom-instance-addr 127.0.0.1:9090 \
+            --prom-instance-config \
+            --prom-export-worker-metrics $RUN_ID.parquet \
             --option internal-iterations=10 \
             --option continue-as-new-after-iterations=3 \
             --option sleep-time=1s \
             --option visibility-count-timeout=5m \
             --option min-throughput-per-hour=1000 \
             2>&1 | tee $WORKER_LOG_DIR/scenario.log
+
+      - name: Configure AWS credentials
+        if: always()
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_S3_METRICS_UPLOAD_ROLE_ARN }}
+          aws-region: us-west-2
+  
+      - name: Upload metrics to S3
+        if: always()
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          IS_EXPERIMENT="false"
+          # Set as an experiment if we are not on the main branch or input as an experiment
+          if [[ "$GH_REF" != "refs/heads/main" || "$IS_EXPERIMENT_INPUT" == "true" ]]; then
+            IS_EXPERIMENT="true"
+          fi
+          echo "Uploading metrics: is_experiment=$IS_EXPERIMENT, language=$SDK_LANG, date=$DATE"
+          aws s3 cp omes/$RUN_ID.parquet \
+            "s3://cloud-data-ingest-prod/github/sdk_load_test/is_experiment=$IS_EXPERIMENT/language=$SDK_LANG/date=$DATE/$RUN_ID.parquet"
 
       - name: Upload logs on failure
         if: failure() || cancelled()
