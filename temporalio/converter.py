@@ -1692,6 +1692,11 @@ def value_to_type(
     origin = getattr(hint, "__origin__", hint)
     type_args: tuple = getattr(hint, "__args__", ())
 
+    # using Dict[None,...] produces the type args (NoneType,...)
+    # using dict[None,...] produces the type args (None,...)
+    # Ensure we're always using NoneType over None
+    type_args = tuple(type(t) if t is None else t for t in type_args)
+
     # Literal
     if origin is Literal or origin is typing_extensions.Literal:
         if value not in type_args:
