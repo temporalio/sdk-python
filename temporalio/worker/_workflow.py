@@ -61,12 +61,10 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         debug_mode: bool,
         disable_eager_activity_execution: bool,
         metric_meter: temporalio.common.MetricMeter,
-        on_eviction_hook: None
-        | (
-            Callable[
-                [str, temporalio.bridge.proto.workflow_activation.RemoveFromCache], None
-            ]
-        ),
+        on_eviction_hook: Callable[
+            [str, temporalio.bridge.proto.workflow_activation.RemoveFromCache], None
+        ]
+        | None,
         disable_safe_eviction: bool,
         should_enforce_versioning_behavior: bool,
         assert_local_activity_valid: Callable[[str], None],

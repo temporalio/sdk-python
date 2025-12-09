@@ -23,11 +23,6 @@ from dataclasses import dataclass
 from typing import (
     Any,
     ClassVar,
-    Dict,
-    Optional,
-    Set,
-    Tuple,
-    Type,
     TypeVar,
     cast,
 )
@@ -38,7 +33,7 @@ try:
 
     HAVE_PYDANTIC = True
 except ImportError:
-    HAVE_PYDANTIC = False
+    HAVE_PYDANTIC = False  # type: ignore[reportConstantRedefinition]
 
 import temporalio.exceptions
 import temporalio.workflow
@@ -873,7 +868,7 @@ class _RestrictedProxyLookup:
         if hasattr(access_func, "__get__"):
             # A Python function, can be turned into a bound method.
 
-            def _bind_func(instance: _RestrictedProxy, obj: Any) -> Callable:
+            def _bind_func(_instance: _RestrictedProxy, obj: Any) -> Callable:
                 return access_func.__get__(obj, type(obj))  # type: ignore
 
             bind_func = _bind_func
@@ -881,7 +876,7 @@ class _RestrictedProxyLookup:
         elif access_func is not None:
             # A C function, use partial to bind the first argument.
 
-            def _bind_func(instance: _RestrictedProxy, obj: Any) -> Callable:
+            def _bind_func(_instance: _RestrictedProxy, obj: Any) -> Callable:
                 return functools.partial(access_func, obj)  # type: ignore
 
             bind_func = _bind_func
@@ -896,12 +891,12 @@ class _RestrictedProxyLookup:
         self.is_attr = is_attr
 
     def __set_name__(self, owner: _RestrictedProxy, name: str) -> None:
-        self.name = name
+        self.name = name  # type: ignore[reportUninitializedInstanceVariable]
 
     def __get__(self, instance: _RestrictedProxy, owner: type | None = None) -> Any:
-        if instance is None:
-            if self.class_value is not None:
-                return self.class_value
+        if instance is None:  # type: ignore[reportUninitializedInstanceVariable]
+            if self.class_value is not None:  # type: ignore[reportUnreachable]
+                return self.class_value  # type: ignore[reportUnreachable]
 
             return self
 
@@ -989,7 +984,7 @@ def _is_restrictable(v: Any) -> bool:
 
 
 class _RestrictedProxy:
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         # When we instantiate this class, we have the signature of:
         #   __init__(
         #       self,
@@ -1037,7 +1032,7 @@ class _RestrictedProxy:
         state.assert_child_not_restricted(__name)
         setattr(state.obj, __name, __value)
 
-    def __call__(self, *args, **kwargs) -> _RestrictedProxy:
+    def __call__(self, *args: Any, **kwargs: Any) -> _RestrictedProxy:
         state = _RestrictionState.from_proxy(self)
         _trace("__call__ on %s", state.name)
         state.assert_child_not_restricted("__call__")

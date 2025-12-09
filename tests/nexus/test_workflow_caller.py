@@ -1423,7 +1423,7 @@ async def test_workflow_run_operation_overloads(
 class CustomMetricsService:
     @nexusrpc.handler.sync_operation
     async def custom_metric_op(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: None
+        self, _ctx: nexusrpc.handler.StartOperationContext, _input: None
     ) -> None:
         counter = nexus.metric_meter().create_counter(
             "my-operation-counter", "my-operation-description", "my-operation-unit"
@@ -1433,7 +1433,7 @@ class CustomMetricsService:
 
     @nexusrpc.handler.sync_operation
     def custom_metric_op_executor(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: None
+        self, _ctx: nexusrpc.handler.StartOperationContext, _input: None
     ) -> None:
         counter = nexus.metric_meter().create_counter(
             "my-executor-operation-counter",
