@@ -18,12 +18,16 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Concatenate,
-    Optional,
-    Union,
+    Generic,
+    TypeVar,
     overload,
 )
 
-from nexusrpc.handler import CancelOperationContext, StartOperationContext
+from nexusrpc.handler import (
+    CancelOperationContext,
+    OperationContext,
+    StartOperationContext,
+)
 
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
@@ -97,6 +101,11 @@ def client() -> temporalio.client.Client:
     return _temporal_context().client
 
 
+def metric_meter() -> temporalio.common.MetricMeter:
+    """Get the metric meter for the current Nexus operation."""
+    return _temporal_context().metric_meter
+
+
 def _temporal_context() -> (
     _TemporalStartOperationContext | _TemporalCancelOperationContext
 ):
@@ -129,18 +138,39 @@ def _in_nexus_backing_workflow_start_context() -> bool:
     return _temporal_nexus_backing_workflow_start_context.get(False)
 
 
-@dataclass
-class _TemporalStartOperationContext:
-    """Context for a Nexus start operation being handled by a Temporal Nexus Worker."""
+_OperationCtxT = TypeVar("_OperationCtxT", bound=OperationContext)
 
-    nexus_context: StartOperationContext
-    """Nexus-specific start operation context."""
+
+@dataclass(kw_only=True)
+class _TemporalOperationCtx(Generic[_OperationCtxT]):
+    client: temporalio.client.Client
+    """The Temporal client in use by the worker handling the current Nexus operation."""
 
     info: Callable[[], Info]
     """Temporal information about the running Nexus operation."""
 
-    client: temporalio.client.Client
-    """The Temporal client in use by the worker handling this Nexus operation."""
+    nexus_context: _OperationCtxT
+    """Nexus-specific start operation context."""
+
+    _runtime_metric_meter: temporalio.common.MetricMeter
+    _metric_meter: temporalio.common.MetricMeter | None = None
+
+    @property
+    def metric_meter(self) -> temporalio.common.MetricMeter:
+        if not self._metric_meter:
+            self._metric_meter = self._runtime_metric_meter.with_additional_attributes(
+                {
+                    "nexus_service": self.nexus_context.service,
+                    "nexus_operation": self.nexus_context.operation,
+                    "task_queue": self.info().task_queue,
+                }
+            )
+        return self._metric_meter
+
+
+@dataclass
+class _TemporalStartOperationContext(_TemporalOperationCtx[StartOperationContext]):
+    """Context for a Nexus start operation being handled by a Temporal Nexus Worker."""
 
     @classmethod
     def get(cls) -> _TemporalStartOperationContext:
@@ -226,6 +256,11 @@ class WorkflowRunOperationContext(StartOperationContext):
         return cls(
             **{f.name: getattr(ctx, f.name) for f in dataclasses.fields(ctx)},
         )
+
+    @property
+    def metric_meter(self) -> temporalio.common.MetricMeter:
+        """The metric meter"""
+        return self._temporal_context.metric_meter
 
     # Overload for no-param workflow
     @overload
@@ -480,18 +515,9 @@ class NexusCallback:
     """Header to attach to callback request."""
 
 
-@dataclass(frozen=True)
-class _TemporalCancelOperationContext:
+@dataclass
+class _TemporalCancelOperationContext(_TemporalOperationCtx[CancelOperationContext]):
     """Context for a Nexus cancel operation being handled by a Temporal Nexus Worker."""
-
-    nexus_context: CancelOperationContext
-    """Nexus-specific cancel operation context."""
-
-    info: Callable[[], Info]
-    """Temporal information about the running Nexus cancel operation."""
-
-    client: temporalio.client.Client
-    """The Temporal client in use by the worker handling the current Nexus operation."""
 
     @classmethod
     def get(cls) -> _TemporalCancelOperationContext:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import contextvars
 import json
 import threading
 from collections.abc import Callable, Mapping, Sequence
@@ -12,9 +13,8 @@ from functools import reduce
 from typing import (
     Any,
     NoReturn,
-    Optional,
-    Type,
-    Union,
+    ParamSpec,
+    TypeVar,
     cast,
 )
 
@@ -71,7 +71,7 @@ class _NexusWorker:
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         metric_meter: temporalio.common.MetricMeter,
-        executor: concurrent.futures.Executor | None,
+        executor: concurrent.futures.ThreadPoolExecutor | None,
     ) -> None:
         # TODO: make it possible to query task queue of bridge worker instead of passing
         # unused task_queue into _NexusWorker, _ActivityWorker, etc?
@@ -79,12 +79,20 @@ class _NexusWorker:
         self._client = client
         self._task_queue = task_queue
 
+        self._metric_meter = metric_meter
         middleware = _NexusMiddlewareForInterceptors(interceptors)
 
-        self._handler = Handler(service_handlers, executor, middleware=[middleware])
+        # If an executor is provided, we wrap the executor with one that will
+        # copy the contextvars.Context to the thread on submit
+        handler_executor = _ContextPropagatingExecutor(executor) if executor else None
+        self._handler = Handler(
+            service_handlers, handler_executor, middleware=[middleware]
+        )
+
         self._data_converter = data_converter
-        # TODO(nexus-preview): metric_meter
-        self._metric_meter = metric_meter
+        # TODO(nexus-preview): interceptors
+        self._interceptors = interceptors
+
         self._running_tasks: dict[bytes, _RunningNexusTask] = {}
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
 
@@ -212,6 +220,7 @@ class _NexusWorker:
             info=lambda: Info(task_queue=self._task_queue),
             nexus_context=ctx,
             client=self._client,
+            _runtime_metric_meter=self._metric_meter,
         ).set()
         try:
             try:
@@ -329,6 +338,7 @@ class _NexusWorker:
             nexus_context=ctx,
             client=self._client,
             info=lambda: Info(task_queue=self._task_queue),
+            _runtime_metric_meter=self._metric_meter,
         ).set()
         input = LazyValue(
             serializer=_DummyPayloadSerializer(
@@ -630,7 +640,7 @@ class _NexusOperationHandlerForInterceptor(
 
 
 class _NexusOperationInboundInterceptorImpl(NexusOperationInboundInterceptor):
-    def __init__(self, handler: nexusrpc.handler.MiddlewareSafeOperationHandler):
+    def __init__(self, handler: nexusrpc.handler.MiddlewareSafeOperationHandler):  # pyright: ignore[reportMissingSuperCall]
         self._handler = handler
 
     async def execute_nexus_operation_start(
@@ -666,3 +676,25 @@ class _NexusMiddlewareForInterceptors(nexusrpc.handler.OperationHandlerMiddlewar
         )
 
         return _NexusOperationHandlerForInterceptor(inbound)
+
+
+_P = ParamSpec("_P")
+_T = TypeVar("_T")
+
+
+class _ContextPropagatingExecutor(concurrent.futures.Executor):
+    def __init__(self, executor: concurrent.futures.ThreadPoolExecutor) -> None:
+        self._executor = executor
+
+    def submit(
+        self, fn: Callable[_P, _T], /, *args: _P.args, **kwargs: _P.kwargs
+    ) -> concurrent.futures.Future[_T]:
+        ctx = contextvars.copy_context()
+
+        def wrapped(*a: _P.args, **k: _P.kwargs) -> _T:
+            return ctx.run(fn, *a, **k)
+
+        return self._executor.submit(wrapped, *args, **kwargs)
+
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
+        return self._executor.shutdown(wait=wait, cancel_futures=cancel_futures)
