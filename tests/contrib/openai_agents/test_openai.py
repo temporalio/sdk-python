@@ -72,6 +72,7 @@ from openai.types.responses import (
     ResponseInputTextParam,
     ResponseOutputMessage,
     ResponseOutputText,
+    ResponseTextDeltaEvent,
 )
 from openai.types.responses.response_file_search_tool_call import Result
 from openai.types.responses.response_function_web_search import ActionSearch
@@ -101,6 +102,7 @@ from temporalio.contrib.openai_agents._temporal_model_stub import (
 )
 from temporalio.contrib.openai_agents.testing import (
     AgentEnvironment,
+    EventBuilders,
     ResponseBuilders,
     TestModel,
     TestModelProvider,
@@ -2635,3 +2637,57 @@ async def test_split_workers(client: Client):
                 execution_timeout=timedelta(seconds=120),
             )
             assert result == "test"
+
+
+@workflow.defn
+class StreamingHelloWorldAgent:
+    @workflow.run
+    async def run(self, prompt: str) -> str | None:
+        agent = Agent[None](
+            name="Assistant",
+            instructions="You are a helpful assistant.",
+        )
+
+        result = None
+        for _ in range(2):
+            result = Runner.run_streamed(starting_agent=agent, input=prompt)
+            async for event in result.stream_events():
+                if event.type == "raw_response_event" and isinstance(
+                    event.data, ResponseTextDeltaEvent
+                ):
+                    print(event.data.delta, end="", flush=True)
+
+        return result.final_output if result else None
+
+
+def streaming_hello_model():
+    return TestModel.streaming_events_with_ending(
+        [
+            EventBuilders.text_delta("Hello"),
+            EventBuilders.text_delta(" there"),
+            EventBuilders.text_delta("!"),
+        ]
+    )
+
+
+async def test_streaming(client: Client):
+    async with AgentEnvironment(
+        model=streaming_hello_model(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as env:
+        client = env.applied_on_client(client)
+
+        async with new_worker(
+            client, StreamingHelloWorldAgent, max_cached_workflows=0
+        ) as worker:
+            handle = await client.start_workflow(
+                StreamingHelloWorldAgent.run,
+                "Say hello.",
+                id=f"hello-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=50),
+            )
+            result = await handle.result()
+            assert result == "Hello there!"
