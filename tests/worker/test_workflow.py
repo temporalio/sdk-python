@@ -152,6 +152,7 @@ from tests.helpers.external_stack_trace import (
     ExternalStackTraceWorkflow,
     external_wait_cancel,
 )
+from tests.helpers.metrics import PromMetricMatcher
 
 
 @workflow.defn
@@ -3999,33 +4000,13 @@ async def test_workflow_custom_metrics(client: Client):
             prom_str: str = f.read().decode("utf-8")
             prom_lines = prom_str.splitlines()
 
-        # Intentionally naive metric checker
-        def matches_metric_line(
-            line: str, name: str, at_least_labels: Mapping[str, str], value: int
-        ) -> bool:
-            # Must have metric name
-            if not line.startswith(name + "{"):
-                return False
-            # Must have labels (don't escape for this test)
-            for k, v in at_least_labels.items():
-                if f'{k}="{v}"' not in line:
-                    return False
-            return line.endswith(f" {value}")
-
-        def assert_metric_exists(
-            name: str, at_least_labels: Mapping[str, str], value: int
-        ) -> None:
-            assert any(
-                matches_metric_line(line, name, at_least_labels, value)
-                for line in prom_lines
-            )
-
-        def assert_description_exists(name: str, description: str) -> None:
-            assert f"# HELP {name} {description}" in prom_lines
+        prom_matcher = PromMetricMatcher(prom_lines)
 
         # Check some metrics are as we expect
-        assert_description_exists("my_runtime_gauge", "my-runtime-description")
-        assert_metric_exists(
+        prom_matcher.assert_description_exists(
+            "my_runtime_gauge", "my-runtime-description"
+        )
+        prom_matcher.assert_metric_exists(
             "my_runtime_gauge",
             {
                 "my_runtime_extra_attr1": "val1",
@@ -4035,9 +4016,11 @@ async def test_workflow_custom_metrics(client: Client):
             },
             90,
         )
-        assert_description_exists("my_workflow_histogram", "my-workflow-description")
-        assert_metric_exists("my_workflow_histogram_sum", {}, 56)
-        assert_metric_exists(
+        prom_matcher.assert_description_exists(
+            "my_workflow_histogram", "my-workflow-description"
+        )
+        prom_matcher.assert_metric_exists("my_workflow_histogram_sum", {}, 56)
+        prom_matcher.assert_metric_exists(
             "my_workflow_histogram_sum",
             {
                 "my_workflow_extra_attr": "1234",
@@ -4048,9 +4031,11 @@ async def test_workflow_custom_metrics(client: Client):
             },
             78,
         )
-        assert_description_exists("my_activity_counter", "my-activity-description")
-        assert_metric_exists("my_activity_counter", {}, 12)
-        assert_metric_exists(
+        prom_matcher.assert_description_exists(
+            "my_activity_counter", "my-activity-description"
+        )
+        prom_matcher.assert_metric_exists("my_activity_counter", {}, 12)
+        prom_matcher.assert_metric_exists(
             "my_activity_counter",
             {
                 "my_activity_extra_attr": "12.34",
@@ -4062,7 +4047,7 @@ async def test_workflow_custom_metrics(client: Client):
             34,
         )
         # Also check Temporal metric got its prefix
-        assert_metric_exists(
+        prom_matcher.assert_metric_exists(
             "foo_workflow_completed", {"workflow_type": "CustomMetricsWorkflow"}, 1
         )
 
