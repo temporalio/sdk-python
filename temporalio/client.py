@@ -1335,8 +1335,6 @@ class Client:
         | (
             temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
         ) = None,
-        static_summary: str | None = None,
-        static_details: str | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ScheduleHandle:
@@ -1355,12 +1353,6 @@ class Client:
                 attributes for a scheduled workflow are part of the scheduled
                 action. The dictionary form of this is DEPRECATED, use
                 :py:class:`temporalio.common.TypedSearchAttributes`.
-            static_summary: A single-line fixed summary for this workflow execution that may appear
-                in the UI/CLI. This can be in single-line Temporal markdown format.
-            static_details: General fixed details for this workflow execution that may appear in
-                UI/CLI. This can be in Temporal markdown format and can span multiple lines. This is
-                a fixed value on the workflow that cannot be updated. For details that can be
-                updated, use :py:meth:`temporalio.workflow.get_current_details` within the workflow.
             rpc_metadata: Headers used on the RPC call. Keys here override
                 client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
@@ -3419,7 +3411,7 @@ class WorkflowHistoryEventAsyncIterator:
                     workflow_id=self._input.id,
                     run_id=self._input.run_id or "",
                 ),
-                maximum_page_size=self._input.page_size or 0,
+                maximum_page_size=page_size or self._input.page_size or 0,
                 next_page_token=self._next_page_token or b"",
                 wait_new_event=self._input.wait_new_event,
                 history_event_filter_type=temporalio.api.enums.v1.HistoryEventFilterType.ValueType(
