@@ -230,13 +230,23 @@ class ModelActivity:
                     batch.clear()
                     last_signal_time = asyncio.get_event_loop().time()
 
-            async for event in events:
-                event.model_rebuild()
-                batch.append(event)
+            try:
+                while True:
+                    # If latency has been passed, send the batch
+                    if asyncio.get_event_loop().time() - last_signal_time >= batch_latency:
+                        await send_batch()
+                    try:
+                        event = await asyncio.wait_for(
+                            anext(events), timeout=asyncio.get_event_loop().time() - last_signal_time
+                        )
+                        event.model_rebuild()
+                        batch.append(event)
 
-                current_time = asyncio.get_event_loop().time()
-                if current_time - last_signal_time >= batch_latency:
-                    await send_batch()
+                    # If the wait timed out, the latency has expired so send the batch
+                    except asyncio.TimeoutError:
+                        await send_batch()
+            except StopAsyncIteration:
+                pass
 
             # Send any remaining events in the batch
             if batch:

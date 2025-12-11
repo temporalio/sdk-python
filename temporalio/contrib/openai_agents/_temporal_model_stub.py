@@ -174,7 +174,7 @@ class _TemporalModelStub(Model):
 
         handle = workflow.start_activity_method(
             ModelActivity.stream_model,
-            activity_input,
+            args=[activity_input],
             summary=summary,
             task_queue=self.model_params.task_queue,
             schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
@@ -187,24 +187,23 @@ class _TemporalModelStub(Model):
             priority=self.model_params.priority,
         )
 
-        class SignalIterator(AsyncIterator):
-            def __init__(self):
-                self._monitor_task = asyncio.create_task(self._monitor_activity())
+        async def monitor_activity():
+            try:
+                await handle
+            finally:
+                await stream_queue.put(None)  # Signal end of stream
 
-            async def _monitor_activity(self):
-                try:
-                    await handle
-                finally:
-                    await stream_queue.put(None)  # Signal end of stream
+        monitor_task = asyncio.create_task(monitor_activity())
 
-            async def __anext__(self):
+        async def generator() -> AsyncIterator[TResponseStreamEvent]:
+            while True:
                 item = await stream_queue.get()
                 if item is None:
-                    self._monitor_task.cancel()
-                    raise StopAsyncIteration
-                return item
+                    monitor_task.cancel()
+                    return
+                yield item
 
-        return SignalIterator()
+        return generator()
 
     def _make_summary(
         self, system_instructions: str | None, input: str | list[TResponseInputItem]
