@@ -3112,6 +3112,17 @@ class WorkflowExecutionStatus(IntEnum):
         temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TIMED_OUT
     )
 
+    @property
+    def to_pascal_case(self) -> str:
+        """Convert WorkflowExecutionStatus enum name to Temporal search attribute format.
+
+        Returns:
+            Formatted string for ExecutionStatus search attribute
+        """
+        # Convert "TIMED_OUT" -> "TimedOut", "CONTINUED_AS_NEW" -> "ContinuedAsNew", etc.
+        return "".join(word.capitalize() for word in self.name.split("_"))
+
+
 
 @dataclass
 class WorkflowExecutionCount:
