@@ -4,8 +4,10 @@ import asyncio
 import concurrent.futures
 import multiprocessing
 import multiprocessing.context
+import os
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
+from contextlib import contextmanager
 from datetime import timedelta
 from typing import Any, Optional
 from urllib.request import urlopen
@@ -59,6 +61,7 @@ from temporalio.worker import (
     WorkerTuner,
     WorkflowSlotInfo,
 )
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 from temporalio.workflow import DynamicWorkflowConfig, VersioningIntent
 from tests.helpers import (
     assert_eventually,
@@ -1264,3 +1267,57 @@ class TestForkUseWorker(_TestFork):
             nexus_service_handlers=[],
         )
         self.run(mp_fork_ctx)
+
+
+async def test_worker_debug_mode(client: Client):
+    worker = Worker(
+        client,
+        workflows=[SimpleWorkflow],
+        task_queue=f"task-queue-{uuid.uuid4()}",
+    )
+    assert worker._workflow_worker
+    assert worker._workflow_worker._deadlock_timeout_seconds == 2
+    assert isinstance(worker._workflow_worker._workflow_runner, SandboxedWorkflowRunner)
+    assert (
+        "_pydevd_bundle"
+        not in worker._workflow_worker._workflow_runner.restrictions.passthrough_modules
+    )
+
+    worker = Worker(
+        client,
+        workflows=[SimpleWorkflow],
+        task_queue=f"task-queue-{uuid.uuid4()}",
+        debug_mode=True,
+    )
+    assert worker._workflow_worker
+    assert worker._workflow_worker._deadlock_timeout_seconds is None
+    assert isinstance(worker._workflow_worker._workflow_runner, SandboxedWorkflowRunner)
+    assert (
+        "_pydevd_bundle"
+        in worker._workflow_worker._workflow_runner.restrictions.passthrough_modules
+    )
+
+    @contextmanager
+    def debug_envvar():
+        os.environ["TEMPORAL_DEBUG"] = "true"
+        try:
+            yield
+        finally:
+            os.environ.pop("TEMPORAL_DEBUG")
+
+    with debug_envvar():
+        worker = Worker(
+            client,
+            workflows=[SimpleWorkflow],
+            task_queue=f"task-queue-{uuid.uuid4()}",
+        )
+        assert worker._workflow_worker
+        assert worker._workflow_worker._deadlock_timeout_seconds is None
+        assert isinstance(
+            worker._workflow_worker._workflow_runner,
+            SandboxedWorkflowRunner,
+        )
+        assert (
+            "_pydevd_bundle"
+            in worker._workflow_worker._workflow_runner.restrictions.passthrough_modules
+        )
