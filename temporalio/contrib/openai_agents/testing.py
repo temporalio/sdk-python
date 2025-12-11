@@ -17,9 +17,14 @@ from agents import (
 )
 from agents.items import TResponseOutputItem, TResponseStreamEvent
 from openai.types.responses import (
+    Response,
+    ResponseCompletedEvent,
+    ResponseContentPartDoneEvent,
     ResponseFunctionToolCall,
+    ResponseOutputItemDoneEvent,
     ResponseOutputMessage,
     ResponseOutputText,
+    ResponseTextDeltaEvent,
 )
 
 from temporalio.client import Client
@@ -109,6 +114,87 @@ class ResponseBuilders:
         )
 
 
+class EventBuilders:
+    """Builders for creating stream events for testing.
+
+    .. warning::
+        This API is experimental and may change in the future.
+    """
+
+    @staticmethod
+    def text_delta(text: str) -> ResponseTextDeltaEvent:
+        """Create a TResponseStreamEvent with an text delta.
+
+        .. warning::
+           This API is experimental and may change in the future.
+        """
+        return ResponseTextDeltaEvent(
+            content_index=0,
+            delta=text,
+            item_id="",
+            logprobs=[],
+            output_index=0,
+            sequence_number=0,
+            type="response.output_text.delta",
+        )
+
+    @staticmethod
+    def content_part_done(text: str) -> TResponseStreamEvent:
+        """Create a TResponseStreamEvent for content part completion.
+
+        .. warning::
+           This API is experimental and may change in the future.
+        """
+        return ResponseContentPartDoneEvent(
+            content_index=0,
+            item_id="",
+            output_index=0,
+            sequence_number=0,
+            type="response.content_part.done",
+            part=ResponseOutputText(
+                text=text,
+                annotations=[],
+                type="output_text",
+            ),
+        )
+
+    @staticmethod
+    def output_item_done(text: str) -> TResponseStreamEvent:
+        """Create a TResponseStreamEvent for output item completion.
+
+        .. warning::
+           This API is experimental and may change in the future.
+        """
+        return ResponseOutputItemDoneEvent(
+            output_index=0,
+            sequence_number=0,
+            type="response.output_item.done",
+            item=ResponseBuilders.response_output_message(text),
+        )
+
+    @staticmethod
+    def response_completion(text: str) -> TResponseStreamEvent:
+        """Create a TResponseStreamEvent for response completion.
+
+        .. warning::
+           This API is experimental and may change in the future.
+        """
+        return ResponseCompletedEvent(
+            response=Response(
+                id="",
+                created_at=0.0,
+                object="response",
+                model="",
+                parallel_tool_calls=False,
+                tool_choice="none",
+                tools=[],
+                output=[ResponseBuilders.response_output_message(text)],
+            ),
+            sequence_number=0,
+            type="response.completed",
+        )
+
+
 class TestModelProvider(ModelProvider):
     """Test model provider which simply returns the given module.
 
@@ -144,13 +230,19 @@ class TestModel(Model):
 
     __test__ = False
 
-    def __init__(self, fn: Callable[[], ModelResponse]) -> None:
+    def __init__(
+        self,
+        fn: Callable[[], ModelResponse] | None,
+        *,
+        streaming_fn: Callable[[], AsyncIterator[TResponseStreamEvent]] | None = None,
+    ) -> None:
         """Initialize a test model with a callable.
 
         .. warning::
            This API is experimental and may change in the future.
         """
         self.fn = fn
+        self.streaming_fn = streaming_fn
 
     async def get_response(
         self,
@@ -164,6 +256,8 @@ class TestModel(Model):
         **kwargs,
     ) -> ModelResponse:
         """Get a response from the mocked model, by calling the callable passed to the constructor."""
+        if self.fn is None:
+            raise ValueError("No non-streaming function provided")
         return self.fn()
 
     def stream_response(
@@ -177,8 +271,10 @@ class TestModel(Model):
         tracing: ModelTracing,
         **kwargs,
     ) -> AsyncIterator[TResponseStreamEvent]:
-        """Get a streamed response from the model. Unimplemented."""
-        raise NotImplementedError()
+        """Get a streamed response from the model."""
+        if self.streaming_fn is None:
+            raise ValueError("No streaming function provided")
+        return self.streaming_fn()
 
     @staticmethod
     def returning_responses(responses: list[ModelResponse]) -> "TestModel":
@@ -189,6 +285,42 @@ class TestModel(Model):
         """
         i = iter(responses)
         return TestModel(lambda: next(i))
+
+    @staticmethod
+    def streaming_events(events: list[TResponseStreamEvent]) -> "TestModel":
+        """Create a mock model which sequentially returns responses from a list.
+
+        .. warning::
+           This API is experimental and may change in the future.
+        """
+
+        async def generator():
+            for event in events:
+                yield event
+
+        return TestModel(None, streaming_fn=lambda: generator())
+
+    @staticmethod
+    def streaming_events_with_ending(
+        events: list[ResponseTextDeltaEvent],
+    ) -> "TestModel":
+        """Create a mock model which sequentially returns responses from a list. Appends ending markers
+
+        .. warning::
+           This API is experimental and may change in the future.
+        """
+        content = ""
+        for event in events:
+            content += event.delta
+
+        return TestModel.streaming_events(
+            events
+            + [
+                EventBuilders.content_part_done(content),
+                EventBuilders.output_item_done(content),
+                EventBuilders.response_completion(content),
+            ]
+        )
 
 
 class AgentEnvironment:

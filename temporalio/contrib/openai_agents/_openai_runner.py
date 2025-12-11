@@ -15,7 +15,7 @@ from agents import (
     Tool,
     TResponseInputItem,
 )
-from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
+from agents.run import DEFAULT_AGENT_RUNNER, AgentRunner
 
 from temporalio import workflow
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
@@ -98,66 +98,15 @@ class TemporalOpenAIRunner(AgentRunner):
                 **kwargs,
             )
 
-        tool_types = typing.get_args(Tool)
-        for t in starting_agent.tools:
-            if not isinstance(t, tool_types):
-                raise ValueError(
-                    "Provided tool is not a tool type. If using an activity, make sure to wrap it with openai_agents.workflow.activity_as_tool."
-                )
+        _check_preconditions(starting_agent, **kwargs)
 
-        if starting_agent.mcp_servers:
-            from temporalio.contrib.openai_agents._mcp import (
-                _StatefulMCPServerReference,
-                _StatelessMCPServerReference,
-            )
-
-            for s in starting_agent.mcp_servers:
-                if not isinstance(
-                    s,
-                    (
-                        _StatelessMCPServerReference,
-                        _StatefulMCPServerReference,
-                    ),
-                ):
-                    raise ValueError(
-                        f"Unknown mcp_server type {type(s)} may not work durably."
-                    )
-
-        context = kwargs.get("context")
-        max_turns = kwargs.get("max_turns", DEFAULT_MAX_TURNS)
-        hooks = kwargs.get("hooks")
-        run_config = kwargs.get("run_config")
-        previous_response_id = kwargs.get("previous_response_id")
-        session = kwargs.get("session")
-
-        if isinstance(session, SQLiteSession):
-            raise ValueError("Temporal workflows don't support SQLite sessions.")
-
-        if run_config is None:
-            run_config = RunConfig()
-
-        if run_config.model:
-            if not isinstance(run_config.model, str):
-                raise ValueError(
-                    "Temporal workflows require a model name to be a string in the run config."
-                )
-            run_config = dataclasses.replace(
-                run_config,
-                model=_TemporalModelStub(
-                    run_config.model, model_params=self.model_params, agent=None
-                ),
-            )
+        kwargs["run_config"] = self._process_run_config(kwargs.get("run_config"))
 
         try:
             return await self._runner.run(
                 starting_agent=_convert_agent(self.model_params, starting_agent, None),
                 input=input,
-                context=context,
-                max_turns=max_turns,
-                hooks=hooks,
-                run_config=run_config,
-                previous_response_id=previous_response_id,
-                session=session,
+                **kwargs,
             )
         except AgentsException as e:
             # In order for workflow failures to properly fail the workflow, we need to rewrap them in
@@ -199,7 +148,45 @@ class TemporalOpenAIRunner(AgentRunner):
                 input,
                 **kwargs,
             )
-        raise RuntimeError("Temporal workflows do not support streaming.")
+
+        _check_preconditions(starting_agent, **kwargs)
+
+        kwargs["run_config"] = self._process_run_config(kwargs.get("run_config"))
+
+        try:
+            return self._runner.run_streamed(
+                starting_agent=_convert_agent(self.model_params, starting_agent, None),
+                input=input,
+                **kwargs,
+            )
+        except AgentsException as e:
+            # In order for workflow failures to properly fail the workflow, we need to rewrap them in
+            # a Temporal error
+            if e.__cause__ and workflow.is_failure_exception(e.__cause__):
+                reraise = AgentsWorkflowError(
+                    f"Workflow failure exception in Agents Framework: {e}"
+                )
+                reraise.__traceback__ = e.__traceback__
+                raise reraise from e.__cause__
+            else:
+                raise e
+
+    def _process_run_config(self, run_config: RunConfig | None) -> RunConfig:
+        if run_config is None:
+            run_config = RunConfig()
+
+        if run_config.model:
+            if not isinstance(run_config.model, str):
+                raise ValueError(
+                    "Temporal workflows require a model name to be a string in the run config."
+                )
+            run_config = dataclasses.replace(
+                run_config,
+                model=_TemporalModelStub(
+                    run_config.model, model_params=self.model_params, agent=None
+                ),
+            )
+        return run_config
 
 
 def _model_name(agent: Agent[Any]) -> str | None:
@@ -209,3 +196,34 @@ def _model_name(agent: Agent[Any]) -> str | None:
             "Temporal workflows require a model name to be a string in the agent."
         )
     return name
+
+
+def _check_preconditions(starting_agent: Agent[TContext], **kwargs: Any) -> None:
+    tool_types = typing.get_args(Tool)
+    for t in starting_agent.tools:
+        if not isinstance(t, tool_types):
+            raise ValueError(
+                "Provided tool is not a tool type. If using an activity, make sure to wrap it with openai_agents.workflow.activity_as_tool."
+            )
+
+    if starting_agent.mcp_servers:
+        from temporalio.contrib.openai_agents._mcp import (
+            _StatefulMCPServerReference,
+            _StatelessMCPServerReference,
+        )
+
+        for s in starting_agent.mcp_servers:
+            if not isinstance(
+                s,
+                (
+                    _StatelessMCPServerReference,
+                    _StatefulMCPServerReference,
+                ),
+            ):
+                raise ValueError(
+                    f"Unknown mcp_server type {type(s)} may not work durably."
+                )
+
+    session = kwargs.get("session")
+    if isinstance(session, SQLiteSession):
+        raise ValueError("Temporal workflows don't support SQLite sessions.")
