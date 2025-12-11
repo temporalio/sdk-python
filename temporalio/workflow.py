@@ -33,7 +33,6 @@ from typing import (
     Generic,
     Literal,
     NoReturn,
-    Type,  # type: ignore[reportDeprecated]
     TypeVar,
     cast,
     overload,
@@ -2519,7 +2518,7 @@ async def execute_activity(
 # Overload for async no-param activity
 @overload
 def start_activity_class(
-    activity: Type[CallableAsyncNoParam[ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableAsyncNoParam[ReturnType]],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -2538,7 +2537,7 @@ def start_activity_class(
 # Overload for sync no-param activity
 @overload
 def start_activity_class(
-    activity: Type[CallableSyncNoParam[ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableSyncNoParam[ReturnType]],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -2557,7 +2556,7 @@ def start_activity_class(
 # Overload for async single-param activity
 @overload
 def start_activity_class(
-    activity: Type[CallableAsyncSingleParam[ParamType, ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
     task_queue: str | None = None,
@@ -2577,7 +2576,7 @@ def start_activity_class(
 # Overload for sync single-param activity
 @overload
 def start_activity_class(
-    activity: Type[CallableSyncSingleParam[ParamType, ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
     task_queue: str | None = None,
@@ -2597,7 +2596,7 @@ def start_activity_class(
 # Overload for async multi-param activity
 @overload
 def start_activity_class(
-    activity: Type[Callable[..., Awaitable[ReturnType]]],  # type: ignore[reportDeprecated]
+    activity: type[Callable[..., Awaitable[ReturnType]]],  # type: ignore[reportOverlappingOverload]
     *,
     args: Sequence[Any],
     task_queue: str | None = None,
@@ -2616,8 +2615,8 @@ def start_activity_class(
 
 # Overload for sync multi-param activity
 @overload
-def start_activity_class(
-    activity: Type[Callable[..., ReturnType]],  # type: ignore[reportDeprecated]
+def start_activity_class(  # type: ignore[reportOverlappingOverload]
+    activity: type[Callable[..., ReturnType]],  # type: ignore[reportOverlappingOverload]
     *,
     args: Sequence[Any],
     task_queue: str | None = None,
@@ -2635,7 +2634,7 @@ def start_activity_class(
 
 
 def start_activity_class(
-    activity: Type[Callable],  # type: ignore[reportDeprecated]
+    activity: type[Callable],  # type: ignore[reportOverlappingOverload]
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
@@ -2676,7 +2675,7 @@ def start_activity_class(
 # Overload for async no-param activity
 @overload
 async def execute_activity_class(
-    activity: Type[CallableAsyncNoParam[ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableAsyncNoParam[ReturnType]],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -2695,7 +2694,7 @@ async def execute_activity_class(
 # Overload for sync no-param activity
 @overload
 async def execute_activity_class(
-    activity: Type[CallableSyncNoParam[ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableSyncNoParam[ReturnType]],
     *,
     task_queue: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
@@ -2714,7 +2713,7 @@ async def execute_activity_class(
 # Overload for async single-param activity
 @overload
 async def execute_activity_class(
-    activity: Type[CallableAsyncSingleParam[ParamType, ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
     task_queue: str | None = None,
@@ -2734,7 +2733,7 @@ async def execute_activity_class(
 # Overload for sync single-param activity
 @overload
 async def execute_activity_class(
-    activity: Type[CallableSyncSingleParam[ParamType, ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
     task_queue: str | None = None,
@@ -2754,7 +2753,7 @@ async def execute_activity_class(
 # Overload for async multi-param activity
 @overload
 async def execute_activity_class(
-    activity: Type[Callable[..., Awaitable[ReturnType]]],  # type: ignore[reportDeprecated]
+    activity: type[Callable[..., Awaitable[ReturnType]]],  # type: ignore[reportOverlappingOverload]
     *,
     args: Sequence[Any],
     task_queue: str | None = None,
@@ -2774,7 +2773,7 @@ async def execute_activity_class(
 # Overload for sync multi-param activity
 @overload
 async def execute_activity_class(
-    activity: Type[Callable[..., ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[Callable[..., ReturnType]],  # type: ignore[reportOverlappingOverload]
     *,
     args: Sequence[Any],
     task_queue: str | None = None,
@@ -2792,7 +2791,7 @@ async def execute_activity_class(
 
 
 async def execute_activity_class(
-    activity: Type[Callable],  # type: ignore[reportDeprecated]
+    activity: type[Callable],  # type: ignore[reportOverlappingOverload]
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
@@ -3499,7 +3498,7 @@ async def execute_local_activity(
 # Overload for async no-param activity
 @overload
 def start_local_activity_class(
-    activity: Type[CallableAsyncNoParam[ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableAsyncNoParam[ReturnType]],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -3514,7 +3513,7 @@ def start_local_activity_class(
 # Overload for sync no-param activity
 @overload
 def start_local_activity_class(
-    activity: Type[CallableSyncNoParam[ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableSyncNoParam[ReturnType]],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -3529,7 +3528,7 @@ def start_local_activity_class(
 # Overload for async single-param activity
 @overload
 def start_local_activity_class(
-    activity: Type[CallableAsyncSingleParam[ParamType, ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
     schedule_to_close_timeout: timedelta | None = None,
@@ -3545,7 +3544,7 @@ def start_local_activity_class(
 # Overload for sync single-param activity
 @overload
 def start_local_activity_class(
-    activity: Type[CallableSyncSingleParam[ParamType, ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
     schedule_to_close_timeout: timedelta | None = None,
@@ -3561,7 +3560,7 @@ def start_local_activity_class(
 # Overload for async multi-param activity
 @overload
 def start_local_activity_class(
-    activity: Type[Callable[..., Awaitable[ReturnType]]],  # type: ignore[reportDeprecated]
+    activity: type[Callable[..., Awaitable[ReturnType]]],  # type: ignore[reportInvalidTypeForm]
     *,
     args: Sequence[Any],
     schedule_to_close_timeout: timedelta | None = None,
@@ -3576,8 +3575,8 @@ def start_local_activity_class(
 
 # Overload for sync multi-param activity
 @overload
-def start_local_activity_class(
-    activity: Type[Callable[..., ReturnType]],  # type: ignore[reportDeprecated]
+def start_local_activity_class(  # type: ignore[reportOverlappingOverload]
+    activity: type[Callable[..., ReturnType]],  # type: ignore[reportInvalidTypeForm]
     *,
     args: Sequence[Any],
     schedule_to_close_timeout: timedelta | None = None,
@@ -3591,7 +3590,7 @@ def start_local_activity_class(
 
 
 def start_local_activity_class(
-    activity: Type[Callable],  # type: ignore[reportDeprecated]
+    activity: type[Callable],  # type: ignore[reportInvalidTypeForm]
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
@@ -3626,7 +3625,7 @@ def start_local_activity_class(
 # Overload for async no-param activity
 @overload
 async def execute_local_activity_class(
-    activity: Type[CallableAsyncNoParam[ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableAsyncNoParam[ReturnType]],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -3642,7 +3641,7 @@ async def execute_local_activity_class(
 # Overload for sync no-param activity
 @overload
 async def execute_local_activity_class(
-    activity: Type[CallableSyncNoParam[ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableSyncNoParam[ReturnType]],
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -3658,7 +3657,7 @@ async def execute_local_activity_class(
 # Overload for async single-param activity
 @overload
 async def execute_local_activity_class(
-    activity: Type[CallableAsyncSingleParam[ParamType, ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
     schedule_to_close_timeout: timedelta | None = None,
@@ -3675,7 +3674,7 @@ async def execute_local_activity_class(
 # Overload for sync single-param activity
 @overload
 async def execute_local_activity_class(
-    activity: Type[CallableSyncSingleParam[ParamType, ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
     arg: ParamType,
     *,
     schedule_to_close_timeout: timedelta | None = None,
@@ -3691,8 +3690,8 @@ async def execute_local_activity_class(
 
 # Overload for async multi-param activity
 @overload
-async def execute_local_activity_class(
-    activity: Type[Callable[..., Awaitable[ReturnType]]],  # type: ignore[reportDeprecated]
+async def execute_local_activity_class(  # type: ignore[reportOverlappingOverload]
+    activity: type[Callable[..., Awaitable[ReturnType]]],  # type: ignore[reportInvalidTypeForm]
     *,
     args: Sequence[Any],
     schedule_to_close_timeout: timedelta | None = None,
@@ -3709,7 +3708,7 @@ async def execute_local_activity_class(
 # Overload for sync multi-param activity
 @overload
 async def execute_local_activity_class(
-    activity: Type[Callable[..., ReturnType]],  # type: ignore[reportDeprecated]
+    activity: type[Callable[..., ReturnType]],  # type: ignore[reportInvalidTypeForm]
     *,
     args: Sequence[Any],
     schedule_to_close_timeout: timedelta | None = None,
@@ -3724,7 +3723,7 @@ async def execute_local_activity_class(
 
 
 async def execute_local_activity_class(
-    activity: Type[Callable],  # type: ignore[reportDeprecated]
+    activity: type[Callable],  # type: ignore[reportInvalidTypeForm]
     arg: Any = temporalio.common._arg_unset,
     *,
     args: Sequence[Any] = [],
