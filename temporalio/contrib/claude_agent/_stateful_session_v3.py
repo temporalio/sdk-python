@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from temporalio import activity, workflow
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import CancelledError
+from temporalio.service import RPCError
 from temporalio.workflow import ActivityConfig, ActivityHandle
 
 from ._session_config import ClaudeSessionConfig
@@ -80,13 +81,23 @@ class _StatefulClaudeSessionReference(AbstractAsyncContextManager):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Exit the context and cancel the session activity."""
+        """Exit the context and wait for session activity to complete.
+
+        The activity should have received END_SESSION from client.close()
+        and should be shutting down gracefully. We wait for it to complete
+        normally before exiting the context.
+        """
         if self._activity_handle:
-            self._activity_handle.cancel()
             try:
+                # Wait for the activity to complete normally after END_SESSION
                 await self._activity_handle
-            except Exception:
-                pass  # Activity cancelled, expected
+            except asyncio.CancelledError:
+                # Only happens if the workflow itself is being cancelled
+                self._activity_handle.cancel()
+                raise
+            except Exception as e:
+                # Log unexpected errors but don't fail the workflow
+                workflow.logger.warning(f"Session activity ended with error: {e}")
 
 
 class StatefulClaudeSessionProvider:
@@ -126,6 +137,8 @@ class StatefulClaudeSessionProvider:
             from claude_agent_sdk import ClaudeSDKClient
 
             client = None
+            # Create shutdown event for coordinating task shutdown
+            shutdown_event = asyncio.Event()
 
             try:
                 logger.info(f"Starting Claude session for workflow: {args.caller_workflow_id}")
@@ -152,6 +165,10 @@ class StatefulClaudeSessionProvider:
                     try:
                         logger.info("Starting to read responses from Claude")
                         async for message in client.receive_messages():
+                            # Check if shutdown has been signaled
+                            if shutdown_event.is_set():
+                                logger.debug("Shutdown event set, stopping response reader")
+                                return
                             # Convert message to dict format for serialization
                             msg_type = type(message).__name__
                             logger.debug(f"Received from Claude: {msg_type}")
@@ -183,15 +200,35 @@ class StatefulClaudeSessionProvider:
                                 # Other message types
                                 response = {"type": msg_type.lower().replace("message", "")}
 
-                            await workflow_handle.signal("receive_claude_message", response)
-                            logger.debug(f"Sent to workflow: {response.get('type')}")
+                            try:
+                                await workflow_handle.signal("receive_claude_message", response)
+                                logger.debug(f"Sent to workflow: {response.get('type')}")
+                            except RPCError as e:
+                                if "workflow execution already completed" in str(e):
+                                    # This is expected - workflow got what it needed and completed
+                                    logger.debug("Workflow has completed, stopping response reader")
+                                    shutdown_event.set()  # Signal all tasks to shutdown
+                                    return
+                                # Re-raise other RPC errors
+                                raise
 
+                    except asyncio.CancelledError:
+                        # Task is being cancelled as part of cleanup
+                        logger.debug("Response reader task cancelled")
+                        return
                     except Exception as e:
                         logger.exception(f"Error reading responses: {e}")
-                        await workflow_handle.signal(
-                            "receive_claude_message",
-                            {"type": "error", "error": str(e)}
-                        )
+                        # Try to notify workflow, but it might be gone
+                        try:
+                            await workflow_handle.signal(
+                                "receive_claude_message",
+                                {"type": "error", "error": str(e)}
+                            )
+                        except RPCError as rpc_err:
+                            if "workflow execution already completed" in str(rpc_err):
+                                logger.debug("Workflow completed before error could be signaled")
+                                return
+                            raise
 
                 response_task = asyncio.create_task(read_responses())
 
@@ -209,7 +246,8 @@ class StatefulClaudeSessionProvider:
 
                         # Check for session end signal
                         if "END_SESSION" in outgoing:
-                            logger.info("Session end requested")
+                            logger.info("Session end requested - completing activity")
+                            shutdown_event.set()  # Signal all tasks to shutdown
                             break
 
                         # Process each message
@@ -249,12 +287,17 @@ class StatefulClaudeSessionProvider:
                     logger.exception(f"Error in session loop: {e}")
                     raise
                 finally:
-                    # Stop the response task
+                    # Clean shutdown of background task
+                    logger.debug("Cleaning up session tasks")
+                    shutdown_event.set()  # Ensure shutdown is signaled
+
+                    # Cancel and wait for response task
                     response_task.cancel()
                     try:
                         await response_task
                     except asyncio.CancelledError:
                         pass
+                    logger.debug("Response task cleanup complete")
 
             except CancelledError:
                 logger.info(f"Session activity cancelled for: {args.caller_workflow_id}")
@@ -263,6 +306,7 @@ class StatefulClaudeSessionProvider:
                 logger.exception(f"Error in session activity: {e}")
                 raise
             finally:
+                # Cancel heartbeat task
                 heartbeat_task.cancel()
                 try:
                     await heartbeat_task
@@ -272,6 +316,9 @@ class StatefulClaudeSessionProvider:
                 # Cleanup Claude resources
                 if client:
                     await client.disconnect()
+                    logger.info("Claude client disconnected")
+
+                logger.info("Session cleanup complete")
 
         return (session_activity,)
 

@@ -39,6 +39,7 @@ import dataclasses
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import asynccontextmanager
 
+from temporalio.contrib.claude_agent._managed_session import ManagedClaudeSession
 from temporalio.contrib.claude_agent._session_config import ClaudeSessionConfig
 from temporalio.contrib.claude_agent._simple_client import SimplifiedClaudeClient
 from temporalio.contrib.claude_agent._stateful_session_v3 import (
@@ -63,6 +64,7 @@ __all__ = [
     "ClaudeAgentPlugin",
     "ClaudeMessageReceiver",
     "ClaudeSessionConfig",
+    "ManagedClaudeSession",
     "SimplifiedClaudeClient",
     "StatefulClaudeSessionProvider",
     "workflow",
