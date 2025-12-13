@@ -60,15 +60,17 @@ class SimplifiedClaudeClient:
         if not self._session_active:
             raise RuntimeError("Session has been closed")
 
-        # Construct the user message in the format expected by Claude
+        # Construct the user message in the format expected by Claude SDK
+        # This matches the format used by ClaudeSDKClient.query()
         user_message = {
             "type": "user",
-            "content": prompt,
+            "message": {"role": "user", "content": prompt},
+            "parent_tool_use_id": None,
+            "session_id": "default"
         }
 
         # Send the message
         msg = json.dumps(user_message) + "\n"
-        print(f"SimplifiedClaudeClient sending: {msg}")
         self._workflow.send_to_claude(msg)
 
         # Wait for and yield responses for this specific query
@@ -83,6 +85,7 @@ class SimplifiedClaudeClient:
                 # Check if we've received the assistant's response
                 if message.get("type") == "assistant":
                     assistant_received = True
+                    # Don't break - yield all messages from this batch
                 elif message.get("type") in ("error", "end"):
                     # Error or end indicates session should close
                     self._session_active = False

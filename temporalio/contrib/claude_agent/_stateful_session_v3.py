@@ -8,7 +8,9 @@ from contextlib import AbstractAsyncContextManager
 from datetime import timedelta
 from typing import Any, Optional
 
+from pydantic import BaseModel
 from temporalio import activity, workflow
+from temporalio.common import RetryPolicy
 from temporalio.exceptions import CancelledError
 from temporalio.workflow import ActivityConfig, ActivityHandle
 
@@ -17,25 +19,12 @@ from ._session_config import ClaudeSessionConfig
 logger = logging.getLogger(__name__)
 
 
-class ClaudeSessionArgs:
+class ClaudeSessionArgs(BaseModel):
     """Arguments for the Claude session activity."""
 
-    def __init__(
-        self,
-        caller_workflow_id: str,
-        caller_run_id: str | None,
-        config: ClaudeSessionConfig,
-    ):
-        """Initialize session arguments.
-
-        Args:
-            caller_workflow_id: ID of the calling workflow
-            caller_run_id: Run ID of the calling workflow
-            config: Configuration for the Claude session
-        """
-        self.caller_workflow_id = caller_workflow_id
-        self.caller_run_id = caller_run_id
-        self.config = config
+    caller_workflow_id: str
+    caller_run_id: str | None
+    config: ClaudeSessionConfig
 
 
 class _StatefulClaudeSessionReference(AbstractAsyncContextManager):
@@ -60,7 +49,7 @@ class _StatefulClaudeSessionReference(AbstractAsyncContextManager):
         self._config = config or ActivityConfig(
             start_to_close_timeout=timedelta(minutes=30),
             heartbeat_timeout=timedelta(minutes=1),
-            retry_policy=workflow.RetryPolicy(maximum_attempts=3),
+            retry_policy=RetryPolicy(maximum_attempts=3),
         )
         self._session_config = session_config
         self._original_config = original_claude_config
@@ -96,7 +85,7 @@ class _StatefulClaudeSessionReference(AbstractAsyncContextManager):
             self._activity_handle.cancel()
             try:
                 await self._activity_handle
-            except workflow.ActivityError:
+            except Exception:
                 pass  # Activity cancelled, expected
 
 
@@ -112,20 +101,16 @@ async def session_activity(args: ClaudeSessionArgs) -> None:
     heartbeat_task = asyncio.create_task(heartbeat_every(30))
 
     # Import Claude SDK components here (outside workflow sandbox)
-    from claude_agent_sdk._internal.query import Query
-    from claude_agent_sdk._internal.transport.subprocess_cli import (
-        SubprocessCLITransport,
-    )
+    from claude_agent_sdk import ClaudeSDKClient
 
-    transport = None
-    query = None
+    client = None
 
     try:
         logger.info(f"Starting Claude session for workflow: {args.caller_workflow_id}")
 
         # Get handle to calling workflow
-        client = activity.client()
-        workflow_handle = client.get_workflow_handle(
+        temporal_client = activity.client()
+        workflow_handle = temporal_client.get_workflow_handle(
             args.caller_workflow_id,
             run_id=args.caller_run_id
         )
@@ -133,10 +118,65 @@ async def session_activity(args: ClaudeSessionArgs) -> None:
         # Convert config to options
         options = args.config.to_claude_options()
 
+        # Create and connect Claude SDK client
+        logger.info("Creating ClaudeSDKClient")
+        client = ClaudeSDKClient(options)
+        await client.connect()
+
+        logger.info("Claude client connected, entering main loop")
+
+        # Start background task to read responses
+        async def read_responses():
+            try:
+                logger.info("Starting to read responses from Claude")
+                async for message in client.receive_messages():
+                    # Convert message to dict format for serialization
+                    msg_type = type(message).__name__
+                    logger.debug(f"Received from Claude: {msg_type}")
+
+                    if msg_type == "SystemMessage":
+                        response = {
+                            "type": "system",
+                            "data": message.data if hasattr(message, "data") else {}
+                        }
+                    elif msg_type == "AssistantMessage":
+                        # Extract text from content blocks
+                        text = ""
+                        for block in message.content:
+                            if hasattr(block, "text"):
+                                text += block.text
+                        response = {
+                            "type": "assistant",
+                            "message": {
+                                "content": [{"type": "text", "text": text}]
+                            }
+                        }
+                    elif msg_type == "ResultMessage":
+                        response = {
+                            "type": "result",
+                            "result": message.result if hasattr(message, "result") else "",
+                            "duration_ms": message.duration_ms if hasattr(message, "duration_ms") else 0
+                        }
+                    else:
+                        # Other message types
+                        response = {"type": msg_type.lower().replace("message", "")}
+
+                    await workflow_handle.signal("receive_claude_message", response)
+                    logger.debug(f"Sent to workflow: {response.get('type')}")
+
+            except Exception as e:
+                logger.exception(f"Error reading responses: {e}")
+                await workflow_handle.signal(
+                    "receive_claude_message",
+                    {"type": "error", "error": str(e)}
+                )
+
+        response_task = asyncio.create_task(read_responses())
+
         # Main session loop - handle multiple queries
         session_active = True
-        while session_active:
-            try:
+        try:
+            while session_active:
                 # Poll workflow for outgoing messages
                 outgoing = await workflow_handle.query("get_outgoing_claude_messages")
 
@@ -150,42 +190,22 @@ async def session_activity(args: ClaudeSessionArgs) -> None:
                     logger.info("Session end requested")
                     break
 
-                # Process each message as a new query
+                # Process each message
                 for msg_str in outgoing:
                     try:
-                        # Parse the message
+                        # Parse the message from SimplifiedClaudeClient
                         message = json.loads(msg_str.strip())
-                        prompt = message.get("content", "")
 
-                        logger.info(f"Processing query: {prompt[:100]}...")
+                        # Extract content from the nested structure
+                        content = ""
+                        if "message" in message and "content" in message["message"]:
+                            content = message["message"]["content"]
 
-                        # Create new transport and query for each turn
-                        transport = SubprocessCLITransport(
-                            prompt=prompt,
-                            options=options,
-                        )
-                        await transport.connect()
+                        logger.info(f"Processing query: {content[:100]}...")
 
-                        query = Query(
-                            transport=transport,
-                            is_streaming_mode=False,
-                            can_use_tool=None,
-                            hooks=None,
-                            sdk_mcp_servers={},
-                        )
-                        await query.start()
-                        await query.initialize()
-
-                        # Read and send responses
-                        async for response in query.receive_messages():
-                            await workflow_handle.signal("receive_claude_message", response)
-                            logger.debug(f"Sent to workflow: {response.get('type')}")
-
-                        # Cleanup after each query
-                        await query.close()
-                        await transport.close()
-                        query = None
-                        transport = None
+                        # Send query to Claude using SDK client
+                        await client.query(content)
+                        logger.info("Query sent successfully")
 
                     except json.JSONDecodeError as e:
                         logger.error(f"Failed to parse message: {msg_str} - {e}")
@@ -200,12 +220,19 @@ async def session_activity(args: ClaudeSessionArgs) -> None:
                             {"type": "error", "error": str(e)}
                         )
 
-            except CancelledError:
-                logger.info("Session cancelled")
-                raise
-            except Exception as e:
-                logger.exception(f"Error in session loop: {e}")
-                raise
+        except CancelledError:
+            logger.info("Session cancelled")
+            raise
+        except Exception as e:
+            logger.exception(f"Error in session loop: {e}")
+            raise
+        finally:
+            # Stop the response task
+            response_task.cancel()
+            try:
+                await response_task
+            except asyncio.CancelledError:
+                pass
 
     except CancelledError:
         logger.info(f"Session activity cancelled for: {args.caller_workflow_id}")
@@ -221,10 +248,8 @@ async def session_activity(args: ClaudeSessionArgs) -> None:
             pass
 
         # Cleanup Claude resources
-        if query:
-            await query.close()
-        if transport:
-            await transport.close()
+        if client:
+            await client.disconnect()
 
 
 class StatefulClaudeSessionProvider:

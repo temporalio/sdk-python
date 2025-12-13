@@ -1,4 +1,4 @@
-"""Test multi-turn conversations with Claude Agent SDK integration."""
+"""Debug test for Claude multi-turn conversations."""
 
 import asyncio
 import logging
@@ -18,66 +18,73 @@ from temporalio.worker import Worker
 
 # Enable debug logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 
 @workflow.defn
-class MultiTurnClaudeWorkflow(ClaudeMessageReceiver):
+class DebugClaudeWorkflow(ClaudeMessageReceiver):
     @workflow.run
     async def run(self) -> str:
         """Workflow that tests multi-turn conversation."""
+        workflow.logger.info("Starting workflow")
+
         # Initialize the message receiver
         self.init_claude_receiver()
         config = ClaudeSessionConfig(
-            system_prompt="You are a helpful assistant. Keep responses brief.",
+            system_prompt="You are a helpful assistant. Keep responses very brief.",
             max_turns=5,
         )
 
-        print("Creating session...")
+        workflow.logger.info("Creating session...")
         async with claude_workflow.claude_session("test-session", config):
-            print("Session created successfully!")
+            workflow.logger.info("Session created successfully!")
 
             # Create simplified client
             client = SimplifiedClaudeClient(self)
+            workflow.logger.info("Client connected")
 
-            print("Client connected")
-
-            # First turn
-            print("Sending first query: What is 2 + 2?")
+            # First query
+            workflow.logger.info("Sending first query")
             result1 = ""
             async for message in client.send_query("What is 2 + 2?"):
-                print(f"Turn 1 - Received: {message.get('type')}")
+                workflow.logger.info(f"Q1: Received {message.get('type')}")
                 if message.get("type") == "assistant":
-                    # Assistant messages have nested structure
+                    # In streaming mode, assistant message has nested structure
                     inner_message = message.get("message", {})
                     content = inner_message.get("content", [])
                     for block in content:
-                        if block.get("type") == "text":
+                        if isinstance(block, dict) and block.get("type") == "text":
                             result1 += block.get("text", "")
 
-            # Second turn - follow-up question
+            workflow.logger.info(f"First query complete: {result1[:50]}")
+
+            # Second query - multi-turn
+            workflow.logger.info("Sending second query")
             result2 = ""
             async for message in client.send_query("Now multiply that by 3"):
-                print(f"Turn 2 - Received: {message.get('type')}")
+                workflow.logger.info(f"Q2: Received {message.get('type')}")
                 if message.get("type") == "assistant":
-                    # Assistant messages have nested structure
+                    # In streaming mode, assistant message has nested structure
                     inner_message = message.get("message", {})
                     content = inner_message.get("content", [])
                     for block in content:
-                        if block.get("type") == "text":
+                        if isinstance(block, dict) and block.get("type") == "text":
                             result2 += block.get("text", "")
 
-            # Close the session properly
+            workflow.logger.info(f"Second query complete: {result2[:50]}")
+
+            # Close client
             await client.close()
 
-            return f"Turn 1: {result1[:100]}\nTurn 2: {result2[:100]}"
+            return f"Q1: {result1[:50]}\nQ2: {result2[:50]}"
 
 
 async def main():
-    print("Starting multi-turn Claude test...")
+    logger.info("Starting debug Claude test...")
 
     # Start Temporal test environment
     async with await WorkflowEnvironment.start_local() as env:
-        print("Test environment started")
+        logger.info("Test environment started")
 
         # Create session provider
         session_provider = StatefulClaudeSessionProvider("test-session")
@@ -90,27 +97,32 @@ async def main():
         config["plugins"] = [plugin]
         client = Client(**config)
 
-        print("Starting worker...")
+        logger.info("Starting worker...")
 
         # Create worker
         async with Worker(
             client,
             task_queue="test-queue",
-            workflows=[MultiTurnClaudeWorkflow],
+            workflows=[DebugClaudeWorkflow],
         ):
-            print("Running workflow...")
+            logger.info("Running workflow...")
 
-            # Run workflow
+            # Run workflow with timeout
             try:
-                result = await client.execute_workflow(
-                    MultiTurnClaudeWorkflow.run,
-                    id="multiturn-claude-workflow",
-                    task_queue="test-queue",
+                result = await asyncio.wait_for(
+                    client.execute_workflow(
+                        DebugClaudeWorkflow.run,
+                        id="debug-claude-workflow",
+                        task_queue="test-queue",
+                    ),
+                    timeout=30.0
                 )
 
-                print(f"Result:\n{result}")
+                logger.info(f"SUCCESS: {result}")
+            except asyncio.TimeoutError:
+                logger.error("TIMEOUT: Workflow execution timed out after 30 seconds")
             except Exception as e:
-                print(f"Error: {e}")
+                logger.error(f"ERROR: {e}")
                 import traceback
                 traceback.print_exc()
 

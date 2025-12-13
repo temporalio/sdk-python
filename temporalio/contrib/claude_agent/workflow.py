@@ -15,7 +15,7 @@ def claude_session(
     name: str,
     config: ClaudeSessionConfig,
     activity_config: ActivityConfig | None = None,
-    session_config: ActivityConfig | None = None,
+    original_claude_config: dict[str, Any] | None = None,
 ) -> AbstractAsyncContextManager[Any]:
     """Create a stateful Claude Agent session for use in Temporal workflows.
 
@@ -72,7 +72,7 @@ def claude_session(
         _StatefulClaudeSessionReference,
     )
 
-    return _StatefulClaudeSessionReference(name, activity_config, session_config, config)
+    return _StatefulClaudeSessionReference(name, activity_config, config, original_claude_config)
 
 
 def create_claude_transport(
