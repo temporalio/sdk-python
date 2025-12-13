@@ -35,40 +35,29 @@ class BasicQueryWorkflow(ClaudeMessageReceiver):
         # Initialize the message receiver
         self.init_claude_receiver()
 
-        from claude_agent_sdk import (
-            AssistantMessage,
-            TextBlock,
-        )
+        from temporalio.contrib.claude_agent import SimplifiedClaudeClient
 
         config = ClaudeSessionConfig(
             system_prompt="You are a helpful assistant. Answer concisely.",
             max_turns=1,
         )
 
-        # Create session and transport
+        # Create session and client
         async with claude_workflow.claude_session("test-session", config):
-            transport = claude_workflow.create_claude_transport("test-session")
+            client = SimplifiedClaudeClient(self)
 
-            # Use transport with query
-            from claude_agent_sdk._internal.client import InternalClient
+            # Send query and collect response
+            result = ""
+            async for message in client.send_query(prompt):
+                if message.get("type") == "assistant":
+                    # Extract text from response
+                    content = message.get("message", {}).get("content", [])
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            result += block.get("text", "")
 
-            client = InternalClient()
-            responses = []
-
-            # Convert config to options for the client
-            options = config.to_claude_options()
-
-            async for message in client.process_query(
-                prompt=prompt,
-                options=options,
-                transport=transport,
-            ):
-                if isinstance(message, AssistantMessage):
-                    for block in message.content:
-                        if isinstance(block, TextBlock):
-                            responses.append(block.text)
-
-            return " ".join(responses)
+            await client.close()
+            return result
 
 
 @pytest.mark.skipif(
@@ -119,10 +108,8 @@ class StreamingConversationWorkflow(ClaudeMessageReceiver):
         """
         # Initialize the message receiver
         self.init_claude_receiver()
-        from claude_agent_sdk import (
-            AssistantMessage,
-            TextBlock,
-        )
+
+        from temporalio.contrib.claude_agent import SimplifiedClaudeClient
 
         config = ClaudeSessionConfig(
             system_prompt="You are a helpful assistant. Answer each question concisely.",
@@ -132,30 +119,22 @@ class StreamingConversationWorkflow(ClaudeMessageReceiver):
         responses = []
 
         async with claude_workflow.claude_session("streaming-session", config):
-            transport = claude_workflow.create_claude_transport("streaming-session")
-
-            from claude_agent_sdk._internal.client import InternalClient
-
-            client = InternalClient()
-
-            # Convert config to options for the client
-            options = config.to_claude_options()
+            client = SimplifiedClaudeClient(self)
 
             # Process each question
             for question in questions:
-                question_responses = []
+                result = ""
+                async for message in client.send_query(question):
+                    if message.get("type") == "assistant":
+                        # Extract text from response
+                        content = message.get("message", {}).get("content", [])
+                        for block in content:
+                            if isinstance(block, dict) and block.get("type") == "text":
+                                result += block.get("text", "")
 
-                async for message in client.process_query(
-                    prompt=question,
-                    options=options,
-                    transport=transport,
-                ):
-                    if isinstance(message, AssistantMessage):
-                        for block in message.content:
-                            if isinstance(block, TextBlock):
-                                question_responses.append(block.text)
+                responses.append(result)
 
-                responses.append(" ".join(question_responses))
+            await client.close()
 
         return responses
 
@@ -215,10 +194,8 @@ class WithOptionsWorkflow(ClaudeMessageReceiver):
         """
         # Initialize the message receiver
         self.init_claude_receiver()
-        from claude_agent_sdk import (
-            AssistantMessage,
-            TextBlock,
-        )
+
+        from temporalio.contrib.claude_agent import SimplifiedClaudeClient
 
         config = ClaudeSessionConfig(
             system_prompt="You are a Python expert. Explain things very simply in one sentence.",
@@ -227,27 +204,20 @@ class WithOptionsWorkflow(ClaudeMessageReceiver):
         )
 
         async with claude_workflow.claude_session("options-session", config):
-            transport = claude_workflow.create_claude_transport("options-session")
+            client = SimplifiedClaudeClient(self)
 
-            from claude_agent_sdk._internal.client import InternalClient
+            # Send query and collect response
+            result = ""
+            async for message in client.send_query(prompt):
+                if message.get("type") == "assistant":
+                    # Extract text from response
+                    content = message.get("message", {}).get("content", [])
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            result += block.get("text", "")
 
-            client = InternalClient()
-            responses = []
-
-            # Convert config to options for the client
-            options = config.to_claude_options()
-
-            async for message in client.process_query(
-                prompt=prompt,
-                options=options,
-                transport=transport,
-            ):
-                if isinstance(message, AssistantMessage):
-                    for block in message.content:
-                        if isinstance(block, TextBlock):
-                            responses.append(block.text)
-
-            return " ".join(responses)
+            await client.close()
+            return result
 
 
 @pytest.mark.skipif(
