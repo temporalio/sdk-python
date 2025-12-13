@@ -277,3 +277,80 @@ async def test_plugin_data_converter(client: Client):
     assert isinstance(
         client.data_converter.payload_converter, ClaudeAgentPayloadConverter
     )
+
+
+@workflow.defn
+class MultiProviderWorkflow(ClaudeMessageReceiver):
+    """Workflow that tests multiple session providers can coexist."""
+
+    @workflow.run
+    async def run(self, session_name: str, prompt: str) -> str:
+        """Run a query using the specified session.
+
+        Args:
+            session_name: Name of the session to use
+            prompt: The question to ask Claude
+
+        Returns:
+            Claude's response text
+        """
+        # Initialize the message receiver
+        self.init_claude_receiver()
+
+        from temporalio.contrib.claude_agent import SimplifiedClaudeClient
+
+        config = ClaudeSessionConfig(
+            system_prompt="You are a helpful assistant. Answer concisely.",
+            max_turns=1,
+        )
+
+        # Create session with the specified name
+        async with claude_workflow.claude_session(session_name, config):
+            client = SimplifiedClaudeClient(self)
+
+            # Send query and collect response
+            result = ""
+            async for message in client.send_query(prompt):
+                if message.get("type") == "assistant":
+                    # Extract text from response
+                    content = message.get("message", {}).get("content", [])
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            result += block.get("text", "")
+
+            await client.close()
+            return result
+
+
+@pytest.mark.skipif(
+    not os.environ.get("ANTHROPIC_API_KEY"),
+    reason="No Anthropic API key available",
+)
+async def test_multiple_providers(client: Client):
+    """Test that multiple session providers can coexist in the same worker."""
+    # Create two providers with different names
+    provider1 = StatefulClaudeSessionProvider("session-alpha")
+    provider2 = StatefulClaudeSessionProvider("session-beta")
+
+    # Create plugin with both providers - this should NOT raise ValueError
+    plugin = ClaudeAgentPlugin(session_providers=[provider1, provider2])
+
+    # Apply plugin to client
+    config = client.config()
+    config["plugins"] = [plugin]
+    client = Client(**config)
+
+    async with new_worker(
+        client, MultiProviderWorkflow, activities=[]
+    ) as worker:
+        # Test using the first session
+        result = await client.execute_workflow(
+            MultiProviderWorkflow.run,
+            args=["session-alpha", "What is 3 + 3? Just give me the number."],
+            id=f"multi-provider-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=60),
+        )
+
+        # Claude should respond with something containing "6"
+        assert "6" in result
