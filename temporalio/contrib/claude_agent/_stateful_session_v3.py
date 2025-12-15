@@ -81,20 +81,21 @@ class _StatefulClaudeSessionReference(AbstractAsyncContextManager):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Exit the context and wait for session activity to complete.
+        """Exit the context and cancel the session activity.
 
-        The activity should have received END_SESSION from client.close()
-        and should be shutting down gracefully. We wait for it to complete
-        normally before exiting the context.
+        Always explicitly cancels the activity to ensure deterministic behavior.
+        This prevents Temporal from auto-cancelling orphaned activities, which
+        would cause nondeterminism errors on replay.
         """
         if self._activity_handle:
+            # Always cancel the activity explicitly
+            self._activity_handle.cancel()
             try:
-                # Wait for the activity to complete normally after END_SESSION
+                # Wait for it to complete
                 await self._activity_handle
             except asyncio.CancelledError:
-                # Only happens if the workflow itself is being cancelled
-                self._activity_handle.cancel()
-                raise
+                # Expected - activity was cancelled
+                pass
             except Exception as e:
                 # Log unexpected errors but don't fail the workflow
                 workflow.logger.warning(f"Session activity ended with error: {e}")
@@ -243,12 +244,6 @@ class StatefulClaudeSessionProvider:
                             # No messages yet, wait briefly
                             await asyncio.sleep(0.1)
                             continue
-
-                        # Check for session end signal
-                        if "END_SESSION" in outgoing:
-                            logger.info("Session end requested - completing activity")
-                            shutdown_event.set()  # Signal all tasks to shutdown
-                            break
 
                         # Process each message
                         for msg_str in outgoing:

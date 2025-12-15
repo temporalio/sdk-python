@@ -107,8 +107,10 @@ class SimplifiedClaudeClient:
     async def close(self) -> None:
         """Close the Claude session.
 
-        This should be called when done with the conversation to clean up resources.
+        Note: This is now a no-op. Session cleanup happens automatically when
+        the workflow exits the context manager, which cancels the activity.
+        This method is kept for backwards compatibility.
         """
-        if self._session_active:
-            self._workflow.send_to_claude("END_SESSION")
-            self._session_active = False
+        # Mark as inactive locally, but don't send END_SESSION
+        # Cleanup happens via activity cancellation in __aexit__
+        self._session_active = False
