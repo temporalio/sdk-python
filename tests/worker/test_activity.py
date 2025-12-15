@@ -37,7 +37,7 @@ from temporalio.exceptions import (
     TimeoutError,
     TimeoutType,
 )
-from temporalio.testing import WorkflowEnvironment
+from temporalio.testing import ActivityEnvironment, WorkflowEnvironment
 from temporalio.worker import (
     ActivityInboundInterceptor,
     ExecuteActivityInput,
@@ -139,33 +139,32 @@ async def test_client_available_in_async_activities(
     assert captured_client is client
 
 
-async def test_client_not_available_in_sync_activities(
+async def test_client_available_in_sync_activities_with_thread_pool(
     client: Client,
     worker: ExternalWorker,
     shared_state_manager: SharedStateManager,
 ):
-    saw_error = False
+    with pytest.raises(RuntimeError, match="Not in activity context"):
+        activity.client()
+
+    captured_client: Client | None = None
 
     @activity.defn
-    def some_activity() -> None:
-        with pytest.raises(
-            RuntimeError, match="The client is only available in `async def`"
-        ):
-            activity.client()
-        nonlocal saw_error
-        saw_error = True
+    async def capture_client() -> None:
+        nonlocal captured_client
+        captured_client = activity.client()
 
     await _execute_workflow_with_activity(
         client,
         worker,
-        some_activity,
+        capture_client,
         worker_config={
             "activity_executor": concurrent.futures.ThreadPoolExecutor(1),
             "max_concurrent_activities": 1,
         },
         shared_state_manager=shared_state_manager,
     )
-    assert saw_error
+    assert captured_client is client
 
 
 async def test_activity_info(

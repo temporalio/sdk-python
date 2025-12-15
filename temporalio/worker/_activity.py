@@ -611,7 +611,7 @@ class _ActivityWorker:
                 ),
                 payload_converter_class_or_instance=data_converter.payload_converter,
                 runtime_metric_meter=None if sync_non_threaded else self._metric_meter,
-                client=self._client if not running_activity.sync else None,
+                client=self._client,
                 cancellation_details=running_activity.cancellation_details,
             )
         )
@@ -786,6 +786,12 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                 else self._worker._data_converter.payload_converter_class
             )
 
+            client = (
+                ctx.client
+                if isinstance(input.executor, concurrent.futures.ThreadPoolExecutor)
+                else None
+            )
+
             try:
                 # Cancel and shutdown event always present here
                 cancelled_event = self._running_activity.cancelled_event
@@ -804,6 +810,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                     payload_converter_class_or_instance,
                     ctx.runtime_metric_meter,
                     cancellation_details,
+                    client,
                     input.fn,
                     *input.args,
                 ]
@@ -850,6 +857,7 @@ def _execute_sync_activity(
     ),
     runtime_metric_meter: temporalio.common.MetricMeter | None,
     cancellation_details: temporalio.activity._ActivityCancellationDetailsHolder,
+    client: temporalio.client.Client | None,
     fn: Callable[..., Any],
     *args: Any,
 ) -> Any:
@@ -878,7 +886,7 @@ def _execute_sync_activity(
             ),
             payload_converter_class_or_instance=payload_converter_class_or_instance,
             runtime_metric_meter=runtime_metric_meter,
-            client=None,
+            client=client,
             cancellation_details=cancellation_details,
         )
     )
