@@ -207,16 +207,11 @@ fn build_metric_parameters(
     description: Option<String>,
     unit: Option<String>,
 ) -> metrics::MetricParameters {
-    let mut build = metrics::MetricParametersBuilder::default();
-    build.name(name);
-    if let Some(description) = description {
-        build.description(description);
-    }
-    if let Some(unit) = unit {
-        build.unit(unit);
-    }
-    // Should be nothing that would fail validation here
-    build.build().unwrap()
+    metrics::MetricParameters::builder()
+        .name(name)
+        .maybe_description(description)
+        .maybe_unit(unit)
+        .build()
 }
 
 #[pymethods]
