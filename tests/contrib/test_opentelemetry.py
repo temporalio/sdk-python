@@ -6,12 +6,14 @@ import logging
 import queue
 import threading
 import uuid
+from collections.abc import Callable, Generator, Iterable
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Callable, Dict, Generator, Iterable, List, Optional, cast
+from typing import Dict, List, Optional, cast
 
+import nexusrpc
 import opentelemetry.context
 import pytest
 from opentelemetry import baggage, context
@@ -20,7 +22,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode, get_tracer
 
-from temporalio import activity, workflow
+from temporalio import activity, nexus, workflow
 from temporalio.client import Client, WithStartWorkflowOperation, WorkflowUpdateStage
 from temporalio.common import RetryPolicy, WorkflowIDConflictPolicy
 from temporalio.contrib.opentelemetry import (
@@ -28,16 +30,21 @@ from temporalio.contrib.opentelemetry import (
     TracingWorkflowInboundInterceptor,
 )
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
-from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
+from temporalio.exceptions import (
+    ApplicationError,
+    ApplicationErrorCategory,
+    NexusOperationError,
+)
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers import LogCapturer
+from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 
 @dataclass
 class TracingActivityParam:
     heartbeat: bool = True
-    fail_until_attempt: Optional[int] = None
+    fail_until_attempt: int | None = None
 
 
 @activity.defn
@@ -50,18 +57,19 @@ async def tracing_activity(param: TracingActivityParam) -> None:
 
 @dataclass
 class TracingWorkflowParam:
-    actions: List[TracingWorkflowAction]
+    actions: list[TracingWorkflowAction]
 
 
 @dataclass
 class TracingWorkflowAction:
     fail_on_non_replay: bool = False
-    child_workflow: Optional[TracingWorkflowActionChildWorkflow] = None
-    activity: Optional[TracingWorkflowActionActivity] = None
-    continue_as_new: Optional[TracingWorkflowActionContinueAsNew] = None
+    child_workflow: TracingWorkflowActionChildWorkflow | None = None
+    activity: TracingWorkflowActionActivity | None = None
+    continue_as_new: TracingWorkflowActionContinueAsNew | None = None
     wait_until_signal_count: int = 0
     wait_and_do_update: bool = False
     wait_and_do_start_with_update: bool = False
+    start_and_cancel_nexus_operation: bool = False
 
 
 @dataclass
@@ -83,6 +91,29 @@ class TracingWorkflowActionActivity:
 @dataclass
 class TracingWorkflowActionContinueAsNew:
     param: TracingWorkflowParam
+
+
+@workflow.defn
+class ExpectCancelNexusWorkflow:
+    @workflow.run
+    async def run(self, input: str):
+        try:
+            await asyncio.wait_for(asyncio.Future(), 2)
+        except asyncio.TimeoutError:
+            raise ApplicationError("expected cancellation")
+
+
+@nexusrpc.handler.service_handler
+class InterceptedNexusService:
+    @nexus.workflow_run_operation
+    async def intercepted_operation(
+        self, ctx: nexus.WorkflowRunOperationContext, input: str
+    ) -> nexus.WorkflowHandle[None]:
+        return await ctx.start_workflow(
+            ExpectCancelNexusWorkflow.run,
+            input,
+            id=f"wf-{uuid.uuid4()}-{ctx.request_id}",
+        )
 
 
 ready_for_update: asyncio.Semaphore
@@ -152,6 +183,22 @@ class TracingWorkflow:
             if action.wait_and_do_start_with_update:
                 ready_for_update_with_start.release()
                 await workflow.wait_condition(lambda: self._did_update_with_start)
+            if action.start_and_cancel_nexus_operation:
+                nexus_client = workflow.create_nexus_client(
+                    endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+                    service=InterceptedNexusService,
+                )
+
+                nexus_handle = await nexus_client.start_operation(
+                    operation=InterceptedNexusService.intercepted_operation,
+                    input="nexus-workflow",
+                )
+                nexus_handle.cancel()
+
+                try:
+                    await nexus_handle
+                except NexusOperationError:
+                    pass
 
     async def _raise_on_non_replay(self) -> None:
         replaying = workflow.unsafe.is_replaying()
@@ -410,14 +457,75 @@ async def test_opentelemetry_tracing_update_with_start(
     ]
 
 
+async def test_opentelemetry_tracing_nexus(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
+        )
+    global ready_for_update_with_start
+    ready_for_update_with_start = asyncio.Semaphore(0)
+    # Create a tracer that has an in-memory exporter
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+    # Create new client with tracer interceptor
+    client_config = client.config()
+    client_config["interceptors"] = [TracingInterceptor(tracer)]
+    client = Client(**client_config)
+
+    task_queue = f"task-queue-{uuid.uuid4()}"
+    await create_nexus_endpoint(task_queue, client)
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[TracingWorkflow, ExpectCancelNexusWorkflow],
+        activities=[tracing_activity],
+        nexus_service_handlers=[InterceptedNexusService()],
+        # Needed so we can wait to send update at the right time
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ):
+        # Run workflow with various actions
+        workflow_id = f"workflow_{uuid.uuid4()}"
+        workflow_params = TracingWorkflowParam(
+            actions=[
+                TracingWorkflowAction(start_and_cancel_nexus_operation=True),
+            ]
+        )
+        handle = await client.start_workflow(
+            TracingWorkflow.run,
+            workflow_params,
+            id=workflow_id,
+            task_queue=task_queue,
+        )
+        await handle.result()
+
+    # Dump debug with attributes, but do string assertion test without
+    logging.debug(
+        "Spans:\n%s",
+        "\n".join(dump_spans(exporter.get_finished_spans(), with_attributes=False)),
+    )
+    assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
+        "StartWorkflow:TracingWorkflow",
+        "  RunWorkflow:TracingWorkflow",
+        "  MyCustomSpan",
+        "  StartNexusOperation:InterceptedNexusService/intercepted_operation",
+        "    RunStartNexusOperationHandler:InterceptedNexusService/intercepted_operation",
+        "      StartWorkflow:ExpectCancelNexusWorkflow",
+        "        RunWorkflow:ExpectCancelNexusWorkflow",
+        "    RunCancelNexusOperationHandler:InterceptedNexusService/intercepted_operation",
+        "  CompleteWorkflow:TracingWorkflow",
+    ]
+
+
 def dump_spans(
     spans: Iterable[ReadableSpan],
     *,
-    parent_id: Optional[int] = None,
+    parent_id: int | None = None,
     with_attributes: bool = True,
     indent_depth: int = 0,
-) -> List[str]:
-    ret: List[str] = []
+) -> list[str]:
+    ret: list[str] = []
     for span in spans:
         if (not span.parent and parent_id is None) or (
             span.parent and span.parent.span_id == parent_id
@@ -427,7 +535,7 @@ def dump_spans(
                 span_str += f" (attributes: {dict(span.attributes or {})})"
             # Add links
             if span.links:
-                span_links: List[str] = []
+                span_links: list[str] = []
                 for link in span.links:
                     for link_span in spans:
                         if (
@@ -555,7 +663,7 @@ async def test_opentelemetry_benign_exception(client: Client):
 
 
 @contextmanager
-def baggage_values(values: Dict[str, str]) -> Generator[None, None, None]:
+def baggage_values(values: dict[str, str]) -> Generator[None]:
     ctx = context.get_current()
     for key, value in values.items():
         ctx = baggage.set_baggage(key, value, context=ctx)
@@ -580,7 +688,7 @@ def get_baggage_value(key: str) -> str:
 
 
 @activity.defn
-async def read_baggage_activity() -> Dict[str, str]:
+async def read_baggage_activity() -> dict[str, str]:
     return {
         "user_id": get_baggage_value("user.id"),
         "tenant_id": get_baggage_value("tenant.id"),
@@ -590,7 +698,7 @@ async def read_baggage_activity() -> Dict[str, str]:
 @workflow.defn
 class ReadBaggageTestWorkflow:
     @workflow.run
-    async def run(self) -> Dict[str, str]:
+    async def run(self) -> dict[str, str]:
         return await workflow.execute_activity(
             read_baggage_activity,
             start_to_close_timeout=timedelta(seconds=10),
@@ -623,9 +731,9 @@ async def test_opentelemetry_baggage_propagation_basic(
 
 
 @activity.defn
-async def read_baggage_local_activity() -> Dict[str, str]:
+async def read_baggage_local_activity() -> dict[str, str]:
     return cast(
-        Dict[str, str],
+        dict[str, str],
         {
             "user_id": get_baggage_value("user.id"),
             "tenant_id": get_baggage_value("tenant.id"),
@@ -636,7 +744,7 @@ async def read_baggage_local_activity() -> Dict[str, str]:
 @workflow.defn
 class LocalActivityBaggageTestWorkflow:
     @workflow.run
-    async def run(self) -> Dict[str, str]:
+    async def run(self) -> dict[str, str]:
         return await workflow.execute_local_activity(
             read_baggage_local_activity,
             start_to_close_timeout=timedelta(seconds=10),
@@ -669,7 +777,7 @@ async def test_opentelemetry_baggage_propagation_local_activity(
         assert result["tenant_id"] == "local-corp"
 
 
-retry_attempt_baggage_values: List[str] = []
+retry_attempt_baggage_values: list[str] = []
 
 
 @activity.defn

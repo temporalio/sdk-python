@@ -1,9 +1,10 @@
 """Visitor that sets command context during payload traversal."""
 
 import contextvars
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Iterator, Optional
+from typing import Optional
 
 from temporalio.api.enums.v1.command_type_pb2 import CommandType
 from temporalio.bridge._visitor import PayloadVisitor, VisitorFunctions
@@ -33,7 +34,7 @@ class CommandInfo:
     command_seq: int
 
 
-current_command_info: contextvars.ContextVar[Optional[CommandInfo]] = (
+current_command_info: contextvars.ContextVar[CommandInfo | None] = (
     contextvars.ContextVar("current_command_info", default=None)
 )
 

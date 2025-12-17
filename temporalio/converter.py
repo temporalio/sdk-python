@@ -13,6 +13,7 @@ import traceback
 import uuid
 import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
@@ -20,16 +21,12 @@ from itertools import zip_longest
 from logging import getLogger
 from typing import (
     Any,
-    Awaitable,
-    Callable,
     ClassVar,
     Dict,
     List,
     Literal,
-    Mapping,
     NewType,
     Optional,
-    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -61,8 +58,7 @@ if sys.version_info < (3, 11):
 if sys.version_info >= (3, 11):
     from enum import StrEnum
 
-if sys.version_info >= (3, 10):
-    from types import UnionType
+from types import UnionType
 
 logger = getLogger(__name__)
 
@@ -176,7 +172,7 @@ class PayloadConverter(ABC):
     @abstractmethod
     def to_payloads(
         self, values: Sequence[Any]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         """Encode values into payloads.
 
         Implementers are expected to just return the payload for
@@ -199,8 +195,8 @@ class PayloadConverter(ABC):
     def from_payloads(
         self,
         payloads: Sequence[temporalio.api.common.v1.Payload],
-        type_hints: Optional[List[Type]] = None,
-    ) -> List[Any]:
+        type_hints: list[type] | None = None,
+    ) -> list[Any]:
         """Decode payloads into values.
 
         Implementers are expected to treat a type hint of
@@ -231,8 +227,8 @@ class PayloadConverter(ABC):
         return temporalio.api.common.v1.Payloads(payloads=self.to_payloads(values))
 
     def from_payloads_wrapper(
-        self, payloads: Optional[temporalio.api.common.v1.Payloads]
-    ) -> List[Any]:
+        self, payloads: temporalio.api.common.v1.Payloads | None
+    ) -> list[Any]:
         """:py:meth:`from_payloads` for the
         :py:class:`temporalio.api.common.v1.Payloads` wrapper.
         """
@@ -261,13 +257,13 @@ class PayloadConverter(ABC):
     def from_payload(
         self,
         payload: temporalio.api.common.v1.Payload,
-        type_hint: Type[temporalio.types.AnyType],
+        type_hint: type[temporalio.types.AnyType],
     ) -> temporalio.types.AnyType: ...
 
     def from_payload(
         self,
         payload: temporalio.api.common.v1.Payload,
-        type_hint: Optional[Type] = None,
+        type_hint: type | None = None,
     ) -> Any:
         """Convert a single payload to a value.
 
@@ -294,7 +290,7 @@ class EncodingPayloadConverter(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
+    def to_payload(self, value: Any) -> temporalio.api.common.v1.Payload | None:
         """Encode a single value to a payload or None.
 
         Args:
@@ -314,7 +310,7 @@ class EncodingPayloadConverter(ABC):
     def from_payload(
         self,
         payload: temporalio.api.common.v1.Payload,
-        type_hint: Optional[Type] = None,
+        type_hint: type | None = None,
     ) -> Any:
         """Decode a single payload to a Python value or raise exception.
 
@@ -359,7 +355,7 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
 
     def to_payloads(
         self, values: Sequence[Any]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         """Encode values trying each converter.
 
         See base class. Always returns the same number of payloads as values.
@@ -390,8 +386,8 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
     def from_payloads(
         self,
         payloads: Sequence[temporalio.api.common.v1.Payload],
-        type_hints: Optional[List[Type]] = None,
-    ) -> List[Any]:
+        type_hints: list[type] | None = None,
+    ) -> list[Any]:
         """Decode values trying each converter.
 
         See base class. Always returns the same number of values as payloads.
@@ -433,7 +429,7 @@ class CompositePayloadConverter(PayloadConverter, WithSerializationContext):
 
     def get_converters_with_context(
         self, context: SerializationContext
-    ) -> Optional[list[EncodingPayloadConverter]]:
+    ) -> list[EncodingPayloadConverter] | None:
         """Return converter instances with context set.
 
         If no converter uses context, return None.
@@ -466,7 +462,7 @@ class DefaultPayloadConverter(CompositePayloadConverter):
     :py:attr:`PayloadConverter.default`.
     """
 
-    default_encoding_payload_converters: Tuple[EncodingPayloadConverter, ...]
+    default_encoding_payload_converters: tuple[EncodingPayloadConverter, ...]
     """Default set of encoding payload converters the default payload converter
     uses.
     """
@@ -484,7 +480,7 @@ class BinaryNullPayloadConverter(EncodingPayloadConverter):
         """See base class."""
         return "binary/null"
 
-    def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
+    def to_payload(self, value: Any) -> temporalio.api.common.v1.Payload | None:
         """See base class."""
         if value is None:
             return temporalio.api.common.v1.Payload(
@@ -495,7 +491,7 @@ class BinaryNullPayloadConverter(EncodingPayloadConverter):
     def from_payload(
         self,
         payload: temporalio.api.common.v1.Payload,
-        type_hint: Optional[Type] = None,
+        type_hint: type | None = None,
     ) -> Any:
         """See base class."""
         if len(payload.data) > 0:
@@ -511,7 +507,7 @@ class BinaryPlainPayloadConverter(EncodingPayloadConverter):
         """See base class."""
         return "binary/plain"
 
-    def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
+    def to_payload(self, value: Any) -> temporalio.api.common.v1.Payload | None:
         """See base class."""
         if isinstance(value, bytes):
             return temporalio.api.common.v1.Payload(
@@ -522,7 +518,7 @@ class BinaryPlainPayloadConverter(EncodingPayloadConverter):
     def from_payload(
         self,
         payload: temporalio.api.common.v1.Payload,
-        type_hint: Optional[Type] = None,
+        type_hint: type | None = None,
     ) -> Any:
         """See base class."""
         return payload.data
@@ -549,7 +545,7 @@ class JSONProtoPayloadConverter(EncodingPayloadConverter):
         """See base class."""
         return "json/protobuf"
 
-    def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
+    def to_payload(self, value: Any) -> temporalio.api.common.v1.Payload | None:
         """See base class."""
         if (
             isinstance(value, google.protobuf.message.Message)
@@ -574,7 +570,7 @@ class JSONProtoPayloadConverter(EncodingPayloadConverter):
     def from_payload(
         self,
         payload: temporalio.api.common.v1.Payload,
-        type_hint: Optional[Type] = None,
+        type_hint: type | None = None,
     ) -> Any:
         """See base class."""
         message_type = payload.metadata.get("messageType", b"<unknown>").decode()
@@ -599,7 +595,7 @@ class BinaryProtoPayloadConverter(EncodingPayloadConverter):
         """See base class."""
         return "binary/protobuf"
 
-    def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
+    def to_payload(self, value: Any) -> temporalio.api.common.v1.Payload | None:
         """See base class."""
         if (
             isinstance(value, google.protobuf.message.Message)
@@ -617,7 +613,7 @@ class BinaryProtoPayloadConverter(EncodingPayloadConverter):
     def from_payload(
         self,
         payload: temporalio.api.common.v1.Payload,
-        type_hint: Optional[Type] = None,
+        type_hint: type | None = None,
     ) -> Any:
         """See base class."""
         message_type = payload.metadata.get("messageType", b"<unknown>").decode()
@@ -676,15 +672,15 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
     type hint.
     """
 
-    _encoder: Optional[Type[json.JSONEncoder]]
-    _decoder: Optional[Type[json.JSONDecoder]]
+    _encoder: type[json.JSONEncoder] | None
+    _decoder: type[json.JSONDecoder] | None
     _encoding: str
 
     def __init__(
         self,
         *,
-        encoder: Optional[Type[json.JSONEncoder]] = AdvancedJSONEncoder,
-        decoder: Optional[Type[json.JSONDecoder]] = None,
+        encoder: type[json.JSONEncoder] | None = AdvancedJSONEncoder,
+        decoder: type[json.JSONDecoder] | None = None,
         encoding: str = "json/plain",
         custom_type_converters: Sequence[JSONTypeConverter] = [],
     ) -> None:
@@ -708,7 +704,7 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
         """See base class."""
         return self._encoding
 
-    def to_payload(self, value: Any) -> Optional[temporalio.api.common.v1.Payload]:
+    def to_payload(self, value: Any) -> temporalio.api.common.v1.Payload | None:
         """See base class."""
         # Check for Pydantic v1
         if hasattr(value, "parse_obj"):
@@ -727,7 +723,7 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
     def from_payload(
         self,
         payload: temporalio.api.common.v1.Payload,
-        type_hint: Optional[Type] = None,
+        type_hint: type | None = None,
     ) -> Any:
         """See base class."""
         try:
@@ -754,8 +750,8 @@ class JSONTypeConverter(ABC):
 
     @abstractmethod
     def to_typed_value(
-        self, hint: Type, value: Any
-    ) -> Union[Optional[Any], _JSONTypeConverterUnhandled]:
+        self, hint: type, value: Any
+    ) -> Any | None | _JSONTypeConverterUnhandled:
         """Convert the given value to a type based on the given hint.
 
         Args:
@@ -779,7 +775,7 @@ class PayloadCodec(ABC):
     @abstractmethod
     async def encode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         """Encode the given payloads.
 
         Args:
@@ -795,7 +791,7 @@ class PayloadCodec(ABC):
     @abstractmethod
     async def decode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         """Decode the given payloads.
 
         Args:
@@ -1113,7 +1109,7 @@ class DefaultFailureConverter(FailureConverter):
             new_failure.CopyFrom(failure)
             failure = new_failure
             try:
-                encoded_attributes: Dict[str, Any] = payload_converter.from_payloads(
+                encoded_attributes: dict[str, Any] = payload_converter.from_payloads(
                     [failure.encoded_attributes]
                 )[0]
                 if isinstance(encoded_attributes, dict):
@@ -1126,7 +1122,7 @@ class DefaultFailureConverter(FailureConverter):
             except:
                 pass
 
-        err: Union[temporalio.exceptions.FailureError, nexusrpc.HandlerError]
+        err: temporalio.exceptions.FailureError | nexusrpc.HandlerError
         if failure.HasField("application_failure_info"):
             app_info = failure.application_failure_info
             err = temporalio.exceptions.ApplicationError(
@@ -1257,13 +1253,13 @@ class DataConverter(WithSerializationContext):
     :py:class:`PayloadCodec` which encodes bytes.
     """
 
-    payload_converter_class: Type[PayloadConverter] = DefaultPayloadConverter
+    payload_converter_class: type[PayloadConverter] = DefaultPayloadConverter
     """Class to instantiate for payload conversion."""
 
-    payload_codec: Optional[PayloadCodec] = None
+    payload_codec: PayloadCodec | None = None
     """Optional codec for encoding payload bytes."""
 
-    failure_converter_class: Type[FailureConverter] = DefaultFailureConverter
+    failure_converter_class: type[FailureConverter] = DefaultFailureConverter
     """Class to instantiate for failure conversion."""
 
     payload_converter: PayloadConverter = dataclasses.field(init=False)
@@ -1281,7 +1277,7 @@ class DataConverter(WithSerializationContext):
 
     async def encode(
         self, values: Sequence[Any]
-    ) -> List[temporalio.api.common.v1.Payload]:
+    ) -> list[temporalio.api.common.v1.Payload]:
         """Encode values into payloads.
 
         First converts values to payloads then encodes payloads using codec.
@@ -1302,8 +1298,8 @@ class DataConverter(WithSerializationContext):
     async def decode(
         self,
         payloads: Sequence[temporalio.api.common.v1.Payload],
-        type_hints: Optional[List[Type]] = None,
-    ) -> List[Any]:
+        type_hints: list[type] | None = None,
+    ) -> list[Any]:
         """Decode payloads into values.
 
         First decodes payloads using codec then converts payloads to values.
@@ -1328,9 +1324,9 @@ class DataConverter(WithSerializationContext):
 
     async def decode_wrapper(
         self,
-        payloads: Optional[temporalio.api.common.v1.Payloads],
-        type_hints: Optional[List[Type]] = None,
-    ) -> List[Any]:
+        payloads: temporalio.api.common.v1.Payloads | None,
+        type_hints: list[type] | None = None,
+    ) -> list[Any]:
         """:py:meth:`decode` for the
         :py:class:`temporalio.api.common.v1.Payloads` wrapper.
         """
@@ -1406,9 +1402,9 @@ def default() -> DataConverter:
 
 
 def encode_search_attributes(
-    attributes: Union[
-        temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
-    ],
+    attributes: (
+        temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
+    ),
     api: temporalio.api.common.v1.SearchAttributes,
 ) -> None:
     """Convert search attributes into an API message.
@@ -1434,7 +1430,7 @@ def encode_typed_search_attribute_value(
     key: temporalio.common.SearchAttributeKey[
         temporalio.common.SearchAttributeValueType
     ],
-    value: Optional[temporalio.common.SearchAttributeValue],
+    value: temporalio.common.SearchAttributeValue | None,
 ) -> temporalio.api.common.v1.Payload:
     """Convert typed search attribute value into a payload.
 
@@ -1482,7 +1478,7 @@ def encode_search_attribute_values(
     if not isinstance(vals, list):
         raise TypeError("Search attribute values must be lists")
     # Confirm all types are the same
-    val_type: Optional[Type] = None
+    val_type: type | None = None
     # Convert dates to strings
     safe_vals = []
     for v in vals:
@@ -1507,8 +1503,8 @@ def encode_search_attribute_values(
 
 
 def _encode_maybe_typed_search_attributes(
-    non_typed_attributes: Optional[temporalio.common.SearchAttributes],
-    typed_attributes: Optional[temporalio.common.TypedSearchAttributes],
+    non_typed_attributes: temporalio.common.SearchAttributes | None,
+    typed_attributes: temporalio.common.TypedSearchAttributes | None,
     api: temporalio.api.common.v1.SearchAttributes,
 ) -> None:
     if non_typed_attributes:
@@ -1575,7 +1571,7 @@ def decode_typed_search_attributes(
         Typed search attribute collection (new object every time).
     """
     conv = default().payload_converter
-    pairs: List[temporalio.common.SearchAttributePair] = []
+    pairs: list[temporalio.common.SearchAttributePair] = []
     for k, v in api.indexed_fields.items():
         # We want the "type" metadata, but if it is not present or an unknown
         # type, we will just ignore
@@ -1621,7 +1617,7 @@ def _decode_search_attribute_value(
 
 
 def value_to_type(
-    hint: Type,
+    hint: type,
     value: Any,
     custom_converters: Sequence[JSONTypeConverter] = [],
 ) -> Any:
@@ -1694,7 +1690,7 @@ def value_to_type(
 
     # Load origin for other checks
     origin = getattr(hint, "__origin__", hint)
-    type_args: Tuple = getattr(hint, "__args__", ())
+    type_args: tuple = getattr(hint, "__args__", ())
 
     # Literal
     if origin is Literal or origin is typing_extensions.Literal:
@@ -1703,8 +1699,7 @@ def value_to_type(
         return value
 
     is_union = origin is Union
-    if sys.version_info >= (3, 10):
-        is_union = is_union or isinstance(origin, UnionType)
+    is_union = is_union or isinstance(origin, UnionType)
 
     # Union
     if is_union:
@@ -1723,7 +1718,7 @@ def value_to_type(
         ret_dict = {}
         # If there are required or optional keys that means we are a TypedDict
         # and therefore can extract per-key types
-        per_key_types: Optional[Dict[str, Type]] = None
+        per_key_types: dict[str, type] | None = None
         if getattr(origin, "__required_keys__", None) or getattr(
             origin, "__optional_keys__", None
         ):

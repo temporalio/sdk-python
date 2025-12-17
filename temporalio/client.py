@@ -14,21 +14,24 @@ import uuid
 import warnings
 from abc import ABC, abstractmethod
 from asyncio import Future
+from collections.abc import (
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Iterable,
+    Mapping,
+    Sequence,
+)
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum, IntEnum
 from typing import (
     Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
+    Concatenate,
     Dict,
     FrozenSet,
     Generic,
-    Iterable,
-    Mapping,
     Optional,
-    Sequence,
     Text,
     Tuple,
     Type,
@@ -41,7 +44,7 @@ import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.timestamp_pb2
 from google.protobuf.internal.containers import MessageMap
-from typing_extensions import Concatenate, Required, Self, TypedDict
+from typing_extensions import Required, Self, TypedDict
 
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
@@ -118,21 +121,20 @@ class Client:
         target_host: str,
         *,
         namespace: str = "default",
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         plugins: Sequence[Plugin] = [],
         interceptors: Sequence[Interceptor] = [],
-        default_workflow_query_reject_condition: Optional[
-            temporalio.common.QueryRejectCondition
-        ] = None,
-        tls: Union[bool, TLSConfig, None] = None,
-        retry_config: Optional[RetryConfig] = None,
-        keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        identity: Optional[str] = None,
+        default_workflow_query_reject_condition: None
+        | (temporalio.common.QueryRejectCondition) = None,
+        tls: bool | TLSConfig | None = None,
+        retry_config: RetryConfig | None = None,
+        keep_alive_config: KeepAliveConfig | None = KeepAliveConfig.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        identity: str | None = None,
         lazy: bool = False,
-        runtime: Optional[temporalio.runtime.Runtime] = None,
-        http_connect_proxy_config: Optional[HttpConnectProxyConfig] = None,
+        runtime: temporalio.runtime.Runtime | None = None,
+        http_connect_proxy_config: HttpConnectProxyConfig | None = None,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
     ) -> Self:
         """Connect to a Temporal server.
@@ -230,9 +232,8 @@ class Client:
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         plugins: Sequence[Plugin] = [],
         interceptors: Sequence[Interceptor] = [],
-        default_workflow_query_reject_condition: Optional[
-            temporalio.common.QueryRejectCondition
-        ] = None,
+        default_workflow_query_reject_condition: None
+        | (temporalio.common.QueryRejectCondition) = None,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
     ):
         """Create a Temporal client from a service client.
@@ -313,7 +314,7 @@ class Client:
         return self._config["data_converter"]
 
     @property
-    def rpc_metadata(self) -> Mapping[str, Union[str, bytes]]:
+    def rpc_metadata(self) -> Mapping[str, str | bytes]:
         """Headers for every call made by this client.
 
         Do not use mutate this mapping. Rather, set this property with an
@@ -322,7 +323,7 @@ class Client:
         return self.service_client.config.rpc_metadata
 
     @rpc_metadata.setter
-    def rpc_metadata(self, value: Mapping[str, Union[str, bytes]]) -> None:
+    def rpc_metadata(self, value: Mapping[str, str | bytes]) -> None:
         """Update the headers for this client.
 
         Do not mutate this mapping after set. Rather, set an entirely new
@@ -342,12 +343,12 @@ class Client:
         self.service_client.config.rpc_metadata = value
 
     @property
-    def api_key(self) -> Optional[str]:
+    def api_key(self) -> str | None:
         """API key for every call made by this client."""
         return self.service_client.config.api_key
 
     @api_key.setter
-    def api_key(self, value: Optional[str]) -> None:
+    def api_key(self, value: str | None) -> None:
         """Update the API key for this client.
 
         This is only set if RPCmetadata doesn't already have an "authorization"
@@ -365,30 +366,28 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
         cron_schedule: str = "",
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        start_delay: Optional[timedelta] = None,
-        start_signal: Optional[str] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> WorkflowHandle[SelfType, ReturnType]: ...
 
     # Overload for single-param workflow
@@ -400,30 +399,28 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
         cron_schedule: str = "",
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        start_delay: Optional[timedelta] = None,
-        start_signal: Optional[str] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> WorkflowHandle[SelfType, ReturnType]: ...
 
     # Overload for multi-param workflow
@@ -437,30 +434,28 @@ class Client:
         args: Sequence[Any],
         id: str,
         task_queue: str,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
         cron_schedule: str = "",
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        start_delay: Optional[timedelta] = None,
-        start_signal: Optional[str] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> WorkflowHandle[SelfType, ReturnType]: ...
 
     # Overload for string-name workflow
@@ -473,66 +468,62 @@ class Client:
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Optional[type] = None,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
+        result_type: type | None = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
         cron_schedule: str = "",
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        start_delay: Optional[timedelta] = None,
-        start_signal: Optional[str] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> WorkflowHandle[Any, Any]: ...
 
     async def start_workflow(
         self,
-        workflow: Union[str, Callable[..., Awaitable[Any]]],
+        workflow: str | Callable[..., Awaitable[Any]],
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Optional[type] = None,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
+        result_type: type | None = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
         cron_schedule: str = "",
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        start_delay: Optional[timedelta] = None,
-        start_signal: Optional[str] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
         # The following options should not be considered part of the public API. They
         # are deliberately not exposed in overloads, and are not subject to any
         # backwards compatibility guarantees.
@@ -540,7 +531,7 @@ class Client:
         workflow_event_links: Sequence[
             temporalio.api.common.v1.Link.WorkflowEvent
         ] = [],
-        request_id: Optional[str] = None,
+        request_id: str | None = None,
         stack_level: int = 2,
     ) -> WorkflowHandle[Any, Any]:
         """Start a workflow and return its handle.
@@ -646,30 +637,28 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
         cron_schedule: str = "",
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        start_delay: Optional[timedelta] = None,
-        start_signal: Optional[str] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> ReturnType: ...
 
     # Overload for single-param workflow
@@ -681,30 +670,28 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
         cron_schedule: str = "",
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        start_delay: Optional[timedelta] = None,
-        start_signal: Optional[str] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> ReturnType: ...
 
     # Overload for multi-param workflow
@@ -718,30 +705,28 @@ class Client:
         args: Sequence[Any],
         id: str,
         task_queue: str,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
         cron_schedule: str = "",
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        start_delay: Optional[timedelta] = None,
-        start_signal: Optional[str] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> ReturnType: ...
 
     # Overload for string-name workflow
@@ -754,66 +739,62 @@ class Client:
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Optional[type] = None,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
+        result_type: type | None = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
         cron_schedule: str = "",
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        start_delay: Optional[timedelta] = None,
-        start_signal: Optional[str] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> Any: ...
 
     async def execute_workflow(
         self,
-        workflow: Union[str, Callable[..., Awaitable[Any]]],
+        workflow: str | Callable[..., Awaitable[Any]],
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Optional[type] = None,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
+        result_type: type | None = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy = temporalio.common.WorkflowIDConflictPolicy.UNSPECIFIED,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
         cron_schedule: str = "",
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        start_delay: Optional[timedelta] = None,
-        start_signal: Optional[str] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        start_signal: str | None = None,
         start_signal_args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
         request_eager_start: bool = False,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> Any:
         """Start a workflow and wait for completion.
 
@@ -857,9 +838,9 @@ class Client:
         self,
         workflow_id: str,
         *,
-        run_id: Optional[str] = None,
-        first_execution_run_id: Optional[str] = None,
-        result_type: Optional[Type] = None,
+        run_id: str | None = None,
+        first_execution_run_id: str | None = None,
+        result_type: type | None = None,
     ) -> WorkflowHandle[Any, Any]:
         """Get a workflow handle to an existing workflow by its ID.
 
@@ -884,14 +865,14 @@ class Client:
 
     def get_workflow_handle_for(
         self,
-        workflow: Union[
-            MethodAsyncNoParam[SelfType, ReturnType],
-            MethodAsyncSingleParam[SelfType, Any, ReturnType],
-        ],
+        workflow: (
+            MethodAsyncNoParam[SelfType, ReturnType]
+            | MethodAsyncSingleParam[SelfType, Any, ReturnType]
+        ),
         workflow_id: str,
         *,
-        run_id: Optional[str] = None,
-        first_execution_run_id: Optional[str] = None,
+        run_id: str | None = None,
+        first_execution_run_id: str | None = None,
     ) -> WorkflowHandle[SelfType, ReturnType]:
         """Get a typed workflow handle to an existing workflow by its ID.
 
@@ -922,9 +903,9 @@ class Client:
         update: temporalio.workflow.UpdateMethodMultiParam[[SelfType], LocalReturnType],
         *,
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
-        id: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> LocalReturnType: ...
 
     # Overload for single-param update
@@ -937,9 +918,9 @@ class Client:
         arg: ParamType,
         *,
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
-        id: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> LocalReturnType: ...
 
     # Overload for multi-param update
@@ -952,9 +933,9 @@ class Client:
         *,
         args: MultiParamSpec.args,  # type: ignore
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
-        id: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> LocalReturnType: ...
 
     # Overload for string-name update
@@ -966,23 +947,23 @@ class Client:
         *,
         start_workflow_operation: WithStartWorkflowOperation[Any, Any],
         args: Sequence[Any] = [],
-        id: Optional[str] = None,
-        result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        result_type: type | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> Any: ...
 
     async def execute_update_with_start_workflow(
         self,
-        update: Union[str, Callable],
+        update: str | Callable,
         arg: Any = temporalio.common._arg_unset,
         *,
         start_workflow_operation: WithStartWorkflowOperation[Any, Any],
         args: Sequence[Any] = [],
-        id: Optional[str] = None,
-        result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        result_type: type | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> Any:
         """Send an update-with-start request and wait for the update to complete.
 
@@ -1040,9 +1021,9 @@ class Client:
         *,
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         wait_for_stage: WorkflowUpdateStage,
-        id: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
     # Overload for single-param start update
@@ -1056,9 +1037,9 @@ class Client:
         *,
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         wait_for_stage: WorkflowUpdateStage,
-        id: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
     # Overload for multi-param start update
@@ -1072,9 +1053,9 @@ class Client:
         args: MultiParamSpec.args,  # type: ignore
         start_workflow_operation: WithStartWorkflowOperation[SelfType, Any],
         wait_for_stage: WorkflowUpdateStage,
-        id: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
     # Overload for string-name start update
@@ -1087,24 +1068,24 @@ class Client:
         start_workflow_operation: WithStartWorkflowOperation[Any, Any],
         wait_for_stage: WorkflowUpdateStage,
         args: Sequence[Any] = [],
-        id: Optional[str] = None,
-        result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        result_type: type | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowUpdateHandle[Any]: ...
 
     async def start_update_with_start_workflow(
         self,
-        update: Union[str, Callable],
+        update: str | Callable,
         arg: Any = temporalio.common._arg_unset,
         *,
         start_workflow_operation: WithStartWorkflowOperation[Any, Any],
         wait_for_stage: WorkflowUpdateStage,
         args: Sequence[Any] = [],
-        id: Optional[str] = None,
-        result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        result_type: type | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowUpdateHandle[Any]:
         """Send an update-with-start request and wait for it to be accepted.
 
@@ -1161,16 +1142,16 @@ class Client:
 
     async def _start_update_with_start(
         self,
-        update: Union[str, Callable],
+        update: str | Callable,
         arg: Any = temporalio.common._arg_unset,
         *,
         wait_for_stage: WorkflowUpdateStage,
         args: Sequence[Any] = [],
-        id: Optional[str] = None,
-        result_type: Optional[Type] = None,
+        id: str | None = None,
+        result_type: type | None = None,
         start_workflow_operation: WithStartWorkflowOperation[SelfType, ReturnType],
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowUpdateHandle[Any]:
         if wait_for_stage == WorkflowUpdateStage.ADMITTED:
             raise ValueError("ADMITTED wait stage not supported")
@@ -1223,13 +1204,13 @@ class Client:
 
     def list_workflows(
         self,
-        query: Optional[str] = None,
+        query: str | None = None,
         *,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         page_size: int = 1000,
-        next_page_token: Optional[bytes] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        next_page_token: bytes | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowExecutionAsyncIterator:
         """List workflows.
 
@@ -1268,9 +1249,9 @@ class Client:
 
     async def count_workflows(
         self,
-        query: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        query: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowExecutionCount:
         """Count workflows.
 
@@ -1292,7 +1273,7 @@ class Client:
 
     @overload
     def get_async_activity_handle(
-        self, *, workflow_id: str, run_id: Optional[str], activity_id: str
+        self, *, workflow_id: str, run_id: str | None, activity_id: str
     ) -> AsyncActivityHandle:
         pass
 
@@ -1303,10 +1284,10 @@ class Client:
     def get_async_activity_handle(
         self,
         *,
-        workflow_id: Optional[str] = None,
-        run_id: Optional[str] = None,
-        activity_id: Optional[str] = None,
-        task_token: Optional[bytes] = None,
+        workflow_id: str | None = None,
+        run_id: str | None = None,
+        activity_id: str | None = None,
+        task_token: bytes | None = None,
     ) -> AsyncActivityHandle:
         """Get an async activity handle.
 
@@ -1349,17 +1330,13 @@ class Client:
         *,
         trigger_immediately: bool = False,
         backfill: Sequence[ScheduleBackfill] = [],
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> ScheduleHandle:
         """Create a schedule and return its handle.
 
@@ -1376,12 +1353,6 @@ class Client:
                 attributes for a scheduled workflow are part of the scheduled
                 action. The dictionary form of this is DEPRECATED, use
                 :py:class:`temporalio.common.TypedSearchAttributes`.
-            static_summary: A single-line fixed summary for this workflow execution that may appear
-                in the UI/CLI. This can be in single-line Temporal markdown format.
-            static_details: General fixed details for this workflow execution that may appear in
-                UI/CLI. This can be in Temporal markdown format and can span multiple lines. This is
-                a fixed value on the workflow that cannot be updated. For details that can be
-                updated, use :py:meth:`temporalio.workflow.get_current_details` within the workflow.
             rpc_metadata: Headers used on the RPC call. Keys here override
                 client-level RPC metadata keys.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
@@ -1413,12 +1384,12 @@ class Client:
 
     async def list_schedules(
         self,
-        query: Optional[str] = None,
+        query: str | None = None,
         *,
         page_size: int = 1000,
-        next_page_token: Optional[bytes] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        next_page_token: bytes | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> ScheduleAsyncIterator:
         """List schedules.
 
@@ -1457,8 +1428,8 @@ class Client:
         self,
         task_queue: str,
         operation: BuildIdOp,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Used to add new Build IDs or otherwise update the relative compatibility of Build Ids as
         defined on a specific task queue for the Worker Versioning feature.
@@ -1487,9 +1458,9 @@ class Client:
     async def get_worker_build_id_compatibility(
         self,
         task_queue: str,
-        max_sets: Optional[int] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        max_sets: int | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkerBuildIdVersionSets:
         """Get the Build ID compatibility sets for a specific task queue.
 
@@ -1519,9 +1490,9 @@ class Client:
         self,
         build_ids: Sequence[str],
         task_queues: Sequence[str] = [],
-        reachability_type: Optional[TaskReachabilityType] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        reachability_type: TaskReachabilityType | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkerTaskReachability:
         """Determine if some Build IDs for certain Task Queues could have tasks dispatched to them.
 
@@ -1565,7 +1536,7 @@ class ClientConfig(TypedDict, total=False):
     plugins: Required[Sequence[Plugin]]
     interceptors: Required[Sequence[Interceptor]]
     default_workflow_query_reject_condition: Required[
-        Optional[temporalio.common.QueryRejectCondition]
+        temporalio.common.QueryRejectCondition | None
     ]
     header_codec_behavior: Required[HeaderCodecBehavior]
 
@@ -1596,16 +1567,15 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         client: Client,
         id: str,
         *,
-        run_id: Optional[str] = None,
-        result_run_id: Optional[str] = None,
-        first_execution_run_id: Optional[str] = None,
-        result_type: Optional[Type] = None,
-        start_workflow_response: Optional[
-            Union[
-                temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
-                temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse,
-            ]
-        ] = None,
+        run_id: str | None = None,
+        result_run_id: str | None = None,
+        first_execution_run_id: str | None = None,
+        result_type: type | None = None,
+        start_workflow_response: None
+        | (
+            temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse
+            | temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse
+        ) = None,
     ) -> None:
         """Create workflow handle."""
         self._client = client
@@ -1631,7 +1601,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         return self._id
 
     @property
-    def run_id(self) -> Optional[str]:
+    def run_id(self) -> str | None:
         """If present, run ID used to ensure that requested operations apply
         to this exact run.
 
@@ -1644,7 +1614,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         return self._run_id
 
     @property
-    def result_run_id(self) -> Optional[str]:
+    def result_run_id(self) -> str | None:
         """Run ID used for :py:meth:`result` calls if present to ensure result
         is for a workflow starting from this run.
 
@@ -1659,7 +1629,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         return self._result_run_id
 
     @property
-    def first_execution_run_id(self) -> Optional[str]:
+    def first_execution_run_id(self) -> str | None:
         """Run ID used to ensure requested operations apply to a workflow ID
         started with this run ID.
 
@@ -1676,8 +1646,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self,
         *,
         follow_runs: bool = True,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> ReturnType:
         """Wait for result of the workflow.
 
@@ -1807,8 +1777,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     async def cancel(
         self,
         *,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Cancel the workflow.
 
@@ -1843,8 +1813,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     async def describe(
         self,
         *,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowExecutionDescription:
         """Get workflow details.
 
@@ -1882,8 +1852,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         *,
         event_filter_type: WorkflowHistoryEventFilterType = WorkflowHistoryEventFilterType.ALL_EVENT,
         skip_archival: bool = False,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowHistory:
         """Get workflow history.
 
@@ -1906,13 +1876,13 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     def fetch_history_events(
         self,
         *,
-        page_size: Optional[int] = None,
-        next_page_token: Optional[bytes] = None,
+        page_size: int | None = None,
+        next_page_token: bytes | None = None,
         wait_new_event: bool = False,
         event_filter_type: WorkflowHistoryEventFilterType = WorkflowHistoryEventFilterType.ALL_EVENT,
         skip_archival: bool = False,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowHistoryEventAsyncIterator:
         """Get workflow history events as an async iterator.
 
@@ -1946,15 +1916,15 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
     def _fetch_history_events_for_run(
         self,
-        run_id: Optional[str],
+        run_id: str | None,
         *,
-        page_size: Optional[int] = None,
-        next_page_token: Optional[bytes] = None,
+        page_size: int | None = None,
+        next_page_token: bytes | None = None,
         wait_new_event: bool = False,
         event_filter_type: WorkflowHistoryEventFilterType = WorkflowHistoryEventFilterType.ALL_EVENT,
         skip_archival: bool = False,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowHistoryEventAsyncIterator:
         return self._client._impl.fetch_workflow_history_events(
             FetchWorkflowHistoryEventsInput(
@@ -1976,9 +1946,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self,
         query: MethodSyncOrAsyncNoParam[SelfType, LocalReturnType],
         *,
-        reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        reject_condition: temporalio.common.QueryRejectCondition | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> LocalReturnType: ...
 
     # Overload for single-param query
@@ -1988,9 +1958,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         query: MethodSyncOrAsyncSingleParam[SelfType, ParamType, LocalReturnType],
         arg: ParamType,
         *,
-        reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        reject_condition: temporalio.common.QueryRejectCondition | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> LocalReturnType: ...
 
     # Overload for multi-param query
@@ -1999,13 +1969,13 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self,
         query: Callable[
             Concatenate[SelfType, MultiParamSpec],
-            Union[Awaitable[LocalReturnType], LocalReturnType],
+            Awaitable[LocalReturnType] | LocalReturnType,
         ],
         *,
         args: Sequence[Any],
-        reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        reject_condition: temporalio.common.QueryRejectCondition | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> LocalReturnType: ...
 
     # Overload for string-name query
@@ -2016,22 +1986,22 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
-        result_type: Optional[Type] = None,
-        reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        result_type: type | None = None,
+        reject_condition: temporalio.common.QueryRejectCondition | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> Any: ...
 
     async def query(
         self,
-        query: Union[str, Callable],
+        query: str | Callable,
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
-        result_type: Optional[Type] = None,
-        reject_condition: Optional[temporalio.common.QueryRejectCondition] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        result_type: type | None = None,
+        reject_condition: temporalio.common.QueryRejectCondition | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> Any:
         """Query the workflow.
 
@@ -2101,8 +2071,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self,
         signal: MethodSyncOrAsyncNoParam[SelfType, None],
         *,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None: ...
 
     # Overload for single-param signal
@@ -2112,21 +2082,19 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         signal: MethodSyncOrAsyncSingleParam[SelfType, ParamType, None],
         arg: ParamType,
         *,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None: ...
 
     # Overload for multi-param signal
     @overload
     async def signal(
         self,
-        signal: Callable[
-            Concatenate[SelfType, MultiParamSpec], Union[Awaitable[None], None]
-        ],
+        signal: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[None] | None],
         *,
         args: Sequence[Any],
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None: ...
 
     # Overload for string-name signal
@@ -2137,18 +2105,18 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None: ...
 
     async def signal(
         self,
-        signal: Union[str, Callable],
+        signal: str | Callable,
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Send a signal to the workflow.
 
@@ -2189,9 +2157,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
     async def terminate(
         self,
         *args: Any,
-        reason: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        reason: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Terminate the workflow.
 
@@ -2233,9 +2201,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self,
         update: temporalio.workflow.UpdateMethodMultiParam[[SelfType], LocalReturnType],
         *,
-        id: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> LocalReturnType: ...
 
     # Overload for single-param update
@@ -2247,9 +2215,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         ],
         arg: ParamType,
         *,
-        id: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> LocalReturnType: ...
 
     # Overload for multi-param update
@@ -2261,9 +2229,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         ],
         *,
         args: MultiParamSpec.args,  # type: ignore
-        id: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> LocalReturnType: ...
 
     # Overload for string-name update
@@ -2274,22 +2242,22 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
-        id: Optional[str] = None,
-        result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        result_type: type | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> Any: ...
 
     async def execute_update(
         self,
-        update: Union[str, Callable],
+        update: str | Callable,
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
-        id: Optional[str] = None,
-        result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        result_type: type | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> Any:
         """Send an update request to the workflow and wait for it to complete.
 
@@ -2333,9 +2301,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         update: temporalio.workflow.UpdateMethodMultiParam[[SelfType], LocalReturnType],
         *,
         wait_for_stage: WorkflowUpdateStage,
-        id: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
     # Overload for single-param start update
@@ -2348,9 +2316,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         arg: ParamType,
         *,
         wait_for_stage: WorkflowUpdateStage,
-        id: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
     # Overload for multi-param start update
@@ -2363,9 +2331,9 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         *,
         args: MultiParamSpec.args,  # type: ignore
         wait_for_stage: WorkflowUpdateStage,
-        id: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowUpdateHandle[LocalReturnType]: ...
 
     # Overload for string-name start update
@@ -2377,23 +2345,23 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         *,
         wait_for_stage: WorkflowUpdateStage,
         args: Sequence[Any] = [],
-        id: Optional[str] = None,
-        result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        result_type: type | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowUpdateHandle[Any]: ...
 
     async def start_update(
         self,
-        update: Union[str, Callable],
+        update: str | Callable,
         arg: Any = temporalio.common._arg_unset,
         *,
         wait_for_stage: WorkflowUpdateStage,
         args: Sequence[Any] = [],
-        id: Optional[str] = None,
-        result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        result_type: type | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowUpdateHandle[Any]:
         """Send an update request to the workflow and return a handle to it.
 
@@ -2433,15 +2401,15 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
     async def _start_update(
         self,
-        update: Union[str, Callable],
+        update: str | Callable,
         arg: Any = temporalio.common._arg_unset,
         *,
         wait_for_stage: WorkflowUpdateStage,
         args: Sequence[Any] = [],
-        id: Optional[str] = None,
-        result_type: Optional[Type] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        id: str | None = None,
+        result_type: type | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> WorkflowUpdateHandle[Any]:
         if wait_for_stage == WorkflowUpdateStage.ADMITTED:
             raise ValueError("ADMITTED wait stage not supported")
@@ -2470,8 +2438,8 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         self,
         id: str,
         *,
-        workflow_run_id: Optional[str] = None,
-        result_type: Optional[Type] = None,
+        workflow_run_id: str | None = None,
+        result_type: type | None = None,
     ) -> WorkflowUpdateHandle[Any]:
         """Get a handle for an update. The handle can be used to wait on the
         update result.
@@ -2501,7 +2469,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         update: temporalio.workflow.UpdateMethodMultiParam[Any, LocalReturnType],
         id: str,
         *,
-        workflow_run_id: Optional[str] = None,
+        workflow_run_id: str | None = None,
     ) -> WorkflowUpdateHandle[LocalReturnType]:
         """Get a typed handle for an update. The handle can be used to wait on
         the update result.
@@ -2538,26 +2506,24 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         id: str,
         task_queue: str,
         id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
         cron_schedule: str = "",
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        start_delay: Optional[timedelta] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> None: ...
 
     # Overload for single-param workflow, with_start
@@ -2570,26 +2536,24 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         id: str,
         task_queue: str,
         id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
         cron_schedule: str = "",
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        start_delay: Optional[timedelta] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> None: ...
 
     # Overload for multi-param workflow, with_start
@@ -2604,26 +2568,24 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         id: str,
         task_queue: str,
         id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
         cron_schedule: str = "",
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        start_delay: Optional[timedelta] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> None: ...
 
     # Overload for string-name workflow, with_start
@@ -2637,59 +2599,55 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         id: str,
         task_queue: str,
         id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy,
-        result_type: Optional[Type] = None,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
+        result_type: type | None = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
         cron_schedule: str = "",
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        start_delay: Optional[timedelta] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> None: ...
 
     def __init__(
         self,
-        workflow: Union[str, Callable[..., Awaitable[Any]]],
+        workflow: str | Callable[..., Awaitable[Any]],
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
         id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy,
-        result_type: Optional[Type] = None,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
+        result_type: type | None = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.WorkflowIDReusePolicy = temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
         cron_schedule: str = "",
-        memo: Optional[Mapping[str, Any]] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.TypedSearchAttributes,
-                temporalio.common.SearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        start_delay: Optional[timedelta] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        memo: Mapping[str, Any] | None = None,
+        search_attributes: None
+        | (
+            temporalio.common.TypedSearchAttributes | temporalio.common.SearchAttributes
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        start_delay: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        versioning_override: Optional[temporalio.common.VersioningOverride] = None,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
         stack_level: int = 2,
     ) -> None:
         """Create a WithStartWorkflowOperation.
@@ -2743,7 +2701,7 @@ class AsyncActivityIDReference:
     """Reference to an async activity by its qualified ID."""
 
     workflow_id: str
-    run_id: Optional[str]
+    run_id: str | None
     activity_id: str
 
 
@@ -2753,8 +2711,8 @@ class AsyncActivityHandle(WithSerializationContext):
     def __init__(
         self,
         client: Client,
-        id_or_token: Union[AsyncActivityIDReference, bytes],
-        data_converter_override: Optional[DataConverter] = None,
+        id_or_token: AsyncActivityIDReference | bytes,
+        data_converter_override: DataConverter | None = None,
     ) -> None:
         """Create an async activity handle."""
         self._client = client
@@ -2764,8 +2722,8 @@ class AsyncActivityHandle(WithSerializationContext):
     async def heartbeat(
         self,
         *details: Any,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Record a heartbeat for the activity.
 
@@ -2787,10 +2745,10 @@ class AsyncActivityHandle(WithSerializationContext):
 
     async def complete(
         self,
-        result: Optional[Any] = temporalio.common._arg_unset,
+        result: Any | None = temporalio.common._arg_unset,
         *,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Complete the activity.
 
@@ -2815,8 +2773,8 @@ class AsyncActivityHandle(WithSerializationContext):
         error: Exception,
         *,
         last_heartbeat_details: Sequence[Any] = [],
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Fail the activity.
 
@@ -2841,8 +2799,8 @@ class AsyncActivityHandle(WithSerializationContext):
     async def report_cancellation(
         self,
         *details: Any,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Report the activity as cancelled.
 
@@ -2890,10 +2848,10 @@ class AsyncActivityHandle(WithSerializationContext):
 class WorkflowExecution:
     """Info for a single workflow execution run."""
 
-    close_time: Optional[datetime]
+    close_time: datetime | None
     """When the workflow was closed if closed."""
 
-    execution_time: Optional[datetime]
+    execution_time: datetime | None
     """When this workflow run started or should start."""
 
     history_length: int
@@ -2905,16 +2863,16 @@ class WorkflowExecution:
     namespace: str
     """Namespace for the workflow."""
 
-    parent_id: Optional[str]
+    parent_id: str | None
     """ID for the parent workflow if this was started as a child."""
 
-    parent_run_id: Optional[str]
+    parent_run_id: str | None
     """Run ID for the parent workflow if this was started as a child."""
 
-    root_id: Optional[str]
+    root_id: str | None
     """ID for the root workflow."""
 
-    root_run_id: Optional[str]
+    root_run_id: str | None
     """Run ID for the root workflow."""
 
     raw_info: temporalio.api.workflow.v1.WorkflowExecutionInfo
@@ -2933,7 +2891,7 @@ class WorkflowExecution:
     start_time: datetime
     """When the workflow was created."""
 
-    status: Optional[WorkflowExecutionStatus]
+    status: WorkflowExecutionStatus | None
     """Status for the workflow."""
 
     task_queue: str
@@ -3036,20 +2994,20 @@ class WorkflowExecution:
 
     @overload
     async def memo_value(
-        self, key: str, *, type_hint: Type[ParamType]
+        self, key: str, *, type_hint: type[ParamType]
     ) -> ParamType: ...
 
     @overload
     async def memo_value(
-        self, key: str, default: AnyType, *, type_hint: Type[ParamType]
-    ) -> Union[AnyType, ParamType]: ...
+        self, key: str, default: AnyType, *, type_hint: type[ParamType]
+    ) -> AnyType | ParamType: ...
 
     async def memo_value(
         self,
         key: str,
         default: Any = temporalio.common._arg_unset,
         *,
-        type_hint: Optional[Type] = None,
+        type_hint: type | None = None,
     ) -> Any:
         """Memo value for the given key, optional default, and optional type
         hint.
@@ -3085,11 +3043,11 @@ class WorkflowExecutionDescription(WorkflowExecution):
     raw_description: temporalio.api.workflowservice.v1.DescribeWorkflowExecutionResponse
     """Underlying protobuf description."""
 
-    _static_summary: Optional[str] = None
-    _static_details: Optional[str] = None
+    _static_summary: str | None = None
+    _static_details: str | None = None
     _metadata_decoded: bool = False
 
-    async def static_summary(self) -> Optional[str]:
+    async def static_summary(self) -> str | None:
         """Gets the single-line fixed summary for this workflow execution that may appear in
         UI/CLI. This can be in single-line Temporal markdown format.
         """
@@ -3097,7 +3055,7 @@ class WorkflowExecutionDescription(WorkflowExecution):
             await self._decode_metadata()
         return self._static_summary
 
-    async def static_details(self) -> Optional[str]:
+    async def static_details(self) -> str | None:
         """Gets the general fixed details for this workflow execution that may appear in UI/CLI.
         This can be in Temporal markdown format and can span multiple lines.
         """
@@ -3227,7 +3185,7 @@ class WorkflowExecutionAsyncIterator:
         self._client = client
         self._input = input
         self._next_page_token = input.next_page_token
-        self._current_page: Optional[Sequence[WorkflowExecution]] = None
+        self._current_page: Sequence[WorkflowExecution] | None = None
         self._current_page_index = 0
         self._limit = input.limit
         self._yielded = 0
@@ -3240,16 +3198,16 @@ class WorkflowExecutionAsyncIterator:
         return self._current_page_index
 
     @property
-    def current_page(self) -> Optional[Sequence[WorkflowExecution]]:
+    def current_page(self) -> Sequence[WorkflowExecution] | None:
         """Current page, if it has been fetched yet."""
         return self._current_page
 
     @property
-    def next_page_token(self) -> Optional[bytes]:
+    def next_page_token(self) -> bytes | None:
         """Token for the next page request if any."""
         return self._next_page_token
 
-    async def fetch_next_page(self, *, page_size: Optional[int] = None) -> None:
+    async def fetch_next_page(self, *, page_size: int | None = None) -> None:
         """Fetch the next page if any.
 
         Args:
@@ -3316,8 +3274,8 @@ class WorkflowExecutionAsyncIterator:
         *,
         event_filter_type: WorkflowHistoryEventFilterType = WorkflowHistoryEventFilterType.ALL_EVENT,
         skip_archival: bool = False,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> AsyncIterator[WorkflowHistory]:
         """Create an async iterator consuming all workflows and calling
         :py:meth:`WorkflowHandle.fetch_history` on each one.
@@ -3358,9 +3316,7 @@ class WorkflowHistory:
         ].workflow_execution_started_event_attributes.original_execution_run_id
 
     @staticmethod
-    def from_json(
-        workflow_id: str, history: Union[str, Dict[str, Any]]
-    ) -> WorkflowHistory:
+    def from_json(workflow_id: str, history: str | dict[str, Any]) -> WorkflowHistory:
         """Construct a WorkflowHistory from an ID and a json dump of history.
 
         This is built to work both with Temporal UI/CLI JSON as well as
@@ -3386,7 +3342,7 @@ class WorkflowHistory:
             temporalio.api.history.v1.History(events=self.events)
         )
 
-    def to_json_dict(self) -> Dict[str, Any]:
+    def to_json_dict(self) -> dict[str, Any]:
         """Convert this history to JSON-compatible dict.
 
         Note, this does not include the workflow ID.
@@ -3417,9 +3373,9 @@ class WorkflowHistoryEventAsyncIterator:
         self._client = client
         self._input = input
         self._next_page_token = input.next_page_token
-        self._current_page: Optional[
-            Sequence[temporalio.api.history.v1.HistoryEvent]
-        ] = None
+        self._current_page: (
+            None | (Sequence[temporalio.api.history.v1.HistoryEvent])
+        ) = None
         self._current_page_index = 0
 
     @property
@@ -3432,16 +3388,16 @@ class WorkflowHistoryEventAsyncIterator:
     @property
     def current_page(
         self,
-    ) -> Optional[Sequence[temporalio.api.history.v1.HistoryEvent]]:
+    ) -> Sequence[temporalio.api.history.v1.HistoryEvent] | None:
         """Current page, if it has been fetched yet."""
         return self._current_page
 
     @property
-    def next_page_token(self) -> Optional[bytes]:
+    def next_page_token(self) -> bytes | None:
         """Token for the next page request if any."""
         return self._next_page_token
 
-    async def fetch_next_page(self, *, page_size: Optional[int] = None) -> None:
+    async def fetch_next_page(self, *, page_size: int | None = None) -> None:
         """Fetch the next page if any.
 
         Args:
@@ -3455,7 +3411,7 @@ class WorkflowHistoryEventAsyncIterator:
                     workflow_id=self._input.id,
                     run_id=self._input.run_id or "",
                 ),
-                maximum_page_size=self._input.page_size or 0,
+                maximum_page_size=page_size or self._input.page_size or 0,
                 next_page_token=self._next_page_token or b"",
                 wait_new_event=self._input.wait_new_event,
                 history_event_filter_type=temporalio.api.enums.v1.HistoryEventFilterType.ValueType(
@@ -3519,8 +3475,8 @@ class ScheduleHandle:
     async def backfill(
         self,
         *backfill: ScheduleBackfill,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Backfill the schedule by going through the specified time periods as
         if they passed right now.
@@ -3545,8 +3501,8 @@ class ScheduleHandle:
     async def delete(
         self,
         *,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Delete this schedule.
 
@@ -3566,8 +3522,8 @@ class ScheduleHandle:
     async def describe(
         self,
         *,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> ScheduleDescription:
         """Fetch this schedule's description.
 
@@ -3587,9 +3543,9 @@ class ScheduleHandle:
     async def pause(
         self,
         *,
-        note: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        note: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Pause the schedule and set a note.
 
@@ -3611,9 +3567,9 @@ class ScheduleHandle:
     async def trigger(
         self,
         *,
-        overlap: Optional[ScheduleOverlapPolicy] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        overlap: ScheduleOverlapPolicy | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Trigger an action on this schedule to happen immediately.
 
@@ -3635,9 +3591,9 @@ class ScheduleHandle:
     async def unpause(
         self,
         *,
-        note: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        note: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Unpause the schedule and set a note.
 
@@ -3659,30 +3615,30 @@ class ScheduleHandle:
     @overload
     async def update(
         self,
-        updater: Callable[[ScheduleUpdateInput], Optional[ScheduleUpdate]],
+        updater: Callable[[ScheduleUpdateInput], ScheduleUpdate | None],
         *,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None: ...
 
     @overload
     async def update(
         self,
-        updater: Callable[[ScheduleUpdateInput], Awaitable[Optional[ScheduleUpdate]]],
+        updater: Callable[[ScheduleUpdateInput], Awaitable[ScheduleUpdate | None]],
         *,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None: ...
 
     async def update(
         self,
         updater: Callable[
             [ScheduleUpdateInput],
-            Union[Optional[ScheduleUpdate], Awaitable[Optional[ScheduleUpdate]]],
+            ScheduleUpdate | None | Awaitable[ScheduleUpdate | None],
         ],
         *,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Update a schedule using a callback to build the update from the
         description.
@@ -3738,20 +3694,20 @@ class ScheduleSpec:
     skip: Sequence[ScheduleCalendarSpec] = dataclasses.field(default_factory=list)
     """Set of matching calendar times that will be skipped."""
 
-    start_at: Optional[datetime] = None
+    start_at: datetime | None = None
     """Time before which any matching times will be skipped."""
 
-    end_at: Optional[datetime] = None
+    end_at: datetime | None = None
     """Time after which any matching times will be skipped."""
 
-    jitter: Optional[timedelta] = None
+    jitter: timedelta | None = None
     """Jitter to apply each action.
 
     An action's scheduled time will be incremented by a random value between 0
     and this value if present (but not past the next schedule).
     """
 
-    time_zone_name: Optional[str] = None
+    time_zone_name: str | None = None
     """IANA time zone name, for example ``US/Central``."""
 
     @staticmethod
@@ -3777,15 +3733,15 @@ class ScheduleSpec:
         )
 
     def _to_proto(self) -> temporalio.api.schedule.v1.ScheduleSpec:
-        start_time: Optional[google.protobuf.timestamp_pb2.Timestamp] = None
+        start_time: google.protobuf.timestamp_pb2.Timestamp | None = None
         if self.start_at:
             start_time = google.protobuf.timestamp_pb2.Timestamp()
             start_time.FromDatetime(self.start_at)
-        end_time: Optional[google.protobuf.timestamp_pb2.Timestamp] = None
+        end_time: google.protobuf.timestamp_pb2.Timestamp | None = None
         if self.end_at:
             end_time = google.protobuf.timestamp_pb2.Timestamp()
             end_time.FromDatetime(self.end_at)
-        jitter: Optional[google.protobuf.duration_pb2.Duration] = None
+        jitter: google.protobuf.duration_pb2.Duration | None = None
         if self.jitter:
             jitter = google.protobuf.duration_pb2.Duration()
             jitter.FromTimedelta(self.jitter)
@@ -3882,7 +3838,7 @@ class ScheduleCalendarSpec:
     """Day of week range to match, 0-6, 0 is Sunday. Default matches all
     days."""
 
-    comment: Optional[str] = None
+    comment: str | None = None
     """Description of this schedule."""
 
     @staticmethod
@@ -3923,7 +3879,7 @@ class ScheduleIntervalSpec:
     every: timedelta
     """Period to repeat the interval."""
 
-    offset: Optional[timedelta] = None
+    offset: timedelta | None = None
     """Fixed offset added to each interval period."""
 
     @staticmethod
@@ -3938,7 +3894,7 @@ class ScheduleIntervalSpec:
     def _to_proto(self) -> temporalio.api.schedule.v1.IntervalSpec:
         interval = google.protobuf.duration_pb2.Duration()
         interval.FromTimedelta(self.every)
-        phase: Optional[google.protobuf.duration_pb2.Duration] = None
+        phase: google.protobuf.duration_pb2.Duration | None = None
         if self.offset:
             phase = google.protobuf.duration_pb2.Duration()
             phase.FromTimedelta(self.offset)
@@ -3972,26 +3928,24 @@ class ScheduleActionStartWorkflow(ScheduleAction):
     """Schedule action to start a workflow."""
 
     workflow: str
-    args: Union[Sequence[Any], Sequence[temporalio.api.common.v1.Payload]]
+    args: Sequence[Any] | Sequence[temporalio.api.common.v1.Payload]
     id: str
     task_queue: str
-    execution_timeout: Optional[timedelta]
-    run_timeout: Optional[timedelta]
-    task_timeout: Optional[timedelta]
-    retry_policy: Optional[temporalio.common.RetryPolicy]
-    memo: Optional[
-        Union[Mapping[str, Any], Mapping[str, temporalio.api.common.v1.Payload]]
-    ]
+    execution_timeout: timedelta | None
+    run_timeout: timedelta | None
+    task_timeout: timedelta | None
+    retry_policy: temporalio.common.RetryPolicy | None
+    memo: None | (Mapping[str, Any] | Mapping[str, temporalio.api.common.v1.Payload])
     typed_search_attributes: temporalio.common.TypedSearchAttributes
     untyped_search_attributes: temporalio.common.SearchAttributes
     """This is deprecated and is only present in case existing untyped
     attributes already exist for update. This should never be used when
     creating."""
-    static_summary: Optional[Union[str, temporalio.api.common.v1.Payload]]
-    static_details: Optional[Union[str, temporalio.api.common.v1.Payload]]
+    static_summary: str | temporalio.api.common.v1.Payload | None
+    static_details: str | temporalio.api.common.v1.Payload | None
     priority: temporalio.common.Priority
 
-    headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]]
+    headers: Mapping[str, temporalio.api.common.v1.Payload] | None
     """
     Headers may still be encoded by the payload codec if present.
     """
@@ -4011,14 +3965,14 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         *,
         id: str,
         task_queue: str,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
-        memo: Optional[Mapping[str, Any]] = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        memo: Mapping[str, Any] | None = None,
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> None: ...
 
@@ -4031,14 +3985,14 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         *,
         id: str,
         task_queue: str,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
-        memo: Optional[Mapping[str, Any]] = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        memo: Mapping[str, Any] | None = None,
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> None: ...
 
@@ -4053,14 +4007,14 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         args: Sequence[Any],
         id: str,
         task_queue: str,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
-        memo: Optional[Mapping[str, Any]] = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        memo: Mapping[str, Any] | None = None,
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> None: ...
 
@@ -4074,14 +4028,14 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
-        memo: Optional[Mapping[str, Any]] = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        memo: Mapping[str, Any] | None = None,
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> None: ...
 
@@ -4096,23 +4050,23 @@ class ScheduleActionStartWorkflow(ScheduleAction):
 
     def __init__(
         self,
-        workflow: Union[str, Callable[..., Awaitable[Any]]],
+        workflow: str | Callable[..., Awaitable[Any]],
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
-        id: Optional[str] = None,
-        task_queue: Optional[str] = None,
-        execution_timeout: Optional[timedelta] = None,
-        run_timeout: Optional[timedelta] = None,
-        task_timeout: Optional[timedelta] = None,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
-        memo: Optional[Mapping[str, Any]] = None,
+        id: str | None = None,
+        task_queue: str | None = None,
+        execution_timeout: timedelta | None = None,
+        run_timeout: timedelta | None = None,
+        task_timeout: timedelta | None = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        memo: Mapping[str, Any] | None = None,
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
         untyped_search_attributes: temporalio.common.SearchAttributes = {},
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
-        headers: Optional[Mapping[str, temporalio.api.common.v1.Payload]] = None,
-        raw_info: Optional[temporalio.api.workflow.v1.NewWorkflowExecutionInfo] = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
+        headers: Mapping[str, temporalio.api.common.v1.Payload] | None = None,
+        raw_info: temporalio.api.workflow.v1.NewWorkflowExecutionInfo | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> None:
         """Create a start-workflow action.
@@ -4214,23 +4168,23 @@ class ScheduleActionStartWorkflow(ScheduleAction):
     async def _to_proto(
         self, client: Client
     ) -> temporalio.api.schedule.v1.ScheduleAction:
-        execution_timeout: Optional[google.protobuf.duration_pb2.Duration] = None
+        execution_timeout: google.protobuf.duration_pb2.Duration | None = None
         if self.execution_timeout:
             execution_timeout = google.protobuf.duration_pb2.Duration()
             execution_timeout.FromTimedelta(self.execution_timeout)
-        run_timeout: Optional[google.protobuf.duration_pb2.Duration] = None
+        run_timeout: google.protobuf.duration_pb2.Duration | None = None
         if self.run_timeout:
             run_timeout = google.protobuf.duration_pb2.Duration()
             run_timeout.FromTimedelta(self.run_timeout)
-        task_timeout: Optional[google.protobuf.duration_pb2.Duration] = None
+        task_timeout: google.protobuf.duration_pb2.Duration | None = None
         if self.task_timeout:
             task_timeout = google.protobuf.duration_pb2.Duration()
             task_timeout.FromTimedelta(self.task_timeout)
-        retry_policy: Optional[temporalio.api.common.v1.RetryPolicy] = None
+        retry_policy: temporalio.api.common.v1.RetryPolicy | None = None
         if self.retry_policy:
             retry_policy = temporalio.api.common.v1.RetryPolicy()
             self.retry_policy.apply_to_proto(retry_policy)
-        priority: Optional[temporalio.api.common.v1.Priority] = None
+        priority: temporalio.api.common.v1.Priority | None = None
         if self.priority:
             priority = self.priority._to_proto()
         data_converter = client.data_converter.with_context(
@@ -4369,7 +4323,7 @@ class ScheduleBackfill:
     This is exclusive
     """
     end_at: datetime
-    overlap: Optional[ScheduleOverlapPolicy] = None
+    overlap: ScheduleOverlapPolicy | None = None
 
     def _to_proto(self) -> temporalio.api.schedule.v1.BackfillRequest:
         start_time = google.protobuf.timestamp_pb2.Timestamp()
@@ -4433,7 +4387,7 @@ class SchedulePolicy:
 class ScheduleState:
     """State of a schedule."""
 
-    note: Optional[str] = None
+    note: str | None = None
     """Human readable message for the schedule.
 
     The system may overwrite this value on certain conditions like
@@ -4584,20 +4538,20 @@ class ScheduleDescription:
 
     @overload
     async def memo_value(
-        self, key: str, *, type_hint: Type[ParamType]
+        self, key: str, *, type_hint: type[ParamType]
     ) -> ParamType: ...
 
     @overload
     async def memo_value(
-        self, key: str, default: AnyType, *, type_hint: Type[ParamType]
-    ) -> Union[AnyType, ParamType]: ...
+        self, key: str, default: AnyType, *, type_hint: type[ParamType]
+    ) -> AnyType | ParamType: ...
 
     async def memo_value(
         self,
         key: str,
         default: Any = temporalio.common._arg_unset,
         *,
-        type_hint: Optional[Type] = None,
+        type_hint: type | None = None,
     ) -> Any:
         """Memo value for the given key, optional default, and optional type
         hint.
@@ -4652,7 +4606,7 @@ class ScheduleInfo:
     created_at: datetime
     """When the schedule was created."""
 
-    last_updated_at: Optional[datetime]
+    last_updated_at: datetime | None
     """When the schedule was last updated."""
 
     @staticmethod
@@ -4746,7 +4700,7 @@ class ScheduleUpdate:
     schedule: Schedule
     """Schedule to update."""
 
-    search_attributes: Optional[temporalio.common.TypedSearchAttributes] = None
+    search_attributes: temporalio.common.TypedSearchAttributes | None = None
     """Search attributes to update."""
 
 
@@ -4757,14 +4711,14 @@ class ScheduleListDescription:
     id: str
     """ID of the schedule."""
 
-    schedule: Optional[ScheduleListSchedule]
+    schedule: ScheduleListSchedule | None
     """Schedule details that can be mutated.
 
     This may not be present in older Temporal servers without advanced
     visibility.
     """
 
-    info: Optional[ScheduleListInfo]
+    info: ScheduleListInfo | None
     """Information about the schedule.
 
     This may not be present in older Temporal servers without advanced
@@ -4833,20 +4787,20 @@ class ScheduleListDescription:
 
     @overload
     async def memo_value(
-        self, key: str, *, type_hint: Type[ParamType]
+        self, key: str, *, type_hint: type[ParamType]
     ) -> ParamType: ...
 
     @overload
     async def memo_value(
-        self, key: str, default: AnyType, *, type_hint: Type[ParamType]
-    ) -> Union[AnyType, ParamType]: ...
+        self, key: str, default: AnyType, *, type_hint: type[ParamType]
+    ) -> AnyType | ParamType: ...
 
     async def memo_value(
         self,
         key: str,
         default: Any = temporalio.common._arg_unset,
         *,
-        type_hint: Optional[Type] = None,
+        type_hint: type | None = None,
     ) -> Any:
         """Memo value for the given key, optional default, and optional type
         hint.
@@ -4953,7 +4907,7 @@ class ScheduleListInfo:
 class ScheduleListState:
     """State of a listed schedule."""
 
-    note: Optional[str]
+    note: str | None
     """Human readable message for the schedule.
 
     The system may overwrite this value on certain conditions like
@@ -4993,7 +4947,7 @@ class ScheduleAsyncIterator:
         self._client = client
         self._input = input
         self._next_page_token = input.next_page_token
-        self._current_page: Optional[Sequence[ScheduleListDescription]] = None
+        self._current_page: Sequence[ScheduleListDescription] | None = None
         self._current_page_index = 0
 
     @property
@@ -5004,16 +4958,16 @@ class ScheduleAsyncIterator:
         return self._current_page_index
 
     @property
-    def current_page(self) -> Optional[Sequence[ScheduleListDescription]]:
+    def current_page(self) -> Sequence[ScheduleListDescription] | None:
         """Current page, if it has been fetched yet."""
         return self._current_page
 
     @property
-    def next_page_token(self) -> Optional[bytes]:
+    def next_page_token(self) -> bytes | None:
         """Token for the next page request if any."""
         return self._next_page_token
 
-    async def fetch_next_page(self, *, page_size: Optional[int] = None) -> None:
+    async def fetch_next_page(self, *, page_size: int | None = None) -> None:
         """Fetch the next page if any.
 
         Args:
@@ -5075,9 +5029,9 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
         id: str,
         workflow_id: str,
         *,
-        workflow_run_id: Optional[str] = None,
-        result_type: Optional[Type] = None,
-        known_outcome: Optional[temporalio.api.update.v1.Outcome] = None,
+        workflow_run_id: str | None = None,
+        result_type: type | None = None,
+        known_outcome: temporalio.api.update.v1.Outcome | None = None,
     ):
         """Create a workflow update handle.
 
@@ -5111,15 +5065,15 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
         return self._workflow_id
 
     @property
-    def workflow_run_id(self) -> Optional[str]:
+    def workflow_run_id(self) -> str | None:
         """If specified, the specific run of the Workflow targeted by this Update."""
         return self._workflow_run_id
 
     async def result(
         self,
         *,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> LocalReturnType:
         """Wait for and return the result of the update. The result may already be known in which case no network call
         is made. Otherwise the result will be polled for until it is returned.
@@ -5162,8 +5116,8 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
 
     async def _poll_until_outcome(
         self,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         if self._known_outcome:
             return
@@ -5256,13 +5210,13 @@ class WorkflowContinuedAsNewError(temporalio.exceptions.TemporalError):
 class WorkflowQueryRejectedError(temporalio.exceptions.TemporalError):
     """Error that occurs when a query was rejected."""
 
-    def __init__(self, status: Optional[WorkflowExecutionStatus]) -> None:
+    def __init__(self, status: WorkflowExecutionStatus | None) -> None:
         """Create workflow query rejected error."""
         super().__init__(f"Query rejected, status: {status}")
         self._status = status
 
     @property
-    def status(self) -> Optional[WorkflowExecutionStatus]:
+    def status(self) -> WorkflowExecutionStatus | None:
         """Get workflow execution status causing rejection."""
         return self._status
 
@@ -5317,7 +5271,7 @@ class WorkflowUpdateRPCTimeoutOrCancelledError(RPCTimeoutOrCancelledError):
 class AsyncActivityCancelledError(temporalio.exceptions.TemporalError):
     """Error that occurs when async activity attempted heartbeat but was cancelled."""
 
-    def __init__(self, details: Optional[ActivityCancellationDetails] = None) -> None:
+    def __init__(self, details: ActivityCancellationDetails | None = None) -> None:
         """Create async activity cancelled error."""
         super().__init__("Activity cancelled")
         self.details = details
@@ -5339,36 +5293,34 @@ class StartWorkflowInput:
     args: Sequence[Any]
     id: str
     task_queue: str
-    execution_timeout: Optional[timedelta]
-    run_timeout: Optional[timedelta]
-    task_timeout: Optional[timedelta]
+    execution_timeout: timedelta | None
+    run_timeout: timedelta | None
+    task_timeout: timedelta | None
     id_reuse_policy: temporalio.common.WorkflowIDReusePolicy
     id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy
-    retry_policy: Optional[temporalio.common.RetryPolicy]
+    retry_policy: temporalio.common.RetryPolicy | None
     cron_schedule: str
-    memo: Optional[Mapping[str, Any]]
-    search_attributes: Optional[
-        Union[
-            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
-        ]
-    ]
-    start_delay: Optional[timedelta]
+    memo: Mapping[str, Any] | None
+    search_attributes: None | (
+        temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
+    )
+    start_delay: timedelta | None
     headers: Mapping[str, temporalio.api.common.v1.Payload]
-    start_signal: Optional[str]
+    start_signal: str | None
     start_signal_args: Sequence[Any]
-    static_summary: Optional[str]
-    static_details: Optional[str]
+    static_summary: str | None
+    static_details: str | None
     # Type may be absent
-    ret_type: Optional[Type]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    ret_type: type | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
     request_eager_start: bool
     priority: temporalio.common.Priority
     # The following options are experimental and unstable.
     callbacks: Sequence[Callback]
     workflow_event_links: Sequence[temporalio.api.common.v1.Link.WorkflowEvent]
-    request_id: Optional[str]
-    versioning_override: Optional[temporalio.common.VersioningOverride] = None
+    request_id: str | None
+    versioning_override: temporalio.common.VersioningOverride | None = None
 
 
 @dataclass
@@ -5376,10 +5328,10 @@ class CancelWorkflowInput:
     """Input for :py:meth:`OutboundInterceptor.cancel_workflow`."""
 
     id: str
-    run_id: Optional[str]
-    first_execution_run_id: Optional[str]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    run_id: str | None
+    first_execution_run_id: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5387,9 +5339,9 @@ class DescribeWorkflowInput:
     """Input for :py:meth:`OutboundInterceptor.describe_workflow`."""
 
     id: str
-    run_id: Optional[str]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    run_id: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5397,35 +5349,35 @@ class FetchWorkflowHistoryEventsInput:
     """Input for :py:meth:`OutboundInterceptor.fetch_workflow_history_events`."""
 
     id: str
-    run_id: Optional[str]
-    page_size: Optional[int]
-    next_page_token: Optional[bytes]
+    run_id: str | None
+    page_size: int | None
+    next_page_token: bytes | None
     wait_new_event: bool
     event_filter_type: WorkflowHistoryEventFilterType
     skip_archival: bool
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
 class ListWorkflowsInput:
     """Input for :py:meth:`OutboundInterceptor.list_workflows`."""
 
-    query: Optional[str]
+    query: str | None
     page_size: int
-    next_page_token: Optional[bytes]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
-    limit: Optional[int]
+    next_page_token: bytes | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+    limit: int | None
 
 
 @dataclass
 class CountWorkflowsInput:
     """Input for :py:meth:`OutboundInterceptor.count_workflows`."""
 
-    query: Optional[str]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    query: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5433,15 +5385,15 @@ class QueryWorkflowInput:
     """Input for :py:meth:`OutboundInterceptor.query_workflow`."""
 
     id: str
-    run_id: Optional[str]
+    run_id: str | None
     query: str
     args: Sequence[Any]
-    reject_condition: Optional[temporalio.common.QueryRejectCondition]
+    reject_condition: temporalio.common.QueryRejectCondition | None
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     # Type may be absent
-    ret_type: Optional[Type]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    ret_type: type | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5449,12 +5401,12 @@ class SignalWorkflowInput:
     """Input for :py:meth:`OutboundInterceptor.signal_workflow`."""
 
     id: str
-    run_id: Optional[str]
+    run_id: str | None
     signal: str
     args: Sequence[Any]
     headers: Mapping[str, temporalio.api.common.v1.Payload]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5462,12 +5414,12 @@ class TerminateWorkflowInput:
     """Input for :py:meth:`OutboundInterceptor.terminate_workflow`."""
 
     id: str
-    run_id: Optional[str]
-    first_execution_run_id: Optional[str]
+    run_id: str | None
+    first_execution_run_id: str | None
     args: Sequence[Any]
-    reason: Optional[str]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    reason: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5475,30 +5427,30 @@ class StartWorkflowUpdateInput:
     """Input for :py:meth:`OutboundInterceptor.start_workflow_update`."""
 
     id: str
-    run_id: Optional[str]
-    first_execution_run_id: Optional[str]
-    update_id: Optional[str]
+    run_id: str | None
+    first_execution_run_id: str | None
+    update_id: str | None
     update: str
     args: Sequence[Any]
     wait_for_stage: WorkflowUpdateStage
     headers: Mapping[str, temporalio.api.common.v1.Payload]
-    ret_type: Optional[Type]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    ret_type: type | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
 class UpdateWithStartUpdateWorkflowInput:
     """Update input for :py:meth:`OutboundInterceptor.start_update_with_start_workflow`."""
 
-    update_id: Optional[str]
+    update_id: str | None
     update: str
     args: Sequence[Any]
     wait_for_stage: WorkflowUpdateStage
     headers: Mapping[str, temporalio.api.common.v1.Payload]
-    ret_type: Optional[Type]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    ret_type: type | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5512,29 +5464,27 @@ class UpdateWithStartStartWorkflowInput:
     args: Sequence[Any]
     id: str
     task_queue: str
-    execution_timeout: Optional[timedelta]
-    run_timeout: Optional[timedelta]
-    task_timeout: Optional[timedelta]
+    execution_timeout: timedelta | None
+    run_timeout: timedelta | None
+    task_timeout: timedelta | None
     id_reuse_policy: temporalio.common.WorkflowIDReusePolicy
     id_conflict_policy: temporalio.common.WorkflowIDConflictPolicy
-    retry_policy: Optional[temporalio.common.RetryPolicy]
+    retry_policy: temporalio.common.RetryPolicy | None
     cron_schedule: str
-    memo: Optional[Mapping[str, Any]]
-    search_attributes: Optional[
-        Union[
-            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
-        ]
-    ]
-    start_delay: Optional[timedelta]
+    memo: Mapping[str, Any] | None
+    search_attributes: None | (
+        temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
+    )
+    start_delay: timedelta | None
     headers: Mapping[str, temporalio.api.common.v1.Payload]
-    static_summary: Optional[str]
-    static_details: Optional[str]
+    static_summary: str | None
+    static_details: str | None
     # Type may be absent
-    ret_type: Optional[Type]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    ret_type: type | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
     priority: temporalio.common.Priority
-    versioning_override: Optional[temporalio.common.VersioningOverride] = None
+    versioning_override: temporalio.common.VersioningOverride | None = None
 
 
 @dataclass
@@ -5553,45 +5503,45 @@ class StartWorkflowUpdateWithStartInput:
 class HeartbeatAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.heartbeat_async_activity`."""
 
-    id_or_token: Union[AsyncActivityIDReference, bytes]
+    id_or_token: AsyncActivityIDReference | bytes
     details: Sequence[Any]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
-    data_converter_override: Optional[DataConverter] = None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+    data_converter_override: DataConverter | None = None
 
 
 @dataclass
 class CompleteAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.complete_async_activity`."""
 
-    id_or_token: Union[AsyncActivityIDReference, bytes]
-    result: Optional[Any]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
-    data_converter_override: Optional[DataConverter] = None
+    id_or_token: AsyncActivityIDReference | bytes
+    result: Any | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+    data_converter_override: DataConverter | None = None
 
 
 @dataclass
 class FailAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.fail_async_activity`."""
 
-    id_or_token: Union[AsyncActivityIDReference, bytes]
+    id_or_token: AsyncActivityIDReference | bytes
     error: Exception
     last_heartbeat_details: Sequence[Any]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
-    data_converter_override: Optional[DataConverter] = None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+    data_converter_override: DataConverter | None = None
 
 
 @dataclass
 class ReportCancellationAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.report_cancellation_async_activity`."""
 
-    id_or_token: Union[AsyncActivityIDReference, bytes]
+    id_or_token: AsyncActivityIDReference | bytes
     details: Sequence[Any]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
-    data_converter_override: Optional[DataConverter] = None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+    data_converter_override: DataConverter | None = None
 
 
 @dataclass
@@ -5602,14 +5552,12 @@ class CreateScheduleInput:
     schedule: Schedule
     trigger_immediately: bool
     backfill: Sequence[ScheduleBackfill]
-    memo: Optional[Mapping[str, Any]]
-    search_attributes: Optional[
-        Union[
-            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
-        ]
-    ]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    memo: Mapping[str, Any] | None
+    search_attributes: None | (
+        temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
+    )
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5617,10 +5565,10 @@ class ListSchedulesInput:
     """Input for :py:meth:`OutboundInterceptor.list_schedules`."""
 
     page_size: int
-    next_page_token: Optional[bytes]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
-    query: Optional[str] = None
+    next_page_token: bytes | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+    query: str | None = None
 
 
 @dataclass
@@ -5629,8 +5577,8 @@ class BackfillScheduleInput:
 
     id: str
     backfills: Sequence[ScheduleBackfill]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5638,8 +5586,8 @@ class DeleteScheduleInput:
     """Input for :py:meth:`OutboundInterceptor.delete_schedule`."""
 
     id: str
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5647,8 +5595,8 @@ class DescribeScheduleInput:
     """Input for :py:meth:`OutboundInterceptor.describe_schedule`."""
 
     id: str
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5656,9 +5604,9 @@ class PauseScheduleInput:
     """Input for :py:meth:`OutboundInterceptor.pause_schedule`."""
 
     id: str
-    note: Optional[str]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    note: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5666,9 +5614,9 @@ class TriggerScheduleInput:
     """Input for :py:meth:`OutboundInterceptor.trigger_schedule`."""
 
     id: str
-    overlap: Optional[ScheduleOverlapPolicy]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    overlap: ScheduleOverlapPolicy | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5676,9 +5624,9 @@ class UnpauseScheduleInput:
     """Input for :py:meth:`OutboundInterceptor.unpause_schedule`."""
 
     id: str
-    note: Optional[str]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    note: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5688,10 +5636,10 @@ class UpdateScheduleInput:
     id: str
     updater: Callable[
         [ScheduleUpdateInput],
-        Union[Optional[ScheduleUpdate], Awaitable[Optional[ScheduleUpdate]]],
+        ScheduleUpdate | None | Awaitable[ScheduleUpdate | None],
     ]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5700,8 +5648,8 @@ class UpdateWorkerBuildIdCompatibilityInput:
 
     task_queue: str
     operation: BuildIdOp
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5709,9 +5657,9 @@ class GetWorkerBuildIdCompatibilityInput:
     """Input for :py:meth:`OutboundInterceptor.get_worker_build_id_compatibility`."""
 
     task_queue: str
-    max_sets: Optional[int]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    max_sets: int | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5720,9 +5668,9 @@ class GetWorkerTaskReachabilityInput:
 
     build_ids: Sequence[str]
     task_queues: Sequence[str]
-    reachability: Optional[TaskReachabilityType]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    reachability: TaskReachabilityType | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -5911,19 +5859,19 @@ class _ClientImpl(OutboundInterceptor):
     async def start_workflow(
         self, input: StartWorkflowInput
     ) -> WorkflowHandle[Any, Any]:
-        req: Union[
-            temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
-            temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest,
-        ]
+        req: (
+            temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest
+            | temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest
+        )
         if input.start_signal is not None:
             req = await self._build_signal_with_start_workflow_execution_request(input)
         else:
             req = await self._build_start_workflow_execution_request(input)
 
-        resp: Union[
-            temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
-            temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse,
-        ]
+        resp: (
+            temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse
+            | temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionResponse
+        )
         first_execution_run_id = None
         eagerly_started = False
         try:
@@ -6032,11 +5980,11 @@ class _ClientImpl(OutboundInterceptor):
 
     async def _populate_start_workflow_execution_request(
         self,
-        req: Union[
-            temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
-            temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest,
-        ],
-        input: Union[StartWorkflowInput, UpdateWithStartStartWorkflowInput],
+        req: (
+            temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest
+            | temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest
+        ),
+        input: StartWorkflowInput | UpdateWithStartStartWorkflowInput,
     ) -> None:
         data_converter = self._client.data_converter.with_context(
             WorkflowSerializationContext(
@@ -6308,7 +6256,7 @@ class _ClientImpl(OutboundInterceptor):
 
     async def _build_update_workflow_execution_request(
         self,
-        input: Union[StartWorkflowUpdateInput, UpdateWithStartUpdateWorkflowInput],
+        input: StartWorkflowUpdateInput | UpdateWithStartUpdateWorkflowInput,
         workflow_id: str,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkflowExecutionRequest:
         data_converter = self._client.data_converter.with_context(
@@ -6368,7 +6316,7 @@ class _ClientImpl(OutboundInterceptor):
                 input._on_start(start_response)
                 seen_start = True
 
-        err: Optional[BaseException] = None
+        err: BaseException | None = None
 
         try:
             return await self._start_workflow_update_with_start(
@@ -6676,7 +6624,7 @@ class _ClientImpl(OutboundInterceptor):
                 "Must set limited actions to true if there are remaining actions set"
             )
 
-        initial_patch: Optional[temporalio.api.schedule.v1.SchedulePatch] = None
+        initial_patch: temporalio.api.schedule.v1.SchedulePatch | None = None
         if input.trigger_immediately or input.backfill:
             initial_patch = temporalio.api.schedule.v1.SchedulePatch(
                 trigger_immediately=temporalio.api.schedule.v1.TriggerImmediatelyRequest(
@@ -6919,8 +6867,8 @@ class _ClientImpl(OutboundInterceptor):
 
     async def _apply_headers(
         self,
-        source: Optional[Mapping[str, temporalio.api.common.v1.Payload]],
-        dest: MessageMap[Text, temporalio.api.common.v1.Payload],
+        source: Mapping[str, temporalio.api.common.v1.Payload] | None,
+        dest: MessageMap[str, temporalio.api.common.v1.Payload],
     ) -> None:
         await _apply_headers(
             source,
@@ -6932,10 +6880,10 @@ class _ClientImpl(OutboundInterceptor):
 
 
 async def _apply_headers(
-    source: Optional[Mapping[str, temporalio.api.common.v1.Payload]],
-    dest: MessageMap[Text, temporalio.api.common.v1.Payload],
+    source: Mapping[str, temporalio.api.common.v1.Payload] | None,
+    dest: MessageMap[str, temporalio.api.common.v1.Payload],
     encode_headers: bool,
-    codec: Optional[temporalio.converter.PayloadCodec],
+    codec: temporalio.converter.PayloadCodec | None,
 ) -> None:
     if source is None:
         return
@@ -6947,7 +6895,7 @@ async def _apply_headers(
 
 
 def _history_from_json(
-    history: Union[str, Dict[str, Any]],
+    history: str | dict[str, Any],
 ) -> temporalio.api.history.v1.History:
     if isinstance(history, str):
         history = json.loads(history)
@@ -7021,7 +6969,7 @@ def _history_from_json(
 _pascal_case_match = re.compile("([A-Z]+)")
 
 
-def _fix_history_failure(parent: Dict[str, Any], *attrs: str) -> None:
+def _fix_history_failure(parent: dict[str, Any], *attrs: str) -> None:
     _fix_history_enum(
         "TIMEOUT_TYPE", parent, *attrs, "timeoutFailureInfo", "timeoutType"
     )
@@ -7047,7 +6995,7 @@ def _fix_history_failure(parent: Dict[str, Any], *attrs: str) -> None:
         _fix_history_failure(parent, "cause")
 
 
-def _fix_history_enum(prefix: str, parent: Dict[str, Any], *attrs: str) -> None:
+def _fix_history_enum(prefix: str, parent: dict[str, Any], *attrs: str) -> None:
     # If the attr is "*", we need to handle all dict children
     if attrs[0] == "*":
         for child in parent.values():
@@ -7275,7 +7223,7 @@ class BuildIdReachability:
     is an empty list, the Build ID is not reachable on that queue.
     """
 
-    unretrieved_task_queues: FrozenSet[str]
+    unretrieved_task_queues: frozenset[str]
     """If any Task Queues could not be retrieved because the server limits the number that can be
     queried at once, they will be listed here.
     """
@@ -7355,17 +7303,17 @@ class CloudOperationsClient:
     @staticmethod
     async def connect(
         *,
-        api_key: Optional[str] = None,
-        version: Optional[str] = None,
+        api_key: str | None = None,
+        version: str | None = None,
         target_host: str = "saas-api.tmprl.cloud:443",
-        tls: Union[bool, TLSConfig] = True,
-        retry_config: Optional[RetryConfig] = None,
-        keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        identity: Optional[str] = None,
+        tls: bool | TLSConfig = True,
+        retry_config: RetryConfig | None = None,
+        keep_alive_config: KeepAliveConfig | None = KeepAliveConfig.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        identity: str | None = None,
         lazy: bool = False,
-        runtime: Optional[temporalio.runtime.Runtime] = None,
-        http_connect_proxy_config: Optional[HttpConnectProxyConfig] = None,
+        runtime: temporalio.runtime.Runtime | None = None,
+        http_connect_proxy_config: HttpConnectProxyConfig | None = None,
     ) -> CloudOperationsClient:
         """Connect to a Temporal Cloud Operations API.
 
@@ -7453,7 +7401,7 @@ class CloudOperationsClient:
         return self._service_client.config.identity
 
     @property
-    def rpc_metadata(self) -> Mapping[str, Union[str, bytes]]:
+    def rpc_metadata(self) -> Mapping[str, str | bytes]:
         """Headers for every call made by this client.
 
         Do not use mutate this mapping. Rather, set this property with an
@@ -7463,7 +7411,7 @@ class CloudOperationsClient:
         return self.service_client.config.rpc_metadata
 
     @rpc_metadata.setter
-    def rpc_metadata(self, value: Mapping[str, Union[str, bytes]]) -> None:
+    def rpc_metadata(self, value: Mapping[str, str | bytes]) -> None:
         """Update the headers for this client.
 
         Do not mutate this mapping after set. Rather, set an entirely new
@@ -7475,12 +7423,12 @@ class CloudOperationsClient:
         self.service_client.update_rpc_metadata(value)
 
     @property
-    def api_key(self) -> Optional[str]:
+    def api_key(self) -> str | None:
         """API key for every call made by this client."""
         return self.service_client.config.api_key
 
     @api_key.setter
-    def api_key(self, value: Optional[str]) -> None:
+    def api_key(self, value: str | None) -> None:
         """Update the API key for this client.
 
         This is only set if RPCmetadata doesn't already have an "authorization"
@@ -7497,9 +7445,9 @@ Callback = temporalio.nexus.NexusCallback
 
 async def _encode_user_metadata(
     converter: temporalio.converter.DataConverter,
-    summary: Optional[Union[str, temporalio.api.common.v1.Payload]],
-    details: Optional[Union[str, temporalio.api.common.v1.Payload]],
-) -> Optional[temporalio.api.sdk.v1.UserMetadata]:
+    summary: str | temporalio.api.common.v1.Payload | None,
+    details: str | temporalio.api.common.v1.Payload | None,
+) -> temporalio.api.sdk.v1.UserMetadata | None:
     if summary is None and details is None:
         return None
     enc_summary = None
@@ -7519,8 +7467,8 @@ async def _encode_user_metadata(
 
 async def _decode_user_metadata(
     converter: temporalio.converter.DataConverter,
-    metadata: Optional[temporalio.api.sdk.v1.UserMetadata],
-) -> Tuple[Optional[str], Optional[str]]:
+    metadata: temporalio.api.sdk.v1.UserMetadata | None,
+) -> tuple[str | None, str | None]:
     """Returns (summary, details)"""
     if metadata is None:
         return None, None

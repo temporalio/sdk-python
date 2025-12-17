@@ -4,16 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
-    AsyncIterator,
-    Iterator,
     List,
-    Mapping,
     Optional,
-    Sequence,
     Type,
     Union,
     cast,
@@ -80,26 +77,25 @@ class WorkflowEnvironment:
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[temporalio.client.Interceptor] = [],
         plugins: Sequence[temporalio.client.Plugin] = [],
-        default_workflow_query_reject_condition: Optional[
-            temporalio.common.QueryRejectCondition
-        ] = None,
-        retry_config: Optional[temporalio.client.RetryConfig] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        identity: Optional[str] = None,
+        default_workflow_query_reject_condition: None
+        | (temporalio.common.QueryRejectCondition) = None,
+        retry_config: temporalio.client.RetryConfig | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        identity: str | None = None,
         tls: bool | temporalio.client.TLSConfig = False,
         ip: str = "127.0.0.1",
-        port: Optional[int] = None,
-        download_dest_dir: Optional[str] = None,
+        port: int | None = None,
+        download_dest_dir: str | None = None,
         ui: bool = False,
-        runtime: Optional[temporalio.runtime.Runtime] = None,
+        runtime: temporalio.runtime.Runtime | None = None,
         search_attributes: Sequence[temporalio.common.SearchAttributeKey] = (),
-        dev_server_existing_path: Optional[str] = None,
-        dev_server_database_filename: Optional[str] = None,
+        dev_server_existing_path: str | None = None,
+        dev_server_database_filename: str | None = None,
         dev_server_log_format: str = "pretty",
-        dev_server_log_level: Optional[str] = "warn",
+        dev_server_log_level: str | None = "warn",
         dev_server_download_version: str = "default",
         dev_server_extra_args: Sequence[str] = [],
-        dev_server_download_ttl: Optional[timedelta] = None,
+        dev_server_download_ttl: timedelta | None = None,
     ) -> WorkflowEnvironment:
         """Start a full Temporal server locally, downloading if necessary.
 
@@ -241,19 +237,18 @@ class WorkflowEnvironment:
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[temporalio.client.Interceptor] = [],
         plugins: Sequence[temporalio.client.Plugin] = [],
-        default_workflow_query_reject_condition: Optional[
-            temporalio.common.QueryRejectCondition
-        ] = None,
-        retry_config: Optional[temporalio.client.RetryConfig] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        identity: Optional[str] = None,
-        port: Optional[int] = None,
-        download_dest_dir: Optional[str] = None,
-        runtime: Optional[temporalio.runtime.Runtime] = None,
-        test_server_existing_path: Optional[str] = None,
+        default_workflow_query_reject_condition: None
+        | (temporalio.common.QueryRejectCondition) = None,
+        retry_config: temporalio.client.RetryConfig | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        identity: str | None = None,
+        port: int | None = None,
+        download_dest_dir: str | None = None,
+        runtime: temporalio.runtime.Runtime | None = None,
+        test_server_existing_path: str | None = None,
         test_server_download_version: str = "default",
         test_server_extra_args: Sequence[str] = [],
-        test_server_download_ttl: Optional[timedelta] = None,
+        test_server_download_ttl: timedelta | None = None,
     ) -> WorkflowEnvironment:
         """Start a time skipping workflow environment.
 
@@ -380,7 +375,7 @@ class WorkflowEnvironment:
         """Shut down this environment."""
         pass
 
-    async def sleep(self, duration: Union[timedelta, float]) -> None:
+    async def sleep(self, duration: timedelta | float) -> None:
         """Sleep in this environment.
 
         This awaits a regular :py:func:`asyncio.sleep` in regular environments,
@@ -432,7 +427,7 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
         # Add assertion interceptor to client and if time skipping is supported,
         # add time skipping interceptor
         self._supports_time_skipping = server.has_test_service
-        interceptors: List[temporalio.client.Interceptor] = [
+        interceptors: list[temporalio.client.Interceptor] = [
             _AssertionErrorInterceptor()
         ]
         if self._supports_time_skipping:
@@ -444,7 +439,7 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
     async def shutdown(self) -> None:
         await self._server.shutdown()
 
-    async def sleep(self, duration: Union[timedelta, float]) -> None:
+    async def sleep(self, duration: timedelta | float) -> None:
         # Use regular sleep if no time skipping
         if not self._supports_time_skipping:
             return await super().sleep(duration)
@@ -510,7 +505,7 @@ class _AssertionErrorInterceptor(
 ):
     def workflow_interceptor_class(
         self, input: temporalio.worker.WorkflowInterceptorClassInput
-    ) -> Optional[Type[temporalio.worker.WorkflowInboundInterceptor]]:
+    ) -> type[temporalio.worker.WorkflowInboundInterceptor] | None:
         return _AssertionErrorWorkflowInboundInterceptor
 
 
@@ -575,8 +570,8 @@ class _TimeSkippingWorkflowHandle(temporalio.client.WorkflowHandle):
         self,
         *,
         follow_runs: bool = True,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> Any:
         async with self.env.time_skipping_unlocked():
             return await super().result(

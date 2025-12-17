@@ -8,13 +8,14 @@ import signal
 import threading
 import time
 import uuid
+from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from time import sleep
-from typing import Any, Callable, List, NoReturn, Optional, Sequence, Type
+from typing import Any, List, NoReturn, Optional, Type
 
 import pytest
 
@@ -122,7 +123,7 @@ async def test_client_available_in_async_activities(
     with pytest.raises(RuntimeError, match="Not in activity context"):
         activity.client()
 
-    captured_client: Optional[Client] = None
+    captured_client: Client | None = None
 
     @activity.defn
     async def capture_client() -> None:
@@ -185,7 +186,7 @@ async def test_activity_info(
     assert str(err.value) == "Not in activity context"
 
     # Capture the info from the activity
-    info: Optional[activity.Info] = None
+    info: activity.Info | None = None
 
     @activity.defn
     async def capture_info() -> None:
@@ -517,7 +518,7 @@ async def test_sync_activity_thread_cancel_exception_shielded(
     worker: ExternalWorker,
     shared_state_manager: SharedStateManager,
 ):
-    events: List[str] = []
+    events: list[str] = []
 
     @activity.defn
     def wait_cancel() -> None:
@@ -703,7 +704,7 @@ async def test_max_concurrent_activities(
     worker: ExternalWorker,
     shared_state_manager: SharedStateManager,
 ):
-    seen_indexes: List[int] = []
+    seen_indexes: list[int] = []
     complete_activities_event = asyncio.Event()
 
     @activity.defn
@@ -741,7 +742,7 @@ class SomeClass1:
 @dataclass
 class SomeClass2:
     foo: str
-    bar: Optional[SomeClass1] = None
+    bar: SomeClass1 | None = None
 
 
 async def test_activity_type_hints(
@@ -870,7 +871,7 @@ async def test_activity_heartbeat_details_timeout(
 @activity.defn
 def picklable_heartbeat_details_activity() -> str:
     info = activity.info()
-    some_list: List[str] = (
+    some_list: list[str] = (
         next(iter(info.heartbeat_details)) if info.heartbeat_details else []
     )
     some_list.append(f"attempt: {info.attempt}")
@@ -1033,7 +1034,7 @@ async def test_activity_logging(
         activity.logger.base_logger.removeHandler(handler)
         activity.logger.base_logger.setLevel(prev_level)
     assert result.result == "Hello, Temporal!"
-    records: List[logging.LogRecord] = list(handler.queue.queue)  # type: ignore
+    records: list[logging.LogRecord] = list(handler.queue.queue)  # type: ignore
     assert len(records) > 0
     assert records[-1].message.startswith(
         "Called with arg: Temporal ({'activity_id': '"
@@ -1240,11 +1241,11 @@ async def test_sync_activity_process_executor_crash(
 
 class AsyncActivityWrapper:
     def __init__(self) -> None:
-        self._info: Optional[activity.Info] = None
+        self._info: activity.Info | None = None
         self._info_set = asyncio.Event()
 
     @activity.defn
-    async def run(self) -> Optional[str]:
+    async def run(self) -> str | None:
         self._info = activity.info()
         self._info_set.set()
         activity.raise_complete_async()
@@ -1571,21 +1572,21 @@ async def _execute_workflow_with_activity(
     fn: Callable,
     *args: Any,
     shared_state_manager: SharedStateManager,
-    count: Optional[int] = None,
-    index_as_arg: Optional[bool] = None,
-    schedule_to_close_timeout_ms: Optional[int] = None,
-    start_to_close_timeout_ms: Optional[int] = None,
-    schedule_to_start_timeout_ms: Optional[int] = None,
-    cancel_after_ms: Optional[int] = None,
-    wait_for_cancellation: Optional[bool] = None,
-    heartbeat_timeout_ms: Optional[int] = None,
-    retry_max_attempts: Optional[int] = None,
-    non_retryable_error_types: Optional[Sequence[str]] = None,
+    count: int | None = None,
+    index_as_arg: bool | None = None,
+    schedule_to_close_timeout_ms: int | None = None,
+    start_to_close_timeout_ms: int | None = None,
+    schedule_to_start_timeout_ms: int | None = None,
+    cancel_after_ms: int | None = None,
+    wait_for_cancellation: bool | None = None,
+    heartbeat_timeout_ms: int | None = None,
+    retry_max_attempts: int | None = None,
+    non_retryable_error_types: Sequence[str] | None = None,
     worker_config: WorkerConfig = {},
-    on_complete: Optional[Callable[[], None]] = None,
-    activity_name_override: Optional[str] = None,
-    result_type_override: Optional[Type] = None,
-    additional_activities: List[Callable] = [],
+    on_complete: Callable[[], None] | None = None,
+    activity_name_override: str | None = None,
+    result_type_override: type | None = None,
+    additional_activities: list[Callable] = [],
 ) -> _ActivityResult:
     worker_config["client"] = client
     worker_config["task_queue"] = str(uuid.uuid4())

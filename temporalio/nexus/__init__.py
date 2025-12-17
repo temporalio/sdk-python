@@ -16,6 +16,7 @@ from ._operation_context import (
     in_operation,
     info,
     logger,
+    metric_meter,
 )
 from ._token import WorkflowHandle
 
@@ -29,5 +30,6 @@ __all__ = (
     "in_operation",
     "info",
     "logger",
+    "metric_meter",
     "WorkflowHandle",
 )

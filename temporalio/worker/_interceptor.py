@@ -3,17 +3,15 @@
 from __future__ import annotations
 
 import concurrent.futures
-from collections.abc import Callable, Mapping, MutableMapping
+from collections.abc import Awaitable, Callable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
     Any,
-    Awaitable,
     Generic,
     List,
     NoReturn,
     Optional,
-    Sequence,
     Type,
     Union,
 )
@@ -52,7 +50,7 @@ class Interceptor:
 
     def workflow_interceptor_class(
         self, input: WorkflowInterceptorClassInput
-    ) -> Optional[Type[WorkflowInboundInterceptor]]:
+    ) -> type[WorkflowInboundInterceptor] | None:
         """Class that will be instantiated and used to intercept workflows.
 
         This method is called on workflow start. The class must have the same
@@ -67,6 +65,20 @@ class Interceptor:
             The class to construct to intercept each workflow.
         """
         return None
+
+    def intercept_nexus_operation(
+        self, next: NexusOperationInboundInterceptor
+    ) -> NexusOperationInboundInterceptor:
+        """Method called for intercepting a Nexus operation.
+
+        Args:
+            next: The underlying inbound this interceptor
+             should delegate to.
+
+        Returns:
+            The new interceptor that should be used for the Nexus operation.
+        """
+        return next
 
 
 @dataclass(frozen=True)
@@ -91,7 +103,7 @@ class ExecuteActivityInput:
 
     fn: Callable[..., Any]
     args: Sequence[Any]
-    executor: Optional[concurrent.futures.Executor]
+    executor: concurrent.futures.Executor | None
     headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
@@ -151,29 +163,27 @@ class ActivityOutboundInterceptor:
 class ContinueAsNewInput:
     """Input for :py:meth:`WorkflowOutboundInterceptor.continue_as_new`."""
 
-    workflow: Optional[str]
+    workflow: str | None
     args: Sequence[Any]
-    task_queue: Optional[str]
-    run_timeout: Optional[timedelta]
-    task_timeout: Optional[timedelta]
-    retry_policy: Optional[temporalio.common.RetryPolicy]
-    memo: Optional[Mapping[str, Any]]
-    search_attributes: Optional[
-        Union[
-            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
-        ]
-    ]
+    task_queue: str | None
+    run_timeout: timedelta | None
+    task_timeout: timedelta | None
+    retry_policy: temporalio.common.RetryPolicy | None
+    memo: Mapping[str, Any] | None
+    search_attributes: None | (
+        temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
+    )
     headers: Mapping[str, temporalio.api.common.v1.Payload]
-    versioning_intent: Optional[VersioningIntent]
+    versioning_intent: VersioningIntent | None
     # The types may be absent
-    arg_types: Optional[List[Type]]
+    arg_types: list[type] | None
 
 
 @dataclass
 class ExecuteWorkflowInput:
     """Input for :py:meth:`WorkflowInboundInterceptor.execute_workflow`."""
 
-    type: Type
+    type: type
     # Note, this is an unbound method
     run_fn: Callable[..., Awaitable[Any]]
     args: Sequence[Any]
@@ -229,7 +239,7 @@ class SignalExternalWorkflowInput:
     args: Sequence[Any]
     namespace: str
     workflow_id: str
-    workflow_run_id: Optional[str]
+    workflow_run_id: str | None
     headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
@@ -239,22 +249,22 @@ class StartActivityInput:
 
     activity: str
     args: Sequence[Any]
-    activity_id: Optional[str]
-    task_queue: Optional[str]
-    schedule_to_close_timeout: Optional[timedelta]
-    schedule_to_start_timeout: Optional[timedelta]
-    start_to_close_timeout: Optional[timedelta]
-    heartbeat_timeout: Optional[timedelta]
-    retry_policy: Optional[temporalio.common.RetryPolicy]
+    activity_id: str | None
+    task_queue: str | None
+    schedule_to_close_timeout: timedelta | None
+    schedule_to_start_timeout: timedelta | None
+    start_to_close_timeout: timedelta | None
+    heartbeat_timeout: timedelta | None
+    retry_policy: temporalio.common.RetryPolicy | None
     cancellation_type: temporalio.workflow.ActivityCancellationType
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     disable_eager_execution: bool
-    versioning_intent: Optional[VersioningIntent]
-    summary: Optional[str]
+    versioning_intent: VersioningIntent | None
+    summary: str | None
     priority: temporalio.common.Priority
     # The types may be absent
-    arg_types: Optional[List[Type]]
-    ret_type: Optional[Type]
+    arg_types: list[type] | None
+    ret_type: type | None
 
 
 @dataclass
@@ -264,29 +274,27 @@ class StartChildWorkflowInput:
     workflow: str
     args: Sequence[Any]
     id: str
-    task_queue: Optional[str]
+    task_queue: str | None
     cancellation_type: temporalio.workflow.ChildWorkflowCancellationType
     parent_close_policy: temporalio.workflow.ParentClosePolicy
-    execution_timeout: Optional[timedelta]
-    run_timeout: Optional[timedelta]
-    task_timeout: Optional[timedelta]
+    execution_timeout: timedelta | None
+    run_timeout: timedelta | None
+    task_timeout: timedelta | None
     id_reuse_policy: temporalio.common.WorkflowIDReusePolicy
-    retry_policy: Optional[temporalio.common.RetryPolicy]
+    retry_policy: temporalio.common.RetryPolicy | None
     cron_schedule: str
-    memo: Optional[Mapping[str, Any]]
-    search_attributes: Optional[
-        Union[
-            temporalio.common.SearchAttributes, temporalio.common.TypedSearchAttributes
-        ]
-    ]
+    memo: Mapping[str, Any] | None
+    search_attributes: None | (
+        temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
+    )
     headers: Mapping[str, temporalio.api.common.v1.Payload]
-    versioning_intent: Optional[VersioningIntent]
-    static_summary: Optional[str]
-    static_details: Optional[str]
+    versioning_intent: VersioningIntent | None
+    static_summary: str | None
+    static_details: str | None
     priority: temporalio.common.Priority
     # The types may be absent
-    arg_types: Optional[List[Type]]
-    ret_type: Optional[Type]
+    arg_types: list[type] | None
+    ret_type: type | None
 
 
 @dataclass
@@ -301,7 +309,7 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
     cancellation_type: temporalio.workflow.NexusOperationCancellationType
     headers: Mapping[str, str] | None
     summary: str | None
-    output_type: Type[OutputT] | None = None
+    output_type: type[OutputT] | None = None
 
     def __post_init__(self) -> None:
         """Initialize operation-specific attributes after dataclass creation."""
@@ -345,19 +353,19 @@ class StartLocalActivityInput:
 
     activity: str
     args: Sequence[Any]
-    activity_id: Optional[str]
-    schedule_to_close_timeout: Optional[timedelta]
-    schedule_to_start_timeout: Optional[timedelta]
-    start_to_close_timeout: Optional[timedelta]
-    retry_policy: Optional[temporalio.common.RetryPolicy]
-    local_retry_threshold: Optional[timedelta]
+    activity_id: str | None
+    schedule_to_close_timeout: timedelta | None
+    schedule_to_start_timeout: timedelta | None
+    start_to_close_timeout: timedelta | None
+    retry_policy: temporalio.common.RetryPolicy | None
+    local_retry_threshold: timedelta | None
     cancellation_type: temporalio.workflow.ActivityCancellationType
     headers: Mapping[str, temporalio.api.common.v1.Payload]
-    summary: Optional[str]
+    summary: str | None
 
     # The types may be absent
-    arg_types: Optional[List[Type]]
-    ret_type: Optional[Type]
+    arg_types: list[type] | None
+    ret_type: type | None
 
 
 class WorkflowInboundInterceptor:
@@ -471,3 +479,50 @@ class WorkflowOutboundInterceptor:
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
         """Called for every :py:func:`temporalio.workflow.NexusClient.start_operation` call."""
         return await self.next.start_nexus_operation(input)
+
+
+@dataclass
+class ExecuteNexusOperationStartInput:
+    """Input for :pyt:meth:`NexusOperationInboundInterceptor.start_operation"""
+
+    ctx: nexusrpc.handler.StartOperationContext
+    input: Any
+
+
+@dataclass
+class ExecuteNexusOperationCancelInput:
+    """Input for :pyt:meth:`NexusOperationInboundInterceptor.cancel_operation"""
+
+    ctx: nexusrpc.handler.CancelOperationContext
+    token: str
+
+
+class NexusOperationInboundInterceptor:
+    """Inbound interceptor to wrap Nexus operation starting and cancelling.
+
+    This should be extended by any Nexus operation inbound interceptors.
+    """
+
+    def __init__(self, next: NexusOperationInboundInterceptor) -> None:
+        """Create the inbound interceptor.
+
+        Args:
+            next: The next interceptor in the chain. The default implementation
+                of all calls is to delegate to the next interceptor.
+        """
+        self.next = next
+
+    async def execute_nexus_operation_start(
+        self, input: ExecuteNexusOperationStartInput
+    ) -> (
+        nexusrpc.handler.StartOperationResultSync[Any]
+        | nexusrpc.handler.StartOperationResultAsync
+    ):
+        """Called to start a Nexus operation"""
+        return await self.next.execute_nexus_operation_start(input)
+
+    async def execute_nexus_operation_cancel(
+        self, input: ExecuteNexusOperationCancelInput
+    ) -> None:
+        """Called to cancel an in progress Nexus operation"""
+        return await self.next.execute_nexus_operation_cancel(input)

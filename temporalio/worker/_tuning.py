@@ -3,11 +3,12 @@ from __future__ import annotations
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Callable, Literal, Optional, Protocol, Union, runtime_checkable
+from typing import Any, Literal, Optional, Protocol, TypeAlias, Union, runtime_checkable
 
-from typing_extensions import Self, TypeAlias
+from typing_extensions import Self
 
 import temporalio.bridge.worker
 from temporalio.common import WorkerDeploymentVersion
@@ -42,12 +43,12 @@ class ResourceBasedTunerConfig:
 class ResourceBasedSlotConfig:
     """Options for a specific slot type being used with a :py:class:`ResourceBasedSlotSupplier`."""
 
-    minimum_slots: Optional[int] = None
+    minimum_slots: int | None = None
     """Amount of slots that will be issued regardless of any other checks. Defaults to 5 for workflows and 1 for
     activities."""
-    maximum_slots: Optional[int] = None
+    maximum_slots: int | None = None
     """Maximum amount of slots permitted. Defaults to 500."""
-    ramp_throttle: Optional[timedelta] = None
+    ramp_throttle: timedelta | None = None
     """Minimum time we will wait (after passing the minimum slots number) between handing out new slots in milliseconds.
     Defaults to 0 for workflows and 50ms for activities.
 
@@ -90,7 +91,7 @@ class SlotReserveContext(Protocol):
     .. warning::
         Deprecated, use :py:attr:`worker_deployment_version` instead.
     """
-    worker_deployment_version: Optional[WorkerDeploymentVersion]
+    worker_deployment_version: WorkerDeploymentVersion | None
     """The deployment version of the worker that is requesting the reservation, if any."""
     is_sticky: bool
     """True iff this is a reservation for a sticky poll for a workflow task."""
@@ -151,7 +152,7 @@ class SlotMarkUsedContext(Protocol):
 class SlotReleaseContext:
     """Context for releasing a slot from a :py:class:`CustomSlotSupplier`."""
 
-    slot_info: Optional[SlotInfo]
+    slot_info: SlotInfo | None
     """Info about the task that will be using the slot. May be None if the slot was never used."""
     permit: SlotPermit
     """The permit that was issued when the slot was reserved."""
@@ -183,7 +184,7 @@ class CustomSlotSupplier(ABC):
         ...
 
     @abstractmethod
-    def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+    def try_reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit | None:
         """This function is called when trying to reserve slots for "eager" workflow and activity tasks.
         Eager tasks are those which are returned as a result of completing a workflow task, rather than
         from polling. Your implementation must not block, and if a slot is available, return a permit
@@ -246,7 +247,7 @@ class _BridgeSlotSupplierWrapper:
             # Error needs to be re-thrown here so the rust code will loop
             raise
 
-    def try_reserve_slot(self, ctx: SlotReserveContext) -> Optional[SlotPermit]:
+    def try_reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit | None:
         try:
             return self._supplier.try_reserve_slot(ctx)
         except Exception:
@@ -316,10 +317,10 @@ class WorkerTuner(ABC):
         *,
         target_memory_usage: float,
         target_cpu_usage: float,
-        workflow_config: Optional[ResourceBasedSlotConfig] = None,
-        activity_config: Optional[ResourceBasedSlotConfig] = None,
-        local_activity_config: Optional[ResourceBasedSlotConfig] = None,
-        nexus_config: Optional[ResourceBasedSlotConfig] = None,
+        workflow_config: ResourceBasedSlotConfig | None = None,
+        activity_config: ResourceBasedSlotConfig | None = None,
+        local_activity_config: ResourceBasedSlotConfig | None = None,
+        nexus_config: ResourceBasedSlotConfig | None = None,
     ) -> WorkerTuner:
         """Create a resource-based tuner with the provided options."""
         resource_cfg = ResourceBasedTunerConfig(target_memory_usage, target_cpu_usage)
@@ -346,10 +347,10 @@ class WorkerTuner(ABC):
     def create_fixed(
         cls,
         *,
-        workflow_slots: Optional[int] = None,
-        activity_slots: Optional[int] = None,
-        local_activity_slots: Optional[int] = None,
-        nexus_slots: Optional[int] = None,
+        workflow_slots: int | None = None,
+        activity_slots: int | None = None,
+        local_activity_slots: int | None = None,
+        nexus_slots: int | None = None,
     ) -> WorkerTuner:
         """Create a fixed-size tuner with the provided number of slots.
 
@@ -411,16 +412,16 @@ class WorkerTuner(ABC):
             _to_bridge_slot_supplier(self._get_nexus_slot_supplier(), "nexus"),
         )
 
-    def _get_activities_max(self) -> Optional[int]:
+    def _get_activities_max(self) -> int | None:
         return WorkerTuner._get_slot_supplier_max(
             self._get_activity_task_slot_supplier()
         )
 
-    def _get_nexus_tasks_max(self) -> Optional[int]:
+    def _get_nexus_tasks_max(self) -> int | None:
         return WorkerTuner._get_slot_supplier_max(self._get_nexus_slot_supplier())
 
     @staticmethod
-    def _get_slot_supplier_max(slot_supplier: SlotSupplier) -> Optional[int]:
+    def _get_slot_supplier_max(slot_supplier: SlotSupplier) -> int | None:
         if isinstance(slot_supplier, FixedSizeSlotSupplier):
             return slot_supplier.num_slots
         elif isinstance(slot_supplier, ResourceBasedSlotSupplier):
