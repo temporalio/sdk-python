@@ -2761,7 +2761,7 @@ async def test_signal_streaming_failure(client: Client):
 async def test_callback_streaming(client: Client):
     events = []
 
-    async def callback(event: TResponseStreamEvent) -> None:
+    async def callback(_: ModelSettings, event: TResponseStreamEvent) -> None:
         events.append(event)
 
     async with AgentEnvironment(

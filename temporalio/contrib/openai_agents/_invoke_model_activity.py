@@ -241,7 +241,9 @@ class ModelActivity:
                     event.model_rebuild()
                     batch.append(event)
                     if self._streaming_options.callback is not None:
-                        await self._streaming_options.callback(event)
+                        await self._streaming_options.callback(
+                            input["model_settings"], event
+                        )
 
             try:
                 completed, pending = await asyncio.wait(
@@ -297,7 +299,7 @@ class ModelActivity:
             event.model_rebuild()
             result.append(event)
             if self._streaming_options.callback is not None:
-                await self._streaming_options.callback(event)
+                await self._streaming_options.callback(input["model_settings"], event)
 
         return result
 

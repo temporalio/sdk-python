@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Awaitable, Optional, Union
 
-from agents import Agent, TResponseInputItem
+from agents import Agent, ModelSettings, TResponseInputItem
 from agents.items import TResponseStreamEvent
 
 from temporalio.common import Priority, RetryPolicy
@@ -76,8 +76,11 @@ class ModelActivityParameters:
 class StreamingOptions:
     """Options applicable for use of run_streamed"""
 
-    callback: Callable[[TResponseStreamEvent], Awaitable[None]] | None = None
-    """A callback function that will be invoked inside the activity on every stream event which occurs."""
+    callback: (
+        Callable[[ModelSettings, TResponseStreamEvent], Awaitable[None]] | None
+    ) = None
+    """A callback function that will be invoked inside the activity on every stream event which occurs.
+    ModelSettings are provided so that the callback can distinguish what to do based on extra_args if desired."""
 
     use_signals: bool = False
     """If true, the activity will use signals to provide events to the workflow as they occur. Ensure that the workflow
