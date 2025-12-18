@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, cast
 
+import nexusrpc
 import opentelemetry.context
 import pytest
 from opentelemetry import baggage, context
@@ -21,7 +22,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode, get_tracer
 
-from temporalio import activity, workflow
+from temporalio import activity, nexus, workflow
 from temporalio.client import Client, WithStartWorkflowOperation, WorkflowUpdateStage
 from temporalio.common import RetryPolicy, WorkflowIDConflictPolicy
 from temporalio.contrib.opentelemetry import (
@@ -29,10 +30,15 @@ from temporalio.contrib.opentelemetry import (
     TracingWorkflowInboundInterceptor,
 )
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
-from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
+from temporalio.exceptions import (
+    ApplicationError,
+    ApplicationErrorCategory,
+    NexusOperationError,
+)
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers import LogCapturer
+from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 
 @dataclass
@@ -63,6 +69,7 @@ class TracingWorkflowAction:
     wait_until_signal_count: int = 0
     wait_and_do_update: bool = False
     wait_and_do_start_with_update: bool = False
+    start_and_cancel_nexus_operation: bool = False
 
 
 @dataclass
@@ -84,6 +91,29 @@ class TracingWorkflowActionActivity:
 @dataclass
 class TracingWorkflowActionContinueAsNew:
     param: TracingWorkflowParam
+
+
+@workflow.defn
+class ExpectCancelNexusWorkflow:
+    @workflow.run
+    async def run(self, input: str):
+        try:
+            await asyncio.wait_for(asyncio.Future(), 2)
+        except asyncio.TimeoutError:
+            raise ApplicationError("expected cancellation")
+
+
+@nexusrpc.handler.service_handler
+class InterceptedNexusService:
+    @nexus.workflow_run_operation
+    async def intercepted_operation(
+        self, ctx: nexus.WorkflowRunOperationContext, input: str
+    ) -> nexus.WorkflowHandle[None]:
+        return await ctx.start_workflow(
+            ExpectCancelNexusWorkflow.run,
+            input,
+            id=f"wf-{uuid.uuid4()}-{ctx.request_id}",
+        )
 
 
 ready_for_update: asyncio.Semaphore
@@ -153,6 +183,22 @@ class TracingWorkflow:
             if action.wait_and_do_start_with_update:
                 ready_for_update_with_start.release()
                 await workflow.wait_condition(lambda: self._did_update_with_start)
+            if action.start_and_cancel_nexus_operation:
+                nexus_client = workflow.create_nexus_client(
+                    endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+                    service=InterceptedNexusService,
+                )
+
+                nexus_handle = await nexus_client.start_operation(
+                    operation=InterceptedNexusService.intercepted_operation,
+                    input="nexus-workflow",
+                )
+                nexus_handle.cancel()
+
+                try:
+                    await nexus_handle
+                except NexusOperationError:
+                    pass
 
     async def _raise_on_non_replay(self) -> None:
         replaying = workflow.unsafe.is_replaying()
@@ -407,6 +453,67 @@ async def test_opentelemetry_tracing_update_with_start(
         "  HandleUpdate:update_with_start (links: StartUpdateWithStartWorkflow:TracingWorkflow)",
         "  RunWorkflow:TracingWorkflow",
         "  MyCustomSpan",
+        "  CompleteWorkflow:TracingWorkflow",
+    ]
+
+
+async def test_opentelemetry_tracing_nexus(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
+        )
+    global ready_for_update_with_start
+    ready_for_update_with_start = asyncio.Semaphore(0)
+    # Create a tracer that has an in-memory exporter
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+    # Create new client with tracer interceptor
+    client_config = client.config()
+    client_config["interceptors"] = [TracingInterceptor(tracer)]
+    client = Client(**client_config)
+
+    task_queue = f"task-queue-{uuid.uuid4()}"
+    await create_nexus_endpoint(task_queue, client)
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[TracingWorkflow, ExpectCancelNexusWorkflow],
+        activities=[tracing_activity],
+        nexus_service_handlers=[InterceptedNexusService()],
+        # Needed so we can wait to send update at the right time
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ):
+        # Run workflow with various actions
+        workflow_id = f"workflow_{uuid.uuid4()}"
+        workflow_params = TracingWorkflowParam(
+            actions=[
+                TracingWorkflowAction(start_and_cancel_nexus_operation=True),
+            ]
+        )
+        handle = await client.start_workflow(
+            TracingWorkflow.run,
+            workflow_params,
+            id=workflow_id,
+            task_queue=task_queue,
+        )
+        await handle.result()
+
+    # Dump debug with attributes, but do string assertion test without
+    logging.debug(
+        "Spans:\n%s",
+        "\n".join(dump_spans(exporter.get_finished_spans(), with_attributes=False)),
+    )
+    assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
+        "StartWorkflow:TracingWorkflow",
+        "  RunWorkflow:TracingWorkflow",
+        "  MyCustomSpan",
+        "  StartNexusOperation:InterceptedNexusService/intercepted_operation",
+        "    RunStartNexusOperationHandler:InterceptedNexusService/intercepted_operation",
+        "      StartWorkflow:ExpectCancelNexusWorkflow",
+        "        RunWorkflow:ExpectCancelNexusWorkflow",
+        "    RunCancelNexusOperationHandler:InterceptedNexusService/intercepted_operation",
         "  CompleteWorkflow:TracingWorkflow",
     ]
 

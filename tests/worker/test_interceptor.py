@@ -4,9 +4,10 @@ from collections.abc import Callable
 from datetime import timedelta
 from typing import Any, NoReturn
 
+import nexusrpc
 import pytest
 
-from temporalio import activity, workflow
+from temporalio import activity, nexus, workflow
 from temporalio.client import Client, WorkflowUpdateFailedError
 from temporalio.exceptions import ApplicationError, NexusOperationError
 from temporalio.testing import WorkflowEnvironment
@@ -15,22 +16,25 @@ from temporalio.worker import (
     ActivityOutboundInterceptor,
     ContinueAsNewInput,
     ExecuteActivityInput,
+    ExecuteNexusOperationCancelInput,
+    ExecuteNexusOperationStartInput,
     ExecuteWorkflowInput,
     HandleQueryInput,
     HandleSignalInput,
     HandleUpdateInput,
     Interceptor,
+    NexusOperationInboundInterceptor,
     SignalChildWorkflowInput,
     SignalExternalWorkflowInput,
     StartActivityInput,
     StartChildWorkflowInput,
     StartLocalActivityInput,
+    StartNexusOperationInput,
     Worker,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
-from temporalio.worker._interceptor import StartNexusOperationInput
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 interceptor_traces: list[tuple[str, Any]] = []
@@ -46,6 +50,11 @@ class TracingWorkerInterceptor(Interceptor):
         self, input: WorkflowInterceptorClassInput
     ) -> type[WorkflowInboundInterceptor] | None:
         return TracingWorkflowInboundInterceptor
+
+    def intercept_nexus_operation(
+        self, next: NexusOperationInboundInterceptor
+    ) -> NexusOperationInboundInterceptor:
+        return TracingNexusInboundInterceptor(next)
 
 
 class TracingActivityInboundInterceptor(ActivityInboundInterceptor):
@@ -134,6 +143,50 @@ class TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
         return await super().start_nexus_operation(input)
 
 
+class TracingNexusInboundInterceptor(NexusOperationInboundInterceptor):
+    async def execute_nexus_operation_start(
+        self, input: ExecuteNexusOperationStartInput
+    ) -> (
+        nexusrpc.handler.StartOperationResultSync[Any]
+        | nexusrpc.handler.StartOperationResultAsync
+    ):
+        interceptor_traces.append(
+            (f"nexus.start_operation.{input.ctx.service}.{input.ctx.operation}", input)
+        )
+        return await super().execute_nexus_operation_start(input)
+
+    async def execute_nexus_operation_cancel(
+        self, input: ExecuteNexusOperationCancelInput
+    ) -> None:
+        interceptor_traces.append(
+            (f"nexus.cancel_operation.{input.ctx.service}.{input.ctx.operation}", input)
+        )
+        return await super().execute_nexus_operation_cancel(input)
+
+
+@workflow.defn
+class ExpectCancelNexusWorkflow:
+    @workflow.run
+    async def run(self, input: str):
+        try:
+            await asyncio.wait_for(asyncio.Future(), 2)
+        except asyncio.TimeoutError:
+            raise ApplicationError("expected cancellation")
+
+
+@nexusrpc.handler.service_handler
+class InterceptedNexusService:
+    @nexus.workflow_run_operation
+    async def intercepted_operation(
+        self, ctx: nexus.WorkflowRunOperationContext, input: str
+    ) -> nexus.WorkflowHandle[None]:
+        return await ctx.start_workflow(
+            ExpectCancelNexusWorkflow.run,
+            input,
+            id=f"wf-{uuid.uuid4()}-{ctx.request_id}",
+        )
+
+
 @activity.defn
 async def intercepted_activity(param: str) -> str:
     if not activity.info().is_local:
@@ -177,20 +230,18 @@ class InterceptedWorkflow:
 
         nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
-            service="non-existent-nexus-service",
+            service=InterceptedNexusService,
         )
+
+        nexus_handle = await nexus_client.start_operation(
+            operation=InterceptedNexusService.intercepted_operation,
+            input="nexus-workflow",
+        )
+        nexus_handle.cancel()
+
         try:
-            await nexus_client.start_operation(
-                operation="non-existent-nexus-operation",
-                input={"test": "data"},
-                schedule_to_close_timeout=timedelta(microseconds=1),
-            )
-            raise Exception("unreachable")
+            await nexus_handle
         except NexusOperationError:
-            # The test requires only that the workflow attempts to schedule the nexus operation.
-            # Instead of setting up a nexus service, we deliberately schedule a call to a
-            # non-existent nexus operation with an insufficiently long timeout, and expect this
-            # error.
             pass
 
         await self.finish.wait()
@@ -230,9 +281,10 @@ async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
     async with Worker(
         client,
         task_queue=task_queue,
-        workflows=[InterceptedWorkflow],
+        workflows=[InterceptedWorkflow, ExpectCancelNexusWorkflow],
         activities=[intercepted_activity],
         interceptors=[TracingWorkerInterceptor()],
+        nexus_service_handlers=[InterceptedNexusService()],
     ):
         # Run workflow
         handle = await client.start_workflow(
@@ -310,6 +362,14 @@ async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
         assert pop_trace("workflow.update.handler", lambda v: v.args[0] == "update-val")
         assert pop_trace(
             "workflow.update.validator", lambda v: v.args[0] == "reject-me"
+        )
+        assert pop_trace(
+            "nexus.start_operation.InterceptedNexusService.intercepted_operation",
+            lambda v: v.input == "nexus-workflow",
+        )
+        assert pop_trace("workflow.execute", lambda v: v.args[0] == "nexus-workflow")
+        assert pop_trace(
+            "nexus.cancel_operation.InterceptedNexusService.intercepted_operation",
         )
 
         # Confirm no unexpected traces
