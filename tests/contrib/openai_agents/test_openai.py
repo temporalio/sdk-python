@@ -163,7 +163,7 @@ async def get_weather(city: str) -> Weather:
 
 
 @activity.defn
-async def get_weather_country(city: str, _country: str) -> Weather:
+async def get_weather_country(city: str, country: str) -> Weather:  # type: ignore[reportUnusedParameter]
     """
     Get the weather for a given city in a country.
     """
@@ -1646,7 +1646,9 @@ async def test_lite_llm(client: Client):
     if sys.version_info >= (3, 14):
         pytest.skip("Lite LLM does not yet support Python 3.14")  # type:ignore[reportUnreachable]
 
-    from agents.extensions.models.litellm_provider import LitellmProvider
+    from agents.extensions.models.litellm_provider import (
+        LitellmProvider,  # type:ignore[reportUnreachable]
+    )
 
     async with AgentEnvironment(
         model_provider=LitellmProvider(),
@@ -1654,13 +1656,13 @@ async def test_lite_llm(client: Client):
             start_to_close_timeout=timedelta(seconds=30),
         ),
     ) as agent_env:
-        client = agent_env.applied_on_client(client)
+        client = agent_env.applied_on_client(client)  # type:ignore[reportUnreachable]
 
         async with new_worker(
             client,
             HelloWorldAgent,
         ) as worker:
-            workflow_handle = await client.start_workflow(
+            workflow_handle = await client.start_workflow(  # type:ignore[reportUnreachable]
                 HelloWorldAgent.run,
                 "Tell me about recursion in programming",
                 id=f"lite-llm-{uuid.uuid4()}",
@@ -2180,7 +2182,7 @@ async def test_output_type(client: Client):
 class McpServerWorkflow:
     @workflow.run
     async def run(self, caching: bool, factory_argument: Any | None) -> str:
-        from agents.mcp import MCPServer
+        from agents.mcp import MCPServer  # type: ignore[reportUnusedImport]
 
         server: MCPServer = openai_agents.workflow.stateless_mcp_server(
             "HelloServer", cache_tools_list=caching, factory_argument=factory_argument

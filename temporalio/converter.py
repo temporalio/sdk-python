@@ -1520,7 +1520,7 @@ def _get_iso_datetime_parser() -> Callable[[str], datetime]:
         return datetime.fromisoformat  # type:ignore[reportUnreachable] # noqa
     else:
         # Isolate import for py > 3.11, as dependency only installed for < 3.11
-        return parser.isoparse
+        return parser.isoparse  # type:ignore[reportUnreachable]
 
 
 def decode_search_attributes(

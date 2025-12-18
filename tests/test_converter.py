@@ -315,7 +315,7 @@ class MyTypedDictNotTotal(TypedDict, total=False):
 # TODO(cretz): Fix when https://github.com/pydantic/pydantic/pull/9612 tagged
 if sys.version_info <= (3, 12, 3):
 
-    class MyPydanticClass(pydantic.BaseModel):
+    class MyPydanticClass(pydantic.BaseModel):  # type: ignore[reportUnreachable]
         foo: str
         bar: list[MyPydanticClass]
         baz: UUID | None = None
@@ -462,7 +462,7 @@ def test_json_type_hints():
     # Pydantic
     # TODO(cretz): Fix when https://github.com/pydantic/pydantic/pull/9612 tagged
     if sys.version_info <= (3, 12, 3):
-        ok(
+        ok(  # type: ignore[reportUnreachable]
             MyPydanticClass,
             MyPydanticClass(
                 foo="foo", bar=[MyPydanticClass(foo="baz", bar=[])], baz=uuid4()

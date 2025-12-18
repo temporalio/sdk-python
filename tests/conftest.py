@@ -61,7 +61,7 @@ def pytest_addoption(parser):  # type: ignore[reportMissingParameterType]
 
 @pytest.fixture(scope="session")
 def event_loop():
-    loop = asyncio.get_event_loop_policy().new_event_loop()
+    loop = asyncio.get_event_loop_policy().new_event_loop()  # type: ignore[reportDeprecated]
     yield loop
     try:
         loop.close()
