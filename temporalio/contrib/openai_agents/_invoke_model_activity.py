@@ -217,7 +217,8 @@ class ModelActivity:
                     message="Activity Failed",
                     sequence_number=0,
                     type="error",
-                ))
+                )
+            )
         try:
             events = model.stream_response(
                 system_instructions=input.get("system_instructions"),
@@ -239,7 +240,9 @@ class ModelActivity:
 
             async def send_batches():
                 while True:
-                    await asyncio.sleep(self._streaming_options.signal_batch_latency_seconds)
+                    await asyncio.sleep(
+                        self._streaming_options.signal_batch_latency_seconds
+                    )
                     await send_batch()
 
             async def read_events():

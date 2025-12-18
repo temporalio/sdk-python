@@ -66,6 +66,7 @@ from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
     EasyInputMessageParam,
     ResponseCodeInterpreterToolCall,
+    ResponseErrorEvent,
     ResponseFileSearchToolCall,
     ResponseFunctionToolCall,
     ResponseFunctionToolCallParam,
@@ -74,7 +75,6 @@ from openai.types.responses import (
     ResponseOutputMessage,
     ResponseOutputText,
     ResponseTextDeltaEvent,
-    ResponseErrorEvent,
 )
 from openai.types.responses.response_file_search_tool_call import Result
 from openai.types.responses.response_function_web_search import ActionSearch
@@ -2648,7 +2648,7 @@ async def test_split_workers(client: Client):
 class StreamingHelloWorldAgent:
     def __init__(self):
         self.events = []
-        self.has_failure = False
+        self._has_failure = False
 
     @workflow.run
     async def run(self, prompt: str) -> str | None:
@@ -2666,7 +2666,7 @@ class StreamingHelloWorldAgent:
             if event.type == "raw_response_event" and isinstance(
                 event.data, ResponseErrorEvent
             ):
-                self.has_failure = True
+                self._has_failure = True
 
         return result.final_output if result else None
 
@@ -2676,7 +2676,7 @@ class StreamingHelloWorldAgent:
 
     @workflow.query
     def has_failure(self) -> bool:
-        return self.has_failure
+        return self._has_failure
 
 
 def streaming_hello_model():
