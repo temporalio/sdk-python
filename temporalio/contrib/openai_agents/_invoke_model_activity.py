@@ -5,11 +5,9 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 
 import asyncio
 import enum
-import json
-import traceback
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Awaitable, Callable, NoReturn, Optional, Union
+from typing import Any, NoReturn, Union
 
 from agents import (
     AgentOutputSchemaBase,
@@ -35,6 +33,7 @@ from openai import (
     APIStatusError,
     AsyncOpenAI,
 )
+from openai.types.responses import ResponseErrorEvent
 from openai.types.responses.tool_param import Mcp
 from pydantic_core import to_json
 from typing_extensions import Required, TypedDict
@@ -205,10 +204,21 @@ class ModelActivity:
         tools = _make_tools(input)
         handoffs = _make_handoffs(input)
 
+        handle = activity.client().get_workflow_handle(
+            workflow_id=activity.info().workflow_id
+        )
+
+        batch: list[TResponseStreamEvent] = []
+
+        # If the activity previously failed, notify the stream
+        if activity.info().attempt > 1:
+            batch.append(
+                ResponseErrorEvent(
+                    message="Activity Failed",
+                    sequence_number=0,
+                    type="error",
+                ))
         try:
-            handle = activity.client().get_workflow_handle(
-                workflow_id=activity.info().workflow_id
-            )
             events = model.stream_response(
                 system_instructions=input.get("system_instructions"),
                 input=input["input"],
@@ -222,10 +232,6 @@ class ModelActivity:
                 prompt=input.get("prompt"),
             )
 
-            # Batch events with configurable latency
-            batch: list[TResponseStreamEvent] = []
-            batch_latency = self._streaming_options.signal_batch_latency_seconds
-
             async def send_batch():
                 if batch:
                     await handle.signal(input["signal"], batch)
@@ -233,7 +239,7 @@ class ModelActivity:
 
             async def send_batches():
                 while True:
-                    await asyncio.sleep(batch_latency)
+                    await asyncio.sleep(self._streaming_options.signal_batch_latency_seconds)
                     await send_batch()
 
             async def read_events():
@@ -263,7 +269,6 @@ class ModelActivity:
                     await task
 
             except StopAsyncIteration as e:
-                traceback.print_exception(e.__class__, e, e.__traceback__)
                 pass
             # Send any remaining events in the batch
             if batch:

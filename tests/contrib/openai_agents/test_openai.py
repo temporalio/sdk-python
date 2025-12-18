@@ -74,6 +74,7 @@ from openai.types.responses import (
     ResponseOutputMessage,
     ResponseOutputText,
     ResponseTextDeltaEvent,
+    ResponseErrorEvent,
 )
 from openai.types.responses.response_file_search_tool_call import Result
 from openai.types.responses.response_function_web_search import ActionSearch
@@ -2647,6 +2648,7 @@ async def test_split_workers(client: Client):
 class StreamingHelloWorldAgent:
     def __init__(self):
         self.events = []
+        self.has_failure = False
 
     @workflow.run
     async def run(self, prompt: str) -> str | None:
@@ -2661,13 +2663,20 @@ class StreamingHelloWorldAgent:
                 event.data, ResponseTextDeltaEvent
             ):
                 self.events.append(event.data.delta)
+            if event.type == "raw_response_event" and isinstance(
+                event.data, ResponseErrorEvent
+            ):
+                self.has_failure = True
 
         return result.final_output if result else None
 
     @workflow.query
     def get_events(self) -> list[str]:
-        print("Querying events: ", self.events)
         return self.events
+
+    @workflow.query
+    def has_failure(self) -> bool:
+        return self.has_failure
 
 
 def streaming_hello_model():
@@ -2756,6 +2765,7 @@ async def test_signal_streaming_failure(client: Client):
             result = await handle.result()
             assert result == "Hello there!"
             assert len(await handle.query(StreamingHelloWorldAgent.get_events)) == 6
+            assert await handle.query(StreamingHelloWorldAgent.has_failure)
 
 
 async def test_callback_streaming(client: Client):
