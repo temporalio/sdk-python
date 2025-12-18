@@ -6,6 +6,7 @@ Implements mapping of OpenAI datastructures to Pydantic friendly types.
 import asyncio
 import enum
 import json
+import traceback
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, NoReturn, Optional, Union
@@ -220,34 +221,34 @@ class ModelActivity:
 
             # Batch events with configurable latency
             batch: list[TResponseStreamEvent] = []
-            last_signal_time = asyncio.get_event_loop().time()
             batch_latency = input.get("batch_latency_seconds", 1.0)
 
             async def send_batch():
-                nonlocal last_signal_time
                 if batch:
                     await handle.signal(input["signal"], batch)
                     batch.clear()
-                    last_signal_time = asyncio.get_event_loop().time()
 
             try:
-                while True:
-                    # If latency has been passed, send the batch
-                    if asyncio.get_event_loop().time() - last_signal_time >= batch_latency:
-                        await send_batch()
-                    try:
-                        event = await asyncio.wait_for(
-                            anext(events), timeout=asyncio.get_event_loop().time() - last_signal_time
-                        )
-                        event.model_rebuild()
+                async def read_events():
+                    async for event in events:
                         batch.append(event)
-
-                    # If the wait timed out, the latency has expired so send the batch
-                    except asyncio.TimeoutError:
+                async def send_batches():
+                    while True:
+                        await asyncio.sleep(batch_latency)
                         await send_batch()
-            except StopAsyncIteration:
-                pass
+                completed, pending = await asyncio.wait([read_events(), send_batches()], return_when=asyncio.FIRST_COMPLETED)
+                for task in pending:
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
+                for task in completed:
+                    await task
 
+            except StopAsyncIteration as e:
+                traceback.print_exception(e.__class__, e, e.__traceback__)
+                pass
             # Send any remaining events in the batch
             if batch:
                 await send_batch()

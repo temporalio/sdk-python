@@ -2641,6 +2641,9 @@ async def test_split_workers(client: Client):
 
 @workflow.defn
 class StreamingHelloWorldAgent:
+    def __init__(self):
+        self.events = []
+
     @workflow.run
     async def run(self, prompt: str) -> str | None:
         agent = Agent[None](
@@ -2648,17 +2651,19 @@ class StreamingHelloWorldAgent:
             instructions="You are a helpful assistant.",
         )
 
-        result = None
-        for _ in range(2):
-            result = Runner.run_streamed(starting_agent=agent, input=prompt)
-            async for event in result.stream_events():
-                if event.type == "raw_response_event" and isinstance(
-                    event.data, ResponseTextDeltaEvent
-                ):
-                    print(event.data.delta, end="", flush=True)
+        result = Runner.run_streamed(starting_agent=agent, input=prompt)
+        async for event in result.stream_events():
+            if event.type == "raw_response_event" and isinstance(
+                event.data, ResponseTextDeltaEvent
+            ):
+                self.events.append(event.data.delta)
 
         return result.final_output if result else None
 
+    @workflow.query
+    def get_events(self) -> list[str]:
+        print("Querying events: ", self.events)
+        return self.events
 
 def streaming_hello_model():
     return TestModel.streaming_events_with_ending(
@@ -2684,10 +2689,63 @@ async def test_streaming(client: Client):
         ) as worker:
             handle = await client.start_workflow(
                 StreamingHelloWorldAgent.run,
-                "Say hello.",
+                args=["Say hello."],
                 id=f"hello-workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=50),
             )
             result = await handle.result()
             assert result == "Hello there!"
+            assert len(await handle.query(StreamingHelloWorldAgent.get_events)) == 3
+
+failed = False
+
+def streaming_failure_model():
+    async def generator():
+        try:
+            global failed
+            for event in [
+                EventBuilders.text_delta("Hello"),
+                EventBuilders.text_delta(" there"),
+                EventBuilders.text_delta("!"),
+            ]:
+                yield event
+            await asyncio.sleep(0.25)
+            if not failed:
+                failed = True
+                raise ValueError("Intentional failure")
+
+            for event in EventBuilders.ending("Hello there!"):
+                yield event
+        finally:
+            print("Leaving activity...")
+
+    return TestModel(None, streaming_fn=lambda: generator())
+
+
+async def test_streaming_failure(client: Client):
+    async with AgentEnvironment(
+        # model=streaming_failure_model(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+            streaming_batch_latency_seconds=0.1,
+            retry_policy=RetryPolicy(
+                maximum_attempts=1
+            )
+        ),
+    ) as env:
+        client = env.applied_on_client(client)
+
+        async with new_worker(
+            client, StreamingHelloWorldAgent, max_cached_workflows=0
+        ) as worker:
+            handle = await client.start_workflow(
+                StreamingHelloWorldAgent.run,
+                args=["Say hello."],
+                id=f"hello-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=50),
+            )
+            result = await handle.result()
+            assert result == "Hello there!"
+            assert len(await handle.query(StreamingHelloWorldAgent.get_events)) == 6

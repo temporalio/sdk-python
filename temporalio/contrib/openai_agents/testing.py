@@ -194,6 +194,19 @@ class EventBuilders:
             type="response.completed",
         )
 
+    @staticmethod
+    def ending(text: str) -> list[TResponseStreamEvent]:
+        """Create a list of TResponseStreamEvent for the end of a stream.
+
+        .. warning::
+           This API is experimental and may change in the future.
+        """
+        return [
+            EventBuilders.content_part_done(text),
+            EventBuilders.output_item_done(text),
+            EventBuilders.response_completion(text),
+        ]
+
 
 class TestModelProvider(ModelProvider):
     """Test model provider which simply returns the given module.
@@ -315,11 +328,7 @@ class TestModel(Model):
 
         return TestModel.streaming_events(
             events
-            + [
-                EventBuilders.content_part_done(content),
-                EventBuilders.output_item_done(content),
-                EventBuilders.response_completion(content),
-            ]
+            + EventBuilders.ending(content)
         )
 
 

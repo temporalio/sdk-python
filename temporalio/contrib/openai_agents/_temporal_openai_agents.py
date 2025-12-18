@@ -182,6 +182,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
             Union["StatelessMCPServerProvider", "StatefulMCPServerProvider"]
         ] = (),
         register_activities: bool = True,
+        streaming_batch_latency_seconds: float = 1.0,
     ) -> None:
         """Initialize the OpenAI agents plugin.
 

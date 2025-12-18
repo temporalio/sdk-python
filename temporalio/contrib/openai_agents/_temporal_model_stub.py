@@ -2,17 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from asyncio import FIRST_COMPLETED
-from typing import Optional, Tuple
 
 from temporalio import workflow
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
-from temporalio.contrib.openai_agents._temporal_trace_provider import _workflow_uuid
 
 logger = logging.getLogger(__name__)
 
 from collections.abc import AsyncIterator
-from typing import Any, Union, cast
+from typing import Any
 
 from agents import (
     Agent,
@@ -169,7 +166,7 @@ class _TemporalModelStub(Model):
             conversation_id=conversation_id,
             prompt=prompt,
             signal=signal_name,
-            batch_latency_seconds=1.0,
+            batch_latency_seconds=self.model_params.streaming_batch_latency_seconds,
         )
 
         handle = workflow.start_activity_method(
@@ -199,7 +196,7 @@ class _TemporalModelStub(Model):
             while True:
                 item = await stream_queue.get()
                 if item is None:
-                    monitor_task.cancel()
+                    await monitor_task
                     return
                 yield item
 

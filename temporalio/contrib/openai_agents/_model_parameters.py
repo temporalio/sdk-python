@@ -69,3 +69,6 @@ class ModelActivityParameters:
 
     use_local_activity: bool = False
     """Whether to use a local activity. If changed during a workflow execution, that would break determinism."""
+
+    streaming_batch_latency_seconds: float = 1.0
+    """Default batch latency for streaming events."""
