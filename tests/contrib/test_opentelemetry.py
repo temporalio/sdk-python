@@ -96,7 +96,7 @@ class TracingWorkflowActionContinueAsNew:
 @workflow.defn
 class ExpectCancelNexusWorkflow:
     @workflow.run
-    async def run(self, input: str):
+    async def run(self, _input: str):
         try:
             await asyncio.wait_for(asyncio.Future(), 2)
         except asyncio.TimeoutError:
