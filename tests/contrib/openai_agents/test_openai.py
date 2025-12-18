@@ -418,7 +418,7 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
 
 
 @activity.defn
-async def get_weather_failure(_city: str) -> Weather:
+async def get_weather_failure(city: str) -> Weather:  # type: ignore[reportUnusedParameter]
     """
     Get the weather for a given city.
     """
