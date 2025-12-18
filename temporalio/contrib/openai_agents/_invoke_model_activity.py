@@ -9,7 +9,7 @@ import json
 import traceback
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, NoReturn, Optional, Union
+from typing import Any, Awaitable, Callable, NoReturn, Optional, Union
 
 from agents import (
     AgentOutputSchemaBase,
@@ -41,6 +41,7 @@ from typing_extensions import Required, TypedDict
 
 from temporalio import activity, workflow
 from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbeater
+from temporalio.contrib.openai_agents._model_parameters import StreamingOptions
 from temporalio.exceptions import ApplicationError
 
 
@@ -151,11 +152,10 @@ class ActivityModelInput(TypedDict, total=False):
     prompt: Any | None
 
 
-class StreamActivityModelInput(ActivityModelInput):
+class ActivityModelInputWithSignal(ActivityModelInput):
     """Input for the stream_model activity."""
 
     signal: str
-    batch_latency_seconds: float
 
 
 class ModelActivity:
@@ -163,11 +163,14 @@ class ModelActivity:
     Disabling retries in your model of choice is recommended to allow activity retries to define the retry model.
     """
 
-    def __init__(self, model_provider: ModelProvider | None = None):
+    def __init__(
+        self, model_provider: ModelProvider | None, streaming_options: StreamingOptions
+    ):
         """Initialize the activity with a model provider."""
         self._model_provider = model_provider or OpenAIProvider(
             openai_client=AsyncOpenAI(max_retries=0)
         )
+        self._streaming_options = streaming_options
 
     @activity.defn
     @_auto_heartbeater
@@ -195,7 +198,7 @@ class ModelActivity:
             _handle_error(e)
 
     @activity.defn
-    async def stream_model(self, input: StreamActivityModelInput) -> None:
+    async def stream_model(self, input: ActivityModelInputWithSignal) -> None:
         """Activity that streams a model with the given input."""
         model = self._model_provider.get_model(input.get("model_name"))
 
@@ -221,22 +224,29 @@ class ModelActivity:
 
             # Batch events with configurable latency
             batch: list[TResponseStreamEvent] = []
-            batch_latency = input.get("batch_latency_seconds", 1.0)
+            batch_latency = self._streaming_options.signal_batch_latency_seconds
 
             async def send_batch():
                 if batch:
                     await handle.signal(input["signal"], batch)
                     batch.clear()
 
+            async def read_events():
+                async for event in events:
+                    event.model_rebuild()
+                    batch.append(event)
+                    if self._streaming_options.callback is not None:
+                        await self._streaming_options.callback(event)
+
+            async def send_batches():
+                while True:
+                    await asyncio.sleep(batch_latency)
+                    await send_batch()
+
             try:
-                async def read_events():
-                    async for event in events:
-                        batch.append(event)
-                async def send_batches():
-                    while True:
-                        await asyncio.sleep(batch_latency)
-                        await send_batch()
-                completed, pending = await asyncio.wait([read_events(), send_batches()], return_when=asyncio.FIRST_COMPLETED)
+                completed, pending = await asyncio.wait(
+                    [read_events(), send_batches()], return_when=asyncio.FIRST_COMPLETED
+                )
                 for task in pending:
                     task.cancel()
                     try:
@@ -255,6 +265,37 @@ class ModelActivity:
 
         except APIStatusError as e:
             _handle_error(e)
+
+    @activity.defn
+    async def batch_stream_model(
+        self, input: ActivityModelInput
+    ) -> list[TResponseStreamEvent]:
+        """Activity that streams a model with the given input."""
+        model = self._model_provider.get_model(input.get("model_name"))
+
+        tools = _make_tools(input)
+        handoffs = _make_handoffs(input)
+
+        events = model.stream_response(
+            system_instructions=input.get("system_instructions"),
+            input=input["input"],
+            model_settings=input["model_settings"],
+            tools=tools,
+            output_schema=input.get("output_schema"),
+            handoffs=handoffs,
+            tracing=ModelTracing(input["tracing"]),
+            previous_response_id=input.get("previous_response_id"),
+            conversation_id=input.get("conversation_id"),
+            prompt=input.get("prompt"),
+        )
+        result = []
+        async for event in events:
+            event.model_rebuild()
+            result.append(event)
+            if self._streaming_options.callback is not None:
+                await self._streaming_options.callback(event)
+
+        return result
 
 
 async def _empty_on_invoke_tool(ctx: RunContextWrapper[Any], input: str) -> str:

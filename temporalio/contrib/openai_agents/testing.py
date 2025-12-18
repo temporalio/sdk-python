@@ -32,7 +32,10 @@ from temporalio.contrib.openai_agents._mcp import (
     StatefulMCPServerProvider,
     StatelessMCPServerProvider,
 )
-from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
+from temporalio.contrib.openai_agents._model_parameters import (
+    ModelActivityParameters,
+    StreamingOptions,
+)
 from temporalio.contrib.openai_agents._temporal_openai_agents import OpenAIAgentsPlugin
 
 __all__ = [
@@ -326,10 +329,7 @@ class TestModel(Model):
         for event in events:
             content += event.delta
 
-        return TestModel.streaming_events(
-            events
-            + EventBuilders.ending(content)
-        )
+        return TestModel.streaming_events(events + EventBuilders.ending(content))
 
 
 class AgentEnvironment:
@@ -367,6 +367,7 @@ class AgentEnvironment:
             StatelessMCPServerProvider | StatefulMCPServerProvider
         ] = (),
         register_activities: bool = True,
+        streaming_options: StreamingOptions = StreamingOptions(),
     ) -> None:
         """Initialize the AgentEnvironment.
 
@@ -383,6 +384,7 @@ class AgentEnvironment:
                 If both are provided, model_provider will be used.
             mcp_server_providers: Sequence of MCP servers to automatically register with the worker.
             register_activities: Whether to register activities during worker execution.
+            streaming_options: Options applicable for use of run_streamed.
 
         .. warning::
            This API is experimental and may change in the future.
@@ -396,6 +398,7 @@ class AgentEnvironment:
         self._mcp_server_providers = mcp_server_providers
         self._register_activities = register_activities
         self._plugin: OpenAIAgentsPlugin | None = None
+        self.streaming_options = streaming_options
 
     async def __aenter__(self) -> "AgentEnvironment":
         """Enter the async context manager."""
@@ -405,6 +408,7 @@ class AgentEnvironment:
             model_provider=self._model_provider,
             mcp_server_providers=self._mcp_server_providers,
             register_activities=self._register_activities,
+            streaming_options=self.streaming_options,
         )
 
         return self

@@ -4,9 +4,10 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, Union
+from typing import Any, Awaitable, Optional, Union
 
 from agents import Agent, TResponseInputItem
+from agents.items import TResponseStreamEvent
 
 from temporalio.common import Priority, RetryPolicy
 from temporalio.workflow import ActivityCancellationType, VersioningIntent
@@ -70,5 +71,18 @@ class ModelActivityParameters:
     use_local_activity: bool = False
     """Whether to use a local activity. If changed during a workflow execution, that would break determinism."""
 
-    streaming_batch_latency_seconds: float = 1.0
-    """Default batch latency for streaming events."""
+
+@dataclass
+class StreamingOptions:
+    """Options applicable for use of run_streamed"""
+
+    callback: Callable[[TResponseStreamEvent], Awaitable[None]] | None = None
+    """A callback function that will be invoked inside the activity on every stream event which occurs."""
+
+    use_signals: bool = False
+    """If true, the activity will use signals to provide events to the workflow as they occur. Ensure that the workflow
+    appropriately handles those signals during replay. If false, all the stream events will be delivered when the activity completes."""
+
+    signal_batch_latency_seconds: float = 1.0
+    """Batch latency for sending signals. Lower values will result in lower stream event latency but higher 
+    signal volume, and therefore cost."""

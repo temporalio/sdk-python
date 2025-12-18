@@ -18,7 +18,10 @@ from agents import (
 from agents.run import DEFAULT_AGENT_RUNNER, AgentRunner
 
 from temporalio import workflow
-from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
+from temporalio.contrib.openai_agents._model_parameters import (
+    ModelActivityParameters,
+    StreamingOptions,
+)
 from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModelStub
 from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 
@@ -26,6 +29,7 @@ from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 # Recursively replace models in all agents
 def _convert_agent(
     model_params: ModelActivityParameters,
+    streaming_options: StreamingOptions,
     agent: Agent[Any],
     seen: dict[int, Agent] | None,
 ) -> Agent[Any]:
@@ -49,13 +53,17 @@ def _convert_agent(
     new_handoffs: list[Agent | Handoff] = []
     for handoff in agent.handoffs:
         if isinstance(handoff, Agent):
-            new_handoffs.append(_convert_agent(model_params, handoff, seen))
+            new_handoffs.append(
+                _convert_agent(model_params, streaming_options, handoff, seen)
+            )
         elif isinstance(handoff, Handoff):
             original_invoke = handoff.on_invoke_handoff
 
             async def on_invoke(context: RunContextWrapper[Any], args: str) -> Agent:
                 handoff_agent = await original_invoke(context, args)
-                return _convert_agent(model_params, handoff_agent, seen)
+                return _convert_agent(
+                    model_params, streaming_options, handoff_agent, seen
+                )
 
             new_handoffs.append(
                 dataclasses.replace(handoff, on_invoke_handoff=on_invoke)
@@ -67,6 +75,7 @@ def _convert_agent(
         model_name=name,
         model_params=model_params,
         agent=agent,
+        streaming_options=streaming_options,
     )
     new_agent.handoffs = new_handoffs
     return new_agent
@@ -79,10 +88,13 @@ class TemporalOpenAIRunner(AgentRunner):
 
     """
 
-    def __init__(self, model_params: ModelActivityParameters) -> None:
+    def __init__(
+        self, model_params: ModelActivityParameters, streaming_options: StreamingOptions
+    ) -> None:
         """Initialize the Temporal OpenAI Runner."""
         self._runner = DEFAULT_AGENT_RUNNER or AgentRunner()
         self.model_params = model_params
+        self.streaming_options = streaming_options
 
     async def run(
         self,
@@ -104,7 +116,9 @@ class TemporalOpenAIRunner(AgentRunner):
 
         try:
             return await self._runner.run(
-                starting_agent=_convert_agent(self.model_params, starting_agent, None),
+                starting_agent=_convert_agent(
+                    self.model_params, self.streaming_options, starting_agent, None
+                ),
                 input=input,
                 **kwargs,
             )
@@ -155,7 +169,9 @@ class TemporalOpenAIRunner(AgentRunner):
 
         try:
             return self._runner.run_streamed(
-                starting_agent=_convert_agent(self.model_params, starting_agent, None),
+                starting_agent=_convert_agent(
+                    self.model_params, self.streaming_options, starting_agent, None
+                ),
                 input=input,
                 **kwargs,
             )
@@ -183,7 +199,10 @@ class TemporalOpenAIRunner(AgentRunner):
             run_config = dataclasses.replace(
                 run_config,
                 model=_TemporalModelStub(
-                    run_config.model, model_params=self.model_params, agent=None
+                    run_config.model,
+                    model_params=self.model_params,
+                    streaming_options=self.streaming_options,
+                    agent=None,
                 ),
             )
         return run_config

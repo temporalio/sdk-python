@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
     Any,
+    Awaitable,
     Optional,
     Union,
     cast,
@@ -91,10 +92,11 @@ from temporalio.common import RetryPolicy
 from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents import (
     ModelActivityParameters,
+    ModelSummaryProvider,
     StatefulMCPServerProvider,
     StatelessMCPServerProvider,
+    StreamingOptions,
 )
-from temporalio.contrib.openai_agents._model_parameters import ModelSummaryProvider
 from temporalio.contrib.openai_agents._openai_runner import _convert_agent
 from temporalio.contrib.openai_agents._temporal_model_stub import (
     _extract_summary,
@@ -2553,7 +2555,9 @@ async def test_stateful_mcp_server_no_worker(client: Client):
 
 async def test_model_conversion_loops():
     agent = init_agents()
-    converted = _convert_agent(ModelActivityParameters(), agent, None)
+    converted = _convert_agent(
+        ModelActivityParameters(), StreamingOptions(), agent, None
+    )
     seat_booking_handoff = converted.handoffs[1]
     assert isinstance(seat_booking_handoff, Handoff)
     context: RunContextWrapper[AirlineAgentContext] = RunContextWrapper(
@@ -2665,6 +2669,7 @@ class StreamingHelloWorldAgent:
         print("Querying events: ", self.events)
         return self.events
 
+
 def streaming_hello_model():
     return TestModel.streaming_events_with_ending(
         [
@@ -2675,11 +2680,14 @@ def streaming_hello_model():
     )
 
 
-async def test_streaming(client: Client):
+async def test_signal_streaming(client: Client):
     async with AgentEnvironment(
         model=streaming_hello_model(),
         model_params=ModelActivityParameters(
             start_to_close_timeout=timedelta(seconds=30),
+        ),
+        streaming_options=StreamingOptions(
+            use_signals=True,
         ),
     ) as env:
         client = env.applied_on_client(client)
@@ -2698,40 +2706,39 @@ async def test_streaming(client: Client):
             assert result == "Hello there!"
             assert len(await handle.query(StreamingHelloWorldAgent.get_events)) == 3
 
+
 failed = False
 
-def streaming_failure_model():
-    async def generator():
-        try:
-            global failed
-            for event in [
-                EventBuilders.text_delta("Hello"),
-                EventBuilders.text_delta(" there"),
-                EventBuilders.text_delta("!"),
-            ]:
-                yield event
-            await asyncio.sleep(0.25)
-            if not failed:
-                failed = True
-                raise ValueError("Intentional failure")
 
-            for event in EventBuilders.ending("Hello there!"):
-                yield event
-        finally:
-            print("Leaving activity...")
+def streaming_failure_model():
+    async def generator() -> AsyncIterator[TResponseStreamEvent]:
+        global failed
+        for event in [
+            EventBuilders.text_delta("Hello"),
+            EventBuilders.text_delta(" there"),
+            EventBuilders.text_delta("!"),
+        ]:
+            yield event
+        await asyncio.sleep(0.25)
+        if not failed:
+            failed = True
+            raise ValueError("Intentional failure")
+
+        for end_event in EventBuilders.ending("Hello there!"):
+            yield end_event
 
     return TestModel(None, streaming_fn=lambda: generator())
 
 
-async def test_streaming_failure(client: Client):
+async def test_signal_streaming_failure(client: Client):
     async with AgentEnvironment(
-        # model=streaming_failure_model(),
+        model=streaming_failure_model(),
         model_params=ModelActivityParameters(
             start_to_close_timeout=timedelta(seconds=30),
-            streaming_batch_latency_seconds=0.1,
-            retry_policy=RetryPolicy(
-                maximum_attempts=1
-            )
+        ),
+        streaming_options=StreamingOptions(
+            use_signals=True,
+            signal_batch_latency_seconds=0.1,
         ),
     ) as env:
         client = env.applied_on_client(client)
@@ -2749,3 +2756,38 @@ async def test_streaming_failure(client: Client):
             result = await handle.result()
             assert result == "Hello there!"
             assert len(await handle.query(StreamingHelloWorldAgent.get_events)) == 6
+
+
+async def test_callback_streaming(client: Client):
+    events = []
+
+    async def callback(event: TResponseStreamEvent) -> None:
+        events.append(event)
+
+    async with AgentEnvironment(
+        model=streaming_hello_model(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+        streaming_options=StreamingOptions(
+            callback=callback,
+        ),
+    ) as env:
+        client = env.applied_on_client(client)
+
+        async with new_worker(
+            client, StreamingHelloWorldAgent, max_cached_workflows=0
+        ) as worker:
+            handle = await client.start_workflow(
+                StreamingHelloWorldAgent.run,
+                args=["Say hello."],
+                id=f"hello-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=50),
+            )
+            result = await handle.result()
+            assert result == "Hello there!"
+            assert len(await handle.query(StreamingHelloWorldAgent.get_events)) == 3
+
+            # The results include the ending markers because it wasn't filtered like the workflow
+            assert len(events) == 6

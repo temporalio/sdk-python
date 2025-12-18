@@ -4,7 +4,10 @@ import asyncio
 import logging
 
 from temporalio import workflow
-from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
+from temporalio.contrib.openai_agents._model_parameters import (
+    ModelActivityParameters,
+    StreamingOptions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +37,13 @@ from openai.types.responses.response_prompt_param import ResponsePromptParam
 
 from temporalio.contrib.openai_agents._invoke_model_activity import (
     ActivityModelInput,
+    ActivityModelInputWithSignal,
     AgentOutputSchemaInput,
     FunctionToolInput,
     HandoffInput,
     HostedMCPToolInput,
     ModelActivity,
     ModelTracingInput,
-    StreamActivityModelInput,
     ToolInput,
 )
 
@@ -54,11 +57,13 @@ class _TemporalModelStub(Model):
         *,
         model_params: ModelActivityParameters,
         agent: Agent[Any] | None,
+        streaming_options: StreamingOptions,
     ) -> None:
         self.model_name = model_name
         self.model_params = model_params
         self.agent = agent
         self.stream_events: list[TResponseStreamEvent] = []
+        self.streaming_options = streaming_options
 
     async def get_response(
         self,
@@ -153,7 +158,7 @@ class _TemporalModelStub(Model):
         signal_name = "model_stream_signal"
         workflow.set_signal_handler(signal_name, handle_stream_event)
 
-        activity_input = StreamActivityModelInput(
+        activity_input = ActivityModelInput(
             model_name=self.model_name,
             system_instructions=system_instructions,
             input=input,
@@ -165,42 +170,63 @@ class _TemporalModelStub(Model):
             previous_response_id=previous_response_id,
             conversation_id=conversation_id,
             prompt=prompt,
-            signal=signal_name,
-            batch_latency_seconds=self.model_params.streaming_batch_latency_seconds,
         )
+        if self.streaming_options.use_signals:
+            handle = workflow.start_activity_method(
+                ModelActivity.stream_model,
+                args=[
+                    ActivityModelInputWithSignal(**activity_input, signal=signal_name)
+                ],
+                summary=summary,
+                task_queue=self.model_params.task_queue,
+                schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
+                schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
+                start_to_close_timeout=self.model_params.start_to_close_timeout,
+                heartbeat_timeout=self.model_params.heartbeat_timeout,
+                retry_policy=self.model_params.retry_policy,
+                cancellation_type=self.model_params.cancellation_type,
+                versioning_intent=self.model_params.versioning_intent,
+                priority=self.model_params.priority,
+            )
 
-        handle = workflow.start_activity_method(
-            ModelActivity.stream_model,
-            args=[activity_input],
-            summary=summary,
-            task_queue=self.model_params.task_queue,
-            schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
-            schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
-            start_to_close_timeout=self.model_params.start_to_close_timeout,
-            heartbeat_timeout=self.model_params.heartbeat_timeout,
-            retry_policy=self.model_params.retry_policy,
-            cancellation_type=self.model_params.cancellation_type,
-            versioning_intent=self.model_params.versioning_intent,
-            priority=self.model_params.priority,
-        )
+            async def monitor_activity():
+                try:
+                    await handle
+                finally:
+                    await stream_queue.put(None)  # Signal end of stream
 
-        async def monitor_activity():
-            try:
-                await handle
-            finally:
-                await stream_queue.put(None)  # Signal end of stream
+            monitor_task = asyncio.create_task(monitor_activity())
 
-        monitor_task = asyncio.create_task(monitor_activity())
+            async def generator() -> AsyncIterator[TResponseStreamEvent]:
+                while True:
+                    item = await stream_queue.get()
+                    if item is None:
+                        await monitor_task
+                        return
+                    yield item
 
-        async def generator() -> AsyncIterator[TResponseStreamEvent]:
-            while True:
-                item = await stream_queue.get()
-                if item is None:
-                    await monitor_task
-                    return
-                yield item
+            return generator()
+        else:
 
-        return generator()
+            async def generator() -> AsyncIterator[TResponseStreamEvent]:
+                results = await workflow.execute_activity_method(
+                    ModelActivity.batch_stream_model,
+                    args=[activity_input],
+                    summary=summary,
+                    task_queue=self.model_params.task_queue,
+                    schedule_to_close_timeout=self.model_params.schedule_to_close_timeout,
+                    schedule_to_start_timeout=self.model_params.schedule_to_start_timeout,
+                    start_to_close_timeout=self.model_params.start_to_close_timeout,
+                    heartbeat_timeout=self.model_params.heartbeat_timeout,
+                    retry_policy=self.model_params.retry_policy,
+                    cancellation_type=self.model_params.cancellation_type,
+                    versioning_intent=self.model_params.versioning_intent,
+                    priority=self.model_params.priority,
+                )
+                for event in results:
+                    yield event
+
+            return generator()
 
     def _make_summary(
         self, system_instructions: str | None, input: str | list[TResponseInputItem]
