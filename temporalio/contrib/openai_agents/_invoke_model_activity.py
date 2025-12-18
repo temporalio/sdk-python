@@ -231,6 +231,11 @@ class ModelActivity:
                     await handle.signal(input["signal"], batch)
                     batch.clear()
 
+            async def send_batches():
+                while True:
+                    await asyncio.sleep(batch_latency)
+                    await send_batch()
+
             async def read_events():
                 async for event in events:
                     event.model_rebuild()
@@ -238,14 +243,13 @@ class ModelActivity:
                     if self._streaming_options.callback is not None:
                         await self._streaming_options.callback(event)
 
-            async def send_batches():
-                while True:
-                    await asyncio.sleep(batch_latency)
-                    await send_batch()
-
             try:
                 completed, pending = await asyncio.wait(
-                    [read_events(), send_batches()], return_when=asyncio.FIRST_COMPLETED
+                    [
+                        asyncio.create_task(read_events()),
+                        asyncio.create_task(send_batches()),
+                    ],
+                    return_when=asyncio.FIRST_COMPLETED,
                 )
                 for task in pending:
                     task.cancel()
