@@ -25,6 +25,7 @@ from typing import (
     ClassVar,
     Literal,
     NewType,
+    Optional,
     TypeVar,
     get_type_hints,
     overload,
@@ -117,7 +118,7 @@ class ActivitySerializationContext(SerializationContext):
             this may be the workflow ID prefix as configured, not the final workflow ID when the
             workflow is created by the schedule.
         workflow_type: Workflow Type. Only set if this is an activity started from a workflow.
-        is_local: Whether the activity is a local activity. False if this is a standalone activity started directly by a client.
+        is_local: Whether the activity is a local activity. False if the activity was not started by a workflow.
     """
 
     namespace: str

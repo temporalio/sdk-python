@@ -106,7 +106,6 @@ class Info:
     heartbeat_timeout: timedelta | None
     is_local: bool
     namespace: str
-    """Namespace the activity is running in."""
     schedule_to_close_timeout: timedelta | None
     scheduled_time: datetime
     start_to_close_timeout: timedelta | None
@@ -114,17 +113,17 @@ class Info:
     task_queue: str
     task_token: bytes
     workflow_id: str | None
-    """ID of the workflow that started this activity. None for standalone activities."""
+    """ID of the workflow. None if the activity was not started by a workflow."""
     workflow_namespace: str | None
-    """Namespace of the workflow that started this activity. None for standalone activities.
+    """Namespace of the workflow. None if the activity was not started by a workflow.
 
     .. deprecated::
         Use :py:attr:`namespace` instead.
     """
     workflow_run_id: str | None
-    """Run ID of the workflow that started this activity. None for standalone activities."""
+    """Run ID of the workflow. None if the activity was not started by a workflow."""
     workflow_type: str | None
-    """Type of the workflow that started this activity. None for standalone activities."""
+    """Type of the workflow. None if the activity was not started by a workflow."""
     priority: temporalio.common.Priority
     retry_policy: temporalio.common.RetryPolicy | None
     """The retry policy of this activity.
@@ -134,11 +133,11 @@ class Info:
     version), but it may still be defined server-side."""
 
     activity_run_id: str | None = None
-    """Run ID of this standalone activity. None for workflow activities."""
+    """Run ID of this activity. None for workflow activities."""
 
     @property
     def in_workflow(self) -> bool:
-        """Whether this activity was started by a workflow (vs. standalone)."""
+        """Was this activity started by a workflow?"""
         return self.workflow_id is not None
 
     # TODO(cretz): Consider putting identity on here for "worker_id" for logger?
