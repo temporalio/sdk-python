@@ -7,6 +7,7 @@ import contextvars
 import inspect
 import logging
 import threading
+import typing
 import uuid
 import warnings
 from abc import ABC, abstractmethod
@@ -26,7 +27,6 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum, Flag, IntEnum, auto
 from functools import partial
 from random import Random
-import typing
 from typing import (
     TYPE_CHECKING,
     Any,

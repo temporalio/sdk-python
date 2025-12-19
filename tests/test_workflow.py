@@ -1,7 +1,7 @@
 import inspect
 import itertools
-from collections.abc import Callable, Sequence
 import typing
+from collections.abc import Callable, Sequence
 from typing import Any, Set, Type, get_type_hints
 
 import pytest
