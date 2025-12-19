@@ -1283,8 +1283,8 @@ class Client:
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         heartbeat_timeout: timedelta | None = None,
-        id_reuse_policy: temporalio.common.ActivityIdReusePolicy = temporalio.common.ActivityIdReusePolicy.ALLOW_DUPLICATE,
-        id_conflict_policy: temporalio.common.ActivityIdConflictPolicy = temporalio.common.ActivityIdConflictPolicy.FAIL,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
         retry_policy: temporalio.common.RetryPolicy | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         static_summary: str | None = None,
@@ -1334,7 +1334,7 @@ class Client:
                 args=args,
                 id=id,
                 task_queue=task_queue,
-                ret_type=result_type or result_type_from_type_annotation,
+                result_type=result_type or result_type_from_type_annotation,
                 schedule_to_close_timeout=schedule_to_close_timeout,
                 start_to_close_timeout=start_to_close_timeout,
                 schedule_to_start_timeout=schedule_to_start_timeout,
@@ -1343,8 +1343,8 @@ class Client:
                 id_conflict_policy=id_conflict_policy,
                 retry_policy=retry_policy,
                 search_attributes=search_attributes,
-                static_summary=static_summary,
-                static_details=static_details,
+                summary=static_summary,
+                details=static_details,
                 headers={},
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
@@ -1365,8 +1365,8 @@ class Client:
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         heartbeat_timeout: timedelta | None = None,
-        id_reuse_policy: temporalio.common.ActivityIdReusePolicy = temporalio.common.ActivityIdReusePolicy.ALLOW_DUPLICATE,
-        id_conflict_policy: temporalio.common.ActivityIdConflictPolicy = temporalio.common.ActivityIdConflictPolicy.FAIL,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
         retry_policy: temporalio.common.RetryPolicy | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         static_summary: str | None = None,
@@ -1488,7 +1488,7 @@ class Client:
         self,
         *,
         activity_id: str,
-        run_id: str | None = None,
+        activity_run_id: str | None = None,
     ) -> ActivityHandle[Any]:
         """Get a handle to an existing activity, as the caller of that activity.
 
@@ -1500,7 +1500,7 @@ class Client:
 
         Args:
             activity_id: The activity ID.
-            run_id:      The run ID. If not provided, targets the
+            activity_run_id: The activity run ID. If not provided, targets the
                          latest run.
 
         Returns:
@@ -2963,13 +2963,11 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
 class ActivityExecutionAsyncIterator:
     """Asynchronous iterator for activity execution values.
 
-    Each item yielded by the iterator is either a :py:class:`ActivityExecution` (i.e. a standalone
-    activity) or a :py:class:`WorkflowActivityExecution` (i.e. an activity started by a workflow).
-
     You should typically use ``async for`` on this iterator and not call any of its methods.
-    """
 
-    # TODO(dan): do we want to use the "standalone" explanatory qualifier in docstrings?
+    .. warning::
+       This API is experimental.
+    """
 
     def __init__(
         self,
@@ -2984,9 +2982,7 @@ class ActivityExecutionAsyncIterator:
         self._client = client
         self._input = input
         self._next_page_token = input.next_page_token
-        self._current_page: (
-            Sequence[ActivityExecution | WorkflowActivityExecution] | None
-        ) = None
+        self._current_page: Sequence[ActivityExecution] | None = None
         self._current_page_index = 0
         self._limit = input.limit
         self._yielded = 0
@@ -2999,9 +2995,7 @@ class ActivityExecutionAsyncIterator:
         return self._current_page_index
 
     @property
-    def current_page(
-        self,
-    ) -> Sequence[ActivityExecution | WorkflowActivityExecution] | None:
+    def current_page(self) -> Sequence[ActivityExecution] | None:
         """Current page, if it has been fetched yet."""
         return self._current_page
 
@@ -3034,11 +3028,7 @@ class ActivityExecutionAsyncIterator:
         )
 
         self._current_page = [
-            WorkflowActivityExecution._from_raw_info(
-                v, self._client.namespace, self._client.data_converter
-            )
-            if getattr(v, "workflow_id", None)
-            else ActivityExecution._from_raw_info(
+            ActivityExecution._from_raw_info(
                 v, self._client.namespace, self._client.data_converter
             )
             for v in resp.executions
@@ -3050,8 +3040,7 @@ class ActivityExecutionAsyncIterator:
         """Return self as the iterator."""
         return self
 
-    # This is a direct copy of WorkflowExecutionAsyncIterator.__anext__
-    async def __anext__(self) -> ActivityExecution | WorkflowActivityExecution:
+    async def __anext__(self) -> ActivityExecution:
         """Get the next execution on this iterator, fetching next page if
         necessary.
         """
@@ -3089,6 +3078,9 @@ class ActivityExecution:
     activity_id: str
     """Activity ID."""
 
+    activity_run_id: str | None
+    """Run ID of the activity."""
+
     activity_type: str
     """Type name of the activity."""
 
@@ -3098,20 +3090,17 @@ class ActivityExecution:
     execution_duration: timedelta | None
     """Duration from scheduled to close time, only populated if closed."""
 
+    namespace: str
+    """Namespace of the activity (copied from calling client)."""
+
     raw_info: temporalio.api.activity.v1.ActivityExecutionListInfo
     """Underlying protobuf info."""
 
-    run_id: str
-    """Run ID of the activity."""
-
-    schedule_time: datetime
+    scheduled_time: datetime
     """Time the activity was originally scheduled."""
 
     search_attributes: temporalio.common.SearchAttributes
     """Search attributes from the start request."""
-
-    state_transition_count: int
-    """Number of state transitions."""
 
     status: temporalio.common.ActivityExecutionStatus
     """Current status of the activity."""
@@ -3129,6 +3118,7 @@ class ActivityExecution:
         """Create from raw proto activity list info."""
         return cls(
             activity_id=info.activity_id,
+            activity_run_id=info.run_id or None,
             activity_type=(
                 info.activity_type.name if info.HasField("activity_type") else ""
             ),
@@ -3142,9 +3132,9 @@ class ActivityExecution:
                 if info.HasField("execution_duration")
                 else None
             ),
+            namespace=namespace,
             raw_info=info,
-            run_id=info.run_id,
-            schedule_time=(
+            scheduled_time=(
                 info.schedule_time.ToDatetime().replace(tzinfo=timezone.utc)
                 if info.HasField("schedule_time")
                 else datetime.min
@@ -3152,7 +3142,6 @@ class ActivityExecution:
             search_attributes=temporalio.converter.decode_search_attributes(
                 info.search_attributes
             ),
-            state_transition_count=info.state_transition_count,
             status=(
                 temporalio.common.ActivityExecutionStatus(info.status)
                 if info.status
@@ -3163,74 +3152,18 @@ class ActivityExecution:
 
 
 @dataclass(frozen=True)
-class WorkflowActivityExecution:
-    """Info for a workflow activity execution from list response.
+class ActivityExecutionCountAggregationGroup:
+    """A single aggregation group from a count activities call.
 
     .. warning::
        This API is experimental.
     """
 
-    activity_id: str
-    """Activity ID."""
+    count: int
+    """Count for this group."""
 
-    activity_type: str
-    """Type name of the activity."""
-
-    close_time: datetime | None
-    """Time the activity reached a terminal status, if closed."""
-
-    execution_duration: timedelta | None
-    """Duration from scheduled to close time, only populated if closed."""
-
-    raw_info: temporalio.api.activity.v1.ActivityExecutionListInfo
-    """Underlying protobuf info."""
-
-    schedule_time: datetime
-    """Time the activity was originally scheduled."""
-
-    task_queue: str
-    """Task queue the activity was scheduled on."""
-
-    workflow_id: str
-    """ID of the workflow that started this activity."""
-
-    workflow_run_id: str | None
-    """Run ID of the workflow that started this activity."""
-
-    @classmethod
-    def _from_raw_info(
-        cls,
-        info: temporalio.api.activity.v1.ActivityExecutionListInfo,
-        namespace: str,
-        converter: temporalio.converter.DataConverter,
-    ) -> Self:
-        """Create from raw proto activity list info."""
-        # For workflow activities, we expect workflow_id to be set
-        return cls(
-            activity_id=info.activity_id,
-            activity_type=info.activity_type.name
-            if info.HasField("activity_type")
-            else "",
-            close_time=(
-                info.close_time.ToDatetime().replace(tzinfo=timezone.utc)
-                if info.HasField("close_time")
-                else None
-            ),
-            execution_duration=(
-                info.execution_duration.ToTimedelta()
-                if info.HasField("execution_duration")
-                else None
-            ),
-            raw_info=info,
-            schedule_time=(
-                info.schedule_time.ToDatetime().replace(tzinfo=timezone.utc)
-                if info.HasField("schedule_time")
-                else datetime.min
-            ),
-            task_queue=info.task_queue,
-            workflow_id="TODO",  # TODO(dan): WorkflowActivityExecution class is not needed?
-            workflow_run_id=None,  # Not provided in list response
-        )
+    group_values: Sequence[Any]
+    """Values that define this group."""
 
 
 @dataclass(frozen=True)
@@ -3244,6 +3177,9 @@ class ActivityExecutionCount:
     count: int
     """Total count matching the filter, if any."""
 
+    groups: Sequence[ActivityExecutionCountAggregationGroup]
+    """Aggregation groups if requested."""
+
     @staticmethod
     def _from_raw(
         resp: temporalio.api.workflowservice.v1.CountActivityExecutionsResponse,
@@ -3251,6 +3187,13 @@ class ActivityExecutionCount:
         """Create from raw proto response."""
         return ActivityExecutionCount(
             count=resp.count,
+            groups=[
+                ActivityExecutionCountAggregationGroup(
+                    count=g.count,
+                    group_values=list(g.group_values),
+                )
+                for g in resp.groups
+            ],
         )
 
 
@@ -3265,6 +3208,9 @@ class ActivityExecutionDescription:
     activity_id: str
     """Activity ID."""
 
+    activity_run_id: str | None
+    """Run ID of the activity."""
+
     activity_type: str
     """Type name of the activity."""
 
@@ -3274,8 +3220,14 @@ class ActivityExecutionDescription:
     canceled_reason: str | None
     """Reason for cancellation, if cancel was requested."""
 
+    close_time: datetime | None
+    """Time the activity reached a terminal status, if closed."""
+
     current_retry_interval: timedelta | None
     """Time until the next retry, if applicable."""
+
+    execution_duration: timedelta | None
+    """Duration from scheduled to close time, only populated if closed."""
 
     expiration_time: datetime
     """Scheduled time plus schedule_to_close_timeout."""
@@ -3301,7 +3253,8 @@ class ActivityExecutionDescription:
     last_worker_identity: str
     """Identity of the last worker that processed the activity."""
 
-    retry_policy: temporalio.common.RetryPolicy
+    namespace: str
+    """Namespace of the activity (copied from calling client)."""
 
     next_attempt_schedule_time: datetime | None
     """Time when the next attempt will be scheduled."""
@@ -3309,20 +3262,17 @@ class ActivityExecutionDescription:
     raw_info: Any
     """Raw proto response."""
 
-    run_id: str
-    """Run ID of the activity."""
+    retry_policy: temporalio.common.RetryPolicy
+    """Retry policy for the activity."""
 
     run_state: temporalio.common.PendingActivityState | None
     """More detailed breakdown if status is RUNNING."""
 
-    schedule_time: datetime
+    scheduled_time: datetime
     """Time the activity was originally scheduled."""
 
     search_attributes: temporalio.common.SearchAttributes
     """Search attributes."""
-
-    state_transition_count: int
-    """Number of state transitions."""
 
     status: temporalio.common.ActivityExecutionStatus
     """Current status of the activity."""
@@ -3335,19 +3285,31 @@ class ActivityExecutionDescription:
         cls,
         info: temporalio.api.activity.v1.ActivityExecutionInfo,
         input: temporalio.api.common.v1.Payloads,
+        namespace: str,
         data_converter: temporalio.converter.DataConverter,
     ) -> Self:
         """Create from raw proto activity info."""
         return cls(
             activity_id=info.activity_id,
+            activity_run_id=info.run_id or None,
             activity_type=(
                 info.activity_type.name if info.HasField("activity_type") else ""
             ),
             attempt=info.attempt,
-            canceled_reason=info.canceled_reason,
+            canceled_reason=info.canceled_reason or None,
+            close_time=(
+                info.close_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("close_time")
+                else None
+            ),
             current_retry_interval=(
                 info.current_retry_interval.ToTimedelta()
                 if info.HasField("current_retry_interval")
+                else None
+            ),
+            execution_duration=(
+                info.execution_duration.ToTimedelta()
+                if info.HasField("execution_duration")
                 else None
             ),
             expiration_time=(
@@ -3385,24 +3347,23 @@ class ActivityExecutionDescription:
                 else None
             ),
             last_worker_identity=info.last_worker_identity,
-            retry_policy=temporalio.common.RetryPolicy.from_proto(info.retry_policy),
+            namespace=namespace,
             next_attempt_schedule_time=(
                 info.next_attempt_schedule_time.ToDatetime(tzinfo=timezone.utc)
                 if info.HasField("next_attempt_schedule_time")
                 else None
             ),
             raw_info=info,
-            run_id=info.run_id,
+            retry_policy=temporalio.common.RetryPolicy.from_proto(info.retry_policy),
             run_state=(
                 temporalio.common.PendingActivityState(info.run_state)
                 if info.run_state
                 else None
             ),
-            schedule_time=(info.schedule_time.ToDatetime(tzinfo=timezone.utc)),
+            scheduled_time=(info.schedule_time.ToDatetime(tzinfo=timezone.utc)),
             search_attributes=temporalio.converter.decode_search_attributes(
                 info.search_attributes
             ),
-            state_transition_count=info.state_transition_count,
             status=(
                 temporalio.common.ActivityExecutionStatus(info.status)
                 if info.status
@@ -3581,16 +3542,16 @@ class ActivityHandle(Generic[ReturnType]):
     def __init__(
         self,
         client: Client,
-        id: str,
+        activity_id: str,
         *,
-        run_id: str,
+        activity_run_id: str,
         result_type: Type | None = None,
         data_converter_override: DataConverter | None = None,
     ) -> None:
         """Create activity handle."""
         self._client = client
-        self._id = id
-        self._run_id = run_id
+        self._activity_id = activity_id
+        self._activity_run_id = activity_run_id
         self._result_type = result_type
         self._data_converter_override = data_converter_override
         self._known_outcome: (
@@ -3598,14 +3559,14 @@ class ActivityHandle(Generic[ReturnType]):
         ) = None
 
     @property
-    def id(self) -> str:
+    def activity_id(self) -> str:
         """ID of the activity."""
-        return self._id
+        return self._activity_id
 
     @property
-    def run_id(self) -> str:
+    def activity_run_id(self) -> str:
         """Run ID of the activity."""
-        return self._run_id
+        return self._activity_run_id
 
     def with_context(self, context: SerializationContext) -> Self:
         """Create a new ActivityHandle with a different serialization context.
@@ -3626,8 +3587,8 @@ class ActivityHandle(Generic[ReturnType]):
             )
         return cls(
             self._client,
-            id=self._id,
-            run_id=self._run_id,
+            activity_id=self._activity_id,
+            activity_run_id=self._activity_run_id,
             result_type=self._result_type,
             data_converter_override=data_converter,
         )
@@ -3696,8 +3657,8 @@ class ActivityHandle(Generic[ReturnType]):
 
         req = temporalio.api.workflowservice.v1.PollActivityExecutionRequest(
             namespace=self._client.namespace,
-            activity_id=self._id,
-            run_id=self._run_id,
+            activity_id=self._activity_id,
+            run_id=self._activity_run_id,
         )
 
         # Continue polling as long as we have no outcome
@@ -3727,6 +3688,7 @@ class ActivityHandle(Generic[ReturnType]):
         self,
         *,
         reason: str | None = None,
+        wait_for_cancel_completed: bool = False,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> None:
@@ -3743,14 +3705,16 @@ class ActivityHandle(Generic[ReturnType]):
 
         Args:
             reason: Reason for the cancellation. Recorded and available via describe.
+            wait_for_cancel_completed: If True, wait for the activity to be canceled before returning.
             rpc_metadata: Headers used on the RPC call.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
         """
         await self._client._impl.cancel_activity(
             CancelActivityInput(
-                activity_id=self._id,
-                run_id=self._run_id,
+                activity_id=self._activity_id,
+                activity_run_id=self._activity_run_id,
                 reason=reason,
+                wait_for_cancel_completed=wait_for_cancel_completed,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )
@@ -3779,8 +3743,8 @@ class ActivityHandle(Generic[ReturnType]):
         """
         await self._client._impl.terminate_activity(
             TerminateActivityInput(
-                activity_id=self._id,
-                run_id=self._run_id,
+                activity_id=self._activity_id,
+                activity_run_id=self._activity_run_id,
                 reason=reason,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
@@ -3807,8 +3771,8 @@ class ActivityHandle(Generic[ReturnType]):
         """
         return await self._client._impl.describe_activity(
             DescribeActivityInput(
-                activity_id=self._id,
-                run_id=self._run_id,
+                activity_id=self._activity_id,
+                activity_run_id=self._activity_run_id,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )
@@ -3836,8 +3800,8 @@ class ActivityHandle(Generic[ReturnType]):
             rpc_timeout: Optional RPC deadline to set for the RPC call.
         """
         id_ref = ActivityIDReference(
-            activity_id=self._id,
-            run_id=self._run_id,
+            activity_id=self._activity_id,
+            run_id=self._activity_run_id,
             workflow_id=None,
         )
         if not isinstance(id_ref, ActivityIDReference):
@@ -3878,8 +3842,8 @@ class ActivityHandle(Generic[ReturnType]):
             rpc_timeout: Optional RPC deadline to set for the RPC call.
         """
         id_ref = ActivityIDReference(
-            activity_id=self._id,
-            run_id=self._run_id,
+            activity_id=self._activity_id,
+            run_id=self._activity_run_id,
             workflow_id=None,
         )
         if not isinstance(id_ref, ActivityIDReference):
@@ -3922,8 +3886,8 @@ class ActivityHandle(Generic[ReturnType]):
             rpc_timeout: Optional RPC deadline to set for the RPC call.
         """
         id_ref = ActivityIDReference(
-            activity_id=self._id,
-            run_id=self._run_id,
+            activity_id=self._activity_id,
+            run_id=self._activity_run_id,
             workflow_id=None,
         )
         if not isinstance(id_ref, ActivityIDReference):
@@ -6556,22 +6520,18 @@ class StartActivityInput:
     args: Sequence[Any]
     id: str
     task_queue: str
-    ret_type: Type | None
+    result_type: Type | None
     schedule_to_close_timeout: timedelta | None
     start_to_close_timeout: timedelta | None
     schedule_to_start_timeout: timedelta | None
     heartbeat_timeout: timedelta | None
-    id_reuse_policy: temporalio.common.ActivityIdReusePolicy
-    id_conflict_policy: temporalio.common.ActivityIdConflictPolicy
+    id_reuse_policy: temporalio.common.ActivityIDReusePolicy
+    id_conflict_policy: temporalio.common.ActivityIDConflictPolicy
     retry_policy: temporalio.common.RetryPolicy | None
     priority: temporalio.common.Priority
-    search_attributes: (
-        temporalio.common.SearchAttributes
-        | temporalio.common.TypedSearchAttributes
-        | None
-    )
-    static_summary: str | None
-    static_details: str | None
+    search_attributes: temporalio.common.TypedSearchAttributes | None
+    summary: str | None
+    details: str | None
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
@@ -6586,8 +6546,9 @@ class CancelActivityInput:
     """
 
     activity_id: str
-    run_id: str
+    activity_run_id: str | None
     reason: str | None
+    wait_for_cancel_completed: bool
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
 
@@ -6601,7 +6562,7 @@ class TerminateActivityInput:
     """
 
     activity_id: str
-    run_id: str
+    activity_run_id: str | None
     reason: str | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
@@ -6616,7 +6577,7 @@ class DescribeActivityInput:
     """
 
     activity_id: str
-    run_id: str
+    activity_run_id: str | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
 
@@ -7510,9 +7471,9 @@ class _ClientImpl(OutboundInterceptor):
         )
         return ActivityHandle(
             self._client,
-            id=input.id,
-            run_id=resp.run_id,
-            result_type=input.ret_type,
+            activity_id=input.id,
+            activity_run_id=resp.run_id,
+            result_type=input.result_type,
         )
 
     async def _build_start_activity_execution_request(
@@ -7572,7 +7533,7 @@ class _ClientImpl(OutboundInterceptor):
 
         # Set user metadata
         metadata = await _encode_user_metadata(
-            data_converter, input.static_summary, input.static_details
+            data_converter, input.summary, input.details
         )
         if metadata is not None:
             req.user_metadata.CopyFrom(metadata)
@@ -7593,7 +7554,7 @@ class _ClientImpl(OutboundInterceptor):
             temporalio.api.workflowservice.v1.RequestCancelActivityExecutionRequest(
                 namespace=self._client.namespace,
                 activity_id=input.activity_id,
-                run_id=input.run_id,
+                run_id=input.activity_run_id or "",
                 identity=self._client.identity,
                 request_id=str(uuid.uuid4()),
                 reason=input.reason or "",
@@ -7609,7 +7570,7 @@ class _ClientImpl(OutboundInterceptor):
             temporalio.api.workflowservice.v1.TerminateActivityExecutionRequest(
                 namespace=self._client.namespace,
                 activity_id=input.activity_id,
-                run_id=input.run_id,
+                run_id=input.activity_run_id or "",
                 reason=input.reason or "",
                 identity=self._client.identity,
             ),
@@ -7626,7 +7587,7 @@ class _ClientImpl(OutboundInterceptor):
             temporalio.api.workflowservice.v1.DescribeActivityExecutionRequest(
                 namespace=self._client.namespace,
                 activity_id=input.activity_id,
-                run_id=input.run_id,
+                run_id=input.activity_run_id or "",
                 include_input=True,
             ),
             retry=True,
@@ -7636,6 +7597,7 @@ class _ClientImpl(OutboundInterceptor):
         return await ActivityExecutionDescription._from_raw_info(
             info=resp.info,
             input=resp.input,
+            namespace=self._client.namespace,
             data_converter=self._client.data_converter.with_context(
                 WorkflowSerializationContext(
                     namespace=self._client.namespace,

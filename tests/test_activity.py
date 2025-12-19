@@ -30,7 +30,7 @@ async def test_describe(client: Client):
     )
     desc = await activity_handle.describe()
     assert desc.activity_id == activity_id
-    assert desc.run_id == activity_handle.run_id
+    assert desc.activity_run_id == activity_handle.activity_run_id
     assert desc.activity_type == "increment"
     assert desc.task_queue == task_queue
     assert desc.status == ActivityExecutionStatus.RUNNING
@@ -111,7 +111,7 @@ async def test_manual_completion(client: Client):
         # Complete activity manually
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
-            run_id=activity_handle.run_id,
+            run_id=activity_handle.activity_run_id,
         )
         await async_activity_handle.complete(7)
         assert await activity_handle.result() == 7
@@ -149,7 +149,7 @@ async def test_manual_cancellation(client: Client):
         )
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
-            run_id=activity_handle.run_id,
+            run_id=activity_handle.activity_run_id,
         )
         await async_activity_handle.report_cancellation("Test cancellation")
         with pytest.raises(ActivityFailedError) as err:
@@ -188,7 +188,7 @@ async def test_manual_failure(client: Client):
         )
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
-            run_id=activity_handle.run_id,
+            run_id=activity_handle.activity_run_id,
         )
         await async_activity_handle.fail(
             ApplicationError("Test failure", non_retryable=True)
@@ -262,7 +262,7 @@ async def test_manual_heartbeat(client: Client):
     ):
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
-            run_id=activity_handle.run_id,
+            run_id=activity_handle.activity_run_id,
         )
         await wait_for_activity_start_wf_handle.result()
         await async_activity_handle.heartbeat("Test heartbeat details")

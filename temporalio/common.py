@@ -147,7 +147,7 @@ class WorkflowIDConflictPolicy(IntEnum):
     )
 
 
-class ActivityIdReusePolicy(IntEnum):
+class ActivityIDReusePolicy(IntEnum):
     """How already-closed activity IDs are handled on start.
 
     .. warning::
@@ -170,7 +170,7 @@ class ActivityIdReusePolicy(IntEnum):
     )
 
 
-class ActivityIdConflictPolicy(IntEnum):
+class ActivityIDConflictPolicy(IntEnum):
     """How already-running activity IDs are handled on start.
 
     .. warning::
