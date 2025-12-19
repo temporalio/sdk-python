@@ -1996,13 +1996,7 @@ The following discrepancies exist between the spec above and the current Python 
 
 4. **`ActivityExecutionCountAggregationGroup.group_values`**: Spec says `Sequence[temporalio.common.SearchAttributeValue]`, implementation uses `Sequence[Any]`.
 
-### Parameter Name Discrepancies
-
-1. **`start_activity` uses `static_summary` and `static_details`**: Spec says parameter should be named `summary` (no `static_` prefix) and explicitly says "no static_details". Implementation should be updated to match spec.
-
 ### Extra Items (Not in Spec)
-
-1. **`ActivityHandle.pause()`, `unpause()`, `reset()` methods**: These activity lifecycle methods are implemented but not specified. These should be removed from implementation.
 
 2. **`ActivityExecutionDescription.input: Sequence[Any]`**: Extra field providing deserialized activity input. Not in spec but useful for debugging.
 

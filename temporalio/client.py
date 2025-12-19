@@ -1287,8 +1287,7 @@ class Client:
         id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
         retry_policy: temporalio.common.RetryPolicy | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
-        static_summary: str | None = None,
-        static_details: str | None = None,
+        summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
@@ -1314,10 +1313,8 @@ class Client:
                 Default is FAIL.
             retry_policy: Retry policy for the activity.
             search_attributes: Search attributes for the activity.
-            static_summary: A single-line fixed summary for this activity that may appear
+            summary: A single-line fixed summary for this activity that may appear
                 in the UI/CLI. This can be in single-line Temporal markdown format.
-            static_details: General fixed details for this activity that may appear in
-                UI/CLI. This can be in Temporal markdown format and can span multiple lines.
             priority: Priority of the activity execution.
             rpc_metadata: Headers used on the RPC call.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
@@ -1343,8 +1340,7 @@ class Client:
                 id_conflict_policy=id_conflict_policy,
                 retry_policy=retry_policy,
                 search_attributes=search_attributes,
-                summary=static_summary,
-                details=static_details,
+                summary=summary,
                 headers={},
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
@@ -1369,8 +1365,7 @@ class Client:
         id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
         retry_policy: temporalio.common.RetryPolicy | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
-        static_summary: str | None = None,
-        static_details: str | None = None,
+        summary: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
@@ -1403,8 +1398,7 @@ class Client:
             id_conflict_policy=id_conflict_policy,
             retry_policy=retry_policy,
             search_attributes=search_attributes,
-            static_summary=static_summary,
-            static_details=static_details,
+            summary=summary,
             priority=priority,
             rpc_metadata=rpc_metadata,
             rpc_timeout=rpc_timeout,
@@ -3776,138 +3770,6 @@ class ActivityHandle(Generic[ReturnType]):
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )
-        )
-
-    # TODO:
-    # update_options
-
-    async def pause(
-        self,
-        *,
-        reason: str | None = None,
-        rpc_metadata: Mapping[str, str | bytes] = {},
-        rpc_timeout: timedelta | None = None,
-    ) -> None:
-        """Pause the activity.
-
-        .. warning::
-           This API is experimental.
-
-        Args:
-            reason: Reason for pausing the activity.
-            rpc_metadata: Headers used on the RPC call. Keys here override
-                client-level RPC metadata keys.
-            rpc_timeout: Optional RPC deadline to set for the RPC call.
-        """
-        id_ref = ActivityIDReference(
-            activity_id=self._activity_id,
-            run_id=self._activity_run_id,
-            workflow_id=None,
-        )
-        if not isinstance(id_ref, ActivityIDReference):
-            raise ValueError("Cannot pause activity with task token")
-
-        await self._client.workflow_service.pause_activity(
-            temporalio.api.workflowservice.v1.PauseActivityRequest(
-                namespace=self._client.namespace,
-                execution=temporalio.api.common.v1.WorkflowExecution(
-                    workflow_id=id_ref.workflow_id or "",
-                    run_id=id_ref.run_id or "",
-                ),
-                identity=self._client.identity,
-                id=id_ref.activity_id,
-                reason=reason or "",
-            ),
-            retry=True,
-            metadata=rpc_metadata,
-            timeout=rpc_timeout,
-        )
-
-    async def unpause(
-        self,
-        *,
-        reset_attempts: bool = False,
-        rpc_metadata: Mapping[str, str | bytes] = {},
-        rpc_timeout: timedelta | None = None,
-    ) -> None:
-        """Unpause the activity.
-
-        .. warning::
-           This API is experimental.
-
-        Args:
-            reset_attempts: Whether to reset the number of attempts.
-            rpc_metadata: Headers used on the RPC call. Keys here override
-                client-level RPC metadata keys.
-            rpc_timeout: Optional RPC deadline to set for the RPC call.
-        """
-        id_ref = ActivityIDReference(
-            activity_id=self._activity_id,
-            run_id=self._activity_run_id,
-            workflow_id=None,
-        )
-        if not isinstance(id_ref, ActivityIDReference):
-            raise ValueError("Cannot unpause activity with task token")
-
-        await self._client.workflow_service.unpause_activity(
-            temporalio.api.workflowservice.v1.UnpauseActivityRequest(
-                namespace=self._client.namespace,
-                execution=temporalio.api.common.v1.WorkflowExecution(
-                    workflow_id=id_ref.workflow_id or "",
-                    run_id=id_ref.run_id or "",
-                ),
-                identity=self._client.identity,
-                id=id_ref.activity_id,
-                reset_attempts=reset_attempts,
-            ),
-            retry=True,
-            metadata=rpc_metadata,
-            timeout=rpc_timeout,
-        )
-
-    async def reset(
-        self,
-        *,
-        reset_heartbeat: bool = False,
-        keep_paused: bool = False,
-        rpc_metadata: Mapping[str, str | bytes] = {},
-        rpc_timeout: timedelta | None = None,
-    ) -> None:
-        """Reset the activity.
-
-        .. warning::
-           This API is experimental.
-
-        Args:
-            reset_heartbeat: Whether to reset heartbeat details.
-            keep_paused: If activity is paused, whether to keep it paused after reset.
-            rpc_metadata: Headers used on the RPC call. Keys here override
-                client-level RPC metadata keys.
-            rpc_timeout: Optional RPC deadline to set for the RPC call.
-        """
-        id_ref = ActivityIDReference(
-            activity_id=self._activity_id,
-            run_id=self._activity_run_id,
-            workflow_id=None,
-        )
-        if not isinstance(id_ref, ActivityIDReference):
-            raise ValueError("Cannot reset activity with task token")
-
-        await self._client.workflow_service.reset_activity(
-            temporalio.api.workflowservice.v1.ResetActivityRequest(
-                namespace=self._client.namespace,
-                execution=temporalio.api.common.v1.WorkflowExecution(
-                    workflow_id=id_ref.workflow_id or "",
-                    run_id=id_ref.run_id or "",
-                ),
-                identity=self._client.identity,
-                id=id_ref.activity_id,
-                reset_heartbeat=reset_heartbeat,
-                keep_paused=keep_paused,
-            ),
-            retry=True,
-            metadata=rpc_metadata,
-            timeout=rpc_timeout,
         )
 
 
@@ -6531,7 +6393,6 @@ class StartActivityInput:
     priority: temporalio.common.Priority
     search_attributes: temporalio.common.TypedSearchAttributes | None
     summary: str | None
-    details: str | None
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
@@ -7532,9 +7393,7 @@ class _ClientImpl(OutboundInterceptor):
             )
 
         # Set user metadata
-        metadata = await _encode_user_metadata(
-            data_converter, input.summary, input.details
-        )
+        metadata = await _encode_user_metadata(data_converter, input.summary, None)
         if metadata is not None:
             req.user_metadata.CopyFrom(metadata)
 
