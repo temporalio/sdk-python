@@ -84,10 +84,10 @@ class NoEventLoopPolicy(asyncio.AbstractEventLoopPolicy):  # type: ignore[name-d
         return None
 
     def get_child_watcher(self):
-        return self._underlying.get_child_watcher()
+        return self._underlying.get_child_watcher()  # type: ignore[reportDeprecated]
 
     def set_child_watcher(self, watcher):  # type: ignore[reportMissingParameterType]
-        return self._underlying.set_child_watcher(watcher)
+        return self._underlying.set_child_watcher(watcher)  # type: ignore[reportDeprecated]
 
 
 @pytest.fixture(scope="session")

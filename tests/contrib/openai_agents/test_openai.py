@@ -214,7 +214,7 @@ class WeatherServiceHandler:
     @nexusrpc.handler.sync_operation
     async def get_weather_nexus_operation(
         self,
-        ctx: nexusrpc.handler.StartOperationContext,
+        ctx: nexusrpc.handler.StartOperationContext,  # type: ignore[reportUnusedParameter]
         input: WeatherInput,  # type: ignore[reportUnusedParameter]
     ) -> Weather:
         return Weather(
