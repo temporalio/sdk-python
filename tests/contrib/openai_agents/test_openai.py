@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
     Any,
+    Awaitable,
     Optional,
     Union,
     cast,
@@ -65,6 +66,7 @@ from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
     EasyInputMessageParam,
     ResponseCodeInterpreterToolCall,
+    ResponseErrorEvent,
     ResponseFileSearchToolCall,
     ResponseFunctionToolCall,
     ResponseFunctionToolCallParam,
@@ -72,6 +74,7 @@ from openai.types.responses import (
     ResponseInputTextParam,
     ResponseOutputMessage,
     ResponseOutputText,
+    ResponseTextDeltaEvent,
 )
 from openai.types.responses.response_file_search_tool_call import Result
 from openai.types.responses.response_function_web_search import ActionSearch
@@ -90,10 +93,11 @@ from temporalio.common import RetryPolicy
 from temporalio.contrib import openai_agents
 from temporalio.contrib.openai_agents import (
     ModelActivityParameters,
+    ModelSummaryProvider,
     StatefulMCPServerProvider,
     StatelessMCPServerProvider,
+    StreamingOptions,
 )
-from temporalio.contrib.openai_agents._model_parameters import ModelSummaryProvider
 from temporalio.contrib.openai_agents._openai_runner import _convert_agent
 from temporalio.contrib.openai_agents._temporal_model_stub import (
     _extract_summary,
@@ -101,6 +105,7 @@ from temporalio.contrib.openai_agents._temporal_model_stub import (
 )
 from temporalio.contrib.openai_agents.testing import (
     AgentEnvironment,
+    EventBuilders,
     ResponseBuilders,
     TestModel,
     TestModelProvider,
@@ -2551,7 +2556,9 @@ async def test_stateful_mcp_server_no_worker(client: Client):
 
 async def test_model_conversion_loops():
     agent = init_agents()
-    converted = _convert_agent(ModelActivityParameters(), agent, None)
+    converted = _convert_agent(
+        ModelActivityParameters(), StreamingOptions(), agent, None
+    )
     seat_booking_handoff = converted.handoffs[1]
     assert isinstance(seat_booking_handoff, Handoff)
     context: RunContextWrapper[AirlineAgentContext] = RunContextWrapper(
@@ -2635,3 +2642,162 @@ async def test_split_workers(client: Client):
                 execution_timeout=timedelta(seconds=120),
             )
             assert result == "test"
+
+
+@workflow.defn
+class StreamingHelloWorldAgent:
+    def __init__(self):
+        self.events = []
+        self._has_failure = False
+
+    @workflow.run
+    async def run(self, prompt: str) -> str | None:
+        agent = Agent[None](
+            name="Assistant",
+            instructions="You are a helpful assistant.",
+        )
+
+        result = Runner.run_streamed(starting_agent=agent, input=prompt)
+        async for event in result.stream_events():
+            if event.type == "raw_response_event" and isinstance(
+                event.data, ResponseTextDeltaEvent
+            ):
+                self.events.append(event.data.delta)
+            if event.type == "raw_response_event" and isinstance(
+                event.data, ResponseErrorEvent
+            ):
+                self._has_failure = True
+
+        return result.final_output if result else None
+
+    @workflow.query
+    def get_events(self) -> list[str]:
+        return self.events
+
+    @workflow.query
+    def has_failure(self) -> bool:
+        return self._has_failure
+
+
+def streaming_hello_model():
+    return TestModel.streaming_events_with_ending(
+        [
+            EventBuilders.text_delta("Hello"),
+            EventBuilders.text_delta(" there"),
+            EventBuilders.text_delta("!"),
+        ]
+    )
+
+
+async def test_signal_streaming(client: Client):
+    async with AgentEnvironment(
+        model=streaming_hello_model(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+        streaming_options=StreamingOptions(
+            use_signals=True,
+        ),
+    ) as env:
+        client = env.applied_on_client(client)
+
+        async with new_worker(
+            client, StreamingHelloWorldAgent, max_cached_workflows=0
+        ) as worker:
+            handle = await client.start_workflow(
+                StreamingHelloWorldAgent.run,
+                args=["Say hello."],
+                id=f"hello-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=50),
+            )
+            result = await handle.result()
+            assert result == "Hello there!"
+            assert len(await handle.query(StreamingHelloWorldAgent.get_events)) == 3
+
+
+failed = False
+
+
+def streaming_failure_model():
+    async def generator() -> AsyncIterator[TResponseStreamEvent]:
+        global failed
+        for event in [
+            EventBuilders.text_delta("Hello"),
+            EventBuilders.text_delta(" there"),
+            EventBuilders.text_delta("!"),
+        ]:
+            yield event
+        await asyncio.sleep(0.25)
+        if not failed:
+            failed = True
+            raise ValueError("Intentional failure")
+
+        for end_event in EventBuilders.ending("Hello there!"):
+            yield end_event
+
+    return TestModel(None, streaming_fn=lambda: generator())
+
+
+async def test_signal_streaming_failure(client: Client):
+    async with AgentEnvironment(
+        model=streaming_failure_model(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+        streaming_options=StreamingOptions(
+            use_signals=True,
+            signal_batch_latency_seconds=0.1,
+        ),
+    ) as env:
+        client = env.applied_on_client(client)
+
+        async with new_worker(
+            client, StreamingHelloWorldAgent, max_cached_workflows=0
+        ) as worker:
+            handle = await client.start_workflow(
+                StreamingHelloWorldAgent.run,
+                args=["Say hello."],
+                id=f"hello-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=50),
+            )
+            result = await handle.result()
+            assert result == "Hello there!"
+            assert len(await handle.query(StreamingHelloWorldAgent.get_events)) == 6
+            assert await handle.query(StreamingHelloWorldAgent.has_failure)
+
+
+async def test_callback_streaming(client: Client):
+    events = []
+
+    async def callback(_: ModelSettings, event: TResponseStreamEvent) -> None:
+        events.append(event)
+
+    async with AgentEnvironment(
+        model=streaming_hello_model(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+        streaming_options=StreamingOptions(
+            callback=callback,
+        ),
+    ) as env:
+        client = env.applied_on_client(client)
+
+        async with new_worker(
+            client, StreamingHelloWorldAgent, max_cached_workflows=0
+        ) as worker:
+            handle = await client.start_workflow(
+                StreamingHelloWorldAgent.run,
+                args=["Say hello."],
+                id=f"hello-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=50),
+            )
+            result = await handle.result()
+            assert result == "Hello there!"
+            assert len(await handle.query(StreamingHelloWorldAgent.get_events)) == 3
+
+            # The results include the ending markers because it wasn't filtered like the workflow
+            assert len(events) == 6
