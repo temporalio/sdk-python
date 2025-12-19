@@ -29,9 +29,7 @@ from typing import (
     Any,
     Concatenate,
     Generic,
-    Optional,
     Type,
-    Union,
     cast,
     overload,
 )
@@ -1274,26 +1272,26 @@ class Client:
     # - TODO: Support sync and async activity functions
     async def start_activity(
         self,
-        activity: Union[str, Callable[..., Awaitable[ReturnType]]],
+        activity: str | Callable[..., Awaitable[ReturnType]],
         *,
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Optional[Type] = None,
+        result_type: Type | None = None,
         # Either schedule_to_close_timeout or start_to_close_timeout must be present
-        schedule_to_close_timeout: Optional[timedelta] = None,
-        start_to_close_timeout: Optional[timedelta] = None,
-        schedule_to_start_timeout: Optional[timedelta] = None,
-        heartbeat_timeout: Optional[timedelta] = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.IdReusePolicy = temporalio.common.IdReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.IdConflictPolicy = temporalio.common.IdConflictPolicy.FAIL,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
-        search_attributes: Optional[temporalio.common.TypedSearchAttributes] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[ReturnType]:
         """Start an activity and return its handle.
 
@@ -1356,31 +1354,30 @@ class Client:
 
     async def execute_activity(
         self,
-        activity: Union[str, Callable[..., Awaitable[ReturnType]]],
+        activity: str | Callable[..., Awaitable[ReturnType]],
         *,
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Optional[Type] = None,
+        result_type: Type | None = None,
         # Either schedule_to_close_timeout or start_to_close_timeout must be present
-        schedule_to_close_timeout: Optional[timedelta] = None,
-        start_to_close_timeout: Optional[timedelta] = None,
-        schedule_to_start_timeout: Optional[timedelta] = None,
-        heartbeat_timeout: Optional[timedelta] = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
         id_reuse_policy: temporalio.common.IdReusePolicy = temporalio.common.IdReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.IdConflictPolicy = temporalio.common.IdConflictPolicy.FAIL,
-        retry_policy: Optional[temporalio.common.RetryPolicy] = None,
-        search_attributes: Optional[
-            Union[
-                temporalio.common.SearchAttributes,
-                temporalio.common.TypedSearchAttributes,
-            ]
-        ] = None,
-        static_summary: Optional[str] = None,
-        static_details: Optional[str] = None,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: (
+            temporalio.common.SearchAttributes
+            | temporalio.common.TypedSearchAttributes
+            | None
+        ) = None,
+        static_summary: str | None = None,
+        static_details: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> ReturnType:
         """Start an activity, wait for it to complete, and return its result.
 
@@ -1420,13 +1417,13 @@ class Client:
 
     def list_activities(
         self,
-        query: Optional[str] = None,
+        query: str | None = None,
         *,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         page_size: int = 1000,
-        next_page_token: Optional[bytes] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        next_page_token: bytes | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> ActivityExecutionAsyncIterator:
         """List activities.
 
@@ -1466,10 +1463,10 @@ class Client:
 
     async def count_activities(
         self,
-        query: Optional[str] = None,
+        query: str | None = None,
         *,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> ActivityExecutionCount:
         """Count activities matching the query.
 
@@ -1495,7 +1492,7 @@ class Client:
         self,
         *,
         activity_id: str,
-        run_id: Optional[str] = None,
+        run_id: str | None = None,
     ) -> ActivityHandle[Any]:
         """Get a handle to an existing activity, as the caller of that activity.
 
@@ -1517,7 +1514,7 @@ class Client:
 
     @overload
     def get_async_activity_handle(
-        self, *, activity_id: str, run_id: Optional[str]
+        self, *, activity_id: str, run_id: str | None = None
     ) -> AsyncActivityHandle:
         pass
 
@@ -2991,9 +2988,9 @@ class ActivityExecutionAsyncIterator:
         self._client = client
         self._input = input
         self._next_page_token = input.next_page_token
-        self._current_page: Optional[
-            Sequence[Union[ActivityExecution, WorkflowActivityExecution]]
-        ] = None
+        self._current_page: (
+            Sequence[ActivityExecution | WorkflowActivityExecution] | None
+        ) = None
         self._current_page_index = 0
         self._limit = input.limit
         self._yielded = 0
@@ -3008,16 +3005,16 @@ class ActivityExecutionAsyncIterator:
     @property
     def current_page(
         self,
-    ) -> Optional[Sequence[Union[ActivityExecution, WorkflowActivityExecution]]]:
+    ) -> Sequence[ActivityExecution | WorkflowActivityExecution] | None:
         """Current page, if it has been fetched yet."""
         return self._current_page
 
     @property
-    def next_page_token(self) -> Optional[bytes]:
+    def next_page_token(self) -> bytes | None:
         """Token for the next page request if any."""
         return self._next_page_token
 
-    async def fetch_next_page(self, *, page_size: Optional[int] = None) -> None:
+    async def fetch_next_page(self, *, page_size: int | None = None) -> None:
         """Fetch the next page of results.
 
         Args:
@@ -3058,7 +3055,7 @@ class ActivityExecutionAsyncIterator:
         return self
 
     # This is a direct copy of WorkflowExecutionAsyncIterator.__anext__
-    async def __anext__(self) -> Union[ActivityExecution, WorkflowActivityExecution]:
+    async def __anext__(self) -> ActivityExecution | WorkflowActivityExecution:
         """Get the next execution on this iterator, fetching next page if
         necessary.
         """
@@ -3099,10 +3096,10 @@ class ActivityExecution:
     activity_type: str
     """Type name of the activity."""
 
-    close_time: Optional[datetime]
+    close_time: datetime | None
     """Time the activity reached a terminal status, if closed."""
 
-    execution_duration: Optional[timedelta]
+    execution_duration: timedelta | None
     """Duration from scheduled to close time, only populated if closed."""
 
     raw_info: temporalio.api.activity.v1.ActivityListInfo
@@ -3183,10 +3180,10 @@ class WorkflowActivityExecution:
     activity_type: str
     """Type name of the activity."""
 
-    close_time: Optional[datetime]
+    close_time: datetime | None
     """Time the activity reached a terminal status, if closed."""
 
-    execution_duration: Optional[timedelta]
+    execution_duration: timedelta | None
     """Duration from scheduled to close time, only populated if closed."""
 
     raw_info: temporalio.api.activity.v1.ActivityListInfo
@@ -3201,7 +3198,7 @@ class WorkflowActivityExecution:
     workflow_id: str
     """ID of the workflow that started this activity."""
 
-    workflow_run_id: Optional[str]
+    workflow_run_id: str | None
     """Run ID of the workflow that started this activity."""
 
     @classmethod
@@ -3278,10 +3275,10 @@ class ActivityExecutionDescription:
     attempt: int
     """Current attempt number."""
 
-    canceled_reason: Optional[str]
+    canceled_reason: str | None
     """Reason for cancellation, if cancel was requested."""
 
-    current_retry_interval: Optional[timedelta]
+    current_retry_interval: timedelta | None
     """Time until the next retry, if applicable."""
 
     eager_execution_requested: bool
@@ -3295,16 +3292,16 @@ class ActivityExecutionDescription:
     input: Sequence[Any]
     """Serialized activity input."""
 
-    last_attempt_complete_time: Optional[datetime]
+    last_attempt_complete_time: datetime | None
     """Time when the last attempt completed."""
 
-    last_failure: Optional[Exception]
+    last_failure: Exception | None
     """Failure from the last failed attempt, if any."""
 
-    last_heartbeat_time: Optional[datetime]
+    last_heartbeat_time: datetime | None
     """Time of the last heartbeat."""
 
-    last_started_time: Optional[datetime]
+    last_started_time: datetime | None
     """Time the last attempt was started."""
 
     last_worker_identity: str
@@ -3313,7 +3310,7 @@ class ActivityExecutionDescription:
     maximum_attempts: int
     """Maximum number of attempts allowed."""
 
-    next_attempt_schedule_time: Optional[datetime]
+    next_attempt_schedule_time: datetime | None
     """Time when the next attempt will be scheduled."""
 
     paused: bool
@@ -3325,7 +3322,7 @@ class ActivityExecutionDescription:
     run_id: str
     """Run ID of the activity."""
 
-    run_state: Optional[temporalio.common.PendingActivityState]
+    run_state: temporalio.common.PendingActivityState | None
     """More detailed breakdown if status is RUNNING."""
 
     scheduled_time: datetime
@@ -3385,7 +3382,7 @@ class ActivityExecutionDescription:
             ),
             last_failure=(
                 cast(
-                    Optional[Exception],
+                    Exception | None,
                     await data_converter.decode_failure(info.last_failure),
                 )
                 if info.HasField("last_failure")
@@ -3447,8 +3444,8 @@ class ActivityIDReference:
        This API is experimental.
     """
 
-    workflow_id: Optional[str]
-    run_id: Optional[str]
+    workflow_id: str | None
+    run_id: str | None
     activity_id: str
 
 
@@ -3611,8 +3608,8 @@ class ActivityHandle(Generic[ReturnType]):
         id: str,
         *,
         run_id: str,
-        result_type: Optional[Type] = None,
-        data_converter_override: Optional[DataConverter] = None,
+        result_type: Type | None = None,
+        data_converter_override: DataConverter | None = None,
     ) -> None:
         """Create activity handle."""
         self._client = client
@@ -3620,12 +3617,9 @@ class ActivityHandle(Generic[ReturnType]):
         self._run_id = run_id
         self._result_type = result_type
         self._data_converter_override = data_converter_override
-        self._known_outcome: Optional[
-            Union[
-                temporalio.api.common.v1.Payloads,
-                temporalio.api.failure.v1.Failure,
-            ]
-        ] = None
+        self._known_outcome: (
+            temporalio.api.common.v1.Payloads | temporalio.api.failure.v1.Failure | None
+        ) = None
 
     @property
     def id(self) -> str:
@@ -3665,8 +3659,8 @@ class ActivityHandle(Generic[ReturnType]):
     async def result(
         self,
         *,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> ReturnType:
         """Wait for result of the activity.
 
@@ -3717,8 +3711,8 @@ class ActivityHandle(Generic[ReturnType]):
 
     async def _poll_until_outcome(
         self,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Poll for activity result until it's available."""
         if self._known_outcome:
@@ -3760,9 +3754,9 @@ class ActivityHandle(Generic[ReturnType]):
     async def cancel(
         self,
         *,
-        reason: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        reason: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Request cancellation of the activity.
 
@@ -3793,9 +3787,9 @@ class ActivityHandle(Generic[ReturnType]):
     async def terminate(
         self,
         *,
-        reason: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        reason: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Terminate the activity execution immediately.
 
@@ -3824,8 +3818,8 @@ class ActivityHandle(Generic[ReturnType]):
     async def describe(
         self,
         *,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> ActivityExecutionDescription:
         """Describe the activity execution.
 
@@ -3854,9 +3848,9 @@ class ActivityHandle(Generic[ReturnType]):
     async def pause(
         self,
         *,
-        reason: Optional[str] = None,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        reason: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Pause the activity.
 
@@ -3897,8 +3891,8 @@ class ActivityHandle(Generic[ReturnType]):
         self,
         *,
         reset_attempts: bool = False,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Unpause the activity.
 
@@ -3940,8 +3934,8 @@ class ActivityHandle(Generic[ReturnType]):
         *,
         reset_heartbeat: bool = False,
         keep_paused: bool = False,
-        rpc_metadata: Mapping[str, Union[str, bytes]] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> None:
         """Reset the activity.
 
@@ -6590,26 +6584,25 @@ class StartActivityInput:
     args: Sequence[Any]
     id: str
     task_queue: str
-    ret_type: Optional[Type]
-    schedule_to_close_timeout: Optional[timedelta]
-    start_to_close_timeout: Optional[timedelta]
-    schedule_to_start_timeout: Optional[timedelta]
-    heartbeat_timeout: Optional[timedelta]
+    ret_type: Type | None
+    schedule_to_close_timeout: timedelta | None
+    start_to_close_timeout: timedelta | None
+    schedule_to_start_timeout: timedelta | None
+    heartbeat_timeout: timedelta | None
     id_reuse_policy: temporalio.common.IdReusePolicy
     id_conflict_policy: temporalio.common.IdConflictPolicy
-    retry_policy: Optional[temporalio.common.RetryPolicy]
+    retry_policy: temporalio.common.RetryPolicy | None
     priority: temporalio.common.Priority
-    search_attributes: Optional[
-        Union[
-            temporalio.common.SearchAttributes,
-            temporalio.common.TypedSearchAttributes,
-        ]
-    ]
-    static_summary: Optional[str]
-    static_details: Optional[str]
+    search_attributes: (
+        temporalio.common.SearchAttributes
+        | temporalio.common.TypedSearchAttributes
+        | None
+    )
+    static_summary: str | None
+    static_details: str | None
     headers: Mapping[str, temporalio.api.common.v1.Payload]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -6622,9 +6615,9 @@ class CancelActivityInput:
 
     activity_id: str
     run_id: str
-    reason: Optional[str]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    reason: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -6637,9 +6630,9 @@ class TerminateActivityInput:
 
     activity_id: str
     run_id: str
-    reason: Optional[str]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    reason: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -6652,8 +6645,8 @@ class DescribeActivityInput:
 
     activity_id: str
     run_id: str
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
@@ -6664,12 +6657,12 @@ class ListActivitiesInput:
        This API is experimental.
     """
 
-    query: Optional[str]
+    query: str | None
     page_size: int
-    next_page_token: Optional[bytes]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
-    limit: Optional[int]
+    next_page_token: bytes | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+    limit: int | None
 
 
 @dataclass
@@ -6680,9 +6673,9 @@ class CountActivitiesInput:
        This API is experimental.
     """
 
-    query: Optional[str]
-    rpc_metadata: Mapping[str, Union[str, bytes]]
-    rpc_timeout: Optional[timedelta]
+    query: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
 
 
 @dataclass
