@@ -175,10 +175,17 @@ class WorkflowServiceStub:
     ]
     """RecordActivityTaskHeartbeat is optionally called by workers while they execute activities.
 
-    If worker fails to heartbeat within the `heartbeat_timeout` interval for the activity task,
-    then it will be marked as timed out and an `ACTIVITY_TASK_TIMED_OUT` event will be written to
-    the workflow history. Calling `RecordActivityTaskHeartbeat` will fail with `NotFound` in
-    such situations, in that event, the SDK should request cancellation of the activity.
+    If a worker fails to heartbeat within the `heartbeat_timeout` interval for the activity task,
+    then the current attempt times out. Depending on RetryPolicy, this may trigger a retry or
+    time out the activity.
+
+    For workflow activities, an `ACTIVITY_TASK_TIMED_OUT` event will be written to the workflow
+    history. Calling `RecordActivityTaskHeartbeat` will fail with `NotFound` in such situations,
+    in that event, the SDK should request cancellation of the activity.
+
+    The request may contain response `details` which will be persisted by the server and may be
+    used by the activity to checkpoint progress. The `cancel_requested` field in the response
+    indicates whether cancellation has been requested for the activity.
     """
     RecordActivityTaskHeartbeatById: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatByIdRequest,
@@ -197,7 +204,7 @@ class WorkflowServiceStub:
     """RespondActivityTaskCompleted is called by workers when they successfully complete an activity
     task.
 
-    This results in a new `ACTIVITY_TASK_COMPLETED` event being written to the workflow history
+    For workflow activities, this results in a new `ACTIVITY_TASK_COMPLETED` event being written to the workflow history
     and a new workflow task created for the workflow. Fails with `NotFound` if the task token is
     no longer valid due to activity timeout, already being completed, or never having existed.
     """
@@ -205,7 +212,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdResponse,
     ]
-    """See `RecordActivityTaskCompleted`. This version allows clients to record completions by
+    """See `RespondActivityTaskCompleted`. This version allows clients to record completions by
     namespace/workflow id/activity id instead of task token.
 
     (-- api-linter: core::0136::prepositions=disabled
@@ -237,7 +244,7 @@ class WorkflowServiceStub:
     ]
     """RespondActivityTaskFailed is called by workers when processing an activity task fails.
 
-    This results in a new `ACTIVITY_TASK_CANCELED` event being written to the workflow history
+    For workflow activities, this results in a new `ACTIVITY_TASK_CANCELED` event being written to the workflow history
     and a new workflow task created for the workflow. Fails with `NotFound` if the task token is
     no longer valid due to activity timeout, already being completed, or never having existed.
     """
@@ -245,7 +252,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdResponse,
     ]
-    """See `RecordActivityTaskCanceled`. This version allows clients to record failures by
+    """See `RespondActivityTaskCanceled`. This version allows clients to record failures by
     namespace/workflow id/activity id instead of task token.
 
     (-- api-linter: core::0136::prepositions=disabled
@@ -760,6 +767,8 @@ class WorkflowServiceStub:
     ]
     """UpdateActivityOptions is called by the client to update the options of an activity by its ID or type.
     If there are multiple pending activities of the provided type - all of them will be updated.
+    This API will be deprecated soon and replaced with a newer UpdateActivityExecutionOptions that is better named and
+    structured to work well for standalone activities.
     """
     UpdateWorkflowExecutionOptions: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkflowExecutionOptionsRequest,
@@ -786,6 +795,8 @@ class WorkflowServiceStub:
     - The activity should respond to the cancellation accordingly.
 
     Returns a `NotFound` error if there is no pending activity with the provided ID or type
+    This API will be deprecated soon and replaced with a newer PauseActivityExecution that is better named and
+    structured to work well for standalone activities.
     """
     UnpauseActivity: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.UnpauseActivityRequest,
@@ -804,6 +815,8 @@ class WorkflowServiceStub:
     'reset_heartbeat': the activity heartbeat timer and heartbeats will be reset.
 
     Returns a `NotFound` error if there is no pending activity with the provided ID or type
+    This API will be deprecated soon and replaced with a newer UnpauseActivityExecution that is better named and
+    structured to work well for standalone activities.
     """
     ResetActivity: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.ResetActivityRequest,
@@ -826,6 +839,8 @@ class WorkflowServiceStub:
     'keep_paused': if the activity is paused, it will remain paused.
 
     Returns a `NotFound` error if there is no pending activity with the provided ID or type.
+    This API will be deprecated soon and replaced with a newer ResetActivityExecution that is better named and
+    structured to work well for standalone activities.
     """
     CreateWorkflowRule: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkflowRuleRequest,
@@ -900,6 +915,74 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse,
     ]
     """DescribeWorker returns information about the specified worker."""
+    StartActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionResponse,
+    ]
+    """StartActivityExecution starts a new activity execution.
+
+    Returns an `ActivityExecutionAlreadyStarted` error if an instance already exists with same activity ID in this namespace
+    unless permitted by the specified ID conflict policy.
+    """
+    DescribeActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionResponse,
+    ]
+    """DescribeActivityExecution returns information about an activity execution.
+    It can be used to:
+    - Get current activity info without waiting
+    - Long-poll for next state change and return new activity info
+    Response can optionally include activity input or outcome (if the activity has completed).
+    """
+    PollActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionResponse,
+    ]
+    """PollActivityExecution long-polls for an activity execution to complete and returns the
+    outcome (result or failure).
+    """
+    ListActivityExecutions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsResponse,
+    ]
+    """ListActivityExecutions is a visibility API to list activity executions in a specific namespace."""
+    CountActivityExecutions: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsResponse,
+    ]
+    """CountActivityExecutions is a visibility API to count activity executions in a specific namespace."""
+    RequestCancelActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionResponse,
+    ]
+    """RequestCancelActivityExecution requests cancellation of an activity execution.
+
+    Cancellation is cooperative: this call records the request, but the activity must detect and
+    acknowledge it for the activity to reach CANCELED status. The cancellation signal is
+    delivered via `cancel_requested` in the heartbeat response; SDKs surface this via
+    language-idiomatic mechanisms (context cancellation, exceptions, abort signals).
+    """
+    TerminateActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionResponse,
+    ]
+    """TerminateActivityExecution terminates an existing activity execution immediately.
+
+    Termination does not reach the worker and the activity code cannot react to it. A terminated activity may have a
+    running attempt.
+    """
+    DeleteActivityExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionResponse,
+    ]
+    """DeleteActivityExecution asynchronously deletes a specific activity execution (when
+    ActivityExecution.run_id is provided) or the latest activity execution (when
+    ActivityExecution.run_id is not provided). If the activity Execution is running, it will be
+    terminated before deletion.
+
+    (-- api-linter: core::0127::http-annotation=disabled
+        aip.dev/not-precedent: Activity deletion not exposed to HTTP, users should use cancel or terminate. --)
+    """
 
 class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     """WorkflowService API defines how Temporal SDKs and other clients interact with the Temporal server
@@ -1098,10 +1181,17 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatResponse:
         """RecordActivityTaskHeartbeat is optionally called by workers while they execute activities.
 
-        If worker fails to heartbeat within the `heartbeat_timeout` interval for the activity task,
-        then it will be marked as timed out and an `ACTIVITY_TASK_TIMED_OUT` event will be written to
-        the workflow history. Calling `RecordActivityTaskHeartbeat` will fail with `NotFound` in
-        such situations, in that event, the SDK should request cancellation of the activity.
+        If a worker fails to heartbeat within the `heartbeat_timeout` interval for the activity task,
+        then the current attempt times out. Depending on RetryPolicy, this may trigger a retry or
+        time out the activity.
+
+        For workflow activities, an `ACTIVITY_TASK_TIMED_OUT` event will be written to the workflow
+        history. Calling `RecordActivityTaskHeartbeat` will fail with `NotFound` in such situations,
+        in that event, the SDK should request cancellation of the activity.
+
+        The request may contain response `details` which will be persisted by the server and may be
+        used by the activity to checkpoint progress. The `cancel_requested` field in the response
+        indicates whether cancellation has been requested for the activity.
         """
     @abc.abstractmethod
     def RecordActivityTaskHeartbeatById(
@@ -1124,7 +1214,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         """RespondActivityTaskCompleted is called by workers when they successfully complete an activity
         task.
 
-        This results in a new `ACTIVITY_TASK_COMPLETED` event being written to the workflow history
+        For workflow activities, this results in a new `ACTIVITY_TASK_COMPLETED` event being written to the workflow history
         and a new workflow task created for the workflow. Fails with `NotFound` if the task token is
         no longer valid due to activity timeout, already being completed, or never having existed.
         """
@@ -1134,7 +1224,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCompletedByIdResponse:
-        """See `RecordActivityTaskCompleted`. This version allows clients to record completions by
+        """See `RespondActivityTaskCompleted`. This version allows clients to record completions by
         namespace/workflow id/activity id instead of task token.
 
         (-- api-linter: core::0136::prepositions=disabled
@@ -1172,7 +1262,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledResponse:
         """RespondActivityTaskFailed is called by workers when processing an activity task fails.
 
-        This results in a new `ACTIVITY_TASK_CANCELED` event being written to the workflow history
+        For workflow activities, this results in a new `ACTIVITY_TASK_CANCELED` event being written to the workflow history
         and a new workflow task created for the workflow. Fails with `NotFound` if the task token is
         no longer valid due to activity timeout, already being completed, or never having existed.
         """
@@ -1182,7 +1272,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         request: temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledByIdResponse:
-        """See `RecordActivityTaskCanceled`. This version allows clients to record failures by
+        """See `RespondActivityTaskCanceled`. This version allows clients to record failures by
         namespace/workflow id/activity id instead of task token.
 
         (-- api-linter: core::0136::prepositions=disabled
@@ -1817,6 +1907,8 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateActivityOptionsResponse:
         """UpdateActivityOptions is called by the client to update the options of an activity by its ID or type.
         If there are multiple pending activities of the provided type - all of them will be updated.
+        This API will be deprecated soon and replaced with a newer UpdateActivityExecutionOptions that is better named and
+        structured to work well for standalone activities.
         """
     @abc.abstractmethod
     def UpdateWorkflowExecutionOptions(
@@ -1847,6 +1939,8 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         - The activity should respond to the cancellation accordingly.
 
         Returns a `NotFound` error if there is no pending activity with the provided ID or type
+        This API will be deprecated soon and replaced with a newer PauseActivityExecution that is better named and
+        structured to work well for standalone activities.
         """
     @abc.abstractmethod
     def UnpauseActivity(
@@ -1867,6 +1961,8 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         'reset_heartbeat': the activity heartbeat timer and heartbeats will be reset.
 
         Returns a `NotFound` error if there is no pending activity with the provided ID or type
+        This API will be deprecated soon and replaced with a newer UnpauseActivityExecution that is better named and
+        structured to work well for standalone activities.
         """
     @abc.abstractmethod
     def ResetActivity(
@@ -1891,6 +1987,8 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         'keep_paused': if the activity is paused, it will remain paused.
 
         Returns a `NotFound` error if there is no pending activity with the provided ID or type.
+        This API will be deprecated soon and replaced with a newer ResetActivityExecution that is better named and
+        structured to work well for standalone activities.
         """
     @abc.abstractmethod
     def CreateWorkflowRule(
@@ -1991,6 +2089,90 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse:
         """DescribeWorker returns information about the specified worker."""
+    @abc.abstractmethod
+    def StartActivityExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionResponse:
+        """StartActivityExecution starts a new activity execution.
+
+        Returns an `ActivityExecutionAlreadyStarted` error if an instance already exists with same activity ID in this namespace
+        unless permitted by the specified ID conflict policy.
+        """
+    @abc.abstractmethod
+    def DescribeActivityExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionResponse:
+        """DescribeActivityExecution returns information about an activity execution.
+        It can be used to:
+        - Get current activity info without waiting
+        - Long-poll for next state change and return new activity info
+        Response can optionally include activity input or outcome (if the activity has completed).
+        """
+    @abc.abstractmethod
+    def PollActivityExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PollActivityExecutionResponse:
+        """PollActivityExecution long-polls for an activity execution to complete and returns the
+        outcome (result or failure).
+        """
+    @abc.abstractmethod
+    def ListActivityExecutions(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListActivityExecutionsResponse:
+        """ListActivityExecutions is a visibility API to list activity executions in a specific namespace."""
+    @abc.abstractmethod
+    def CountActivityExecutions(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CountActivityExecutionsResponse:
+        """CountActivityExecutions is a visibility API to count activity executions in a specific namespace."""
+    @abc.abstractmethod
+    def RequestCancelActivityExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionResponse:
+        """RequestCancelActivityExecution requests cancellation of an activity execution.
+
+        Cancellation is cooperative: this call records the request, but the activity must detect and
+        acknowledge it for the activity to reach CANCELED status. The cancellation signal is
+        delivered via `cancel_requested` in the heartbeat response; SDKs surface this via
+        language-idiomatic mechanisms (context cancellation, exceptions, abort signals).
+        """
+    @abc.abstractmethod
+    def TerminateActivityExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionResponse:
+        """TerminateActivityExecution terminates an existing activity execution immediately.
+
+        Termination does not reach the worker and the activity code cannot react to it. A terminated activity may have a
+        running attempt.
+        """
+    @abc.abstractmethod
+    def DeleteActivityExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteActivityExecutionResponse:
+        """DeleteActivityExecution asynchronously deletes a specific activity execution (when
+        ActivityExecution.run_id is provided) or the latest activity execution (when
+        ActivityExecution.run_id is not provided). If the activity Execution is running, it will be
+        terminated before deletion.
+
+        (-- api-linter: core::0127::http-annotation=disabled
+            aip.dev/not-precedent: Activity deletion not exposed to HTTP, users should use cancel or terminate. --)
+        """
 
 def add_WorkflowServiceServicer_to_server(
     servicer: WorkflowServiceServicer, server: grpc.Server
