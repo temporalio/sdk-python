@@ -440,3 +440,30 @@ class MultiOperationExecutionFailure(google.protobuf.message.Message):
     ) -> None: ...
 
 global___MultiOperationExecutionFailure = MultiOperationExecutionFailure
+
+class ActivityExecutionAlreadyStartedFailure(google.protobuf.message.Message):
+    """An error indicating that an activity execution failed to start. Returned when there is an existing activity with the
+    given activity ID, and the given ID reuse and conflict policies do not permit starting a new one or attaching to an
+    existing one.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    START_REQUEST_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    start_request_id: builtins.str
+    run_id: builtins.str
+    def __init__(
+        self,
+        *,
+        start_request_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "run_id", b"run_id", "start_request_id", b"start_request_id"
+        ],
+    ) -> None: ...
+
+global___ActivityExecutionAlreadyStartedFailure = ActivityExecutionAlreadyStartedFailure
