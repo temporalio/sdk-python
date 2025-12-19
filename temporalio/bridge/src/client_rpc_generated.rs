@@ -20,6 +20,14 @@ impl ClientRef {
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
+                "count_activity_executions" => {
+                    rpc_call!(
+                        retry_client,
+                        call,
+                        WorkflowService,
+                        count_activity_executions
+                    )
+                }
                 "count_workflow_executions" => {
                     rpc_call!(
                         retry_client,
@@ -33,6 +41,14 @@ impl ClientRef {
                 }
                 "create_workflow_rule" => {
                     rpc_call!(retry_client, call, WorkflowService, create_workflow_rule)
+                }
+                "delete_activity_execution" => {
+                    rpc_call!(
+                        retry_client,
+                        call,
+                        WorkflowService,
+                        delete_activity_execution
+                    )
                 }
                 "delete_schedule" => {
                     rpc_call!(retry_client, call, WorkflowService, delete_schedule)
@@ -66,6 +82,14 @@ impl ClientRef {
                 }
                 "deprecate_namespace" => {
                     rpc_call!(retry_client, call, WorkflowService, deprecate_namespace)
+                }
+                "describe_activity_execution" => {
+                    rpc_call!(
+                        retry_client,
+                        call,
+                        WorkflowService,
+                        describe_activity_execution
+                    )
                 }
                 "describe_batch_operation" => {
                     rpc_call!(
@@ -183,6 +207,14 @@ impl ClientRef {
                         get_workflow_execution_history_reverse
                     )
                 }
+                "list_activity_executions" => {
+                    rpc_call!(
+                        retry_client,
+                        call,
+                        WorkflowService,
+                        list_activity_executions
+                    )
+                }
                 "list_archived_workflow_executions" => {
                     rpc_call!(
                         retry_client,
@@ -258,6 +290,9 @@ impl ClientRef {
                 "pause_activity" => {
                     rpc_call!(retry_client, call, WorkflowService, pause_activity)
                 }
+                "poll_activity_execution" => {
+                    rpc_call!(retry_client, call, WorkflowService, poll_activity_execution)
+                }
                 "poll_activity_task_queue" => {
                     rpc_call!(
                         retry_client,
@@ -309,6 +344,14 @@ impl ClientRef {
                 }
                 "register_namespace" => {
                     rpc_call!(retry_client, call, WorkflowService, register_namespace)
+                }
+                "request_cancel_activity_execution" => {
+                    rpc_call!(
+                        retry_client,
+                        call,
+                        WorkflowService,
+                        request_cancel_activity_execution
+                    )
                 }
                 "request_cancel_workflow_execution" => {
                     rpc_call!(
@@ -474,6 +517,14 @@ impl ClientRef {
                         signal_workflow_execution
                     )
                 }
+                "start_activity_execution" => {
+                    rpc_call!(
+                        retry_client,
+                        call,
+                        WorkflowService,
+                        start_activity_execution
+                    )
+                }
                 "start_batch_operation" => {
                     rpc_call!(retry_client, call, WorkflowService, start_batch_operation)
                 }
@@ -487,6 +538,14 @@ impl ClientRef {
                 }
                 "stop_batch_operation" => {
                     rpc_call!(retry_client, call, WorkflowService, stop_batch_operation)
+                }
+                "terminate_activity_execution" => {
+                    rpc_call!(
+                        retry_client,
+                        call,
+                        WorkflowService,
+                        terminate_activity_execution
+                    )
                 }
                 "terminate_workflow_execution" => {
                     rpc_call!(

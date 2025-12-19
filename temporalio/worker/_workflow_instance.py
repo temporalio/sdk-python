@@ -794,6 +794,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             workflow_id=self._info.workflow_id,
             workflow_type=self._info.workflow_type,
             activity_type=handle._input.activity,
+            activity_id=handle._input.activity_id,
             activity_task_queue=(
                 handle._input.task_queue or self._info.task_queue
                 if isinstance(handle._input, StartActivityInput)
@@ -2129,6 +2130,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 workflow_id=self._info.workflow_id,
                 workflow_type=self._info.workflow_type,
                 activity_type=activity_handle._input.activity,
+                activity_id=activity_handle._input.activity_id,
                 activity_task_queue=(
                     activity_handle._input.task_queue
                     if isinstance(activity_handle._input, StartActivityInput)
@@ -2924,6 +2926,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
                 workflow_id=self._instance._info.workflow_id,
                 workflow_type=self._instance._info.workflow_type,
                 activity_type=self._input.activity,
+                activity_id=self._input.activity_id,
                 activity_task_queue=(
                     self._input.task_queue or self._instance._info.task_queue
                     if isinstance(self._input, StartActivityInput)
