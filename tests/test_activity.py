@@ -120,6 +120,7 @@ async def test_manual_completion(client: Client):
 
 
 async def test_manual_cancellation(client: Client):
+    pytest.skip(reason="https://temporalio.atlassian.net/browse/ACT-647")
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     wait_for_signal_workflow_id = str(uuid.uuid4())
