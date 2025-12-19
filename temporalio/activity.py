@@ -23,6 +23,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     NoReturn,
+    Type,
     overload,
 )
 
@@ -579,8 +580,8 @@ class _Definition:
 
     @classmethod
     def get_name_and_result_type(
-        cls, name_or_run_fn: Union[str, Callable[..., Any]]
-    ) -> Tuple[str, Optional[Type]]:
+        cls, name_or_run_fn: str | Callable[..., Any]
+    ) -> tuple[str, Type | None]:
         if isinstance(name_or_run_fn, str):
             return name_or_run_fn, None
         elif callable(name_or_run_fn):
