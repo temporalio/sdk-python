@@ -98,7 +98,7 @@ class WorkflowSerializationContext(SerializationContext):
     namespace: str
     """Namespace."""
 
-    workflow_id: Optional[str]
+    workflow_id: str | None
     """Workflow ID."""
 
 
@@ -117,13 +117,13 @@ class ActivitySerializationContext(SerializationContext):
             this may be the workflow ID prefix as configured, not the final workflow ID when the
             workflow is created by the schedule.
         workflow_type: Workflow Type. Only set if this is an activity started from a workflow.
-        is_local: Whether the activity is a local activity. False if this is a standalone activity started directly by a client.
+        is_local: Whether the activity is a local activity. False if the activity was not started by a workflow.
     """
 
     namespace: str
     """Namespace."""
 
-    activity_id: Optional[str]
+    activity_id: str | None
     """Activity ID. Optional if this is an activity started from a workflow."""
 
     activity_type: str
@@ -132,10 +132,10 @@ class ActivitySerializationContext(SerializationContext):
     activity_task_queue: str
     """Activity task queue."""
 
-    workflow_id: Optional[str]
+    workflow_id: str | None
     """Workflow ID if this is an activity started from a workflow."""
 
-    workflow_type: Optional[str]
+    workflow_type: str | None
     """Workflow type if this is an activity started from a workflow."""
 
     is_local: bool

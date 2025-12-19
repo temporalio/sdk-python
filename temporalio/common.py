@@ -190,7 +190,7 @@ class ActivityIDConflictPolicy(IntEnum):
 
 
 class ActivityExecutionStatus(IntEnum):
-    """Status of a standalone activity execution.
+    """Status of an activity execution.
 
     .. warning::
        This API is experimental.
@@ -198,17 +198,31 @@ class ActivityExecutionStatus(IntEnum):
     See :py:class:`temporalio.api.enums.v1.ActivityExecutionStatus`.
     """
 
-    UNSPECIFIED = 0  # ACTIVITY_EXECUTION_STATUS_UNSPECIFIED
-    RUNNING = 1  # ACTIVITY_EXECUTION_STATUS_RUNNING
-    COMPLETED = 2  # ACTIVITY_EXECUTION_STATUS_COMPLETED
-    FAILED = 3  # ACTIVITY_EXECUTION_STATUS_FAILED
-    CANCELED = 4  # ACTIVITY_EXECUTION_STATUS_CANCELED
-    TERMINATED = 5  # ACTIVITY_EXECUTION_STATUS_TERMINATED
-    TIMED_OUT = 6  # ACTIVITY_EXECUTION_STATUS_TIMED_OUT
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_UNSPECIFIED
+    )
+    RUNNING = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_RUNNING
+    )
+    COMPLETED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_COMPLETED
+    )
+    FAILED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_FAILED
+    )
+    CANCELED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_CANCELED
+    )
+    TERMINATED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_TERMINATED
+    )
+    TIMED_OUT = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_TIMED_OUT
+    )
 
 
 class PendingActivityState(IntEnum):
-    """State of a pending activity.
+    """Detailed state of an activity execution that is in ACTIVITY_EXECUTION_STATUS_RUNNING.
 
     .. warning::
        This API is experimental.
