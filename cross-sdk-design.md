@@ -1972,6 +1972,64 @@ workflow_id: Optional[str]
 
 ## 5. Serialization context (TODO)
 
+## 6. [AI-generated] Python Implementation Notes (Current Status)
+
+The following discrepancies exist between the spec above and the current Python SDK implementation:
+
+### Intentionally Deferred (Would Require Significant Work)
+
+1. **`GetActivityResultInput` and `get_activity_result` interceptor method**: Not implemented. The current implementation caches the result directly in `ActivityHandle._known_outcome` and doesn't expose a separate interceptor point for getting results. Adding this would require refactoring the result caching logic.
+
+2. **`ActivityExecutionDescription` does not extend `ActivityExecution`**: Python frozen dataclasses don't support inheritance well. The two classes are separate with duplicated fields. This is a stylistic difference that doesn't affect functionality.
+
+3. **Overload methods `start_activity_class`, `start_activity_method`, `execute_activity_class`, `execute_activity_method`**: Not implemented. Only the base `start_activity` and `execute_activity` methods exist. These additional overloads would provide better type inference for class-based and method-based activity definitions.
+
+4. **`get_activity_handle` is incomplete**: The method exists but raises `NotImplementedError`. When implemented, should include `result_type` parameter per spec.
+
+### Missing Fields
+
+1. **`ActivityExecution.state_transition_count: Optional[int]`**: Removed from implementation. The spec says it should be present (though not always populated).
+
+2. **`ActivityExecutionDescription.eager_execution_requested: bool`**: Missing from implementation.
+
+3. **`ActivityExecutionDescription.paused: bool`**: Missing from implementation.
+
+4. **`ActivityExecutionCountAggregationGroup.group_values`**: Spec says `Sequence[temporalio.common.SearchAttributeValue]`, implementation uses `Sequence[Any]`.
+
+### Parameter Name Discrepancies
+
+1. **`start_activity` uses `static_summary` and `static_details`**: Spec says parameter should be named `summary` (no `static_` prefix) and explicitly says "no static_details". Implementation should be updated to match spec.
+
+### Extra Items (Not in Spec)
+
+1. **`ActivityHandle.pause()`, `unpause()`, `reset()` methods**: These activity lifecycle methods are implemented but not specified. These should be removed from implementation.
+
+2. **`ActivityExecutionDescription.input: Sequence[Any]`**: Extra field providing deserialized activity input. Not in spec but useful for debugging.
+
+3. **`PendingActivityState` enum**: Added to `temporalio.common` to support `ActivityExecutionDescription.run_state`. Should be added to spec.
+
+4. **`ActivityFailedError` exception class**: New error for standalone activity failures. Should be added to spec.
+
+### Minor Type Differences
+
+1. **`ActivityHandle.activity_run_id`**: Returns `str` (always set from `StartActivityExecution` response) but spec shows `Optional[str]`. The non-optional type is correct since start always returns a run_id.
+
+2. **`ActivityExecutionDescription.retry_policy`**: Not optional in implementation, but spec says `Optional`. Should verify proto field optionality.
+
+### Implemented Correctly
+
+- All `ActivityIDReusePolicy`, `ActivityIDConflictPolicy`, `ActivityExecutionStatus` enums
+- `ActivityHandle` with `activity_id`, `activity_run_id`, `result()`, `describe()`, `cancel()`, `terminate()`
+- `ActivityExecution` with core fields (except `state_transition_count`)
+- `ActivityExecutionDescription` with most fields (except `eager_execution_requested`, `paused`)
+- `ActivityExecutionAsyncIterator` for listing
+- `ActivityExecutionCount` and `ActivityExecutionCountAggregationGroup`
+- `Client.start_activity()`, `execute_activity()`, `list_activities()`, `count_activities()`
+- `OutboundInterceptor` methods: `start_activity`, `describe_activity`, `cancel_activity`, `terminate_activity`, `list_activities`, `count_activities`
+- All input dataclasses: `StartActivityInput`, `DescribeActivityInput`, `CancelActivityInput`, `TerminateActivityInput`, `ListActivitiesInput`, `CountActivitiesInput`
+- `activity.Info` changes: `namespace`, `activity_run_id`, `in_workflow` property, optional workflow fields
+- `AsyncActivityIDReference.workflow_id` is now `Optional[str]`
+
 # TypeScript
 
 ## 1. New module `client.activity-client`
