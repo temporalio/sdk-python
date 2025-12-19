@@ -1368,11 +1368,7 @@ class Client:
         id_reuse_policy: temporalio.common.ActivityIdReusePolicy = temporalio.common.ActivityIdReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.ActivityIdConflictPolicy = temporalio.common.ActivityIdConflictPolicy.FAIL,
         retry_policy: temporalio.common.RetryPolicy | None = None,
-        search_attributes: (
-            temporalio.common.SearchAttributes
-            | temporalio.common.TypedSearchAttributes
-            | None
-        ) = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         static_summary: str | None = None,
         static_details: str | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
@@ -3041,7 +3037,7 @@ class ActivityExecutionAsyncIterator:
             WorkflowActivityExecution._from_raw_info(
                 v, self._client.namespace, self._client.data_converter
             )
-            if v.workflow_id
+            if getattr(v, "workflow_id", None)
             else ActivityExecution._from_raw_info(
                 v, self._client.namespace, self._client.data_converter
             )
@@ -3102,13 +3098,13 @@ class ActivityExecution:
     execution_duration: timedelta | None
     """Duration from scheduled to close time, only populated if closed."""
 
-    raw_info: temporalio.api.activity.v1.ActivityListInfo
+    raw_info: temporalio.api.activity.v1.ActivityExecutionListInfo
     """Underlying protobuf info."""
 
     run_id: str
     """Run ID of the activity."""
 
-    scheduled_time: datetime
+    schedule_time: datetime
     """Time the activity was originally scheduled."""
 
     search_attributes: temporalio.common.SearchAttributes
@@ -3126,7 +3122,7 @@ class ActivityExecution:
     @classmethod
     def _from_raw_info(
         cls,
-        info: temporalio.api.activity.v1.ActivityListInfo,
+        info: temporalio.api.activity.v1.ActivityExecutionListInfo,
         namespace: str,
         converter: temporalio.converter.DataConverter,
     ) -> Self:
@@ -3148,9 +3144,9 @@ class ActivityExecution:
             ),
             raw_info=info,
             run_id=info.run_id,
-            scheduled_time=(
-                info.scheduled_time.ToDatetime().replace(tzinfo=timezone.utc)
-                if info.HasField("scheduled_time")
+            schedule_time=(
+                info.schedule_time.ToDatetime().replace(tzinfo=timezone.utc)
+                if info.HasField("schedule_time")
                 else datetime.min
             ),
             search_attributes=temporalio.converter.decode_search_attributes(
@@ -3186,10 +3182,10 @@ class WorkflowActivityExecution:
     execution_duration: timedelta | None
     """Duration from scheduled to close time, only populated if closed."""
 
-    raw_info: temporalio.api.activity.v1.ActivityListInfo
+    raw_info: temporalio.api.activity.v1.ActivityExecutionListInfo
     """Underlying protobuf info."""
 
-    scheduled_time: datetime
+    schedule_time: datetime
     """Time the activity was originally scheduled."""
 
     task_queue: str
@@ -3204,7 +3200,7 @@ class WorkflowActivityExecution:
     @classmethod
     def _from_raw_info(
         cls,
-        info: temporalio.api.activity.v1.ActivityListInfo,
+        info: temporalio.api.activity.v1.ActivityExecutionListInfo,
         namespace: str,
         converter: temporalio.converter.DataConverter,
     ) -> Self:
@@ -3226,13 +3222,13 @@ class WorkflowActivityExecution:
                 else None
             ),
             raw_info=info,
-            scheduled_time=(
-                info.scheduled_time.ToDatetime().replace(tzinfo=timezone.utc)
-                if info.HasField("scheduled_time")
+            schedule_time=(
+                info.schedule_time.ToDatetime().replace(tzinfo=timezone.utc)
+                if info.HasField("schedule_time")
                 else datetime.min
             ),
             task_queue=info.task_queue,
-            workflow_id=info.workflow_id,
+            workflow_id="TODO",  # TODO(dan): WorkflowActivityExecution class is not needed?
             workflow_run_id=None,  # Not provided in list response
         )
 
@@ -3281,8 +3277,6 @@ class ActivityExecutionDescription:
     current_retry_interval: timedelta | None
     """Time until the next retry, if applicable."""
 
-    eager_execution_requested: bool
-    """Whether eager execution was requested."""
     expiration_time: datetime
     """Scheduled time plus schedule_to_close_timeout."""
 
@@ -3307,14 +3301,10 @@ class ActivityExecutionDescription:
     last_worker_identity: str
     """Identity of the last worker that processed the activity."""
 
-    maximum_attempts: int
-    """Maximum number of attempts allowed."""
+    retry_policy: temporalio.common.RetryPolicy
 
     next_attempt_schedule_time: datetime | None
     """Time when the next attempt will be scheduled."""
-
-    paused: bool
-    """Whether the activity is paused."""
 
     raw_info: Any
     """Raw proto response."""
@@ -3325,7 +3315,7 @@ class ActivityExecutionDescription:
     run_state: temporalio.common.PendingActivityState | None
     """More detailed breakdown if status is RUNNING."""
 
-    scheduled_time: datetime
+    schedule_time: datetime
     """Time the activity was originally scheduled."""
 
     search_attributes: temporalio.common.SearchAttributes
@@ -3344,6 +3334,7 @@ class ActivityExecutionDescription:
     async def _from_raw_info(
         cls,
         info: temporalio.api.activity.v1.ActivityExecutionInfo,
+        input: temporalio.api.common.v1.Payloads,
         data_converter: temporalio.converter.DataConverter,
     ) -> Self:
         """Create from raw proto activity info."""
@@ -3359,7 +3350,6 @@ class ActivityExecutionDescription:
                 if info.HasField("current_retry_interval")
                 else None
             ),
-            eager_execution_requested=info.eager_execution_requested,
             expiration_time=(
                 info.expiration_time.ToDatetime(tzinfo=timezone.utc)
                 if info.HasField("expiration_time")
@@ -3370,11 +3360,7 @@ class ActivityExecutionDescription:
                 if info.HasField("heartbeat_details")
                 else []
             ),
-            input=(
-                await data_converter.decode(info.input.payloads)
-                if info.HasField("input")
-                else []
-            ),
+            input=await data_converter.decode(input.payloads),
             last_attempt_complete_time=(
                 info.last_attempt_complete_time.ToDatetime(tzinfo=timezone.utc)
                 if info.HasField("last_attempt_complete_time")
@@ -3399,13 +3385,12 @@ class ActivityExecutionDescription:
                 else None
             ),
             last_worker_identity=info.last_worker_identity,
-            maximum_attempts=info.maximum_attempts,
+            retry_policy=temporalio.common.RetryPolicy.from_proto(info.retry_policy),
             next_attempt_schedule_time=(
                 info.next_attempt_schedule_time.ToDatetime(tzinfo=timezone.utc)
                 if info.HasField("next_attempt_schedule_time")
                 else None
             ),
-            paused=info.HasField("pause_info"),
             raw_info=info,
             run_id=info.run_id,
             run_state=(
@@ -3413,11 +3398,7 @@ class ActivityExecutionDescription:
                 if info.run_state
                 else None
             ),
-            scheduled_time=(
-                info.scheduled_time.ToDatetime(tzinfo=timezone.utc)
-                if info.HasField("scheduled_time")
-                else datetime.min
-            ),
+            schedule_time=(info.schedule_time.ToDatetime(tzinfo=timezone.utc)),
             search_attributes=temporalio.converter.decode_search_attributes(
                 info.search_attributes
             ),
@@ -3427,12 +3408,7 @@ class ActivityExecutionDescription:
                 if info.status
                 else temporalio.common.ActivityExecutionStatus.RUNNING
             ),
-            task_queue=(
-                info.activity_options.task_queue.name
-                if info.HasField("activity_options")
-                and info.activity_options.HasField("task_queue")
-                else ""
-            ),
+            task_queue=info.task_queue,
         )
 
 
@@ -3618,7 +3594,7 @@ class ActivityHandle(Generic[ReturnType]):
         self._result_type = result_type
         self._data_converter_override = data_converter_override
         self._known_outcome: (
-            temporalio.api.common.v1.Payloads | temporalio.api.failure.v1.Failure | None
+            temporalio.api.activity.v1.ActivityExecutionOutcome | None
         ) = None
 
     @property
@@ -3691,11 +3667,11 @@ class ActivityHandle(Generic[ReturnType]):
         )
         data_converter = self._data_converter_override or self._client.data_converter
         assert self._known_outcome
-        if isinstance(self._known_outcome, temporalio.api.failure.v1.Failure):
+        if self._known_outcome.HasField("failure"):
             raise ActivityFailedError(
-                cause=await data_converter.decode_failure(self._known_outcome),
+                cause=await data_converter.decode_failure(self._known_outcome.failure),
             )
-        payloads = self._known_outcome
+        payloads = self._known_outcome.result
         if not payloads.payloads:
             # E.g. a void workflow function in another language may not set any payloads.
             return None  # type: ignore
@@ -3718,27 +3694,23 @@ class ActivityHandle(Generic[ReturnType]):
         if self._known_outcome:
             return
 
-        req = temporalio.api.workflowservice.v1.GetActivityExecutionResultRequest(
+        req = temporalio.api.workflowservice.v1.PollActivityExecutionRequest(
             namespace=self._client.namespace,
             activity_id=self._id,
             run_id=self._run_id,
-            wait=True,  # Enable long polling
         )
 
         # Continue polling as long as we have no outcome
         while True:
             try:
-                res = await self._client.workflow_service.get_activity_execution_result(
+                res = await self._client.workflow_service.poll_activity_execution(
                     req,
                     retry=True,
                     metadata=rpc_metadata,
                     timeout=rpc_timeout,
                 )
-                if res.HasField("result"):
-                    self._known_outcome = res.result
-                    return
-                elif res.HasField("failure"):
-                    self._known_outcome = res.failure
+                if res.HasField("outcome"):
+                    self._known_outcome = res.outcome
                     return
             except RPCError as err:
                 if err.status == RPCStatusCode.DEADLINE_EXCEEDED:
@@ -7566,35 +7538,27 @@ class _ClientImpl(OutboundInterceptor):
             activity_type=temporalio.api.common.v1.ActivityType(
                 name=input.activity_type
             ),
+            task_queue=temporalio.api.taskqueue.v1.TaskQueue(name=input.task_queue),
             id_reuse_policy=cast(
-                "temporalio.api.enums.v1.IdReusePolicy.ValueType",
+                "temporalio.api.enums.v1.ActivityIdReusePolicy.ValueType",
                 int(input.id_reuse_policy),
             ),
             id_conflict_policy=cast(
-                "temporalio.api.enums.v1.IdConflictPolicy.ValueType",
+                "temporalio.api.enums.v1.ActivityIdConflictPolicy.ValueType",
                 int(input.id_conflict_policy),
             ),
         )
 
-        # Build ActivityOptions
-        options = temporalio.api.activity.v1.ActivityOptions(
-            task_queue=temporalio.api.taskqueue.v1.TaskQueue(name=input.task_queue),
-        )
         if input.schedule_to_close_timeout is not None:
-            options.schedule_to_close_timeout.FromTimedelta(
-                input.schedule_to_close_timeout
-            )
+            req.schedule_to_close_timeout.FromTimedelta(input.schedule_to_close_timeout)
         if input.start_to_close_timeout is not None:
-            options.start_to_close_timeout.FromTimedelta(input.start_to_close_timeout)
+            req.start_to_close_timeout.FromTimedelta(input.start_to_close_timeout)
         if input.schedule_to_start_timeout is not None:
-            options.schedule_to_start_timeout.FromTimedelta(
-                input.schedule_to_start_timeout
-            )
+            req.schedule_to_start_timeout.FromTimedelta(input.schedule_to_start_timeout)
         if input.heartbeat_timeout is not None:
-            options.heartbeat_timeout.FromTimedelta(input.heartbeat_timeout)
+            req.heartbeat_timeout.FromTimedelta(input.heartbeat_timeout)
         if input.retry_policy is not None:
-            input.retry_policy.apply_to_proto(options.retry_policy)
-        req.options.CopyFrom(options)
+            input.retry_policy.apply_to_proto(req.retry_policy)
 
         # Set input payloads
         if input.args:
@@ -7670,8 +7634,9 @@ class _ClientImpl(OutboundInterceptor):
             timeout=input.rpc_timeout,
         )
         return await ActivityExecutionDescription._from_raw_info(
-            resp.info,
-            self._client.data_converter.with_context(
+            info=resp.info,
+            input=resp.input,
+            data_converter=self._client.data_converter.with_context(
                 WorkflowSerializationContext(
                     namespace=self._client.namespace,
                     workflow_id=input.activity_id,  # Using activity_id as workflow_id for standalone activities
