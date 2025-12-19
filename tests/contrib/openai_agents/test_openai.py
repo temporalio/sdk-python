@@ -213,7 +213,7 @@ class WeatherService:
 class WeatherServiceHandler:
     @nexusrpc.handler.sync_operation
     async def get_weather_nexus_operation(
-        self, _ctx: nexusrpc.handler.StartOperationContext, input: WeatherInput
+        self, ctx: nexusrpc.handler.StartOperationContext, input: WeatherInput  # type: ignore[reportUnusedParameter]
     ) -> Weather:
         return Weather(
             city=input.city, temperature_range="14-20C", conditions="Sunny with wind."

@@ -203,7 +203,7 @@ def nexus_operation_as_tool(
         >>> # Use tool with an OpenAI agent
     """
 
-    def operation_callable(_input: Any):
+    def operation_callable(input: Any):  # type: ignore[reportUnusedParameter]
         raise NotImplementedError("This function definition is used as a type only")
 
     operation_callable.__annotations__ = {
