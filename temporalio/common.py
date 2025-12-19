@@ -14,11 +14,6 @@ from typing import (
     Any,
     ClassVar,
     Generic,
-    List,
-    Optional,
-    Text,
-    Tuple,
-    Type,
     TypeAlias,
     TypeVar,
     Union,
@@ -152,45 +147,46 @@ class WorkflowIDConflictPolicy(IntEnum):
     )
 
 
-class IdReusePolicy(IntEnum):
-    """How already-closed entity IDs are handled on start.
+class ActivityIdReusePolicy(IntEnum):
+    """How already-closed activity IDs are handled on start.
 
     .. warning::
        This API is experimental.
 
-    See :py:class:`temporalio.api.enums.v1.IdReusePolicy`.
-    """
-
-    UNSPECIFIED = int(temporalio.api.enums.v1.IdReusePolicy.ID_REUSE_POLICY_UNSPECIFIED)
-    ALLOW_DUPLICATE = int(
-        temporalio.api.enums.v1.IdReusePolicy.ID_REUSE_POLICY_ALLOW_DUPLICATE
-    )
-    ALLOW_DUPLICATE_FAILED_ONLY = int(
-        temporalio.api.enums.v1.IdReusePolicy.ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY
-    )
-    REJECT_DUPLICATE = int(
-        temporalio.api.enums.v1.IdReusePolicy.ID_REUSE_POLICY_REJECT_DUPLICATE
-    )
-
-
-class IdConflictPolicy(IntEnum):
-    """How already-running entity IDs are handled on start.
-
-    .. warning::
-       This API is experimental.
-
-    See :py:class:`temporalio.api.enums.v1.IdConflictPolicy`.
+    See :py:class:`temporalio.api.enums.v1.ActivityIdReusePolicy`.
     """
 
     UNSPECIFIED = int(
-        temporalio.api.enums.v1.IdConflictPolicy.ID_CONFLICT_POLICY_UNSPECIFIED
+        temporalio.api.enums.v1.ActivityIdReusePolicy.ACTIVITY_ID_REUSE_POLICY_UNSPECIFIED
     )
-    FAIL = int(temporalio.api.enums.v1.IdConflictPolicy.ID_CONFLICT_POLICY_FAIL)
+    ALLOW_DUPLICATE = int(
+        temporalio.api.enums.v1.ActivityIdReusePolicy.ACTIVITY_ID_REUSE_POLICY_ALLOW_DUPLICATE
+    )
+    ALLOW_DUPLICATE_FAILED_ONLY = int(
+        temporalio.api.enums.v1.ActivityIdReusePolicy.ACTIVITY_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY
+    )
+    REJECT_DUPLICATE = int(
+        temporalio.api.enums.v1.ActivityIdReusePolicy.ACTIVITY_ID_REUSE_POLICY_REJECT_DUPLICATE
+    )
+
+
+class ActivityIdConflictPolicy(IntEnum):
+    """How already-running activity IDs are handled on start.
+
+    .. warning::
+       This API is experimental.
+
+    See :py:class:`temporalio.api.enums.v1.ActivityIdConflictPolicy`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.ActivityIdConflictPolicy.ACTIVITY_ID_CONFLICT_POLICY_UNSPECIFIED
+    )
+    FAIL = int(
+        temporalio.api.enums.v1.ActivityIdConflictPolicy.ACTIVITY_ID_CONFLICT_POLICY_FAIL
+    )
     USE_EXISTING = int(
-        temporalio.api.enums.v1.IdConflictPolicy.ID_CONFLICT_POLICY_USE_EXISTING
-    )
-    TERMINATE_EXISTING = int(
-        temporalio.api.enums.v1.IdConflictPolicy.ID_CONFLICT_POLICY_TERMINATE_EXISTING
+        temporalio.api.enums.v1.ActivityIdConflictPolicy.ACTIVITY_ID_CONFLICT_POLICY_USE_EXISTING
     )
 
 

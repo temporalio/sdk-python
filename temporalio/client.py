@@ -1283,8 +1283,8 @@ class Client:
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         heartbeat_timeout: timedelta | None = None,
-        id_reuse_policy: temporalio.common.IdReusePolicy = temporalio.common.IdReusePolicy.ALLOW_DUPLICATE,
-        id_conflict_policy: temporalio.common.IdConflictPolicy = temporalio.common.IdConflictPolicy.FAIL,
+        id_reuse_policy: temporalio.common.ActivityIdReusePolicy = temporalio.common.ActivityIdReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIdConflictPolicy = temporalio.common.ActivityIdConflictPolicy.FAIL,
         retry_policy: temporalio.common.RetryPolicy | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         static_summary: str | None = None,
@@ -1365,8 +1365,8 @@ class Client:
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         heartbeat_timeout: timedelta | None = None,
-        id_reuse_policy: temporalio.common.IdReusePolicy = temporalio.common.IdReusePolicy.ALLOW_DUPLICATE,
-        id_conflict_policy: temporalio.common.IdConflictPolicy = temporalio.common.IdConflictPolicy.FAIL,
+        id_reuse_policy: temporalio.common.ActivityIdReusePolicy = temporalio.common.ActivityIdReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIdConflictPolicy = temporalio.common.ActivityIdConflictPolicy.FAIL,
         retry_policy: temporalio.common.RetryPolicy | None = None,
         search_attributes: (
             temporalio.common.SearchAttributes
@@ -6589,8 +6589,8 @@ class StartActivityInput:
     start_to_close_timeout: timedelta | None
     schedule_to_start_timeout: timedelta | None
     heartbeat_timeout: timedelta | None
-    id_reuse_policy: temporalio.common.IdReusePolicy
-    id_conflict_policy: temporalio.common.IdConflictPolicy
+    id_reuse_policy: temporalio.common.ActivityIdReusePolicy
+    id_conflict_policy: temporalio.common.ActivityIdConflictPolicy
     retry_policy: temporalio.common.RetryPolicy | None
     priority: temporalio.common.Priority
     search_attributes: (
