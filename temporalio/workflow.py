@@ -26,6 +26,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum, Flag, IntEnum, auto
 from functools import partial
 from random import Random
+import typing
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -1919,7 +1920,10 @@ def _assert_dynamic_handler_args(
         not arg_types
         or len(arg_types) != 2
         or arg_types[0] != str
-        or arg_types[1] != Sequence[temporalio.common.RawValue]
+        or (
+            arg_types[1] != Sequence[temporalio.common.RawValue]
+            and arg_types[1] != typing.Sequence[temporalio.common.RawValue]
+        )
     ):
         raise RuntimeError(
             "Dynamic handler must have 3 arguments: self, str, and Sequence[temporalio.common.RawValue]"

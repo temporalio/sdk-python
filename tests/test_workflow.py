@@ -1,6 +1,7 @@
 import inspect
 import itertools
 from collections.abc import Callable, Sequence
+import typing
 from typing import Any, Set, Type, get_type_hints
 
 import pytest
@@ -67,6 +68,27 @@ class GoodDefn(GoodDefnBase):
 
     @workflow.update(dynamic=True, description="dud")
     def update3(self, name: str, args: Sequence[RawValue]):
+        pass
+
+
+@workflow.defn()
+class GoodDefnDeprecatedTypes(GoodDefnBase):
+    # Just having the definition here is enough to confirm the signatures
+    # do not trigger a RuntimeError
+    @workflow.run
+    async def run(self, name: str) -> str:
+        raise NotImplementedError
+
+    @workflow.signal(dynamic=True)
+    def signal(self, name: str, args: typing.Sequence[RawValue]):
+        pass
+
+    @workflow.query(dynamic=True)
+    def query(self, name: str, args: typing.Sequence[RawValue]):
+        pass
+
+    @workflow.update(dynamic=True)
+    def update(self, name: str, args: typing.Sequence[RawValue]):
         pass
 
 
