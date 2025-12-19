@@ -355,14 +355,15 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
         self, input: temporalio.worker.ExecuteActivityInput
     ) -> Any:
         info = temporalio.activity.info()
+        attributes: dict[str, str] = {"temporalActivityID": info.activity_id}
+        if info.workflow_id:
+            attributes["temporalWorkflowID"] = info.workflow_id
+        if info.workflow_run_id:
+            attributes["temporalRunID"] = info.workflow_run_id
         with self.root._start_as_current_span(
             f"RunActivity:{info.activity_type}",
             context=self.root._context_from_headers(input.headers),
-            attributes={
-                "temporalWorkflowID": info.workflow_id,
-                "temporalRunID": info.workflow_run_id,
-                "temporalActivityID": info.activity_id,
-            },
+            attributes=attributes,
             kind=opentelemetry.trace.SpanKind.SERVER,
         ):
             return await super().execute_activity(input)

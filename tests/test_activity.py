@@ -11,8 +11,6 @@ from temporalio.common import ActivityExecutionStatus
 from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.worker import Worker
 
-pytest.skip(reason="Standalone Activity server support is under development")
-
 
 @activity.defn
 async def increment(input: int) -> int:
@@ -32,8 +30,7 @@ async def test_describe(client: Client):
     )
     desc = await activity_handle.describe()
     assert desc.activity_id == activity_id
-    # TODO: server not returning run ID yet
-    # assert desc.run_id == activity_handle.run_id
+    assert desc.activity_run_id == activity_handle.activity_run_id
     assert desc.activity_type == "increment"
     assert desc.task_queue == task_queue
     assert desc.status == ActivityExecutionStatus.RUNNING
@@ -70,6 +67,7 @@ async def test_get_result(client: Client):
 @dataclass
 class ActivityInput:
     wait_for_signal_workflow_id: str
+    wait_for_activity_start_workflow_id: str | None = None
 
 
 @activity.defn
@@ -113,7 +111,7 @@ async def test_manual_completion(client: Client):
         # Complete activity manually
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
-            run_id=activity_handle.run_id,
+            run_id=activity_handle.activity_run_id,
         )
         await async_activity_handle.complete(7)
         assert await activity_handle.result() == 7
@@ -123,6 +121,7 @@ async def test_manual_completion(client: Client):
 
 
 async def test_manual_cancellation(client: Client):
+    pytest.skip(reason="https://temporalio.atlassian.net/browse/ACT-647")
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     wait_for_signal_workflow_id = str(uuid.uuid4())
@@ -150,7 +149,7 @@ async def test_manual_cancellation(client: Client):
         )
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
-            run_id=activity_handle.run_id,
+            run_id=activity_handle.activity_run_id,
         )
         await async_activity_handle.report_cancellation("Test cancellation")
         with pytest.raises(ActivityFailedError) as err:
@@ -189,9 +188,11 @@ async def test_manual_failure(client: Client):
         )
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
-            run_id=activity_handle.run_id,
+            run_id=activity_handle.activity_run_id,
         )
-        await async_activity_handle.fail(ApplicationError("Test failure"))
+        await async_activity_handle.fail(
+            ApplicationError("Test failure", non_retryable=True)
+        )
         with pytest.raises(ActivityFailedError) as err:
             await activity_handle.result()
         assert isinstance(err.value.cause, ApplicationError)
@@ -203,13 +204,22 @@ async def test_manual_failure(client: Client):
 
 @activity.defn
 async def activity_for_testing_heartbeat(input: ActivityInput) -> str:
-    wait_for_heartbeat_wf_handle = await activity.client().start_workflow(
-        WaitForSignalWorkflow.run,
-        id=input.wait_for_signal_workflow_id,
-        task_queue=activity.info().task_queue,
-    )
     info = activity.info()
     if info.attempt == 1:
+        # Signal that activity has started (only on first attempt)
+        if input.wait_for_activity_start_workflow_id:
+            await (
+                activity.client()
+                .get_workflow_handle(
+                    workflow_id=input.wait_for_activity_start_workflow_id,
+                )
+                .signal(WaitForSignalWorkflow.signal)
+            )
+        wait_for_heartbeat_wf_handle = await activity.client().start_workflow(
+            WaitForSignalWorkflow.run,
+            id=input.wait_for_signal_workflow_id,
+            task_queue=activity.info().task_queue,
+        )
         # Wait for test to notify that it has sent heartbeat
         await wait_for_heartbeat_wf_handle.result()
         raise Exception("Intentional error to force retry")
@@ -225,15 +235,24 @@ async def test_manual_heartbeat(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     wait_for_signal_workflow_id = str(uuid.uuid4())
+    wait_for_activity_start_workflow_id = str(uuid.uuid4())
 
     activity_handle = await client.start_activity(
         activity_for_testing_heartbeat,
         args=(
-            ActivityInput(wait_for_signal_workflow_id=wait_for_signal_workflow_id),
+            ActivityInput(
+                wait_for_signal_workflow_id=wait_for_signal_workflow_id,
+                wait_for_activity_start_workflow_id=wait_for_activity_start_workflow_id,
+            ),
         ),  # TODO: overloads
         id=activity_id,
         task_queue=task_queue,
         start_to_close_timeout=timedelta(seconds=5),
+    )
+    wait_for_activity_start_wf_handle = await client.start_workflow(
+        WaitForSignalWorkflow.run,
+        id=wait_for_activity_start_workflow_id,
+        task_queue=task_queue,
     )
     async with Worker(
         client,
@@ -243,8 +262,9 @@ async def test_manual_heartbeat(client: Client):
     ):
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
-            run_id=activity_handle.run_id,
+            run_id=activity_handle.activity_run_id,
         )
+        await wait_for_activity_start_wf_handle.result()
         await async_activity_handle.heartbeat("Test heartbeat details")
         await client.get_workflow_handle(
             workflow_id=wait_for_signal_workflow_id,
