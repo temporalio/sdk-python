@@ -8,7 +8,7 @@ from temporalio import activity
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 
 
-def _auto_heartbeater(fn: F) -> F:
+def _auto_heartbeater(fn: F) -> F:  # type:ignore[reportUnusedClass]
     # Propagate type hints from the original callable.
     @wraps(fn)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:

@@ -7,7 +7,7 @@ import multiprocessing.context
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import timedelta
-from typing import Any, Optional
+from typing import Any
 from urllib.request import urlopen
 
 import nexusrpc
@@ -20,16 +20,13 @@ from temporalio import activity, workflow
 from temporalio.api.workflowservice.v1 import (
     DescribeWorkerDeploymentRequest,
     DescribeWorkerDeploymentResponse,
-    ListWorkersRequest,
     SetWorkerDeploymentCurrentVersionRequest,
     SetWorkerDeploymentCurrentVersionResponse,
     SetWorkerDeploymentRampingVersionRequest,
     SetWorkerDeploymentRampingVersionResponse,
 )
 from temporalio.client import (
-    BuildIdOpAddNewDefault,
     Client,
-    TaskReachabilityType,
 )
 from temporalio.common import PinnedVersioningOverride, RawValue, VersioningBehavior
 from temporalio.runtime import (
@@ -64,7 +61,6 @@ from tests.helpers import (
     assert_eventually,
     find_free_port,
     new_worker,
-    worker_versioning_enabled,
 )
 from tests.helpers.fork import _ForkTestResult, _TestFork
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
@@ -239,7 +235,7 @@ async def test_worker_validate_fail(client: Client, env: WorkflowEnvironment):
     assert str(err.value).startswith("Worker validation failed")
 
 
-async def test_can_run_resource_based_worker(client: Client, env: WorkflowEnvironment):
+async def test_can_run_resource_based_worker(client: Client):
     tuner = WorkerTuner.create_resource_based(
         target_memory_usage=0.5,
         target_cpu_usage=0.5,
@@ -262,7 +258,7 @@ async def test_can_run_resource_based_worker(client: Client, env: WorkflowEnviro
         await wf1.result()
 
 
-async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvironment):
+async def test_can_run_composite_tuner_worker(client: Client):
     resource_based_options = ResourceBasedTunerConfig(0.5, 0.5)
     tuner = WorkerTuner.create_composite(
         workflow_supplier=FixedSizeSlotSupplier(5),
@@ -299,9 +295,7 @@ async def test_can_run_composite_tuner_worker(client: Client, env: WorkflowEnvir
         await wf1.result()
 
 
-async def test_cant_specify_max_concurrent_and_tuner(
-    client: Client, env: WorkflowEnvironment
-):
+async def test_cant_specify_max_concurrent_and_tuner(client: Client):
     tuner = WorkerTuner.create_resource_based(
         target_memory_usage=0.5,
         target_cpu_usage=0.5,
@@ -320,7 +314,7 @@ async def test_cant_specify_max_concurrent_and_tuner(
     assert "when also specifying tuner" in str(err.value)
 
 
-async def test_warns_when_workers_too_low(client: Client, env: WorkflowEnvironment):
+async def test_warns_when_workers_too_low(client: Client):
     tuner = WorkerTuner.create_resource_based(
         target_memory_usage=0.5,
         target_cpu_usage=0.5,
@@ -503,7 +497,7 @@ class SimpleWorkflow:
         return "hi"
 
 
-async def test_throwing_slot_supplier(client: Client, env: WorkflowEnvironment):
+async def test_throwing_slot_supplier(client: Client):
     """Ensures a (mostly) broken slot supplier doesn't hose everything up"""
 
     class ThrowingSlotSupplier(CustomSlotSupplier):
@@ -546,7 +540,7 @@ async def test_throwing_slot_supplier(client: Client, env: WorkflowEnvironment):
         await wf1.result()
 
 
-async def test_blocking_slot_supplier(client: Client, env: WorkflowEnvironment):
+async def test_blocking_slot_supplier(client: Client):
     class BlockingSlotSupplier(CustomSlotSupplier):
         marked_used = False
 
@@ -828,7 +822,7 @@ async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
 @workflow.defn(dynamic=True, versioning_behavior=VersioningBehavior.PINNED)
 class DynamicWorkflowVersioningOnDefn:
     @workflow.run
-    async def run(self, args: Sequence[RawValue]) -> str:
+    async def run(self, _args: Sequence[RawValue]) -> str:
         return "dynamic"
 
 
@@ -841,7 +835,7 @@ class DynamicWorkflowVersioningOnConfigMethod:
         )
 
     @workflow.run
-    async def run(self, args: Sequence[RawValue]) -> str:
+    async def run(self, _args: Sequence[RawValue]) -> str:
         return "dynamic"
 
 
@@ -922,12 +916,12 @@ class NoVersioningAnnotationWorkflow:
 @workflow.defn(dynamic=True)
 class NoVersioningAnnotationDynamicWorkflow:
     @workflow.run
-    async def run(self, args: Sequence[RawValue]) -> str:
+    async def run(self, _args: Sequence[RawValue]) -> str:
         return "whee"
 
 
 async def test_workflows_must_have_versioning_behavior_when_feature_turned_on(
-    client: Client, env: WorkflowEnvironment
+    client: Client,
 ):
     with pytest.raises(ValueError) as exc_info:
         Worker(
@@ -1051,9 +1045,7 @@ async def test_workflows_can_use_versioning_override(
         )
 
 
-async def test_can_run_autoscaling_polling_worker(
-    client: Client, env: WorkflowEnvironment
-):
+async def test_can_run_autoscaling_polling_worker(client: Client):
     # Create new runtime with Prom server
     prom_addr = f"127.0.0.1:{find_free_port()}"
     runtime = Runtime(
@@ -1228,7 +1220,7 @@ class PollFailureInjector:
 
 class TestForkCreateWorker(_TestFork):
     async def coro(self):
-        self._worker = Worker(
+        self._worker = Worker(  # type:ignore[reportUninitializedInstanceVariable]
             self._client,
             task_queue=f"task-queue-{uuid.uuid4()}",
             activities=[never_run_activity],
@@ -1242,7 +1234,7 @@ class TestForkCreateWorker(_TestFork):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot create worker across forks"
         )
-        self._client = client
+        self._client = client  # type:ignore[reportUninitializedInstanceVariable]
         self.run(mp_fork_ctx)
 
 
@@ -1256,7 +1248,7 @@ class TestForkUseWorker(_TestFork):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot use worker across forks"
         )
-        self._pre_fork_worker = Worker(
+        self._pre_fork_worker = Worker(  # type:ignore[reportUninitializedInstanceVariable]
             client,
             task_queue=f"task-queue-{uuid.uuid4()}",
             activities=[never_run_activity],

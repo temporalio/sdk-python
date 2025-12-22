@@ -13,17 +13,9 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum, IntEnum
 from typing import (
     Any,
-    Deque,
-    Dict,
-    List,
+    Dict,  # type:ignore[reportDeprecated]
     Literal,
     NewType,
-    Optional,
-    Set,
-    Text,
-    Tuple,
-    Type,
-    Union,
 )
 from uuid import UUID, uuid4
 
@@ -56,7 +48,7 @@ from temporalio.exceptions import ApplicationError, FailureError
 
 # StrEnum is available in 3.11+
 if sys.version_info >= (3, 11):
-    from enum import StrEnum
+    from enum import StrEnum  # type:ignore[reportUnreachable]
 
 
 class NonSerializableClass:
@@ -73,7 +65,7 @@ class SerializableEnum(IntEnum):
 
 if sys.version_info >= (3, 11):
 
-    class SerializableStrEnum(StrEnum):
+    class SerializableStrEnum(StrEnum):  # type:ignore[reportUnreachable]
         FOO = "foo"
 
 
@@ -99,12 +91,12 @@ class NewTypeMessage:
 
 async def test_converter_default():
     async def assert_payload(
-        input,
-        expected_encoding,
-        expected_data,
+        input,  # type:ignore[reportMissingParameterType]
+        expected_encoding,  # type:ignore[reportMissingParameterType]
+        expected_data,  # type:ignore[reportMissingParameterType]
         *,
-        expected_decoded_input=None,
-        type_hint=None,
+        expected_decoded_input=None,  # type:ignore[reportMissingParameterType]
+        type_hint=None,  # type:ignore[reportMissingParameterType]
     ):
         payloads = await DataConverter().encode([input])
         # Check encoding and data
@@ -258,7 +250,7 @@ def test_encode_search_attribute_values():
     with pytest.raises(TypeError, match="of type tuple not one of"):
         encode_search_attribute_values([("bad type",)])  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="Timezone must be present"):
-        encode_search_attribute_values([datetime.utcnow()])
+        encode_search_attribute_values([datetime.utcnow()])  # type: ignore[reportDeprecated]
     with pytest.raises(TypeError, match="must have the same type"):
         encode_search_attribute_values(["foo", 123])  # type: ignore[arg-type]
 
@@ -266,7 +258,7 @@ def test_encode_search_attribute_values():
 def test_decode_search_attributes():
     """Tests decode from protobuf for python types"""
 
-    def payload(key, dtype, data, encoding=None):
+    def payload(key, dtype, data, encoding=None):  # type:ignore[reportMissingParameterType]
         if encoding is None:
             encoding = {"encoding": b"json/plain"}
         check = temporalio.api.common.v1.Payload(
@@ -323,7 +315,7 @@ class MyTypedDictNotTotal(TypedDict, total=False):
 # TODO(cretz): Fix when https://github.com/pydantic/pydantic/pull/9612 tagged
 if sys.version_info <= (3, 12, 3):
 
-    class MyPydanticClass(pydantic.BaseModel):
+    class MyPydanticClass(pydantic.BaseModel):  # type: ignore[reportUnreachable]
         foo: str
         bar: list[MyPydanticClass]
         baz: UUID | None = None
@@ -388,13 +380,13 @@ def test_json_type_hints():
     ok(NestedDataClass, {"foo": "bar", "unknownfield": "baz"}, NestedDataClass("bar"))
 
     # Optional/Union
-    ok(Optional[int], 5)
-    ok(Optional[int], None)
-    ok(Optional[MyDataClass], MyDataClass("foo", 5, SerializableEnum.FOO))
-    ok(Union[int, str], 5)
-    ok(Union[int, str], "foo")
-    ok(Union[MyDataClass, NestedDataClass], MyDataClass("foo", 5, SerializableEnum.FOO))
-    ok(Union[MyDataClass, NestedDataClass], NestedDataClass("foo"))
+    ok(int | None, 5)
+    ok(int | None, None)
+    ok(MyDataClass | None, MyDataClass("foo", 5, SerializableEnum.FOO))
+    ok(int | str, 5)
+    ok(int | str, "foo")
+    ok(MyDataClass | NestedDataClass, MyDataClass("foo", 5, SerializableEnum.FOO))
+    ok(MyDataClass | NestedDataClass, NestedDataClass("foo"))
     ok(int | None, None)
     ok(int | None, 5)
     fail(int | None, "1")
@@ -414,7 +406,7 @@ def test_json_type_hints():
     ok(set[int], {5, 6})
     ok(set, {5, 6})
     ok(list, ["foo"])
-    ok(Deque[int], deque([5, 6]))
+    ok(deque[int], deque([5, 6]))
     ok(Sequence[int], [5, 6])
     fail(list[int], [1, 2, "3"])
 
@@ -445,7 +437,7 @@ def test_json_type_hints():
     ok(dict[None, str], {"null": "1"})
 
     # Dict has a different value for None keys
-    ok(Dict[None, str], {None: "1"})
+    ok(Dict[None, str], {None: "1"})  # type:ignore[reportDeprecated]
 
     # Alias
     ok(MyDataClassAlias, MyDataClass("foo", 5, SerializableEnum.FOO))
@@ -461,7 +453,7 @@ def test_json_type_hints():
     # StrEnum is available in 3.11+
     if sys.version_info >= (3, 11):
         # StrEnum
-        ok(SerializableStrEnum, SerializableStrEnum.FOO)
+        ok(SerializableStrEnum, SerializableStrEnum.FOO)  # type:ignore[reportUnreachable]
         ok(
             list[SerializableStrEnum],
             [SerializableStrEnum.FOO, SerializableStrEnum.FOO],
@@ -470,7 +462,7 @@ def test_json_type_hints():
     # Pydantic
     # TODO(cretz): Fix when https://github.com/pydantic/pydantic/pull/9612 tagged
     if sys.version_info <= (3, 12, 3):
-        ok(
+        ok(  # type: ignore[reportUnreachable]
             MyPydanticClass,
             MyPydanticClass(
                 foo="foo", bar=[MyPydanticClass(foo="baz", bar=[])], baz=uuid4()

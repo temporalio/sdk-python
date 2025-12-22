@@ -8,7 +8,6 @@ import logging
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
-from typing import Dict, Optional, Type
 
 from typing_extensions import TypedDict
 
@@ -180,7 +179,7 @@ class Replayer:
             replayed.
         """
 
-        def make_lambda(plugin, next):
+        def make_lambda(plugin, next):  # type: ignore[reportMissingParameterType]
             return lambda r, hs: plugin.run_replayer(r, hs, next)
 
         next_function = lambda r, hs: r._workflow_replay_iterator(hs)
@@ -204,7 +203,7 @@ class Replayer:
 
             # Create eviction hook
             def on_eviction_hook(
-                run_id: str,
+                _run_id: str,
                 remove_job: temporalio.bridge.proto.workflow_activation.RemoveFromCache,
             ) -> None:
                 nonlocal last_replay_failure

@@ -1,3 +1,4 @@
+# pyright: reportUnreachable=false
 from __future__ import annotations
 
 import asyncio
@@ -22,14 +23,8 @@ from enum import IntEnum
 from functools import partial
 from typing import (
     Any,
-    Dict,
-    List,
     Literal,
     NoReturn,
-    Optional,
-    Tuple,
-    Type,
-    Union,
     cast,
 )
 from urllib.request import urlopen
@@ -62,8 +57,6 @@ from temporalio.client import (
     AsyncActivityCancelledError,
     Client,
     CreateScheduleInput,
-    RPCError,
-    RPCStatusCode,
     ScheduleActionStartWorkflow,
     ScheduleHandle,
     SignalWorkflowInput,
@@ -115,7 +108,7 @@ from temporalio.runtime import (
     Runtime,
     TelemetryConfig,
 )
-from temporalio.service import __version__
+from temporalio.service import RPCError, RPCStatusCode, __version__
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     ExecuteWorkflowInput,
@@ -1196,7 +1189,7 @@ async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
 
 
 @pytest.mark.skip(reason="unable to easily prevent child start currently")
-async def test_workflow_cancel_child_unstarted(client: Client):
+async def test_workflow_cancel_child_unstarted(_client: Client):
     raise NotImplementedError
 
 
@@ -1531,7 +1524,7 @@ class SimpleCodec(PayloadCodec):
         return list(wrapper.payloads)
 
 
-async def test_workflow_with_codec(client: Client, env: WorkflowEnvironment):
+async def test_workflow_with_codec(client: Client):
     # Make client with this codec and run a couple of existing tests
     config = client.config()
     config["data_converter"] = DataConverter(payload_codec=SimpleCodec())
@@ -1996,7 +1989,7 @@ class LoggingWorkflow:
         return self._last_signal
 
 
-async def test_workflow_logging(client: Client, env: WorkflowEnvironment):
+async def test_workflow_logging(client: Client):
     workflow.logger.full_workflow_info_on_extra = True
     with LogCapturer().logs_captured(
         workflow.logger.base_logger, activity.logger.base_logger
@@ -5148,7 +5141,7 @@ class Foo(pydantic.BaseModel):
 @workflow.defn(failure_exception_types=[pydantic.ValidationError])
 class FailOnBadPydanticInputWorkflow:
     @workflow.run
-    async def run(self, params: Foo) -> None:
+    async def run(self, _params: Foo) -> None:
         pass
 
 
@@ -5168,7 +5161,7 @@ async def test_workflow_fail_on_bad_pydantic_input(client: Client):
 @workflow.defn(failure_exception_types=[Exception])
 class FailOnBadInputWorkflow:
     @workflow.run
-    async def run(self, param: str) -> None:
+    async def run(self, _param: str) -> None:
         pass
 
 
@@ -5261,7 +5254,7 @@ async def test_workflow_replace_worker_client_diff_runtimes_fail(client: Client)
 
 
 @activity.defn(dynamic=True)
-async def return_name_activity(args: Sequence[RawValue]) -> str:
+async def return_name_activity(_args: Sequence[RawValue]) -> str:
     return activity.info().activity_type
 
 
@@ -5620,13 +5613,13 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
             if handler_dynamism == "-dynamic-":
 
                 async def my_late_registered_dynamic_update(
-                    name: str, args: Sequence[RawValue]
+                    _name: str, _args: Sequence[RawValue]
                 ) -> str:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
                     return "my-late-registered-dynamic-update-result"
 
                 async def my_late_registered_dynamic_signal(
-                    name: str, args: Sequence[RawValue]
+                    _name: str, _args: Sequence[RawValue]
                 ) -> None:
                     await workflow.wait_condition(lambda: self.handlers_may_finish)
 
@@ -5681,12 +5674,12 @@ class UnfinishedHandlersOnWorkflowTerminationWorkflow:
         await workflow.wait_condition(lambda: self.handlers_may_finish)
 
     @workflow.update(dynamic=True)
-    async def my_dynamic_update(self, name: str, args: Sequence[RawValue]) -> str:
+    async def my_dynamic_update(self, _name: str, _args: Sequence[RawValue]) -> str:
         await workflow.wait_condition(lambda: self.handlers_may_finish)
         return "my-dynamic-update-result"
 
     @workflow.signal(dynamic=True)
-    async def my_dynamic_signal(self, name: str, args: Sequence[RawValue]) -> None:
+    async def my_dynamic_signal(self, _name: str, _args: Sequence[RawValue]) -> None:
         await workflow.wait_condition(lambda: self.handlers_may_finish)
 
 
@@ -5984,7 +5977,6 @@ class UpdateCompletionIsHonoredWhenAfterWorkflowReturnWorkflow2:
 
 async def test_update_completion_is_honored_when_after_workflow_return_2(
     client: Client,
-    env: WorkflowEnvironment,
 ):
     async with Worker(
         client,
@@ -7514,7 +7506,7 @@ class WorkflowDynamicConfigFnFailure:
         raise Exception("Dynamic config failure")
 
     @workflow.run
-    async def run(self, args: Sequence[RawValue]) -> None:
+    async def run(self, _args: Sequence[RawValue]) -> None:
         raise RuntimeError("Should never actually run")
 
 
@@ -8284,7 +8276,7 @@ async def test_previous_run_failure(client: Client):
         assert result == "Done"
 
 
-class EncryptionCodec(PayloadCodec):
+class FakeEncryptionCodec(PayloadCodec):
     def __init__(
         self,
         key_id: str = "test-key-id",
@@ -8325,7 +8317,6 @@ class EncryptionCodec(PayloadCodec):
         return ret
 
     def encrypt(self, data: bytes) -> bytes:
-        nonce = os.urandom(12)
         return data
 
     def decrypt(self, data: bytes) -> bytes:
@@ -8364,7 +8355,7 @@ async def test_search_attribute_codec(client: Client, env_type: str):
 
     config = client.config()
     config["data_converter"] = dataclasses.replace(
-        temporalio.converter.default(), payload_codec=EncryptionCodec()
+        temporalio.converter.default(), payload_codec=FakeEncryptionCodec()
     )
     client = Client(**config)
 
@@ -8375,7 +8366,7 @@ async def test_search_attribute_codec(client: Client, env_type: str):
         SearchAttributeCodecChildWorkflow,
     ) as worker:
         # Run workflow
-        result = await client.execute_workflow(
+        await client.execute_workflow(
             SearchAttributeCodecParentWorkflow.run,
             "Temporal",
             id="encryption-workflow-id",
@@ -8425,7 +8416,7 @@ async def test_activity_failure_with_encoded_payload_is_decoded_in_workflow(
 ):
     config = client.config()
     config["data_converter"] = dataclasses.replace(
-        temporalio.converter.default(), payload_codec=EncryptionCodec()
+        temporalio.converter.default(), payload_codec=FakeEncryptionCodec()
     )
     client = Client(**config)
 

@@ -44,13 +44,13 @@ else:
     ), f"Expected protobuf 4.x/5.x/6.x, got {protobuf_version}"
 
 
-def pytest_runtest_setup(item):
+def pytest_runtest_setup(item):  # type: ignore[reportMissingParameterType]
     """Print a newline so that custom printed output starts on new line."""
     if item.config.getoption("-s"):
         print()
 
 
-def pytest_addoption(parser):
+def pytest_addoption(parser):  # type: ignore[reportMissingParameterType]
     parser.addoption(
         "-E",
         "--workflow-environment",
@@ -61,7 +61,7 @@ def pytest_addoption(parser):
 
 @pytest.fixture(scope="session")
 def event_loop():
-    loop = asyncio.get_event_loop_policy().new_event_loop()
+    loop = asyncio.get_event_loop_policy().new_event_loop()  # type: ignore[reportDeprecated]
     yield loop
     try:
         loop.close()
@@ -77,17 +77,17 @@ class NoEventLoopPolicy(asyncio.AbstractEventLoopPolicy):  # type: ignore[name-d
     def get_event_loop(self):
         return self._underlying.get_event_loop()
 
-    def set_event_loop(self, loop):
+    def set_event_loop(self, loop):  # type: ignore[reportMissingParameterType]
         return self._underlying.set_event_loop(loop)
 
     def new_event_loop(self):  # type: ignore[reportIncompatibleMethodOverride]
         return None
 
     def get_child_watcher(self):
-        return self._underlying.get_child_watcher()
+        return self._underlying.get_child_watcher()  # type: ignore[reportDeprecated]
 
-    def set_child_watcher(self, watcher):
-        return self._underlying.set_child_watcher(watcher)
+    def set_child_watcher(self, watcher):  # type: ignore[reportMissingParameterType]
+        return self._underlying.set_child_watcher(watcher)  # type: ignore[reportDeprecated]
 
 
 @pytest.fixture(scope="session")
@@ -95,7 +95,7 @@ def env_type(request: pytest.FixtureRequest) -> str:
     return request.config.getoption("--workflow-environment")  # type: ignore[reportReturnType]
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
 async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
     if env_type == "local":
         http_port = 7243
@@ -163,12 +163,12 @@ def mp_fork_ctx() -> Iterator[multiprocessing.context.BaseContext | None]:
                 p.join()
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture  # type: ignore[reportUntypedFunctionDecorator]
 async def client(env: WorkflowEnvironment) -> Client:
     return env.client
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
 async def worker(
     env: WorkflowEnvironment,
 ) -> AsyncGenerator[ExternalWorker, None]:
@@ -182,7 +182,7 @@ async def worker(
 # hook forcefully kills the process as success when the exit code from pytest
 # is a success.
 @pytest.hookimpl(hookwrapper=True, trylast=True)
-def pytest_cmdline_main(config):
+def pytest_cmdline_main(config):  # type: ignore[reportMissingParameterType, reportUnusedParameter]
     result = yield
     if result.get_result() == 0:
         os._exit(0)

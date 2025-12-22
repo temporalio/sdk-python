@@ -1,10 +1,9 @@
 """Parameters for configuring Temporal activity execution for model calls."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, Union
+from typing import Any
 
 from agents import Agent, TResponseInputItem
 

@@ -8,16 +8,9 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, MutableSequence, Sequence
 from dataclasses import dataclass
 from typing import (
-    List,
-    Optional,
-    Set,
-    Tuple,
     TypeAlias,
-    Union,
 )
 
-import temporalio.api.common.v1
-import temporalio.api.history.v1
 import temporalio.bridge.client
 import temporalio.bridge.proto
 import temporalio.bridge.proto.activity_task
@@ -27,7 +20,6 @@ import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
-import temporalio.exceptions
 from temporalio.api.common.v1.message_pb2 import Payload
 from temporalio.bridge._visitor import VisitorFunctions
 from temporalio.bridge.temporal_sdk_bridge import (
@@ -80,10 +72,7 @@ class PollerBehaviorAutoscaling:
     initial: int
 
 
-PollerBehavior: TypeAlias = Union[
-    PollerBehaviorSimpleMaximum,
-    PollerBehaviorAutoscaling,
-]
+PollerBehavior: TypeAlias = PollerBehaviorSimpleMaximum | PollerBehaviorAutoscaling
 
 
 @dataclass
@@ -118,11 +107,11 @@ class WorkerVersioningStrategyLegacyBuildIdBased:
     build_id_with_versioning: str
 
 
-WorkerVersioningStrategy: TypeAlias = Union[
-    WorkerVersioningStrategyNone,
-    WorkerDeploymentOptions,
-    WorkerVersioningStrategyLegacyBuildIdBased,
-]
+WorkerVersioningStrategy: TypeAlias = (
+    WorkerVersioningStrategyNone
+    | WorkerDeploymentOptions
+    | WorkerVersioningStrategyLegacyBuildIdBased
+)
 
 
 @dataclass
@@ -150,11 +139,9 @@ class FixedSizeSlotSupplier:
     num_slots: int
 
 
-SlotSupplier: TypeAlias = Union[
-    FixedSizeSlotSupplier,
-    ResourceBasedSlotSupplier,
-    BridgeCustomSlotSupplier,
-]
+SlotSupplier: TypeAlias = (
+    FixedSizeSlotSupplier | ResourceBasedSlotSupplier | BridgeCustomSlotSupplier
+)
 
 
 @dataclass

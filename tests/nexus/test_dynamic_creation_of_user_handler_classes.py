@@ -110,8 +110,8 @@ def make_incrementer_user_service_definition_and_service_handler_classes(
     #
     @sync_operation
     async def _increment_op(
-        self,
-        ctx: nexusrpc.handler.StartOperationContext,
+        _self,  # type:ignore[reportMissingParameterType]
+        _ctx: nexusrpc.handler.StartOperationContext,
         input: int,
     ) -> int:
         return input + 1

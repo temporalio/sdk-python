@@ -12,27 +12,17 @@ from collections.abc import Awaitable, Callable, MutableMapping, Sequence
 from dataclasses import dataclass
 from datetime import timezone
 from types import TracebackType
-from typing import (
-    Dict,
-    List,
-    Optional,
-    Set,
-    Type,
-)
 
-import temporalio.activity
 import temporalio.api.common.v1
-import temporalio.bridge._visitor
-import temporalio.bridge.client
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.runtime
 import temporalio.bridge.worker
-import temporalio.client
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow
+from temporalio.bridge.worker import PollShutdownError
 
 from . import _command_aware_visitor
 from ._interceptor import (
@@ -53,7 +43,7 @@ logger = logging.getLogger(__name__)
 LOG_PROTOS = False
 
 
-class _WorkflowWorker:
+class _WorkflowWorker:  # type:ignore[reportUnusedClass]
     def __init__(
         self,
         *,
@@ -71,12 +61,10 @@ class _WorkflowWorker:
         debug_mode: bool,
         disable_eager_activity_execution: bool,
         metric_meter: temporalio.common.MetricMeter,
-        on_eviction_hook: None
-        | (
-            Callable[
-                [str, temporalio.bridge.proto.workflow_activation.RemoveFromCache], None
-            ]
-        ),
+        on_eviction_hook: Callable[
+            [str, temporalio.bridge.proto.workflow_activation.RemoveFromCache], None
+        ]
+        | None,
         disable_safe_eviction: bool,
         should_enforce_versioning_behavior: bool,
         assert_local_activity_valid: Callable[[str], None],
@@ -186,7 +174,7 @@ class _WorkflowWorker:
                 # when done.
                 task = asyncio.create_task(self._handle_activation(act))
                 setattr(task, "__temporal_task_tag", task_tag)
-        except temporalio.bridge.worker.PollShutdownError:
+        except PollShutdownError:
             pass
         except Exception as err:
             raise RuntimeError("Workflow worker failed") from err
@@ -224,7 +212,7 @@ class _WorkflowWorker:
                 )
                 completion.failed.failure.message = "Worker shutting down"
                 await self._bridge_worker().complete_workflow_activation(completion)
-            except temporalio.bridge.worker.PollShutdownError:
+            except PollShutdownError:
                 return
 
     async def _handle_activation(

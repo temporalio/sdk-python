@@ -14,6 +14,7 @@ import threading
 import traceback
 import warnings
 from abc import ABC, abstractmethod
+from collections import deque
 from collections.abc import (
     Awaitable,
     Callable,
@@ -31,22 +32,14 @@ from datetime import timedelta
 from enum import IntEnum
 from typing import (
     Any,
-    Deque,
-    Dict,
     Generic,
-    List,
     NoReturn,
-    Optional,
-    Set,
-    Tuple,
-    Type,
     TypeAlias,
     TypeVar,
-    Union,
     cast,
 )
 
-import nexusrpc.handler
+import nexusrpc
 from nexusrpc import InputT, OutputT
 from typing_extensions import Self, TypedDict, TypeVarTuple, Unpack
 
@@ -124,7 +117,8 @@ class WorkflowRunner(ABC):
         raise NotImplementedError
 
     def set_worker_level_failure_exception_types(
-        self, types: Sequence[type[BaseException]]
+        self,
+        types: Sequence[type[BaseException]],  # type:ignore[reportUnusedParameter]
     ) -> None:
         """Set worker-level failure exception types that will be used to
         validate in the sandbox when calling ``prepare_workflow``.
@@ -260,7 +254,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # Lazily loaded
         self._untyped_converted_memo: MutableMapping[str, Any] | None = None
         # Handles which are ready to run on the next event loop iteration
-        self._ready: Deque[asyncio.Handle] = collections.deque()
+        self._ready: deque[asyncio.Handle] = collections.deque()
         self._conditions: list[tuple[Callable[[], bool], asyncio.Future]] = []
         # Keyed by seq
         self._pending_timers: dict[int, _TimerHandle] = {}
@@ -511,7 +505,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 )
                 self._current_completion.failed.failure.application_failure_info.SetInParent()
 
-        def is_completion(command):
+        def is_completion(
+            command: temporalio.bridge.proto.workflow_commands.workflow_commands_pb2.WorkflowCommand,
+        ):
             return (
                 command.HasField("complete_workflow_execution")
                 or command.HasField("continue_as_new_workflow_execution")
@@ -571,7 +567,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             raise RuntimeError(f"Unrecognized job: {job.WhichOneof('variant')}")
 
     def _apply_cancel_workflow(
-        self, job: temporalio.bridge.proto.workflow_activation.CancelWorkflow
+        self, _job: temporalio.bridge.proto.workflow_activation.CancelWorkflow
     ) -> None:
         self._cancel_requested = True
         # TODO(cretz): Details or cancel message or whatever?
@@ -772,7 +768,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._patches_notified.add(job.patch_id)
 
     def _apply_remove_from_cache(
-        self, job: temporalio.bridge.proto.workflow_activation.RemoveFromCache
+        self, _job: temporalio.bridge.proto.workflow_activation.RemoveFromCache
     ) -> None:
         self._deleting = True
         self._cancel_requested = True
@@ -1040,7 +1036,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._process_signal_job(signal_defn, job)
 
     def _apply_initialize_workflow(
-        self, job: temporalio.bridge.proto.workflow_activation.InitializeWorkflow
+        self, _job: temporalio.bridge.proto.workflow_activation.InitializeWorkflow
     ) -> None:
         # Async call to run on the scheduler thread. This will be wrapped in
         # another function which applies exception handling.
@@ -1135,7 +1131,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             name = defn.name
             arg_types = defn.arg_types
         elif workflow is not None:
-            raise TypeError("Workflow must be None, a string, or callable")
+            raise TypeError("Workflow must be None, a string, or callable")  # type:ignore[reportUnreachable]
 
         self._outbound.continue_as_new(
             ContinueAsNewInput(
@@ -1152,8 +1148,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 versioning_intent=versioning_intent,
             )
         )
-        # TODO(cretz): Why can't MyPy infer the above never returns?
-        raise RuntimeError("Unreachable")
 
     def workflow_extern_functions(self) -> Mapping[str, Callable]:
         return self._extern_functions
@@ -2308,7 +2302,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             job.signal_name, defn.unfinished_policy
         )
 
-        def done_callback(f):
+        def done_callback(_f: Any):
             self._in_progress_signals.pop(id, None)
 
         task = self.create_task(
@@ -2943,9 +2937,6 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             # the cancel (i.e. cancelled before started)
             if not self._started and not self.done():
                 self._apply_cancel_command(self._instance._add_command())
-        # Message not supported in older versions
-        if sys.version_info < (3, 9):
-            return super().cancel()
         return super().cancel(msg)
 
     def _resolve_success(self, result: Any) -> None:

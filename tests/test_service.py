@@ -3,7 +3,7 @@ import os
 import re
 from collections.abc import Callable, Mapping
 from datetime import timedelta
-from typing import Any, Dict, Tuple, Type
+from typing import Any
 
 import google.protobuf.empty_pb2
 import google.protobuf.message
@@ -47,7 +47,7 @@ def test_all_grpc_calls_present(client: Client):
     ) -> None:
         # Collect service calls
         service_calls = set()
-        for name, call in inspect.getmembers(service):
+        for name, _call in inspect.getmembers(service):
             # ignore private methods and non-rpc members "client" and "service"
             if name[0] != "_" and name != "client" and name != "service":
                 service_calls.add(name)

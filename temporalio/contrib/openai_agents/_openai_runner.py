@@ -1,6 +1,6 @@
 import dataclasses
 import typing
-from typing import Any, Optional, Union
+from typing import Any
 
 from agents import (
     Agent,

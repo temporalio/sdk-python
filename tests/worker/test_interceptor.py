@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from collections.abc import Callable
 from datetime import timedelta
-from typing import Any, List, NoReturn, Optional, Tuple, Type
+from typing import Any, NoReturn
 
 import nexusrpc
 import pytest
@@ -167,7 +167,7 @@ class TracingNexusInboundInterceptor(NexusOperationInboundInterceptor):
 @workflow.defn
 class ExpectCancelNexusWorkflow:
     @workflow.run
-    async def run(self, input: str):
+    async def run(self, _input: str):
         try:
             await asyncio.wait_for(asyncio.Future(), 2)
         except asyncio.TimeoutError:
@@ -252,7 +252,7 @@ class InterceptedWorkflow:
         return f"query: {param}"
 
     @workflow.signal
-    def signal(self, param: str) -> None:
+    def signal(self, _param: str) -> None:
         self.finish.set()
 
     @workflow.update

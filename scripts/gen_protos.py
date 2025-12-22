@@ -7,7 +7,6 @@ import tempfile
 from collections.abc import Mapping
 from functools import partial
 from pathlib import Path
-from typing import List
 
 base_dir = Path(__file__).parent.parent
 proto_dir = (
