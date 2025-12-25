@@ -151,9 +151,11 @@ class TemporalLangGraphRunner:
                     task for task in loop.tasks.values() if not task.writes
                 ]
 
-                # Execute each task
-                for task in tasks_to_execute:
-                    await self._execute_task(task, loop)
+                # Execute all tasks in parallel (BSP model allows parallelism
+                # within a tick, we just need to wait for all before after_tick)
+                await asyncio.gather(*[
+                    self._execute_task(task, loop) for task in tasks_to_execute
+                ])
 
                 # Process writes and advance to next step
                 loop.after_tick()
