@@ -11,7 +11,6 @@ FINDINGS:
     3. Submit signature: (fn, *args, __name__=None, __cancel_on_exit__=False,
        __reraise_on_exit__=True, __next_tick__=False, **kwargs) -> Future[T]
     4. fn is typically `arun_with_retry` with task as first arg
-    5. WARNING: CONFIG_KEY_RUNNER_SUBMIT is deprecated in LangGraph v1.0
 
 Key Insight:
     When submit is called, fn=arun_with_retry, args[0]=PregelExecutableTask
@@ -20,6 +19,13 @@ Key Insight:
     IMPORTANT: The dunder args (__name__, __cancel_on_exit__, etc.) are for
     the submit mechanism itself and should NOT be passed to fn. Only *args
     and **kwargs should be passed to fn.
+
+API STABILITY NOTE:
+    We import CONFIG_KEY_RUNNER_SUBMIT from langgraph._internal._constants
+    to avoid deprecation warnings. The public export (langgraph.constants)
+    emits a warning because this is considered private API. However, the
+    mechanism is still used internally by LangGraph. The LangGraph team may
+    change this API in future versions - we should monitor for changes.
 
 VALIDATION STATUS: PASSED
     - Submit injection works via CONFIG_KEY_RUNNER_SUBMIT
@@ -32,28 +38,20 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import warnings
 from collections import deque
 from dataclasses import dataclass
 from typing import Any, Callable, TypeVar
 from weakref import WeakMethod
 
-# Suppress the deprecation warning for our prototype
-warnings.filterwarnings(
-    "ignore",
-    message=".*CONFIG_KEY_RUNNER_SUBMIT.*",
-    category=DeprecationWarning,
-)
-
 from langchain_core.runnables import RunnableConfig
-from langgraph.constants import CONFIG_KEY_RUNNER_SUBMIT
+from typing_extensions import TypedDict
+
+# Import from internal module to avoid deprecation warning
+# This is the same constant LangGraph uses internally
+from langgraph._internal._constants import CONFIG_KEY_RUNNER_SUBMIT
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel import Pregel
 from langgraph.types import PregelExecutableTask
-from typing_extensions import TypedDict
-
-# Re-enable warnings after import
-warnings.filterwarnings("default", category=DeprecationWarning)
 
 T = TypeVar("T")
 

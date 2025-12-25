@@ -1,12 +1,16 @@
 """Tests for Pregel loop submit function injection.
 
 These tests validate our assumptions about AsyncPregelLoop.
+
+NOTE: We import CONFIG_KEY_RUNNER_SUBMIT from langgraph._internal._constants
+to avoid deprecation warnings. This is intentional - the mechanism is still
+used internally by LangGraph, but the public export warns because it's
+considered private API. The LangGraph team may change this in future versions.
 """
 
 from __future__ import annotations
 
 import asyncio
-import warnings
 from operator import add
 from typing import Annotated, Any, Callable, TypeVar
 from weakref import WeakMethod
@@ -15,14 +19,9 @@ import pytest
 from langchain_core.runnables import RunnableConfig
 from typing_extensions import TypedDict
 
-# Suppress the deprecation warning for our prototype
-warnings.filterwarnings(
-    "ignore",
-    message=".*CONFIG_KEY_RUNNER_SUBMIT.*",
-    category=DeprecationWarning,
-)
-
-from langgraph.constants import CONFIG_KEY_RUNNER_SUBMIT
+# Import from internal module to avoid deprecation warning
+# This is the same constant LangGraph uses internally
+from langgraph._internal._constants import CONFIG_KEY_RUNNER_SUBMIT
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import PregelExecutableTask
 
