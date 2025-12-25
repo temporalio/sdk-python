@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, Callable, Optional, cast
 
 from temporalio import workflow
 
@@ -23,6 +23,7 @@ with workflow.unsafe.imports_passed_through():
 from temporalio.contrib.langgraph._models import (
     InterruptValue,
     NodeActivityInput,
+    StateSnapshot,
 )
 
 if TYPE_CHECKING:
@@ -102,6 +103,7 @@ class TemporalLangGraphRunner:
         default_max_retries: int = 3,
         default_task_queue: Optional[str] = None,
         enable_workflow_execution: bool = False,
+        checkpoint: Optional[dict[str, Any]] = None,
     ) -> None:
         """Initialize the Temporal runner.
 
@@ -116,6 +118,10 @@ class TemporalLangGraphRunner:
             enable_workflow_execution: If True, nodes marked with
                 metadata={"temporal": {"run_in_workflow": True}} will
                 execute directly in the workflow instead of as activities.
+            checkpoint: Optional checkpoint data from a previous execution's
+                get_state().model_dump(). If provided, the runner will restore
+                its internal state from this checkpoint, allowing continuation
+                after a Temporal continue-as-new.
         """
         # Validate no step_timeout
         if pregel.step_timeout is not None:
@@ -144,14 +150,19 @@ class TemporalLangGraphRunner:
         self._completed_nodes_in_cycle: set[str] = set()
         # Cached writes from resumed nodes (injected into tasks to trigger successors)
         self._resumed_node_writes: dict[str, list[tuple[str, Any]]] = {}
-        # In-memory checkpointer for tracking graph execution state
-        self._checkpointer: Optional[Any] = None
-        self._thread_id: str = "temporal-runner"
+        # Track the last output state for get_state()
+        self._last_output: Optional[dict[str, Any]] = None
+
+        # Restore from checkpoint if provided
+        if checkpoint is not None:
+            self._restore_from_checkpoint(checkpoint)
 
     async def ainvoke(
         self,
         input_state: dict[str, Any] | Any,
         config: Optional[dict[str, Any]] = None,
+        *,
+        should_continue: Optional[Callable[[], bool]] = None,
     ) -> dict[str, Any]:
         """Execute the graph asynchronously.
 
@@ -164,12 +175,19 @@ class TemporalLangGraphRunner:
                 When resuming with Command, the state from the previous
                 interrupt will be used.
             config: Optional configuration for the execution.
+            should_continue: Optional callable that returns False when execution
+                should stop for checkpointing. Called once after each graph tick
+                (BSP superstep), where each tick processes one layer of nodes.
+                When it returns False, execution stops and the result contains
+                '__checkpoint__' key with a StateSnapshot for continue-as-new.
+                Typical use: track tick count or check Temporal workflow history length.
 
         Returns:
-            The final state after graph execution. If a node called
-            interrupt(), the result will contain '__interrupt__' key
-            with a list of Interrupt objects (matching LangGraph's
-            native API).
+            The final state after graph execution. Special keys in result:
+            - '__interrupt__': Present if a node called interrupt(). Contains
+              a list of Interrupt objects (matching LangGraph's native API).
+            - '__checkpoint__': Present if should_continue() returned False.
+              Contains a StateSnapshot for use with continue-as-new.
 
         Example (basic):
             >>> result = await app.ainvoke({"messages": [HumanMessage(content="Hi")]})
@@ -182,6 +200,14 @@ class TemporalLangGraphRunner:
             ...     # result['__interrupt__'][0].value has the interrupt data
             ...     # Get human input...
             ...     result = await app.ainvoke(Command(resume=human_input))
+
+        Example (continue-as-new on history limit):
+            >>> result = await app.ainvoke(
+            ...     input_data,
+            ...     should_continue=lambda: workflow.info().get_current_history_length() < 10000
+            ... )
+            >>> if '__checkpoint__' in result:
+            ...     workflow.continue_as_new(input_data, result['__checkpoint__'])
         """
         # Import Command here to check type
         with workflow.unsafe.imports_passed_through():
@@ -311,6 +337,12 @@ class TemporalLangGraphRunner:
                 # process any pending writes and continue to next tick
                 if not tasks_to_execute:
                     loop.after_tick()
+                    # Check if we should stop for checkpointing
+                    if should_continue is not None and not should_continue():
+                        output = cast("dict[str, Any]", loop.output) if loop.output else {}
+                        output["__checkpoint__"] = self.get_state()
+                        self._last_output = output
+                        return output
                     continue
 
                 # Execute tasks sequentially for now (simplifies interrupt handling)
@@ -331,6 +363,13 @@ class TemporalLangGraphRunner:
 
                 # Process writes and advance to next step
                 loop.after_tick()
+
+                # Check if we should stop for checkpointing
+                if should_continue is not None and not should_continue():
+                    output = cast("dict[str, Any]", loop.output) if loop.output else {}
+                    output["__checkpoint__"] = self.get_state()
+                    self._last_output = output
+                    return output
         finally:
             # Exit the loop context only if we completed normally (not interrupted)
             # Calling __aexit__ on interrupted loop may block indefinitely
@@ -349,6 +388,9 @@ class TemporalLangGraphRunner:
             )
             # Merge with any existing state in output
             output = {**output, "__interrupt__": [interrupt_obj]}
+
+        # Track last output for get_state() checkpoint
+        self._last_output = output
 
         return output
 
@@ -761,3 +803,97 @@ class TemporalLangGraphRunner:
             "Synchronous invoke() is not supported in Temporal workflows. "
             "Use ainvoke() instead."
         )
+
+    def get_state(self) -> StateSnapshot:
+        """Get the current state snapshot for checkpointing.
+
+        Returns a StateSnapshot that can be serialized and passed to
+        Temporal's continue-as-new. The snapshot contains all data needed
+        to restore the runner's state in a new workflow execution.
+
+        This follows LangGraph's get_state() API pattern.
+
+        Returns:
+            A StateSnapshot containing the current execution state.
+
+        Example (continue-as-new pattern):
+            >>> @workflow.defn
+            >>> class LongRunningAgentWorkflow:
+            ...     @workflow.run
+            ...     async def run(self, input_data: dict, checkpoint: dict | None = None):
+            ...         app = compile("my_graph", checkpoint=checkpoint)
+            ...         result = await app.ainvoke(input_data)
+            ...
+            ...         # Check if we should continue-as-new (e.g., history too long)
+            ...         if workflow.info().get_current_history_length() > 10000:
+            ...             snapshot = app.get_state()
+            ...             workflow.continue_as_new(input_data, snapshot.model_dump())
+            ...
+            ...         return result
+        """
+        # Determine next nodes based on current state
+        next_nodes: tuple[str, ...] = ()
+        if self._interrupted_node_name is not None:
+            next_nodes = (self._interrupted_node_name,)
+
+        # Build tasks tuple with interrupt info if present
+        tasks: tuple[dict[str, Any], ...] = ()
+        if self._pending_interrupt is not None:
+            tasks = ({
+                "interrupt_value": self._pending_interrupt.value,
+                "interrupt_node": self._pending_interrupt.node_name,
+                "interrupt_task_id": self._pending_interrupt.task_id,
+            },)
+
+        # For values, prefer interrupted_state when there's an interrupt
+        # (since _last_output only contains the interrupt marker, not the full state)
+        # Otherwise use _last_output for completed executions
+        if self._interrupted_state is not None:
+            values = self._interrupted_state
+        else:
+            values = self._last_output or {}
+
+        return StateSnapshot(
+            values=values,
+            next=next_nodes,
+            metadata={
+                "step": self._step_counter,
+                "invocation_counter": self._invocation_counter,
+                "completed_nodes": list(self._completed_nodes_in_cycle),
+            },
+            tasks=tasks,
+        )
+
+    def _restore_from_checkpoint(self, checkpoint: dict[str, Any]) -> None:
+        """Restore runner state from a checkpoint.
+
+        This method restores the runner's internal state from a checkpoint
+        dictionary (typically from StateSnapshot.model_dump()).
+
+        Args:
+            checkpoint: Checkpoint data from a previous get_state().model_dump().
+        """
+        # Restore state values
+        self._last_output = checkpoint.get("values")
+        self._interrupted_state = checkpoint.get("values")
+
+        # Restore next node (interrupted node)
+        next_nodes = checkpoint.get("next", ())
+        if next_nodes:
+            self._interrupted_node_name = next_nodes[0]
+
+        # Restore metadata
+        metadata = checkpoint.get("metadata", {})
+        self._step_counter = metadata.get("step", 0)
+        self._invocation_counter = metadata.get("invocation_counter", 0)
+        self._completed_nodes_in_cycle = set(metadata.get("completed_nodes", []))
+
+        # Restore interrupt info from tasks
+        tasks = checkpoint.get("tasks", ())
+        if tasks:
+            task = tasks[0]
+            self._pending_interrupt = InterruptValue(
+                value=task.get("interrupt_value"),
+                node_name=task.get("interrupt_node", ""),
+                task_id=task.get("interrupt_task_id", ""),
+            )

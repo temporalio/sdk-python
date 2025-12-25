@@ -359,3 +359,5 @@ async def test_multiple_sequential_interrupts(client: Client) -> None:
         # Verify final result
         assert result["step1_result"] == "first_value"
         assert result["step2_result"] == "second_value"
+
+

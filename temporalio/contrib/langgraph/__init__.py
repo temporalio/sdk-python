@@ -52,6 +52,7 @@ from datetime import timedelta
 from typing import Optional
 
 from temporalio.contrib.langgraph._graph_registry import get_graph
+from temporalio.contrib.langgraph._models import StateSnapshot
 from temporalio.contrib.langgraph._plugin import LangGraphPlugin
 from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
 
@@ -63,6 +64,7 @@ def compile(
     default_max_retries: int = 3,
     default_task_queue: Optional[str] = None,
     enable_workflow_execution: bool = False,
+    checkpoint: Optional[dict] = None,
 ) -> TemporalLangGraphRunner:
     """Compile a registered LangGraph graph for Temporal execution.
 
@@ -87,6 +89,10 @@ def compile(
             If True, nodes marked with metadata={"temporal": {"run_in_workflow": True}}
             will run directly in the workflow instead of as activities.
             Default: False (all nodes run as activities for safety).
+        checkpoint: Optional checkpoint data from a previous execution's
+            get_state().model_dump(). If provided, the runner will restore
+            its internal state from this checkpoint, allowing continuation
+            after a Temporal continue-as-new.
 
     Returns:
         A TemporalLangGraphRunner that can be used like a compiled graph.
@@ -118,6 +124,21 @@ def compile(
             ...     async def run(self, graph_id: str, query: str):
             ...         app = compile(graph_id)
             ...         return await app.ainvoke({"query": query})
+
+        Usage with continue-as-new (workflow.py):
+            >>> @workflow.defn
+            >>> class LongRunningAgentWorkflow:
+            ...     @workflow.run
+            ...     async def run(self, input_data: dict, checkpoint: dict | None = None):
+            ...         app = compile("my_graph", checkpoint=checkpoint)
+            ...         result = await app.ainvoke(input_data)
+            ...
+            ...         # Check if we should continue-as-new
+            ...         if workflow.info().get_current_history_length() > 10000:
+            ...             snapshot = app.get_state()
+            ...             workflow.continue_as_new(input_data, snapshot.model_dump())
+            ...
+            ...         return result
     """
     # Get graph from registry
     pregel = get_graph(graph_id)
@@ -129,11 +150,13 @@ def compile(
         default_max_retries=default_max_retries,
         default_task_queue=default_task_queue,
         enable_workflow_execution=enable_workflow_execution,
+        checkpoint=checkpoint,
     )
 
 
 __all__ = [
     "compile",
     "LangGraphPlugin",
+    "StateSnapshot",
     "TemporalLangGraphRunner",
 ]

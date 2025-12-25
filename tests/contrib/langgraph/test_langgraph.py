@@ -1177,6 +1177,223 @@ class TestInterruptIntegration:
         asyncio.get_event_loop().run_until_complete(run_test())
 
 
+class TestCheckpointAndContinue:
+    """Tests for checkpoint and should_continue functionality."""
+
+    def test_get_state_returns_snapshot(self) -> None:
+        """get_state() should return a StateSnapshot with execution state."""
+        from temporalio.contrib.langgraph import LangGraphPlugin
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from temporalio.contrib.langgraph._models import StateSnapshot
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        get_global_registry().clear()
+
+        class State(TypedDict, total=False):
+            value: int
+
+        def simple_node(state: State) -> State:
+            return {"value": state.get("value", 0) * 2}
+
+        def build():
+            graph = StateGraph(State)
+            graph.add_node("double", simple_node)
+            graph.add_edge(START, "double")
+            graph.add_edge("double", END)
+            return graph.compile()
+
+        LangGraphPlugin(graphs={"checkpoint_test": build})
+        pregel = get_global_registry().get_graph("checkpoint_test")
+        runner = TemporalLangGraphRunner(pregel, graph_id="checkpoint_test")
+
+        # Set some internal state
+        runner._last_output = {"value": 42}
+        runner._step_counter = 5
+        runner._invocation_counter = 2
+
+        snapshot = runner.get_state()
+
+        assert isinstance(snapshot, StateSnapshot)
+        assert snapshot.values == {"value": 42}
+        assert snapshot.metadata["step"] == 5
+        assert snapshot.metadata["invocation_counter"] == 2
+
+    def test_restore_from_checkpoint(self) -> None:
+        """Runner should restore state from checkpoint dict."""
+        from temporalio.contrib.langgraph import LangGraphPlugin
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        get_global_registry().clear()
+
+        class State(TypedDict, total=False):
+            value: int
+
+        def simple_node(state: State) -> State:
+            return {"value": state.get("value", 0) * 2}
+
+        def build():
+            graph = StateGraph(State)
+            graph.add_node("double", simple_node)
+            graph.add_edge(START, "double")
+            graph.add_edge("double", END)
+            return graph.compile()
+
+        LangGraphPlugin(graphs={"restore_test": build})
+        pregel = get_global_registry().get_graph("restore_test")
+
+        # Create checkpoint data (as if from model_dump())
+        checkpoint = {
+            "values": {"value": 100},
+            "next": ["double"],
+            "metadata": {
+                "step": 10,
+                "invocation_counter": 5,
+                "completed_nodes": ["__start__"],
+            },
+            "tasks": [],
+        }
+
+        # Create runner with checkpoint
+        runner = TemporalLangGraphRunner(
+            pregel,
+            graph_id="restore_test",
+            checkpoint=checkpoint,
+        )
+
+        # Verify state was restored
+        assert runner._last_output == {"value": 100}
+        assert runner._interrupted_state == {"value": 100}
+        assert runner._interrupted_node_name == "double"
+        assert runner._step_counter == 10
+        assert runner._invocation_counter == 5
+        assert runner._completed_nodes_in_cycle == {"__start__"}
+
+    def test_should_continue_parameter_accepted(self) -> None:
+        """ainvoke should accept should_continue parameter."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from temporalio.contrib.langgraph import LangGraphPlugin
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from temporalio.contrib.langgraph._models import (
+            ChannelWrite,
+            NodeActivityOutput,
+        )
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        get_global_registry().clear()
+
+        class State(TypedDict, total=False):
+            value: int
+
+        def simple_node(state: State) -> State:
+            return {"value": 42}
+
+        def build():
+            graph = StateGraph(State)
+            graph.add_node("simple", simple_node)
+            graph.add_edge(START, "simple")
+            graph.add_edge("simple", END)
+            return graph.compile()
+
+        LangGraphPlugin(graphs={"continue_test": build})
+        pregel = get_global_registry().get_graph("continue_test")
+        runner = TemporalLangGraphRunner(pregel, graph_id="continue_test")
+
+        # Track if should_continue was called
+        was_called = False
+
+        async def mock_execute_activity(func, input_data, **kwargs):
+            return NodeActivityOutput(
+                writes=[ChannelWrite(channel="value", value=42)],
+                interrupt=None,
+            )
+
+        def should_continue():
+            nonlocal was_called
+            was_called = True
+            return True  # Continue execution
+
+        async def run_test():
+            with patch("temporalio.contrib.langgraph._runner.workflow") as mock_workflow:
+                mock_workflow.execute_activity = mock_execute_activity
+                mock_workflow.unsafe = MagicMock()
+                mock_workflow.unsafe.imports_passed_through = MagicMock(
+                    return_value=MagicMock(__enter__=MagicMock(), __exit__=MagicMock())
+                )
+
+                result = await runner.ainvoke(
+                    {"value": 0},
+                    should_continue=should_continue,
+                )
+
+                # Execution should complete normally
+                assert "__checkpoint__" not in result
+                # should_continue should have been called
+                assert was_called is True
+
+        asyncio.get_event_loop().run_until_complete(run_test())
+
+    def test_should_continue_false_returns_checkpoint(self) -> None:
+        """When should_continue returns False, ainvoke returns __checkpoint__."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from temporalio.contrib.langgraph import LangGraphPlugin
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from temporalio.contrib.langgraph._models import (
+            ChannelWrite,
+            NodeActivityOutput,
+            StateSnapshot,
+        )
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        get_global_registry().clear()
+
+        class State(TypedDict, total=False):
+            value: int
+
+        def simple_node(state: State) -> State:
+            return {"value": 42}
+
+        def build():
+            graph = StateGraph(State)
+            graph.add_node("simple", simple_node)
+            graph.add_edge(START, "simple")
+            graph.add_edge("simple", END)
+            return graph.compile()
+
+        LangGraphPlugin(graphs={"continue_false_test": build})
+        pregel = get_global_registry().get_graph("continue_false_test")
+        runner = TemporalLangGraphRunner(pregel, graph_id="continue_false_test")
+
+        async def mock_execute_activity(func, input_data, **kwargs):
+            return NodeActivityOutput(
+                writes=[ChannelWrite(channel="value", value=42)],
+                interrupt=None,
+            )
+
+        async def run_test():
+            with patch("temporalio.contrib.langgraph._runner.workflow") as mock_workflow:
+                mock_workflow.execute_activity = mock_execute_activity
+                mock_workflow.unsafe = MagicMock()
+                mock_workflow.unsafe.imports_passed_through = MagicMock(
+                    return_value=MagicMock(__enter__=MagicMock(), __exit__=MagicMock())
+                )
+
+                result = await runner.ainvoke(
+                    {"value": 0},
+                    should_continue=lambda: False,  # Always stop
+                )
+
+                # Should have stopped and returned checkpoint
+                assert "__checkpoint__" in result
+                assert isinstance(result["__checkpoint__"], StateSnapshot)
+
+        asyncio.get_event_loop().run_until_complete(run_test())
+
+
 # ==============================================================================
 # End-to-End Tests with Real Temporal Worker
 # ==============================================================================

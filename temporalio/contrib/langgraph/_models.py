@@ -199,3 +199,49 @@ class NodeActivityOutput(BaseModel):
             List of (channel_name, reconstructed_value) tuples.
         """
         return [write.to_tuple() for write in self.writes]
+
+
+class StateSnapshot(BaseModel):
+    """Snapshot of graph execution state for checkpointing.
+
+    This model follows LangGraph's StateSnapshot API, providing the data
+    needed to checkpoint and restore graph execution state. It can be
+    serialized and passed to Temporal's continue-as-new for long-running
+    workflows.
+
+    Attributes:
+        values: The current state values (graph state at checkpoint time).
+        next: Tuple of next node names to execute. Empty if graph completed,
+            contains the interrupted node name if execution was interrupted.
+        metadata: Execution metadata including step count and completed nodes.
+        tasks: Pending interrupt information (if any).
+
+    Example (continue-as-new pattern):
+        >>> @workflow.defn
+        >>> class LongRunningAgentWorkflow:
+        ...     @workflow.run
+        ...     async def run(self, input_data: dict, checkpoint: dict | None = None):
+        ...         app = compile("my_graph", checkpoint=checkpoint)
+        ...         result = await app.ainvoke(input_data)
+        ...
+        ...         # Check if we should continue-as-new
+        ...         if workflow.info().get_current_history_length() > 10000:
+        ...             snapshot = app.get_state()
+        ...             workflow.continue_as_new(input_data, snapshot.model_dump())
+        ...
+        ...         return result
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    values: dict[str, Any]
+    """The current state values at checkpoint time."""
+
+    next: tuple[str, ...]
+    """Next nodes to execute. Empty if complete, contains interrupted node if interrupted."""
+
+    metadata: dict[str, Any]
+    """Execution metadata including step, completed_nodes, invocation_counter."""
+
+    tasks: tuple[dict[str, Any], ...]
+    """Pending tasks/interrupts. Contains interrupt info if execution was interrupted."""
