@@ -7,7 +7,7 @@ discriminated unions.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any, Union
+from typing import TYPE_CHECKING, Annotated, Any, Optional, Union
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict
 
@@ -143,6 +143,9 @@ class NodeActivityInput(BaseModel):
         config: Filtered RunnableConfig (without internal keys).
         path: Graph hierarchy path for nested graphs.
         triggers: List of channels that triggered this task.
+        resume_value: Value to return from interrupt() when resuming.
+            If provided, the node's interrupt() call will return this value
+            instead of raising an interrupt.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -154,6 +157,25 @@ class NodeActivityInput(BaseModel):
     config: dict[str, Any]
     path: tuple[str | int, ...]
     triggers: list[str]
+    resume_value: Optional[Any] = None
+
+
+class InterruptValue(BaseModel):
+    """Data about an interrupt raised by a node.
+
+    This is returned by the activity when a node calls interrupt().
+
+    Attributes:
+        value: The value passed to interrupt() by the node.
+        node_name: Name of the node that interrupted.
+        task_id: The Pregel task ID.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    value: Any
+    node_name: str
+    task_id: str
 
 
 class NodeActivityOutput(BaseModel):
@@ -161,11 +183,14 @@ class NodeActivityOutput(BaseModel):
 
     Attributes:
         writes: List of channel writes produced by the node.
+        interrupt: If set, the node called interrupt() and this contains
+            the interrupt data. When interrupt is set, writes may be empty.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     writes: list[ChannelWrite]
+    interrupt: Optional[InterruptValue] = None
 
     def to_write_tuples(self) -> list[tuple[str, Any]]:
         """Convert writes to (channel, value) tuples.

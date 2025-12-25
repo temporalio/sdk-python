@@ -5,10 +5,12 @@ These tests validate the production implementation:
 - Graph registry
 - Plugin
 - Runner
+- End-to-end workflow tests with real Temporal worker
 """
 
 from __future__ import annotations
 
+import uuid
 from datetime import timedelta
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -17,6 +19,7 @@ import pytest
 from typing_extensions import TypedDict
 
 from langgraph.graph import END, START, StateGraph
+from temporalio.client import Client
 
 
 class TestModels:
@@ -732,3 +735,742 @@ class TestPerNodeConfiguration:
 
         assert runner._get_node_heartbeat_timeout("long_running") == timedelta(minutes=5)
         assert runner._get_node_heartbeat_timeout("short_running") is None
+
+
+class TestInterruptHandling:
+    """Tests for human-in-the-loop interrupt functionality."""
+
+    def test_interrupt_value_model(self) -> None:
+        """InterruptValue should store interrupt data."""
+        from temporalio.contrib.langgraph._models import InterruptValue
+
+        interrupt = InterruptValue(
+            value="Please confirm",
+            node_name="confirm_node",
+            task_id="task_456",
+        )
+
+        assert interrupt.value == "Please confirm"
+        assert interrupt.node_name == "confirm_node"
+        assert interrupt.task_id == "task_456"
+
+    def test_node_activity_output_with_interrupt(self) -> None:
+        """NodeActivityOutput should support interrupt field."""
+        from temporalio.contrib.langgraph._models import (
+            InterruptValue,
+            NodeActivityOutput,
+        )
+
+        output = NodeActivityOutput(
+            writes=[],
+            interrupt=InterruptValue(
+                value="waiting",
+                node_name="wait_node",
+                task_id="task_789",
+            ),
+        )
+
+        assert output.interrupt is not None
+        assert output.interrupt.value == "waiting"
+        assert len(output.writes) == 0
+
+    def test_node_activity_input_with_resume(self) -> None:
+        """NodeActivityInput should support resume_value field."""
+        from temporalio.contrib.langgraph._models import NodeActivityInput
+
+        input_data = NodeActivityInput(
+            node_name="my_node",
+            task_id="task_123",
+            graph_id="my_graph",
+            input_state={"value": 1},
+            config={},
+            path=(),
+            triggers=[],
+            resume_value="user_response",
+        )
+
+        assert input_data.resume_value == "user_response"
+
+    def test_activity_catches_langgraph_interrupt(self) -> None:
+        """Activity should catch LangGraph interrupt and return InterruptValue."""
+        import asyncio
+
+        from langgraph.types import interrupt
+
+        from temporalio.contrib.langgraph import LangGraphPlugin
+        from temporalio.contrib.langgraph._activities import execute_node
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from temporalio.contrib.langgraph._models import NodeActivityInput
+
+        get_global_registry().clear()
+
+        class State(TypedDict, total=False):
+            value: int
+            approved: bool
+
+        def approval_node(state: State) -> State:
+            # This will raise GraphInterrupt
+            approved = interrupt({"question": "Do you approve?", "value": state.get("value")})
+            return {"approved": approved}
+
+        def build():
+            graph = StateGraph(State)
+            graph.add_node("approval", approval_node)
+            graph.add_edge(START, "approval")
+            graph.add_edge("approval", END)
+            return graph.compile()
+
+        LangGraphPlugin(graphs={"interrupt_test": build})
+
+        input_data = NodeActivityInput(
+            node_name="approval",
+            task_id="test_task_interrupt",
+            graph_id="interrupt_test",
+            input_state={"value": 42},
+            config={},
+            path=(),
+            triggers=[],
+        )
+
+        with patch("temporalio.activity.heartbeat"):
+            result = asyncio.get_event_loop().run_until_complete(
+                execute_node(input_data)
+            )
+
+        # Should return interrupt, not writes
+        assert result.interrupt is not None
+        assert result.interrupt.node_name == "approval"
+        assert result.interrupt.value == {"question": "Do you approve?", "value": 42}
+        assert len(result.writes) == 0
+
+    def test_activity_resumes_with_value(self) -> None:
+        """Activity should pass resume value to interrupt()."""
+        import asyncio
+
+        from langgraph.types import interrupt
+
+        from temporalio.contrib.langgraph import LangGraphPlugin
+        from temporalio.contrib.langgraph._activities import execute_node
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from temporalio.contrib.langgraph._models import NodeActivityInput
+
+        get_global_registry().clear()
+
+        class State(TypedDict, total=False):
+            value: int
+            approved: bool
+
+        def approval_node(state: State) -> State:
+            # When resume_value is provided, interrupt() returns it
+            approved = interrupt("Approve?")
+            return {"approved": approved}
+
+        def build():
+            graph = StateGraph(State)
+            graph.add_node("approval", approval_node)
+            graph.add_edge(START, "approval")
+            graph.add_edge("approval", END)
+            return graph.compile()
+
+        LangGraphPlugin(graphs={"resume_test": build})
+
+        # Execute with resume_value - should NOT raise interrupt
+        input_data = NodeActivityInput(
+            node_name="approval",
+            task_id="test_task_resume",
+            graph_id="resume_test",
+            input_state={"value": 42},
+            config={},
+            path=(),
+            triggers=[],
+            resume_value=True,  # Resume with approval
+        )
+
+        with patch("temporalio.activity.heartbeat"):
+            result = asyncio.get_event_loop().run_until_complete(
+                execute_node(input_data)
+            )
+
+        # Should return writes, not interrupt
+        assert result.interrupt is None
+        # Filter out internal LangGraph channels (like __resume__)
+        user_writes = [w for w in result.writes if not w.channel.startswith("__")]
+        assert len(user_writes) == 1
+        assert user_writes[0].channel == "approved"
+        assert user_writes[0].value is True
+
+    def test_runner_stores_interrupted_state(self) -> None:
+        """Runner should initialize interrupt state tracking."""
+        from temporalio.contrib.langgraph import LangGraphPlugin
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        get_global_registry().clear()
+
+        class State(TypedDict, total=False):
+            value: int
+
+        def build():
+            graph = StateGraph(State)
+            graph.add_node("node", lambda s: {"value": 1})
+            graph.add_edge(START, "node")
+            graph.add_edge("node", END)
+            return graph.compile()
+
+        LangGraphPlugin(graphs={"state_test": build})
+        pregel = get_global_registry().get_graph("state_test")
+
+        runner = TemporalLangGraphRunner(pregel, graph_id="state_test")
+
+        # Should have interrupt state attributes
+        assert runner._interrupted_state is None
+        assert runner._resume_value is None
+        assert runner._resume_used is False
+
+    def test_runner_has_pending_interrupt_attribute(self) -> None:
+        """Runner should have _pending_interrupt attribute for native API."""
+        from temporalio.contrib.langgraph import LangGraphPlugin
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        get_global_registry().clear()
+
+        class State(TypedDict, total=False):
+            value: int
+
+        def build():
+            graph = StateGraph(State)
+            graph.add_node("node", lambda s: {"value": 1})
+            graph.add_edge(START, "node")
+            graph.add_edge("node", END)
+            return graph.compile()
+
+        LangGraphPlugin(graphs={"pending_test": build})
+        pregel = get_global_registry().get_graph("pending_test")
+
+        runner = TemporalLangGraphRunner(pregel, graph_id="pending_test")
+
+        # Should have _pending_interrupt attribute for native API
+        assert runner._pending_interrupt is None
+
+
+class TestInterruptIntegration:
+    """Integration tests for interrupt functionality."""
+
+    def test_ainvoke_returns_interrupt_in_result(self) -> None:
+        """ainvoke should return __interrupt__ in result when node calls interrupt()."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from langgraph.types import interrupt
+
+        from temporalio.contrib.langgraph import LangGraphPlugin
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from temporalio.contrib.langgraph._models import (
+            InterruptValue,
+            NodeActivityOutput,
+        )
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        get_global_registry().clear()
+
+        class State(TypedDict, total=False):
+            value: int
+            approved: bool
+
+        def approval_node(state: State) -> State:
+            approved = interrupt({"question": "Do you approve?", "value": state.get("value")})
+            return {"approved": approved}
+
+        def build():
+            graph = StateGraph(State)
+            graph.add_node("approval", approval_node)
+            graph.add_edge(START, "approval")
+            graph.add_edge("approval", END)
+            return graph.compile()
+
+        LangGraphPlugin(graphs={"int_test_1": build})
+        pregel = get_global_registry().get_graph("int_test_1")
+        runner = TemporalLangGraphRunner(pregel, graph_id="int_test_1")
+
+        # Mock workflow.execute_activity to return an interrupt
+        mock_result = NodeActivityOutput(
+            writes=[],
+            interrupt=InterruptValue(
+                value={"question": "Do you approve?", "value": 42},
+                node_name="approval",
+                task_id="task_123",
+            ),
+        )
+
+        async def run_test():
+            with patch("temporalio.contrib.langgraph._runner.workflow") as mock_workflow:
+                mock_workflow.execute_activity = AsyncMock(return_value=mock_result)
+                mock_workflow.unsafe = MagicMock()
+                mock_workflow.unsafe.imports_passed_through = MagicMock(
+                    return_value=MagicMock(__enter__=MagicMock(), __exit__=MagicMock())
+                )
+
+                result = await runner.ainvoke({"value": 42})
+
+                # Result should contain __interrupt__ key
+                assert "__interrupt__" in result
+                assert len(result["__interrupt__"]) == 1
+
+                interrupt_obj = result["__interrupt__"][0]
+                assert interrupt_obj.value == {"question": "Do you approve?", "value": 42}
+
+        asyncio.get_event_loop().run_until_complete(run_test())
+
+    def test_ainvoke_resumes_with_command(self) -> None:
+        """ainvoke should resume execution when called with Command(resume=value)."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from langgraph.types import Command, interrupt
+
+        from temporalio.contrib.langgraph import LangGraphPlugin
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from temporalio.contrib.langgraph._models import (
+            ChannelWrite,
+            InterruptValue,
+            NodeActivityOutput,
+        )
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        get_global_registry().clear()
+
+        class State(TypedDict, total=False):
+            value: int
+            approved: bool
+
+        def approval_node(state: State) -> State:
+            approved = interrupt("Approve?")
+            return {"approved": approved}
+
+        def build():
+            graph = StateGraph(State)
+            graph.add_node("approval", approval_node)
+            graph.add_edge(START, "approval")
+            graph.add_edge("approval", END)
+            return graph.compile()
+
+        LangGraphPlugin(graphs={"int_test_2": build})
+        pregel = get_global_registry().get_graph("int_test_2")
+        runner = TemporalLangGraphRunner(pregel, graph_id="int_test_2")
+
+        call_count = 0
+
+        async def mock_execute_activity(func, input_data, **kwargs):
+            nonlocal call_count
+            call_count += 1
+
+            if call_count == 1:
+                # First call: return interrupt
+                return NodeActivityOutput(
+                    writes=[],
+                    interrupt=InterruptValue(
+                        value="Approve?",
+                        node_name="approval",
+                        task_id="task_456",
+                    ),
+                )
+            else:
+                # Second call (resume): verify resume_value is passed
+                assert input_data.resume_value is True, f"Expected resume_value=True, got {input_data.resume_value}"
+                return NodeActivityOutput(
+                    writes=[ChannelWrite(channel="approved", value=True)],
+                    interrupt=None,
+                )
+
+        async def run_test():
+            with patch("temporalio.contrib.langgraph._runner.workflow") as mock_workflow:
+                mock_workflow.execute_activity = mock_execute_activity
+                mock_workflow.unsafe = MagicMock()
+                mock_workflow.unsafe.imports_passed_through = MagicMock(
+                    return_value=MagicMock(__enter__=MagicMock(), __exit__=MagicMock())
+                )
+
+                # First call - should return interrupt
+                result1 = await runner.ainvoke({"value": 42})
+                assert "__interrupt__" in result1
+                assert result1["__interrupt__"][0].value == "Approve?"
+
+                # Verify state was saved
+                assert runner._interrupted_state is not None
+                assert runner._pending_interrupt is not None
+
+                # Second call with Command(resume=True) - should resume
+                result2 = await runner.ainvoke(Command(resume=True))
+
+                # Should complete without interrupt
+                assert "__interrupt__" not in result2
+                assert call_count == 2
+
+        asyncio.get_event_loop().run_until_complete(run_test())
+
+    def test_interrupt_state_reset_on_resume(self) -> None:
+        """Interrupt state should be reset after successful resume."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from langgraph.types import Command
+
+        from temporalio.contrib.langgraph import LangGraphPlugin
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from temporalio.contrib.langgraph._models import (
+            ChannelWrite,
+            InterruptValue,
+            NodeActivityOutput,
+        )
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        get_global_registry().clear()
+
+        class State(TypedDict, total=False):
+            value: int
+
+        def simple_node(state: State) -> State:
+            return {"value": state.get("value", 0) + 1}
+
+        def build():
+            graph = StateGraph(State)
+            graph.add_node("simple", simple_node)
+            graph.add_edge(START, "simple")
+            graph.add_edge("simple", END)
+            return graph.compile()
+
+        LangGraphPlugin(graphs={"int_test_3": build})
+        pregel = get_global_registry().get_graph("int_test_3")
+        runner = TemporalLangGraphRunner(pregel, graph_id="int_test_3")
+
+        # Manually set interrupt state to simulate previous interrupt
+        runner._interrupted_state = {"value": 42}
+        runner._pending_interrupt = InterruptValue(
+            value="test",
+            node_name="test_node",
+            task_id="task_789",
+        )
+
+        async def mock_execute_activity(func, input_data, **kwargs):
+            return NodeActivityOutput(
+                writes=[ChannelWrite(channel="value", value=43)],
+                interrupt=None,
+            )
+
+        async def run_test():
+            with patch("temporalio.contrib.langgraph._runner.workflow") as mock_workflow:
+                mock_workflow.execute_activity = mock_execute_activity
+                mock_workflow.unsafe = MagicMock()
+                mock_workflow.unsafe.imports_passed_through = MagicMock(
+                    return_value=MagicMock(__enter__=MagicMock(), __exit__=MagicMock())
+                )
+
+                # Resume execution
+                result = await runner.ainvoke(Command(resume="user_input"))
+
+                # Interrupt state should be cleared after successful execution
+                assert "__interrupt__" not in result
+                # _pending_interrupt is reset at start of ainvoke when Command is passed
+                assert runner._pending_interrupt is None
+
+        asyncio.get_event_loop().run_until_complete(run_test())
+
+
+# ==============================================================================
+# End-to-End Tests with Real Temporal Worker
+# ==============================================================================
+
+# Graph builders and workflows must be defined at module level for Temporal
+
+from temporalio import workflow
+from temporalio.contrib.langgraph import LangGraphPlugin, compile as lg_compile
+from langgraph.types import Command
+
+
+class E2EApprovalState(TypedDict, total=False):
+    """State for approval workflow."""
+
+    value: int
+    approved: bool
+    approval_reason: str
+
+
+def _e2e_approval_node(state: E2EApprovalState) -> E2EApprovalState:
+    """Node that requests approval via interrupt."""
+    from langgraph.types import interrupt
+
+    # Request approval - this will pause execution
+    approval_response = interrupt({
+        "question": "Do you approve this value?",
+        "current_value": state.get("value", 0),
+    })
+
+    # When resumed, approval_response will be the value passed to Command(resume=...)
+    return {
+        "approved": approval_response.get("approved", False),
+        "approval_reason": approval_response.get("reason", ""),
+    }
+
+
+def _e2e_process_node(state: E2EApprovalState) -> E2EApprovalState:
+    """Node that processes the approved value."""
+    if state.get("approved"):
+        return {"value": state.get("value", 0) * 2}
+    return {"value": 0}
+
+
+def build_e2e_approval_graph():
+    """Build the approval graph for e2e tests."""
+    graph = StateGraph(E2EApprovalState)
+    graph.add_node("request_approval", _e2e_approval_node)
+    graph.add_node("process", _e2e_process_node)
+    graph.add_edge(START, "request_approval")
+    graph.add_edge("request_approval", "process")
+    graph.add_edge("process", END)
+    return graph.compile()
+
+
+class E2ESimpleState(TypedDict, total=False):
+    """State for simple workflow without interrupts."""
+
+    value: int
+    result: int
+
+
+def _e2e_double_node(state: E2ESimpleState) -> E2ESimpleState:
+    """Simple node that doubles the value."""
+    return {"result": state.get("value", 0) * 2}
+
+
+def build_e2e_simple_graph():
+    """Build a simple graph without interrupts for e2e tests."""
+    graph = StateGraph(E2ESimpleState)
+    graph.add_node("double", _e2e_double_node)
+    graph.add_edge(START, "double")
+    graph.add_edge("double", END)
+    return graph.compile()
+
+
+# Module-level workflow definitions for e2e tests
+# Using sandboxed=False because langgraph imports aren't sandbox-compatible
+@workflow.defn(sandboxed=False)
+class E2ESimpleGraphWorkflow:
+    """Simple workflow for e2e testing."""
+
+    @workflow.run
+    async def run(self, input_value: int) -> dict:
+        app = lg_compile("e2e_simple")
+        return await app.ainvoke({"value": input_value})
+
+
+@workflow.defn(sandboxed=False)
+class E2EApprovalWorkflow:
+    """Workflow with interrupt for e2e testing."""
+
+    def __init__(self):
+        self._approval_response: dict | None = None
+        self._interrupt_value: Any = None
+
+    @workflow.signal
+    def provide_approval(self, response: dict) -> None:
+        self._approval_response = response
+
+    @workflow.query
+    def get_interrupt_value(self) -> Any:
+        return self._interrupt_value
+
+    @workflow.run
+    async def run(self, input_value: int) -> dict:
+        app = lg_compile("e2e_approval")
+
+        # First invocation - should hit interrupt
+        result = await app.ainvoke({"value": input_value})
+
+        # Check for interrupt
+        if "__interrupt__" in result:
+            self._interrupt_value = result["__interrupt__"][0].value
+
+            # Wait for signal with approval
+            await workflow.wait_condition(
+                lambda: self._approval_response is not None
+            )
+
+            # Resume with the approval response
+            result = await app.ainvoke(Command(resume=self._approval_response))
+
+        return result
+
+
+@workflow.defn(sandboxed=False)
+class E2ERejectionWorkflow:
+    """Workflow for testing interrupt rejection."""
+
+    def __init__(self):
+        self._approval_response: dict | None = None
+
+    @workflow.signal
+    def provide_approval(self, response: dict) -> None:
+        self._approval_response = response
+
+    @workflow.run
+    async def run(self, input_value: int) -> dict:
+        app = lg_compile("e2e_approval_reject")
+
+        result = await app.ainvoke({"value": input_value})
+
+        if "__interrupt__" in result:
+            await workflow.wait_condition(
+                lambda: self._approval_response is not None
+            )
+            result = await app.ainvoke(Command(resume=self._approval_response))
+
+        return result
+
+
+class TestE2EWorkflows:
+    """End-to-end tests with real Temporal worker."""
+
+    @pytest.mark.asyncio
+    async def test_simple_graph_execution(self, client: Client) -> None:
+        """Test basic graph execution without interrupts."""
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from tests.helpers import new_worker
+
+        # Clear registry to avoid conflicts
+        get_global_registry().clear()
+
+        # Create plugin with the graph
+        plugin = LangGraphPlugin(
+            graphs={"e2e_simple": build_e2e_simple_graph},
+            default_activity_timeout=timedelta(seconds=30),
+        )
+
+        # Apply plugin to client
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
+
+        # Run workflow (plugin is already applied to client)
+        async with new_worker(
+            plugin_client,
+            E2ESimpleGraphWorkflow,
+        ) as worker:
+            result = await plugin_client.execute_workflow(
+                E2ESimpleGraphWorkflow.run,
+                21,
+                id=f"e2e-simple-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+
+            assert result["result"] == 42
+
+    @pytest.mark.asyncio
+    async def test_interrupt_and_resume_with_signal(self, client: Client) -> None:
+        """Test interrupt flow with signal-based resume."""
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from tests.helpers import new_worker
+        import asyncio
+
+        # Clear registry to avoid conflicts
+        get_global_registry().clear()
+
+        # Create plugin with the approval graph
+        plugin = LangGraphPlugin(
+            graphs={"e2e_approval": build_e2e_approval_graph},
+            default_activity_timeout=timedelta(seconds=30),
+        )
+
+        # Apply plugin to client
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
+
+        # Run workflow (plugin is already applied to client)
+        async with new_worker(
+            plugin_client,
+            E2EApprovalWorkflow,
+        ) as worker:
+            # Start workflow
+            handle = await plugin_client.start_workflow(
+                E2EApprovalWorkflow.run,
+                42,
+                id=f"e2e-approval-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=60),
+            )
+
+            # Wait a bit for the workflow to reach the interrupt
+            await asyncio.sleep(1)
+
+            # Query the interrupt value
+            interrupt_value = await handle.query(E2EApprovalWorkflow.get_interrupt_value)
+            assert interrupt_value is not None
+            assert interrupt_value["question"] == "Do you approve this value?"
+            assert interrupt_value["current_value"] == 42
+
+            # Send approval signal
+            await handle.signal(
+                E2EApprovalWorkflow.provide_approval,
+                {"approved": True, "reason": "Looks good!"},
+            )
+
+            # Wait for workflow completion
+            result = await handle.result()
+
+            # Value should be doubled (42 * 2 = 84)
+            assert result["value"] == 84
+            assert result["approved"] is True
+            assert result["approval_reason"] == "Looks good!"
+
+    @pytest.mark.asyncio
+    async def test_interrupt_with_rejection(self, client: Client) -> None:
+        """Test interrupt flow where approval is rejected."""
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from tests.helpers import new_worker
+        import asyncio
+
+        # Clear registry to avoid conflicts
+        get_global_registry().clear()
+
+        # Create plugin with the approval graph
+        plugin = LangGraphPlugin(
+            graphs={"e2e_approval_reject": build_e2e_approval_graph},
+            default_activity_timeout=timedelta(seconds=30),
+        )
+
+        # Apply plugin to client
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
+
+        # Run workflow (plugin is already applied to client)
+        async with new_worker(
+            plugin_client,
+            E2ERejectionWorkflow,
+        ) as worker:
+            handle = await plugin_client.start_workflow(
+                E2ERejectionWorkflow.run,
+                100,
+                id=f"e2e-reject-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=60),
+            )
+
+            await asyncio.sleep(1)
+
+            # Reject the approval
+            await handle.signal(
+                E2ERejectionWorkflow.provide_approval,
+                {"approved": False, "reason": "Not approved"},
+            )
+
+            result = await handle.result()
+
+            # Value should be 0 (rejected)
+            assert result["value"] == 0
+            assert result["approved"] is False

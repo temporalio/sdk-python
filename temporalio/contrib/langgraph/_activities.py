@@ -17,6 +17,7 @@ from temporalio import activity
 from temporalio.contrib.langgraph._graph_registry import get_graph
 from temporalio.contrib.langgraph._models import (
     ChannelWrite,
+    InterruptValue,
     NodeActivityInput,
     NodeActivityOutput,
 )
@@ -26,10 +27,17 @@ if TYPE_CHECKING:
 
 # Import CONFIG_KEY_SEND and CONFIG_KEY_READ for Pregel context injection
 # CONFIG_KEY_SEND is for write capture, CONFIG_KEY_READ is for state reading
+# CONFIG_KEY_SCRATCHPAD is needed for interrupt() to work
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     from langgraph.constants import CONFIG_KEY_SEND
-    from langgraph._internal._constants import CONFIG_KEY_READ
+    from langgraph._internal._constants import (
+        CONFIG_KEY_CHECKPOINT_NS,
+        CONFIG_KEY_READ,
+        CONFIG_KEY_SCRATCHPAD,
+    )
+    from langgraph._internal._scratchpad import PregelScratchpad
+    from langgraph.errors import GraphInterrupt as LangGraphInterrupt
 
 
 @activity.defn(name="execute_langgraph_node")
@@ -115,13 +123,54 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
     # Build config with Pregel context callbacks injected
     # CONFIG_KEY_SEND is REQUIRED for capturing writes
     # CONFIG_KEY_READ is REQUIRED for conditional edges and state reading
+    # CONFIG_KEY_SCRATCHPAD is REQUIRED for interrupt() to work
+    #
+    # PregelScratchpad tracks interrupt state:
+    # - resume: list of resume values (consumed in order by interrupt() calls)
+    # - interrupt_counter: returns index of current interrupt
+    # - get_null_resume: returns None or raises for missing resume values
+    #
+    # When resuming, we provide the resume value in the resume list.
+    # interrupt() will pop from this list and return the value instead of raising.
+    resume_values: list[Any] = []
+    if input_data.resume_value is not None:
+        resume_values = [input_data.resume_value]
+
+    # Track interrupt index for matching resume values to interrupts
+    interrupt_idx = 0
+
+    def interrupt_counter() -> int:
+        nonlocal interrupt_idx
+        idx = interrupt_idx
+        interrupt_idx += 1
+        return idx
+
+    def get_null_resume(consume: bool) -> Any:
+        # Called when interrupt() doesn't have a resume value
+        # Return None to signal no resume value available
+        return None
+
+    scratchpad = PregelScratchpad(
+        step=0,
+        stop=1,
+        call_counter=lambda: 0,
+        interrupt_counter=interrupt_counter,
+        get_null_resume=get_null_resume,
+        resume=resume_values,
+        subgraph_counter=lambda: 0,
+    )
+
+    configurable: dict[str, Any] = {
+        **input_data.config.get("configurable", {}),
+        CONFIG_KEY_SEND: writes.extend,  # Callback to capture writes
+        CONFIG_KEY_READ: read_state,  # Callback to read state
+        CONFIG_KEY_SCRATCHPAD: scratchpad,  # Scratchpad for interrupt handling
+        CONFIG_KEY_CHECKPOINT_NS: "",  # Namespace for checkpointing (used by interrupt)
+    }
+
     config: dict[str, Any] = {
         **input_data.config,
-        "configurable": {
-            **input_data.config.get("configurable", {}),
-            CONFIG_KEY_SEND: writes.extend,  # Callback to capture writes
-            CONFIG_KEY_READ: read_state,  # Callback to read state
-        },
+        "configurable": configurable,
     }
 
     # Send heartbeat indicating execution start
@@ -145,6 +194,33 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
             result = await node_runnable.ainvoke(input_data.input_state, runnable_config)
         else:
             result = node_runnable.invoke(input_data.input_state, runnable_config)
+    except LangGraphInterrupt as e:
+        # Node called interrupt() - return interrupt data instead of writes
+        activity.heartbeat(
+            {
+                "node": input_data.node_name,
+                "task_id": input_data.task_id,
+                "graph_id": input_data.graph_id,
+                "status": "interrupted",
+            }
+        )
+        # Extract the value passed to interrupt()
+        # GraphInterrupt contains a tuple of Interrupt objects in args[0]
+        # Each Interrupt has a .value attribute with the actual interrupt value
+        interrupt_value = None
+        if e.args and len(e.args) > 0:
+            interrupts = e.args[0]
+            if interrupts and len(interrupts) > 0:
+                # Get the value from the first Interrupt object
+                interrupt_value = interrupts[0].value
+        return NodeActivityOutput(
+            writes=[],
+            interrupt=InterruptValue(
+                value=interrupt_value,
+                node_name=input_data.node_name,
+                task_id=input_data.task_id,
+            ),
+        )
     except Exception:
         # Send heartbeat indicating failure before re-raising
         activity.heartbeat(

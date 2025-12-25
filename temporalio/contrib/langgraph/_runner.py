@@ -21,6 +21,7 @@ with workflow.unsafe.imports_passed_through():
     from temporalio.contrib.langgraph._activities import execute_node
 
 from temporalio.contrib.langgraph._models import (
+    InterruptValue,
     NodeActivityInput,
 )
 
@@ -43,7 +44,13 @@ class TemporalLangGraphRunner:
     - Handles task scheduling based on graph topology
     - Routes node execution to Temporal activities
 
-    Example:
+    Human-in-the-Loop Support:
+        When a node calls LangGraph's interrupt() function, ainvoke() returns
+        a result dict containing '__interrupt__' key with the interrupt info.
+        This matches LangGraph's native API. To resume, call ainvoke() with
+        Command(resume=value).
+
+    Example (basic):
         >>> from temporalio.contrib.langgraph import compile
         >>>
         >>> @workflow.defn
@@ -52,6 +59,39 @@ class TemporalLangGraphRunner:
         ...     async def run(self, graph_id: str, input_data: dict):
         ...         app = compile(graph_id)
         ...         return await app.ainvoke(input_data)
+
+    Example (with interrupts - LangGraph native API):
+        >>> from temporalio.contrib.langgraph import compile
+        >>> from langgraph.types import Command
+        >>>
+        >>> @workflow.defn
+        >>> class MyWorkflow:
+        ...     def __init__(self):
+        ...         self._human_response = None
+        ...
+        ...     @workflow.signal
+        ...     def provide_input(self, value: str):
+        ...         self._human_response = value
+        ...
+        ...     @workflow.run
+        ...     async def run(self, input_data: dict):
+        ...         app = compile("my_graph")
+        ...         result = await app.ainvoke(input_data)
+        ...
+        ...         # Check for interrupt (same as native LangGraph API)
+        ...         if '__interrupt__' in result:
+        ...             interrupt_info = result['__interrupt__'][0]
+        ...             # interrupt_info.value contains data from interrupt()
+        ...
+        ...             # Wait for human input via signal
+        ...             await workflow.wait_condition(
+        ...                 lambda: self._human_response is not None
+        ...             )
+        ...
+        ...             # Resume using LangGraph's Command API
+        ...             result = await app.ainvoke(Command(resume=self._human_response))
+        ...
+        ...         return result
     """
 
     def __init__(
@@ -91,10 +131,17 @@ class TemporalLangGraphRunner:
         self.default_task_queue = default_task_queue
         self.enable_workflow_execution = enable_workflow_execution
         self._step_counter = 0
+        # State for interrupt handling
+        self._interrupted_state: Optional[dict[str, Any]] = None
+        self._interrupted_node_name: Optional[str] = None  # Track which node interrupted
+        self._resume_value: Optional[Any] = None
+        self._resume_used: bool = False
+        # Pending interrupt from current execution (set by _execute_as_activity)
+        self._pending_interrupt: Optional[InterruptValue] = None
 
     async def ainvoke(
         self,
-        input_state: dict[str, Any],
+        input_state: dict[str, Any] | Any,
         config: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
         """Execute the graph asynchronously.
@@ -103,16 +150,59 @@ class TemporalLangGraphRunner:
         graph traversal, executing each node as a Temporal activity.
 
         Args:
-            input_state: The initial state to pass to the graph.
+            input_state: The initial state to pass to the graph, OR a
+                Command(resume=value) to resume after an interrupt.
+                When resuming with Command, the state from the previous
+                interrupt will be used.
             config: Optional configuration for the execution.
 
         Returns:
-            The final state after graph execution.
+            The final state after graph execution. If a node called
+            interrupt(), the result will contain '__interrupt__' key
+            with a list of Interrupt objects (matching LangGraph's
+            native API).
+
+        Example (basic):
+            >>> result = await app.ainvoke({"messages": [HumanMessage(content="Hi")]})
+
+        Example (handling interrupt - LangGraph native API):
+            >>> from langgraph.types import Command
+            >>>
+            >>> result = await app.ainvoke(initial_state)
+            >>> if '__interrupt__' in result:
+            ...     # result['__interrupt__'][0].value has the interrupt data
+            ...     # Get human input...
+            ...     result = await app.ainvoke(Command(resume=human_input))
         """
+        # Import Command here to check type
+        with workflow.unsafe.imports_passed_through():
+            from langgraph.types import Command
+
+        # Track resume state for this invocation
+        resume_value: Optional[Any] = None
+
+        # Check if input is a Command with resume value (LangGraph API)
+        if isinstance(input_state, Command):
+            if hasattr(input_state, "resume") and input_state.resume is not None:
+                resume_value = input_state.resume
+            # When resuming, use the state from the last interrupt
+            if self._interrupted_state is None:
+                raise ValueError(
+                    "Cannot resume with Command - no previous interrupt state. "
+                    "Call ainvoke() first and check for '__interrupt__' in the result."
+                )
+            input_state = self._interrupted_state
+
+        self._resume_value = resume_value
+        self._resume_used = False
+        # Reset pending interrupt for this invocation
+        self._pending_interrupt = None
+
         # Import here to avoid workflow sandbox issues
         with workflow.unsafe.imports_passed_through():
             from langgraph.pregel._loop import AsyncPregelLoop
             from langgraph.pregel._io import read_channels
+            from langgraph.types import Interrupt
 
         config = config or {}
 
@@ -153,33 +243,77 @@ class TemporalLangGraphRunner:
 
                 # Execute all tasks in parallel (BSP model allows parallelism
                 # within a tick, we just need to wait for all before after_tick)
-                await asyncio.gather(*[
+                # Collect results to check for interrupts
+                results = await asyncio.gather(*[
                     self._execute_task(task, loop) for task in tasks_to_execute
                 ])
+
+                # Check if any task was interrupted
+                if not all(results):
+                    # An interrupt occurred - break the loop
+                    break
 
                 # Process writes and advance to next step
                 loop.after_tick()
 
-        # Return final output (set by loop.__aexit__)
-        return cast("dict[str, Any]", loop.output)
+        # Get the output from the loop
+        output = cast("dict[str, Any]", loop.output) if loop.output else {}
 
-    async def _execute_task(self, task: PregelExecutableTask, loop: Any) -> None:
+        # If there's a pending interrupt, add it to the result (LangGraph native API)
+        if self._pending_interrupt is not None:
+            # Create LangGraph Interrupt object to match native API
+            interrupt_obj = Interrupt.from_ns(
+                value=self._pending_interrupt.value,
+                ns="",  # Empty namespace since we don't use checkpointing
+            )
+            # Merge with any existing state in output
+            output = {**output, "__interrupt__": [interrupt_obj]}
+
+        return output
+
+    async def _execute_task(self, task: PregelExecutableTask, loop: Any) -> bool:
         """Execute a single task, either in workflow or as activity.
 
         Args:
             task: The Pregel task to execute.
             loop: The AsyncPregelLoop instance for recording writes.
+
+        Returns:
+            True if execution should continue, False if an interrupt occurred.
         """
+        # Determine if this task should receive the resume value
+        # Only pass resume value to the specific node that was interrupted
+        resume_for_task = None
+        if (
+            self._resume_value is not None
+            and not self._resume_used
+            and self._interrupted_node_name == task.name
+        ):
+            # This is the node that was interrupted - pass the resume value
+            resume_for_task = self._resume_value
+
         if self._should_run_in_workflow(task.name):
             # Execute directly in workflow (for deterministic operations)
+            # Note: workflow execution doesn't support interrupts currently
             writes = await self._execute_in_workflow(task)
         else:
             # Execute as activity
-            writes = await self._execute_as_activity(task)
+            writes = await self._execute_as_activity(task, resume_for_task)
+
+        # Check if an interrupt occurred
+        if self._pending_interrupt is not None:
+            # The task interrupted - don't mark resume as used
+            return False
+
+        # If we provided a resume value and the task completed successfully,
+        # it means the task consumed the resume value (interrupt() returned it)
+        if resume_for_task is not None:
+            self._resume_used = True
 
         # Record writes to the loop
         # This is how activity results flow back into the Pregel state
         task.writes.extend(writes)
+        return True
 
     def _should_run_in_workflow(self, node_name: str) -> bool:
         """Check if a node should run directly in the workflow.
@@ -247,14 +381,19 @@ class TemporalLangGraphRunner:
     async def _execute_as_activity(
         self,
         task: PregelExecutableTask,
+        resume_value: Optional[Any] = None,
     ) -> list[tuple[str, Any]]:
         """Execute a task as a Temporal activity.
 
         Args:
             task: The task to execute.
+            resume_value: If provided, passed to the activity to resume
+                an interrupted node. The node's interrupt() call will
+                return this value instead of raising.
 
         Returns:
             List of (channel, value) tuples representing the writes.
+            If the node called interrupt(), _pending_interrupt will be set.
         """
         self._step_counter += 1
 
@@ -267,6 +406,7 @@ class TemporalLangGraphRunner:
             config=self._filter_config(cast("dict[str, Any]", task.config)),
             path=cast("tuple[str | int, ...]", task.path),
             triggers=list(task.triggers) if task.triggers else [],
+            resume_value=resume_value,
         )
 
         # Get node-specific configuration
@@ -284,6 +424,17 @@ class TemporalLangGraphRunner:
             retry_policy=retry_policy,
             heartbeat_timeout=heartbeat_timeout,
         )
+
+        # Check if the node raised an interrupt
+        if result.interrupt is not None:
+            # Save state for resume - use task input as the state at interrupt
+            self._interrupted_state = cast("dict[str, Any]", task.input)
+            # Save which node interrupted so we can pass resume value to it
+            self._interrupted_node_name = task.name
+            # Store the interrupt for the caller to handle
+            self._pending_interrupt = result.interrupt
+            # Return empty writes - the interrupt stops further execution
+            return []
 
         # Convert ChannelWrite objects to tuples
         return result.to_write_tuples()
