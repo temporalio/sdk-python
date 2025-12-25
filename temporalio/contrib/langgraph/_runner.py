@@ -131,6 +131,8 @@ class TemporalLangGraphRunner:
         self.default_task_queue = default_task_queue
         self.enable_workflow_execution = enable_workflow_execution
         self._step_counter = 0
+        # Track invocation number for unique activity IDs across replays
+        self._invocation_counter = 0
         # State for interrupt handling
         self._interrupted_state: Optional[dict[str, Any]] = None
         self._interrupted_node_name: Optional[str] = None  # Track which node interrupted
@@ -138,6 +140,13 @@ class TemporalLangGraphRunner:
         self._resume_used: bool = False
         # Pending interrupt from current execution (set by _execute_as_activity)
         self._pending_interrupt: Optional[InterruptValue] = None
+        # Track nodes completed in current resume cycle (to avoid re-execution)
+        self._completed_nodes_in_cycle: set[str] = set()
+        # Cached writes from resumed nodes (injected into tasks to trigger successors)
+        self._resumed_node_writes: dict[str, list[tuple[str, Any]]] = {}
+        # In-memory checkpointer for tracking graph execution state
+        self._checkpointer: Optional[Any] = None
+        self._thread_id: str = "temporal-runner"
 
     async def ainvoke(
         self,
@@ -182,7 +191,9 @@ class TemporalLangGraphRunner:
         resume_value: Optional[Any] = None
 
         # Check if input is a Command with resume value (LangGraph API)
+        is_resume = False
         if isinstance(input_state, Command):
+            is_resume = True
             if hasattr(input_state, "resume") and input_state.resume is not None:
                 resume_value = input_state.resume
             # When resuming, use the state from the last interrupt
@@ -192,11 +203,18 @@ class TemporalLangGraphRunner:
                     "Call ainvoke() first and check for '__interrupt__' in the result."
                 )
             input_state = self._interrupted_state
+        else:
+            # Fresh invocation - clear completed nodes tracking
+            self._completed_nodes_in_cycle.clear()
 
         self._resume_value = resume_value
         self._resume_used = False
         # Reset pending interrupt for this invocation
         self._pending_interrupt = None
+        # Increment invocation counter for unique activity IDs
+        self._invocation_counter += 1
+        # Reset step counter for this invocation
+        self._step_counter = 0
 
         # Import here to avoid workflow sandbox issues
         with workflow.unsafe.imports_passed_through():
@@ -211,6 +229,42 @@ class TemporalLangGraphRunner:
             config["configurable"] = {}
         if "recursion_limit" not in config:
             config["recursion_limit"] = 25
+
+        # Handle resume case: execute the interrupted node first and cache its writes
+        # The cached writes will be injected when the loop schedules this node,
+        # allowing the trigger mechanism to work for successor nodes
+        if is_resume and self._interrupted_node_name:
+            interrupted_node = self._interrupted_node_name
+            resume_writes = await self._execute_resumed_node(
+                interrupted_node, input_state, config
+            )
+            if self._pending_interrupt is not None:
+                # Node interrupted again - return immediately
+                interrupt_obj = Interrupt.from_ns(
+                    value=self._pending_interrupt.value,
+                    ns="",
+                )
+                return {**input_state, "__interrupt__": [interrupt_obj]}
+
+            # Merge the resumed node's writes into input_state
+            # This ensures the writes are part of the final output even if the loop
+            # doesn't schedule the resumed node (e.g., when it's the last node)
+            for channel, value in resume_writes:
+                input_state[channel] = value
+
+            # Cache the writes for the trigger mechanism
+            self._resumed_node_writes[interrupted_node] = resume_writes
+            # ADD the resumed node to completed nodes (don't reset!)
+            # This preserves knowledge of previously completed nodes across invocations,
+            # preventing them from re-running when the graph continues.
+            # We do need __start__ to run again to trigger the graph traversal,
+            # but step1 (and other completed user nodes) should be skipped.
+            # Remove __start__ from completed to allow it to run again.
+            self._completed_nodes_in_cycle.discard("__start__")
+            # Add the interrupted node to completed (it just ran via _execute_resumed_node)
+            self._completed_nodes_in_cycle.add(interrupted_node)
+            # Clear interrupted node since we've handled it
+            self._interrupted_node_name = None
 
         # Create AsyncPregelLoop with all required parameters
         # Cast config to RunnableConfig for type checking
@@ -230,31 +284,58 @@ class TemporalLangGraphRunner:
             stream_keys=getattr(self.pregel, "stream_channels_asis", None) or [],
         )
 
-        # Use direct async with to ensure __aexit__ sets loop.output
-        async with loop:
-            # Execute the Pregel loop
+        # Execute the Pregel loop manually (not using async with to avoid blocking)
+        # Enter the loop context
+        await loop.__aenter__()
+        interrupted = False
+        try:
             # loop.tick() prepares the next tasks based on graph topology
             # We execute tasks and call loop.after_tick() to process writes
             while loop.tick():
+                # Inject cached writes for resumed nodes
+                # This allows the trigger mechanism to schedule successor nodes
+                for task in loop.tasks.values():
+                    if task.name in self._resumed_node_writes:
+                        cached_writes = self._resumed_node_writes.pop(task.name)
+                        task.writes.extend(cached_writes)
+
                 # Get tasks that need to be executed (those without writes)
+                # Also skip nodes that already completed in this resume cycle
+                # (prevents re-execution when resuming from interrupted state)
                 tasks_to_execute = [
-                    task for task in loop.tasks.values() if not task.writes
+                    task for task in loop.tasks.values()
+                    if not task.writes and task.name not in self._completed_nodes_in_cycle
                 ]
 
-                # Execute all tasks in parallel (BSP model allows parallelism
-                # within a tick, we just need to wait for all before after_tick)
-                # Collect results to check for interrupts
-                results = await asyncio.gather(*[
-                    self._execute_task(task, loop) for task in tasks_to_execute
-                ])
+                # If no tasks to execute (all filtered out or have cached writes),
+                # process any pending writes and continue to next tick
+                if not tasks_to_execute:
+                    loop.after_tick()
+                    continue
+
+                # Execute tasks sequentially for now (simplifies interrupt handling)
+                # TODO: Re-enable parallel execution with proper interrupt handling
+                task_interrupted = False
+                for task in tasks_to_execute:
+                    result = await self._execute_task(task, loop)
+                    if not result:
+                        task_interrupted = True
+                        break
 
                 # Check if any task was interrupted
-                if not all(results):
-                    # An interrupt occurred - break the loop
+                if task_interrupted:
+                    # An interrupt occurred - finalize writes before breaking
+                    loop.after_tick()
+                    interrupted = True
                     break
 
                 # Process writes and advance to next step
                 loop.after_tick()
+        finally:
+            # Exit the loop context only if we completed normally (not interrupted)
+            # Calling __aexit__ on interrupted loop may block indefinitely
+            if not interrupted:
+                await loop.__aexit__(None, None, None)
 
         # Get the output from the loop
         output = cast("dict[str, Any]", loop.output) if loop.output else {}
@@ -304,6 +385,9 @@ class TemporalLangGraphRunner:
         if self._pending_interrupt is not None:
             # The task interrupted - don't mark resume as used
             return False
+
+        # Task completed successfully - track it to prevent re-execution
+        self._completed_nodes_in_cycle.add(task.name)
 
         # If we provided a resume value and the task completed successfully,
         # it means the task consumed the resume value (interrupt() returned it)
@@ -415,10 +499,23 @@ class TemporalLangGraphRunner:
         retry_policy = self._get_node_retry_policy(task.name)
         heartbeat_timeout = self._get_node_heartbeat_timeout(task.name)
 
+        # Generate unique activity ID to prevent replay confusion
+        # When resuming, the activity input differs (has resume_value), but Temporal
+        # matches activities by type+position in code, not input. Using a unique ID
+        # based on invocation ID, step counter, and node name ensures each
+        # execution is distinct, even across workflow replays.
+        # Prefer invocation_id from config (workflow-controlled) over internal counter.
+        config_dict = cast("dict[str, Any]", task.config)
+        invocation_id = config_dict.get("configurable", {}).get(
+            "invocation_id", self._invocation_counter
+        )
+        activity_id = f"inv{invocation_id}-{task.name}-{self._step_counter}"
+
         # Execute activity
         result = await workflow.execute_activity(
             execute_node,
             activity_input,
+            activity_id=activity_id,
             start_to_close_timeout=timeout,
             task_queue=task_queue,
             retry_policy=retry_policy,
@@ -435,6 +532,78 @@ class TemporalLangGraphRunner:
             self._pending_interrupt = result.interrupt
             # Return empty writes - the interrupt stops further execution
             return []
+
+        # Convert ChannelWrite objects to tuples
+        return result.to_write_tuples()
+
+    async def _execute_resumed_node(
+        self,
+        node_name: str,
+        input_state: dict[str, Any],
+        config: dict[str, Any],
+    ) -> list[tuple[str, Any]]:
+        """Execute the interrupted node with the resume value.
+
+        This method directly executes the node that was interrupted, bypassing
+        the AsyncPregelLoop's task scheduling. This is necessary because the
+        loop doesn't know which nodes already ran without a checkpointer.
+
+        Args:
+            node_name: The name of the interrupted node.
+            input_state: The state at the time of interrupt.
+            config: Configuration for the execution.
+
+        Returns:
+            List of (channel, value) tuples representing the writes.
+            If the node interrupts again, _pending_interrupt will be set.
+        """
+        self._step_counter += 1
+
+        # Build activity input with resume value
+        activity_input = NodeActivityInput(
+            node_name=node_name,
+            task_id=f"resume-{node_name}-{self._invocation_counter}",
+            graph_id=self.graph_id,
+            input_state=input_state,
+            config=self._filter_config(config),
+            path=tuple(),
+            triggers=[],
+            resume_value=self._resume_value,
+        )
+
+        # Get node-specific configuration
+        timeout = self._get_node_timeout(node_name)
+        task_queue = self._get_node_task_queue(node_name)
+        retry_policy = self._get_node_retry_policy(node_name)
+        heartbeat_timeout = self._get_node_heartbeat_timeout(node_name)
+
+        # Generate unique activity ID
+        invocation_id = config.get("configurable", {}).get(
+            "invocation_id", self._invocation_counter
+        )
+        activity_id = f"inv{invocation_id}-resume-{node_name}-{self._step_counter}"
+
+        # Execute activity
+        result = await workflow.execute_activity(
+            execute_node,
+            activity_input,
+            activity_id=activity_id,
+            start_to_close_timeout=timeout,
+            task_queue=task_queue,
+            retry_policy=retry_policy,
+            heartbeat_timeout=heartbeat_timeout,
+        )
+
+        # Check if the node interrupted again
+        if result.interrupt is not None:
+            # Update interrupted state
+            self._interrupted_state = input_state
+            self._interrupted_node_name = node_name
+            self._pending_interrupt = result.interrupt
+            return []
+
+        # Mark resume as consumed
+        self._resume_used = True
 
         # Convert ChannelWrite objects to tuples
         return result.to_write_tuples()

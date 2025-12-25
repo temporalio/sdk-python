@@ -136,7 +136,7 @@ class TestGraphRegistry:
 
         def build_graph():
             graph = StateGraph(State)
-            graph.add_node("node", lambda s: {"value": 1})
+            graph.add_node("node", lambda state: {"value": 1})
             graph.add_edge(START, "node")
             graph.add_edge("node", END)
             return graph.compile()
@@ -178,8 +178,8 @@ class TestGraphRegistry:
         class State(TypedDict, total=False):
             value: int
 
-        def my_node(s: State) -> State:
-            return {"value": s.get("value", 0) + 1}
+        def my_node(state: State) -> State:
+            return {"value": state.get("value", 0) + 1}
 
         def build_graph():
             graph = StateGraph(State)
@@ -233,7 +233,7 @@ class TestLangGraphPlugin:
 
         def build_test_graph():
             graph = StateGraph(State)
-            graph.add_node("node", lambda s: {"value": 1})
+            graph.add_node("node", lambda state: {"value": 1})
             graph.add_edge(START, "node")
             graph.add_edge("node", END)
             return graph.compile()
@@ -356,7 +356,7 @@ class TestCompileFunction:
 
         def build_compile_test():
             graph = StateGraph(State)
-            graph.add_node("node", lambda s: {"value": 1})
+            graph.add_node("node", lambda state: {"value": 1})
             graph.add_edge(START, "node")
             graph.add_edge("node", END)
             return graph.compile()
@@ -391,7 +391,7 @@ class TestCompileFunction:
 
         def build():
             graph = StateGraph(State)
-            graph.add_node("node", lambda s: {"value": 1})
+            graph.add_node("node", lambda state: {"value": 1})
             graph.add_edge(START, "node")
             graph.add_edge("node", END)
             return graph.compile()
@@ -530,7 +530,7 @@ class TestNodeExecutionActivity:
 
         def build():
             graph = StateGraph(State)
-            graph.add_node("real_node", lambda s: {"value": 1})
+            graph.add_node("real_node", lambda state: {"value": 1})
             graph.add_edge(START, "real_node")
             graph.add_edge("real_node", END)
             return graph.compile()
@@ -574,12 +574,12 @@ class TestPerNodeConfiguration:
             graph = StateGraph(State)
             graph.add_node(
                 "slow_node",
-                lambda s: {"value": 1},
+                lambda state: {"value": 1},
                 metadata={"temporal": {"activity_timeout": timedelta(hours=2)}},
             )
             graph.add_node(
                 "fast_node",
-                lambda s: {"value": 2},
+                lambda state: {"value": 2},
                 # No metadata - should use default
             )
             graph.add_edge(START, "slow_node")
@@ -615,12 +615,12 @@ class TestPerNodeConfiguration:
             graph = StateGraph(State)
             graph.add_node(
                 "gpu_node",
-                lambda s: {"value": 1},
+                lambda state: {"value": 1},
                 metadata={"temporal": {"task_queue": "gpu-workers"}},
             )
             graph.add_node(
                 "cpu_node",
-                lambda s: {"value": 2},
+                lambda state: {"value": 2},
             )
             graph.add_edge(START, "gpu_node")
             graph.add_edge("gpu_node", "cpu_node")
@@ -656,7 +656,7 @@ class TestPerNodeConfiguration:
             graph = StateGraph(State)
             graph.add_node(
                 "flaky_node",
-                lambda s: {"value": 1},
+                lambda state: {"value": 1},
                 retry_policy=LGRetryPolicy(
                     max_attempts=5,
                     initial_interval=2.0,
@@ -666,7 +666,7 @@ class TestPerNodeConfiguration:
             )
             graph.add_node(
                 "reliable_node",
-                lambda s: {"value": 2},
+                lambda state: {"value": 2},
             )
             graph.add_edge(START, "flaky_node")
             graph.add_edge("flaky_node", "reliable_node")
@@ -708,7 +708,7 @@ class TestPerNodeConfiguration:
             graph = StateGraph(State)
             graph.add_node(
                 "long_running",
-                lambda s: {"value": 1},
+                lambda state: {"value": 1},
                 metadata={
                     "temporal": {
                         "activity_timeout": timedelta(hours=1),
@@ -718,7 +718,7 @@ class TestPerNodeConfiguration:
             )
             graph.add_node(
                 "short_running",
-                lambda s: {"value": 2},
+                lambda state: {"value": 2},
             )
             graph.add_edge(START, "long_running")
             graph.add_edge("long_running", "short_running")
@@ -912,7 +912,7 @@ class TestInterruptHandling:
 
         def build():
             graph = StateGraph(State)
-            graph.add_node("node", lambda s: {"value": 1})
+            graph.add_node("node", lambda state: {"value": 1})
             graph.add_edge(START, "node")
             graph.add_edge("node", END)
             return graph.compile()
@@ -940,7 +940,7 @@ class TestInterruptHandling:
 
         def build():
             graph = StateGraph(State)
-            graph.add_node("node", lambda s: {"value": 1})
+            graph.add_node("node", lambda state: {"value": 1})
             graph.add_edge(START, "node")
             graph.add_edge("node", END)
             return graph.compile()
