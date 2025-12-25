@@ -1,46 +1,51 @@
 """Pydantic models for LangGraph-Temporal integration.
 
 These models handle serialization of node activity inputs and outputs,
-with special handling for LangChain message types.
+with proper type handling for LangChain message types via Pydantic's
+discriminated unions.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Annotated, Any, Union
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, BeforeValidator, ConfigDict
+
+if TYPE_CHECKING:
+    from langchain_core.messages import AnyMessage
 
 
-def _reconstruct_message(data: dict[str, Any]) -> Any:
-    """Reconstruct a LangChain message from a serialized dict.
+def _coerce_to_message(value: Any) -> Any:
+    """Coerce a dict to a LangChain message if it looks like one.
 
-    LangChain messages include a 'type' field that identifies the message class.
+    This validator enables automatic deserialization of LangChain messages
+    when they are stored in dict[str, Any] fields.
     """
-    from langchain_core.messages import (
-        AIMessage,
-        FunctionMessage,
-        HumanMessage,
-        SystemMessage,
-        ToolMessage,
-    )
+    if isinstance(value, dict) and "type" in value:
+        msg_type = value.get("type")
+        if msg_type in ("human", "ai", "system", "function", "tool",
+                        "HumanMessageChunk", "AIMessageChunk", "SystemMessageChunk",
+                        "FunctionMessageChunk", "ToolMessageChunk", "chat", "ChatMessageChunk"):
+            # Use LangChain's AnyMessage type adapter to deserialize
+            from langchain_core.messages import AnyMessage
+            from pydantic import TypeAdapter
+            return TypeAdapter(AnyMessage).validate_python(value)
+    return value
 
-    message_type = data.get("type", "")
-    message_map: dict[str, type] = {
-        "human": HumanMessage,
-        "ai": AIMessage,
-        "system": SystemMessage,
-        "function": FunctionMessage,
-        "tool": ToolMessage,
-    }
 
-    message_class = message_map.get(message_type)
-    if message_class:
-        # Remove 'type' field as it's not a constructor argument
-        data_copy = {k: v for k, v in data.items() if k != "type"}
-        return message_class(**data_copy)
+def _coerce_state_values(state: dict[str, Any]) -> dict[str, Any]:
+    """Coerce state dict values, converting message dicts to proper types."""
+    result: dict[str, Any] = {}
+    for key, value in state.items():
+        if isinstance(value, list):
+            result[key] = [_coerce_to_message(item) for item in value]
+        else:
+            result[key] = _coerce_to_message(value)
+    return result
 
-    # Return as-is if unknown type
-    return data
+
+# Type alias for state dict with automatic message coercion
+LangGraphState = Annotated[dict[str, Any], BeforeValidator(_coerce_state_values)]
 
 
 def _is_langchain_message(value: Any) -> bool:
@@ -107,10 +112,10 @@ class ChannelWrite(BaseModel):
             The reconstructed value with proper message types.
         """
         if self.value_type == "message" and isinstance(self.value, dict):
-            return _reconstruct_message(self.value)
+            return _coerce_to_message(self.value)
         elif self.value_type == "message_list" and isinstance(self.value, list):
             return [
-                _reconstruct_message(item) if isinstance(item, dict) else item
+                _coerce_to_message(item) if isinstance(item, dict) else item
                 for item in self.value
             ]
         return self.value
@@ -145,7 +150,7 @@ class NodeActivityInput(BaseModel):
     node_name: str
     task_id: str
     graph_id: str
-    input_state: dict[str, Any]
+    input_state: LangGraphState  # Auto-coerces message dicts to LangChain messages
     config: dict[str, Any]
     path: tuple[str | int, ...]
     triggers: list[str]

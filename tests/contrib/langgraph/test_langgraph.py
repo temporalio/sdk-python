@@ -417,7 +417,7 @@ class TestNodeExecutionActivity:
         import asyncio
 
         from temporalio.contrib.langgraph import LangGraphPlugin
-        from temporalio.contrib.langgraph._activities import NodeExecutionActivity
+        from temporalio.contrib.langgraph._activities import execute_node
         from temporalio.contrib.langgraph._graph_registry import get_global_registry
         from temporalio.contrib.langgraph._models import NodeActivityInput
 
@@ -437,10 +437,7 @@ class TestNodeExecutionActivity:
             graph.add_edge("increment", END)
             return graph.compile()
 
-        plugin = LangGraphPlugin(graphs={"activity_test": build})
-
-        # Create activity instance
-        activity_instance = NodeExecutionActivity(plugin)
+        LangGraphPlugin(graphs={"activity_test": build})
 
         # Create input
         input_data = NodeActivityInput(
@@ -456,7 +453,7 @@ class TestNodeExecutionActivity:
         # Execute activity (mock activity context)
         with patch("temporalio.activity.heartbeat"):
             result = asyncio.get_event_loop().run_until_complete(
-                activity_instance.execute_node(input_data)
+                execute_node(input_data)
             )
 
         # Verify writes were captured
@@ -472,7 +469,7 @@ class TestNodeExecutionActivity:
         from langchain_core.messages import AIMessage, HumanMessage
 
         from temporalio.contrib.langgraph import LangGraphPlugin
-        from temporalio.contrib.langgraph._activities import NodeExecutionActivity
+        from temporalio.contrib.langgraph._activities import execute_node
         from temporalio.contrib.langgraph._graph_registry import get_global_registry
         from temporalio.contrib.langgraph._models import NodeActivityInput
 
@@ -491,8 +488,7 @@ class TestNodeExecutionActivity:
             graph.add_edge("agent", END)
             return graph.compile()
 
-        plugin = LangGraphPlugin(graphs={"message_test": build})
-        activity_instance = NodeExecutionActivity(plugin)
+        LangGraphPlugin(graphs={"message_test": build})
 
         input_data = NodeActivityInput(
             node_name="agent",
@@ -506,7 +502,7 @@ class TestNodeExecutionActivity:
 
         with patch("temporalio.activity.heartbeat"):
             result = asyncio.get_event_loop().run_until_complete(
-                activity_instance.execute_node(input_data)
+                execute_node(input_data)
             )
 
         # Verify message type was detected
@@ -520,7 +516,7 @@ class TestNodeExecutionActivity:
         import asyncio
 
         from temporalio.contrib.langgraph import LangGraphPlugin
-        from temporalio.contrib.langgraph._activities import NodeExecutionActivity
+        from temporalio.contrib.langgraph._activities import execute_node
         from temporalio.contrib.langgraph._graph_registry import get_global_registry
         from temporalio.contrib.langgraph._models import NodeActivityInput
 
@@ -536,8 +532,7 @@ class TestNodeExecutionActivity:
             graph.add_edge("real_node", END)
             return graph.compile()
 
-        plugin = LangGraphPlugin(graphs={"missing_node_test": build})
-        activity_instance = NodeExecutionActivity(plugin)
+        LangGraphPlugin(graphs={"missing_node_test": build})
 
         input_data = NodeActivityInput(
             node_name="nonexistent_node",
@@ -552,7 +547,7 @@ class TestNodeExecutionActivity:
         with patch("temporalio.activity.heartbeat"):
             with pytest.raises(ValueError, match="not found"):
                 asyncio.get_event_loop().run_until_complete(
-                    activity_instance.execute_node(input_data)
+                    execute_node(input_data)
                 )
 
 
@@ -659,7 +654,7 @@ class TestPerNodeConfiguration:
             graph.add_node(
                 "flaky_node",
                 lambda s: {"value": 1},
-                retry=LGRetryPolicy(
+                retry_policy=LGRetryPolicy(
                     max_attempts=5,
                     initial_interval=2.0,
                     backoff_factor=3.0,

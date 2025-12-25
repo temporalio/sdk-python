@@ -117,11 +117,9 @@ class LangGraphPlugin(SimplePlugin):
             activities: Sequence[Callable[..., Any]] | None,
         ) -> Sequence[Callable[..., Any]]:
             """Add LangGraph node execution activity."""
-            from temporalio.contrib.langgraph._activities import NodeExecutionActivity
+            from temporalio.contrib.langgraph._activities import execute_node
 
-            # Create activity instance with access to this plugin
-            node_activity = NodeExecutionActivity(self)
-            return list(activities or []) + [node_activity.execute_node]
+            return list(activities or []) + [execute_node]
 
         super().__init__(
             name="LangGraphPlugin",

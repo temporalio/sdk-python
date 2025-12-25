@@ -2,24 +2,32 @@
 
 This module provides TemporalLangGraphRunner, which wraps a compiled LangGraph
 graph and executes nodes as Temporal activities for durable execution.
+
+Architecture:
+    - The Pregel loop runs in the workflow (deterministic orchestration)
+    - Node execution is routed to Temporal activities (non-deterministic I/O)
+    - The runner uses AsyncPregelLoop for proper graph traversal and state management
 """
 
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Optional, cast
 
 from temporalio import workflow
 
+with workflow.unsafe.imports_passed_through():
+    from temporalio.contrib.langgraph._activities import execute_node
+
 from temporalio.contrib.langgraph._models import (
-    ChannelWrite,
     NodeActivityInput,
-    NodeActivityOutput,
 )
 
 if TYPE_CHECKING:
     from langchain_core.runnables import RunnableConfig
     from langgraph.pregel import Pregel
+    from langgraph.types import PregelExecutableTask
 
 
 class TemporalLangGraphRunner:
@@ -29,11 +37,11 @@ class TemporalLangGraphRunner:
     an interface similar to the standard graph, but executes nodes as
     Temporal activities for durable execution.
 
-    The runner:
-    - Executes the Pregel loop deterministically in the workflow
+    The runner uses LangGraph's AsyncPregelLoop for proper graph orchestration:
+    - Evaluates conditional edges
+    - Manages state channels
+    - Handles task scheduling based on graph topology
     - Routes node execution to Temporal activities
-    - Captures node outputs and applies them to state
-    - Handles retries and timeouts via Temporal
 
     Example:
         >>> from temporalio.contrib.langgraph import compile
@@ -91,8 +99,8 @@ class TemporalLangGraphRunner:
     ) -> dict[str, Any]:
         """Execute the graph asynchronously.
 
-        This method runs the Pregel loop, executing each node as a
-        Temporal activity and collecting the results.
+        This method runs the Pregel loop using AsyncPregelLoop for proper
+        graph traversal, executing each node as a Temporal activity.
 
         Args:
             input_state: The initial state to pass to the graph.
@@ -101,31 +109,75 @@ class TemporalLangGraphRunner:
         Returns:
             The final state after graph execution.
         """
+        # Import here to avoid workflow sandbox issues
+        with workflow.unsafe.imports_passed_through():
+            from langgraph.pregel._loop import AsyncPregelLoop
+            from langgraph.pregel._io import read_channels
+
         config = config or {}
 
-        # Initialize state with input
-        state = dict(input_state)
+        # Ensure config has required structure
+        if "configurable" not in config:
+            config["configurable"] = {}
+        if "recursion_limit" not in config:
+            config["recursion_limit"] = 25
 
-        # Get the graph structure
-        nodes = self.pregel.nodes
+        # Create AsyncPregelLoop with all required parameters
+        # Cast config to RunnableConfig for type checking
+        loop = AsyncPregelLoop(
+            input=input_state,
+            stream=None,  # No streaming for now
+            config=cast("RunnableConfig", config),
+            store=getattr(self.pregel, "store", None),
+            cache=getattr(self.pregel, "cache", None),
+            checkpointer=None,  # Use Temporal's event history instead
+            nodes=self.pregel.nodes,
+            specs=self.pregel.channels,
+            trigger_to_nodes=getattr(self.pregel, "trigger_to_nodes", {}),
+            durability="sync",  # Temporal handles durability
+            input_keys=getattr(self.pregel, "input_channels", None) or [],
+            output_keys=getattr(self.pregel, "output_channels", None) or [],
+            stream_keys=getattr(self.pregel, "stream_channels_asis", None) or [],
+        )
 
-        # Simple execution: iterate through nodes in order
-        # TODO: Full Pregel loop implementation with proper task scheduling
-        for node_name, pregel_node in nodes.items():
-            # Check if node should run in workflow
-            if self._should_run_in_workflow(node_name):
-                # Execute directly in workflow (for deterministic operations)
-                result = await self._execute_in_workflow(node_name, state, config)
-            else:
-                # Execute as activity
-                result = await self._execute_as_activity(node_name, state, config)
+        # Use direct async with to ensure __aexit__ sets loop.output
+        async with loop:
+            # Execute the Pregel loop
+            # loop.tick() prepares the next tasks based on graph topology
+            # We execute tasks and call loop.after_tick() to process writes
+            while loop.tick():
+                # Get tasks that need to be executed (those without writes)
+                tasks_to_execute = [
+                    task for task in loop.tasks.values() if not task.writes
+                ]
 
-            # Apply writes to state
-            if result:
-                for channel, value in result:
-                    state[channel] = value
+                # Execute each task
+                for task in tasks_to_execute:
+                    await self._execute_task(task, loop)
 
-        return state
+                # Process writes and advance to next step
+                loop.after_tick()
+
+        # Return final output (set by loop.__aexit__)
+        return cast("dict[str, Any]", loop.output)
+
+    async def _execute_task(self, task: PregelExecutableTask, loop: Any) -> None:
+        """Execute a single task, either in workflow or as activity.
+
+        Args:
+            task: The Pregel task to execute.
+            loop: The AsyncPregelLoop instance for recording writes.
+        """
+        if self._should_run_in_workflow(task.name):
+            # Execute directly in workflow (for deterministic operations)
+            writes = await self._execute_in_workflow(task)
+        else:
+            # Execute as activity
+            writes = await self._execute_as_activity(task)
+
+        # Record writes to the loop
+        # This is how activity results flow back into the Pregel state
+        task.writes.extend(writes)
 
     def _should_run_in_workflow(self, node_name: str) -> bool:
         """Check if a node should run directly in the workflow.
@@ -145,56 +197,59 @@ class TemporalLangGraphRunner:
             return False
 
         # Look for temporal.run_in_workflow in metadata
-        # Note: This would need to be set when the node was added to the graph
         metadata = getattr(node, "metadata", None) or {}
         temporal_config = metadata.get("temporal", {})
         return temporal_config.get("run_in_workflow", False)
 
     async def _execute_in_workflow(
         self,
-        node_name: str,
-        state: dict[str, Any],
-        config: dict[str, Any],
+        task: PregelExecutableTask,
     ) -> list[tuple[str, Any]]:
-        """Execute a node directly in the workflow.
+        """Execute a task directly in the workflow.
 
         This is used for deterministic operations that don't need
         activity durability.
 
         Args:
-            node_name: The name of the node to execute.
-            state: The current state.
-            config: The configuration.
+            task: The task to execute.
 
         Returns:
             List of (channel, value) tuples representing the writes.
         """
-        node = self.pregel.nodes.get(node_name)
-        if node is None or node.node is None:
-            return []
+        with workflow.unsafe.imports_passed_through():
+            from collections import deque
+            from langgraph.constants import CONFIG_KEY_SEND
 
-        # Execute the node directly
-        # Cast config to RunnableConfig for type checking
-        runnable_config = cast("RunnableConfig", config)
-        result = node.node.invoke(state, runnable_config)
+        # Setup write capture
+        writes: deque[tuple[str, Any]] = deque()
 
-        # Convert result to writes
-        if isinstance(result, dict):
-            return list(result.items())
-        return []
+        # Inject write callback into config
+        config = {
+            **task.config,
+            "configurable": {
+                **task.config.get("configurable", {}),
+                CONFIG_KEY_SEND: writes.extend,
+            },
+        }
+
+        # Execute the task's proc (the node's runnable)
+        if task.proc is not None:
+            runnable_config = cast("RunnableConfig", config)
+            if asyncio.iscoroutinefunction(getattr(task.proc, "ainvoke", None)):
+                await task.proc.ainvoke(task.input, runnable_config)
+            else:
+                task.proc.invoke(task.input, runnable_config)
+
+        return list(writes)
 
     async def _execute_as_activity(
         self,
-        node_name: str,
-        state: dict[str, Any],
-        config: dict[str, Any],
+        task: PregelExecutableTask,
     ) -> list[tuple[str, Any]]:
-        """Execute a node as a Temporal activity.
+        """Execute a task as a Temporal activity.
 
         Args:
-            node_name: The name of the node to execute.
-            state: The current state.
-            config: The configuration.
+            task: The task to execute.
 
         Returns:
             List of (channel, value) tuples representing the writes.
@@ -203,24 +258,24 @@ class TemporalLangGraphRunner:
 
         # Build activity input
         activity_input = NodeActivityInput(
-            node_name=node_name,
-            task_id=f"{node_name}_{self._step_counter}_{workflow.info().workflow_id}",
+            node_name=task.name,
+            task_id=task.id,
             graph_id=self.graph_id,
-            input_state=state,
-            config=self._filter_config(config),
-            path=(),
-            triggers=[],
+            input_state=task.input,
+            config=self._filter_config(cast("dict[str, Any]", task.config)),
+            path=cast("tuple[str | int, ...]", task.path),
+            triggers=list(task.triggers) if task.triggers else [],
         )
 
         # Get node-specific configuration
-        timeout = self._get_node_timeout(node_name)
-        task_queue = self._get_node_task_queue(node_name)
-        retry_policy = self._get_node_retry_policy(node_name)
-        heartbeat_timeout = self._get_node_heartbeat_timeout(node_name)
+        timeout = self._get_node_timeout(task.name)
+        task_queue = self._get_node_task_queue(task.name)
+        retry_policy = self._get_node_retry_policy(task.name)
+        heartbeat_timeout = self._get_node_heartbeat_timeout(task.name)
 
         # Execute activity
-        result: NodeActivityOutput = await workflow.execute_activity(
-            "execute_langgraph_node",
+        result = await workflow.execute_activity(
+            execute_node,
             activity_input,
             start_to_close_timeout=timeout,
             task_queue=task_queue,
