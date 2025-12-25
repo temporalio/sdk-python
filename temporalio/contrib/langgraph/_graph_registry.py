@@ -1,0 +1,194 @@
+"""Thread-safe graph registry for LangGraph-Temporal integration.
+
+This module provides a global registry for graph builders and cached compiled
+graphs. Graphs are built once per worker process and cached for efficiency.
+"""
+
+from __future__ import annotations
+
+import threading
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from langgraph.pregel import Pregel
+
+
+class GraphRegistry:
+    """Thread-safe registry for graph builders and cached compiled graphs.
+
+    This registry is the core of the plugin architecture:
+    - Graph builders are registered by ID
+    - Compiled graphs are cached on first access
+    - Cache access is thread-safe via locking
+
+    The registry uses double-checked locking to ensure graphs are built
+    exactly once even under concurrent access from multiple threads.
+    """
+
+    def __init__(self) -> None:
+        """Initialize an empty registry."""
+        self._builders: dict[str, Callable[[], Pregel]] = {}
+        self._cache: dict[str, Pregel] = {}
+        self._lock = threading.Lock()
+
+    def register(self, graph_id: str, builder: Callable[[], Pregel]) -> None:
+        """Register a graph builder by ID.
+
+        Args:
+            graph_id: Unique identifier for the graph.
+            builder: A callable that returns a compiled Pregel graph.
+        """
+        with self._lock:
+            if graph_id in self._builders:
+                raise ValueError(
+                    f"Graph '{graph_id}' is already registered. "
+                    "Use a unique graph_id for each graph."
+                )
+            self._builders[graph_id] = builder
+
+    def get_graph(self, graph_id: str) -> Pregel:
+        """Get a compiled graph by ID, building and caching if needed.
+
+        This method is thread-safe. The graph will be built exactly once
+        even if multiple threads request it simultaneously.
+
+        Args:
+            graph_id: The ID of the graph to retrieve.
+
+        Returns:
+            The compiled Pregel graph.
+
+        Raises:
+            KeyError: If no graph with the given ID is registered.
+        """
+        # Fast path: check cache without lock (dict read is atomic in CPython)
+        if graph_id in self._cache:
+            return self._cache[graph_id]
+
+        # Slow path: acquire lock and build if needed
+        with self._lock:
+            # Double-check after acquiring lock
+            if graph_id in self._cache:
+                return self._cache[graph_id]
+
+            if graph_id not in self._builders:
+                available = list(self._builders.keys())
+                raise KeyError(
+                    f"Graph '{graph_id}' not found in registry. "
+                    f"Available graphs: {available}"
+                )
+
+            # Build and cache
+            builder = self._builders[graph_id]
+            graph = builder()
+            self._cache[graph_id] = graph
+            return graph
+
+    def get_node(self, graph_id: str, node_name: str) -> Any:
+        """Get a specific node's runnable from a cached graph.
+
+        Args:
+            graph_id: The ID of the graph.
+            node_name: The name of the node to retrieve.
+
+        Returns:
+            The PregelNode for the specified node.
+
+        Raises:
+            KeyError: If the graph or node is not found.
+        """
+        graph = self.get_graph(graph_id)
+
+        if node_name not in graph.nodes:
+            available = list(graph.nodes.keys())
+            raise KeyError(
+                f"Node '{node_name}' not found in graph '{graph_id}'. "
+                f"Available nodes: {available}"
+            )
+
+        return graph.nodes[node_name]
+
+    def list_graphs(self) -> list[str]:
+        """List all registered graph IDs.
+
+        Returns:
+            List of registered graph IDs.
+        """
+        with self._lock:
+            return list(self._builders.keys())
+
+    def is_registered(self, graph_id: str) -> bool:
+        """Check if a graph is registered.
+
+        Args:
+            graph_id: The ID to check.
+
+        Returns:
+            True if the graph is registered, False otherwise.
+        """
+        with self._lock:
+            return graph_id in self._builders
+
+    def clear(self) -> None:
+        """Clear all registered builders and cached graphs.
+
+        This is primarily useful for testing.
+        """
+        with self._lock:
+            self._builders.clear()
+            self._cache.clear()
+
+
+# Global registry instance
+_global_registry = GraphRegistry()
+
+
+def get_global_registry() -> GraphRegistry:
+    """Get the global graph registry instance.
+
+    Returns:
+        The global GraphRegistry instance.
+    """
+    return _global_registry
+
+
+def register_graph(graph_id: str, builder: Callable[[], Pregel]) -> None:
+    """Register a graph builder in the global registry.
+
+    Args:
+        graph_id: Unique identifier for the graph.
+        builder: A callable that returns a compiled Pregel graph.
+    """
+    _global_registry.register(graph_id, builder)
+
+
+def get_graph(graph_id: str) -> Pregel:
+    """Get a compiled graph from the global registry.
+
+    Args:
+        graph_id: The ID of the graph to retrieve.
+
+    Returns:
+        The compiled Pregel graph.
+
+    Raises:
+        KeyError: If no graph with the given ID is registered.
+    """
+    return _global_registry.get_graph(graph_id)
+
+
+def get_node(graph_id: str, node_name: str) -> Any:
+    """Get a node from a graph in the global registry.
+
+    Args:
+        graph_id: The ID of the graph.
+        node_name: The name of the node.
+
+    Returns:
+        The PregelNode for the specified node.
+
+    Raises:
+        KeyError: If the graph or node is not found.
+    """
+    return _global_registry.get_node(graph_id, node_name)
