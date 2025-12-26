@@ -17,10 +17,14 @@ from temporalio import activity
 from temporalio.contrib.langgraph._graph_registry import get_graph
 from temporalio.contrib.langgraph._models import (
     ChannelWrite,
+    ChatModelActivityInput,
+    ChatModelActivityOutput,
     InterruptValue,
     NodeActivityInput,
     NodeActivityOutput,
     StoreSnapshot,
+    ToolActivityInput,
+    ToolActivityOutput,
 )
 from temporalio.contrib.langgraph._store import ActivityLocalStore
 
@@ -206,7 +210,9 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
         if asyncio.iscoroutinefunction(
             getattr(node_runnable, "ainvoke", None)
         ) or asyncio.iscoroutinefunction(getattr(node_runnable, "invoke", None)):
-            result = await node_runnable.ainvoke(input_data.input_state, runnable_config)
+            result = await node_runnable.ainvoke(
+                input_data.input_state, runnable_config
+            )
         else:
             result = node_runnable.invoke(input_data.input_state, runnable_config)
     except LangGraphInterrupt as e:
@@ -296,4 +302,96 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
         writes=channel_writes,
         store_writes=store_writes,
         send_packets=send_packets,
+    )
+
+
+@activity.defn(name="execute_langgraph_tool")
+async def execute_tool(
+    input_data: ToolActivityInput,
+) -> ToolActivityOutput:
+    """Execute a LangChain tool as a Temporal activity.
+
+    This activity executes tools that have been wrapped with temporal_tool().
+    It looks up the tool by name in the registry, executes it with the
+    provided input, and returns the result.
+
+    Args:
+        input_data: The input data containing tool name and input.
+
+    Returns:
+        ToolActivityOutput containing the tool's output.
+
+    Raises:
+        KeyError: If the tool is not found in the registry.
+        Exception: Any exception raised by the tool during execution.
+    """
+    from temporalio.contrib.langgraph._tool_registry import get_tool
+
+    # Get tool from registry
+    tool = get_tool(input_data.tool_name)
+
+    # Execute the tool
+    # Tools can accept various input formats
+    result = await tool.ainvoke(input_data.tool_input)
+
+    return ToolActivityOutput(output=result)
+
+
+@activity.defn(name="execute_langgraph_chat_model")
+async def execute_chat_model(
+    input_data: ChatModelActivityInput,
+) -> ChatModelActivityOutput:
+    """Execute a LangChain chat model call as a Temporal activity.
+
+    This activity executes LLM calls for models wrapped with temporal_model().
+    It looks up the model by name in the registry, deserializes the messages,
+    executes the model, and returns the serialized result.
+
+    Args:
+        input_data: The input data containing model name, messages, and options.
+
+    Returns:
+        ChatModelActivityOutput containing the serialized generations.
+
+    Raises:
+        KeyError: If the model is not found in the registry.
+        Exception: Any exception raised by the model during execution.
+    """
+    from langchain_core.messages import AnyMessage
+    from pydantic import TypeAdapter
+
+    from temporalio.contrib.langgraph._model_registry import get_model
+
+    # Get model from registry
+    model = get_model(input_data.model_name or "default")
+
+    # Deserialize messages
+    messages: list[Any] = []
+    for msg_dict in input_data.messages:
+        # Use LangChain's message type adapter for proper deserialization
+        deserialized_msg: Any = TypeAdapter(AnyMessage).validate_python(msg_dict)
+        messages.append(deserialized_msg)
+
+    # Execute the model
+    # Use _agenerate for direct access to ChatResult
+    result = await model._agenerate(
+        messages,
+        stop=input_data.stop,
+        **input_data.kwargs,
+    )
+
+    # Serialize generations for return
+    generations = []
+    for gen in result.generations:
+        gen_data = {
+            "message": gen.message.model_dump()
+            if hasattr(gen.message, "model_dump")
+            else {"content": str(gen.message.content), "type": "ai"},
+            "generation_info": gen.generation_info,
+        }
+        generations.append(gen_data)
+
+    return ChatModelActivityOutput(
+        generations=generations,
+        llm_output=result.llm_output,
     )

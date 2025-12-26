@@ -59,9 +59,16 @@ from temporalio.contrib.langgraph._graph_registry import (
     get_graph,
     get_per_node_activity_options,
 )
+from temporalio.contrib.langgraph._model_registry import (
+    register_model,
+    register_model_factory,
+)
 from temporalio.contrib.langgraph._models import StateSnapshot
 from temporalio.contrib.langgraph._plugin import LangGraphPlugin
 from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+from temporalio.contrib.langgraph._temporal_model import temporal_model
+from temporalio.contrib.langgraph._temporal_tool import temporal_tool
+from temporalio.contrib.langgraph._tool_registry import register_tool
 
 
 def node_activity_options(
@@ -356,6 +363,11 @@ __all__ = [
     "compile",
     "LangGraphPlugin",
     "node_activity_options",
+    "register_model",
+    "register_model_factory",
+    "register_tool",
     "StateSnapshot",
+    "temporal_model",
+    "temporal_tool",
     "TemporalLangGraphRunner",
 ]

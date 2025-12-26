@@ -21,7 +21,7 @@ from langgraph.store.base import (
     SearchOp,
 )
 
-from temporalio.contrib.langgraph._models import StoreItem, StoreSnapshot, StoreWrite
+from temporalio.contrib.langgraph._models import StoreSnapshot, StoreWrite
 
 
 class ActivityLocalStore(BaseStore):
@@ -143,9 +143,7 @@ class ActivityLocalStore(BaseStore):
 
         return None
 
-    def _put(
-        self, namespace: tuple[str, ...], key: str, value: dict[str, Any]
-    ) -> None:
+    def _put(self, namespace: tuple[str, ...], key: str, value: dict[str, Any]) -> None:
         """Put a value into the store.
 
         Args:
@@ -212,7 +210,10 @@ class ActivityLocalStore(BaseStore):
                 continue
 
             # Check namespace prefix match
-            if len(ns) >= len(namespace_prefix) and ns[: len(namespace_prefix)] == namespace_prefix:
+            if (
+                len(ns) >= len(namespace_prefix)
+                and ns[: len(namespace_prefix)] == namespace_prefix
+            ):
                 # Apply filter if provided (simple equality filter)
                 if filter:
                     match = all(value.get(k) == v for k, v in filter.items())

@@ -138,7 +138,9 @@ class TemporalLangGraphRunner:
         self.pregel = pregel
         self.graph_id = graph_id
         # Extract defaults from activity_options() format
-        self.default_activity_options = (default_activity_options or {}).get("temporal", {})
+        self.default_activity_options = (default_activity_options or {}).get(
+            "temporal", {}
+        )
         # Extract per_node_activity_options from activity_options() format for each node
         self.per_node_activity_options = {
             node_name: cfg.get("temporal", {})
@@ -150,7 +152,9 @@ class TemporalLangGraphRunner:
         self._invocation_counter = 0
         # State for interrupt handling
         self._interrupted_state: Optional[dict[str, Any]] = None
-        self._interrupted_node_name: Optional[str] = None  # Track which node interrupted
+        self._interrupted_node_name: Optional[str] = (
+            None  # Track which node interrupted
+        )
         self._resume_value: Optional[Any] = None
         self._resume_used: bool = False
         # Pending interrupt from current execution (set by _execute_as_activity)
@@ -256,7 +260,6 @@ class TemporalLangGraphRunner:
         # Import here to avoid workflow sandbox issues
         with workflow.unsafe.imports_passed_through():
             from langgraph.pregel._loop import AsyncPregelLoop
-            from langgraph.pregel._io import read_channels
             from langgraph.types import Interrupt
 
         config = config or {}
@@ -340,8 +343,10 @@ class TemporalLangGraphRunner:
                 # Also skip nodes that already completed in this resume cycle
                 # (prevents re-execution when resuming from interrupted state)
                 tasks_to_execute = [
-                    task for task in loop.tasks.values()
-                    if not task.writes and task.name not in self._completed_nodes_in_cycle
+                    task
+                    for task in loop.tasks.values()
+                    if not task.writes
+                    and task.name not in self._completed_nodes_in_cycle
                 ]
 
                 # If no tasks to execute (all filtered out or have cached writes),
@@ -350,7 +355,9 @@ class TemporalLangGraphRunner:
                     loop.after_tick()
                     # Check if we should stop for checkpointing
                     if should_continue is not None and not should_continue():
-                        output = cast("dict[str, Any]", loop.output) if loop.output else {}
+                        output = (
+                            cast("dict[str, Any]", loop.output) if loop.output else {}
+                        )
                         output["__checkpoint__"] = self.get_state()
                         self._last_output = output
                         return output
@@ -820,7 +827,11 @@ class TemporalLangGraphRunner:
         node_metadata = self._get_node_metadata(node_name)
         compile_node_options = self.per_node_activity_options.get(node_name, {})
         # Merge: default_activity_options < per_node_activity_options < node metadata from add_node
-        temporal_config = {**self.default_activity_options, **compile_node_options, **node_metadata}
+        temporal_config = {
+            **self.default_activity_options,
+            **compile_node_options,
+            **node_metadata,
+        }
         options: dict[str, Any] = {}
 
         # start_to_close_timeout (required, with default)
@@ -844,7 +855,9 @@ class TemporalLangGraphRunner:
             options["heartbeat_timeout"] = heartbeat
 
         # retry_policy priority: node metadata > per_node_activity_options > LangGraph native > default_activity_options > built-in
-        node_policy = node_metadata.get("retry_policy") or compile_node_options.get("retry_policy")
+        node_policy = node_metadata.get("retry_policy") or compile_node_options.get(
+            "retry_policy"
+        )
         if isinstance(node_policy, RetryPolicy):
             # Node metadata has explicit Temporal RetryPolicy
             options["retry_policy"] = node_policy
@@ -861,7 +874,9 @@ class TemporalLangGraphRunner:
                     maximum_interval=timedelta(seconds=lg_policy.max_interval),
                     maximum_attempts=lg_policy.max_attempts,
                 )
-            elif isinstance(self.default_activity_options.get("retry_policy"), RetryPolicy):
+            elif isinstance(
+                self.default_activity_options.get("retry_policy"), RetryPolicy
+            ):
                 # Use default_activity_options retry_policy
                 options["retry_policy"] = self.default_activity_options["retry_policy"]
             else:
@@ -952,11 +967,13 @@ class TemporalLangGraphRunner:
         # Build tasks tuple with interrupt info if present
         tasks: tuple[dict[str, Any], ...] = ()
         if self._pending_interrupt is not None:
-            tasks = ({
-                "interrupt_value": self._pending_interrupt.value,
-                "interrupt_node": self._pending_interrupt.node_name,
-                "interrupt_task_id": self._pending_interrupt.task_id,
-            },)
+            tasks = (
+                {
+                    "interrupt_value": self._pending_interrupt.value,
+                    "interrupt_node": self._pending_interrupt.node_name,
+                    "interrupt_task_id": self._pending_interrupt.task_id,
+                },
+            )
 
         # For values, prefer interrupted_state when there's an interrupt
         # (since _last_output only contains the interrupt marker, not the full state)

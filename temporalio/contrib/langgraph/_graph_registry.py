@@ -156,9 +156,7 @@ class GraphRegistry:
         """
         return self._default_activity_options.get(graph_id, {})
 
-    def get_per_node_activity_options(
-        self, graph_id: str
-    ) -> dict[str, dict[str, Any]]:
+    def get_per_node_activity_options(self, graph_id: str) -> dict[str, dict[str, Any]]:
         """Get per-node activity options for a graph.
 
         Args:

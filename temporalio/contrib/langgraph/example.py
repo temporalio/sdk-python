@@ -53,7 +53,7 @@ from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from temporalio.contrib.langgraph import LangGraphPlugin, compile, node_activity_options
 
 if TYPE_CHECKING:
-    from langgraph.graph.state import CompiledStateGraph
+    pass
 
 
 # =============================================================================
@@ -93,13 +93,18 @@ def classify_query(state: SupportState) -> SupportState:
 
     if any(word in last_message for word in ["bill", "charge", "payment", "invoice"]):
         category = "billing"
-    elif any(word in last_message for word in ["error", "bug", "broken", "not working", "crash"]):
+    elif any(
+        word in last_message
+        for word in ["error", "bug", "broken", "not working", "crash"]
+    ):
         category = "technical"
     else:
         category = "general"
 
     # Simple sentiment detection
-    if any(word in last_message for word in ["angry", "frustrated", "terrible", "awful"]):
+    if any(
+        word in last_message for word in ["angry", "frustrated", "terrible", "awful"]
+    ):
         sentiment = "negative"
     elif any(word in last_message for word in ["thanks", "great", "love", "excellent"]):
         sentiment = "positive"
@@ -140,7 +145,11 @@ def escalate_to_human(state: SupportState) -> SupportState:
     return {
         "escalation_reason": f"Customer sentiment: {state.get('sentiment')}",
         "messages": state.get("messages", [])
-        + [AIMessage(content="I'm connecting you with a human agent who can better assist you.")],
+        + [
+            AIMessage(
+                content="I'm connecting you with a human agent who can better assist you."
+            )
+        ],
     }
 
 
@@ -157,7 +166,9 @@ def generate_response(state: SupportState) -> SupportState:
 # =============================================================================
 
 
-def route_by_category(state: SupportState) -> Literal["billing", "technical", "general"]:
+def route_by_category(
+    state: SupportState,
+) -> Literal["billing", "technical", "general"]:
     """Route to the appropriate handler based on category."""
     return state.get("category", "general")  # type: ignore[return-value]
 
@@ -206,7 +217,9 @@ def build_support_agent() -> Any:
             start_to_close_timeout=timedelta(minutes=2),
         ),
         # Billing lookups may need more retries
-        retry_policy=RetryPolicy(max_attempts=5, initial_interval=1.0, backoff_factor=2.0),
+        retry_policy=RetryPolicy(
+            max_attempts=5, initial_interval=1.0, backoff_factor=2.0
+        ),
     )
 
     graph.add_node(
@@ -373,9 +386,13 @@ async def main():
         print(f"Sentiment: {result.get('sentiment')}")
         print(f"Escalated: {result.get('should_escalate')}")
         if result.get("messages"):
-            last_msg = result['messages'][-1]
+            last_msg = result["messages"][-1]
             # Handle both message objects and dicts
-            content = last_msg.content if hasattr(last_msg, 'content') else last_msg.get('content')
+            content = (
+                last_msg.content
+                if hasattr(last_msg, "content")
+                else last_msg.get("content")
+            )
             print(f"Response: {content}")
         print()
 
@@ -394,8 +411,12 @@ async def main():
         print(f"Escalated: {result.get('should_escalate')}")
         print(f"Escalation Reason: {result.get('escalation_reason')}")
         if result.get("messages"):
-            last_msg = result['messages'][-1]
-            content = last_msg.content if hasattr(last_msg, 'content') else last_msg.get('content')
+            last_msg = result["messages"][-1]
+            content = (
+                last_msg.content
+                if hasattr(last_msg, "content")
+                else last_msg.get("content")
+            )
             print(f"Response: {content}")
         print()
 
@@ -411,8 +432,12 @@ async def main():
         )
         print(f"Category: {result.get('category')}")
         if result.get("messages"):
-            last_msg = result['messages'][-1]
-            content = last_msg.content if hasattr(last_msg, 'content') else last_msg.get('content')
+            last_msg = result["messages"][-1]
+            content = (
+                last_msg.content
+                if hasattr(last_msg, "content")
+                else last_msg.get("content")
+            )
             print(f"Response: {content}")
         else:
             print("Response: N/A")

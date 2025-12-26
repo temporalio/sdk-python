@@ -7,12 +7,12 @@ discriminated unions.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Optional
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict
 
 if TYPE_CHECKING:
-    from langchain_core.messages import AnyMessage
+    pass
 
 
 def _coerce_to_message(value: Any) -> Any:
@@ -23,12 +23,24 @@ def _coerce_to_message(value: Any) -> Any:
     """
     if isinstance(value, dict) and "type" in value:
         msg_type = value.get("type")
-        if msg_type in ("human", "ai", "system", "function", "tool",
-                        "HumanMessageChunk", "AIMessageChunk", "SystemMessageChunk",
-                        "FunctionMessageChunk", "ToolMessageChunk", "chat", "ChatMessageChunk"):
+        if msg_type in (
+            "human",
+            "ai",
+            "system",
+            "function",
+            "tool",
+            "HumanMessageChunk",
+            "AIMessageChunk",
+            "SystemMessageChunk",
+            "FunctionMessageChunk",
+            "ToolMessageChunk",
+            "chat",
+            "ChatMessageChunk",
+        ):
             # Use LangChain's AnyMessage type adapter to deserialize
             from langchain_core.messages import AnyMessage
             from pydantic import TypeAdapter
+
             return TypeAdapter(AnyMessage).validate_python(value)
     return value
 
@@ -350,3 +362,91 @@ class StateSnapshot(BaseModel):
 
     store_state: list[dict[str, Any]] = []
     """Serialized store data for cross-node persistence."""
+
+
+# ==============================================================================
+# Tool Activity Models
+# ==============================================================================
+
+
+class ToolActivityInput(BaseModel):
+    """Input data for the tool execution activity.
+
+    This model encapsulates data needed to execute a LangChain tool
+    in a Temporal activity.
+
+    Attributes:
+        tool_name: Name of the tool to execute (must be registered).
+        tool_input: The input to pass to the tool (dict or primitive).
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    tool_name: str
+    tool_input: Any
+
+
+class ToolActivityOutput(BaseModel):
+    """Output data from the tool execution activity.
+
+    Attributes:
+        output: The result returned by the tool.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    output: Any
+
+
+# ==============================================================================
+# Chat Model Activity Models
+# ==============================================================================
+
+
+class ChatModelActivityInput(BaseModel):
+    """Input data for the chat model execution activity.
+
+    This model encapsulates data needed to execute a LangChain chat model
+    call in a Temporal activity.
+
+    Attributes:
+        model_name: Name of the model to use (for registry lookup).
+        messages: List of serialized messages to send to the model.
+        stop: Optional list of stop sequences.
+        kwargs: Additional keyword arguments for the model.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    model_name: Optional[str]
+    messages: list[dict[str, Any]]
+    stop: Optional[list[str]] = None
+    kwargs: dict[str, Any] = {}
+
+
+class ChatGenerationData(BaseModel):
+    """Serialized chat generation data.
+
+    Attributes:
+        message: Serialized message dict.
+        generation_info: Optional generation metadata.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    message: dict[str, Any]
+    generation_info: Optional[dict[str, Any]] = None
+
+
+class ChatModelActivityOutput(BaseModel):
+    """Output data from the chat model execution activity.
+
+    Attributes:
+        generations: List of generation data (serialized).
+        llm_output: Optional LLM-specific output metadata.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    generations: list[dict[str, Any]]
+    llm_output: Optional[dict[str, Any]] = None

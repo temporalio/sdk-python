@@ -14,7 +14,6 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from temporalio.contrib.langgraph._graph_registry import (
-    get_global_registry,
     register_graph,
 )
 from temporalio.contrib.pydantic import PydanticPayloadConverter
@@ -132,10 +131,18 @@ class LangGraphPlugin(SimplePlugin):
         def add_activities(
             activities: Sequence[Callable[..., Any]] | None,
         ) -> Sequence[Callable[..., Any]]:
-            """Add LangGraph node execution activity."""
-            from temporalio.contrib.langgraph._activities import execute_node
+            """Add LangGraph activities for node, tool, and model execution."""
+            from temporalio.contrib.langgraph._activities import (
+                execute_chat_model,
+                execute_node,
+                execute_tool,
+            )
 
-            return list(activities or []) + [execute_node]
+            return list(activities or []) + [
+                execute_node,
+                execute_tool,
+                execute_chat_model,
+            ]
 
         super().__init__(
             name="LangGraphPlugin",
