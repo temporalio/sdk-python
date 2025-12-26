@@ -572,10 +572,34 @@ This approach follows the same pattern as LangGraph's own `main.py`, just with T
 |-------------------|----------------|-----------|
 | `ToolNode` | ❌ No | Activity (executes tools with I/O) |
 | `tools_condition` | ✅ Yes | Workflow (routing logic) |
-| `create_react_agent` | Mixed | Hybrid (orchestration in workflow, tools as activities) |
+| `create_agent` (LangChain 1.0+) | Mixed | Hybrid (orchestration in workflow, tools as activities) |
+| `create_react_agent` (legacy) | Mixed | Hybrid (orchestration in workflow, tools as activities) |
 | `ValidationNode` | ✅ Yes | Workflow (pure validation) |
 
-**Example:**
+**Example with create_agent (LangChain 1.0+, Recommended):**
+```python
+from langchain.agents import create_agent
+
+@workflow.defn
+class AgentWorkflow:
+    @workflow.run
+    async def run(self, user_input: str):
+        # Initialize agent using LangChain 1.0+ API
+        agent = create_agent(
+            model="openai:gpt-4",
+            tools=[search_tool, calculator_tool]
+        )
+
+        # Wrap with Temporal runner
+        runner = TemporalLangGraphRunner(agent)
+
+        # Execute - tools run as activities automatically
+        return await runner.ainvoke({
+            "messages": [("user", user_input)]
+        })
+```
+
+**Example with create_react_agent (LangGraph Prebuilt, Legacy):**
 ```python
 from langgraph.prebuilt import create_react_agent, ToolNode
 
@@ -583,7 +607,7 @@ from langgraph.prebuilt import create_react_agent, ToolNode
 class ReactAgentWorkflow:
     @workflow.run
     async def run(self, user_input: str):
-        # Initialize prebuilt agent
+        # Initialize prebuilt agent (legacy API)
         agent = create_react_agent(
             ChatOpenAI(model="gpt-4"),
             tools=[search_tool, calculator_tool]
@@ -1664,11 +1688,13 @@ graph.add_node(
 Run deterministic nodes directly in workflow instead of activities.
 
 ```python
-# Level 2: Node metadata
+from temporalio.contrib.langgraph import temporal_node_metadata
+
+# Level 2: Node metadata (using helper function)
 graph.add_node(
     "validate_input",  # Deterministic validation
     validate_input,
-    metadata={"temporal": {"run_in_workflow": True}}
+    metadata=temporal_node_metadata(run_in_workflow=True),
 )
 
 # Level 4: Compile default (enables the feature)
@@ -1684,7 +1710,11 @@ app = compile(graph, enable_workflow_execution=True)
 from datetime import timedelta
 from langgraph.graph import StateGraph, START
 from langgraph.types import RetryPolicy
-from temporalio.contrib.langgraph import compile
+from temporalio.contrib.langgraph import (
+    compile,
+    node_activity_options,
+    temporal_node_metadata,
+)
 
 # Build graph with comprehensive per-node configuration
 graph = StateGraph(MyState)
@@ -1693,7 +1723,7 @@ graph = StateGraph(MyState)
 graph.add_node(
     "validate",
     validate_input,
-    metadata={"temporal": {"run_in_workflow": True}}
+    metadata=temporal_node_metadata(run_in_workflow=True),
 )
 
 # External API with retries and timeout
@@ -1706,12 +1736,10 @@ graph.add_node(
         backoff_factor=2.0,
         max_interval=30.0,
     ),
-    metadata={
-        "temporal": {
-            "activity_timeout": timedelta(minutes=2),
-            "heartbeat_timeout": timedelta(seconds=30),
-        }
-    }
+    metadata=node_activity_options(
+        start_to_close_timeout=timedelta(minutes=2),
+        heartbeat_timeout=timedelta(seconds=30),
+    ),
 )
 
 # GPU-intensive processing on specialized workers
@@ -1719,13 +1747,11 @@ graph.add_node(
     "process_image",
     process_image,
     retry_policy=RetryPolicy(max_attempts=2),  # Don't retry too much
-    metadata={
-        "temporal": {
-            "activity_timeout": timedelta(hours=1),
-            "task_queue": "gpu-workers",
-            "heartbeat_timeout": timedelta(minutes=10),
-        }
-    }
+    metadata=node_activity_options(
+        start_to_close_timeout=timedelta(hours=1),
+        task_queue="gpu-workers",
+        heartbeat_timeout=timedelta(minutes=10),
+    ),
 )
 
 # Standard processing with defaults
@@ -1774,6 +1800,82 @@ result = await app.ainvoke(
 | Task Queue | `temporal.task_queue` | `default_task_queue` | N/A | workflow queue |
 | Heartbeat | `temporal.heartbeat_timeout` | N/A | N/A | None |
 | Hybrid Exec | `temporal.run_in_workflow` | `enable_workflow_execution` | N/A | False |
+
+#### **5.3.6 Helper Functions**
+
+The SDK provides two helper functions for creating node metadata with proper typing and structure.
+
+##### **node_activity_options()**
+
+Creates activity-specific configuration for nodes. Use this for timeouts, retries, task queues, and other activity settings.
+
+```python
+from datetime import timedelta
+from temporalio.common import RetryPolicy
+from temporalio.contrib.langgraph import node_activity_options
+
+# Basic timeout configuration
+graph.add_node(
+    "fetch_data",
+    fetch_data,
+    metadata=node_activity_options(
+        start_to_close_timeout=timedelta(minutes=5),
+    ),
+)
+
+# Full activity configuration
+graph.add_node(
+    "process",
+    process_data,
+    metadata=node_activity_options(
+        start_to_close_timeout=timedelta(minutes=30),
+        heartbeat_timeout=timedelta(minutes=5),
+        task_queue="gpu-workers",
+        retry_policy=RetryPolicy(
+            maximum_attempts=5,
+            initial_interval=timedelta(seconds=1),
+            backoff_coefficient=2.0,
+        ),
+    ),
+)
+```
+
+##### **temporal_node_metadata()**
+
+Higher-level helper that combines activity options with workflow execution flags. Use this when you need to specify `run_in_workflow` along with activity options.
+
+```python
+from temporalio.contrib.langgraph import temporal_node_metadata, node_activity_options
+
+# Mark a node to run in workflow (deterministic operations)
+graph.add_node(
+    "validate",
+    validate_input,
+    metadata=temporal_node_metadata(run_in_workflow=True),
+)
+
+# Combine activity options with run_in_workflow
+graph.add_node(
+    "transform",
+    transform_data,
+    metadata=temporal_node_metadata(
+        activity_options=node_activity_options(
+            start_to_close_timeout=timedelta(minutes=10),
+            task_queue="compute-workers",
+        ),
+        run_in_workflow=False,  # Run as activity (default)
+    ),
+)
+```
+
+**When to use which:**
+
+| Scenario | Use |
+|----------|-----|
+| Activity configuration only | `node_activity_options()` |
+| `run_in_workflow=True` only | `temporal_node_metadata(run_in_workflow=True)` |
+| Both activity options and `run_in_workflow` | `temporal_node_metadata(activity_options=..., run_in_workflow=...)` |
+| Raw metadata dict | `metadata={"temporal": {...}}` |
 
 ---
 
@@ -1952,14 +2054,45 @@ plugin = LangGraphPlugin(
 )
 ```
 
-### **6.3 With Prebuilt React Agent**
+### **6.3 With Prebuilt Agents**
+
+**Using create_agent (LangChain 1.0+, Recommended):**
+
+```python
+from langchain.agents import create_agent
+from temporalio.contrib.langgraph import compile, LangGraphPlugin
+
+def build_agent():
+    """Build an agent using LangChain 1.0+ API"""
+    return create_agent(
+        model="openai:gpt-4",
+        tools=[search_web, calculator, file_reader]
+    )
+
+@workflow.defn
+class AgentWorkflow:
+    @workflow.run
+    async def run(self, graph_id: str, task: str):
+        app = compile(graph_id)
+
+        return await app.ainvoke({
+            "messages": [("user", task)]
+        })
+
+# Setup in main.py
+plugin = LangGraphPlugin(
+    graphs={"my_agent": build_agent}
+)
+```
+
+**Using create_react_agent (LangGraph Prebuilt, Legacy):**
 
 ```python
 from langgraph.prebuilt import create_react_agent
 from temporalio.contrib.langgraph import compile, LangGraphPlugin
 
 def build_react_agent():
-    """Build a ReAct agent"""
+    """Build a ReAct agent (legacy API)"""
     return create_react_agent(
         ChatOpenAI(model="gpt-4"),
         tools=[search_web, calculator, file_reader]
@@ -2016,19 +2149,21 @@ def fetch_from_api(state: dict) -> dict:
     return {"data": data}
 
 def build_hybrid_graph():
+    from temporalio.contrib.langgraph import temporal_node_metadata
+
     graph = StateGraph(dict)
 
     # Fast deterministic nodes - run in workflow
     graph.add_node(
         "validate",
         validate_input,
-        metadata={"temporal": {"run_in_workflow": True}}
+        metadata=temporal_node_metadata(run_in_workflow=True),
     )
 
     graph.add_node(
         "transform",
         transform_data,
-        metadata={"temporal": {"run_in_workflow": True}}
+        metadata=temporal_node_metadata(run_in_workflow=True),
     )
 
     # I/O node - runs as activity
@@ -2272,7 +2407,8 @@ await client.execute_workflow(
 | **Conditional edges** | ✅ Yes | Evaluate in workflow |
 | **Send API** | ✅ Yes | Dynamic tasks supported |
 | **ToolNode** | ✅ Yes | Executes as activity |
-| **create_react_agent** | ✅ Yes | Full support |
+| **create_agent** (LangChain 1.0+) | ✅ Yes | Full support (recommended) |
+| **create_react_agent** (legacy) | ✅ Yes | Full support |
 | **Interrupts** | ⚠️  Partial | V1: Basic support, V2: Full signals |
 | **Subgraphs** | ⚠️  Partial | V1: Inline, V2: Child workflows |
 | **Streaming** | ⚠️  Limited | Queries/heartbeats for progress |

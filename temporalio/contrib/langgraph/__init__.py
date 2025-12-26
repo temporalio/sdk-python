@@ -83,7 +83,6 @@ def node_activity_options(
     versioning_intent: Optional[temporalio.workflow.VersioningIntent] = None,
     summary: Optional[str] = None,
     priority: Optional[temporalio.common.Priority] = None,
-    run_in_workflow: bool = False,
 ) -> dict[str, Any]:
     """Create activity options for LangGraph nodes.
 
@@ -113,9 +112,6 @@ def node_activity_options(
             See `VersioningIntent` for options.
         summary: A human-readable summary of the activity for observability.
         priority: Priority for task queue ordering when tasks are backlogged.
-        run_in_workflow: If True and `enable_workflow_execution=True` is set on
-            `compile()`, this node will run directly in the workflow instead of
-            as an activity. Only use for deterministic, non-I/O operations.
 
     Returns:
         A metadata dict with Temporal configuration under the "temporal" key.
@@ -188,9 +184,85 @@ def node_activity_options(
         config["summary"] = summary
     if priority is not None:
         config["priority"] = priority
-    if run_in_workflow:
-        config["run_in_workflow"] = True
     return {"temporal": config}
+
+
+def temporal_node_metadata(
+    *,
+    activity_options: Optional[dict[str, Any]] = None,
+    run_in_workflow: bool = False,
+) -> dict[str, Any]:
+    """Create complete node metadata for Temporal LangGraph integration.
+
+    This helper combines activity options with workflow execution flags into
+    a single metadata dict. Use this when you need to specify both activity
+    configuration and workflow execution behavior for a node.
+
+    Args:
+        activity_options: Activity options from ``node_activity_options()``.
+            If provided, these will be merged into the result.
+        run_in_workflow: If True and ``enable_workflow_execution=True`` is set
+            on ``compile()``, this node will run directly in the workflow
+            instead of as an activity. Only use for deterministic, non-I/O
+            operations like validation, routing logic, or pure computations.
+
+    Returns:
+        A metadata dict with Temporal configuration under the "temporal" key.
+        Can be merged with other metadata using the ``|`` operator.
+
+    Example:
+        Mark a node to run in workflow (deterministic operations):
+
+            >>> graph.add_node(
+            ...     "validate",
+            ...     validate_input,
+            ...     metadata=temporal_node_metadata(run_in_workflow=True),
+            ... )
+
+        Combine activity options with workflow execution:
+
+            >>> graph.add_node(
+            ...     "process",
+            ...     process_data,
+            ...     metadata=temporal_node_metadata(
+            ...         activity_options=node_activity_options(
+            ...             start_to_close_timeout=timedelta(minutes=5),
+            ...             task_queue="gpu-workers",
+            ...         ),
+            ...         run_in_workflow=False,  # Run as activity (default)
+            ...     ),
+            ... )
+
+        Activity options only (equivalent to node_activity_options directly):
+
+            >>> graph.add_node(
+            ...     "fetch",
+            ...     fetch_data,
+            ...     metadata=temporal_node_metadata(
+            ...         activity_options=node_activity_options(
+            ...             start_to_close_timeout=timedelta(minutes=2),
+            ...         ),
+            ...     ),
+            ... )
+
+    Note:
+        For nodes that only need activity options without ``run_in_workflow``,
+        you can use ``node_activity_options()`` directly as metadata.
+    """
+    # Start with activity options if provided, otherwise empty temporal config
+    if activity_options:
+        result = activity_options.copy()
+        # Ensure temporal key exists
+        if "temporal" not in result:
+            result["temporal"] = {}
+    else:
+        result = {"temporal": {}}
+
+    # Add run_in_workflow flag if True
+    if run_in_workflow:
+        result["temporal"]["run_in_workflow"] = True
+
+    return result
 
 
 def compile(
@@ -368,6 +440,7 @@ __all__ = [
     "register_tool",
     "StateSnapshot",
     "temporal_model",
+    "temporal_node_metadata",
     "temporal_tool",
     "TemporalLangGraphRunner",
 ]

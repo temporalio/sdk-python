@@ -257,10 +257,10 @@ def temporal_model(
 ) -> "BaseChatModel":
     """Wrap a LangChain chat model to execute LLM calls as Temporal activities.
 
-    Use this when running agentic nodes (like create_react_agent) in the
-    workflow with run_in_workflow=True. Each LLM invocation becomes a separate
-    activity, providing durability and retryability for each turn in the
-    agentic loop.
+    Use this when running agentic nodes (like ``create_agent`` from LangChain
+    or ``create_react_agent`` from LangGraph). Each LLM invocation becomes a
+    separate activity, providing durability and retryability for each turn in
+    the agentic loop.
 
     The wrapped model preserves the interface of BaseChatModel, so it works
     seamlessly with LangChain agents and the LangGraph framework.
@@ -291,7 +291,20 @@ def temporal_model(
         when invoked within a workflow.
 
     Example:
-        Basic usage with model name:
+        Basic usage with create_agent (LangChain 1.0+):
+
+            >>> from temporalio.contrib.langgraph import temporal_model
+            >>> from langchain.agents import create_agent
+            >>>
+            >>> model = temporal_model(
+            ...     "gpt-4o",
+            ...     start_to_close_timeout=timedelta(minutes=2),
+            ...     retry_policy=RetryPolicy(maximum_attempts=3),
+            ... )
+            >>>
+            >>> agent = create_agent(model=model, tools=tools)
+
+        With create_react_agent (LangGraph prebuilt, legacy):
 
             >>> from temporalio.contrib.langgraph import temporal_model
             >>> from langgraph.prebuilt import create_react_agent
@@ -322,13 +335,13 @@ def temporal_model(
             ...     heartbeat_timeout=timedelta(seconds=30),
             ... )
 
-        Complete pattern with react_agent:
+        Complete pattern with create_agent (recommended):
 
             >>> from temporalio.contrib.langgraph import (
             ...     temporal_model,
             ...     temporal_tool,
-            ...     node_activity_options,
             ... )
+            >>> from langchain.agents import create_agent
             >>>
             >>> # Durable model
             >>> model = temporal_model("gpt-4o")
@@ -336,15 +349,25 @@ def temporal_model(
             >>> # Durable tools
             >>> tools = [temporal_tool(search_web), calculator]
             >>>
-            >>> # Create react agent
-            >>> agent = create_react_agent(model, tools)
-            >>>
-            >>> # Add to graph with workflow execution
-            >>> graph.add_node(
-            ...     "agent",
-            ...     agent,
-            ...     metadata=node_activity_options(run_in_workflow=True),
+            >>> # Create agent (LangChain 1.0+)
+            >>> agent = create_agent(model=model, tools=tools)
+
+        Complete pattern with create_react_agent (legacy):
+
+            >>> from temporalio.contrib.langgraph import (
+            ...     temporal_model,
+            ...     temporal_tool,
             ... )
+            >>> from langgraph.prebuilt import create_react_agent
+            >>>
+            >>> # Durable model
+            >>> model = temporal_model("gpt-4o")
+            >>>
+            >>> # Durable tools
+            >>> tools = [temporal_tool(search_web), calculator]
+            >>>
+            >>> # Create react agent (LangGraph prebuilt)
+            >>> agent = create_react_agent(model, tools)
 
     Note:
         When using a model name string, you must register a model factory

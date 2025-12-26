@@ -189,9 +189,114 @@ All parameters mirror `workflow.execute_activity()` options:
 | Versioning Intent | `versioning_intent` | Worker Build ID versioning |
 | Summary | `summary` | Human-readable activity description |
 | Priority | `priority` | Task queue ordering priority |
-| Workflow Execution | `run_in_workflow` | Run in workflow instead of activity |
 
 You can also use LangGraph's native `retry_policy` parameter on `add_node()`, which is automatically mapped to Temporal's retry policy. If both are specified, `node_activity_options(retry_policy=...)` takes precedence.
+
+## Agentic Execution
+
+Run LLM-powered agents with durable tool execution and model calls. Both LangChain's new `create_agent` (recommended) and LangGraph's `create_react_agent` (legacy) are supported.
+
+### Using create_agent (LangChain 1.0+, Recommended)
+
+```python
+from datetime import timedelta
+from langchain.agents import create_agent
+from temporalio.contrib.langgraph import (
+    temporal_model,
+    temporal_tool,
+    node_activity_options,
+    LangGraphPlugin,
+    compile,
+)
+from temporalio import workflow
+from langchain_core.tools import tool
+
+
+@tool
+def search_web(query: str) -> str:
+    """Search the web for information."""
+    # Your search implementation
+    return f"Results for: {query}"
+
+
+def build_agent_graph():
+    # Wrap model for durable LLM calls
+    model = temporal_model(
+        "gpt-4o",
+        start_to_close_timeout=timedelta(minutes=2),
+    )
+
+    # Wrap tools for durable execution
+    tools = [
+        temporal_tool(search_web, start_to_close_timeout=timedelta(minutes=1)),
+    ]
+
+    # Create agent using LangChain 1.0+ API
+    return create_agent(model=model, tools=tools)
+
+
+@workflow.defn
+class AgentWorkflow:
+    @workflow.run
+    async def run(self, query: str) -> dict:
+        app = compile("my_agent")
+        return await app.ainvoke({"messages": [{"role": "user", "content": query}]})
+
+
+# Register with plugin
+plugin = LangGraphPlugin(graphs={"my_agent": build_agent_graph})
+```
+
+### Using create_react_agent (LangGraph Prebuilt, Legacy)
+
+```python
+from langgraph.prebuilt import create_react_agent
+from temporalio.contrib.langgraph import temporal_model, temporal_tool
+
+
+def build_react_agent():
+    model = temporal_model("gpt-4o")
+    tools = [temporal_tool(search_web)]
+
+    # Legacy API - still fully supported
+    return create_react_agent(model, tools)
+```
+
+### Hybrid Execution (Advanced)
+
+For deterministic nodes that don't require durability, you can mark them to run directly in the workflow using `temporal_node_metadata()`:
+
+```python
+from temporalio.contrib.langgraph import temporal_node_metadata, node_activity_options
+
+# Mark a specific node to run in workflow instead of as an activity
+graph.add_node(
+    "validate",
+    validate_input,
+    metadata=temporal_node_metadata(run_in_workflow=True),  # Deterministic, no I/O
+)
+
+# Combine with activity options
+graph.add_node(
+    "process",
+    process_data,
+    metadata=temporal_node_metadata(
+        activity_options=node_activity_options(
+            start_to_close_timeout=timedelta(minutes=5),
+            task_queue="gpu-workers",
+        ),
+        run_in_workflow=False,  # Run as activity (default)
+    ),
+)
+```
+
+Note: `run_in_workflow` requires `enable_workflow_execution=True` in `compile()`.
+
+### Key Benefits
+
+- **Durable LLM Calls**: Each model invocation is a separate activity with retries
+- **Durable Tool Execution**: Tool calls survive failures and can be retried
+- **Middleware Support**: `create_agent` supports hooks for human-in-the-loop, summarization, etc.
 
 ## Human-in-the-Loop (Interrupts)
 
@@ -419,7 +524,8 @@ async def node_with_subgraph(state: dict) -> dict:
 | Conditional edges | Full |
 | Send API | Full |
 | ToolNode | Full |
-| create_react_agent | Full |
+| create_agent (LangChain 1.0+) | Full |
+| create_react_agent (legacy) | Full |
 | interrupt() | Full |
 | Store API | Full |
 | Streaming | Limited (via queries) |

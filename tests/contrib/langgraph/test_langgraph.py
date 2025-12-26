@@ -22,7 +22,69 @@ from langgraph.graph import END, START, StateGraph
 from temporalio.client import Client
 from temporalio.common import RetryPolicy
 
-from temporalio.contrib.langgraph import node_activity_options
+from temporalio.contrib.langgraph import node_activity_options, temporal_node_metadata
+
+
+class TestTemporalNodeMetadata:
+    """Tests for temporal_node_metadata helper function."""
+
+    def test_run_in_workflow_only(self) -> None:
+        """temporal_node_metadata should create metadata with run_in_workflow flag."""
+        result = temporal_node_metadata(run_in_workflow=True)
+
+        assert result == {"temporal": {"run_in_workflow": True}}
+
+    def test_run_in_workflow_false(self) -> None:
+        """temporal_node_metadata with run_in_workflow=False should not include the flag."""
+        result = temporal_node_metadata(run_in_workflow=False)
+
+        # run_in_workflow=False should result in empty temporal config
+        assert result == {"temporal": {}}
+
+    def test_activity_options_only(self) -> None:
+        """temporal_node_metadata should pass through activity options."""
+        activity_opts = node_activity_options(
+            start_to_close_timeout=timedelta(minutes=5),
+            task_queue="gpu-workers",
+        )
+        result = temporal_node_metadata(activity_options=activity_opts)
+
+        assert result["temporal"]["start_to_close_timeout"] == timedelta(minutes=5)
+        assert result["temporal"]["task_queue"] == "gpu-workers"
+        assert "run_in_workflow" not in result["temporal"]
+
+    def test_activity_options_with_run_in_workflow(self) -> None:
+        """temporal_node_metadata should combine activity options with run_in_workflow."""
+        activity_opts = node_activity_options(
+            start_to_close_timeout=timedelta(minutes=10),
+            retry_policy=RetryPolicy(maximum_attempts=5),
+        )
+        result = temporal_node_metadata(
+            activity_options=activity_opts,
+            run_in_workflow=True,
+        )
+
+        assert result["temporal"]["start_to_close_timeout"] == timedelta(minutes=10)
+        assert result["temporal"]["retry_policy"].maximum_attempts == 5
+        assert result["temporal"]["run_in_workflow"] is True
+
+    def test_no_arguments(self) -> None:
+        """temporal_node_metadata with no arguments should return empty temporal config."""
+        result = temporal_node_metadata()
+
+        assert result == {"temporal": {}}
+
+    def test_does_not_mutate_activity_options(self) -> None:
+        """temporal_node_metadata should not mutate the input activity_options."""
+        activity_opts = node_activity_options(
+            start_to_close_timeout=timedelta(minutes=5),
+        )
+        original = activity_opts.copy()
+
+        temporal_node_metadata(activity_options=activity_opts, run_in_workflow=True)
+
+        # Original should be unchanged
+        assert activity_opts == original
 
 
 class TestModels:

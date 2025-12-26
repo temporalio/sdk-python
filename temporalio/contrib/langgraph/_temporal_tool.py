@@ -195,10 +195,9 @@ def temporal_tool(
 ) -> "BaseTool":
     """Wrap a LangChain tool to execute as a Temporal activity.
 
-    Use this when running agentic nodes (like create_react_agent) in the
-    workflow with run_in_workflow=True. Tools wrapped with temporal_tool()
-    will execute durably as activities, while unwrapped tools run locally
-    in the workflow.
+    Use this when running agentic nodes (like ``create_agent`` from LangChain
+    or ``create_react_agent`` from LangGraph). Tools wrapped with temporal_tool()
+    will execute durably as activities, providing retries and failure recovery.
 
     The wrapped tool preserves all metadata from the original tool (name,
     description, args_schema) so it works seamlessly with LangChain agents.
@@ -254,8 +253,18 @@ def temporal_tool(
             ...     start_to_close_timeout=timedelta(minutes=2),
             ... )
 
-        Mixing durable and local tools:
+        Mixing durable and local tools with create_agent (LangChain 1.0+):
 
+            >>> from langchain.agents import create_agent
+            >>> tools = [
+            ...     temporal_tool(search_web, start_to_close_timeout=timedelta(minutes=2)),
+            ...     calculator,  # Runs locally in workflow (deterministic)
+            ... ]
+            >>> agent = create_agent(model="openai:gpt-4", tools=tools)
+
+        With create_react_agent (LangGraph prebuilt, legacy):
+
+            >>> from langgraph.prebuilt import create_react_agent
             >>> tools = [
             ...     temporal_tool(search_web, start_to_close_timeout=timedelta(minutes=2)),
             ...     calculator,  # Runs locally in workflow (deterministic)
