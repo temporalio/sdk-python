@@ -91,7 +91,7 @@ Configure timeouts, retries, and task queues per node using `temporal_node_metad
 
 ```python
 from datetime import timedelta
-from langgraph.types import RetryPolicy
+from temporalio.common import RetryPolicy
 from temporalio.contrib.langgraph import temporal_node_metadata
 
 def build_configured_graph():
@@ -110,14 +110,14 @@ def build_configured_graph():
     graph.add_node(
         "fetch_data",
         fetch_from_api,
-        retry_policy=RetryPolicy(
-            max_attempts=5,
-            initial_interval=1.0,
-            backoff_factor=2.0,
-        ),
         metadata=temporal_node_metadata(
             start_to_close_timeout=timedelta(minutes=2),
             heartbeat_timeout=timedelta(seconds=30),
+            retry_policy=RetryPolicy(
+                maximum_attempts=5,
+                initial_interval=timedelta(seconds=1),
+                backoff_coefficient=2.0,
+            ),
         ),
     )
 
@@ -273,20 +273,24 @@ class LongRunningWorkflow:
 The `compile()` function accepts these parameters:
 
 ```python
+from temporalio.common import RetryPolicy
+
 app = compile(
     "graph_id",
-    # Default timeout for all nodes (overridden by node metadata)
-    default_activity_timeout=timedelta(minutes=5),
-    # Default retry attempts (overridden by node retry_policy)
-    default_max_retries=3,
-    # Default task queue (overridden by node metadata)
-    default_task_queue=None,
+    # Default configuration for all nodes (overridden by node metadata)
+    defaults=temporal_node_metadata(
+        start_to_close_timeout=timedelta(minutes=5),
+        retry_policy=RetryPolicy(maximum_attempts=3),
+        task_queue="agent-workers",
+    ),
     # Enable hybrid execution for deterministic nodes
     enable_workflow_execution=False,
     # Restore from checkpoint for continue-as-new
     checkpoint=None,
 )
 ```
+
+The `defaults` parameter accepts the same options as `temporal_node_metadata()`. Node-specific metadata overrides these defaults.
 
 ## Full Example
 

@@ -20,6 +20,9 @@ from typing_extensions import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 from temporalio.client import Client
+from temporalio.common import RetryPolicy
+
+from temporalio.contrib.langgraph import temporal_node_metadata
 
 
 class TestModels:
@@ -498,7 +501,7 @@ class TestTemporalLangGraphRunner:
         )
 
         assert runner.graph_id == "test"
-        assert runner.default_activity_timeout == timedelta(minutes=5)
+        assert runner.defaults == {}
 
     def test_runner_invoke_raises(self) -> None:
         """Synchronous invoke should raise NotImplementedError."""
@@ -607,15 +610,17 @@ class TestCompileFunction:
 
         runner = compile(
             "options_test",
-            default_activity_timeout=timedelta(minutes=10),
-            default_max_retries=5,
-            default_task_queue="custom-queue",
+            defaults=temporal_node_metadata(
+                start_to_close_timeout=timedelta(minutes=10),
+                retry_policy=RetryPolicy(maximum_attempts=5),
+                task_queue="custom-queue",
+            ),
             enable_workflow_execution=True,
         )
 
-        assert runner.default_activity_timeout == timedelta(minutes=10)
-        assert runner.default_max_retries == 5
-        assert runner.default_task_queue == "custom-queue"
+        assert runner.defaults["start_to_close_timeout"] == timedelta(minutes=10)
+        assert runner.defaults["retry_policy"].maximum_attempts == 5
+        assert runner.defaults["task_queue"] == "custom-queue"
         assert runner.enable_workflow_execution is True
 
 
@@ -782,7 +787,9 @@ class TestPerNodeConfiguration:
             graph.add_node(
                 "slow_node",
                 lambda state: {"value": 1},
-                metadata={"temporal": {"activity_timeout": timedelta(hours=2)}},
+                metadata=temporal_node_metadata(
+                    start_to_close_timeout=timedelta(hours=2),
+                ),
             )
             graph.add_node(
                 "fast_node",
@@ -800,10 +807,12 @@ class TestPerNodeConfiguration:
         runner = TemporalLangGraphRunner(
             pregel,
             graph_id="timeout_test",
-            default_activity_timeout=timedelta(minutes=5),
+            defaults=temporal_node_metadata(
+                start_to_close_timeout=timedelta(minutes=5),
+            ),
         )
 
-        # Check timeouts
+        # Check timeouts - slow_node has metadata override, fast_node uses default
         assert runner._get_node_activity_options("slow_node")["start_to_close_timeout"] == timedelta(hours=2)
         assert runner._get_node_activity_options("fast_node")["start_to_close_timeout"] == timedelta(minutes=5)
 
@@ -840,7 +849,9 @@ class TestPerNodeConfiguration:
         runner = TemporalLangGraphRunner(
             pregel,
             graph_id="queue_test",
-            default_task_queue="standard-workers",
+            defaults=temporal_node_metadata(
+                task_queue="standard-workers",
+            ),
         )
 
         assert runner._get_node_activity_options("gpu_node")["task_queue"] == "gpu-workers"
@@ -886,17 +897,19 @@ class TestPerNodeConfiguration:
         runner = TemporalLangGraphRunner(
             pregel,
             graph_id="retry_test",
-            default_max_retries=3,
+            defaults=temporal_node_metadata(
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            ),
         )
 
-        # Check flaky node has custom retry policy
+        # Check flaky node has custom retry policy (from LangGraph RetryPolicy)
         flaky_policy = runner._get_node_activity_options("flaky_node")["retry_policy"]
         assert flaky_policy.maximum_attempts == 5
         assert flaky_policy.initial_interval == timedelta(seconds=2)
         assert flaky_policy.backoff_coefficient == 3.0
         assert flaky_policy.maximum_interval == timedelta(seconds=120)
 
-        # Check reliable node uses default
+        # Check reliable node uses default from temporal_node_metadata
         reliable_policy = runner._get_node_activity_options("reliable_node")["retry_policy"]
         assert reliable_policy.maximum_attempts == 3
 

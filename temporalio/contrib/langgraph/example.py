@@ -47,6 +47,7 @@ from typing_extensions import TypedDict
 
 from temporalio import workflow
 from temporalio.client import Client
+from temporalio.common import RetryPolicy as TemporalRetryPolicy
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
 from temporalio.contrib.langgraph import LangGraphPlugin, compile, temporal_node_metadata
@@ -305,8 +306,10 @@ class CustomerSupportWorkflow:
         # Get the compiled graph runner
         app = compile(
             "support_agent",
-            default_activity_timeout=timedelta(minutes=1),
-            default_max_retries=3,
+            defaults=temporal_node_metadata(
+                start_to_close_timeout=timedelta(minutes=1),
+                retry_policy=TemporalRetryPolicy(maximum_attempts=3),
+            ),
         )
 
         # Create initial state with the customer message

@@ -102,9 +102,7 @@ class TemporalLangGraphRunner:
         self,
         pregel: Pregel,
         graph_id: str,
-        default_activity_timeout: Optional[timedelta] = None,
-        default_max_retries: int = 3,
-        default_task_queue: Optional[str] = None,
+        defaults: Optional[dict[str, Any]] = None,
         enable_workflow_execution: bool = False,
         checkpoint: Optional[dict[str, Any]] = None,
     ) -> None:
@@ -113,11 +111,9 @@ class TemporalLangGraphRunner:
         Args:
             pregel: The compiled Pregel graph instance.
             graph_id: The ID of the graph in the registry.
-            default_activity_timeout: Default timeout for node activities.
-                Defaults to 5 minutes if not specified.
-            default_max_retries: Default maximum retry attempts for activities.
-            default_task_queue: Default task queue for activities.
-                If None, uses the workflow's task queue.
+            defaults: Default activity configuration for all nodes, created via
+                `temporal_node_metadata()`. Node-specific metadata overrides these.
+                If not specified, defaults to 5 minute timeout and 3 retry attempts.
             enable_workflow_execution: If True, nodes marked with
                 metadata={"temporal": {"run_in_workflow": True}} will
                 execute directly in the workflow instead of as activities.
@@ -135,9 +131,8 @@ class TemporalLangGraphRunner:
 
         self.pregel = pregel
         self.graph_id = graph_id
-        self.default_activity_timeout = default_activity_timeout or timedelta(minutes=5)
-        self.default_max_retries = default_max_retries
-        self.default_task_queue = default_task_queue
+        # Extract defaults from temporal_node_metadata() format
+        self.defaults = (defaults or {}).get("temporal", {})
         self.enable_workflow_execution = enable_workflow_execution
         self._step_counter = 0
         # Track invocation number for unique activity IDs across replays
@@ -793,12 +788,13 @@ class TemporalLangGraphRunner:
         """Get all activity options for a specific node.
 
         Returns a dict of options that can be passed as **kwargs to execute_activity.
-        Combines metadata configuration with defaults and LangGraph retry policy mapping.
+        Combines defaults with node metadata (node metadata takes priority).
 
-        Priority for retry_policy:
-            1. Temporal RetryPolicy in metadata (highest)
-            2. LangGraph retry_policy on node
-            3. Default max retries
+        Priority for each option:
+            1. Node metadata (highest)
+            2. Defaults from compile()
+            3. LangGraph retry_policy on node (for retry_policy only)
+            4. Built-in defaults (5 min timeout, 3 retries)
 
         Args:
             node_name: The name of the node.
@@ -809,7 +805,9 @@ class TemporalLangGraphRunner:
         from temporalio.common import Priority, RetryPolicy
         from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
-        temporal_config = self._get_node_metadata(node_name)
+        node_config = self._get_node_metadata(node_name)
+        # Merge: defaults first, then node-specific overrides
+        temporal_config = {**self.defaults, **node_config}
         options: dict[str, Any] = {}
 
         # start_to_close_timeout (required, with default)
@@ -820,26 +818,25 @@ class TemporalLangGraphRunner:
         if isinstance(timeout, timedelta):
             options["start_to_close_timeout"] = timeout
         else:
-            options["start_to_close_timeout"] = self.default_activity_timeout
+            options["start_to_close_timeout"] = timedelta(minutes=5)
 
-        # task_queue (optional, with default)
+        # task_queue (optional)
         task_queue = temporal_config.get("task_queue")
         if isinstance(task_queue, str):
             options["task_queue"] = task_queue
-        elif self.default_task_queue is not None:
-            options["task_queue"] = self.default_task_queue
 
         # heartbeat_timeout (optional)
         heartbeat = temporal_config.get("heartbeat_timeout")
         if isinstance(heartbeat, timedelta):
             options["heartbeat_timeout"] = heartbeat
 
-        # retry_policy: metadata > LangGraph > default
-        metadata_policy = temporal_config.get("retry_policy")
-        if isinstance(metadata_policy, RetryPolicy):
-            options["retry_policy"] = metadata_policy
+        # retry_policy priority: node metadata > LangGraph native > defaults > built-in
+        node_policy = node_config.get("retry_policy")
+        if isinstance(node_policy, RetryPolicy):
+            # Node metadata has explicit Temporal RetryPolicy
+            options["retry_policy"] = node_policy
         else:
-            # Check for LangGraph retry_policy
+            # Check for LangGraph native retry_policy on node
             node = self.pregel.nodes.get(node_name)
             retry_policies = getattr(node, "retry_policy", None) if node else None
             if retry_policies and len(retry_policies) > 0:
@@ -851,10 +848,12 @@ class TemporalLangGraphRunner:
                     maximum_interval=timedelta(seconds=lg_policy.max_interval),
                     maximum_attempts=lg_policy.max_attempts,
                 )
+            elif isinstance(self.defaults.get("retry_policy"), RetryPolicy):
+                # Use defaults retry_policy
+                options["retry_policy"] = self.defaults["retry_policy"]
             else:
-                options["retry_policy"] = RetryPolicy(
-                    maximum_attempts=self.default_max_retries
-                )
+                # Built-in default
+                options["retry_policy"] = RetryPolicy(maximum_attempts=3)
 
         # schedule_to_close_timeout (optional)
         schedule_to_close = temporal_config.get("schedule_to_close_timeout")

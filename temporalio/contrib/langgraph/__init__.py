@@ -185,9 +185,7 @@ def temporal_node_metadata(
 def compile(
     graph_id: str,
     *,
-    default_activity_timeout: Optional[timedelta] = None,
-    default_max_retries: int = 3,
-    default_task_queue: Optional[str] = None,
+    defaults: Optional[dict[str, Any]] = None,
     enable_workflow_execution: bool = False,
     checkpoint: Optional[dict] = None,
 ) -> TemporalLangGraphRunner:
@@ -204,12 +202,9 @@ def compile(
     Args:
         graph_id: ID of the graph registered with LangGraphPlugin.
             This should match a key in the `graphs` dict passed to the plugin.
-        default_activity_timeout: Default timeout for node activities.
-            Can be overridden per-node via metadata. Default: 5 minutes.
-        default_max_retries: Default maximum retry attempts for activities.
-            Can be overridden per-node via retry_policy. Default: 3.
-        default_task_queue: Default task queue for activities.
-            If None, uses the workflow's task queue.
+        defaults: Default activity configuration for all nodes, created via
+            `temporal_node_metadata()`. Node-specific metadata overrides these.
+            If not specified, defaults to 5 minute timeout and 3 retry attempts.
         enable_workflow_execution: Enable hybrid execution mode.
             If True, nodes marked with metadata={"temporal": {"run_in_workflow": True}}
             will run directly in the workflow instead of as activities.
@@ -228,7 +223,7 @@ def compile(
     Example:
         Setup (main.py):
             >>> from temporalio.client import Client
-            >>> from temporalio.contrib.langgraph import LangGraphPlugin
+            >>> from temporalio.contrib.langgraph import LangGraphPlugin, temporal_node_metadata
             >>>
             >>> def build_weather_agent():
             ...     graph = StateGraph(AgentState)
@@ -241,13 +236,19 @@ def compile(
             >>> client = await Client.connect("localhost:7233", plugins=[plugin])
 
         Usage (workflow.py):
-            >>> from temporalio.contrib.langgraph import compile
+            >>> from temporalio.contrib.langgraph import compile, temporal_node_metadata
             >>>
             >>> @workflow.defn
             >>> class WeatherAgentWorkflow:
             ...     @workflow.run
             ...     async def run(self, graph_id: str, query: str):
-            ...         app = compile(graph_id)
+            ...         app = compile(
+            ...             graph_id,
+            ...             defaults=temporal_node_metadata(
+            ...                 start_to_close_timeout=timedelta(minutes=10),
+            ...                 task_queue="agent-workers",
+            ...             ),
+            ...         )
             ...         return await app.ainvoke({"query": query})
 
         Usage with continue-as-new (workflow.py):
@@ -271,9 +272,7 @@ def compile(
     return TemporalLangGraphRunner(
         pregel,
         graph_id=graph_id,
-        default_activity_timeout=default_activity_timeout,
-        default_max_retries=default_max_retries,
-        default_task_queue=default_task_queue,
+        defaults=defaults,
         enable_workflow_execution=enable_workflow_execution,
         checkpoint=checkpoint,
     )
