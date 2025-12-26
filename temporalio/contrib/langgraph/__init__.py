@@ -60,7 +60,7 @@ from temporalio.contrib.langgraph._plugin import LangGraphPlugin
 from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
 
 
-def temporal_node_metadata(
+def node_activity_options(
     *,
     schedule_to_close_timeout: Optional[timedelta] = None,
     schedule_to_start_timeout: Optional[timedelta] = None,
@@ -74,11 +74,11 @@ def temporal_node_metadata(
     priority: Optional[temporalio.common.Priority] = None,
     run_in_workflow: bool = False,
 ) -> dict[str, Any]:
-    """Create typed metadata for LangGraph nodes with Temporal activity configuration.
+    """Create activity options for LangGraph nodes.
 
     This helper provides type-safe configuration for LangGraph nodes when using
-    the Temporal integration. It returns a properly structured metadata dict
-    that can be passed to `graph.add_node()`.
+    the Temporal integration. It returns a properly structured dict that can be
+    passed to `graph.add_node(metadata=...)` or to `compile()` parameters.
 
     All parameters mirror the options available in `workflow.execute_activity()`.
 
@@ -115,7 +115,7 @@ def temporal_node_metadata(
             >>> graph.add_node(
             ...     "fetch_data",
             ...     fetch_from_api,
-            ...     metadata=temporal_node_metadata(
+            ...     metadata=node_activity_options(
             ...         start_to_close_timeout=timedelta(minutes=2),
             ...         heartbeat_timeout=timedelta(seconds=30),
             ...     ),
@@ -126,7 +126,7 @@ def temporal_node_metadata(
             >>> graph.add_node(
             ...     "unreliable_api",
             ...     call_api,
-            ...     metadata=temporal_node_metadata(
+            ...     metadata=node_activity_options(
             ...         start_to_close_timeout=timedelta(minutes=5),
             ...         retry_policy=RetryPolicy(
             ...             initial_interval=timedelta(seconds=1),
@@ -140,7 +140,7 @@ def temporal_node_metadata(
             >>> graph.add_node(
             ...     "gpu_inference",
             ...     run_inference,
-            ...     metadata=temporal_node_metadata(
+            ...     metadata=node_activity_options(
             ...         start_to_close_timeout=timedelta(hours=1),
             ...         task_queue="gpu-workers",
             ...         heartbeat_timeout=timedelta(minutes=1),
@@ -151,7 +151,7 @@ def temporal_node_metadata(
             >>> graph.add_node(
             ...     "process",
             ...     process_data,
-            ...     metadata=temporal_node_metadata(
+            ...     metadata=node_activity_options(
             ...         task_queue="gpu-workers",
             ...     ) | {"custom_key": "custom_value"},
             ... )
@@ -185,7 +185,8 @@ def temporal_node_metadata(
 def compile(
     graph_id: str,
     *,
-    defaults: Optional[dict[str, Any]] = None,
+    default_activity_options: Optional[dict[str, Any]] = None,
+    per_node_activity_options: Optional[dict[str, dict[str, Any]]] = None,
     enable_workflow_execution: bool = False,
     checkpoint: Optional[dict] = None,
 ) -> TemporalLangGraphRunner:
@@ -202,9 +203,14 @@ def compile(
     Args:
         graph_id: ID of the graph registered with LangGraphPlugin.
             This should match a key in the `graphs` dict passed to the plugin.
-        defaults: Default activity configuration for all nodes, created via
-            `temporal_node_metadata()`. Node-specific metadata overrides these.
+        default_activity_options: Default activity options for all nodes, created
+            via `node_activity_options()`. Node-specific options override these.
             If not specified, defaults to 5 minute timeout and 3 retry attempts.
+        per_node_activity_options: Per-node options mapping node names to
+            `node_activity_options()`. Use this to configure existing graphs
+            without modifying their source code. Takes precedence over
+            `default_activity_options` but is overridden by options set directly
+            on the node via add_node(metadata=...).
         enable_workflow_execution: Enable hybrid execution mode.
             If True, nodes marked with metadata={"temporal": {"run_in_workflow": True}}
             will run directly in the workflow instead of as activities.
@@ -223,7 +229,7 @@ def compile(
     Example:
         Setup (main.py):
             >>> from temporalio.client import Client
-            >>> from temporalio.contrib.langgraph import LangGraphPlugin, temporal_node_metadata
+            >>> from temporalio.contrib.langgraph import LangGraphPlugin, node_activity_options
             >>>
             >>> def build_weather_agent():
             ...     graph = StateGraph(AgentState)
@@ -235,8 +241,8 @@ def compile(
             ... )
             >>> client = await Client.connect("localhost:7233", plugins=[plugin])
 
-        Usage (workflow.py):
-            >>> from temporalio.contrib.langgraph import compile, temporal_node_metadata
+        Usage with defaults (workflow.py):
+            >>> from temporalio.contrib.langgraph import compile, node_activity_options
             >>>
             >>> @workflow.defn
             >>> class WeatherAgentWorkflow:
@@ -244,12 +250,28 @@ def compile(
             ...     async def run(self, graph_id: str, query: str):
             ...         app = compile(
             ...             graph_id,
-            ...             defaults=temporal_node_metadata(
+            ...             default_activity_options=node_activity_options(
             ...                 start_to_close_timeout=timedelta(minutes=10),
-            ...                 task_queue="agent-workers",
             ...             ),
             ...         )
             ...         return await app.ainvoke({"query": query})
+
+        Usage with per-node options (existing graphs):
+            >>> app = compile(
+            ...     "my_graph",
+            ...     default_activity_options=node_activity_options(
+            ...         start_to_close_timeout=timedelta(minutes=5),
+            ...     ),
+            ...     per_node_activity_options={
+            ...         "slow_node": node_activity_options(
+            ...             start_to_close_timeout=timedelta(hours=2),
+            ...         ),
+            ...         "gpu_node": node_activity_options(
+            ...             task_queue="gpu-workers",
+            ...             start_to_close_timeout=timedelta(hours=1),
+            ...         ),
+            ...     },
+            ... )
 
         Usage with continue-as-new (workflow.py):
             >>> @workflow.defn
@@ -272,7 +294,8 @@ def compile(
     return TemporalLangGraphRunner(
         pregel,
         graph_id=graph_id,
-        defaults=defaults,
+        default_activity_options=default_activity_options,
+        per_node_activity_options=per_node_activity_options,
         enable_workflow_execution=enable_workflow_execution,
         checkpoint=checkpoint,
     )
@@ -281,7 +304,7 @@ def compile(
 __all__ = [
     "compile",
     "LangGraphPlugin",
+    "node_activity_options",
     "StateSnapshot",
     "TemporalLangGraphRunner",
-    "temporal_node_metadata",
 ]

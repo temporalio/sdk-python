@@ -50,7 +50,7 @@ from temporalio.client import Client
 from temporalio.common import RetryPolicy as TemporalRetryPolicy
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
-from temporalio.contrib.langgraph import LangGraphPlugin, compile, temporal_node_metadata
+from temporalio.contrib.langgraph import LangGraphPlugin, compile, node_activity_options
 
 if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph
@@ -192,7 +192,7 @@ def build_support_agent() -> Any:
     graph.add_node(
         "classify",
         classify_query,
-        metadata=temporal_node_metadata(
+        metadata=node_activity_options(
             start_to_close_timeout=timedelta(seconds=30),
         ),
         # Retry quickly for classification
@@ -202,7 +202,7 @@ def build_support_agent() -> Any:
     graph.add_node(
         "billing",
         handle_billing,
-        metadata=temporal_node_metadata(
+        metadata=node_activity_options(
             start_to_close_timeout=timedelta(minutes=2),
         ),
         # Billing lookups may need more retries
@@ -212,7 +212,7 @@ def build_support_agent() -> Any:
     graph.add_node(
         "technical",
         handle_technical,
-        metadata=temporal_node_metadata(
+        metadata=node_activity_options(
             start_to_close_timeout=timedelta(minutes=5),
             heartbeat_timeout=timedelta(seconds=30),
         ),
@@ -223,7 +223,7 @@ def build_support_agent() -> Any:
     graph.add_node(
         "general",
         handle_general,
-        metadata=temporal_node_metadata(
+        metadata=node_activity_options(
             start_to_close_timeout=timedelta(seconds=30),
         ),
     )
@@ -231,7 +231,7 @@ def build_support_agent() -> Any:
     graph.add_node(
         "escalate",
         escalate_to_human,
-        metadata=temporal_node_metadata(
+        metadata=node_activity_options(
             start_to_close_timeout=timedelta(seconds=10),
         ),
     )
@@ -239,7 +239,7 @@ def build_support_agent() -> Any:
     graph.add_node(
         "respond",
         generate_response,
-        metadata=temporal_node_metadata(
+        metadata=node_activity_options(
             start_to_close_timeout=timedelta(seconds=10),
         ),
     )
@@ -306,7 +306,7 @@ class CustomerSupportWorkflow:
         # Get the compiled graph runner
         app = compile(
             "support_agent",
-            defaults=temporal_node_metadata(
+            default_activity_options=node_activity_options(
                 start_to_close_timeout=timedelta(minutes=1),
                 retry_policy=TemporalRetryPolicy(maximum_attempts=3),
             ),

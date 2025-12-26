@@ -102,7 +102,8 @@ class TemporalLangGraphRunner:
         self,
         pregel: Pregel,
         graph_id: str,
-        defaults: Optional[dict[str, Any]] = None,
+        default_activity_options: Optional[dict[str, Any]] = None,
+        per_node_activity_options: Optional[dict[str, dict[str, Any]]] = None,
         enable_workflow_execution: bool = False,
         checkpoint: Optional[dict[str, Any]] = None,
     ) -> None:
@@ -111,9 +112,14 @@ class TemporalLangGraphRunner:
         Args:
             pregel: The compiled Pregel graph instance.
             graph_id: The ID of the graph in the registry.
-            defaults: Default activity configuration for all nodes, created via
-                `temporal_node_metadata()`. Node-specific metadata overrides these.
-                If not specified, defaults to 5 minute timeout and 3 retry attempts.
+            default_activity_options: Default activity options for all nodes,
+                created via `activity_options()`. Node-specific options override
+                these. If not specified, defaults to 5 minute timeout and 3 retries.
+            per_node_activity_options: Per-node options mapping node names to
+                `activity_options()`. Use this to configure existing graphs
+                without modifying their source code. Takes precedence over
+                `default_activity_options` but is overridden by options set directly
+                on the node via add_node(metadata=...).
             enable_workflow_execution: If True, nodes marked with
                 metadata={"temporal": {"run_in_workflow": True}} will
                 execute directly in the workflow instead of as activities.
@@ -131,8 +137,13 @@ class TemporalLangGraphRunner:
 
         self.pregel = pregel
         self.graph_id = graph_id
-        # Extract defaults from temporal_node_metadata() format
-        self.defaults = (defaults or {}).get("temporal", {})
+        # Extract defaults from activity_options() format
+        self.default_activity_options = (default_activity_options or {}).get("temporal", {})
+        # Extract per_node_activity_options from activity_options() format for each node
+        self.per_node_activity_options = {
+            node_name: cfg.get("temporal", {})
+            for node_name, cfg in (per_node_activity_options or {}).items()
+        }
         self.enable_workflow_execution = enable_workflow_execution
         self._step_counter = 0
         # Track invocation number for unique activity IDs across replays
@@ -791,10 +802,11 @@ class TemporalLangGraphRunner:
         Combines defaults with node metadata (node metadata takes priority).
 
         Priority for each option:
-            1. Node metadata (highest)
-            2. Defaults from compile()
-            3. LangGraph retry_policy on node (for retry_policy only)
-            4. Built-in defaults (5 min timeout, 3 retries)
+            1. Node metadata from add_node() (highest)
+            2. node_config from compile()
+            3. defaults from compile()
+            4. LangGraph retry_policy on node (for retry_policy only)
+            5. Built-in defaults (5 min timeout, 3 retries)
 
         Args:
             node_name: The name of the node.
@@ -805,9 +817,10 @@ class TemporalLangGraphRunner:
         from temporalio.common import Priority, RetryPolicy
         from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
-        node_config = self._get_node_metadata(node_name)
-        # Merge: defaults first, then node-specific overrides
-        temporal_config = {**self.defaults, **node_config}
+        node_metadata = self._get_node_metadata(node_name)
+        compile_node_options = self.per_node_activity_options.get(node_name, {})
+        # Merge: default_activity_options < per_node_activity_options < node metadata from add_node
+        temporal_config = {**self.default_activity_options, **compile_node_options, **node_metadata}
         options: dict[str, Any] = {}
 
         # start_to_close_timeout (required, with default)
@@ -830,8 +843,8 @@ class TemporalLangGraphRunner:
         if isinstance(heartbeat, timedelta):
             options["heartbeat_timeout"] = heartbeat
 
-        # retry_policy priority: node metadata > LangGraph native > defaults > built-in
-        node_policy = node_config.get("retry_policy")
+        # retry_policy priority: node metadata > per_node_activity_options > LangGraph native > default_activity_options > built-in
+        node_policy = node_metadata.get("retry_policy") or compile_node_options.get("retry_policy")
         if isinstance(node_policy, RetryPolicy):
             # Node metadata has explicit Temporal RetryPolicy
             options["retry_policy"] = node_policy
@@ -848,9 +861,9 @@ class TemporalLangGraphRunner:
                     maximum_interval=timedelta(seconds=lg_policy.max_interval),
                     maximum_attempts=lg_policy.max_attempts,
                 )
-            elif isinstance(self.defaults.get("retry_policy"), RetryPolicy):
-                # Use defaults retry_policy
-                options["retry_policy"] = self.defaults["retry_policy"]
+            elif isinstance(self.default_activity_options.get("retry_policy"), RetryPolicy):
+                # Use default_activity_options retry_policy
+                options["retry_policy"] = self.default_activity_options["retry_policy"]
             else:
                 # Built-in default
                 options["retry_policy"] = RetryPolicy(maximum_attempts=3)

@@ -22,7 +22,7 @@ from langgraph.graph import END, START, StateGraph
 from temporalio.client import Client
 from temporalio.common import RetryPolicy
 
-from temporalio.contrib.langgraph import temporal_node_metadata
+from temporalio.contrib.langgraph import node_activity_options
 
 
 class TestModels:
@@ -501,7 +501,7 @@ class TestTemporalLangGraphRunner:
         )
 
         assert runner.graph_id == "test"
-        assert runner.defaults == {}
+        assert runner.default_activity_options == {}
 
     def test_runner_invoke_raises(self) -> None:
         """Synchronous invoke should raise NotImplementedError."""
@@ -610,7 +610,7 @@ class TestCompileFunction:
 
         runner = compile(
             "options_test",
-            defaults=temporal_node_metadata(
+            default_activity_options=node_activity_options(
                 start_to_close_timeout=timedelta(minutes=10),
                 retry_policy=RetryPolicy(maximum_attempts=5),
                 task_queue="custom-queue",
@@ -618,9 +618,9 @@ class TestCompileFunction:
             enable_workflow_execution=True,
         )
 
-        assert runner.defaults["start_to_close_timeout"] == timedelta(minutes=10)
-        assert runner.defaults["retry_policy"].maximum_attempts == 5
-        assert runner.defaults["task_queue"] == "custom-queue"
+        assert runner.default_activity_options["start_to_close_timeout"] == timedelta(minutes=10)
+        assert runner.default_activity_options["retry_policy"].maximum_attempts == 5
+        assert runner.default_activity_options["task_queue"] == "custom-queue"
         assert runner.enable_workflow_execution is True
 
 
@@ -787,7 +787,7 @@ class TestPerNodeConfiguration:
             graph.add_node(
                 "slow_node",
                 lambda state: {"value": 1},
-                metadata=temporal_node_metadata(
+                metadata=node_activity_options(
                     start_to_close_timeout=timedelta(hours=2),
                 ),
             )
@@ -807,7 +807,7 @@ class TestPerNodeConfiguration:
         runner = TemporalLangGraphRunner(
             pregel,
             graph_id="timeout_test",
-            defaults=temporal_node_metadata(
+            default_activity_options=node_activity_options(
                 start_to_close_timeout=timedelta(minutes=5),
             ),
         )
@@ -849,7 +849,7 @@ class TestPerNodeConfiguration:
         runner = TemporalLangGraphRunner(
             pregel,
             graph_id="queue_test",
-            defaults=temporal_node_metadata(
+            default_activity_options=node_activity_options(
                 task_queue="standard-workers",
             ),
         )
@@ -897,7 +897,7 @@ class TestPerNodeConfiguration:
         runner = TemporalLangGraphRunner(
             pregel,
             graph_id="retry_test",
-            defaults=temporal_node_metadata(
+            default_activity_options=node_activity_options(
                 retry_policy=RetryPolicy(maximum_attempts=3),
             ),
         )
@@ -955,6 +955,111 @@ class TestPerNodeConfiguration:
 
         assert runner._get_node_activity_options("long_running").get("heartbeat_timeout") == timedelta(minutes=5)
         assert runner._get_node_activity_options("short_running").get("heartbeat_timeout") is None
+
+    def test_node_config_from_compile(self) -> None:
+        """Runner should use node_config from compile() for existing graphs."""
+        from temporalio.contrib.langgraph import LangGraphPlugin
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        get_global_registry().clear()
+
+        class State(TypedDict, total=False):
+            value: int
+
+        # Graph without any Temporal metadata (simulates existing graph)
+        def build():
+            graph = StateGraph(State)
+            graph.add_node("slow_node", lambda state: {"value": 1})
+            graph.add_node("gpu_node", lambda state: {"value": 2})
+            graph.add_node("normal_node", lambda state: {"value": 3})
+            graph.add_edge(START, "slow_node")
+            graph.add_edge("slow_node", "gpu_node")
+            graph.add_edge("gpu_node", "normal_node")
+            graph.add_edge("normal_node", END)
+            return graph.compile()
+
+        LangGraphPlugin(graphs={"existing_graph": build})
+        pregel = get_global_registry().get_graph("existing_graph")
+
+        # Configure nodes via compile() without modifying graph source
+        runner = TemporalLangGraphRunner(
+            pregel,
+            graph_id="existing_graph",
+            default_activity_options=node_activity_options(
+                start_to_close_timeout=timedelta(minutes=5),
+            ),
+            per_node_activity_options={
+                "slow_node": node_activity_options(
+                    start_to_close_timeout=timedelta(hours=2),
+                ),
+                "gpu_node": node_activity_options(
+                    task_queue="gpu-workers",
+                    start_to_close_timeout=timedelta(hours=1),
+                ),
+            },
+        )
+
+        # slow_node: timeout from node_config
+        assert runner._get_node_activity_options("slow_node")["start_to_close_timeout"] == timedelta(hours=2)
+        # gpu_node: task_queue and timeout from node_config
+        assert runner._get_node_activity_options("gpu_node")["task_queue"] == "gpu-workers"
+        assert runner._get_node_activity_options("gpu_node")["start_to_close_timeout"] == timedelta(hours=1)
+        # normal_node: uses defaults
+        assert runner._get_node_activity_options("normal_node")["start_to_close_timeout"] == timedelta(minutes=5)
+        assert "task_queue" not in runner._get_node_activity_options("normal_node")
+
+    def test_node_config_priority(self) -> None:
+        """Node metadata from add_node() should override node_config from compile()."""
+        from temporalio.contrib.langgraph import LangGraphPlugin
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        get_global_registry().clear()
+
+        class State(TypedDict, total=False):
+            value: int
+
+        # Graph with Temporal metadata on one node
+        def build():
+            graph = StateGraph(State)
+            graph.add_node(
+                "node_with_metadata",
+                lambda state: {"value": 1},
+                metadata=node_activity_options(
+                    start_to_close_timeout=timedelta(minutes=30),  # From add_node
+                ),
+            )
+            graph.add_node("node_without_metadata", lambda state: {"value": 2})
+            graph.add_edge(START, "node_with_metadata")
+            graph.add_edge("node_with_metadata", "node_without_metadata")
+            graph.add_edge("node_without_metadata", END)
+            return graph.compile()
+
+        LangGraphPlugin(graphs={"priority_test": build})
+        pregel = get_global_registry().get_graph("priority_test")
+
+        # Try to override via per_node_activity_options
+        runner = TemporalLangGraphRunner(
+            pregel,
+            graph_id="priority_test",
+            default_activity_options=node_activity_options(
+                start_to_close_timeout=timedelta(minutes=5),
+            ),
+            per_node_activity_options={
+                "node_with_metadata": node_activity_options(
+                    start_to_close_timeout=timedelta(hours=1),  # Should be ignored
+                ),
+                "node_without_metadata": node_activity_options(
+                    start_to_close_timeout=timedelta(minutes=15),  # Should apply
+                ),
+            },
+        )
+
+        # node_with_metadata: metadata from add_node wins over node_config
+        assert runner._get_node_activity_options("node_with_metadata")["start_to_close_timeout"] == timedelta(minutes=30)
+        # node_without_metadata: node_config wins over defaults
+        assert runner._get_node_activity_options("node_without_metadata")["start_to_close_timeout"] == timedelta(minutes=15)
 
 
 class TestInterruptHandling:
