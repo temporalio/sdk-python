@@ -20,7 +20,9 @@ from temporalio.contrib.langgraph._models import (
     InterruptValue,
     NodeActivityInput,
     NodeActivityOutput,
+    StoreSnapshot,
 )
+from temporalio.contrib.langgraph._store import ActivityLocalStore
 
 if TYPE_CHECKING:
     from langchain_core.runnables import RunnableConfig
@@ -28,16 +30,19 @@ if TYPE_CHECKING:
 # Import CONFIG_KEY_SEND and CONFIG_KEY_READ for Pregel context injection
 # CONFIG_KEY_SEND is for write capture, CONFIG_KEY_READ is for state reading
 # CONFIG_KEY_SCRATCHPAD is needed for interrupt() to work
+# CONFIG_KEY_RUNTIME is for injecting the runtime with store access
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     from langgraph.constants import CONFIG_KEY_SEND
     from langgraph._internal._constants import (
         CONFIG_KEY_CHECKPOINT_NS,
         CONFIG_KEY_READ,
+        CONFIG_KEY_RUNTIME,
         CONFIG_KEY_SCRATCHPAD,
     )
     from langgraph._internal._scratchpad import PregelScratchpad
     from langgraph.errors import GraphInterrupt as LangGraphInterrupt
+    from langgraph.runtime import Runtime
 
 
 @activity.defn(name="execute_langgraph_node")
@@ -160,6 +165,11 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
         subgraph_counter=lambda: 0,
     )
 
+    # Create activity-local store if snapshot provided
+    store: ActivityLocalStore | None = None
+    if input_data.store_snapshot is not None:
+        store = ActivityLocalStore(input_data.store_snapshot)
+
     configurable: dict[str, Any] = {
         **input_data.config.get("configurable", {}),
         CONFIG_KEY_SEND: writes.extend,  # Callback to capture writes
@@ -167,6 +177,12 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
         CONFIG_KEY_SCRATCHPAD: scratchpad,  # Scratchpad for interrupt handling
         CONFIG_KEY_CHECKPOINT_NS: "",  # Namespace for checkpointing (used by interrupt)
     }
+
+    # Inject store via Runtime if available
+    # LangGraph's get_store() accesses store through config[configurable][__pregel_runtime].store
+    if store is not None:
+        runtime = Runtime(store=store)
+        configurable[CONFIG_KEY_RUNTIME] = runtime
 
     config: dict[str, Any] = {
         **input_data.config,
@@ -213,6 +229,8 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
             if interrupts and len(interrupts) > 0:
                 # Get the value from the first Interrupt object
                 interrupt_value = interrupts[0].value
+        # Collect store writes even on interrupt
+        store_writes = store.get_writes() if store is not None else []
         return NodeActivityOutput(
             writes=[],
             interrupt=InterruptValue(
@@ -220,6 +238,7 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
                 node_name=input_data.node_name,
                 task_id=input_data.task_id,
             ),
+            store_writes=store_writes,
         )
     except Exception:
         # Send heartbeat indicating failure before re-raising
@@ -258,4 +277,7 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
         ChannelWrite.create(channel, value) for channel, value in writes
     ]
 
-    return NodeActivityOutput(writes=channel_writes)
+    # Collect store writes
+    store_writes = store.get_writes() if store is not None else []
+
+    return NodeActivityOutput(writes=channel_writes, store_writes=store_writes)

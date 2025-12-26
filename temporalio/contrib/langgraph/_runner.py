@@ -24,6 +24,9 @@ from temporalio.contrib.langgraph._models import (
     InterruptValue,
     NodeActivityInput,
     StateSnapshot,
+    StoreItem,
+    StoreSnapshot,
+    StoreWrite,
 )
 
 if TYPE_CHECKING:
@@ -152,6 +155,8 @@ class TemporalLangGraphRunner:
         self._resumed_node_writes: dict[str, list[tuple[str, Any]]] = {}
         # Track the last output state for get_state()
         self._last_output: Optional[dict[str, Any]] = None
+        # Store state for cross-node persistence (key: (namespace, key), value: dict)
+        self._store_state: dict[tuple[tuple[str, ...], str], dict[str, Any]] = {}
 
         # Restore from checkpoint if provided
         if checkpoint is not None:
@@ -523,6 +528,9 @@ class TemporalLangGraphRunner:
         """
         self._step_counter += 1
 
+        # Prepare store snapshot for the activity
+        store_snapshot = self._prepare_store_snapshot()
+
         # Build activity input
         activity_input = NodeActivityInput(
             node_name=task.name,
@@ -533,6 +541,7 @@ class TemporalLangGraphRunner:
             path=cast("tuple[str | int, ...]", task.path),
             triggers=list(task.triggers) if task.triggers else [],
             resume_value=resume_value,
+            store_snapshot=store_snapshot,
         )
 
         # Get node-specific configuration
@@ -563,6 +572,11 @@ class TemporalLangGraphRunner:
             retry_policy=retry_policy,
             heartbeat_timeout=heartbeat_timeout,
         )
+
+        # Apply store writes from the activity (before checking interrupt)
+        # This ensures store mutations are preserved even if the node interrupts
+        if result.store_writes:
+            self._apply_store_writes(result.store_writes)
 
         # Check if the node raised an interrupt
         if result.interrupt is not None:
@@ -601,6 +615,9 @@ class TemporalLangGraphRunner:
         """
         self._step_counter += 1
 
+        # Prepare store snapshot for the activity
+        store_snapshot = self._prepare_store_snapshot()
+
         # Build activity input with resume value
         activity_input = NodeActivityInput(
             node_name=node_name,
@@ -611,6 +628,7 @@ class TemporalLangGraphRunner:
             path=tuple(),
             triggers=[],
             resume_value=self._resume_value,
+            store_snapshot=store_snapshot,
         )
 
         # Get node-specific configuration
@@ -635,6 +653,10 @@ class TemporalLangGraphRunner:
             retry_policy=retry_policy,
             heartbeat_timeout=heartbeat_timeout,
         )
+
+        # Apply store writes from the activity
+        if result.store_writes:
+            self._apply_store_writes(result.store_writes)
 
         # Check if the node interrupted again
         if result.interrupt is not None:
@@ -862,6 +884,7 @@ class TemporalLangGraphRunner:
                 "completed_nodes": list(self._completed_nodes_in_cycle),
             },
             tasks=tasks,
+            store_state=self._serialize_store_state(),
         )
 
     def _restore_from_checkpoint(self, checkpoint: dict[str, Any]) -> None:
@@ -897,3 +920,52 @@ class TemporalLangGraphRunner:
                 node_name=task.get("interrupt_node", ""),
                 task_id=task.get("interrupt_task_id", ""),
             )
+
+        # Restore store state
+        store_state = checkpoint.get("store_state", {})
+        self._store_state = {
+            (tuple(item["namespace"]), item["key"]): item["value"]
+            for item in store_state
+        }
+
+    def _prepare_store_snapshot(self) -> Optional[StoreSnapshot]:
+        """Prepare a store snapshot for activity input.
+
+        Creates a snapshot of the current store state to pass to an activity.
+        The activity will use this snapshot for reads and capture writes.
+
+        Returns:
+            StoreSnapshot if there's store data, None otherwise.
+        """
+        if not self._store_state:
+            return None
+
+        items = [
+            StoreItem(namespace=ns, key=key, value=value)
+            for (ns, key), value in self._store_state.items()
+        ]
+        return StoreSnapshot(items=items)
+
+    def _apply_store_writes(self, writes: list[StoreWrite]) -> None:
+        """Apply store writes from an activity to the workflow store state.
+
+        Args:
+            writes: List of store write operations from the activity.
+        """
+        for write in writes:
+            key = (tuple(write.namespace), write.key)
+            if write.operation == "put" and write.value is not None:
+                self._store_state[key] = write.value
+            elif write.operation == "delete":
+                self._store_state.pop(key, None)
+
+    def _serialize_store_state(self) -> list[dict[str, Any]]:
+        """Serialize store state for checkpoint.
+
+        Returns:
+            List of dicts suitable for JSON serialization.
+        """
+        return [
+            {"namespace": list(ns), "key": key, "value": value}
+            for (ns, key), value in self._store_state.items()
+        ]

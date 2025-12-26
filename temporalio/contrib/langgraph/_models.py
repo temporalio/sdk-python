@@ -7,7 +7,7 @@ discriminated unions.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any, Optional, Union
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Optional, Union
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict
 
@@ -46,6 +46,65 @@ def _coerce_state_values(state: dict[str, Any]) -> dict[str, Any]:
 
 # Type alias for state dict with automatic message coercion
 LangGraphState = Annotated[dict[str, Any], BeforeValidator(_coerce_state_values)]
+
+
+# ==============================================================================
+# Store Models
+# ==============================================================================
+
+
+class StoreItem(BaseModel):
+    """Single item in the store.
+
+    Represents a key-value pair within a namespace.
+
+    Attributes:
+        namespace: Hierarchical namespace tuple (e.g., ("user", "123")).
+        key: The key within the namespace.
+        value: The stored value (must be JSON-serializable).
+    """
+
+    namespace: tuple[str, ...]
+    key: str
+    value: dict[str, Any]
+
+
+class StoreWrite(BaseModel):
+    """A write operation to be applied to the store.
+
+    Captures store mutations made during node execution for replay
+    in the workflow.
+
+    Attributes:
+        operation: Either "put" (upsert) or "delete".
+        namespace: The target namespace.
+        key: The key to write/delete.
+        value: The value to store (None for delete operations).
+    """
+
+    operation: Literal["put", "delete"]
+    namespace: tuple[str, ...]
+    key: str
+    value: Optional[dict[str, Any]] = None
+
+
+class StoreSnapshot(BaseModel):
+    """Snapshot of store data passed to an activity.
+
+    Contains the subset of store data that a node may need to read.
+    Currently passes the entire store; future optimization could
+    use namespace hints to reduce payload size.
+
+    Attributes:
+        items: List of store items to make available to the node.
+    """
+
+    items: list[StoreItem] = []
+
+
+# ==============================================================================
+# Channel Write Models
+# ==============================================================================
 
 
 def _is_langchain_message(value: Any) -> bool:
@@ -146,6 +205,9 @@ class NodeActivityInput(BaseModel):
         resume_value: Value to return from interrupt() when resuming.
             If provided, the node's interrupt() call will return this value
             instead of raising an interrupt.
+        store_snapshot: Snapshot of store data for the node to read/write.
+            If provided, an ActivityLocalStore will be created and injected
+            into the node's config.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -158,6 +220,7 @@ class NodeActivityInput(BaseModel):
     path: tuple[str | int, ...]
     triggers: list[str]
     resume_value: Optional[Any] = None
+    store_snapshot: Optional[StoreSnapshot] = None
 
 
 class InterruptValue(BaseModel):
@@ -185,12 +248,16 @@ class NodeActivityOutput(BaseModel):
         writes: List of channel writes produced by the node.
         interrupt: If set, the node called interrupt() and this contains
             the interrupt data. When interrupt is set, writes may be empty.
+        store_writes: List of store write operations made by the node.
+            These will be applied to the workflow's store state after
+            the activity completes.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     writes: list[ChannelWrite]
     interrupt: Optional[InterruptValue] = None
+    store_writes: list[StoreWrite] = []
 
     def to_write_tuples(self) -> list[tuple[str, Any]]:
         """Convert writes to (channel, value) tuples.
@@ -215,6 +282,7 @@ class StateSnapshot(BaseModel):
             contains the interrupted node name if execution was interrupted.
         metadata: Execution metadata including step count and completed nodes.
         tasks: Pending interrupt information (if any).
+        store_state: Serialized store data for cross-node persistence.
 
     Example (continue-as-new pattern):
         >>> @workflow.defn
@@ -245,3 +313,6 @@ class StateSnapshot(BaseModel):
 
     tasks: tuple[dict[str, Any], ...]
     """Pending tasks/interrupts. Contains interrupt info if execution was interrupted."""
+
+    store_state: list[dict[str, Any]] = []
+    """Serialized store data for cross-node persistence."""

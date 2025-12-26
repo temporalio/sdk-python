@@ -123,6 +123,213 @@ class TestModels:
         tuples = output.to_write_tuples()
         assert tuples == [("a", 1), ("b", 2)]
 
+    def test_store_item(self) -> None:
+        """StoreItem should store namespace, key, value."""
+        from temporalio.contrib.langgraph._models import StoreItem
+
+        item = StoreItem(
+            namespace=("user", "123"),
+            key="preferences",
+            value={"theme": "dark"},
+        )
+        assert item.namespace == ("user", "123")
+        assert item.key == "preferences"
+        assert item.value == {"theme": "dark"}
+
+    def test_store_write_put(self) -> None:
+        """StoreWrite should represent put operations."""
+        from temporalio.contrib.langgraph._models import StoreWrite
+
+        write = StoreWrite(
+            operation="put",
+            namespace=("user", "123"),
+            key="settings",
+            value={"notifications": True},
+        )
+        assert write.operation == "put"
+        assert write.namespace == ("user", "123")
+        assert write.key == "settings"
+        assert write.value == {"notifications": True}
+
+    def test_store_write_delete(self) -> None:
+        """StoreWrite should represent delete operations."""
+        from temporalio.contrib.langgraph._models import StoreWrite
+
+        write = StoreWrite(
+            operation="delete",
+            namespace=("user", "123"),
+            key="old_key",
+        )
+        assert write.operation == "delete"
+        assert write.value is None
+
+    def test_store_snapshot(self) -> None:
+        """StoreSnapshot should contain list of store items."""
+        from temporalio.contrib.langgraph._models import StoreItem, StoreSnapshot
+
+        snapshot = StoreSnapshot(
+            items=[
+                StoreItem(namespace=("user", "1"), key="k1", value={"v": 1}),
+                StoreItem(namespace=("user", "2"), key="k2", value={"v": 2}),
+            ]
+        )
+        assert len(snapshot.items) == 2
+        assert snapshot.items[0].key == "k1"
+
+    def test_node_activity_input_with_store(self) -> None:
+        """NodeActivityInput should include store_snapshot."""
+        from temporalio.contrib.langgraph._models import (
+            NodeActivityInput,
+            StoreItem,
+            StoreSnapshot,
+        )
+
+        snapshot = StoreSnapshot(
+            items=[StoreItem(namespace=("user",), key="k", value={"v": 1})]
+        )
+        input_data = NodeActivityInput(
+            node_name="my_node",
+            task_id="task_123",
+            graph_id="my_graph",
+            input_state={"value": 1},
+            config={},
+            path=tuple(),
+            triggers=[],
+            store_snapshot=snapshot,
+        )
+        assert input_data.store_snapshot is not None
+        assert len(input_data.store_snapshot.items) == 1
+
+    def test_node_activity_output_with_store_writes(self) -> None:
+        """NodeActivityOutput should include store_writes."""
+        from temporalio.contrib.langgraph._models import (
+            NodeActivityOutput,
+            StoreWrite,
+        )
+
+        output = NodeActivityOutput(
+            writes=[],
+            store_writes=[
+                StoreWrite(
+                    operation="put",
+                    namespace=("user", "1"),
+                    key="pref",
+                    value={"v": 1},
+                )
+            ],
+        )
+        assert len(output.store_writes) == 1
+        assert output.store_writes[0].operation == "put"
+
+
+class TestActivityLocalStore:
+    """Tests for ActivityLocalStore."""
+
+    def test_put_and_get(self) -> None:
+        """Store should support put and get operations."""
+        from langgraph.store.base import GetOp, Item, PutOp
+
+        from temporalio.contrib.langgraph._models import StoreSnapshot
+        from temporalio.contrib.langgraph._store import ActivityLocalStore
+
+        store = ActivityLocalStore(StoreSnapshot(items=[]))
+
+        # Put a value
+        ops = store.batch([
+            PutOp(
+                namespace=("user", "123"),
+                key="prefs",
+                value={"theme": "dark"},
+            )
+        ])
+        assert ops == [None]  # Put returns None
+
+        # Get it back (read-your-writes)
+        results = store.batch([GetOp(namespace=("user", "123"), key="prefs")])
+        item = results[0]
+        assert isinstance(item, Item)
+        assert item.value == {"theme": "dark"}
+
+        # Check writes were captured
+        writes = store.get_writes()
+        assert len(writes) == 1
+        assert writes[0].operation == "put"
+        assert writes[0].value == {"theme": "dark"}
+
+    def test_get_from_snapshot(self) -> None:
+        """Store should read from snapshot for items not in local cache."""
+        from langgraph.store.base import GetOp, Item
+
+        from temporalio.contrib.langgraph._models import StoreItem, StoreSnapshot
+        from temporalio.contrib.langgraph._store import ActivityLocalStore
+
+        snapshot = StoreSnapshot(
+            items=[
+                StoreItem(
+                    namespace=("user", "123"),
+                    key="existing",
+                    value={"from": "snapshot"},
+                )
+            ]
+        )
+        store = ActivityLocalStore(snapshot)
+
+        results = store.batch([GetOp(namespace=("user", "123"), key="existing")])
+        item = results[0]
+        assert isinstance(item, Item)
+        assert item.value == {"from": "snapshot"}
+
+        # No writes since we only read
+        assert store.get_writes() == []
+
+    def test_delete(self) -> None:
+        """Store should support delete operations."""
+        from langgraph.store.base import GetOp, PutOp
+
+        from temporalio.contrib.langgraph._models import StoreSnapshot
+        from temporalio.contrib.langgraph._store import ActivityLocalStore
+
+        store = ActivityLocalStore(StoreSnapshot(items=[]))
+
+        # Put then delete
+        store.batch([PutOp(namespace=("ns",), key="k", value={"v": 1})])
+        store.batch([PutOp(namespace=("ns",), key="k", value=None)])  # None = delete
+
+        # Should be deleted
+        results = store.batch([GetOp(namespace=("ns",), key="k")])
+        assert results[0] is None
+
+        # Check writes include both put and delete
+        writes = store.get_writes()
+        assert len(writes) == 2
+        assert writes[0].operation == "put"
+        assert writes[1].operation == "delete"
+
+    def test_search(self) -> None:
+        """Store should support search operations."""
+        from langgraph.store.base import PutOp, SearchOp
+
+        from temporalio.contrib.langgraph._models import StoreItem, StoreSnapshot
+        from temporalio.contrib.langgraph._store import ActivityLocalStore
+
+        snapshot = StoreSnapshot(
+            items=[
+                StoreItem(namespace=("user", "1"), key="a", value={"v": 1}),
+                StoreItem(namespace=("user", "1"), key="b", value={"v": 2}),
+                StoreItem(namespace=("other",), key="c", value={"v": 3}),
+            ]
+        )
+        store = ActivityLocalStore(snapshot)
+
+        # Add a local write
+        store.batch([PutOp(namespace=("user", "1"), key="d", value={"v": 4})])
+
+        # Search for user/1 namespace
+        results = store.batch([SearchOp(namespace_prefix=("user", "1"), filter=None, limit=10)])
+        items = results[0]
+        assert isinstance(items, list)
+        assert len(items) == 3  # a, b, d (not c which is in different namespace)
+
 
 class TestGraphRegistry:
     """Tests for the graph registry."""
