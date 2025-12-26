@@ -165,10 +165,10 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
         subgraph_counter=lambda: 0,
     )
 
-    # Create activity-local store if snapshot provided
-    store: ActivityLocalStore | None = None
-    if input_data.store_snapshot is not None:
-        store = ActivityLocalStore(input_data.store_snapshot)
+    # Create activity-local store for node execution
+    # Always create a store so get_store() works, even on first invocation with no data
+    store_snapshot = input_data.store_snapshot or StoreSnapshot(items=[])
+    store = ActivityLocalStore(store_snapshot)
 
     configurable: dict[str, Any] = {
         **input_data.config.get("configurable", {}),
@@ -178,11 +178,10 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
         CONFIG_KEY_CHECKPOINT_NS: "",  # Namespace for checkpointing (used by interrupt)
     }
 
-    # Inject store via Runtime if available
+    # Inject store via Runtime
     # LangGraph's get_store() accesses store through config[configurable][__pregel_runtime].store
-    if store is not None:
-        runtime = Runtime(store=store)
-        configurable[CONFIG_KEY_RUNTIME] = runtime
+    runtime = Runtime(store=store)
+    configurable[CONFIG_KEY_RUNTIME] = runtime
 
     config: dict[str, Any] = {
         **input_data.config,
@@ -230,7 +229,7 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
                 # Get the value from the first Interrupt object
                 interrupt_value = interrupts[0].value
         # Collect store writes even on interrupt
-        store_writes = store.get_writes() if store is not None else []
+        store_writes = store.get_writes()
         return NodeActivityOutput(
             writes=[],
             interrupt=InterruptValue(
@@ -278,6 +277,6 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
     ]
 
     # Collect store writes
-    store_writes = store.get_writes() if store is not None else []
+    store_writes = store.get_writes()
 
     return NodeActivityOutput(writes=channel_writes, store_writes=store_writes)

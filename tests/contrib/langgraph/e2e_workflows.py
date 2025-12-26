@@ -184,6 +184,55 @@ class MultiInterruptWorkflow:
 
 
 @workflow.defn
+class StoreWorkflow:
+    """Workflow that tests store functionality across nodes.
+
+    This tests that:
+    1. Node1 can write to the store
+    2. Node2 (in a subsequent activity) can read node1's writes
+    3. Store data persists across node executions within a workflow
+    """
+
+    @workflow.run
+    async def run(self, user_id: str) -> dict:
+        app = lg_compile("e2e_store")
+        return await app.ainvoke({"user_id": user_id})
+
+
+@workflow.defn
+class MultiInvokeStoreWorkflow:
+    """Workflow that invokes the same graph multiple times.
+
+    This tests that store data persists across multiple ainvoke() calls
+    within the same workflow execution. Each invocation increments a
+    counter in the store, and can read the previous count.
+    """
+
+    @workflow.run
+    async def run(self, user_id: str, num_invocations: int) -> list[dict]:
+        """Run the counter graph multiple times.
+
+        Args:
+            user_id: User ID for store namespace.
+            num_invocations: How many times to invoke the graph.
+
+        Returns:
+            List of results from each invocation.
+        """
+        app = lg_compile("e2e_counter")
+        results = []
+
+        for i in range(num_invocations):
+            result = await app.ainvoke({
+                "user_id": user_id,
+                "invocation_num": i + 1,
+            })
+            results.append(result)
+
+        return results
+
+
+@workflow.defn
 class ContinueAsNewWorkflow:
     """Workflow demonstrating continue-as-new with checkpoint.
 
