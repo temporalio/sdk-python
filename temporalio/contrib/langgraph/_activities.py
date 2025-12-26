@@ -271,12 +271,29 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
         }
     )
 
-    # Convert writes to ChannelWrite for type preservation
-    channel_writes = [
-        ChannelWrite.create(channel, value) for channel, value in writes
-    ]
+    # Separate Send objects from regular channel writes
+    # Send objects are control flow instructions that need to go back to the
+    # Pregel loop in the workflow to create new tasks
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        from langgraph.types import Send
+
+    from temporalio.contrib.langgraph._models import SendPacket
+
+    # Convert writes to ChannelWrite, capturing Send objects separately
+    channel_writes = []
+    send_packets = []
+    for channel, value in writes:
+        if isinstance(value, Send):
+            send_packets.append(SendPacket.from_send(value))
+        else:
+            channel_writes.append(ChannelWrite.create(channel, value))
 
     # Collect store writes
     store_writes = store.get_writes()
 
-    return NodeActivityOutput(writes=channel_writes, store_writes=store_writes)
+    return NodeActivityOutput(
+        writes=channel_writes,
+        store_writes=store_writes,
+        send_packets=send_packets,
+    )

@@ -241,6 +241,36 @@ class InterruptValue(BaseModel):
     task_id: str
 
 
+class SendPacket(BaseModel):
+    """Serialized representation of a LangGraph Send object.
+
+    Send objects are returned from conditional edge functions to create
+    dynamic parallel tasks. They cannot be serialized directly, so we
+    convert them to this model for passing between activities and workflows.
+
+    Attributes:
+        node: The target node name to send to.
+        arg: The state/argument to pass to the target node.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    node: str
+    arg: dict[str, Any]
+
+    @classmethod
+    def from_send(cls, send: Any) -> "SendPacket":
+        """Create a SendPacket from a LangGraph Send object.
+
+        Args:
+            send: A langgraph.types.Send object.
+
+        Returns:
+            A serializable SendPacket.
+        """
+        return cls(node=send.node, arg=send.arg)
+
+
 class NodeActivityOutput(BaseModel):
     """Output data from the node execution activity.
 
@@ -251,6 +281,9 @@ class NodeActivityOutput(BaseModel):
         store_writes: List of store write operations made by the node.
             These will be applied to the workflow's store state after
             the activity completes.
+        send_packets: List of Send operations to dispatch to other nodes.
+            These are produced by conditional edge functions and need to
+            be processed by the runner to create new tasks.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -258,6 +291,7 @@ class NodeActivityOutput(BaseModel):
     writes: list[ChannelWrite]
     interrupt: Optional[InterruptValue] = None
     store_writes: list[StoreWrite] = []
+    send_packets: list[SendPacket] = []
 
     def to_write_tuples(self) -> list[tuple[str, Any]]:
         """Convert writes to (channel, value) tuples.

@@ -423,10 +423,13 @@ class TemporalLangGraphRunner:
         if self._should_run_in_workflow(task.name):
             # Execute directly in workflow (for deterministic operations)
             # Note: workflow execution doesn't support interrupts currently
-            writes = await self._execute_in_workflow(task)
+            writes: list[tuple[str, Any]] = await self._execute_in_workflow(task)
+            send_packets: list[Any] = []
         else:
             # Execute as activity
-            writes = await self._execute_as_activity(task, resume_for_task)
+            writes, send_packets = await self._execute_as_activity_with_sends(
+                task, resume_for_task
+            )
 
         # Check if an interrupt occurred
         if self._pending_interrupt is not None:
@@ -444,6 +447,15 @@ class TemporalLangGraphRunner:
         # Record writes to the loop
         # This is how activity results flow back into the Pregel state
         task.writes.extend(writes)
+
+        # Handle Send packets - execute each as a separate task
+        # Send creates dynamic tasks with custom input (Send.arg)
+        if send_packets:
+            send_writes = await self._execute_send_packets(send_packets, task.config)
+            if self._pending_interrupt is not None:
+                return False
+            task.writes.extend(send_writes)
+
         return True
 
     def _should_run_in_workflow(self, node_name: str) -> bool:
@@ -509,12 +521,12 @@ class TemporalLangGraphRunner:
 
         return list(writes)
 
-    async def _execute_as_activity(
+    async def _execute_as_activity_with_sends(
         self,
         task: PregelExecutableTask,
         resume_value: Optional[Any] = None,
-    ) -> list[tuple[str, Any]]:
-        """Execute a task as a Temporal activity.
+    ) -> tuple[list[tuple[str, Any]], list[Any]]:
+        """Execute a task as a Temporal activity, returning writes and send packets.
 
         Args:
             task: The task to execute.
@@ -523,7 +535,9 @@ class TemporalLangGraphRunner:
                 return this value instead of raising.
 
         Returns:
-            List of (channel, value) tuples representing the writes.
+            Tuple of (writes, send_packets) where:
+            - writes: List of (channel, value) tuples representing state writes
+            - send_packets: List of SendPacket objects for dynamic task creation
             If the node called interrupt(), _pending_interrupt will be set.
         """
         self._step_counter += 1
@@ -550,12 +564,7 @@ class TemporalLangGraphRunner:
         retry_policy = self._get_node_retry_policy(task.name)
         heartbeat_timeout = self._get_node_heartbeat_timeout(task.name)
 
-        # Generate unique activity ID to prevent replay confusion
-        # When resuming, the activity input differs (has resume_value), but Temporal
-        # matches activities by type+position in code, not input. Using a unique ID
-        # based on invocation ID, step counter, and node name ensures each
-        # execution is distinct, even across workflow replays.
-        # Prefer invocation_id from config (workflow-controlled) over internal counter.
+        # Generate unique activity ID
         config_dict = cast("dict[str, Any]", task.config)
         invocation_id = config_dict.get("configurable", {}).get(
             "invocation_id", self._invocation_counter
@@ -574,23 +583,105 @@ class TemporalLangGraphRunner:
         )
 
         # Apply store writes from the activity (before checking interrupt)
-        # This ensures store mutations are preserved even if the node interrupts
         if result.store_writes:
             self._apply_store_writes(result.store_writes)
 
         # Check if the node raised an interrupt
         if result.interrupt is not None:
-            # Save state for resume - use task input as the state at interrupt
             self._interrupted_state = cast("dict[str, Any]", task.input)
-            # Save which node interrupted so we can pass resume value to it
             self._interrupted_node_name = task.name
-            # Store the interrupt for the caller to handle
             self._pending_interrupt = result.interrupt
-            # Return empty writes - the interrupt stops further execution
-            return []
+            return [], []
 
-        # Convert ChannelWrite objects to tuples
-        return result.to_write_tuples()
+        # Return writes and send_packets separately
+        return result.to_write_tuples(), list(result.send_packets)
+
+    async def _execute_send_packets(
+        self,
+        send_packets: list[Any],
+        config: Any,
+    ) -> list[tuple[str, Any]]:
+        """Execute Send packets as separate activities.
+
+        Send packets create dynamic tasks with custom input (Send.arg).
+        Each Send is executed as a separate activity with Send.arg as the input state.
+
+        Args:
+            send_packets: List of SendPacket objects from a conditional edge.
+            config: The config from the parent task.
+
+        Returns:
+            List of (channel, value) tuples from all Send task executions.
+        """
+        all_writes: list[tuple[str, Any]] = []
+
+        for packet in send_packets:
+            self._step_counter += 1
+
+            # Prepare store snapshot
+            store_snapshot = self._prepare_store_snapshot()
+
+            # Build activity input with Send.arg as the input state
+            activity_input = NodeActivityInput(
+                node_name=packet.node,
+                task_id=f"send-{packet.node}-{self._step_counter}",
+                graph_id=self.graph_id,
+                input_state=packet.arg,  # Send.arg is the custom input
+                config=self._filter_config(cast("dict[str, Any]", config)),
+                path=tuple(),
+                triggers=[],
+                resume_value=None,
+                store_snapshot=store_snapshot,
+            )
+
+            # Get node-specific configuration
+            timeout = self._get_node_timeout(packet.node)
+            task_queue = self._get_node_task_queue(packet.node)
+            retry_policy = self._get_node_retry_policy(packet.node)
+            heartbeat_timeout = self._get_node_heartbeat_timeout(packet.node)
+
+            # Generate unique activity ID
+            config_dict = cast("dict[str, Any]", config)
+            invocation_id = config_dict.get("configurable", {}).get(
+                "invocation_id", self._invocation_counter
+            )
+            activity_id = f"inv{invocation_id}-send-{packet.node}-{self._step_counter}"
+
+            # Execute activity
+            result = await workflow.execute_activity(
+                execute_node,
+                activity_input,
+                activity_id=activity_id,
+                start_to_close_timeout=timeout,
+                task_queue=task_queue,
+                retry_policy=retry_policy,
+                heartbeat_timeout=heartbeat_timeout,
+            )
+
+            # Apply store writes
+            if result.store_writes:
+                self._apply_store_writes(result.store_writes)
+
+            # Check for interrupt
+            if result.interrupt is not None:
+                self._interrupted_state = packet.arg
+                self._interrupted_node_name = packet.node
+                self._pending_interrupt = result.interrupt
+                return all_writes
+
+            # Collect writes
+            all_writes.extend(result.to_write_tuples())
+
+            # Handle nested Send packets recursively
+            if result.send_packets:
+                nested_writes = await self._execute_send_packets(
+                    list(result.send_packets), config
+                )
+                if self._pending_interrupt is not None:
+                    return all_writes
+                all_writes.extend(nested_writes)
+
+        return all_writes
 
     async def _execute_resumed_node(
         self,
