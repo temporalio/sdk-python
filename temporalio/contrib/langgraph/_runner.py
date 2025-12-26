@@ -559,10 +559,7 @@ class TemporalLangGraphRunner:
         )
 
         # Get node-specific configuration
-        timeout = self._get_node_timeout(task.name)
-        task_queue = self._get_node_task_queue(task.name)
-        retry_policy = self._get_node_retry_policy(task.name)
-        heartbeat_timeout = self._get_node_heartbeat_timeout(task.name)
+        activity_options = self._get_node_activity_options(task.name)
 
         # Generate unique activity ID
         config_dict = cast("dict[str, Any]", task.config)
@@ -576,10 +573,7 @@ class TemporalLangGraphRunner:
             execute_node,
             activity_input,
             activity_id=activity_id,
-            start_to_close_timeout=timeout,
-            task_queue=task_queue,
-            retry_policy=retry_policy,
-            heartbeat_timeout=heartbeat_timeout,
+            **activity_options,
         )
 
         # Apply store writes from the activity (before checking interrupt)
@@ -635,10 +629,7 @@ class TemporalLangGraphRunner:
             )
 
             # Get node-specific configuration
-            timeout = self._get_node_timeout(packet.node)
-            task_queue = self._get_node_task_queue(packet.node)
-            retry_policy = self._get_node_retry_policy(packet.node)
-            heartbeat_timeout = self._get_node_heartbeat_timeout(packet.node)
+            activity_options = self._get_node_activity_options(packet.node)
 
             # Generate unique activity ID
             config_dict = cast("dict[str, Any]", config)
@@ -652,10 +643,7 @@ class TemporalLangGraphRunner:
                 execute_node,
                 activity_input,
                 activity_id=activity_id,
-                start_to_close_timeout=timeout,
-                task_queue=task_queue,
-                retry_policy=retry_policy,
-                heartbeat_timeout=heartbeat_timeout,
+                **activity_options,
             )
 
             # Apply store writes
@@ -723,10 +711,7 @@ class TemporalLangGraphRunner:
         )
 
         # Get node-specific configuration
-        timeout = self._get_node_timeout(node_name)
-        task_queue = self._get_node_task_queue(node_name)
-        retry_policy = self._get_node_retry_policy(node_name)
-        heartbeat_timeout = self._get_node_heartbeat_timeout(node_name)
+        activity_options = self._get_node_activity_options(node_name)
 
         # Generate unique activity ID
         invocation_id = config.get("configurable", {}).get(
@@ -739,10 +724,7 @@ class TemporalLangGraphRunner:
             execute_node,
             activity_input,
             activity_id=activity_id,
-            start_to_close_timeout=timeout,
-            task_queue=task_queue,
-            retry_policy=retry_policy,
-            heartbeat_timeout=heartbeat_timeout,
+            **activity_options,
         )
 
         # Apply store writes from the activity
@@ -807,98 +789,104 @@ class TemporalLangGraphRunner:
         metadata = getattr(node, "metadata", None) or {}
         return metadata.get("temporal", {})
 
-    def _get_node_timeout(self, node_name: str) -> timedelta:
-        """Get the timeout for a specific node.
+    def _get_node_activity_options(self, node_name: str) -> dict[str, Any]:
+        """Get all activity options for a specific node.
 
-        Priority: node metadata > default
-        Looks for metadata={"temporal": {"activity_timeout": timedelta(...)}}
+        Returns a dict of options that can be passed as **kwargs to execute_activity.
+        Combines metadata configuration with defaults and LangGraph retry policy mapping.
+
+        Priority for retry_policy:
+            1. Temporal RetryPolicy in metadata (highest)
+            2. LangGraph retry_policy on node
+            3. Default max retries
 
         Args:
             node_name: The name of the node.
 
         Returns:
-            The timeout for the node's activity.
+            Dict of activity options for execute_activity().
         """
+        from temporalio.common import Priority, RetryPolicy
+        from temporalio.workflow import ActivityCancellationType, VersioningIntent
+
         temporal_config = self._get_node_metadata(node_name)
-        timeout = temporal_config.get("activity_timeout")
+        options: dict[str, Any] = {}
+
+        # start_to_close_timeout (required, with default)
+        # Check new key first, fall back to legacy key
+        timeout = temporal_config.get(
+            "start_to_close_timeout", temporal_config.get("activity_timeout")
+        )
         if isinstance(timeout, timedelta):
-            return timeout
-        return self.default_activity_timeout
+            options["start_to_close_timeout"] = timeout
+        else:
+            options["start_to_close_timeout"] = self.default_activity_timeout
 
-    def _get_node_task_queue(self, node_name: str) -> Optional[str]:
-        """Get the task queue for a specific node.
-
-        Priority: node metadata > default
-        Looks for metadata={"temporal": {"task_queue": "queue-name"}}
-
-        Args:
-            node_name: The name of the node.
-
-        Returns:
-            The task queue for the node's activity, or None for default.
-        """
-        temporal_config = self._get_node_metadata(node_name)
+        # task_queue (optional, with default)
         task_queue = temporal_config.get("task_queue")
         if isinstance(task_queue, str):
-            return task_queue
-        return self.default_task_queue
+            options["task_queue"] = task_queue
+        elif self.default_task_queue is not None:
+            options["task_queue"] = self.default_task_queue
 
-    def _get_node_heartbeat_timeout(self, node_name: str) -> Optional[timedelta]:
-        """Get the heartbeat timeout for a specific node.
+        # heartbeat_timeout (optional)
+        heartbeat = temporal_config.get("heartbeat_timeout")
+        if isinstance(heartbeat, timedelta):
+            options["heartbeat_timeout"] = heartbeat
 
-        Looks for metadata={"temporal": {"heartbeat_timeout": timedelta(...)}}
+        # retry_policy: metadata > LangGraph > default
+        metadata_policy = temporal_config.get("retry_policy")
+        if isinstance(metadata_policy, RetryPolicy):
+            options["retry_policy"] = metadata_policy
+        else:
+            # Check for LangGraph retry_policy
+            node = self.pregel.nodes.get(node_name)
+            retry_policies = getattr(node, "retry_policy", None) if node else None
+            if retry_policies and len(retry_policies) > 0:
+                # LangGraph stores as tuple, use first policy
+                lg_policy = retry_policies[0]
+                options["retry_policy"] = RetryPolicy(
+                    initial_interval=timedelta(seconds=lg_policy.initial_interval),
+                    backoff_coefficient=lg_policy.backoff_factor,
+                    maximum_interval=timedelta(seconds=lg_policy.max_interval),
+                    maximum_attempts=lg_policy.max_attempts,
+                )
+            else:
+                options["retry_policy"] = RetryPolicy(
+                    maximum_attempts=self.default_max_retries
+                )
 
-        Args:
-            node_name: The name of the node.
+        # schedule_to_close_timeout (optional)
+        schedule_to_close = temporal_config.get("schedule_to_close_timeout")
+        if isinstance(schedule_to_close, timedelta):
+            options["schedule_to_close_timeout"] = schedule_to_close
 
-        Returns:
-            The heartbeat timeout, or None if not specified.
-        """
-        temporal_config = self._get_node_metadata(node_name)
-        timeout = temporal_config.get("heartbeat_timeout")
-        if isinstance(timeout, timedelta):
-            return timeout
-        return None
+        # schedule_to_start_timeout (optional)
+        schedule_to_start = temporal_config.get("schedule_to_start_timeout")
+        if isinstance(schedule_to_start, timedelta):
+            options["schedule_to_start_timeout"] = schedule_to_start
 
-    def _get_node_retry_policy(self, node_name: str) -> Any:
-        """Get the retry policy for a specific node.
+        # cancellation_type (optional)
+        cancellation_type = temporal_config.get("cancellation_type")
+        if isinstance(cancellation_type, ActivityCancellationType):
+            options["cancellation_type"] = cancellation_type
 
-        Maps LangGraph's RetryPolicy to Temporal's RetryPolicy.
-        Priority: node retry_policy > default
+        # versioning_intent (optional)
+        versioning_intent = temporal_config.get("versioning_intent")
+        if isinstance(versioning_intent, VersioningIntent):
+            options["versioning_intent"] = versioning_intent
 
-        LangGraph RetryPolicy fields:
-        - initial_interval: float (seconds)
-        - backoff_factor: float
-        - max_interval: float (seconds)
-        - max_attempts: int
-        - jitter: bool (not mapped to Temporal)
-        - retry_on: Callable (not mapped to Temporal)
+        # summary (optional)
+        summary = temporal_config.get("summary")
+        if isinstance(summary, str):
+            options["summary"] = summary
 
-        Args:
-            node_name: The name of the node.
+        # priority (optional)
+        priority = temporal_config.get("priority")
+        if isinstance(priority, Priority):
+            options["priority"] = priority
 
-        Returns:
-            Temporal RetryPolicy for the node's activity.
-        """
-        from temporalio.common import RetryPolicy
-
-        node = self.pregel.nodes.get(node_name)
-        if node is None:
-            return RetryPolicy(maximum_attempts=self.default_max_retries)
-
-        # Check for LangGraph retry_policy
-        retry_policies = getattr(node, "retry_policy", None)
-        if retry_policies and len(retry_policies) > 0:
-            # LangGraph stores as tuple, use first policy
-            lg_policy = retry_policies[0]
-            return RetryPolicy(
-                initial_interval=timedelta(seconds=lg_policy.initial_interval),
-                backoff_coefficient=lg_policy.backoff_factor,
-                maximum_interval=timedelta(seconds=lg_policy.max_interval),
-                maximum_attempts=lg_policy.max_attempts,
-            )
-
-        return RetryPolicy(maximum_attempts=self.default_max_retries)
+        return options
 
     def invoke(
         self,

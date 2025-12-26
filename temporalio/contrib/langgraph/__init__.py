@@ -49,12 +49,137 @@ Key Components:
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Optional
+from typing import Any, Optional
+
+import temporalio.common
+import temporalio.workflow
 
 from temporalio.contrib.langgraph._graph_registry import get_graph
 from temporalio.contrib.langgraph._models import StateSnapshot
 from temporalio.contrib.langgraph._plugin import LangGraphPlugin
 from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+
+def temporal_node_metadata(
+    *,
+    schedule_to_close_timeout: Optional[timedelta] = None,
+    schedule_to_start_timeout: Optional[timedelta] = None,
+    start_to_close_timeout: Optional[timedelta] = None,
+    heartbeat_timeout: Optional[timedelta] = None,
+    task_queue: Optional[str] = None,
+    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
+    cancellation_type: Optional[temporalio.workflow.ActivityCancellationType] = None,
+    versioning_intent: Optional[temporalio.workflow.VersioningIntent] = None,
+    summary: Optional[str] = None,
+    priority: Optional[temporalio.common.Priority] = None,
+    run_in_workflow: bool = False,
+) -> dict[str, Any]:
+    """Create typed metadata for LangGraph nodes with Temporal activity configuration.
+
+    This helper provides type-safe configuration for LangGraph nodes when using
+    the Temporal integration. It returns a properly structured metadata dict
+    that can be passed to `graph.add_node()`.
+
+    All parameters mirror the options available in `workflow.execute_activity()`.
+
+    Args:
+        schedule_to_close_timeout: Total time allowed from scheduling to completion,
+            including retries. If not set, defaults to start_to_close_timeout.
+        schedule_to_start_timeout: Maximum time from scheduling until the activity
+            starts executing on a worker.
+        start_to_close_timeout: Maximum time for a single activity execution attempt.
+            This is the primary timeout for node execution.
+        heartbeat_timeout: Maximum time between heartbeat requests. Required for
+            activities that call `activity.heartbeat()`. If an activity doesn't
+            heartbeat within this interval, it may be considered stalled and retried.
+        task_queue: Route this node to a specific task queue (e.g., for GPU workers
+            or high-memory workers). If None, uses the workflow's task queue.
+        retry_policy: Temporal retry policy for the activity. If set, this takes
+            precedence over LangGraph's native `retry_policy` parameter.
+        cancellation_type: How cancellation of this activity is handled.
+            See `ActivityCancellationType` for options.
+        versioning_intent: Whether to run on a compatible worker Build ID.
+            See `VersioningIntent` for options.
+        summary: A human-readable summary of the activity for observability.
+        priority: Priority for task queue ordering when tasks are backlogged.
+        run_in_workflow: If True and `enable_workflow_execution=True` is set on
+            `compile()`, this node will run directly in the workflow instead of
+            as an activity. Only use for deterministic, non-I/O operations.
+
+    Returns:
+        A metadata dict with Temporal configuration under the "temporal" key.
+        Can be merged with other metadata using the `|` operator.
+
+    Example:
+        Basic usage with timeouts:
+            >>> graph.add_node(
+            ...     "fetch_data",
+            ...     fetch_from_api,
+            ...     metadata=temporal_node_metadata(
+            ...         start_to_close_timeout=timedelta(minutes=2),
+            ...         heartbeat_timeout=timedelta(seconds=30),
+            ...     ),
+            ... )
+
+        With retry policy:
+            >>> from temporalio.common import RetryPolicy
+            >>> graph.add_node(
+            ...     "unreliable_api",
+            ...     call_api,
+            ...     metadata=temporal_node_metadata(
+            ...         start_to_close_timeout=timedelta(minutes=5),
+            ...         retry_policy=RetryPolicy(
+            ...             initial_interval=timedelta(seconds=1),
+            ...             maximum_attempts=5,
+            ...             backoff_coefficient=2.0,
+            ...         ),
+            ...     ),
+            ... )
+
+        Routing to specialized workers:
+            >>> graph.add_node(
+            ...     "gpu_inference",
+            ...     run_inference,
+            ...     metadata=temporal_node_metadata(
+            ...         start_to_close_timeout=timedelta(hours=1),
+            ...         task_queue="gpu-workers",
+            ...         heartbeat_timeout=timedelta(minutes=1),
+            ...     ),
+            ... )
+
+        Combining with other metadata:
+            >>> graph.add_node(
+            ...     "process",
+            ...     process_data,
+            ...     metadata=temporal_node_metadata(
+            ...         task_queue="gpu-workers",
+            ...     ) | {"custom_key": "custom_value"},
+            ... )
+    """
+    config: dict[str, Any] = {}
+    if schedule_to_close_timeout is not None:
+        config["schedule_to_close_timeout"] = schedule_to_close_timeout
+    if schedule_to_start_timeout is not None:
+        config["schedule_to_start_timeout"] = schedule_to_start_timeout
+    if start_to_close_timeout is not None:
+        config["start_to_close_timeout"] = start_to_close_timeout
+    if heartbeat_timeout is not None:
+        config["heartbeat_timeout"] = heartbeat_timeout
+    if task_queue is not None:
+        config["task_queue"] = task_queue
+    if retry_policy is not None:
+        config["retry_policy"] = retry_policy
+    if cancellation_type is not None:
+        config["cancellation_type"] = cancellation_type
+    if versioning_intent is not None:
+        config["versioning_intent"] = versioning_intent
+    if summary is not None:
+        config["summary"] = summary
+    if priority is not None:
+        config["priority"] = priority
+    if run_in_workflow:
+        config["run_in_workflow"] = True
+    return {"temporal": config}
 
 
 def compile(
@@ -159,4 +284,5 @@ __all__ = [
     "LangGraphPlugin",
     "StateSnapshot",
     "TemporalLangGraphRunner",
+    "temporal_node_metadata",
 ]

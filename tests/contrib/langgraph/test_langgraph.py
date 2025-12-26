@@ -804,8 +804,8 @@ class TestPerNodeConfiguration:
         )
 
         # Check timeouts
-        assert runner._get_node_timeout("slow_node") == timedelta(hours=2)
-        assert runner._get_node_timeout("fast_node") == timedelta(minutes=5)
+        assert runner._get_node_activity_options("slow_node")["start_to_close_timeout"] == timedelta(hours=2)
+        assert runner._get_node_activity_options("fast_node")["start_to_close_timeout"] == timedelta(minutes=5)
 
     def test_node_task_queue_from_metadata(self) -> None:
         """Runner should read task_queue from node metadata."""
@@ -843,8 +843,8 @@ class TestPerNodeConfiguration:
             default_task_queue="standard-workers",
         )
 
-        assert runner._get_node_task_queue("gpu_node") == "gpu-workers"
-        assert runner._get_node_task_queue("cpu_node") == "standard-workers"
+        assert runner._get_node_activity_options("gpu_node")["task_queue"] == "gpu-workers"
+        assert runner._get_node_activity_options("cpu_node")["task_queue"] == "standard-workers"
 
     def test_node_retry_policy_mapping(self) -> None:
         """Runner should map LangGraph RetryPolicy to Temporal RetryPolicy."""
@@ -890,14 +890,14 @@ class TestPerNodeConfiguration:
         )
 
         # Check flaky node has custom retry policy
-        flaky_policy = runner._get_node_retry_policy("flaky_node")
+        flaky_policy = runner._get_node_activity_options("flaky_node")["retry_policy"]
         assert flaky_policy.maximum_attempts == 5
         assert flaky_policy.initial_interval == timedelta(seconds=2)
         assert flaky_policy.backoff_coefficient == 3.0
         assert flaky_policy.maximum_interval == timedelta(seconds=120)
 
         # Check reliable node uses default
-        reliable_policy = runner._get_node_retry_policy("reliable_node")
+        reliable_policy = runner._get_node_activity_options("reliable_node")["retry_policy"]
         assert reliable_policy.maximum_attempts == 3
 
     def test_node_heartbeat_timeout_from_metadata(self) -> None:
@@ -940,8 +940,8 @@ class TestPerNodeConfiguration:
             graph_id="heartbeat_test",
         )
 
-        assert runner._get_node_heartbeat_timeout("long_running") == timedelta(minutes=5)
-        assert runner._get_node_heartbeat_timeout("short_running") is None
+        assert runner._get_node_activity_options("long_running").get("heartbeat_timeout") == timedelta(minutes=5)
+        assert runner._get_node_activity_options("short_running").get("heartbeat_timeout") is None
 
 
 class TestInterruptHandling:

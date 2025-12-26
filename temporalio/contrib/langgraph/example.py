@@ -49,7 +49,7 @@ from temporalio import workflow
 from temporalio.client import Client
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
-from temporalio.contrib.langgraph import LangGraphPlugin, compile
+from temporalio.contrib.langgraph import LangGraphPlugin, compile, temporal_node_metadata
 
 if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph
@@ -191,11 +191,9 @@ def build_support_agent() -> Any:
     graph.add_node(
         "classify",
         classify_query,
-        metadata={
-            "temporal": {
-                "activity_timeout": timedelta(seconds=30),
-            }
-        },
+        metadata=temporal_node_metadata(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
         # Retry quickly for classification
         retry_policy=RetryPolicy(max_attempts=3, initial_interval=0.5),
     )
@@ -203,11 +201,9 @@ def build_support_agent() -> Any:
     graph.add_node(
         "billing",
         handle_billing,
-        metadata={
-            "temporal": {
-                "activity_timeout": timedelta(minutes=2),
-            }
-        },
+        metadata=temporal_node_metadata(
+            start_to_close_timeout=timedelta(minutes=2),
+        ),
         # Billing lookups may need more retries
         retry_policy=RetryPolicy(max_attempts=5, initial_interval=1.0, backoff_factor=2.0),
     )
@@ -215,12 +211,10 @@ def build_support_agent() -> Any:
     graph.add_node(
         "technical",
         handle_technical,
-        metadata={
-            "temporal": {
-                "activity_timeout": timedelta(minutes=5),
-                "heartbeat_timeout": timedelta(seconds=30),
-            }
-        },
+        metadata=temporal_node_metadata(
+            start_to_close_timeout=timedelta(minutes=5),
+            heartbeat_timeout=timedelta(seconds=30),
+        ),
         # Technical operations may be slower
         retry_policy=RetryPolicy(max_attempts=3, initial_interval=2.0),
     )
@@ -228,31 +222,25 @@ def build_support_agent() -> Any:
     graph.add_node(
         "general",
         handle_general,
-        metadata={
-            "temporal": {
-                "activity_timeout": timedelta(seconds=30),
-            }
-        },
+        metadata=temporal_node_metadata(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
     )
 
     graph.add_node(
         "escalate",
         escalate_to_human,
-        metadata={
-            "temporal": {
-                "activity_timeout": timedelta(seconds=10),
-            }
-        },
+        metadata=temporal_node_metadata(
+            start_to_close_timeout=timedelta(seconds=10),
+        ),
     )
 
     graph.add_node(
         "respond",
         generate_response,
-        metadata={
-            "temporal": {
-                "activity_timeout": timedelta(seconds=10),
-            }
-        },
+        metadata=temporal_node_metadata(
+            start_to_close_timeout=timedelta(seconds=10),
+        ),
     )
 
     # Define edges

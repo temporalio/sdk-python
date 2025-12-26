@@ -87,11 +87,12 @@ async def main():
 
 ## Per-Node Configuration
 
-Configure timeouts, retries, and task queues per node:
+Configure timeouts, retries, and task queues per node using `temporal_node_metadata()`:
 
 ```python
 from datetime import timedelta
 from langgraph.types import RetryPolicy
+from temporalio.contrib.langgraph import temporal_node_metadata
 
 def build_configured_graph():
     graph = StateGraph(MyState)
@@ -100,11 +101,9 @@ def build_configured_graph():
     graph.add_node(
         "validate",
         validate_input,
-        metadata={
-            "temporal": {
-                "activity_timeout": timedelta(seconds=30),
-            }
-        },
+        metadata=temporal_node_metadata(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
     )
 
     # External API with retries
@@ -116,24 +115,29 @@ def build_configured_graph():
             initial_interval=1.0,
             backoff_factor=2.0,
         ),
-        metadata={
-            "temporal": {
-                "activity_timeout": timedelta(minutes=2),
-                "heartbeat_timeout": timedelta(seconds=30),
-            }
-        },
+        metadata=temporal_node_metadata(
+            start_to_close_timeout=timedelta(minutes=2),
+            heartbeat_timeout=timedelta(seconds=30),
+        ),
     )
 
     # GPU processing on specialized workers
     graph.add_node(
         "process_gpu",
         gpu_processing,
-        metadata={
-            "temporal": {
-                "activity_timeout": timedelta(hours=1),
-                "task_queue": "gpu-workers",
-            }
-        },
+        metadata=temporal_node_metadata(
+            start_to_close_timeout=timedelta(hours=1),
+            task_queue="gpu-workers",
+        ),
+    )
+
+    # Combining with other metadata
+    graph.add_node(
+        "custom_node",
+        custom_func,
+        metadata=temporal_node_metadata(
+            start_to_close_timeout=timedelta(minutes=5),
+        ) | {"custom_key": "custom_value"},
     )
 
     # ... add edges ...
@@ -142,12 +146,23 @@ def build_configured_graph():
 
 ### Configuration Options
 
-| Option | Node Metadata Key | Description |
-|--------|-------------------|-------------|
-| Activity Timeout | `temporal.activity_timeout` | Max time for node execution |
-| Heartbeat Timeout | `temporal.heartbeat_timeout` | Interval for long-running activities |
-| Task Queue | `temporal.task_queue` | Route to specialized workers |
-| Retry Policy | `retry_policy` parameter | LangGraph native retry configuration |
+All parameters mirror `workflow.execute_activity()` options:
+
+| Option | `temporal_node_metadata()` Parameter | Description |
+|--------|--------------------------------------|-------------|
+| Start-to-Close Timeout | `start_to_close_timeout` | Max time for a single execution attempt |
+| Schedule-to-Close Timeout | `schedule_to_close_timeout` | Total time including retries |
+| Schedule-to-Start Timeout | `schedule_to_start_timeout` | Max time waiting to start |
+| Heartbeat Timeout | `heartbeat_timeout` | Interval for long-running activities |
+| Task Queue | `task_queue` | Route to specialized workers |
+| Retry Policy | `retry_policy` | Temporal `RetryPolicy` (overrides LangGraph's) |
+| Cancellation Type | `cancellation_type` | How cancellation is handled |
+| Versioning Intent | `versioning_intent` | Worker Build ID versioning |
+| Summary | `summary` | Human-readable activity description |
+| Priority | `priority` | Task queue ordering priority |
+| Workflow Execution | `run_in_workflow` | Run in workflow instead of activity |
+
+You can also use LangGraph's native `retry_policy` parameter on `add_node()`, which is automatically mapped to Temporal's retry policy. If both are specified, `temporal_node_metadata(retry_policy=...)` takes precedence.
 
 ## Human-in-the-Loop (Interrupts)
 
