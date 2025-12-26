@@ -85,6 +85,35 @@ async def main():
         print(result)
 ```
 
+## Plugin-Level Configuration
+
+Set default activity options at the plugin level to avoid repeating configuration in every workflow:
+
+```python
+from datetime import timedelta
+from temporalio.common import RetryPolicy
+from temporalio.contrib.langgraph import LangGraphPlugin, node_activity_options
+
+# Create plugin with default options for all graphs
+plugin = LangGraphPlugin(
+    graphs={"my_graph": build_my_graph},
+    # Default options for all nodes across all graphs
+    default_activity_options=node_activity_options(
+        start_to_close_timeout=timedelta(minutes=10),
+        retry_policy=RetryPolicy(maximum_attempts=5),
+    ),
+    # Per-node options (applies to all graphs with matching node names)
+    per_node_activity_options={
+        "llm_call": node_activity_options(
+            start_to_close_timeout=timedelta(minutes=30),
+            task_queue="llm-workers",
+        ),
+    },
+)
+```
+
+Plugin-level options are merged with `compile()` options, with `compile()` taking precedence. See [Configuration Priority](#configuration-priority) for details.
+
 ## Per-Node Configuration
 
 Configure timeouts, retries, and task queues per node using `node_activity_options()`:
@@ -300,11 +329,20 @@ app = compile(
 )
 ```
 
-The `default_activity_options` parameter accepts the same options as `node_activity_options()`. The `per_node_activity_options` parameter allows configuring specific nodes without modifying the graph source code. Configuration priority (highest to lowest):
+The `default_activity_options` parameter accepts the same options as `node_activity_options()`. The `per_node_activity_options` parameter allows configuring specific nodes without modifying the graph source code.
+
+### Configuration Priority
+
+Activity options can be set at multiple levels with the following priority (highest to lowest):
+
 1. Node metadata from `add_node(metadata=...)`
 2. `per_node_activity_options` from `compile()`
-3. `default_activity_options` from `compile()`
-4. Built-in defaults (5 min timeout, 3 retries)
+3. `per_node_activity_options` from `LangGraphPlugin()`
+4. `default_activity_options` from `compile()`
+5. `default_activity_options` from `LangGraphPlugin()`
+6. Built-in defaults (5 min timeout, 3 retries)
+
+Options at each level are merged, so you can set base defaults at the plugin level and selectively override specific options in `compile()` or node metadata.
 
 ## Full Example
 

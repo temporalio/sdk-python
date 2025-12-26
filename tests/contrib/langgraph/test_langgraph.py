@@ -1061,6 +1061,134 @@ class TestPerNodeConfiguration:
         # node_without_metadata: node_config wins over defaults
         assert runner._get_node_activity_options("node_without_metadata")["start_to_close_timeout"] == timedelta(minutes=15)
 
+    def test_plugin_level_default_activity_options(self) -> None:
+        """Plugin-level default_activity_options should be used by compile()."""
+        from temporalio.contrib.langgraph import LangGraphPlugin, compile, node_activity_options
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+
+        get_global_registry().clear()
+
+        class State(TypedDict):
+            value: int
+
+        def build():
+            graph = StateGraph(State)
+            graph.add_node("node1", lambda state: {"value": 1})
+            graph.add_edge(START, "node1")
+            graph.add_edge("node1", END)
+            return graph.compile()
+
+        # Create plugin with default activity options
+        LangGraphPlugin(
+            graphs={"plugin_defaults_test": build},
+            default_activity_options=node_activity_options(
+                start_to_close_timeout=timedelta(minutes=15),
+                task_queue="plugin-queue",
+            ),
+        )
+
+        # compile() without options should use plugin defaults
+        runner = compile("plugin_defaults_test")
+        options = runner._get_node_activity_options("node1")
+
+        assert options["start_to_close_timeout"] == timedelta(minutes=15)
+        assert options["task_queue"] == "plugin-queue"
+
+    def test_plugin_level_per_node_activity_options(self) -> None:
+        """Plugin-level per_node_activity_options should be used by compile()."""
+        from temporalio.contrib.langgraph import LangGraphPlugin, compile, node_activity_options
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+
+        get_global_registry().clear()
+
+        class State(TypedDict):
+            value: int
+
+        def build():
+            graph = StateGraph(State)
+            graph.add_node("fast_node", lambda state: {"value": 1})
+            graph.add_node("slow_node", lambda state: {"value": 2})
+            graph.add_edge(START, "fast_node")
+            graph.add_edge("fast_node", "slow_node")
+            graph.add_edge("slow_node", END)
+            return graph.compile()
+
+        # Create plugin with per-node activity options
+        LangGraphPlugin(
+            graphs={"plugin_per_node_test": build},
+            per_node_activity_options={
+                "slow_node": node_activity_options(
+                    start_to_close_timeout=timedelta(hours=2),
+                    task_queue="slow-queue",
+                ),
+            },
+        )
+
+        # compile() without options should use plugin per-node options
+        runner = compile("plugin_per_node_test")
+
+        # fast_node uses defaults
+        fast_options = runner._get_node_activity_options("fast_node")
+        assert "task_queue" not in fast_options
+
+        # slow_node uses plugin per-node options
+        slow_options = runner._get_node_activity_options("slow_node")
+        assert slow_options["start_to_close_timeout"] == timedelta(hours=2)
+        assert slow_options["task_queue"] == "slow-queue"
+
+    def test_compile_overrides_plugin_options(self) -> None:
+        """compile() options should override plugin-level options."""
+        from temporalio.contrib.langgraph import LangGraphPlugin, compile, node_activity_options
+        from temporalio.contrib.langgraph._graph_registry import get_global_registry
+
+        get_global_registry().clear()
+
+        class State(TypedDict):
+            value: int
+
+        def build():
+            graph = StateGraph(State)
+            graph.add_node("node1", lambda state: {"value": 1})
+            graph.add_edge(START, "node1")
+            graph.add_edge("node1", END)
+            return graph.compile()
+
+        # Create plugin with activity options
+        LangGraphPlugin(
+            graphs={"override_test": build},
+            default_activity_options=node_activity_options(
+                start_to_close_timeout=timedelta(minutes=10),
+                task_queue="plugin-queue",
+            ),
+            per_node_activity_options={
+                "node1": node_activity_options(
+                    heartbeat_timeout=timedelta(seconds=30),
+                ),
+            },
+        )
+
+        # compile() with overriding options
+        runner = compile(
+            "override_test",
+            default_activity_options=node_activity_options(
+                start_to_close_timeout=timedelta(minutes=20),  # Override plugin default
+            ),
+            per_node_activity_options={
+                "node1": node_activity_options(
+                    heartbeat_timeout=timedelta(seconds=60),  # Override plugin per-node
+                ),
+            },
+        )
+
+        options = runner._get_node_activity_options("node1")
+
+        # compile() options override plugin options
+        assert options["start_to_close_timeout"] == timedelta(minutes=20)
+        assert options["heartbeat_timeout"] == timedelta(seconds=60)
+
+        # Plugin options that weren't overridden are preserved
+        assert options["task_queue"] == "plugin-queue"
+
 
 class TestInterruptHandling:
     """Tests for human-in-the-loop interrupt functionality."""

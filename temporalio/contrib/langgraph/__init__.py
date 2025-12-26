@@ -54,7 +54,11 @@ from typing import Any, Optional
 import temporalio.common
 import temporalio.workflow
 
-from temporalio.contrib.langgraph._graph_registry import get_graph
+from temporalio.contrib.langgraph._graph_registry import (
+    get_default_activity_options,
+    get_graph,
+    get_per_node_activity_options,
+)
 from temporalio.contrib.langgraph._models import StateSnapshot
 from temporalio.contrib.langgraph._plugin import LangGraphPlugin
 from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
@@ -200,17 +204,25 @@ def compile(
 
         plugin = LangGraphPlugin(graphs={"my_graph": build_my_graph})
 
+    Activity options can be set at multiple levels with the following priority
+    (highest to lowest):
+    1. Node metadata from `add_node(metadata=...)`
+    2. `per_node_activity_options` from `compile()`
+    3. `per_node_activity_options` from `LangGraphPlugin()`
+    4. `default_activity_options` from `compile()`
+    5. `default_activity_options` from `LangGraphPlugin()`
+    6. Built-in defaults (5 min timeout, 3 retries)
+
     Args:
         graph_id: ID of the graph registered with LangGraphPlugin.
             This should match a key in the `graphs` dict passed to the plugin.
         default_activity_options: Default activity options for all nodes, created
-            via `node_activity_options()`. Node-specific options override these.
-            If not specified, defaults to 5 minute timeout and 3 retry attempts.
+            via `node_activity_options()`. Overrides plugin-level defaults.
+            Node-specific options override these.
         per_node_activity_options: Per-node options mapping node names to
-            `node_activity_options()`. Use this to configure existing graphs
-            without modifying their source code. Takes precedence over
-            `default_activity_options` but is overridden by options set directly
-            on the node via add_node(metadata=...).
+            `node_activity_options()`. Overrides plugin-level per-node options.
+            Use this to configure existing graphs without modifying their source
+            code. Node metadata from `add_node(metadata=...)` takes precedence.
         enable_workflow_execution: Enable hybrid execution mode.
             If True, nodes marked with metadata={"temporal": {"run_in_workflow": True}}
             will run directly in the workflow instead of as activities.
@@ -291,11 +303,50 @@ def compile(
     # Get graph from registry
     pregel = get_graph(graph_id)
 
+    # Get plugin-level options from registry
+    plugin_default_options = get_default_activity_options(graph_id)
+    plugin_per_node_options = get_per_node_activity_options(graph_id)
+
+    def _merge_activity_options(
+        base: dict[str, Any], override: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Merge activity options, with override taking precedence.
+
+        Both dicts have structure {"temporal": {...}} from node_activity_options().
+        We need to merge the inner "temporal" dicts.
+        """
+        base_temporal = base.get("temporal", {})
+        override_temporal = override.get("temporal", {})
+        return {"temporal": {**base_temporal, **override_temporal}}
+
+    # Merge options: compile options override plugin options
+    merged_default_options: Optional[dict[str, Any]] = None
+    if plugin_default_options or default_activity_options:
+        merged_default_options = _merge_activity_options(
+            plugin_default_options or {}, default_activity_options or {}
+        )
+
+    merged_per_node_options: Optional[dict[str, dict[str, Any]]] = None
+    if plugin_per_node_options or per_node_activity_options:
+        merged_per_node_options = {}
+        # Start with plugin options
+        for node_name, node_opts in (plugin_per_node_options or {}).items():
+            merged_per_node_options[node_name] = node_opts
+        # Merge compile options
+        if per_node_activity_options:
+            for node_name, node_opts in per_node_activity_options.items():
+                if node_name in merged_per_node_options:
+                    merged_per_node_options[node_name] = _merge_activity_options(
+                        merged_per_node_options[node_name], node_opts
+                    )
+                else:
+                    merged_per_node_options[node_name] = node_opts
+
     return TemporalLangGraphRunner(
         pregel,
         graph_id=graph_id,
-        default_activity_options=default_activity_options,
-        per_node_activity_options=per_node_activity_options,
+        default_activity_options=merged_default_options,
+        per_node_activity_options=merged_per_node_options,
         enable_workflow_execution=enable_workflow_execution,
         checkpoint=checkpoint,
     )

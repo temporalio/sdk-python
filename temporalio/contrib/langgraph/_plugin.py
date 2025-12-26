@@ -91,6 +91,8 @@ class LangGraphPlugin(SimplePlugin):
         graphs: dict[str, Callable[[], Pregel]],
         default_activity_timeout: timedelta = timedelta(minutes=5),
         default_max_retries: int = 3,
+        default_activity_options: dict[str, Any] | None = None,
+        per_node_activity_options: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         """Initialize the LangGraph plugin.
 
@@ -101,6 +103,13 @@ class LangGraphPlugin(SimplePlugin):
             default_activity_timeout: Default timeout for node activities.
                 Can be overridden per-node via metadata.
             default_max_retries: Default retry attempts for node activities.
+            default_activity_options: Default activity options for all nodes across
+                all graphs. Created via `node_activity_options()`. These are used
+                as base defaults that can be overridden by `compile()` or node metadata.
+            per_node_activity_options: Per-node activity options mapping node names
+                to options dicts. Created via `node_activity_options()`. These apply
+                to nodes across all graphs and can be overridden by `compile()` or
+                node metadata.
 
         Raises:
             ValueError: If duplicate graph IDs are provided.
@@ -108,10 +117,17 @@ class LangGraphPlugin(SimplePlugin):
         self._graphs = graphs
         self.default_activity_timeout = default_activity_timeout
         self.default_max_retries = default_max_retries
+        self._default_activity_options = default_activity_options
+        self._per_node_activity_options = per_node_activity_options
 
-        # Register graphs in global registry
+        # Register graphs in global registry with activity options
         for graph_id, builder in graphs.items():
-            register_graph(graph_id, builder)
+            register_graph(
+                graph_id,
+                builder,
+                default_activity_options=default_activity_options,
+                per_node_activity_options=per_node_activity_options,
+            )
 
         def add_activities(
             activities: Sequence[Callable[..., Any]] | None,

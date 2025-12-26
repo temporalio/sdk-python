@@ -20,6 +20,7 @@ class GraphRegistry:
     This registry is the core of the plugin architecture:
     - Graph builders are registered by ID
     - Compiled graphs are cached on first access
+    - Activity options can be stored per-graph
     - Cache access is thread-safe via locking
 
     The registry uses double-checked locking to ensure graphs are built
@@ -30,14 +31,24 @@ class GraphRegistry:
         """Initialize an empty registry."""
         self._builders: dict[str, Callable[[], Pregel]] = {}
         self._cache: dict[str, Pregel] = {}
+        self._default_activity_options: dict[str, dict[str, Any]] = {}
+        self._per_node_activity_options: dict[str, dict[str, dict[str, Any]]] = {}
         self._lock = threading.Lock()
 
-    def register(self, graph_id: str, builder: Callable[[], Pregel]) -> None:
-        """Register a graph builder by ID.
+    def register(
+        self,
+        graph_id: str,
+        builder: Callable[[], Pregel],
+        default_activity_options: dict[str, Any] | None = None,
+        per_node_activity_options: dict[str, dict[str, Any]] | None = None,
+    ) -> None:
+        """Register a graph builder by ID with optional activity options.
 
         Args:
             graph_id: Unique identifier for the graph.
             builder: A callable that returns a compiled Pregel graph.
+            default_activity_options: Default activity options for all nodes in this graph.
+            per_node_activity_options: Per-node activity options for this graph.
         """
         with self._lock:
             if graph_id in self._builders:
@@ -46,6 +57,10 @@ class GraphRegistry:
                     "Use a unique graph_id for each graph."
                 )
             self._builders[graph_id] = builder
+            if default_activity_options:
+                self._default_activity_options[graph_id] = default_activity_options
+            if per_node_activity_options:
+                self._per_node_activity_options[graph_id] = per_node_activity_options
 
     def get_graph(self, graph_id: str) -> Pregel:
         """Get a compiled graph by ID, building and caching if needed.
@@ -130,14 +145,40 @@ class GraphRegistry:
         with self._lock:
             return graph_id in self._builders
 
+    def get_default_activity_options(self, graph_id: str) -> dict[str, Any]:
+        """Get default activity options for a graph.
+
+        Args:
+            graph_id: The ID of the graph.
+
+        Returns:
+            Default activity options dict, or empty dict if none configured.
+        """
+        return self._default_activity_options.get(graph_id, {})
+
+    def get_per_node_activity_options(
+        self, graph_id: str
+    ) -> dict[str, dict[str, Any]]:
+        """Get per-node activity options for a graph.
+
+        Args:
+            graph_id: The ID of the graph.
+
+        Returns:
+            Per-node activity options dict, or empty dict if none configured.
+        """
+        return self._per_node_activity_options.get(graph_id, {})
+
     def clear(self) -> None:
-        """Clear all registered builders and cached graphs.
+        """Clear all registered builders, cached graphs, and activity options.
 
         This is primarily useful for testing.
         """
         with self._lock:
             self._builders.clear()
             self._cache.clear()
+            self._default_activity_options.clear()
+            self._per_node_activity_options.clear()
 
 
 # Global registry instance
@@ -153,14 +194,23 @@ def get_global_registry() -> GraphRegistry:
     return _global_registry
 
 
-def register_graph(graph_id: str, builder: Callable[[], Pregel]) -> None:
+def register_graph(
+    graph_id: str,
+    builder: Callable[[], Pregel],
+    default_activity_options: dict[str, Any] | None = None,
+    per_node_activity_options: dict[str, dict[str, Any]] | None = None,
+) -> None:
     """Register a graph builder in the global registry.
 
     Args:
         graph_id: Unique identifier for the graph.
         builder: A callable that returns a compiled Pregel graph.
+        default_activity_options: Default activity options for all nodes.
+        per_node_activity_options: Per-node activity options.
     """
-    _global_registry.register(graph_id, builder)
+    _global_registry.register(
+        graph_id, builder, default_activity_options, per_node_activity_options
+    )
 
 
 def get_graph(graph_id: str) -> Pregel:
@@ -192,3 +242,27 @@ def get_node(graph_id: str, node_name: str) -> Any:
         KeyError: If the graph or node is not found.
     """
     return _global_registry.get_node(graph_id, node_name)
+
+
+def get_default_activity_options(graph_id: str) -> dict[str, Any]:
+    """Get default activity options for a graph from the global registry.
+
+    Args:
+        graph_id: The ID of the graph.
+
+    Returns:
+        Default activity options dict, or empty dict if none configured.
+    """
+    return _global_registry.get_default_activity_options(graph_id)
+
+
+def get_per_node_activity_options(graph_id: str) -> dict[str, dict[str, Any]]:
+    """Get per-node activity options for a graph from the global registry.
+
+    Args:
+        graph_id: The ID of the graph.
+
+    Returns:
+        Per-node activity options dict, or empty dict if none configured.
+    """
+    return _global_registry.get_per_node_activity_options(graph_id)
