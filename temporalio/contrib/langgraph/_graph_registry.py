@@ -44,6 +44,10 @@ class GraphRegistry:
     ) -> None:
         """Register a graph builder by ID with optional activity options.
 
+        The builder is called immediately to compile the graph, ensuring that
+        graph compilation happens outside the workflow sandbox. This avoids
+        issues with type hint resolution (e.g., Annotated) inside the sandbox.
+
         Args:
             graph_id: Unique identifier for the graph.
             builder: A callable that returns a compiled Pregel graph.
@@ -57,6 +61,9 @@ class GraphRegistry:
                     "Use a unique graph_id for each graph."
                 )
             self._builders[graph_id] = builder
+            # Eagerly build the graph to ensure compilation happens outside
+            # the workflow sandbox where all Python types are available
+            self._cache[graph_id] = builder()
             if default_activity_options:
                 self._default_activity_options[graph_id] = default_activity_options
             if per_node_activity_options:

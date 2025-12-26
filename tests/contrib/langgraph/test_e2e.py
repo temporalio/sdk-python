@@ -1,7 +1,14 @@
 """End-to-end tests for LangGraph-Temporal integration.
 
 These tests run actual workflows with real Temporal workers to verify
-the complete interrupt/resume flow works correctly.
+the complete integration works correctly.
+
+Test organization:
+- TestBasicExecution: Simple graph execution without interrupts
+- TestInterrupts: Human-in-the-loop interrupt tests
+- TestStore: Store persistence tests
+- TestAdvancedFeatures: Send API, subgraphs, Command goto
+- TestAgenticWorkflows: React agent with temporal tools
 """
 
 from __future__ import annotations
@@ -9,544 +16,481 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import timedelta
-from typing import Any
 
 import pytest
-from typing_extensions import TypedDict
 
-from langgraph.graph import END, START, StateGraph
 from temporalio.client import Client
 from temporalio.contrib.langgraph import LangGraphPlugin
 
+from tests.contrib.langgraph.e2e_graphs import (
+    build_approval_graph,
+    build_command_graph,
+    build_counter_graph,
+    build_multi_interrupt_graph,
+    build_react_agent_graph,
+    build_send_graph,
+    build_simple_graph,
+    build_store_graph,
+    build_subgraph,
+)
 from tests.contrib.langgraph.e2e_workflows import (
-    ApprovalWorkflow,
-    MultiInterruptWorkflow,
-    MultiInvokeStoreWorkflow,
-    RejectionWorkflow,
-    SimpleGraphWorkflow,
-    StoreWorkflow,
+    ApprovalE2EWorkflow,
+    CommandE2EWorkflow,
+    MultiInterruptE2EWorkflow,
+    MultiInvokeStoreE2EWorkflow,
+    ReactAgentE2EWorkflow,
+    RejectionE2EWorkflow,
+    SendE2EWorkflow,
+    SimpleE2EWorkflow,
+    StoreE2EWorkflow,
+    SubgraphE2EWorkflow,
 )
 from tests.helpers import new_worker
 
 
 # ==============================================================================
-# Graph State Types
+# Basic Execution Tests
 # ==============================================================================
 
 
-class SimpleState(TypedDict, total=False):
-    """State for simple workflow without interrupts."""
+class TestBasicExecution:
+    """Tests for basic graph execution without interrupts."""
 
-    value: int
-    result: int
+    @pytest.mark.asyncio
+    async def test_simple_graph_execution(self, client: Client) -> None:
+        """Test basic graph execution without interrupts."""
+        plugin = LangGraphPlugin(
+            graphs={"e2e_simple": build_simple_graph},
+            default_activity_timeout=timedelta(seconds=30),
+        )
 
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
 
-class ApprovalState(TypedDict, total=False):
-    """State for approval workflow."""
+        async with new_worker(plugin_client, SimpleE2EWorkflow) as worker:
+            result = await plugin_client.execute_workflow(
+                SimpleE2EWorkflow.run,
+                21,
+                id=f"e2e-simple-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
 
-    value: int
-    approved: bool
-    approval_reason: str
-
-
-class MultiInterruptState(TypedDict, total=False):
-    """State for multi-interrupt workflow."""
-
-    value: int
-    step1_result: str
-    step2_result: str
-
-
-class StoreState(TypedDict, total=False):
-    """State for store test workflow."""
-
-    user_id: str
-    node1_read: str | None
-    node2_read: str | None
-
-
-class MultiInvokeStoreState(TypedDict, total=False):
-    """State for multi-invocation store test workflow."""
-
-    user_id: str
-    invocation_num: int
-    previous_count: int | None
-    current_count: int | None
+            assert result["result"] == 42
 
 
 # ==============================================================================
-# Graph Node Functions
+# Interrupt Tests
 # ==============================================================================
 
 
-def double_node(state: SimpleState) -> SimpleState:
-    """Simple node that doubles the value."""
-    return {"result": state.get("value", 0) * 2}
+class TestInterrupts:
+    """Tests for human-in-the-loop interrupt functionality."""
 
+    @pytest.mark.asyncio
+    async def test_interrupt_and_resume_with_signal(self, client: Client) -> None:
+        """Test interrupt flow with signal-based resume."""
+        plugin = LangGraphPlugin(
+            graphs={"e2e_approval": build_approval_graph},
+            default_activity_timeout=timedelta(seconds=30),
+        )
 
-def approval_node(state: ApprovalState) -> ApprovalState:
-    """Node that requests approval via interrupt."""
-    from langgraph.types import interrupt
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
 
-    approval_response = interrupt({
-        "question": "Do you approve this value?",
-        "current_value": state.get("value", 0),
-    })
+        async with new_worker(plugin_client, ApprovalE2EWorkflow) as worker:
+            handle = await plugin_client.start_workflow(
+                ApprovalE2EWorkflow.run,
+                42,
+                id=f"e2e-approval-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=60),
+            )
 
-    return {
-        "approved": approval_response.get("approved", False),
-        "approval_reason": approval_response.get("reason", ""),
-    }
+            # Wait for the workflow to reach the interrupt
+            await asyncio.sleep(1)
 
+            # Query the interrupt value
+            interrupt_value = await handle.query(
+                ApprovalE2EWorkflow.get_interrupt_value
+            )
+            assert interrupt_value is not None
+            assert interrupt_value["question"] == "Do you approve this value?"
+            assert interrupt_value["current_value"] == 42
 
-def process_node(state: ApprovalState) -> ApprovalState:
-    """Node that processes the approved value."""
-    if state.get("approved"):
-        return {"value": state.get("value", 0) * 2}
-    return {"value": 0}
+            # Send approval signal
+            await handle.signal(
+                ApprovalE2EWorkflow.provide_approval,
+                {"approved": True, "reason": "Looks good!"},
+            )
 
+            # Wait for workflow completion
+            result = await handle.result()
 
-def step1_node(state: MultiInterruptState) -> MultiInterruptState:
-    """First step that requires human input."""
-    from langgraph.types import interrupt
+            # Value should be doubled (42 * 2 = 84)
+            assert result["value"] == 84
+            assert result["approved"] is True
+            assert result["approval_reason"] == "Looks good!"
 
-    response = interrupt({"step": 1, "question": "Enter value for step 1"})
-    return {"step1_result": str(response)}
+    @pytest.mark.asyncio
+    async def test_interrupt_with_rejection(self, client: Client) -> None:
+        """Test interrupt flow where approval is rejected."""
+        # Use a different graph ID to avoid registry conflicts
+        plugin = LangGraphPlugin(
+            graphs={"e2e_rejection": build_approval_graph},
+            default_activity_timeout=timedelta(seconds=30),
+        )
 
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
 
-def step2_node(state: MultiInterruptState) -> MultiInterruptState:
-    """Second step that requires human input."""
-    from langgraph.types import interrupt
+        async with new_worker(plugin_client, RejectionE2EWorkflow) as worker:
+            handle = await plugin_client.start_workflow(
+                RejectionE2EWorkflow.run,
+                100,
+                id=f"e2e-reject-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=60),
+            )
 
-    response = interrupt({"step": 2, "question": "Enter value for step 2"})
-    return {"step2_result": str(response)}
+            await asyncio.sleep(1)
 
+            # Reject the approval
+            await handle.signal(
+                RejectionE2EWorkflow.provide_approval,
+                {"approved": False, "reason": "Not approved"},
+            )
 
-def store_node1(state: StoreState) -> StoreState:
-    """Node that writes to store and reads from it."""
-    from langgraph.config import get_store
+            result = await handle.result()
 
-    store = get_store()
-    user_id = state.get("user_id", "default")
+            # Value should be 0 (rejected)
+            assert result["value"] == 0
+            assert result["approved"] is False
 
-    # Try to read existing value (should be None on first run)
-    existing = store.get(("user", user_id), "preferences")
-    existing_value = existing.value["theme"] if existing else None
+    @pytest.mark.asyncio
+    async def test_multiple_sequential_interrupts(self, client: Client) -> None:
+        """Test workflow that handles multiple interrupts in sequence."""
+        plugin = LangGraphPlugin(
+            graphs={"e2e_multi_interrupt": build_multi_interrupt_graph},
+            default_activity_timeout=timedelta(seconds=30),
+        )
 
-    # Write a new value to the store
-    store.put(("user", user_id), "preferences", {"theme": "dark", "written_by": "node1"})
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
 
-    return {"node1_read": existing_value}
+        async with new_worker(plugin_client, MultiInterruptE2EWorkflow) as worker:
+            handle = await plugin_client.start_workflow(
+                MultiInterruptE2EWorkflow.run,
+                {"value": 100},
+                id=f"e2e-multi-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=60),
+            )
 
+            # Wait for first interrupt
+            await asyncio.sleep(1)
 
-def store_node2(state: StoreState) -> StoreState:
-    """Node that reads from store (should see node1's write)."""
-    from langgraph.config import get_store
+            # Verify first interrupt
+            interrupt_count = await handle.query(
+                MultiInterruptE2EWorkflow.get_interrupt_count
+            )
+            assert interrupt_count == 1
 
-    store = get_store()
-    user_id = state.get("user_id", "default")
+            current_interrupt = await handle.query(
+                MultiInterruptE2EWorkflow.get_current_interrupt
+            )
+            assert current_interrupt["step"] == 1
 
-    # Read the value written by node1
-    item = store.get(("user", user_id), "preferences")
-    read_value = item.value["theme"] if item else None
+            # Check invocation_id before signal
+            invocation_id = await handle.query(
+                MultiInterruptE2EWorkflow.get_invocation_id
+            )
+            assert (
+                invocation_id == 1
+            ), f"Expected invocation_id=1 before signal, got {invocation_id}"
 
-    return {"node2_read": read_value}
+            # Respond to first interrupt
+            await handle.signal(
+                MultiInterruptE2EWorkflow.provide_response, "first_value"
+            )
 
+            # Wait for second interrupt
+            await asyncio.sleep(1)
 
-def counter_node(state: MultiInvokeStoreState) -> MultiInvokeStoreState:
-    """Node that increments a counter in the store.
+            # Debug: check invocation_id after signal
+            invocation_id_after = await handle.query(
+                MultiInterruptE2EWorkflow.get_invocation_id
+            )
+            debug_info = await handle.query(MultiInterruptE2EWorkflow.get_debug_info)
+            print(f"invocation_id after signal: {invocation_id_after}")
+            print(f"debug_info: {debug_info}")
 
-    Each invocation reads the previous count and increments it.
-    This tests that store data persists across graph invocations.
-    """
-    from langgraph.config import get_store
+            # Verify second interrupt
+            interrupt_count = await handle.query(
+                MultiInterruptE2EWorkflow.get_interrupt_count
+            )
+            assert (
+                interrupt_count == 2
+            ), f"Expected interrupt_count=2, got {interrupt_count}. invocation_id={invocation_id_after}. debug={debug_info}"
 
-    store = get_store()
-    user_id = state.get("user_id", "default")
+            current_interrupt = await handle.query(
+                MultiInterruptE2EWorkflow.get_current_interrupt
+            )
+            assert current_interrupt["step"] == 2
 
-    # Read existing count
-    item = store.get(("counters", user_id), "invocation_count")
-    previous_count = item.value["count"] if item else 0
+            # Respond to second interrupt
+            await handle.signal(
+                MultiInterruptE2EWorkflow.provide_response, "second_value"
+            )
 
-    # Increment and write new count
-    new_count = previous_count + 1
-    store.put(("counters", user_id), "invocation_count", {"count": new_count})
+            # Wait for completion
+            result = await handle.result()
 
-    return {
-        "previous_count": previous_count if previous_count > 0 else None,
-        "current_count": new_count,
-    }
+            # Verify final result
+            assert result["step1_result"] == "first_value"
+            assert result["step2_result"] == "second_value"
 
 
 # ==============================================================================
-# Graph Builder Functions
+# Store Tests
 # ==============================================================================
 
 
-def build_simple_graph():
-    """Build a simple graph without interrupts."""
-    graph = StateGraph(SimpleState)
-    graph.add_node("double", double_node)
-    graph.add_edge(START, "double")
-    graph.add_edge("double", END)
-    return graph.compile()
+class TestStore:
+    """Tests for store persistence functionality."""
 
+    @pytest.mark.asyncio
+    async def test_store_persistence(self, client: Client) -> None:
+        """Test that store data persists across node executions."""
+        plugin = LangGraphPlugin(
+            graphs={"e2e_store": build_store_graph},
+            default_activity_timeout=timedelta(seconds=30),
+        )
 
-def build_approval_graph():
-    """Build the approval graph with interrupt."""
-    graph = StateGraph(ApprovalState)
-    graph.add_node("request_approval", approval_node)
-    graph.add_node("process", process_node)
-    graph.add_edge(START, "request_approval")
-    graph.add_edge("request_approval", "process")
-    graph.add_edge("process", END)
-    return graph.compile()
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
 
+        async with new_worker(plugin_client, StoreE2EWorkflow) as worker:
+            result = await plugin_client.execute_workflow(
+                StoreE2EWorkflow.run,
+                "test_user_123",
+                id=f"e2e-store-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
 
-def build_multi_interrupt_graph():
-    """Build a graph with multiple sequential interrupts."""
-    graph = StateGraph(MultiInterruptState)
-    graph.add_node("step1", step1_node)
-    graph.add_node("step2", step2_node)
-    graph.add_edge(START, "step1")
-    graph.add_edge("step1", "step2")
-    graph.add_edge("step2", END)
-    return graph.compile()
+            # Node1 should read None (no prior data)
+            assert result["node1_read"] is None
 
+            # Node2 should read the value written by Node1
+            assert result["node2_read"] == "dark"
 
-def build_store_graph():
-    """Build a graph that uses store for cross-node persistence."""
-    graph = StateGraph(StoreState)
-    graph.add_node("node1", store_node1)
-    graph.add_node("node2", store_node2)
-    graph.add_edge(START, "node1")
-    graph.add_edge("node1", "node2")
-    graph.add_edge("node2", END)
-    return graph.compile()
+    @pytest.mark.asyncio
+    async def test_store_persistence_across_invocations(self, client: Client) -> None:
+        """Test that store data persists across multiple graph invocations.
 
+        This verifies that when the same graph is invoked multiple times within
+        a workflow, store data written in earlier invocations is visible to
+        later invocations.
+        """
+        plugin = LangGraphPlugin(
+            graphs={"e2e_counter": build_counter_graph},
+            default_activity_timeout=timedelta(seconds=30),
+        )
 
-def build_counter_graph():
-    """Build a graph that increments a counter in the store.
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
 
-    Used to test store persistence across multiple graph invocations.
-    """
-    graph = StateGraph(MultiInvokeStoreState)
-    graph.add_node("counter", counter_node)
-    graph.add_edge(START, "counter")
-    graph.add_edge("counter", END)
-    return graph.compile()
+        async with new_worker(plugin_client, MultiInvokeStoreE2EWorkflow) as worker:
+            # Run the graph 3 times within the same workflow
+            results = await plugin_client.execute_workflow(
+                MultiInvokeStoreE2EWorkflow.run,
+                args=["test_user_456", 3],
+                id=f"e2e-multi-invoke-store-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+
+            # Should have 3 results
+            assert len(results) == 3
+
+            # First invocation: previous_count=None, current_count=1
+            assert results[0]["previous_count"] is None
+            assert results[0]["current_count"] == 1
+
+            # Second invocation: previous_count=1, current_count=2
+            assert results[1]["previous_count"] == 1
+            assert results[1]["current_count"] == 2
+
+            # Third invocation: previous_count=2, current_count=3
+            assert results[2]["previous_count"] == 2
+            assert results[2]["current_count"] == 3
 
 
 # ==============================================================================
-# Tests
+# Advanced Feature Tests
 # ==============================================================================
 
 
-@pytest.mark.asyncio
-async def test_simple_graph_execution(client: Client) -> None:
-    """Test basic graph execution without interrupts."""
-    from temporalio.contrib.langgraph._graph_registry import get_global_registry
+class TestAdvancedFeatures:
+    """Tests for advanced LangGraph features."""
 
-    # Clear registry to avoid conflicts
-    get_global_registry().clear()
-
-    # Create plugin with the graph
-    plugin = LangGraphPlugin(
-        graphs={"e2e_simple": build_simple_graph},
-        default_activity_timeout=timedelta(seconds=30),
-    )
-
-    # Apply plugin to client
-    new_config = client.config()
-    existing_plugins = new_config.get("plugins", [])
-    new_config["plugins"] = list(existing_plugins) + [plugin]
-    plugin_client = Client(**new_config)
-
-    # Run workflow (plugin is already applied to client)
-    async with new_worker(
-        plugin_client,
-        SimpleGraphWorkflow,
-    ) as worker:
-        result = await plugin_client.execute_workflow(
-            SimpleGraphWorkflow.run,
-            21,
-            id=f"e2e-simple-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
+    @pytest.mark.asyncio
+    async def test_send_api_dynamic_parallelism(self, client: Client) -> None:
+        """Test that Send API creates dynamic parallel tasks."""
+        plugin = LangGraphPlugin(
+            graphs={"e2e_send": build_send_graph},
+            default_activity_timeout=timedelta(seconds=30),
         )
 
-        assert result["result"] == 42
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
 
+        async with new_worker(plugin_client, SendE2EWorkflow) as worker:
+            result = await plugin_client.execute_workflow(
+                SendE2EWorkflow.run,
+                [1, 2, 3, 4, 5],
+                id=f"e2e-send-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
 
-@pytest.mark.asyncio
-async def test_interrupt_and_resume_with_signal(client: Client) -> None:
-    """Test interrupt flow with signal-based resume."""
-    from temporalio.contrib.langgraph._graph_registry import get_global_registry
+            # Items [1, 2, 3, 4, 5] should be doubled to [2, 4, 6, 8, 10]
+            # Results are accumulated via operator.add
+            assert sorted(result.get("results", [])) == [2, 4, 6, 8, 10]
 
-    # Clear registry to avoid conflicts
-    get_global_registry().clear()
-
-    # Create plugin with the approval graph
-    plugin = LangGraphPlugin(
-        graphs={"e2e_approval": build_approval_graph},
-        default_activity_timeout=timedelta(seconds=30),
-    )
-
-    # Apply plugin to client
-    new_config = client.config()
-    existing_plugins = new_config.get("plugins", [])
-    new_config["plugins"] = list(existing_plugins) + [plugin]
-    plugin_client = Client(**new_config)
-
-    # Run workflow
-    async with new_worker(
-        plugin_client,
-        ApprovalWorkflow,
-    ) as worker:
-        # Start workflow
-        handle = await plugin_client.start_workflow(
-            ApprovalWorkflow.run,
-            42,
-            id=f"e2e-approval-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=60),
+    @pytest.mark.asyncio
+    async def test_subgraph_execution(self, client: Client) -> None:
+        """Test that subgraphs execute correctly."""
+        plugin = LangGraphPlugin(
+            graphs={"e2e_subgraph": build_subgraph},
+            default_activity_timeout=timedelta(seconds=30),
         )
 
-        # Wait for the workflow to reach the interrupt
-        await asyncio.sleep(1)
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
 
-        # Query the interrupt value
-        interrupt_value = await handle.query(ApprovalWorkflow.get_interrupt_value)
-        assert interrupt_value is not None
-        assert interrupt_value["question"] == "Do you approve this value?"
-        assert interrupt_value["current_value"] == 42
+        async with new_worker(plugin_client, SubgraphE2EWorkflow) as worker:
+            result = await plugin_client.execute_workflow(
+                SubgraphE2EWorkflow.run,
+                5,
+                id=f"e2e-subgraph-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
 
-        # Send approval signal
-        await handle.signal(
-            ApprovalWorkflow.provide_approval,
-            {"approved": True, "reason": "Looks good!"},
+            # value=5 -> parent_start adds 10 -> value=15
+            # child_process multiplies by 3 -> child_result=45
+            # parent_end adds 100 -> final_result=145
+            assert result.get("final_result") == 145
+
+    @pytest.mark.asyncio
+    async def test_command_goto_skip_node(self, client: Client) -> None:
+        """Test that Command(goto=) can skip nodes."""
+        plugin = LangGraphPlugin(
+            graphs={"e2e_command": build_command_graph},
+            default_activity_timeout=timedelta(seconds=30),
         )
 
-        # Wait for workflow completion
-        result = await handle.result()
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
 
-        # Value should be doubled (42 * 2 = 84)
-        assert result["value"] == 84
-        assert result["approved"] is True
-        assert result["approval_reason"] == "Looks good!"
+        async with new_worker(plugin_client, CommandE2EWorkflow) as worker:
+            # Test with value > 10 (should skip middle node)
+            result = await plugin_client.execute_workflow(
+                CommandE2EWorkflow.run,
+                20,
+                id=f"e2e-command-skip-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
 
+            # value=20 > 10, so Command(goto="finish") skips middle
+            # Path should be: start -> finish (no middle)
+            assert result.get("path") == ["start", "finish"]
+            # Result should be 20 + 1000 = 1020
+            assert result.get("result") == 1020
 
-@pytest.mark.asyncio
-async def test_interrupt_with_rejection(client: Client) -> None:
-    """Test interrupt flow where approval is rejected."""
-    from temporalio.contrib.langgraph._graph_registry import get_global_registry
-
-    # Clear registry to avoid conflicts
-    get_global_registry().clear()
-
-    # Create plugin with the approval graph
-    plugin = LangGraphPlugin(
-        graphs={"e2e_approval_reject": build_approval_graph},
-        default_activity_timeout=timedelta(seconds=30),
-    )
-
-    # Apply plugin to client
-    new_config = client.config()
-    existing_plugins = new_config.get("plugins", [])
-    new_config["plugins"] = list(existing_plugins) + [plugin]
-    plugin_client = Client(**new_config)
-
-    async with new_worker(
-        plugin_client,
-        RejectionWorkflow,
-    ) as worker:
-        handle = await plugin_client.start_workflow(
-            RejectionWorkflow.run,
-            100,
-            id=f"e2e-reject-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=60),
+    @pytest.mark.asyncio
+    async def test_command_goto_normal_path(self, client: Client) -> None:
+        """Test that Command(goto=) follows normal path when condition not met."""
+        plugin = LangGraphPlugin(
+            graphs={"e2e_command": build_command_graph},
+            default_activity_timeout=timedelta(seconds=30),
         )
 
-        await asyncio.sleep(1)
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
 
-        # Reject the approval
-        await handle.signal(
-            RejectionWorkflow.provide_approval,
-            {"approved": False, "reason": "Not approved"},
+        async with new_worker(plugin_client, CommandE2EWorkflow) as worker:
+            # Test with value <= 10 (should go through middle)
+            result = await plugin_client.execute_workflow(
+                CommandE2EWorkflow.run,
+                5,
+                id=f"e2e-command-normal-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+
+            # value=5 <= 10, so Command(goto="middle")
+            # Path should be: start -> middle -> finish
+            assert result.get("path") == ["start", "middle", "finish"]
+            # value=5 -> middle doubles to 10 -> finish adds 1000 = 1010
+            assert result.get("result") == 1010
+
+
+# ==============================================================================
+# Agentic Workflow Tests
+# ==============================================================================
+
+
+class TestAgenticWorkflows:
+    """Tests for agentic workflows with tools and models."""
+
+    @pytest.mark.asyncio
+    async def test_react_agent_with_temporal_tool(self, client: Client) -> None:
+        """Test react agent using temporal_tool for durable tool execution."""
+        plugin = LangGraphPlugin(
+            graphs={"e2e_react_agent": build_react_agent_graph},
+            default_activity_timeout=timedelta(seconds=30),
         )
 
-        result = await handle.result()
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
 
-        # Value should be 0 (rejected)
-        assert result["value"] == 0
-        assert result["approved"] is False
+        async with new_worker(plugin_client, ReactAgentE2EWorkflow) as worker:
+            result = await plugin_client.execute_workflow(
+                ReactAgentE2EWorkflow.run,
+                "What is 2 + 2?",
+                id=f"e2e-react-agent-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=60),
+            )
 
-
-@pytest.mark.asyncio
-async def test_multiple_sequential_interrupts(client: Client) -> None:
-    """Test workflow that handles multiple interrupts in sequence."""
-    from temporalio.contrib.langgraph._graph_registry import get_global_registry
-
-    # Clear registry to avoid conflicts
-    get_global_registry().clear()
-
-    # Create plugin with the multi-interrupt graph
-    plugin = LangGraphPlugin(
-        graphs={"e2e_multi_interrupt": build_multi_interrupt_graph},
-        default_activity_timeout=timedelta(seconds=30),
-    )
-
-    # Apply plugin to client
-    new_config = client.config()
-    existing_plugins = new_config.get("plugins", [])
-    new_config["plugins"] = list(existing_plugins) + [plugin]
-    plugin_client = Client(**new_config)
-
-    async with new_worker(
-        plugin_client,
-        MultiInterruptWorkflow,
-    ) as worker:
-        handle = await plugin_client.start_workflow(
-            MultiInterruptWorkflow.run,
-            {"value": 100},
-            id=f"e2e-multi-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=60),
-        )
-
-        # Wait for first interrupt
-        await asyncio.sleep(1)
-
-        # Verify first interrupt
-        interrupt_count = await handle.query(MultiInterruptWorkflow.get_interrupt_count)
-        assert interrupt_count == 1
-
-        current_interrupt = await handle.query(MultiInterruptWorkflow.get_current_interrupt)
-        assert current_interrupt["step"] == 1
-
-        # Check invocation_id before signal
-        invocation_id = await handle.query(MultiInterruptWorkflow.get_invocation_id)
-        assert invocation_id == 1, f"Expected invocation_id=1 before signal, got {invocation_id}"
-
-        # Respond to first interrupt
-        await handle.signal(MultiInterruptWorkflow.provide_response, "first_value")
-
-        # Wait for second interrupt
-        await asyncio.sleep(1)
-
-        # Debug: check invocation_id after signal
-        invocation_id_after = await handle.query(MultiInterruptWorkflow.get_invocation_id)
-        debug_info = await handle.query(MultiInterruptWorkflow.get_debug_info)
-        print(f"invocation_id after signal: {invocation_id_after}")
-        print(f"debug_info: {debug_info}")
-
-        # Verify second interrupt
-        interrupt_count = await handle.query(MultiInterruptWorkflow.get_interrupt_count)
-        assert interrupt_count == 2, f"Expected interrupt_count=2, got {interrupt_count}. invocation_id={invocation_id_after}. debug={debug_info}"
-
-        current_interrupt = await handle.query(MultiInterruptWorkflow.get_current_interrupt)
-        assert current_interrupt["step"] == 2
-
-        # Respond to second interrupt
-        await handle.signal(MultiInterruptWorkflow.provide_response, "second_value")
-
-        # Wait for completion
-        result = await handle.result()
-
-        # Verify final result
-        assert result["step1_result"] == "first_value"
-        assert result["step2_result"] == "second_value"
-
-
-@pytest.mark.asyncio
-async def test_store_persistence(client: Client) -> None:
-    """Test that store data persists across node executions."""
-    from temporalio.contrib.langgraph._graph_registry import get_global_registry
-
-    # Clear registry to avoid conflicts
-    get_global_registry().clear()
-
-    # Create plugin with the store graph
-    plugin = LangGraphPlugin(
-        graphs={"e2e_store": build_store_graph},
-        default_activity_timeout=timedelta(seconds=30),
-    )
-
-    # Apply plugin to client
-    new_config = client.config()
-    existing_plugins = new_config.get("plugins", [])
-    new_config["plugins"] = list(existing_plugins) + [plugin]
-    plugin_client = Client(**new_config)
-
-    async with new_worker(
-        plugin_client,
-        StoreWorkflow,
-    ) as worker:
-        result = await plugin_client.execute_workflow(
-            StoreWorkflow.run,
-            "test_user_123",
-            id=f"e2e-store-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
-        )
-
-        # Node1 should read None (no prior data)
-        assert result["node1_read"] is None
-
-        # Node2 should read the value written by Node1
-        assert result["node2_read"] == "dark"
-
-
-@pytest.mark.asyncio
-async def test_store_persistence_across_invocations(client: Client) -> None:
-    """Test that store data persists across multiple graph invocations.
-
-    This verifies that when the same graph is invoked multiple times within
-    a workflow, store data written in earlier invocations is visible to
-    later invocations.
-    """
-    from temporalio.contrib.langgraph._graph_registry import get_global_registry
-
-    # Clear registry to avoid conflicts
-    get_global_registry().clear()
-
-    # Create plugin with the counter graph
-    plugin = LangGraphPlugin(
-        graphs={"e2e_counter": build_counter_graph},
-        default_activity_timeout=timedelta(seconds=30),
-    )
-
-    # Apply plugin to client
-    new_config = client.config()
-    existing_plugins = new_config.get("plugins", [])
-    new_config["plugins"] = list(existing_plugins) + [plugin]
-    plugin_client = Client(**new_config)
-
-    async with new_worker(
-        plugin_client,
-        MultiInvokeStoreWorkflow,
-    ) as worker:
-        # Run the graph 3 times within the same workflow
-        results = await plugin_client.execute_workflow(
-            MultiInvokeStoreWorkflow.run,
-            args=["test_user_456", 3],
-            id=f"e2e-multi-invoke-store-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
-        )
-
-        # Should have 3 results
-        assert len(results) == 3
-
-        # First invocation: previous_count=None, current_count=1
-        assert results[0]["previous_count"] is None
-        assert results[0]["current_count"] == 1
-
-        # Second invocation: previous_count=1, current_count=2
-        assert results[1]["previous_count"] == 1
-        assert results[1]["current_count"] == 2
-
-        # Third invocation: previous_count=2, current_count=3
-        assert results[2]["previous_count"] == 2
-        assert results[2]["current_count"] == 3
+            # Verify the agent produced a result
+            assert (
+                result["message_count"] >= 3
+            )  # Human, AI (tool call), Tool, AI (answer)
+            assert "4" in result["answer"]  # Should contain the calculation result

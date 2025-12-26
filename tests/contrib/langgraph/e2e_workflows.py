@@ -1,8 +1,14 @@
-"""Workflow definitions for LangGraph e2e tests.
+"""Workflow definitions for LangGraph E2E tests.
 
-These workflows are defined in a separate module to ensure proper sandbox
-compatibility. LangGraph imports are wrapped with imports_passed_through().
+All workflow classes used in E2E tests are defined here to ensure proper
+sandbox compatibility. LangGraph imports are wrapped with imports_passed_through().
+
+Naming conventions:
+- Workflow classes: <Feature>E2EWorkflow
+- Graph IDs referenced: e2e_<feature>
 """
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
@@ -16,17 +22,27 @@ with workflow.unsafe.imports_passed_through():
     from temporalio.contrib.langgraph import compile as lg_compile
 
 
+# ==============================================================================
+# Input Types
+# ==============================================================================
+
+
 @dataclass
 class ContinueAsNewInput:
-    """Input for ContinueAsNewWorkflow."""
+    """Input for ContinueAsNewE2EWorkflow."""
 
     input_value: int
     checkpoint: dict | None = None
-    cycle_count: int = 0  # Track how many cycles we've completed
+    cycle_count: int = 0
+
+
+# ==============================================================================
+# Basic Execution Workflows
+# ==============================================================================
 
 
 @workflow.defn
-class SimpleGraphWorkflow:
+class SimpleE2EWorkflow:
     """Simple workflow that runs a graph without interrupts."""
 
     @workflow.run
@@ -35,8 +51,13 @@ class SimpleGraphWorkflow:
         return await app.ainvoke({"value": input_value})
 
 
+# ==============================================================================
+# Interrupt Workflows
+# ==============================================================================
+
+
 @workflow.defn
-class ApprovalWorkflow:
+class ApprovalE2EWorkflow:
     """Workflow with interrupt for human approval.
 
     This demonstrates the full interrupt flow:
@@ -72,9 +93,7 @@ class ApprovalWorkflow:
             self._interrupt_value = result["__interrupt__"][0].value
 
             # Wait for signal with approval
-            await workflow.wait_condition(
-                lambda: self._approval_response is not None
-            )
+            await workflow.wait_condition(lambda: self._approval_response is not None)
 
             # Resume with the approval response
             result = await app.ainvoke(Command(resume=self._approval_response))
@@ -83,7 +102,7 @@ class ApprovalWorkflow:
 
 
 @workflow.defn
-class RejectionWorkflow:
+class RejectionE2EWorkflow:
     """Workflow for testing interrupt rejection."""
 
     def __init__(self) -> None:
@@ -96,21 +115,19 @@ class RejectionWorkflow:
 
     @workflow.run
     async def run(self, input_value: int) -> dict:
-        app = lg_compile("e2e_approval_reject")
+        app = lg_compile("e2e_rejection")
 
         result = await app.ainvoke({"value": input_value})
 
         if "__interrupt__" in result:
-            await workflow.wait_condition(
-                lambda: self._approval_response is not None
-            )
+            await workflow.wait_condition(lambda: self._approval_response is not None)
             result = await app.ainvoke(Command(resume=self._approval_response))
 
         return result
 
 
 @workflow.defn
-class MultiInterruptWorkflow:
+class MultiInterruptE2EWorkflow:
     """Workflow that handles multiple interrupts in sequence."""
 
     def __init__(self) -> None:
@@ -118,6 +135,7 @@ class MultiInterruptWorkflow:
         self._interrupt_count: int = 0
         self._current_interrupt: Any = None
         self._invocation_id: int = 0
+        self._app: Any = None
 
     @workflow.signal
     def provide_response(self, value: Any) -> None:
@@ -142,7 +160,7 @@ class MultiInterruptWorkflow:
     @workflow.query
     def get_debug_info(self) -> dict:
         """Query to get debug info about runner state."""
-        if not hasattr(self, '_app'):
+        if self._app is None:
             return {"error": "no app"}
         return {
             "has_interrupted_state": self._app._interrupted_state is not None,
@@ -183,8 +201,13 @@ class MultiInterruptWorkflow:
             self._response = None
 
 
+# ==============================================================================
+# Store Workflows
+# ==============================================================================
+
+
 @workflow.defn
-class StoreWorkflow:
+class StoreE2EWorkflow:
     """Workflow that tests store functionality across nodes.
 
     This tests that:
@@ -200,54 +223,111 @@ class StoreWorkflow:
 
 
 @workflow.defn
-class MultiInvokeStoreWorkflow:
+class MultiInvokeStoreE2EWorkflow:
     """Workflow that invokes the same graph multiple times.
 
     This tests that store data persists across multiple ainvoke() calls
-    within the same workflow execution. Each invocation increments a
-    counter in the store, and can read the previous count.
+    within the same workflow execution.
     """
 
     @workflow.run
     async def run(self, user_id: str, num_invocations: int) -> list[dict]:
-        """Run the counter graph multiple times.
-
-        Args:
-            user_id: User ID for store namespace.
-            num_invocations: How many times to invoke the graph.
-
-        Returns:
-            List of results from each invocation.
-        """
+        """Run the counter graph multiple times."""
         app = lg_compile("e2e_counter")
         results = []
 
         for i in range(num_invocations):
-            result = await app.ainvoke({
-                "user_id": user_id,
-                "invocation_num": i + 1,
-            })
+            result = await app.ainvoke(
+                {
+                    "user_id": user_id,
+                    "invocation_num": i + 1,
+                }
+            )
             results.append(result)
 
         return results
 
 
+# ==============================================================================
+# Advanced Feature Workflows
+# ==============================================================================
+
+
 @workflow.defn
-class ContinueAsNewWorkflow:
+class SendE2EWorkflow:
+    """Workflow that tests Send API for dynamic parallelism."""
+
+    @workflow.run
+    async def run(self, items: list[int]) -> dict:
+        app = lg_compile("e2e_send")
+        return await app.ainvoke({"items": items})
+
+
+@workflow.defn
+class SubgraphE2EWorkflow:
+    """Workflow that tests subgraph execution."""
+
+    @workflow.run
+    async def run(self, value: int) -> dict:
+        app = lg_compile("e2e_subgraph")
+        return await app.ainvoke({"value": value})
+
+
+@workflow.defn
+class CommandE2EWorkflow:
+    """Workflow that tests Command goto API."""
+
+    @workflow.run
+    async def run(self, value: int) -> dict:
+        app = lg_compile("e2e_command")
+        return await app.ainvoke({"value": value})
+
+
+# ==============================================================================
+# Agentic Workflows
+# ==============================================================================
+
+
+@workflow.defn
+class ReactAgentE2EWorkflow:
+    """Workflow that runs a react agent with temporal tools."""
+
+    @workflow.run
+    async def run(self, question: str) -> dict[str, Any]:
+        """Run the react agent and return the result."""
+        with workflow.unsafe.imports_passed_through():
+            from langchain_core.messages import HumanMessage
+
+        app = lg_compile("e2e_react_agent")
+
+        # Run the agent
+        result = await app.ainvoke({"messages": [HumanMessage(content=question)]})
+
+        # Extract the final message content
+        messages = result.get("messages", [])
+        if messages:
+            final_message = messages[-1]
+            return {
+                "answer": final_message.content,
+                "message_count": len(messages),
+            }
+        return {"answer": "", "message_count": 0}
+
+
+# ==============================================================================
+# Continue-as-New Workflows
+# ==============================================================================
+
+
+@workflow.defn
+class ContinueAsNewE2EWorkflow:
     """Workflow demonstrating continue-as-new with checkpoint.
 
     This workflow demonstrates the checkpoint pattern for long-running workflows:
     1. Runs graph with should_continue callback
-    2. After 2 ticks, should_continue returns False
+    2. After N ticks, should_continue returns False
     3. Workflow gets checkpoint and calls continue-as-new
     4. New execution restores from checkpoint and continues
-
-    The should_continue callback is called once per graph tick (BSP superstep).
-    Each tick processes one layer of nodes in the graph. By tracking ticks,
-    we can limit execution and checkpoint before Temporal's history grows too large.
-
-    This simulates a long-running agent that needs to continue-as-new
-    due to history size limits.
     """
 
     def __init__(self) -> None:
@@ -267,7 +347,6 @@ class ContinueAsNewWorkflow:
         app = lg_compile("e2e_continue_as_new", checkpoint=input_data.checkpoint)
 
         # Define should_continue to stop after 2 ticks
-        # This is called after each tick, so we increment and check
         def should_continue() -> bool:
             self._cycle_count += 1
             return self._cycle_count < 2
