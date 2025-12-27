@@ -7,7 +7,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     List,
-    Optional,
     Sequence,
     Union,
 )
@@ -31,14 +30,14 @@ class _TemporalChatModel:
         model: Union[str, "BaseChatModel"],
         *,
         start_to_close_timeout: timedelta,
-        schedule_to_close_timeout: Optional[timedelta] = None,
-        schedule_to_start_timeout: Optional[timedelta] = None,
-        heartbeat_timeout: Optional[timedelta] = None,
-        task_queue: Optional[str] = None,
-        retry_policy: Optional["RetryPolicy"] = None,
-        cancellation_type: Optional["ActivityCancellationType"] = None,
-        versioning_intent: Optional["VersioningIntent"] = None,
-        priority: Optional["Priority"] = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        task_queue: str | None = None,
+        retry_policy: "RetryPolicy | None" = None,
+        cancellation_type: "ActivityCancellationType | None" = None,
+        versioning_intent: "VersioningIntent | None" = None,
+        priority: "Priority | None" = None,
     ) -> None:
         self._model = model
         self._activity_options: dict[str, Any] = {
@@ -77,8 +76,8 @@ class _TemporalChatModel:
 
         # Get model name for activity
         if isinstance(original_model, str):
-            model_name: Optional[str] = original_model
-            model_instance: Optional[BaseChatModel] = None
+            model_name: str | None = original_model
+            model_instance: BaseChatModel | None = None
         else:
             model_name = getattr(original_model, "model_name", None) or getattr(
                 original_model, "model", None
@@ -107,7 +106,7 @@ class _TemporalChatModel:
             def _generate(
                 self,
                 messages: List["BaseMessage"],
-                stop: Optional[List[str]] = None,
+                stop: List[str] | None = None,
                 run_manager: Any = None,
                 **kwargs: Any,
             ) -> "ChatResult":
@@ -123,7 +122,7 @@ class _TemporalChatModel:
             async def _agenerate(  # type: ignore[override]
                 self,
                 messages: List["BaseMessage"],
-                stop: Optional[List[str]] = None,
+                stop: List[str] | None = None,
                 run_manager: Any = None,
                 **kwargs: Any,
             ) -> "ChatResult":
@@ -223,14 +222,14 @@ def temporal_model(
     model: Union[str, "BaseChatModel"],
     *,
     start_to_close_timeout: timedelta = timedelta(minutes=2),
-    schedule_to_close_timeout: Optional[timedelta] = None,
-    schedule_to_start_timeout: Optional[timedelta] = None,
-    heartbeat_timeout: Optional[timedelta] = None,
-    task_queue: Optional[str] = None,
-    retry_policy: Optional["RetryPolicy"] = None,
-    cancellation_type: Optional["ActivityCancellationType"] = None,
-    versioning_intent: Optional["VersioningIntent"] = None,
-    priority: Optional["Priority"] = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    task_queue: str | None = None,
+    retry_policy: "RetryPolicy | None" = None,
+    cancellation_type: "ActivityCancellationType | None" = None,
+    versioning_intent: "VersioningIntent | None" = None,
+    priority: "Priority | None" = None,
 ) -> "BaseChatModel":
     """Wrap a LangChain chat model to execute LLM calls as Temporal activities.
 

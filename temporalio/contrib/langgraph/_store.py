@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Optional, Sequence
+from typing import Any, Iterable, Sequence
 
 from langgraph.store.base import (
     BaseStore,
@@ -131,7 +131,7 @@ class ActivityLocalStore(BaseStore):
     def _search(
         self,
         namespace_prefix: tuple[str, ...],
-        filter: Optional[dict[str, Any]],
+        filter: dict[str, Any] | None,
         limit: int,
     ) -> list[Item]:
         """Search for items in a namespace."""
@@ -176,7 +176,7 @@ class ActivityLocalStore(BaseStore):
 
     def _list_namespaces(
         self,
-        match_conditions: Optional[Sequence[MatchCondition]],
+        match_conditions: Sequence[MatchCondition] | None,
         limit: int,
     ) -> list[tuple[str, ...]]:
         """List namespaces in the store."""

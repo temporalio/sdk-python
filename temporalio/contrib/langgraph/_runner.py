@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Callable, Optional, cast
+from typing import TYPE_CHECKING, Any, Callable, cast
 
 from temporalio import workflow
 
@@ -41,9 +41,9 @@ class TemporalLangGraphRunner:
         self,
         pregel: Pregel,
         graph_id: str,
-        default_activity_options: Optional[dict[str, Any]] = None,
-        per_node_activity_options: Optional[dict[str, dict[str, Any]]] = None,
-        checkpoint: Optional[dict[str, Any]] = None,
+        default_activity_options: dict[str, Any] | None = None,
+        per_node_activity_options: dict[str, dict[str, Any]] | None = None,
+        checkpoint: dict[str, Any] | None = None,
     ) -> None:
         """Initialize the Temporal runner.
 
@@ -76,20 +76,18 @@ class TemporalLangGraphRunner:
         # Track invocation number for unique activity IDs across replays
         self._invocation_counter = 0
         # State for interrupt handling
-        self._interrupted_state: Optional[dict[str, Any]] = None
-        self._interrupted_node_name: Optional[str] = (
-            None  # Track which node interrupted
-        )
-        self._resume_value: Optional[Any] = None
+        self._interrupted_state: dict[str, Any] | None = None
+        self._interrupted_node_name: str | None = None  # Track which node interrupted
+        self._resume_value: Any | None = None
         self._resume_used: bool = False
         # Pending interrupt from current execution (set by _execute_as_activity)
-        self._pending_interrupt: Optional[InterruptValue] = None
+        self._pending_interrupt: InterruptValue | None = None
         # Track nodes completed in current resume cycle (to avoid re-execution)
         self._completed_nodes_in_cycle: set[str] = set()
         # Cached writes from resumed nodes (injected into tasks to trigger successors)
         self._resumed_node_writes: dict[str, list[tuple[str, Any]]] = {}
         # Track the last output state for get_state()
-        self._last_output: Optional[dict[str, Any]] = None
+        self._last_output: dict[str, Any] | None = None
         # Store state for cross-node persistence (key: (namespace, key), value: dict)
         self._store_state: dict[tuple[tuple[str, ...], str], dict[str, Any]] = {}
 
@@ -100,9 +98,9 @@ class TemporalLangGraphRunner:
     async def ainvoke(
         self,
         input_state: dict[str, Any] | Any,
-        config: Optional[dict[str, Any]] = None,
+        config: dict[str, Any] | None = None,
         *,
-        should_continue: Optional[Callable[[], bool]] = None,
+        should_continue: Callable[[], bool] | None = None,
     ) -> dict[str, Any]:
         """Execute the graph asynchronously.
 
@@ -121,7 +119,7 @@ class TemporalLangGraphRunner:
             from langgraph.types import Command
 
         # Track resume state for this invocation
-        resume_value: Optional[Any] = None
+        resume_value: Any | None = None
 
         # Check if input is a Command with resume value (LangGraph API)
         is_resume = False
@@ -414,7 +412,7 @@ class TemporalLangGraphRunner:
     async def _execute_as_activity_with_sends(
         self,
         task: PregelExecutableTask,
-        resume_value: Optional[Any] = None,
+        resume_value: Any | None = None,
     ) -> tuple[list[tuple[str, Any]], list[Any]]:
         """Execute a task as a Temporal activity, returning writes and send packets."""
         self._step_counter += 1
@@ -727,7 +725,7 @@ class TemporalLangGraphRunner:
     def invoke(
         self,
         input_state: dict[str, Any],
-        config: Optional[dict[str, Any]] = None,
+        config: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Synchronous invoke is not supported. Use ainvoke()."""
         raise NotImplementedError(
@@ -807,7 +805,7 @@ class TemporalLangGraphRunner:
             for item in store_state
         }
 
-    def _prepare_store_snapshot(self) -> Optional[StoreSnapshot]:
+    def _prepare_store_snapshot(self) -> StoreSnapshot | None:
         """Prepare a store snapshot for activity input."""
         if not self._store_state:
             return None

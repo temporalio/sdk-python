@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Callable
 
 from temporalio.contrib.langgraph._exceptions import model_not_found_error
 
@@ -16,7 +16,7 @@ _model_factories: dict[str, Callable[[], "BaseChatModel"]] = {}
 _registry_lock = threading.Lock()
 
 
-def register_model(model: "BaseChatModel", name: Optional[str] = None) -> None:
+def register_model(model: "BaseChatModel", name: str | None = None) -> None:
     """Register a model instance in the global registry."""
     if name is None:
         name = getattr(model, "model_name", None) or getattr(model, "model", None)
@@ -61,9 +61,9 @@ def get_model(name: str) -> "BaseChatModel":
         raise model_not_found_error(name, available)
 
 
-def _try_auto_create_model(name: str) -> Optional["BaseChatModel"]:
+def _try_auto_create_model(name: str) -> "BaseChatModel | None":
     """Try to auto-create a model based on common naming patterns."""
-    model: Optional["BaseChatModel"] = None
+    model: "BaseChatModel | None" = None
     try:
         # OpenAI models
         if name.startswith("gpt-") or name.startswith("o1"):

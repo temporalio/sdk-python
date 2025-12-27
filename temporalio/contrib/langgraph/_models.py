@@ -1,13 +1,9 @@
-"""Pydantic models for LangGraph-Temporal integration."""
+"""Dataclass models for LangGraph-Temporal integration."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Optional
-
-from pydantic import BaseModel, BeforeValidator, ConfigDict
-
-if TYPE_CHECKING:
-    pass
+from dataclasses import dataclass, field
+from typing import Any, Literal
 
 
 def _coerce_to_message(value: Any) -> Any:
@@ -47,36 +43,48 @@ def _coerce_state_values(state: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-# Type alias for state dict with automatic message coercion
-LangGraphState = Annotated[dict[str, Any], BeforeValidator(_coerce_state_values)]
-
-
 # ==============================================================================
 # Store Models
 # ==============================================================================
 
 
-class StoreItem(BaseModel):
+@dataclass
+class StoreItem:
     """A key-value pair within a namespace."""
 
     namespace: tuple[str, ...]
+    """Hierarchical namespace tuple."""
+
     key: str
+    """The key within the namespace."""
+
     value: dict[str, Any]
+    """The stored value."""
 
 
-class StoreWrite(BaseModel):
+@dataclass
+class StoreWrite:
     """A store write operation (put or delete)."""
 
     operation: Literal["put", "delete"]
+    """The type of operation."""
+
     namespace: tuple[str, ...]
+    """Hierarchical namespace tuple."""
+
     key: str
-    value: Optional[dict[str, Any]] = None
+    """The key within the namespace."""
+
+    value: dict[str, Any] | None = None
+    """The value to store (None for delete operations)."""
 
 
-class StoreSnapshot(BaseModel):
+@dataclass
+class StoreSnapshot:
     """Snapshot of store data passed to an activity."""
 
-    items: list[StoreItem] = []
+    items: list[StoreItem] = field(default_factory=list)
+    """List of store items in the snapshot."""
 
 
 # ==============================================================================
@@ -101,14 +109,18 @@ def _is_langchain_message_list(value: Any) -> bool:
     return _is_langchain_message(value[0])
 
 
-class ChannelWrite(BaseModel):
+@dataclass
+class ChannelWrite:
     """A write to a LangGraph channel with type preservation for messages."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     channel: str
+    """The channel name."""
+
     value: Any
+    """The value to write."""
+
     value_type: str | None = None
+    """Type hint for value reconstruction ('message' or 'message_list')."""
 
     @classmethod
     def create(cls, channel: str, value: Any) -> ChannelWrite:
@@ -137,65 +149,96 @@ class ChannelWrite(BaseModel):
         return (self.channel, self.reconstruct_value())
 
 
-class NodeActivityInput(BaseModel):
+@dataclass
+class NodeActivityInput:
     """Input for the node execution activity."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     node_name: str
+    """Name of the node to execute."""
+
     task_id: str
+    """Unique task ID from PregelExecutableTask."""
+
     graph_id: str
-    input_state: LangGraphState
+    """Graph ID for registry lookup."""
+
+    input_state: dict[str, Any]
+    """State to pass to node (coerced to LangChain messages on deserialization)."""
+
     config: dict[str, Any]
+    """Filtered RunnableConfig."""
+
     path: tuple[str | int, ...]
+    """Graph hierarchy path."""
+
     triggers: list[str]
-    resume_value: Optional[Any] = None
-    store_snapshot: Optional[StoreSnapshot] = None
+    """List of channels that triggered this node."""
+
+    resume_value: Any | None = None
+    """Value to resume with (for interrupt handling)."""
+
+    store_snapshot: StoreSnapshot | None = None
+    """Snapshot of store data for the activity."""
+
+    def __post_init__(self) -> None:
+        """Coerce state values to LangChain messages after deserialization."""
+        self.input_state = _coerce_state_values(self.input_state)
 
 
-class InterruptValue(BaseModel):
+@dataclass
+class InterruptValue:
     """Data about an interrupt raised by a node."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     value: Any
+    """The interrupt value."""
+
     node_name: str
+    """Name of the node that raised the interrupt."""
+
     task_id: str
+    """Task ID of the interrupted execution."""
 
 
-class SendPacket(BaseModel):
+@dataclass
+class SendPacket:
     """Serializable representation of a LangGraph Send object."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     node: str
+    """Target node name."""
+
     arg: dict[str, Any]
+    """Arguments to pass to the node."""
 
     @classmethod
-    def from_send(cls, send: Any) -> "SendPacket":
+    def from_send(cls, send: Any) -> SendPacket:
         """Create a SendPacket from a LangGraph Send object."""
         return cls(node=send.node, arg=send.arg)
 
 
-class NodeActivityOutput(BaseModel):
+@dataclass
+class NodeActivityOutput:
     """Output from the node execution activity."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     writes: list[ChannelWrite]
-    interrupt: Optional[InterruptValue] = None
-    store_writes: list[StoreWrite] = []
-    send_packets: list[SendPacket] = []
+    """List of channel writes from the node."""
+
+    interrupt: InterruptValue | None = None
+    """Interrupt data if the node raised an interrupt."""
+
+    store_writes: list[StoreWrite] = field(default_factory=list)
+    """List of store write operations."""
+
+    send_packets: list[SendPacket] = field(default_factory=list)
+    """List of Send packets for dynamic node dispatch."""
 
     def to_write_tuples(self) -> list[tuple[str, Any]]:
         """Convert writes to (channel, value) tuples."""
         return [write.to_tuple() for write in self.writes]
 
 
-class StateSnapshot(BaseModel):
+@dataclass
+class StateSnapshot:
     """Snapshot of graph execution state for checkpointing and continue-as-new."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     values: dict[str, Any]
     """Current state values."""
@@ -209,7 +252,7 @@ class StateSnapshot(BaseModel):
     tasks: tuple[dict[str, Any], ...]
     """Pending tasks/interrupts."""
 
-    store_state: list[dict[str, Any]] = []
+    store_state: list[dict[str, Any]] = field(default_factory=list)
     """Serialized store data."""
 
 
@@ -218,21 +261,23 @@ class StateSnapshot(BaseModel):
 # ==============================================================================
 
 
-class ToolActivityInput(BaseModel):
+@dataclass
+class ToolActivityInput:
     """Input for the tool execution activity."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     tool_name: str
+    """Name of the tool to execute."""
+
     tool_input: Any
+    """Input to pass to the tool."""
 
 
-class ToolActivityOutput(BaseModel):
+@dataclass
+class ToolActivityOutput:
     """Output from the tool execution activity."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     output: Any
+    """Output from the tool execution."""
 
 
 # ==============================================================================
@@ -240,30 +285,40 @@ class ToolActivityOutput(BaseModel):
 # ==============================================================================
 
 
-class ChatModelActivityInput(BaseModel):
+@dataclass
+class ChatModelActivityInput:
     """Input for the chat model execution activity."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_name: str | None
+    """Name of the model to use."""
 
-    model_name: Optional[str]
     messages: list[dict[str, Any]]
-    stop: Optional[list[str]] = None
-    kwargs: dict[str, Any] = {}
+    """List of message dicts to send."""
+
+    stop: list[str] | None = None
+    """Optional stop sequences."""
+
+    kwargs: dict[str, Any] = field(default_factory=dict)
+    """Additional keyword arguments."""
 
 
-class ChatGenerationData(BaseModel):
+@dataclass
+class ChatGenerationData:
     """Serialized chat generation data."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     message: dict[str, Any]
-    generation_info: Optional[dict[str, Any]] = None
+    """The generated message dict."""
+
+    generation_info: dict[str, Any] | None = None
+    """Optional generation metadata."""
 
 
-class ChatModelActivityOutput(BaseModel):
+@dataclass
+class ChatModelActivityOutput:
     """Output from the chat model execution activity."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     generations: list[dict[str, Any]]
-    llm_output: Optional[dict[str, Any]] = None
+    """List of generation dicts."""
+
+    llm_output: dict[str, Any] | None = None
+    """Optional LLM output metadata."""

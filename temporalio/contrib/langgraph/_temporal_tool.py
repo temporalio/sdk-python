@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Callable, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Type, Union
 
 from temporalio import workflow
 
@@ -23,14 +23,14 @@ class _TemporalToolWrapper:
         tool: "BaseTool",
         *,
         start_to_close_timeout: timedelta,
-        schedule_to_close_timeout: Optional[timedelta] = None,
-        schedule_to_start_timeout: Optional[timedelta] = None,
-        heartbeat_timeout: Optional[timedelta] = None,
-        task_queue: Optional[str] = None,
-        retry_policy: Optional["RetryPolicy"] = None,
-        cancellation_type: Optional["ActivityCancellationType"] = None,
-        versioning_intent: Optional["VersioningIntent"] = None,
-        priority: Optional["Priority"] = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        task_queue: str | None = None,
+        retry_policy: "RetryPolicy | None" = None,
+        cancellation_type: "ActivityCancellationType | None" = None,
+        versioning_intent: "VersioningIntent | None" = None,
+        priority: "Priority | None" = None,
     ) -> None:
         self._tool = tool
         self._activity_options: dict[str, Any] = {
@@ -92,7 +92,7 @@ class _TemporalToolWrapper:
             def _run(
                 self,
                 *args: Any,
-                run_manager: Optional["CallbackManagerForToolRun"] = None,
+                run_manager: "CallbackManagerForToolRun | None" = None,
                 **kwargs: Any,
             ) -> Any:
                 """Synchronous execution - delegates to async."""
@@ -105,7 +105,7 @@ class _TemporalToolWrapper:
             async def _arun(
                 self,
                 *args: Any,
-                run_manager: Optional["CallbackManagerForToolRun"] = None,
+                run_manager: "CallbackManagerForToolRun | None" = None,
                 **kwargs: Any,
             ) -> Any:
                 """Async execution - routes to activity when in workflow."""
@@ -161,14 +161,14 @@ def temporal_tool(
     tool: Union["BaseTool", Callable[..., Any]],
     *,
     start_to_close_timeout: timedelta = timedelta(minutes=5),
-    schedule_to_close_timeout: Optional[timedelta] = None,
-    schedule_to_start_timeout: Optional[timedelta] = None,
-    heartbeat_timeout: Optional[timedelta] = None,
-    task_queue: Optional[str] = None,
-    retry_policy: Optional["RetryPolicy"] = None,
-    cancellation_type: Optional["ActivityCancellationType"] = None,
-    versioning_intent: Optional["VersioningIntent"] = None,
-    priority: Optional["Priority"] = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    task_queue: str | None = None,
+    retry_policy: "RetryPolicy | None" = None,
+    cancellation_type: "ActivityCancellationType | None" = None,
+    versioning_intent: "VersioningIntent | None" = None,
+    priority: "Priority | None" = None,
 ) -> "BaseTool":
     """Wrap a LangChain tool to execute as a Temporal activity.
 

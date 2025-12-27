@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any, Optional
+from typing import Any
 
 import temporalio.common
 import temporalio.workflow
@@ -42,16 +42,16 @@ from temporalio.contrib.langgraph._tool_registry import register_tool
 
 def node_activity_options(
     *,
-    schedule_to_close_timeout: Optional[timedelta] = None,
-    schedule_to_start_timeout: Optional[timedelta] = None,
-    start_to_close_timeout: Optional[timedelta] = None,
-    heartbeat_timeout: Optional[timedelta] = None,
-    task_queue: Optional[str] = None,
-    retry_policy: Optional[temporalio.common.RetryPolicy] = None,
-    cancellation_type: Optional[temporalio.workflow.ActivityCancellationType] = None,
-    versioning_intent: Optional[temporalio.workflow.VersioningIntent] = None,
-    summary: Optional[str] = None,
-    priority: Optional[temporalio.common.Priority] = None,
+    schedule_to_close_timeout: timedelta | None = None,
+    schedule_to_start_timeout: timedelta | None = None,
+    start_to_close_timeout: timedelta | None = None,
+    heartbeat_timeout: timedelta | None = None,
+    task_queue: str | None = None,
+    retry_policy: temporalio.common.RetryPolicy | None = None,
+    cancellation_type: temporalio.workflow.ActivityCancellationType | None = None,
+    versioning_intent: temporalio.workflow.VersioningIntent | None = None,
+    summary: str | None = None,
+    priority: temporalio.common.Priority | None = None,
 ) -> dict[str, Any]:
     """Create activity options for LangGraph nodes.
 
@@ -84,7 +84,7 @@ def node_activity_options(
 
 def temporal_node_metadata(
     *,
-    activity_options: Optional[dict[str, Any]] = None,
+    activity_options: dict[str, Any] | None = None,
     run_in_workflow: bool = False,
 ) -> dict[str, Any]:
     """Create node metadata combining activity options and execution flags.
@@ -112,9 +112,9 @@ def temporal_node_metadata(
 def compile(
     graph_id: str,
     *,
-    default_activity_options: Optional[dict[str, Any]] = None,
-    per_node_activity_options: Optional[dict[str, dict[str, Any]]] = None,
-    checkpoint: Optional[dict] = None,
+    default_activity_options: dict[str, Any] | None = None,
+    per_node_activity_options: dict[str, dict[str, Any]] | None = None,
+    checkpoint: dict | None = None,
 ) -> TemporalLangGraphRunner:
     """Compile a registered graph for Temporal execution.
 
@@ -150,13 +150,13 @@ def compile(
         return {"temporal": {**base_temporal, **override_temporal}}
 
     # Merge options: compile options override plugin options
-    merged_default_options: Optional[dict[str, Any]] = None
+    merged_default_options: dict[str, Any] | None = None
     if plugin_default_options or default_activity_options:
         merged_default_options = _merge_activity_options(
             plugin_default_options or {}, default_activity_options or {}
         )
 
-    merged_per_node_options: Optional[dict[str, dict[str, Any]]] = None
+    merged_per_node_options: dict[str, dict[str, Any]] | None = None
     if plugin_per_node_options or per_node_activity_options:
         merged_per_node_options = {}
         # Start with plugin options

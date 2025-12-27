@@ -13,13 +13,13 @@ This document captures discrepancies between the LangGraph integration (`tempora
 |---|----------|----------|-------------|
 | 1 | ~~Experimental warnings~~ | ~~Medium~~ | ~~Missing `.. warning::` notices for experimental API~~ **FIXED** |
 | 2 | ~~Internal API usage~~ | ~~High~~ | ~~Uses `langgraph._internal.*` private modules~~ **DOCUMENTED** |
-| 3 | Data structures | Low | Uses Pydantic instead of dataclasses |
-| 4 | Docstrings | Low | Different style from SDK conventions |
+| 3 | ~~Data structures~~ | ~~Low~~ | ~~Uses Pydantic instead of dataclasses~~ **FIXED** |
+| 4 | ~~Docstrings~~ | ~~Low~~ | ~~Different style from SDK conventions~~ **FIXED** |
 | 5 | ~~Logging~~ | ~~Medium~~ | ~~No module-level logger defined~~ **FIXED** |
 | 6 | ~~Warnings suppression~~ | ~~Medium~~ | ~~Suppresses deprecation warnings~~ **FIXED** |
 | 7 | File organization | Low | Example file in production code |
 | 8 | Test naming | Low | Uses `e2e_` prefix not standard in SDK |
-| 9 | Type annotations | Low | Mixed `Optional[X]` and `X | None` |
+| 9 | ~~Type annotations~~ | ~~Low~~ | ~~Mixed `Optional[X]` and `X | None`~~ **FIXED** |
 | 10 | ~~Exceptions~~ | ~~Medium~~ | ~~Uses generic exceptions instead of domain-specific~~ **FIXED** |
 | 11 | Design docs | Low | Design document in production directory |
 
@@ -80,84 +80,73 @@ from langgraph._internal._scratchpad import PregelScratchpad
 
 ---
 
-### 3. Pydantic Models vs Dataclasses
+### 3. Pydantic Models vs Dataclasses **FIXED**
 
 **Severity**: Low
 **Location**: `_models.py`
 
-**Issue**: The SDK predominantly uses `@dataclass` (often `@dataclass(frozen=True)`) for data structures, while the LangGraph integration uses Pydantic `BaseModel`:
+**Issue**: The SDK predominantly uses `@dataclass` (often `@dataclass(frozen=True)`) for data structures, while the LangGraph integration was using Pydantic `BaseModel`.
 
+**Resolution**: Converted all models in `_models.py` from Pydantic `BaseModel` to Python `@dataclass`:
+- Replaced `BaseModel` inheritance with `@dataclass` decorator
+- Replaced `model_config = ConfigDict(arbitrary_types_allowed=True)` (no longer needed for dataclasses)
+- Replaced Pydantic's `BeforeValidator` for `LangGraphState` with `__post_init__` method in `NodeActivityInput`
+- Updated to SDK-style inline docstrings after field definitions
+- Converted `Optional[X]` to `X | None` for consistency
+
+The models now follow SDK conventions while maintaining full functionality:
 ```python
-# SDK pattern (common.py, activity.py, etc.):
-@dataclass(frozen=True)
-class RetryPolicy:
-    initial_interval: timedelta = timedelta(seconds=1)
-    """Backoff interval for the first retry. Default 1s."""
+@dataclass
+class StoreItem:
+    """A key-value pair within a namespace."""
 
-# LangGraph pattern (_models.py):
-class StoreItem(BaseModel):
-    """Single item in the store."""
     namespace: tuple[str, ...]
+    """Hierarchical namespace tuple."""
+
     key: str
+    """The key within the namespace."""
+
     value: dict[str, Any]
+    """The stored value."""
 ```
 
-**Context**: This may be intentional due to LangChain's Pydantic dependency and serialization requirements, but creates inconsistency with the rest of the SDK.
-
-**Recommendation**: Document why Pydantic is used (likely for LangChain compatibility) in the module docstring.
+Note: `_coerce_to_message()` still uses Pydantic's `TypeAdapter` internally for LangChain message deserialization, which is acceptable since LangChain already depends on Pydantic.
 
 ---
 
-### 4. Docstring Style Inconsistencies
+### 4. Docstring Style Inconsistencies **FIXED**
 
 **Severity**: Low
 **Location**: Various files
 
+**Issue**: Original concern was about module docstrings and attribute documentation style.
+
+**Resolution**: The module now follows SDK conventions:
+
 #### 4a. Module Docstrings
+All module docstrings use short, single-sentence style:
+- `_activities.py`: "Temporal activities for LangGraph node execution."
+- `_models.py`: "Dataclass models for LangGraph-Temporal integration."
+- `_plugin.py`: "LangGraph plugin for Temporal integration."
+- etc.
 
-**SDK Pattern**: Short, single-sentence module docstrings:
-```python
-"""Activity worker."""
-"""Common Temporal exceptions."""
-"""Client for accessing Temporal."""
-```
-
-**LangGraph Pattern**: Longer, more detailed module docstrings with usage examples:
-```python
-"""Temporal integration for LangGraph.
-
-This module provides seamless integration between LangGraph and Temporal,
-enabling durable execution of LangGraph agents...
-
-Quick Start:
-    >>> from temporalio.client import Client
-    ...
-"""
-```
+The `__init__.py` includes an experimental warning which is appropriate for a public API.
 
 #### 4b. Attribute Documentation
-
-**SDK Pattern**: Uses inline docstrings after attributes in dataclasses:
+All dataclasses in `_models.py` use SDK-style inline docstrings after attributes:
 ```python
 @dataclass
-class RetryPolicy:
-    initial_interval: timedelta = timedelta(seconds=1)
-    """Backoff interval for the first retry. Default 1s."""
+class StoreItem:
+    """A key-value pair within a namespace."""
+
+    namespace: tuple[str, ...]
+    """Hierarchical namespace tuple."""
+
+    key: str
+    """The key within the namespace."""
 ```
 
-**LangGraph Pattern**: Uses `Attributes:` section in class docstring:
-```python
-class StoreItem(BaseModel):
-    """Single item in the store.
-
-    Attributes:
-        namespace: Hierarchical namespace tuple...
-        key: The key within the namespace.
-        value: The stored value...
-    """
-```
-
-**Recommendation**: Consider aligning with SDK's inline docstring pattern where possible.
+This pattern was established when converting from Pydantic to dataclasses (item #3).
 
 ---
 
@@ -235,25 +224,22 @@ tests/contrib/langgraph/
 
 ---
 
-### 9. Type Annotations Style
+### 9. Type Annotations Style **FIXED**
 
 **Severity**: Low
 **Location**: Various files
 
-**Issue**: Mixed use of `Optional[X]` and `X | None`:
+**Issue**: Mixed use of `Optional[X]` and `X | None`.
 
-```python
-# Mixed in _runner.py:
-checkpoint: Optional[dict[str, Any]] = None
-resume_value: Optional[Any] = None
+**Resolution**: Standardized all type annotations to use `X | None` syntax throughout the module:
+- `_temporal_tool.py` - Converted all `Optional` usages
+- `_runner.py` - Converted all `Optional` usages
+- `_model_registry.py` - Removed unused `Optional` import
+- `_temporal_model.py` - Converted all `Optional` usages
+- `__init__.py` - Converted all `Optional` usages in public APIs
+- `_store.py` - Converted all `Optional` usages
 
-# vs newer style:
-config: dict[str, Any] | None = None
-```
-
-**SDK Trend**: Newer SDK code tends to prefer `X | None` syntax consistently.
-
-**Recommendation**: Standardize on `X | None` syntax throughout.
+All files now consistently use the `X | None` syntax preferred by newer SDK code.
 
 ---
 
@@ -334,8 +320,9 @@ These should be documented as optional dependencies in `pyproject.toml`.
 - [x] Consider domain-specific exceptions (item #10) **FIXED** - Created `_exceptions.py` with `ApplicationError` factory functions and configuration exceptions
 
 ### Low Priority
+- [x] Convert Pydantic models to dataclasses (item #3) **FIXED** - Converted all models in `_models.py` to dataclasses
 - [ ] Move example file (item #7)
-- [ ] Standardize type annotation style (item #9)
+- [x] Standardize type annotation style (item #9) **FIXED** - Converted all `Optional[X]` to `X | None` syntax
 - [ ] Move design document (item #11)
-- [ ] Align docstring style (item #4)
+- [x] Align docstring style (item #4) **FIXED** - Module and attribute docstrings follow SDK conventions
 - [ ] Review test organization (item #8)
