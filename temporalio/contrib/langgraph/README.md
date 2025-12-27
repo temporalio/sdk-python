@@ -15,7 +15,7 @@ This document is organized as follows:
 
 - **[Quick Start](#quick-start)** - Your first durable LangGraph agent
 - **[Per-Node Configuration](#per-node-configuration)** - Configuring timeouts, retries, and task queues
-- **[Agentic Execution](#agentic-execution)** - Using create_durable_agent() and create_durable_react_agent()
+- **[Agentic Execution](#agentic-execution)** - Using LangGraph's create_react_agent with Temporal
 - **[Human-in-the-Loop](#human-in-the-loop-interrupts)** - Supporting interrupt() with Temporal signals
 - **[Compatibility](#compatibility)** - Feature support matrix
 
@@ -236,20 +236,20 @@ You can also use LangGraph's native `retry_policy` parameter on `add_node()`, wh
 
 ## Agentic Execution
 
-Run LLM-powered agents with durable tool execution and model calls.
+LangGraph's native agent APIs work directly with the Temporal integration. Each graph node (agent reasoning, tool execution) runs as a Temporal activity, providing automatic retries and failure recovery.
 
-### Using Durable Agent Functions (Recommended)
+### Using create_react_agent
 
-The simplest way to create durable agents is with `create_durable_agent` or `create_durable_react_agent`. These functions automatically wrap the model and tools for Temporal durability:
+Use LangGraph's `create_react_agent` with your model and tools:
 
 ```python
 from datetime import timedelta
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
+from langgraph.prebuilt import create_react_agent
 from temporalio import workflow
 from temporalio.contrib.langgraph import (
     activity_options,
-    create_durable_agent,
     LangGraphPlugin,
     compile,
 )
@@ -261,18 +261,15 @@ def search_web(query: str) -> str:
     return f"Results for: {query}"
 
 
+@tool
+def get_weather(city: str) -> str:
+    """Get the weather for a city."""
+    return f"Weather in {city}: Sunny, 72°F"
+
+
 def build_agent_graph():
-    # Just pass your model and tools - wrapping is automatic!
-    return create_durable_agent(
-        ChatOpenAI(model="gpt-4o"),
-        [search_web],
-        model_activity_options=activity_options(
-            start_to_close_timeout=timedelta(minutes=2),
-        ),
-        tool_activity_options=activity_options(
-            start_to_close_timeout=timedelta(minutes=1),
-        ),
-    )
+    model = ChatOpenAI(model="gpt-4o")
+    return create_react_agent(model, [search_web, get_weather])
 
 
 @workflow.defn
@@ -287,116 +284,46 @@ class AgentWorkflow:
 plugin = LangGraphPlugin(graphs={"my_agent": build_agent_graph})
 ```
 
-For LangGraph's prebuilt agent, use `create_durable_react_agent`:
+### How It Works
+
+When you use `create_react_agent`, LangGraph creates a graph with two main nodes:
+- **agent**: Calls the LLM to decide what to do next
+- **tools**: Executes the tools the LLM requested
+
+The Temporal integration runs each node as a separate activity. The agentic loop (agent → tools → agent → tools → ...) continues until the LLM decides to stop. Each activity execution is:
+- **Durable**: Progress is saved after each node completes
+- **Retryable**: Failed nodes can be automatically retried
+- **Recoverable**: If the worker crashes, execution resumes from the last completed node
+
+### Configuring Activity Options
+
+Configure timeouts and retries for agent nodes at the plugin or compile level:
 
 ```python
-from temporalio.contrib.langgraph import create_durable_react_agent
+from temporalio.common import RetryPolicy
 
-
-def build_react_agent():
-    return create_durable_react_agent(
-        ChatOpenAI(model="gpt-4o"),
-        [search_web],
-    )
-```
-
-These functions:
-- Auto-wrap the model with `temporal_model()` for durable LLM calls
-- Auto-wrap tools with `temporal_tool()` for durable tool execution
-- Mark agent nodes to run inline in the workflow (model/tool calls as activities)
-
-This provides fine-grained durability where each LLM call and tool invocation is individually retryable and recoverable.
-
-### Manual Wrapping (Advanced)
-
-For more control, you can manually wrap models and tools:
-
-```python
-from langchain.agents import create_agent
-from temporalio.contrib.langgraph import temporal_model, temporal_tool
-
-
-def build_agent_graph():
-    # Manually wrap model for durable LLM calls
-    model = temporal_model(
-        ChatOpenAI(model="gpt-4o"),
-        start_to_close_timeout=timedelta(minutes=2),
-    )
-
-    # Manually wrap tools for durable execution
-    tools = [
-        temporal_tool(search_web, start_to_close_timeout=timedelta(minutes=1)),
-    ]
-
-    return create_agent(model=model, tools=tools)
-```
-
-### Hybrid Execution (Advanced)
-
-For deterministic nodes that don't require durability, you can mark them to run directly in the workflow using `temporal_node_metadata()`:
-
-```python
-from temporalio.contrib.langgraph import temporal_node_metadata, activity_options
-
-# Mark a specific node to run in workflow instead of as an activity
-graph.add_node(
-    "validate",
-    validate_input,
-    metadata=temporal_node_metadata(run_in_workflow=True),  # Deterministic, no I/O
-)
-
-# Combine with activity options
-graph.add_node(
-    "process",
-    process_data,
-    metadata=temporal_node_metadata(
-        activity_options=activity_options(
+plugin = LangGraphPlugin(
+    graphs={"my_agent": build_agent_graph},
+    per_node_activity_options={
+        # Agent node makes LLM calls - give it time
+        "agent": activity_options(
             start_to_close_timeout=timedelta(minutes=5),
-            task_queue="gpu-workers",
+            retry_policy=RetryPolicy(maximum_attempts=3),
         ),
-        run_in_workflow=False,  # Run as activity (default)
-    ),
+        # Tools node runs tool functions
+        "tools": activity_options(
+            start_to_close_timeout=timedelta(minutes=2),
+        ),
+    },
 )
 ```
-
-### Direct Tool Binding
-
-You can also use `bind_tools()` directly on a `temporal_model()` wrapper. This is useful when building custom graphs or using patterns that require explicit tool binding:
-
-```python
-from temporalio.contrib.langgraph import temporal_model
-from langchain_core.tools import tool
-
-
-@tool
-def get_weather(city: str) -> str:
-    """Get weather for a city."""
-    return f"Weather in {city}: Sunny, 72°F"
-
-
-def build_custom_graph():
-    # Create temporal model with tools bound
-    model = temporal_model(
-        "gpt-4o",
-        start_to_close_timeout=timedelta(minutes=2),
-    )
-    model_with_tools = model.bind_tools([get_weather], tool_choice="auto")
-
-    # Use in your custom graph
-    graph = StateGraph(MyState)
-    graph.add_node("agent", lambda state: {"response": model_with_tools.invoke(state["messages"])})
-    # ... add edges ...
-    return graph.compile()
-```
-
-The bound tools are serialized and passed to the activity, where they are bound to the actual model instance before execution.
 
 ### Key Benefits
 
-- **Durable LLM Calls**: Each model invocation is a separate activity with retries
-- **Durable Tool Execution**: Tool calls survive failures and can be retried
-- **Middleware Support**: `create_agent` supports hooks for human-in-the-loop, summarization, etc.
-- **Tool Binding**: Use `bind_tools()` on temporal models for custom graph patterns
+- **No Special Wrappers Needed**: Use native LangGraph APIs directly
+- **Durable Execution**: Each node execution is persisted by Temporal
+- **Automatic Retries**: Failed LLM calls or tool executions are retried
+- **Crash Recovery**: Execution resumes from last completed node after failures
 
 ## Human-in-the-Loop (Interrupts)
 
@@ -609,9 +536,7 @@ async def node_with_subgraph(state: dict) -> dict:
 | Conditional edges | Full |
 | Send API | Full |
 | ToolNode | Full |
-| create_durable_agent | Full |
-| create_durable_react_agent | Full |
-| temporal_model / temporal_tool | Full |
+| create_react_agent | Full |
 | interrupt() | Full |
 | Store API | Full |
 | Streaming | Limited (via queries) |
