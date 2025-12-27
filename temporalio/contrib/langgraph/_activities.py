@@ -31,10 +31,40 @@ from temporalio.contrib.langgraph._store import ActivityLocalStore
 if TYPE_CHECKING:
     from langchain_core.runnables import RunnableConfig
 
-# Import CONFIG_KEY_SEND and CONFIG_KEY_READ for Pregel context injection
-# CONFIG_KEY_SEND is for write capture, CONFIG_KEY_READ is for state reading
-# CONFIG_KEY_SCRATCHPAD is needed for interrupt() to work
-# CONFIG_KEY_RUNTIME is for injecting the runtime with store access
+# =============================================================================
+# LangGraph Internal API Usage
+# =============================================================================
+#
+# This module uses LangGraph internal APIs (langgraph._internal.*) because we
+# execute individual graph nodes as separate Temporal activities, outside of
+# LangGraph's normal Pregel execution loop.
+#
+# WHY WE NEED THESE:
+# LangGraph's Pregel executor injects special config keys when running nodes:
+#
+# - CONFIG_KEY_SEND: Callback to capture node outputs (writes to channels)
+# - CONFIG_KEY_READ: Callback to read current state (for conditional edges)
+# - CONFIG_KEY_SCRATCHPAD: Tracks interrupt state for interrupt() to work
+# - CONFIG_KEY_RUNTIME: Provides store access and other runtime services
+# - CONFIG_KEY_CHECKPOINT_NS: Namespace for checkpoint operations
+# - PregelScratchpad: Class that manages interrupt/resume state
+#
+# Since we run nodes individually in activities, we must inject this same
+# context to make nodes behave as if they're running inside Pregel.
+#
+# RISKS:
+# These are private APIs that may change in future LangGraph versions.
+# If LangGraph changes these, this integration will need updates.
+# We suppress the deprecation warning for CONFIG_KEY_SEND which moved to
+# _internal in LangGraph 1.0 (to be removed in 2.0).
+#
+# ALTERNATIVES CONSIDERED:
+# - Defining our own string constants: Fragile if LangGraph changes values
+# - Running entire graph in one activity: Loses per-node retry/timeout control
+# - Requesting public API from LangGraph: Best long-term, but uncertain timeline
+#
+# =============================================================================
+
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     from langgraph.constants import CONFIG_KEY_SEND
