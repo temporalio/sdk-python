@@ -134,19 +134,19 @@ Set default activity options at the plugin level to avoid repeating configuratio
 ```python
 from datetime import timedelta
 from temporalio.common import RetryPolicy
-from temporalio.contrib.langgraph import LangGraphPlugin, node_activity_options
+from temporalio.contrib.langgraph import LangGraphPlugin, activity_options
 
 # Create plugin with default options for all graphs
 plugin = LangGraphPlugin(
     graphs={"my_graph": build_my_graph},
     # Default options for all nodes across all graphs
-    default_activity_options=node_activity_options(
+    default_activity_options=activity_options(
         start_to_close_timeout=timedelta(minutes=10),
         retry_policy=RetryPolicy(maximum_attempts=5),
     ),
     # Per-node options (applies to all graphs with matching node names)
     per_node_activity_options={
-        "llm_call": node_activity_options(
+        "llm_call": activity_options(
             start_to_close_timeout=timedelta(minutes=30),
             task_queue="llm-workers",
         ),
@@ -158,12 +158,12 @@ Plugin-level options are merged with `compile()` options, with `compile()` takin
 
 ## Per-Node Configuration
 
-Configure timeouts, retries, and task queues per node using `node_activity_options()`:
+Configure timeouts, retries, and task queues per node using `activity_options()`:
 
 ```python
 from datetime import timedelta
 from temporalio.common import RetryPolicy
-from temporalio.contrib.langgraph import node_activity_options
+from temporalio.contrib.langgraph import activity_options
 
 def build_configured_graph():
     graph = StateGraph(MyState)
@@ -172,7 +172,7 @@ def build_configured_graph():
     graph.add_node(
         "validate",
         validate_input,
-        metadata=node_activity_options(
+        metadata=activity_options(
             start_to_close_timeout=timedelta(seconds=30),
         ),
     )
@@ -181,7 +181,7 @@ def build_configured_graph():
     graph.add_node(
         "fetch_data",
         fetch_from_api,
-        metadata=node_activity_options(
+        metadata=activity_options(
             start_to_close_timeout=timedelta(minutes=2),
             heartbeat_timeout=timedelta(seconds=30),
             retry_policy=RetryPolicy(
@@ -196,7 +196,7 @@ def build_configured_graph():
     graph.add_node(
         "process_gpu",
         gpu_processing,
-        metadata=node_activity_options(
+        metadata=activity_options(
             start_to_close_timeout=timedelta(hours=1),
             task_queue="gpu-workers",
         ),
@@ -206,7 +206,7 @@ def build_configured_graph():
     graph.add_node(
         "custom_node",
         custom_func,
-        metadata=node_activity_options(
+        metadata=activity_options(
             start_to_close_timeout=timedelta(minutes=5),
         ) | {"custom_key": "custom_value"},
     )
@@ -219,7 +219,7 @@ def build_configured_graph():
 
 All parameters mirror `workflow.execute_activity()` options:
 
-| Option | `node_activity_options()` Parameter | Description |
+| Option | `activity_options()` Parameter | Description |
 |--------|--------------------------------------|-------------|
 | Start-to-Close Timeout | `start_to_close_timeout` | Max time for a single execution attempt |
 | Schedule-to-Close Timeout | `schedule_to_close_timeout` | Total time including retries |
@@ -232,7 +232,7 @@ All parameters mirror `workflow.execute_activity()` options:
 | Summary | `summary` | Human-readable activity description |
 | Priority | `priority` | Task queue ordering priority |
 
-You can also use LangGraph's native `retry_policy` parameter on `add_node()`, which is automatically mapped to Temporal's retry policy. If both are specified, `node_activity_options(retry_policy=...)` takes precedence.
+You can also use LangGraph's native `retry_policy` parameter on `add_node()`, which is automatically mapped to Temporal's retry policy. If both are specified, `activity_options(retry_policy=...)` takes precedence.
 
 ## Agentic Execution
 
@@ -248,6 +248,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
 from temporalio import workflow
 from temporalio.contrib.langgraph import (
+    activity_options,
     create_durable_agent,
     LangGraphPlugin,
     compile,
@@ -265,8 +266,12 @@ def build_agent_graph():
     return create_durable_agent(
         ChatOpenAI(model="gpt-4o"),
         [search_web],
-        model_start_to_close_timeout=timedelta(minutes=2),
-        tool_start_to_close_timeout=timedelta(minutes=1),
+        model_activity_options=activity_options(
+            start_to_close_timeout=timedelta(minutes=2),
+        ),
+        tool_activity_options=activity_options(
+            start_to_close_timeout=timedelta(minutes=1),
+        ),
     )
 
 
@@ -331,7 +336,7 @@ def build_agent_graph():
 For deterministic nodes that don't require durability, you can mark them to run directly in the workflow using `temporal_node_metadata()`:
 
 ```python
-from temporalio.contrib.langgraph import temporal_node_metadata, node_activity_options
+from temporalio.contrib.langgraph import temporal_node_metadata, activity_options
 
 # Mark a specific node to run in workflow instead of as an activity
 graph.add_node(
@@ -345,7 +350,7 @@ graph.add_node(
     "process",
     process_data,
     metadata=temporal_node_metadata(
-        activity_options=node_activity_options(
+        activity_options=activity_options(
             start_to_close_timeout=timedelta(minutes=5),
             task_queue="gpu-workers",
         ),
@@ -507,17 +512,17 @@ from temporalio.common import RetryPolicy
 app = compile(
     "graph_id",
     # Default configuration for all nodes (overridden by node metadata)
-    default_activity_options=node_activity_options(
+    default_activity_options=activity_options(
         start_to_close_timeout=timedelta(minutes=5),
         retry_policy=RetryPolicy(maximum_attempts=3),
         task_queue="agent-workers",
     ),
     # Per-node configuration (for existing graphs without modifying source)
     per_node_activity_options={
-        "slow_node": node_activity_options(
+        "slow_node": activity_options(
             start_to_close_timeout=timedelta(hours=2),
         ),
-        "gpu_node": node_activity_options(
+        "gpu_node": activity_options(
             task_queue="gpu-workers",
             start_to_close_timeout=timedelta(hours=1),
         ),
@@ -527,7 +532,7 @@ app = compile(
 )
 ```
 
-The `default_activity_options` parameter accepts the same options as `node_activity_options()`. The `per_node_activity_options` parameter allows configuring specific nodes without modifying the graph source code.
+The `default_activity_options` parameter accepts the same options as `activity_options()`. The `per_node_activity_options` parameter allows configuring specific nodes without modifying the graph source code.
 
 ### Configuration Priority
 

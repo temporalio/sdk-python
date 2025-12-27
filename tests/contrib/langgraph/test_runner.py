@@ -15,7 +15,7 @@ from typing_extensions import TypedDict
 from langgraph.graph import END, START, StateGraph
 from temporalio.common import RetryPolicy
 
-from temporalio.contrib.langgraph import node_activity_options
+from temporalio.contrib.langgraph import activity_options
 
 
 class TestTemporalLangGraphRunner:
@@ -335,7 +335,7 @@ class TestCompileFunction:
 
         runner = compile(
             "options_test",
-            default_activity_options=node_activity_options(
+            default_activity_options=activity_options(
                 start_to_close_timeout=timedelta(minutes=10),
                 retry_policy=RetryPolicy(maximum_attempts=5),
                 task_queue="custom-queue",

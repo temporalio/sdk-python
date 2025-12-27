@@ -44,7 +44,7 @@ from temporalio.contrib.langgraph._temporal_tool import temporal_tool
 from temporalio.contrib.langgraph._tool_registry import register_tool
 
 
-def node_activity_options(
+def activity_options(
     *,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
@@ -57,9 +57,13 @@ def node_activity_options(
     summary: str | None = None,
     priority: temporalio.common.Priority | None = None,
 ) -> dict[str, Any]:
-    """Create activity options for LangGraph nodes.
+    """Create activity options for LangGraph integration.
 
-    Returns a dict for use with ``graph.add_node(metadata=...)`` or ``compile()``.
+    Use with:
+    - ``graph.add_node(metadata=activity_options(...))`` for node activities
+    - ``compile(default_activity_options=activity_options(...))`` for defaults
+    - ``create_durable_agent(model_activity_options=activity_options(...))`` for agents
+
     Parameters mirror ``workflow.execute_activity()``.
     """
     config: dict[str, Any] = {}
@@ -187,11 +191,11 @@ def compile(
 
 __all__ = [
     # Main API
+    "activity_options",
     "compile",
     "create_durable_agent",
     "create_durable_react_agent",
     "LangGraphPlugin",
-    "node_activity_options",
     "register_model",
     "register_model_factory",
     "register_tool",

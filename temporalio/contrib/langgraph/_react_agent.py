@@ -10,37 +10,6 @@ if TYPE_CHECKING:
     from langchain_core.tools import BaseTool
     from langgraph.pregel import Pregel
 
-    from temporalio.common import Priority, RetryPolicy
-    from temporalio.workflow import ActivityCancellationType, VersioningIntent
-
-
-def _build_common_activity_options(
-    schedule_to_close_timeout: timedelta | None,
-    schedule_to_start_timeout: timedelta | None,
-    heartbeat_timeout: timedelta | None,
-    task_queue: str | None,
-    cancellation_type: "ActivityCancellationType | None",
-    versioning_intent: "VersioningIntent | None",
-    priority: "Priority | None",
-) -> dict[str, Any]:
-    """Build common activity options dict."""
-    options: dict[str, Any] = {}
-    if schedule_to_close_timeout is not None:
-        options["schedule_to_close_timeout"] = schedule_to_close_timeout
-    if schedule_to_start_timeout is not None:
-        options["schedule_to_start_timeout"] = schedule_to_start_timeout
-    if heartbeat_timeout is not None:
-        options["heartbeat_timeout"] = heartbeat_timeout
-    if task_queue is not None:
-        options["task_queue"] = task_queue
-    if cancellation_type is not None:
-        options["cancellation_type"] = cancellation_type
-    if versioning_intent is not None:
-        options["versioning_intent"] = versioning_intent
-    if priority is not None:
-        options["priority"] = priority
-    return options
-
 
 def _mark_nodes_for_workflow_execution(graph: "Pregel") -> None:
     """Mark all nodes in a graph to run inline in the workflow.
@@ -71,24 +40,23 @@ def _mark_nodes_for_workflow_execution(graph: "Pregel") -> None:
         }
 
 
+def _extract_activity_options(options: dict[str, Any] | None) -> dict[str, Any]:
+    """Extract activity options from the nested format.
+
+    activity_options() returns {"temporal": {...}}, so we need to extract
+    the inner dict for passing to temporal_model/temporal_tool.
+    """
+    if options is None:
+        return {}
+    return options.get("temporal", {})
+
+
 def create_durable_react_agent(
     model: "BaseChatModel",
     tools: Sequence["BaseTool | Any"],
     *,
-    # Model activity options
-    model_start_to_close_timeout: timedelta = timedelta(minutes=2),
-    model_retry_policy: "RetryPolicy | None" = None,
-    # Tool activity options
-    tool_start_to_close_timeout: timedelta = timedelta(seconds=30),
-    tool_retry_policy: "RetryPolicy | None" = None,
-    # Common activity options
-    schedule_to_close_timeout: timedelta | None = None,
-    schedule_to_start_timeout: timedelta | None = None,
-    heartbeat_timeout: timedelta | None = None,
-    task_queue: str | None = None,
-    cancellation_type: "ActivityCancellationType | None" = None,
-    versioning_intent: "VersioningIntent | None" = None,
-    priority: "Priority | None" = None,
+    model_activity_options: dict[str, Any] | None = None,
+    tool_activity_options: dict[str, Any] | None = None,
     # Pass-through to LangGraph's create_react_agent
     **kwargs: Any,
 ) -> "Pregel":
@@ -111,17 +79,10 @@ def create_durable_react_agent(
     Args:
         model: The chat model to use (will be wrapped with temporal_model).
         tools: List of tools for the agent (will be wrapped with temporal_tool).
-        model_start_to_close_timeout: Timeout for model activity execution.
-        model_retry_policy: Retry policy for model activities.
-        tool_start_to_close_timeout: Timeout for tool activity execution.
-        tool_retry_policy: Retry policy for tool activities.
-        schedule_to_close_timeout: Max time from scheduling to completion.
-        schedule_to_start_timeout: Max time from scheduling to start.
-        heartbeat_timeout: Heartbeat timeout for activities.
-        task_queue: Task queue for activities (defaults to workflow's queue).
-        cancellation_type: How to handle activity cancellation.
-        versioning_intent: Versioning intent for activities.
-        priority: Priority for activities.
+        model_activity_options: Activity options for model calls, from
+            ``activity_options()``. Defaults to 2 minute timeout.
+        tool_activity_options: Activity options for tool calls, from
+            ``activity_options()``. Defaults to 30 second timeout.
         **kwargs: Additional arguments passed to LangGraph's create_react_agent
             (e.g., state_schema, prompt, etc.).
 
@@ -131,11 +92,21 @@ def create_durable_react_agent(
     Example:
         .. code-block:: python
 
-            from temporalio.contrib.langgraph import create_durable_react_agent
+            from temporalio.contrib.langgraph import (
+                create_durable_react_agent,
+                activity_options,
+            )
 
             agent = create_durable_react_agent(
                 ChatOpenAI(model="gpt-4o-mini"),
                 [search_tool, calculator_tool],
+                model_activity_options=activity_options(
+                    start_to_close_timeout=timedelta(minutes=5),
+                ),
+                tool_activity_options=activity_options(
+                    start_to_close_timeout=timedelta(minutes=1),
+                    retry_policy=RetryPolicy(maximum_attempts=5),
+                ),
             )
     """
     from langgraph.prebuilt import create_react_agent as lg_create_react_agent
@@ -143,35 +114,21 @@ def create_durable_react_agent(
     from temporalio.contrib.langgraph._temporal_model import temporal_model
     from temporalio.contrib.langgraph._temporal_tool import temporal_tool
 
-    # Build common activity options
-    common_options = _build_common_activity_options(
-        schedule_to_close_timeout,
-        schedule_to_start_timeout,
-        heartbeat_timeout,
-        task_queue,
-        cancellation_type,
-        versioning_intent,
-        priority,
-    )
+    # Extract options from activity_options() format
+    model_opts = _extract_activity_options(model_activity_options)
+    tool_opts = _extract_activity_options(tool_activity_options)
+
+    # Apply defaults if not specified
+    if "start_to_close_timeout" not in model_opts:
+        model_opts["start_to_close_timeout"] = timedelta(minutes=2)
+    if "start_to_close_timeout" not in tool_opts:
+        tool_opts["start_to_close_timeout"] = timedelta(seconds=30)
 
     # Wrap model for durable LLM execution
-    wrapped_model = temporal_model(
-        model,
-        start_to_close_timeout=model_start_to_close_timeout,
-        retry_policy=model_retry_policy,
-        **common_options,
-    )
+    wrapped_model = temporal_model(model, **model_opts)
 
     # Wrap tools for durable execution
-    wrapped_tools = [
-        temporal_tool(
-            tool,
-            start_to_close_timeout=tool_start_to_close_timeout,
-            retry_policy=tool_retry_policy,
-            **common_options,
-        )
-        for tool in tools
-    ]
+    wrapped_tools = [temporal_tool(tool, **tool_opts) for tool in tools]
 
     # Create the agent using LangGraph's implementation
     agent = lg_create_react_agent(wrapped_model, wrapped_tools, **kwargs)
@@ -188,20 +145,8 @@ def create_durable_agent(
     model: "BaseChatModel",
     tools: Sequence["BaseTool | Any"],
     *,
-    # Model activity options
-    model_start_to_close_timeout: timedelta = timedelta(minutes=2),
-    model_retry_policy: "RetryPolicy | None" = None,
-    # Tool activity options
-    tool_start_to_close_timeout: timedelta = timedelta(seconds=30),
-    tool_retry_policy: "RetryPolicy | None" = None,
-    # Common activity options
-    schedule_to_close_timeout: timedelta | None = None,
-    schedule_to_start_timeout: timedelta | None = None,
-    heartbeat_timeout: timedelta | None = None,
-    task_queue: str | None = None,
-    cancellation_type: "ActivityCancellationType | None" = None,
-    versioning_intent: "VersioningIntent | None" = None,
-    priority: "Priority | None" = None,
+    model_activity_options: dict[str, Any] | None = None,
+    tool_activity_options: dict[str, Any] | None = None,
     # Pass-through to LangChain's create_agent
     **kwargs: Any,
 ) -> "Pregel":
@@ -224,17 +169,10 @@ def create_durable_agent(
     Args:
         model: The chat model to use (will be wrapped with temporal_model).
         tools: List of tools for the agent (will be wrapped with temporal_tool).
-        model_start_to_close_timeout: Timeout for model activity execution.
-        model_retry_policy: Retry policy for model activities.
-        tool_start_to_close_timeout: Timeout for tool activity execution.
-        tool_retry_policy: Retry policy for tool activities.
-        schedule_to_close_timeout: Max time from scheduling to completion.
-        schedule_to_start_timeout: Max time from scheduling to start.
-        heartbeat_timeout: Heartbeat timeout for activities.
-        task_queue: Task queue for activities (defaults to workflow's queue).
-        cancellation_type: How to handle activity cancellation.
-        versioning_intent: Versioning intent for activities.
-        priority: Priority for activities.
+        model_activity_options: Activity options for model calls, from
+            ``activity_options()``. Defaults to 2 minute timeout.
+        tool_activity_options: Activity options for tool calls, from
+            ``activity_options()``. Defaults to 30 second timeout.
         **kwargs: Additional arguments passed to LangChain's create_agent
             (e.g., prompt, response_format, pre_model_hook, etc.).
 
@@ -244,11 +182,21 @@ def create_durable_agent(
     Example:
         .. code-block:: python
 
-            from temporalio.contrib.langgraph import create_durable_agent
+            from temporalio.contrib.langgraph import (
+                create_durable_agent,
+                activity_options,
+            )
 
             agent = create_durable_agent(
                 ChatOpenAI(model="gpt-4o-mini"),
                 [search_tool, calculator_tool],
+                model_activity_options=activity_options(
+                    start_to_close_timeout=timedelta(minutes=5),
+                ),
+                tool_activity_options=activity_options(
+                    start_to_close_timeout=timedelta(minutes=1),
+                    retry_policy=RetryPolicy(maximum_attempts=5),
+                ),
             )
     """
     from langchain.agents import create_agent as lc_create_agent
@@ -256,35 +204,21 @@ def create_durable_agent(
     from temporalio.contrib.langgraph._temporal_model import temporal_model
     from temporalio.contrib.langgraph._temporal_tool import temporal_tool
 
-    # Build common activity options
-    common_options = _build_common_activity_options(
-        schedule_to_close_timeout,
-        schedule_to_start_timeout,
-        heartbeat_timeout,
-        task_queue,
-        cancellation_type,
-        versioning_intent,
-        priority,
-    )
+    # Extract options from activity_options() format
+    model_opts = _extract_activity_options(model_activity_options)
+    tool_opts = _extract_activity_options(tool_activity_options)
+
+    # Apply defaults if not specified
+    if "start_to_close_timeout" not in model_opts:
+        model_opts["start_to_close_timeout"] = timedelta(minutes=2)
+    if "start_to_close_timeout" not in tool_opts:
+        tool_opts["start_to_close_timeout"] = timedelta(seconds=30)
 
     # Wrap model for durable LLM execution
-    wrapped_model = temporal_model(
-        model,
-        start_to_close_timeout=model_start_to_close_timeout,
-        retry_policy=model_retry_policy,
-        **common_options,
-    )
+    wrapped_model = temporal_model(model, **model_opts)
 
     # Wrap tools for durable execution
-    wrapped_tools = [
-        temporal_tool(
-            tool,
-            start_to_close_timeout=tool_start_to_close_timeout,
-            retry_policy=tool_retry_policy,
-            **common_options,
-        )
-        for tool in tools
-    ]
+    wrapped_tools = [temporal_tool(tool, **tool_opts) for tool in tools]
 
     # Create the agent using LangChain's implementation
     agent = lc_create_agent(model=wrapped_model, tools=wrapped_tools, **kwargs)
