@@ -411,14 +411,12 @@ def build_command_graph():
 
 
 def build_react_agent_graph():
-    """Build a react agent graph with temporal tools for E2E testing."""
+    """Build a react agent graph for E2E testing."""
     from langchain_core.language_models.chat_models import BaseChatModel
     from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
     from langchain_core.outputs import ChatGeneration, ChatResult
     from langchain_core.tools import tool
     from langgraph.prebuilt import create_react_agent
-
-    from temporalio.contrib.langgraph import temporal_tool
 
     # Create a proper fake model that inherits from BaseChatModel
     class FakeToolCallingModel(BaseChatModel):
@@ -470,7 +468,7 @@ def build_react_agent_graph():
             """Return self - tools are handled in _generate."""
             return self
 
-    # Create tools
+    # Create tools - plain tools, no wrapper needed
     @tool
     def calculator(expression: str) -> str:
         """Calculate a math expression. Input should be a valid Python math expression."""
@@ -480,17 +478,118 @@ def build_react_agent_graph():
         except Exception as e:
             return f"Error: {e}"
 
-    # Wrap tool with temporal_tool for durable execution
-    durable_calculator = temporal_tool(
-        calculator,
-        start_to_close_timeout=timedelta(seconds=30),
-    )
-
     # Create fake model
     model = FakeToolCallingModel()
 
-    # Create react agent
-    agent = create_react_agent(model, [durable_calculator])
+    # Create react agent with plain tools
+    agent = create_react_agent(model, [calculator])
+
+    return agent
+
+
+# ==============================================================================
+# Native React Agent Graph (no wrappers - tests simplification)
+# ==============================================================================
+
+
+def build_native_react_agent_graph():
+    """Build a react agent using ONLY native LangGraph - no temporal wrappers.
+
+    This tests that the Temporal integration works without temporal_tool or
+    temporal_model wrappers. The model and tools execute directly within
+    the node activities.
+    """
+    from langchain_core.language_models.chat_models import BaseChatModel
+    from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+    from langchain_core.outputs import ChatGeneration, ChatResult
+    from langchain_core.tools import tool
+    from langgraph.prebuilt import create_react_agent
+
+    class FakeToolCallingModel(BaseChatModel):
+        """Fake model that simulates a multi-step tool calling conversation.
+
+        Step 1: Call get_weather tool
+        Step 2: Call get_temperature tool (after seeing weather result)
+        Step 3: Return final answer (after seeing both results)
+
+        This ensures the agent loops at least twice through the tools node.
+        """
+
+        @property
+        def _llm_type(self) -> str:
+            return "fake-multi-step-model"
+
+        def _generate(
+            self,
+            messages: list[BaseMessage],
+            stop: list[str] | None = None,
+            run_manager: Any = None,
+            **kwargs: Any,
+        ) -> ChatResult:
+            """Generate response based on conversation state."""
+            # Count tool results to determine which step we're at
+            tool_results = [m for m in messages if isinstance(m, ToolMessage)]
+            num_tool_results = len(tool_results)
+
+            if num_tool_results == 0:
+                # Step 1: Call get_weather
+                ai_message = AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "id": "call_weather",
+                            "name": "get_weather",
+                            "args": {"city": "San Francisco"},
+                        }
+                    ],
+                )
+            elif num_tool_results == 1:
+                # Step 2: Call get_temperature (after seeing weather)
+                ai_message = AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "id": "call_temp",
+                            "name": "get_temperature",
+                            "args": {"city": "San Francisco"},
+                        }
+                    ],
+                )
+            else:
+                # Step 3: Final answer after seeing both results
+                ai_message = AIMessage(
+                    content="Based on my research: San Francisco is sunny with 72°F temperature.",
+                )
+
+            return ChatResult(
+                generations=[ChatGeneration(message=ai_message)],
+                llm_output={"model": "fake-multi-step-model"},
+            )
+
+        def bind_tools(
+            self,
+            tools: Any,
+            **kwargs: Any,
+        ) -> "FakeToolCallingModel":
+            """Return self - tools are handled in _generate."""
+            return self
+
+    # Create plain tools - NO temporal_tool wrapper
+    @tool
+    def get_weather(city: str) -> str:
+        """Get the weather for a city."""
+        return f"Weather in {city}: Sunny"
+
+    @tool
+    def get_temperature(city: str) -> str:
+        """Get the temperature for a city."""
+        return f"Temperature in {city}: 72°F"
+
+    # Create model - NO temporal_model wrapper
+    model = FakeToolCallingModel()
+
+    # Create react agent using native LangGraph
+    agent = create_react_agent(model, [get_weather, get_temperature])
 
     return agent
 

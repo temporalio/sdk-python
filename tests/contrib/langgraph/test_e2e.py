@@ -27,6 +27,7 @@ from tests.contrib.langgraph.e2e_graphs import (
     build_command_graph,
     build_counter_graph,
     build_multi_interrupt_graph,
+    build_native_react_agent_graph,
     build_react_agent_graph,
     build_send_graph,
     build_simple_graph,
@@ -38,6 +39,7 @@ from tests.contrib.langgraph.e2e_workflows import (
     CommandE2EWorkflow,
     MultiInterruptE2EWorkflow,
     MultiInvokeStoreE2EWorkflow,
+    NativeReactAgentE2EWorkflow,
     ReactAgentE2EWorkflow,
     RejectionE2EWorkflow,
     SendE2EWorkflow,
@@ -558,4 +560,48 @@ class TestAgenticWorkflows:
             assert activity_types[tool_summary] == "tool_node", (
                 f"Expected tool_node activity type for tool, "
                 f"got: {activity_types[tool_summary]}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_native_react_agent_without_wrappers(self, client: Client) -> None:
+        """Test react agent using NATIVE LangGraph - no temporal wrappers.
+
+        This validates that the Temporal integration works without temporal_tool
+        or temporal_model wrappers. The agent loops multiple times:
+        - agent node (calls get_weather tool)
+        - tools node (executes get_weather)
+        - agent node (calls get_temperature tool)
+        - tools node (executes get_temperature)
+        - agent node (returns final answer)
+
+        This proves nodes as activities is sufficient for durability.
+        """
+        plugin = LangGraphPlugin(
+            graphs={"e2e_native_react_agent": build_native_react_agent_graph},
+            default_activity_timeout=timedelta(seconds=30),
+        )
+
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
+
+        async with new_worker(plugin_client, NativeReactAgentE2EWorkflow) as worker:
+            result = await plugin_client.execute_workflow(
+                NativeReactAgentE2EWorkflow.run,
+                "What's the weather in San Francisco?",
+                id=f"e2e-native-react-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=60),
+            )
+
+            # Verify the agent produced a result with multiple loops
+            # Expected: Human, AI (tool call 1), Tool 1, AI (tool call 2), Tool 2, AI (final)
+            assert result["message_count"] >= 6, (
+                f"Expected at least 6 messages (2 tool loops), "
+                f"got {result['message_count']}"
+            )
+            # Verify final answer contains expected content
+            assert "sunny" in result["answer"].lower() or "72" in result["answer"], (
+                f"Expected weather info in answer, got: {result['answer']}"
             )

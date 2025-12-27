@@ -87,10 +87,8 @@ class LangGraphPlugin(SimplePlugin):
         def add_activities(
             activities: Sequence[Callable[..., Any]] | None,
         ) -> Sequence[Callable[..., Any]]:
-            """Add LangGraph activities for node, tool, and model execution."""
+            """Add LangGraph activities for node execution."""
             from temporalio.contrib.langgraph._activities import (
-                execute_chat_model,
-                execute_tool,
                 langgraph_node,
                 langgraph_tool_node,
                 resume_langgraph_node,
@@ -100,8 +98,6 @@ class LangGraphPlugin(SimplePlugin):
                 langgraph_node,
                 langgraph_tool_node,
                 resume_langgraph_node,
-                execute_tool,
-                execute_chat_model,
             ]
 
         def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:

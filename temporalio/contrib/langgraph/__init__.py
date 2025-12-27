@@ -16,32 +16,17 @@ import temporalio.workflow
 from temporalio.contrib.langgraph._exceptions import (
     GRAPH_DEFINITION_CHANGED_ERROR,
     GRAPH_NOT_FOUND_ERROR,
-    MODEL_NOT_FOUND_ERROR,
     NODE_NOT_FOUND_ERROR,
-    TOOL_NOT_FOUND_ERROR,
     GraphAlreadyRegisteredError,
-    ModelAlreadyRegisteredError,
-    ToolAlreadyRegisteredError,
 )
 from temporalio.contrib.langgraph._graph_registry import (
     get_default_activity_options,
     get_graph,
     get_per_node_activity_options,
 )
-from temporalio.contrib.langgraph._model_registry import (
-    register_model,
-    register_model_factory,
-)
 from temporalio.contrib.langgraph._models import StateSnapshot
 from temporalio.contrib.langgraph._plugin import LangGraphPlugin
-from temporalio.contrib.langgraph._react_agent import (
-    create_durable_agent,
-    create_durable_react_agent,
-)
 from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
-from temporalio.contrib.langgraph._temporal_model import temporal_model
-from temporalio.contrib.langgraph._temporal_tool import temporal_tool
-from temporalio.contrib.langgraph._tool_registry import register_tool
 
 
 def activity_options(
@@ -62,7 +47,6 @@ def activity_options(
     Use with:
     - ``graph.add_node(metadata=activity_options(...))`` for node activities
     - ``compile(default_activity_options=activity_options(...))`` for defaults
-    - ``create_durable_agent(model_activity_options=activity_options(...))`` for agents
 
     Parameters mirror ``workflow.execute_activity()``.
     """
@@ -193,25 +177,14 @@ __all__ = [
     # Main API
     "activity_options",
     "compile",
-    "create_durable_agent",
-    "create_durable_react_agent",
     "LangGraphPlugin",
-    "register_model",
-    "register_model_factory",
-    "register_tool",
     "StateSnapshot",
-    "temporal_model",
     "temporal_node_metadata",
-    "temporal_tool",
     "TemporalLangGraphRunner",
     # Exception types (for catching configuration errors)
     "GraphAlreadyRegisteredError",
-    "ModelAlreadyRegisteredError",
-    "ToolAlreadyRegisteredError",
     # Error type constants (for catching ApplicationError.type)
     "GRAPH_NOT_FOUND_ERROR",
     "NODE_NOT_FOUND_ERROR",
-    "TOOL_NOT_FOUND_ERROR",
-    "MODEL_NOT_FOUND_ERROR",
     "GRAPH_DEFINITION_CHANGED_ERROR",
 ]

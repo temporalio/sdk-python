@@ -15,14 +15,10 @@ from temporalio.contrib.langgraph._exceptions import node_not_found_error
 from temporalio.contrib.langgraph._graph_registry import get_graph
 from temporalio.contrib.langgraph._models import (
     ChannelWrite,
-    ChatModelActivityInput,
-    ChatModelActivityOutput,
     InterruptValue,
     NodeActivityInput,
     NodeActivityOutput,
     StoreSnapshot,
-    ToolActivityInput,
-    ToolActivityOutput,
 )
 from temporalio.contrib.langgraph._store import ActivityLocalStore
 
@@ -346,87 +342,3 @@ async def langgraph_tool_node(input_data: NodeActivityInput) -> NodeActivityOutp
 async def resume_langgraph_node(input_data: NodeActivityInput) -> NodeActivityOutput:
     """Resume an interrupted LangGraph node as a Temporal activity."""
     return await _execute_node_impl(input_data)
-
-
-@activity.defn(name="execute_langgraph_tool")
-async def execute_tool(
-    input_data: ToolActivityInput,
-) -> ToolActivityOutput:
-    """Execute a LangChain tool as a Temporal activity."""
-    logger.debug("Executing tool %s", input_data.tool_name)
-
-    from temporalio.contrib.langgraph._tool_registry import get_tool
-
-    # Get tool from registry
-    tool = get_tool(input_data.tool_name)
-
-    # Execute the tool
-    # Tools can accept various input formats
-    result = await tool.ainvoke(input_data.tool_input)
-
-    logger.debug("Tool %s completed", input_data.tool_name)
-
-    return ToolActivityOutput(output=result)
-
-
-@activity.defn(name="execute_langgraph_chat_model")
-async def execute_chat_model(
-    input_data: ChatModelActivityInput,
-) -> ChatModelActivityOutput:
-    """Execute a LangChain chat model call as a Temporal activity."""
-    model_name = input_data.model_name or "default"
-    logger.debug(
-        "Executing chat model %s with %d messages (tools: %s)",
-        model_name,
-        len(input_data.messages),
-        "yes" if input_data.tools else "no",
-    )
-
-    from langchain_core.messages import AnyMessage
-    from pydantic import TypeAdapter
-
-    from temporalio.contrib.langgraph._model_registry import get_model
-
-    # Get model from registry
-    model: Any = get_model(model_name)
-
-    # Bind tools if provided
-    if input_data.tools:
-        # bind_tools accepts tool schemas directly
-        bind_kwargs: dict[str, Any] = {}
-        if input_data.tool_choice is not None:
-            bind_kwargs["tool_choice"] = input_data.tool_choice
-        model = model.bind_tools(input_data.tools, **bind_kwargs)
-
-    # Deserialize messages
-    messages: list[Any] = []
-    for msg_dict in input_data.messages:
-        # Use LangChain's message type adapter for proper deserialization
-        deserialized_msg: Any = TypeAdapter(AnyMessage).validate_python(msg_dict)
-        messages.append(deserialized_msg)
-
-    # Execute the model
-    # Use _agenerate for direct access to ChatResult
-    result = await model._agenerate(
-        messages,
-        stop=input_data.stop,
-        **input_data.kwargs,
-    )
-
-    # Serialize generations for return
-    generations = []
-    for gen in result.generations:
-        gen_data = {
-            "message": gen.message.model_dump()
-            if hasattr(gen.message, "model_dump")
-            else {"content": str(gen.message.content), "type": "ai"},
-            "generation_info": gen.generation_info,
-        }
-        generations.append(gen_data)
-
-    logger.debug("Chat model %s completed with %d generations", model_name, len(generations))
-
-    return ChatModelActivityOutput(
-        generations=generations,
-        llm_output=result.llm_output,
-    )

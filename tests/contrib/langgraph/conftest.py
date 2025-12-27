@@ -16,23 +16,3 @@ def clear_graph_registry():
     get_global_registry().clear()
     yield
     get_global_registry().clear()
-
-
-@pytest.fixture(autouse=True)
-def clear_tool_registry():
-    """Clear the global tool registry before each test."""
-    from temporalio.contrib.langgraph._tool_registry import clear_registry
-
-    clear_registry()
-    yield
-    clear_registry()
-
-
-@pytest.fixture(autouse=True)
-def clear_model_registry():
-    """Clear the global model registry before each test."""
-    from temporalio.contrib.langgraph._model_registry import clear_registry
-
-    clear_registry()
-    yield
-    clear_registry()

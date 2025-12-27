@@ -315,6 +315,41 @@ class ReactAgentE2EWorkflow:
 
 
 # ==============================================================================
+# Native Agent Workflows (no wrappers)
+# ==============================================================================
+
+
+@workflow.defn
+class NativeReactAgentE2EWorkflow:
+    """Workflow that runs a native react agent WITHOUT temporal wrappers.
+
+    This tests that the Temporal integration works with plain LangGraph
+    agents - no temporal_tool or temporal_model wrappers needed.
+    """
+
+    @workflow.run
+    async def run(self, question: str) -> dict[str, Any]:
+        """Run the native react agent and return the result."""
+        with workflow.unsafe.imports_passed_through():
+            from langchain_core.messages import HumanMessage
+
+        app = lg_compile("e2e_native_react_agent")
+
+        # Run the agent
+        result = await app.ainvoke({"messages": [HumanMessage(content=question)]})
+
+        # Extract the final message content
+        messages = result.get("messages", [])
+        if messages:
+            final_message = messages[-1]
+            return {
+                "answer": final_message.content,
+                "message_count": len(messages),
+            }
+        return {"answer": "", "message_count": 0}
+
+
+# ==============================================================================
 # Continue-as-New Workflows
 # ==============================================================================
 
