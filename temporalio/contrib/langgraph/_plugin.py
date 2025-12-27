@@ -47,6 +47,10 @@ def _langgraph_data_converter(converter: DataConverter | None) -> DataConverter:
 class LangGraphPlugin(SimplePlugin):
     """Temporal plugin for LangGraph integration.
 
+    .. warning::
+        This class is experimental and may change in future versions.
+        Use with caution in production environments.
+
     This plugin provides seamless integration between LangGraph and Temporal:
 
     1. **Graph Registration**: Register graph builders by ID for lookup during execution

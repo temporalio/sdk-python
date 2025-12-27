@@ -257,6 +257,9 @@ def temporal_model(
 ) -> "BaseChatModel":
     """Wrap a LangChain chat model to execute LLM calls as Temporal activities.
 
+    .. warning::
+        This API is experimental and may change in future versions.
+
     Use this when running agentic nodes (like ``create_agent`` from LangChain
     or ``create_react_agent`` from LangGraph). Each LLM invocation becomes a
     separate activity, providing durability and retryability for each turn in

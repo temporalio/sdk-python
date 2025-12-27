@@ -1,5 +1,9 @@
 """Temporal integration for LangGraph.
 
+.. warning::
+    This module is experimental and may change in future versions.
+    Use with caution in production environments.
+
 This module provides seamless integration between LangGraph and Temporal,
 enabling durable execution of LangGraph agents with automatic retries,
 timeouts, and enterprise observability.
@@ -274,6 +278,9 @@ def compile(
     checkpoint: Optional[dict] = None,
 ) -> TemporalLangGraphRunner:
     """Compile a registered LangGraph graph for Temporal execution.
+
+    .. warning::
+        This API is experimental and may change in future versions.
 
     This function retrieves a graph from the plugin registry and wraps it
     in a TemporalLangGraphRunner for durable execution within workflows.

@@ -48,7 +48,7 @@ from typing_extensions import TypedDict
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.common import RetryPolicy as TemporalRetryPolicy
-from temporalio.worker import UnsandboxedWorkflowRunner, Worker
+from temporalio.worker import Worker
 
 from temporalio.contrib.langgraph import LangGraphPlugin, compile, node_activity_options
 
@@ -359,15 +359,11 @@ async def main():
 
     # Create worker
     # Note: In production, you'd have separate workers for different task queues
-    # Note: We disable the workflow sandbox because LangGraph/LangChain imports
-    # contain non-deterministic code. The actual graph execution happens in
-    # activities which run outside the sandbox.
     task_queue = f"langgraph-support-{run_id}"  # Fresh queue per run
     async with Worker(
         client,
         task_queue=task_queue,
         workflows=[CustomerSupportWorkflow],
-        workflow_runner=UnsandboxedWorkflowRunner(),
         # Activities are auto-registered by the plugin
     ):
         print("Worker started. Running example queries...\n")

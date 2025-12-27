@@ -1,15 +1,58 @@
 # Temporal LangGraph Integration
 
-Run LangGraph agents with Temporal for durable execution, automatic retries, and enterprise observability.
+⚠️ **Experimental** - This module is experimental and may never advance to the next phase and may be abandoned.
 
-## Features
+## Introduction
 
-- **Durable Execution**: Graph execution survives process restarts and failures
-- **Automatic Retries**: Per-node retry policies with exponential backoff
-- **Distributed Scale**: Route different nodes to specialized workers (GPU, high-memory)
-- **Human-in-the-Loop**: Support for `interrupt()` with Temporal signals
-- **Cross-Node Persistence**: LangGraph Store API for sharing data between nodes
-- **Enterprise Observability**: Full visibility via Temporal UI and metrics
+This integration combines [LangGraph](https://github.com/langchain-ai/langgraph) with [Temporal's durable execution](https://docs.temporal.io/evaluate/understanding-temporal#durable-execution).
+It allows you to build durable agents that never lose their progress and handle long-running, asynchronous, and human-in-the-loop workflows with production-grade reliability.
+
+Temporal and LangGraph are complementary technologies.
+Temporal provides a crash-proof system foundation, taking care of the distributed systems challenges inherent to production agentic systems.
+LangGraph offers a flexible framework for defining agent graphs with conditional logic, cycles, and state management.
+
+This document is organized as follows:
+
+- **[Quick Start](#quick-start)** - Your first durable LangGraph agent
+- **[Per-Node Configuration](#per-node-configuration)** - Configuring timeouts, retries, and task queues
+- **[Agentic Execution](#agentic-execution)** - Using temporal_tool() and temporal_model()
+- **[Human-in-the-Loop](#human-in-the-loop-interrupts)** - Supporting interrupt() with Temporal signals
+- **[Compatibility](#compatibility)** - Feature support matrix
+
+## Architecture
+
+The diagram below shows how LangGraph integrates with Temporal.
+Each graph node executes as a Temporal activity, providing automatic retries and failure recovery.
+The workflow orchestrates the graph execution, maintaining state and handling interrupts.
+
+```text
+            +---------------------+
+            |   Temporal Server   |      (Stores workflow state,
+            +---------------------+       schedules activities,
+                     ^                    persists progress)
+                     |
+        Save state,  |   Schedule Tasks,
+        progress,    |   load state on resume
+        timeouts     |
+                     |
++------------------------------------------------------+
+|                      Worker                          |
+|   +----------------------------------------------+   |
+|   |              Workflow Code                   |   |
+|   |       (LangGraph Orchestration)              |   |
+|   +----------------------------------------------+   |
+|          |          |                |               |
+|          v          v                v               |
+|   +-----------+ +-----------+ +-------------+        |
+|   | Activity  | | Activity  | |  Activity   |        |
+|   | (Node 1)  | | (Node 2)  | | (LLM Call)  |        |
+|   +-----------+ +-----------+ +-------------+        |
+|         |           |                |               |
++------------------------------------------------------+
+          |           |                |
+          v           v                v
+      [External APIs, LLM providers, databases, etc.]
+```
 
 ## Installation
 
@@ -24,7 +67,7 @@ from datetime import timedelta
 from langgraph.graph import StateGraph, START, END
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.worker import Worker, UnsandboxedWorkflowRunner
+from temporalio.worker import Worker
 from temporalio.contrib.langgraph import LangGraphPlugin, compile
 from typing_extensions import TypedDict
 
@@ -73,7 +116,6 @@ async def main():
         client,
         task_queue="langgraph-queue",
         workflows=[MyAgentWorkflow],
-        workflow_runner=UnsandboxedWorkflowRunner(),
     ):
         # Execute workflow
         result = await client.execute_workflow(
@@ -469,19 +511,6 @@ python -m temporalio.contrib.langgraph.example
 ```
 
 ## Important Notes
-
-### Workflow Sandbox
-
-LangGraph and LangChain imports contain non-deterministic code. Use `UnsandboxedWorkflowRunner`:
-
-```python
-Worker(
-    client,
-    task_queue="my-queue",
-    workflows=[MyWorkflow],
-    workflow_runner=UnsandboxedWorkflowRunner(),
-)
-```
 
 ### Activity Registration
 

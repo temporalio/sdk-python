@@ -195,6 +195,9 @@ def temporal_tool(
 ) -> "BaseTool":
     """Wrap a LangChain tool to execute as a Temporal activity.
 
+    .. warning::
+        This API is experimental and may change in future versions.
+
     Use this when running agentic nodes (like ``create_agent`` from LangChain
     or ``create_react_agent`` from LangGraph). Tools wrapped with temporal_tool()
     will execute durably as activities, providing retries and failure recovery.
