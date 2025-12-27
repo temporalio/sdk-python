@@ -8,11 +8,14 @@ looks up the node, executes it, and captures the writes.
 from __future__ import annotations
 
 import asyncio
+import logging
 import warnings
 from collections import deque
 from typing import TYPE_CHECKING, Any, Sequence, cast
 
 from temporalio import activity
+
+logger = logging.getLogger(__name__)
 
 from temporalio.contrib.langgraph._graph_registry import get_graph
 from temporalio.contrib.langgraph._models import (
@@ -102,6 +105,12 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
         ValueError: If the node is not found in the graph.
         Exception: Any exception raised by the node during execution.
     """
+    logger.debug(
+        "Executing node %s in graph %s",
+        input_data.node_name,
+        input_data.graph_id,
+    )
+
     # Get cached graph from registry
     graph = get_graph(input_data.graph_id)
 
@@ -247,6 +256,11 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
             result = node_runnable.invoke(input_data.input_state, runnable_config)
     except LangGraphInterrupt as e:
         # Node called interrupt() - return interrupt data instead of writes
+        logger.debug(
+            "Node %s in graph %s raised interrupt",
+            input_data.node_name,
+            input_data.graph_id,
+        )
         activity.heartbeat(
             {
                 "node": input_data.node_name,
@@ -277,6 +291,12 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
         )
     except Exception:
         # Send heartbeat indicating failure before re-raising
+        logger.debug(
+            "Node %s in graph %s failed with exception",
+            input_data.node_name,
+            input_data.graph_id,
+            exc_info=True,
+        )
         activity.heartbeat(
             {
                 "node": input_data.node_name,
@@ -328,6 +348,13 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
     # Collect store writes
     store_writes = store.get_writes()
 
+    logger.debug(
+        "Node %s in graph %s completed with %d writes",
+        input_data.node_name,
+        input_data.graph_id,
+        len(channel_writes),
+    )
+
     return NodeActivityOutput(
         writes=channel_writes,
         store_writes=store_writes,
@@ -355,6 +382,8 @@ async def execute_tool(
         KeyError: If the tool is not found in the registry.
         Exception: Any exception raised by the tool during execution.
     """
+    logger.debug("Executing tool %s", input_data.tool_name)
+
     from temporalio.contrib.langgraph._tool_registry import get_tool
 
     # Get tool from registry
@@ -363,6 +392,8 @@ async def execute_tool(
     # Execute the tool
     # Tools can accept various input formats
     result = await tool.ainvoke(input_data.tool_input)
+
+    logger.debug("Tool %s completed", input_data.tool_name)
 
     return ToolActivityOutput(output=result)
 
@@ -387,13 +418,16 @@ async def execute_chat_model(
         KeyError: If the model is not found in the registry.
         Exception: Any exception raised by the model during execution.
     """
+    model_name = input_data.model_name or "default"
+    logger.debug("Executing chat model %s with %d messages", model_name, len(input_data.messages))
+
     from langchain_core.messages import AnyMessage
     from pydantic import TypeAdapter
 
     from temporalio.contrib.langgraph._model_registry import get_model
 
     # Get model from registry
-    model = get_model(input_data.model_name or "default")
+    model = get_model(model_name)
 
     # Deserialize messages
     messages: list[Any] = []
@@ -420,6 +454,8 @@ async def execute_chat_model(
             "generation_info": gen.generation_info,
         }
         generations.append(gen_data)
+
+    logger.debug("Chat model %s completed with %d generations", model_name, len(generations))
 
     return ChatModelActivityOutput(
         generations=generations,

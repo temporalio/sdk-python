@@ -224,6 +224,8 @@ class TemporalLangGraphRunner:
             >>> if '__checkpoint__' in result:
             ...     workflow.continue_as_new(input_data, result['__checkpoint__'])
         """
+        workflow.logger.debug("Starting graph execution for %s", self.graph_id)
+
         # Import Command here to check type
         with workflow.unsafe.imports_passed_through():
             from langgraph.types import Command
@@ -409,6 +411,13 @@ class TemporalLangGraphRunner:
 
         # Track last output for get_state() checkpoint
         self._last_output = output
+
+        if "__interrupt__" in output:
+            workflow.logger.debug("Graph %s execution paused at interrupt", self.graph_id)
+        elif "__checkpoint__" in output:
+            workflow.logger.debug("Graph %s execution stopped for checkpoint", self.graph_id)
+        else:
+            workflow.logger.debug("Graph %s execution completed", self.graph_id)
 
         return output
 

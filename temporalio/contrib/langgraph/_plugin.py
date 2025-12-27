@@ -9,6 +9,7 @@ This module provides the LangGraphPlugin class which handles:
 from __future__ import annotations
 
 import dataclasses
+import logging
 from collections.abc import Callable, Sequence
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
@@ -19,6 +20,8 @@ from temporalio.contrib.langgraph._graph_registry import (
 from temporalio.contrib.pydantic import PydanticPayloadConverter
 from temporalio.converter import DataConverter, DefaultPayloadConverter
 from temporalio.plugin import SimplePlugin
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from langgraph.pregel import Pregel
@@ -123,6 +126,12 @@ class LangGraphPlugin(SimplePlugin):
         self._default_activity_options = default_activity_options
         self._per_node_activity_options = per_node_activity_options
 
+        logger.debug(
+            "Initializing LangGraphPlugin with %d graphs: %s",
+            len(graphs),
+            list(graphs.keys()),
+        )
+
         # Register graphs in global registry with activity options
         for graph_id, builder in graphs.items():
             register_graph(
@@ -131,6 +140,7 @@ class LangGraphPlugin(SimplePlugin):
                 default_activity_options=default_activity_options,
                 per_node_activity_options=per_node_activity_options,
             )
+            logger.debug("Registered graph: %s", graph_id)
 
         def add_activities(
             activities: Sequence[Callable[..., Any]] | None,
