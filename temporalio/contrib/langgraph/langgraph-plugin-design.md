@@ -279,16 +279,13 @@ runner = TemporalLangGraphRunner(graph)  # All nodes → activities
 def transform(state: dict) -> dict:
     return {"result": state["value"] * 2}
 
-runner = TemporalLangGraphRunner(
-    graph,
-    enable_workflow_execution=True  # Enable hybrid mode
-)
+runner = TemporalLangGraphRunner(graph)
 ```
 
 **Routing Logic:**
 ```python
 async def _execute_task(task):
-    if self.enable_workflow_execution and is_deterministic(task):
+    if is_deterministic(task):
         # Execute directly in workflow (pure computation)
         return await task.proc.ainvoke(task.input, task.config)
     else:
@@ -753,7 +750,6 @@ class TemporalLangGraphRunner:
         default_activity_timeout: Optional[timedelta] = None,
         default_max_retries: int = 3,
         default_task_queue: Optional[str] = None,
-        enable_workflow_execution: bool = False,
     ):
         """
         Initialize Temporal runner.
@@ -770,10 +766,6 @@ class TemporalLangGraphRunner:
                 Can be overridden per-node via retry_policy. Default: 3
             default_task_queue: Default task queue for activities.
                 Can be overridden per-node via metadata. Default: None
-            enable_workflow_execution: Enable hybrid execution mode.
-                If True, nodes with metadata={"temporal": {"run_in_workflow": True}}
-                run in workflow. If False, all nodes run as activities.
-                Default: False (safer)
 
         Raises:
             ImportError: If temporalio is not installed
@@ -798,7 +790,6 @@ class TemporalLangGraphRunner:
         self.default_activity_timeout = default_activity_timeout or timedelta(minutes=5)
         self.default_max_retries = default_max_retries
         self.default_task_queue = default_task_queue
-        self.enable_workflow_execution = enable_workflow_execution
         self._step_counter = 0
 
     async def ainvoke(
@@ -874,9 +865,6 @@ class TemporalLangGraphRunner:
             True if task should run in workflow (deterministic),
             False if task should run as activity (non-deterministic)
         """
-        if not self.enable_workflow_execution:
-            # Safe default: everything as activity
-            return False
 
         # Check if node is marked as workflow-safe
         node = self.pregel.nodes.get(task.name)
@@ -1469,7 +1457,6 @@ def compile(
     default_activity_timeout: Optional[timedelta] = None,
     default_max_retries: int = 3,
     default_task_queue: Optional[str] = None,
-    enable_workflow_execution: bool = False,
 ) -> TemporalLangGraphRunner:
     """
     Compile a registered LangGraph graph for Temporal execution.
@@ -1501,10 +1488,6 @@ def compile(
         default_task_queue: Default task queue for activities.
             Can be overridden per-node via metadata.
             Default: None (uses workflow's task queue)
-        enable_workflow_execution: Enable hybrid execution mode.
-            If True, nodes marked with metadata={"temporal": {"run_in_workflow": True}}
-            run directly in workflow instead of activities.
-            Default: False (all nodes run as activities for safety)
 
     Returns:
         TemporalLangGraphRunner that can be used like a compiled graph
@@ -1555,7 +1538,6 @@ def compile(
         default_activity_timeout=default_activity_timeout,
         default_max_retries=default_max_retries,
         default_task_queue=default_task_queue,
-        enable_workflow_execution=enable_workflow_execution,
     )
 
 
@@ -1697,9 +1679,9 @@ graph.add_node(
     metadata=temporal_node_metadata(run_in_workflow=True),
 )
 
-# Level 4: Compile default (enables the feature)
-app = compile(graph, enable_workflow_execution=True)
-# Still needs per-node opt-in via metadata!
+# Level 4: Compile - nodes with run_in_workflow=True execute in workflow
+app = compile(graph)
+# Nodes opt-in via metadata to run in workflow
 
 # Level 5: System default = False (all nodes run as activities)
 ```
@@ -1768,7 +1750,6 @@ app = compile(
     default_activity_timeout=timedelta(minutes=5),
     default_max_retries=3,
     default_task_queue="standard-workers",
-    enable_workflow_execution=True,  # Enables hybrid execution
 )
 
 # Execute with runtime override
@@ -1799,7 +1780,7 @@ result = await app.ainvoke(
 | Retry Policy | (use `retry_policy` param) | `default_max_retries` | N/A | 3 attempts |
 | Task Queue | `temporal.task_queue` | `default_task_queue` | N/A | workflow queue |
 | Heartbeat | `temporal.heartbeat_timeout` | N/A | N/A | None |
-| Hybrid Exec | `temporal.run_in_workflow` | `enable_workflow_execution` | N/A | False |
+| Hybrid Exec | `temporal.run_in_workflow` | N/A | N/A | False |
 
 #### **5.3.6 Helper Functions**
 
@@ -2180,10 +2161,7 @@ class HybridWorkflow:
     @workflow.run
     async def run(self, graph_id: str, url: str):
         # V3.1: Use graph_id, enable hybrid execution
-        app = compile(
-            graph_id,
-            enable_workflow_execution=True  # Enables the feature
-        )
+        app = compile(graph_id)
 
         return await app.ainvoke({"url": url})
 
@@ -2426,10 +2404,7 @@ await client.execute_workflow(
 runner = TemporalLangGraphRunner(graph)
 
 # After: Pure nodes in workflow
-runner = TemporalLangGraphRunner(
-    graph,
-    enable_workflow_execution=True
-)
+runner = TemporalLangGraphRunner(graph)
 # Result: 40-60% fewer activity executions for transform-heavy graphs
 ```
 
@@ -2621,7 +2596,6 @@ The implementation is organized into phases, with Phase 1 focused on validating 
 **Deliverables:**
 - Deterministic node detection
 - Workflow-side execution for pure nodes
-- `enable_workflow_execution` flag
 
 **Dependencies:** Phase 4
 

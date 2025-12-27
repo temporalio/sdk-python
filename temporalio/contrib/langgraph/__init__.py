@@ -92,7 +92,6 @@ def temporal_node_metadata(
     Args:
         activity_options: Options from ``node_activity_options()``.
         run_in_workflow: If True, run in workflow instead of as activity.
-            Requires ``enable_workflow_execution=True`` on ``compile()``.
     """
     # Start with activity options if provided, otherwise empty temporal config
     if activity_options:
@@ -115,7 +114,6 @@ def compile(
     *,
     default_activity_options: Optional[dict[str, Any]] = None,
     per_node_activity_options: Optional[dict[str, dict[str, Any]]] = None,
-    enable_workflow_execution: bool = False,
     checkpoint: Optional[dict] = None,
 ) -> TemporalLangGraphRunner:
     """Compile a registered graph for Temporal execution.
@@ -127,7 +125,6 @@ def compile(
         graph_id: ID of graph registered with LangGraphPlugin.
         default_activity_options: Default options for all nodes.
         per_node_activity_options: Per-node options by node name.
-        enable_workflow_execution: Allow nodes to run in workflow.
         checkpoint: Checkpoint from previous get_state() for continue-as-new.
 
     Raises:
@@ -180,7 +177,6 @@ def compile(
         graph_id=graph_id,
         default_activity_options=merged_default_options,
         per_node_activity_options=merged_per_node_options,
-        enable_workflow_execution=enable_workflow_execution,
         checkpoint=checkpoint,
     )
 

@@ -155,7 +155,6 @@ class TestCompileFunction:
                 retry_policy=RetryPolicy(maximum_attempts=5),
                 task_queue="custom-queue",
             ),
-            enable_workflow_execution=True,
         )
 
         assert runner.default_activity_options["start_to_close_timeout"] == timedelta(
@@ -163,4 +162,3 @@ class TestCompileFunction:
         )
         assert runner.default_activity_options["retry_policy"].maximum_attempts == 5
         assert runner.default_activity_options["task_queue"] == "custom-queue"
-        assert runner.enable_workflow_execution is True

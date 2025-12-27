@@ -40,7 +40,6 @@ class TemporalLangGraphRunner:
         graph_id: str,
         default_activity_options: Optional[dict[str, Any]] = None,
         per_node_activity_options: Optional[dict[str, dict[str, Any]]] = None,
-        enable_workflow_execution: bool = False,
         checkpoint: Optional[dict[str, Any]] = None,
     ) -> None:
         """Initialize the Temporal runner.
@@ -50,7 +49,6 @@ class TemporalLangGraphRunner:
             graph_id: The ID of the graph in the registry.
             default_activity_options: Default options for all nodes.
             per_node_activity_options: Per-node options by node name.
-            enable_workflow_execution: Allow nodes to run in workflow.
             checkpoint: Checkpoint from previous get_state() for continue-as-new.
         """
         # Validate no step_timeout
@@ -71,7 +69,6 @@ class TemporalLangGraphRunner:
             node_name: cfg.get("temporal", {})
             for node_name, cfg in (per_node_activity_options or {}).items()
         }
-        self.enable_workflow_execution = enable_workflow_execution
         self._step_counter = 0
         # Track invocation number for unique activity IDs across replays
         self._invocation_counter = 0
@@ -364,9 +361,6 @@ class TemporalLangGraphRunner:
 
     def _should_run_in_workflow(self, node_name: str) -> bool:
         """Check if a node should run directly in the workflow."""
-        if not self.enable_workflow_execution:
-            return False
-
         # Check node metadata
         node = self.pregel.nodes.get(node_name)
         if node is None:

@@ -332,8 +332,6 @@ graph.add_node(
 )
 ```
 
-Note: `run_in_workflow` requires `enable_workflow_execution=True` in `compile()`.
-
 ### Key Benefits
 
 - **Durable LLM Calls**: Each model invocation is a separate activity with retries
@@ -469,8 +467,6 @@ app = compile(
             start_to_close_timeout=timedelta(hours=1),
         ),
     },
-    # Enable hybrid execution for deterministic nodes
-    enable_workflow_execution=False,
     # Restore from checkpoint for continue-as-new
     checkpoint=None,
 )
