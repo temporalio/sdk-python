@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import warnings
 from collections import deque
 from typing import TYPE_CHECKING, Any, Sequence, cast
 
@@ -58,8 +57,6 @@ if TYPE_CHECKING:
 # RISKS:
 # These are private APIs that may change in future LangGraph versions.
 # If LangGraph changes these, this integration will need updates.
-# We suppress the deprecation warning for CONFIG_KEY_SEND which moved to
-# _internal in LangGraph 1.0 (to be removed in 2.0).
 #
 # ALTERNATIVES CONSIDERED:
 # - Defining our own string constants: Fragile if LangGraph changes values
@@ -68,18 +65,17 @@ if TYPE_CHECKING:
 #
 # =============================================================================
 
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore", category=DeprecationWarning)
-    from langgraph.constants import CONFIG_KEY_SEND
-    from langgraph._internal._constants import (
-        CONFIG_KEY_CHECKPOINT_NS,
-        CONFIG_KEY_READ,
-        CONFIG_KEY_RUNTIME,
-        CONFIG_KEY_SCRATCHPAD,
-    )
-    from langgraph._internal._scratchpad import PregelScratchpad
-    from langgraph.errors import GraphInterrupt as LangGraphInterrupt
-    from langgraph.runtime import Runtime
+from langgraph._internal._constants import (
+    CONFIG_KEY_CHECKPOINT_NS,
+    CONFIG_KEY_READ,
+    CONFIG_KEY_RUNTIME,
+    CONFIG_KEY_SCRATCHPAD,
+    CONFIG_KEY_SEND,
+)
+from langgraph._internal._scratchpad import PregelScratchpad
+from langgraph.errors import GraphInterrupt as LangGraphInterrupt
+from langgraph.runtime import Runtime
+from langgraph.types import Send
 
 
 @activity.defn(name="execute_langgraph_node")
@@ -330,10 +326,6 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
     # Separate Send objects from regular channel writes
     # Send objects are control flow instructions that need to go back to the
     # Pregel loop in the workflow to create new tasks
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=DeprecationWarning)
-        from langgraph.types import Send
-
     from temporalio.contrib.langgraph._models import SendPacket
 
     # Convert writes to ChannelWrite, capturing Send objects separately
