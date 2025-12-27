@@ -494,3 +494,68 @@ class TestAgenticWorkflows:
                 result["message_count"] >= 3
             )  # Human, AI (tool call), Tool, AI (answer)
             assert "4" in result["answer"]  # Should contain the calculation result
+
+    @pytest.mark.asyncio
+    async def test_tools_node_activity_summary_shows_tool_calls(
+        self, client: Client
+    ) -> None:
+        """Test that tools node activity summary shows tool name and args."""
+        plugin = LangGraphPlugin(
+            graphs={"e2e_react_agent": build_react_agent_graph},
+            default_activity_timeout=timedelta(seconds=30),
+        )
+
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
+
+        workflow_id = f"e2e-react-summary-{uuid.uuid4()}"
+
+        async with new_worker(plugin_client, ReactAgentE2EWorkflow) as worker:
+            await plugin_client.execute_workflow(
+                ReactAgentE2EWorkflow.run,
+                "What is 2 + 2?",
+                id=workflow_id,
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=60),
+            )
+
+        # Get workflow history and check activity summaries
+        handle = plugin_client.get_workflow_handle(workflow_id)
+        history = await handle.fetch_history()
+
+        # Find ActivityTaskScheduled events and check their summaries and types
+        activity_summaries: list[str] = []
+        activity_types: dict[str, str] = {}  # summary -> activity type
+        for event in history.events:
+            if event.HasField("activity_task_scheduled_event_attributes"):
+                attrs = event.activity_task_scheduled_event_attributes
+                activity_type = attrs.activity_type.name
+                # user_metadata is on the HistoryEvent, not on the attributes
+                if event.HasField("user_metadata") and event.user_metadata.summary.data:
+                    summary = event.user_metadata.summary.data.decode("utf-8")
+                    activity_summaries.append(summary)
+                    activity_types[summary] = activity_type
+
+        # Verify we have activity summaries
+        assert len(activity_summaries) > 0, "No activity summaries found"
+
+        # Find the tools node activity - should show tool call info
+        # The fake model calls calculator({'expression': '2 + 2'})
+        tools_summaries = [s for s in activity_summaries if "calculator" in s]
+        assert (
+            len(tools_summaries) > 0
+        ), f"Expected 'calculator' in summaries, got: {activity_summaries}"
+
+        # Verify the summary contains the args
+        assert any(
+            "expression" in s and "2 + 2" in s for s in tools_summaries
+        ), f"Expected tool args in summary, got: {tools_summaries}"
+
+        # Verify the tool node uses langgraph_tool_node activity type
+        for tool_summary in tools_summaries:
+            assert activity_types[tool_summary] == "langgraph_tool_node", (
+                f"Expected langgraph_tool_node activity type for tool, "
+                f"got: {activity_types[tool_summary]}"
+            )

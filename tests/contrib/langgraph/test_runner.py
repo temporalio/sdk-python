@@ -94,6 +94,133 @@ class TestTemporalLangGraphRunner:
         assert "__pregel_key" not in filtered["configurable"]
 
 
+class TestBuildActivitySummary:
+    """Tests for the _build_activity_summary function."""
+
+    def test_returns_node_name_for_non_tools_node(self) -> None:
+        """Non-tools nodes should return just the node name."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        result = _build_activity_summary("agent", {"messages": []})
+        assert result == "agent"
+
+        result = _build_activity_summary("process", {"data": "value"})
+        assert result == "process"
+
+    def test_returns_node_name_when_no_tool_calls(self) -> None:
+        """Tools node without tool calls should return node name."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        result = _build_activity_summary("tools", {"messages": []})
+        assert result == "tools"
+
+        result = _build_activity_summary("tools", {"messages": [{"content": "hello"}]})
+        assert result == "tools"
+
+    def test_extracts_tool_calls_from_dict_message(self) -> None:
+        """Should extract tool calls from dict-style messages."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        input_state = {
+            "messages": [
+                {
+                    "content": "",
+                    "tool_calls": [
+                        {"name": "get_weather", "args": {"city": "Tokyo"}},
+                    ],
+                }
+            ]
+        }
+
+        result = _build_activity_summary("tools", input_state)
+        assert result == "get_weather({'city': 'Tokyo'})"
+
+    def test_extracts_tool_calls_from_langchain_message(self) -> None:
+        """Should extract tool calls from LangChain AIMessage objects."""
+        from langchain_core.messages import AIMessage
+
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        msg = AIMessage(
+            content="",
+            tool_calls=[
+                {"name": "calculate", "args": {"expression": "2 + 2"}, "id": "call_1"},
+            ],
+        )
+        input_state = {"messages": [msg]}
+
+        result = _build_activity_summary("tools", input_state)
+        assert result == "calculate({'expression': '2 + 2'})"
+
+    def test_handles_multiple_tool_calls(self) -> None:
+        """Should handle multiple tool calls in a single message."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        input_state = {
+            "messages": [
+                {
+                    "tool_calls": [
+                        {"name": "tool1", "args": {"a": 1}},
+                        {"name": "tool2", "args": {"b": 2}},
+                    ],
+                }
+            ]
+        }
+
+        result = _build_activity_summary("tools", input_state)
+        assert result == "tool1({'a': 1}), tool2({'b': 2})"
+
+    def test_truncates_long_summaries(self) -> None:
+        """Should truncate summaries longer than max_length."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        input_state = {
+            "messages": [
+                {
+                    "tool_calls": [
+                        {"name": "search", "args": {"query": "a" * 200}},
+                    ],
+                }
+            ]
+        }
+
+        result = _build_activity_summary("tools", input_state, max_length=50)
+        assert len(result) == 50
+        assert result.endswith("...")
+
+    def test_handles_non_dict_input_state(self) -> None:
+        """Should handle non-dict input states gracefully."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        result = _build_activity_summary("tools", "not a dict")
+        assert result == "tools"
+
+        result = _build_activity_summary("tools", None)
+        assert result == "tools"
+
+    def test_extracts_tool_calls_from_send_packet(self) -> None:
+        """Should extract tool calls from Send packet structure (tool_call_with_context)."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        # This is the structure used by create_react_agent when executing tools via Send
+        input_state = {
+            "__type": "tool_call_with_context",
+            "tool_call": {
+                "name": "calculator",
+                "args": {"expression": "2 + 2"},
+                "id": "call_123",
+                "type": "tool_call",
+            },
+            "state": {
+                "messages": [],
+                "remaining_steps": 24,
+            },
+        }
+
+        result = _build_activity_summary("tools", input_state)
+        assert result == "calculator({'expression': '2 + 2'})"
+
+
 class TestCompileFunction:
     """Tests for the compile() public API."""
 

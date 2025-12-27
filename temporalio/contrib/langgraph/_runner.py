@@ -11,6 +11,7 @@ from temporalio import workflow
 with workflow.unsafe.imports_passed_through():
     from temporalio.contrib.langgraph._activities import (
         langgraph_node,
+        langgraph_tool_node,
         resume_langgraph_node,
     )
 
@@ -27,6 +28,57 @@ if TYPE_CHECKING:
     from langchain_core.runnables import RunnableConfig
     from langgraph.pregel import Pregel
     from langgraph.types import PregelExecutableTask
+
+
+def _build_activity_summary(node_name: str, input_state: Any, max_length: int = 100) -> str:
+    """Build a meaningful activity summary from node name and input state.
+
+    For tool nodes, extracts tool call information from messages or Send packets.
+    For other nodes, returns the node name.
+    """
+    # For "tools" node (ToolNode from create_react_agent), extract tool calls
+    if node_name == "tools" and isinstance(input_state, dict):
+        tool_calls: list[str] = []
+
+        # Case 1: Send packet with tool_call_with_context (from create_react_agent)
+        # Structure: {"__type": "tool_call_with_context", "tool_call": {...}, "state": {...}}
+        if input_state.get("__type") == "tool_call_with_context":
+            tool_call = input_state.get("tool_call", {})
+            name = tool_call.get("name", "unknown")
+            args = tool_call.get("args", {})
+            args_str = str(args)
+            tool_calls.append(f"{name}({args_str})")
+
+        # Case 2: Regular state with messages containing tool_calls
+        else:
+            messages = input_state.get("messages", [])
+            for msg in messages:
+                # Check for tool_calls attribute (AIMessage with tool calls)
+                calls = None
+                if hasattr(msg, "tool_calls"):
+                    calls = msg.tool_calls
+                elif isinstance(msg, dict) and "tool_calls" in msg:
+                    calls = msg["tool_calls"]
+
+                if calls:
+                    for call in calls:
+                        if isinstance(call, dict):
+                            name = call.get("name", "unknown")
+                            args = call.get("args", {})
+                        else:
+                            name = getattr(call, "name", "unknown")
+                            args = getattr(call, "args", {})
+
+                        args_str = str(args)
+                        tool_calls.append(f"{name}({args_str})")
+
+        if tool_calls:
+            summary = ", ".join(tool_calls)
+            if len(summary) > max_length:
+                summary = summary[: max_length - 3] + "..."
+            return summary
+
+    return node_name
 
 
 class TemporalLangGraphRunner:
@@ -449,12 +501,18 @@ class TemporalLangGraphRunner:
         )
         activity_id = f"inv{invocation_id}-{task.name}-{self._step_counter}"
 
+        # Build meaningful summary from node name and input
+        summary = _build_activity_summary(task.name, task.input)
+
+        # Use langgraph_tool_node for "tools" node, langgraph_node for others
+        activity_fn = langgraph_tool_node if task.name == "tools" else langgraph_node
+
         # Execute activity
         result = await workflow.execute_activity(
-            langgraph_node,
+            activity_fn,
             activity_input,
             activity_id=activity_id,
-            summary=task.name,
+            summary=summary,
             **activity_options,
         )
 
@@ -509,12 +567,20 @@ class TemporalLangGraphRunner:
             )
             activity_id = f"inv{invocation_id}-send-{packet.node}-{self._step_counter}"
 
+            # Build meaningful summary from node name and input
+            summary = _build_activity_summary(packet.node, packet.arg)
+
+            # Use langgraph_tool_node for "tools" node, langgraph_node for others
+            activity_fn = (
+                langgraph_tool_node if packet.node == "tools" else langgraph_node
+            )
+
             # Execute activity
             result = await workflow.execute_activity(
-                langgraph_node,
+                activity_fn,
                 activity_input,
                 activity_id=activity_id,
-                summary=packet.node,
+                summary=summary,
                 **activity_options,
             )
 
@@ -577,12 +643,15 @@ class TemporalLangGraphRunner:
         )
         activity_id = f"inv{invocation_id}-resume-{node_name}-{self._step_counter}"
 
+        # Build meaningful summary from node name and input
+        summary = _build_activity_summary(node_name, input_state)
+
         # Execute activity
         result = await workflow.execute_activity(
             resume_langgraph_node,
             activity_input,
             activity_id=activity_id,
-            summary=node_name,
+            summary=summary,
             **activity_options,
         )
 

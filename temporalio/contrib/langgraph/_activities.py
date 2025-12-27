@@ -333,6 +333,16 @@ async def langgraph_node(input_data: NodeActivityInput) -> NodeActivityOutput:
 
 
 @activity.defn
+async def langgraph_tool_node(input_data: NodeActivityInput) -> NodeActivityOutput:
+    """Execute a LangGraph tool node as a Temporal activity.
+
+    This is a separate activity type for tool nodes to distinguish them
+    from regular nodes in the Temporal UI.
+    """
+    return await _execute_node_impl(input_data)
+
+
+@activity.defn
 async def resume_langgraph_node(input_data: NodeActivityInput) -> NodeActivityOutput:
     """Resume an interrupted LangGraph node as a Temporal activity."""
     return await _execute_node_impl(input_data)

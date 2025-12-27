@@ -92,11 +92,13 @@ class LangGraphPlugin(SimplePlugin):
                 execute_chat_model,
                 execute_tool,
                 langgraph_node,
+                langgraph_tool_node,
                 resume_langgraph_node,
             )
 
             return list(activities or []) + [
                 langgraph_node,
+                langgraph_tool_node,
                 resume_langgraph_node,
                 execute_tool,
                 execute_chat_model,
