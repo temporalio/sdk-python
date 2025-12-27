@@ -364,6 +364,12 @@ class TemporalLangGraphRunner:
 
     def _should_run_in_workflow(self, node_name: str) -> bool:
         """Check if a node should run directly in the workflow."""
+        # __start__ is a built-in LangGraph node that only forwards input to
+        # state channels. It performs no I/O or non-deterministic operations,
+        # so it can safely run inline in the workflow.
+        if node_name == "__start__":
+            return True
+
         # Check node metadata
         node = self.pregel.nodes.get(node_name)
         if node is None:
