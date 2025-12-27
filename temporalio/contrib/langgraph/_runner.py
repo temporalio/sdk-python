@@ -41,11 +41,11 @@ def _build_activity_summary(
     For tool nodes, extracts tool call information from messages or Send packets.
     For other nodes, uses metadata description if available, otherwise node name.
     """
-    # For "tools" node (ToolNode from create_react_agent), extract tool calls
+    # For "tools" node (ToolNode from create_agent/create_react_agent), extract tool calls
     if node_name == "tools" and isinstance(input_state, dict):
         tool_calls: list[str] = []
 
-        # Case 1: Send packet with tool_call_with_context (from create_react_agent)
+        # Case 1: Send packet with tool_call_with_context (from create_agent/create_react_agent)
         # Structure: {"__type": "tool_call_with_context", "tool_call": {...}, "state": {...}}
         if input_state.get("__type") == "tool_call_with_context":
             tool_call = input_state.get("tool_call", {})

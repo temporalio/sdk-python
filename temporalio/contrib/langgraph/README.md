@@ -236,17 +236,17 @@ You can also use LangGraph's native `retry_policy` parameter on `add_node()`, wh
 
 ## Agentic Execution
 
-LangGraph's native agent APIs work directly with the Temporal integration. Each graph node (agent reasoning, tool execution) runs as a Temporal activity, providing automatic retries and failure recovery.
+LangChain's agent APIs work directly with the Temporal integration. Each graph node (agent reasoning, tool execution) runs as a Temporal activity, providing automatic retries and failure recovery.
 
-### Using create_react_agent
+### Using create_agent
 
-Use LangGraph's `create_react_agent` with your model and tools:
+Use LangChain's `create_agent` with your model and tools:
 
 ```python
 from datetime import timedelta
+from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
-from langgraph.prebuilt import create_react_agent
 from temporalio import workflow
 from temporalio.contrib.langgraph import (
     activity_options,
@@ -269,7 +269,7 @@ def get_weather(city: str) -> str:
 
 def build_agent_graph():
     model = ChatOpenAI(model="gpt-4o")
-    return create_react_agent(model, [search_web, get_weather])
+    return create_agent(model, [search_web, get_weather])
 
 
 @workflow.defn
@@ -286,7 +286,7 @@ plugin = LangGraphPlugin(graphs={"my_agent": build_agent_graph})
 
 ### How It Works
 
-When you use `create_react_agent`, LangGraph creates a graph with two main nodes:
+When you use `create_agent`, LangGraph creates a graph with two main nodes:
 - **agent**: Calls the LLM to decide what to do next
 - **tools**: Executes the tools the LLM requested
 
@@ -536,7 +536,7 @@ async def node_with_subgraph(state: dict) -> dict:
 | Conditional edges | Full |
 | Send API | Full |
 | ToolNode | Full |
-| create_react_agent | Full |
+| create_agent | Full |
 | interrupt() | Full |
 | Store API | Full |
 | Streaming | Limited (via queries) |

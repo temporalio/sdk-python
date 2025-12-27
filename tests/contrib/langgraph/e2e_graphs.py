@@ -411,7 +411,12 @@ def build_command_graph():
 
 
 def build_react_agent_graph():
-    """Build a react agent graph for E2E testing."""
+    """Build a react agent graph for E2E testing.
+
+    Note: For production use, prefer `from langchain.agents import create_agent`
+    as langgraph.prebuilt.create_react_agent is deprecated. We use the deprecated
+    version here to minimize test dependencies (langchain-core only).
+    """
     from langchain_core.language_models.chat_models import BaseChatModel
     from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
     from langchain_core.outputs import ChatGeneration, ChatResult
@@ -488,16 +493,20 @@ def build_react_agent_graph():
 
 
 # ==============================================================================
-# Native React Agent Graph (no wrappers - tests simplification)
+# Native Agent Graph (no wrappers - tests simplification)
 # ==============================================================================
 
 
 def build_native_react_agent_graph():
-    """Build a react agent using ONLY native LangGraph - no temporal wrappers.
+    """Build an agent using ONLY native LangGraph - no temporal wrappers.
 
     This tests that the Temporal integration works without temporal_tool or
     temporal_model wrappers. The model and tools execute directly within
     the node activities.
+
+    Note: For production use, prefer `from langchain.agents import create_agent`
+    as langgraph.prebuilt.create_react_agent is deprecated. We use the deprecated
+    version here to minimize test dependencies (langchain-core only).
     """
     from langchain_core.language_models.chat_models import BaseChatModel
     from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
