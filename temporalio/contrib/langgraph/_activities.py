@@ -365,7 +365,12 @@ async def execute_chat_model(
 ) -> ChatModelActivityOutput:
     """Execute a LangChain chat model call as a Temporal activity."""
     model_name = input_data.model_name or "default"
-    logger.debug("Executing chat model %s with %d messages", model_name, len(input_data.messages))
+    logger.debug(
+        "Executing chat model %s with %d messages (tools: %s)",
+        model_name,
+        len(input_data.messages),
+        "yes" if input_data.tools else "no",
+    )
 
     from langchain_core.messages import AnyMessage
     from pydantic import TypeAdapter
@@ -373,7 +378,15 @@ async def execute_chat_model(
     from temporalio.contrib.langgraph._model_registry import get_model
 
     # Get model from registry
-    model = get_model(model_name)
+    model: Any = get_model(model_name)
+
+    # Bind tools if provided
+    if input_data.tools:
+        # bind_tools accepts tool schemas directly
+        bind_kwargs: dict[str, Any] = {}
+        if input_data.tool_choice is not None:
+            bind_kwargs["tool_choice"] = input_data.tool_choice
+        model = model.bind_tools(input_data.tools, **bind_kwargs)
 
     # Deserialize messages
     messages: list[Any] = []

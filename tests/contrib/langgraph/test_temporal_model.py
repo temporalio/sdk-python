@@ -176,8 +176,8 @@ class TestTemporalModel:
 
         asyncio.get_event_loop().run_until_complete(run_test())
 
-    def test_bind_tools_raises_not_implemented(self) -> None:
-        """bind_tools should raise NotImplementedError."""
+    def test_bind_tools_with_dict_schemas(self) -> None:
+        """bind_tools should accept dict tool schemas."""
         from temporalio.contrib.langgraph import temporal_model
 
         model = temporal_model(
@@ -185,5 +185,138 @@ class TestTemporalModel:
             start_to_close_timeout=timedelta(minutes=1),
         )
 
-        with pytest.raises(NotImplementedError, match="Tool binding"):
-            model.bind_tools([])
+        # Tool schema as dict
+        tool_schema = {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get weather for a city",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"city": {"type": "string"}},
+                    "required": ["city"],
+                },
+            },
+        }
+
+        bound_model: Any = model.bind_tools([tool_schema])
+
+        # Should return a new model instance
+        assert bound_model is not model
+        assert bound_model._llm_type == "temporal-chat-model"
+        # Tools should be stored
+        assert bound_model._temporal_bound_tools == [tool_schema]
+
+    def test_bind_tools_with_langchain_tool(self) -> None:
+        """bind_tools should convert LangChain tools to schemas."""
+        from langchain_core.tools import tool
+
+        from temporalio.contrib.langgraph import temporal_model
+
+        @tool
+        def calculator(expression: str) -> str:
+            """Calculate a math expression."""
+            return str(eval(expression))
+
+        model = temporal_model(
+            "gpt-4o-bind-tool",
+            start_to_close_timeout=timedelta(minutes=1),
+        )
+
+        bound_model: Any = model.bind_tools([calculator])
+
+        assert bound_model is not model
+        assert len(bound_model._temporal_bound_tools) == 1
+        # Should be converted to OpenAI format
+        tool_schema = bound_model._temporal_bound_tools[0]
+        assert tool_schema["type"] == "function"
+        assert tool_schema["function"]["name"] == "calculator"
+
+    def test_bind_tools_with_tool_choice(self) -> None:
+        """bind_tools should pass through tool_choice."""
+        from temporalio.contrib.langgraph import temporal_model
+
+        model = temporal_model(
+            "gpt-4o-bind-choice",
+            start_to_close_timeout=timedelta(minutes=1),
+        )
+
+        tool_schema = {
+            "type": "function",
+            "function": {"name": "test_tool", "parameters": {}},
+        }
+
+        bound_model: Any = model.bind_tools([tool_schema], tool_choice="auto")
+
+        assert bound_model._temporal_tool_choice == "auto"
+
+    def test_bind_tools_preserves_activity_options(self) -> None:
+        """bind_tools should preserve activity options."""
+        from temporalio.contrib.langgraph import temporal_model
+
+        model = temporal_model(
+            "gpt-4o-bind-options",
+            start_to_close_timeout=timedelta(minutes=5),
+            heartbeat_timeout=timedelta(seconds=30),
+            task_queue="custom-queue",
+        )
+
+        bound_model: Any = model.bind_tools([])
+
+        assert (
+            bound_model._temporal_activity_options["start_to_close_timeout"]
+            == timedelta(minutes=5)
+        )
+        assert bound_model._temporal_activity_options["heartbeat_timeout"] == timedelta(
+            seconds=30
+        )
+        assert bound_model._temporal_activity_options["task_queue"] == "custom-queue"
+
+    def test_bind_tools_passes_tools_to_activity(self) -> None:
+        """When in workflow, bound tools should be passed to activity."""
+        from langchain_core.messages import HumanMessage
+
+        from temporalio.contrib.langgraph import temporal_model
+        from temporalio.contrib.langgraph._models import ChatModelActivityOutput
+
+        model = temporal_model(
+            "gpt-4o-activity-tools",
+            start_to_close_timeout=timedelta(minutes=2),
+        )
+
+        tool_schema = {
+            "type": "function",
+            "function": {"name": "test_tool", "parameters": {}},
+        }
+
+        bound_model = model.bind_tools([tool_schema], tool_choice="required")
+
+        mock_result = ChatModelActivityOutput(
+            generations=[
+                {
+                    "message": {"content": "", "type": "ai", "tool_calls": []},
+                    "generation_info": None,
+                }
+            ],
+            llm_output=None,
+        )
+
+        async def run_test():
+            with patch("temporalio.workflow.in_workflow", return_value=True):
+                with patch("temporalio.workflow.unsafe.imports_passed_through"):
+                    with patch(
+                        "temporalio.workflow.execute_activity",
+                        new_callable=AsyncMock,
+                        return_value=mock_result,
+                    ) as mock_execute:
+                        await bound_model._agenerate([HumanMessage(content="Hello")])
+
+                        # Verify activity was called with tools
+                        mock_execute.assert_called_once()
+                        call_args = mock_execute.call_args
+                        activity_input = call_args[0][1]  # Second positional arg
+
+                        assert activity_input.tools == [tool_schema]
+                        assert activity_input.tool_choice == "required"
+
+        asyncio.get_event_loop().run_until_complete(run_test())

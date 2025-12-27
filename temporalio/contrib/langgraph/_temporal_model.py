@@ -38,8 +38,12 @@ class _TemporalChatModel:
         cancellation_type: "ActivityCancellationType | None" = None,
         versioning_intent: "VersioningIntent | None" = None,
         priority: "Priority | None" = None,
+        bound_tools: list[dict[str, Any]] | None = None,
+        tool_choice: Any | None = None,
     ) -> None:
         self._model = model
+        self._bound_tools = bound_tools
+        self._tool_choice = tool_choice
         self._activity_options: dict[str, Any] = {
             "start_to_close_timeout": start_to_close_timeout,
         }
@@ -73,6 +77,8 @@ class _TemporalChatModel:
 
         original_model = self._model
         activity_options = self._activity_options
+        bound_tools = self._bound_tools
+        tool_choice = self._tool_choice
 
         # Get model name for activity
         if isinstance(original_model, str):
@@ -92,6 +98,8 @@ class _TemporalChatModel:
             _temporal_model_name: Any = model_name
             _temporal_model_instance: Any = model_instance
             _temporal_activity_options: Any = activity_options
+            _temporal_bound_tools: Any = bound_tools
+            _temporal_tool_choice: Any = tool_choice
 
             @property
             def _llm_type(self) -> str:
@@ -163,6 +171,8 @@ class _TemporalChatModel:
                     messages=serialized_messages,
                     stop=stop,
                     kwargs=kwargs,
+                    tools=self._temporal_bound_tools,
+                    tool_choice=self._temporal_tool_choice,
                 )
 
                 # Execute as activity
@@ -195,20 +205,55 @@ class _TemporalChatModel:
             def bind_tools(
                 self,
                 tools: Sequence[Any],
+                tool_choice: Any = None,
                 **kwargs: Any,
-            ) -> "TemporalChatModelWrapper":
+            ) -> "BaseChatModel":
                 """Bind tools to the model.
 
-                This stores the tools for use in the activity, where they will
-                be bound to the actual model instance.
+                Converts tools to OpenAI-compatible schemas and stores them.
+                When executed as an activity, the schemas are bound to the actual model.
+
+                Args:
+                    tools: Sequence of tools (BaseTool, functions, or dicts).
+                    tool_choice: Optional tool choice configuration.
+                    **kwargs: Additional arguments passed to the underlying bind_tools.
+
+                Returns:
+                    A new TemporalChatModelWrapper with tools bound.
                 """
-                # For now, we don't support tool binding in the wrapper
-                # Users should bind tools to the underlying model before wrapping
-                raise NotImplementedError(
-                    "Tool binding on temporal_model is not yet supported. "
-                    "Please bind tools to the model before wrapping with temporal_model(), "
-                    "or use temporal_tool() for individual tool execution."
+                from langchain_core.utils.function_calling import convert_to_openai_tool
+
+                # Convert tools to OpenAI-compatible schemas
+                tool_schemas: list[dict[str, Any]] = []
+                for tool in tools:
+                    if isinstance(tool, dict):
+                        # Already a schema dict
+                        tool_schemas.append(tool)
+                    else:
+                        # Convert using LangChain's utility
+                        tool_schemas.append(convert_to_openai_tool(tool))
+
+                # Create a new wrapper with the tools bound
+                # We need to create a new _TemporalChatModel and wrap it
+                new_wrapper = _TemporalChatModel(
+                    original_model,
+                    start_to_close_timeout=activity_options["start_to_close_timeout"],
+                    schedule_to_close_timeout=activity_options.get(
+                        "schedule_to_close_timeout"
+                    ),
+                    schedule_to_start_timeout=activity_options.get(
+                        "schedule_to_start_timeout"
+                    ),
+                    heartbeat_timeout=activity_options.get("heartbeat_timeout"),
+                    task_queue=activity_options.get("task_queue"),
+                    retry_policy=activity_options.get("retry_policy"),
+                    cancellation_type=activity_options.get("cancellation_type"),
+                    versioning_intent=activity_options.get("versioning_intent"),
+                    priority=activity_options.get("priority"),
+                    bound_tools=tool_schemas,
+                    tool_choice=tool_choice,
                 )
+                return new_wrapper.wrap()
 
         return TemporalChatModelWrapper
 

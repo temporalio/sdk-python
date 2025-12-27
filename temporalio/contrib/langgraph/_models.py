@@ -301,6 +301,12 @@ class ChatModelActivityInput:
     kwargs: dict[str, Any] = field(default_factory=dict)
     """Additional keyword arguments."""
 
+    tools: list[dict[str, Any]] | None = None
+    """Optional list of tool schemas to bind to the model."""
+
+    tool_choice: str | dict[str, Any] | None = None
+    """Optional tool choice configuration."""
+
 
 @dataclass
 class ChatGenerationData:

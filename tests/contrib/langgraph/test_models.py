@@ -315,6 +315,44 @@ class TestToolModelActivityModels:
         assert input_data.stop == ["END"]
         assert input_data.kwargs == {"temperature": 0.7}
 
+    def test_chat_model_activity_input_with_tools(self) -> None:
+        """ChatModelActivityInput should support tools and tool_choice."""
+        from temporalio.contrib.langgraph._models import ChatModelActivityInput
+
+        tool_schema = {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get weather for a city",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"city": {"type": "string"}},
+                },
+            },
+        }
+
+        input_data = ChatModelActivityInput(
+            model_name="gpt-4o",
+            messages=[{"content": "What's the weather?", "type": "human"}],
+            tools=[tool_schema],
+            tool_choice="auto",
+        )
+
+        assert input_data.tools == [tool_schema]
+        assert input_data.tool_choice == "auto"
+
+    def test_chat_model_activity_input_tools_default_none(self) -> None:
+        """ChatModelActivityInput tools should default to None."""
+        from temporalio.contrib.langgraph._models import ChatModelActivityInput
+
+        input_data = ChatModelActivityInput(
+            model_name="gpt-4o",
+            messages=[{"content": "Hello", "type": "human"}],
+        )
+
+        assert input_data.tools is None
+        assert input_data.tool_choice is None
+
     def test_chat_model_activity_output(self) -> None:
         """ChatModelActivityOutput should store generations."""
         from temporalio.contrib.langgraph._models import ChatModelActivityOutput

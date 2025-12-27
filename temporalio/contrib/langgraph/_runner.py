@@ -80,6 +80,8 @@ class TemporalLangGraphRunner:
         self._interrupted_node_name: str | None = None  # Track which node interrupted
         self._resume_value: Any | None = None
         self._resume_used: bool = False
+        # Track whether current invocation is a resume (for cycle tracking)
+        self._is_resume_invocation: bool = False
         # Pending interrupt from current execution (set by _execute_as_activity)
         self._pending_interrupt: InterruptValue | None = None
         # Track nodes completed in current resume cycle (to avoid re-execution)
@@ -140,6 +142,8 @@ class TemporalLangGraphRunner:
 
         self._resume_value = resume_value
         self._resume_used = False
+        # Track whether this is a resume invocation (for cycle tracking)
+        self._is_resume_invocation = is_resume
         # Reset pending interrupt for this invocation
         self._pending_interrupt = None
         # Increment invocation counter for unique activity IDs
@@ -338,8 +342,10 @@ class TemporalLangGraphRunner:
             # The task interrupted - don't mark resume as used
             return False
 
-        # Task completed successfully - track it to prevent re-execution
-        self._completed_nodes_in_cycle.add(task.name)
+        # Task completed successfully - track it to prevent re-execution during resume
+        # Only track during resume invocations to allow normal cyclic execution
+        if self._is_resume_invocation:
+            self._completed_nodes_in_cycle.add(task.name)
 
         # If we provided a resume value and the task completed successfully,
         # it means the task consumed the resume value (interrupt() returned it)
