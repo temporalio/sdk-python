@@ -1,13 +1,4 @@
-"""Temporal runner for LangGraph graphs.
-
-This module provides TemporalLangGraphRunner, which wraps a compiled LangGraph
-graph and executes nodes as Temporal activities for durable execution.
-
-Architecture:
-    - The Pregel loop runs in the workflow (deterministic orchestration)
-    - Node execution is routed to Temporal activities (non-deterministic I/O)
-    - The runner uses AsyncPregelLoop for proper graph traversal and state management
-"""
+"""Temporal runner for LangGraph graphs."""
 
 from __future__ import annotations
 
@@ -38,64 +29,9 @@ if TYPE_CHECKING:
 class TemporalLangGraphRunner:
     """Runner that executes LangGraph graphs with Temporal activities.
 
-    This runner wraps a compiled LangGraph graph (Pregel) and provides
-    an interface similar to the standard graph, but executes nodes as
-    Temporal activities for durable execution.
-
-    The runner uses LangGraph's AsyncPregelLoop for proper graph orchestration:
-    - Evaluates conditional edges
-    - Manages state channels
-    - Handles task scheduling based on graph topology
-    - Routes node execution to Temporal activities
-
-    Human-in-the-Loop Support:
-        When a node calls LangGraph's interrupt() function, ainvoke() returns
-        a result dict containing '__interrupt__' key with the interrupt info.
-        This matches LangGraph's native API. To resume, call ainvoke() with
-        Command(resume=value).
-
-    Example (basic):
-        >>> from temporalio.contrib.langgraph import compile
-        >>>
-        >>> @workflow.defn
-        >>> class MyWorkflow:
-        ...     @workflow.run
-        ...     async def run(self, graph_id: str, input_data: dict):
-        ...         app = compile(graph_id)
-        ...         return await app.ainvoke(input_data)
-
-    Example (with interrupts - LangGraph native API):
-        >>> from temporalio.contrib.langgraph import compile
-        >>> from langgraph.types import Command
-        >>>
-        >>> @workflow.defn
-        >>> class MyWorkflow:
-        ...     def __init__(self):
-        ...         self._human_response = None
-        ...
-        ...     @workflow.signal
-        ...     def provide_input(self, value: str):
-        ...         self._human_response = value
-        ...
-        ...     @workflow.run
-        ...     async def run(self, input_data: dict):
-        ...         app = compile("my_graph")
-        ...         result = await app.ainvoke(input_data)
-        ...
-        ...         # Check for interrupt (same as native LangGraph API)
-        ...         if '__interrupt__' in result:
-        ...             interrupt_info = result['__interrupt__'][0]
-        ...             # interrupt_info.value contains data from interrupt()
-        ...
-        ...             # Wait for human input via signal
-        ...             await workflow.wait_condition(
-        ...                 lambda: self._human_response is not None
-        ...             )
-        ...
-        ...             # Resume using LangGraph's Command API
-        ...             result = await app.ainvoke(Command(resume=self._human_response))
-        ...
-        ...         return result
+    Wraps a compiled Pregel graph and executes nodes as Temporal activities.
+    Uses AsyncPregelLoop for graph orchestration. Supports interrupts via
+    LangGraph's native API (``__interrupt__`` key and ``Command(resume=...)``).
     """
 
     def __init__(
@@ -112,21 +48,10 @@ class TemporalLangGraphRunner:
         Args:
             pregel: The compiled Pregel graph instance.
             graph_id: The ID of the graph in the registry.
-            default_activity_options: Default activity options for all nodes,
-                created via `activity_options()`. Node-specific options override
-                these. If not specified, defaults to 5 minute timeout and 3 retries.
-            per_node_activity_options: Per-node options mapping node names to
-                `activity_options()`. Use this to configure existing graphs
-                without modifying their source code. Takes precedence over
-                `default_activity_options` but is overridden by options set directly
-                on the node via add_node(metadata=...).
-            enable_workflow_execution: If True, nodes marked with
-                metadata={"temporal": {"run_in_workflow": True}} will
-                execute directly in the workflow instead of as activities.
-            checkpoint: Optional checkpoint data from a previous execution's
-                get_state().model_dump(). If provided, the runner will restore
-                its internal state from this checkpoint, allowing continuation
-                after a Temporal continue-as-new.
+            default_activity_options: Default options for all nodes.
+            per_node_activity_options: Per-node options by node name.
+            enable_workflow_execution: Allow nodes to run in workflow.
+            checkpoint: Checkpoint from previous get_state() for continue-as-new.
         """
         # Validate no step_timeout
         if pregel.step_timeout is not None:
@@ -181,48 +106,13 @@ class TemporalLangGraphRunner:
     ) -> dict[str, Any]:
         """Execute the graph asynchronously.
 
-        This method runs the Pregel loop using AsyncPregelLoop for proper
-        graph traversal, executing each node as a Temporal activity.
-
         Args:
-            input_state: The initial state to pass to the graph, OR a
-                Command(resume=value) to resume after an interrupt.
-                When resuming with Command, the state from the previous
-                interrupt will be used.
+            input_state: Initial state or ``Command(resume=value)`` to resume.
             config: Optional configuration for the execution.
-            should_continue: Optional callable that returns False when execution
-                should stop for checkpointing. Called once after each graph tick
-                (BSP superstep), where each tick processes one layer of nodes.
-                When it returns False, execution stops and the result contains
-                '__checkpoint__' key with a StateSnapshot for continue-as-new.
-                Typical use: track tick count or check Temporal workflow history length.
+            should_continue: Callable returning False to stop for checkpointing.
 
         Returns:
-            The final state after graph execution. Special keys in result:
-            - '__interrupt__': Present if a node called interrupt(). Contains
-              a list of Interrupt objects (matching LangGraph's native API).
-            - '__checkpoint__': Present if should_continue() returned False.
-              Contains a StateSnapshot for use with continue-as-new.
-
-        Example (basic):
-            >>> result = await app.ainvoke({"messages": [HumanMessage(content="Hi")]})
-
-        Example (handling interrupt - LangGraph native API):
-            >>> from langgraph.types import Command
-            >>>
-            >>> result = await app.ainvoke(initial_state)
-            >>> if '__interrupt__' in result:
-            ...     # result['__interrupt__'][0].value has the interrupt data
-            ...     # Get human input...
-            ...     result = await app.ainvoke(Command(resume=human_input))
-
-        Example (continue-as-new on history limit):
-            >>> result = await app.ainvoke(
-            ...     input_data,
-            ...     should_continue=lambda: workflow.info().get_current_history_length() < 10000
-            ... )
-            >>> if '__checkpoint__' in result:
-            ...     workflow.continue_as_new(input_data, result['__checkpoint__'])
+            Final state. May contain ``__interrupt__`` or ``__checkpoint__`` keys.
         """
         workflow.logger.debug("Starting graph execution for %s", self.graph_id)
 
@@ -422,15 +312,7 @@ class TemporalLangGraphRunner:
         return output
 
     async def _execute_task(self, task: PregelExecutableTask, loop: Any) -> bool:
-        """Execute a single task, either in workflow or as activity.
-
-        Args:
-            task: The Pregel task to execute.
-            loop: The AsyncPregelLoop instance for recording writes.
-
-        Returns:
-            True if execution should continue, False if an interrupt occurred.
-        """
+        """Execute a single task. Returns False if interrupted."""
         # Determine if this task should receive the resume value
         # Only pass resume value to the specific node that was interrupted
         resume_for_task = None
@@ -481,14 +363,7 @@ class TemporalLangGraphRunner:
         return True
 
     def _should_run_in_workflow(self, node_name: str) -> bool:
-        """Check if a node should run directly in the workflow.
-
-        Args:
-            node_name: The name of the node.
-
-        Returns:
-            True if the node should run in workflow, False for activity.
-        """
+        """Check if a node should run directly in the workflow."""
         if not self.enable_workflow_execution:
             return False
 
@@ -506,17 +381,7 @@ class TemporalLangGraphRunner:
         self,
         task: PregelExecutableTask,
     ) -> list[tuple[str, Any]]:
-        """Execute a task directly in the workflow.
-
-        This is used for deterministic operations that don't need
-        activity durability.
-
-        Args:
-            task: The task to execute.
-
-        Returns:
-            List of (channel, value) tuples representing the writes.
-        """
+        """Execute a task directly in the workflow for deterministic operations."""
         with workflow.unsafe.imports_passed_through():
             from collections import deque
             from langgraph.constants import CONFIG_KEY_SEND
@@ -548,20 +413,7 @@ class TemporalLangGraphRunner:
         task: PregelExecutableTask,
         resume_value: Optional[Any] = None,
     ) -> tuple[list[tuple[str, Any]], list[Any]]:
-        """Execute a task as a Temporal activity, returning writes and send packets.
-
-        Args:
-            task: The task to execute.
-            resume_value: If provided, passed to the activity to resume
-                an interrupted node. The node's interrupt() call will
-                return this value instead of raising.
-
-        Returns:
-            Tuple of (writes, send_packets) where:
-            - writes: List of (channel, value) tuples representing state writes
-            - send_packets: List of SendPacket objects for dynamic task creation
-            If the node called interrupt(), _pending_interrupt will be set.
-        """
+        """Execute a task as a Temporal activity, returning writes and send packets."""
         self._step_counter += 1
 
         # Prepare store snapshot for the activity
@@ -617,18 +469,7 @@ class TemporalLangGraphRunner:
         send_packets: list[Any],
         config: Any,
     ) -> list[tuple[str, Any]]:
-        """Execute Send packets as separate activities.
-
-        Send packets create dynamic tasks with custom input (Send.arg).
-        Each Send is executed as a separate activity with Send.arg as the input state.
-
-        Args:
-            send_packets: List of SendPacket objects from a conditional edge.
-            config: The config from the parent task.
-
-        Returns:
-            List of (channel, value) tuples from all Send task executions.
-        """
+        """Execute Send packets as separate activities."""
         all_writes: list[tuple[str, Any]] = []
 
         for packet in send_packets:
@@ -699,21 +540,7 @@ class TemporalLangGraphRunner:
         input_state: dict[str, Any],
         config: dict[str, Any],
     ) -> list[tuple[str, Any]]:
-        """Execute the interrupted node with the resume value.
-
-        This method directly executes the node that was interrupted, bypassing
-        the AsyncPregelLoop's task scheduling. This is necessary because the
-        loop doesn't know which nodes already ran without a checkpointer.
-
-        Args:
-            node_name: The name of the interrupted node.
-            input_state: The state at the time of interrupt.
-            config: Configuration for the execution.
-
-        Returns:
-            List of (channel, value) tuples representing the writes.
-            If the node interrupts again, _pending_interrupt will be set.
-        """
+        """Execute the interrupted node with the resume value."""
         self._step_counter += 1
 
         # Prepare store snapshot for the activity
@@ -768,16 +595,7 @@ class TemporalLangGraphRunner:
         return result.to_write_tuples()
 
     def _filter_config(self, config: dict[str, Any]) -> dict[str, Any]:
-        """Filter configuration for serialization.
-
-        Removes internal LangGraph keys that shouldn't be serialized.
-
-        Args:
-            config: The original configuration.
-
-        Returns:
-            Filtered configuration safe for serialization.
-        """
+        """Filter configuration to remove internal LangGraph keys."""
         # Keys to exclude from serialization
         exclude_prefixes = ("__pregel_", "__lg_")
 
@@ -797,14 +615,7 @@ class TemporalLangGraphRunner:
         return filtered
 
     def _get_node_metadata(self, node_name: str) -> dict[str, Any]:
-        """Get Temporal-specific metadata for a node.
-
-        Args:
-            node_name: The name of the node.
-
-        Returns:
-            Dict with temporal config from node.metadata.get("temporal", {})
-        """
+        """Get Temporal-specific metadata for a node."""
         node = self.pregel.nodes.get(node_name)
         if node is None:
             return {}
@@ -812,24 +623,7 @@ class TemporalLangGraphRunner:
         return metadata.get("temporal", {})
 
     def _get_node_activity_options(self, node_name: str) -> dict[str, Any]:
-        """Get all activity options for a specific node.
-
-        Returns a dict of options that can be passed as **kwargs to execute_activity.
-        Combines defaults with node metadata (node metadata takes priority).
-
-        Priority for each option:
-            1. Node metadata from add_node() (highest)
-            2. node_config from compile()
-            3. defaults from compile()
-            4. LangGraph retry_policy on node (for retry_policy only)
-            5. Built-in defaults (5 min timeout, 3 retries)
-
-        Args:
-            node_name: The name of the node.
-
-        Returns:
-            Dict of activity options for execute_activity().
-        """
+        """Get activity options for a node, merging defaults and metadata."""
         from temporalio.common import Priority, RetryPolicy
         from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
@@ -929,45 +723,14 @@ class TemporalLangGraphRunner:
         input_state: dict[str, Any],
         config: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
-        """Synchronous invoke is not supported in Temporal workflows.
-
-        Use ainvoke() instead.
-
-        Raises:
-            NotImplementedError: Always raised.
-        """
+        """Synchronous invoke is not supported. Use ainvoke()."""
         raise NotImplementedError(
             "Synchronous invoke() is not supported in Temporal workflows. "
             "Use ainvoke() instead."
         )
 
     def get_state(self) -> StateSnapshot:
-        """Get the current state snapshot for checkpointing.
-
-        Returns a StateSnapshot that can be serialized and passed to
-        Temporal's continue-as-new. The snapshot contains all data needed
-        to restore the runner's state in a new workflow execution.
-
-        This follows LangGraph's get_state() API pattern.
-
-        Returns:
-            A StateSnapshot containing the current execution state.
-
-        Example (continue-as-new pattern):
-            >>> @workflow.defn
-            >>> class LongRunningAgentWorkflow:
-            ...     @workflow.run
-            ...     async def run(self, input_data: dict, checkpoint: dict | None = None):
-            ...         app = compile("my_graph", checkpoint=checkpoint)
-            ...         result = await app.ainvoke(input_data)
-            ...
-            ...         # Check if we should continue-as-new (e.g., history too long)
-            ...         if workflow.info().get_current_history_length() > 10000:
-            ...             snapshot = app.get_state()
-            ...             workflow.continue_as_new(input_data, snapshot.model_dump())
-            ...
-            ...         return result
-        """
+        """Get the current state snapshot for checkpointing and continue-as-new."""
         # Determine next nodes based on current state
         next_nodes: tuple[str, ...] = ()
         if self._interrupted_node_name is not None:
@@ -1005,14 +768,7 @@ class TemporalLangGraphRunner:
         )
 
     def _restore_from_checkpoint(self, checkpoint: dict[str, Any]) -> None:
-        """Restore runner state from a checkpoint.
-
-        This method restores the runner's internal state from a checkpoint
-        dictionary (typically from StateSnapshot.model_dump()).
-
-        Args:
-            checkpoint: Checkpoint data from a previous get_state().model_dump().
-        """
+        """Restore runner state from a checkpoint."""
         # Restore state values
         self._last_output = checkpoint.get("values")
         self._interrupted_state = checkpoint.get("values")
@@ -1046,14 +802,7 @@ class TemporalLangGraphRunner:
         }
 
     def _prepare_store_snapshot(self) -> Optional[StoreSnapshot]:
-        """Prepare a store snapshot for activity input.
-
-        Creates a snapshot of the current store state to pass to an activity.
-        The activity will use this snapshot for reads and capture writes.
-
-        Returns:
-            StoreSnapshot if there's store data, None otherwise.
-        """
+        """Prepare a store snapshot for activity input."""
         if not self._store_state:
             return None
 
@@ -1064,11 +813,7 @@ class TemporalLangGraphRunner:
         return StoreSnapshot(items=items)
 
     def _apply_store_writes(self, writes: list[StoreWrite]) -> None:
-        """Apply store writes from an activity to the workflow store state.
-
-        Args:
-            writes: List of store write operations from the activity.
-        """
+        """Apply store writes from an activity to the workflow store state."""
         for write in writes:
             key = (tuple(write.namespace), write.key)
             if write.operation == "put" and write.value is not None:
@@ -1077,11 +822,7 @@ class TemporalLangGraphRunner:
                 self._store_state.pop(key, None)
 
     def _serialize_store_state(self) -> list[dict[str, Any]]:
-        """Serialize store state for checkpoint.
-
-        Returns:
-            List of dicts suitable for JSON serialization.
-        """
+        """Serialize store state for checkpoint."""
         return [
             {"namespace": list(ns), "key": key, "value": value}
             for (ns, key), value in self._store_state.items()

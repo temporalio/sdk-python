@@ -1,9 +1,4 @@
-"""Registry for LangChain chat models used in Temporal activities.
-
-This module provides a global registry for chat models that are wrapped with
-temporal_model(). The registry allows the execute_chat_model activity to look
-up models by name or retrieve registered instances.
-"""
+"""Registry for LangChain chat models used in Temporal activities."""
 
 from __future__ import annotations
 
@@ -22,16 +17,7 @@ _registry_lock = threading.Lock()
 
 
 def register_model(model: "BaseChatModel", name: Optional[str] = None) -> None:
-    """Register a model instance in the global registry.
-
-    Args:
-        model: The LangChain chat model instance to register.
-        name: Optional name for the model. If not provided, uses the model's
-            model_name or model attribute.
-
-    Raises:
-        ValueError: If the model name cannot be determined.
-    """
+    """Register a model instance in the global registry."""
     if name is None:
         name = getattr(model, "model_name", None) or getattr(model, "model", None)
 
@@ -46,43 +32,13 @@ def register_model(model: "BaseChatModel", name: Optional[str] = None) -> None:
 
 
 def register_model_factory(name: str, factory: Callable[[], "BaseChatModel"]) -> None:
-    """Register a factory function for creating model instances.
-
-    Use this when you want to lazily instantiate models in the activity
-    rather than passing model instances through the workflow.
-
-    Args:
-        name: The model name that will trigger this factory.
-        factory: A callable that returns a BaseChatModel instance.
-
-    Example:
-        >>> from langchain_openai import ChatOpenAI
-        >>>
-        >>> register_model_factory(
-        ...     "gpt-4o",
-        ...     lambda: ChatOpenAI(model="gpt-4o", temperature=0)
-        ... )
-        >>>
-        >>> # Now temporal_model("gpt-4o") will use this factory
-    """
+    """Register a factory function for lazy model instantiation."""
     with _registry_lock:
         _model_factories[name] = factory
 
 
 def get_model(name: str) -> "BaseChatModel":
-    """Get a model from the registry by name.
-
-    First checks for a registered instance, then tries factories.
-
-    Args:
-        name: The name of the model to retrieve.
-
-    Returns:
-        A BaseChatModel instance.
-
-    Raises:
-        KeyError: If no model with the given name is registered.
-    """
+    """Get a model from the registry by name."""
     with _registry_lock:
         # Check instances first
         if name in _model_instances:
@@ -106,17 +62,7 @@ def get_model(name: str) -> "BaseChatModel":
 
 
 def _try_auto_create_model(name: str) -> Optional["BaseChatModel"]:
-    """Try to auto-create a model based on common naming patterns.
-
-    This provides convenience for common model names without requiring
-    explicit registration.
-
-    Args:
-        name: The model name.
-
-    Returns:
-        A BaseChatModel instance if auto-creation succeeded, None otherwise.
-    """
+    """Try to auto-create a model based on common naming patterns."""
     model: Optional["BaseChatModel"] = None
     try:
         # OpenAI models
@@ -145,11 +91,7 @@ def _try_auto_create_model(name: str) -> Optional["BaseChatModel"]:
 
 
 def get_all_models() -> dict[str, "BaseChatModel"]:
-    """Get all registered model instances.
-
-    Returns:
-        A copy of the model instances dict.
-    """
+    """Get all registered model instances."""
     with _registry_lock:
         return dict(_model_instances)
 

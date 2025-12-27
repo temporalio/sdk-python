@@ -1,9 +1,4 @@
-"""Registry for LangChain tools used in Temporal activities.
-
-This module provides a global registry for tools that are wrapped with
-temporal_tool(). The registry allows the execute_tool activity to look up
-tools by name for execution.
-"""
+"""Registry for LangChain tools used in Temporal activities."""
 
 from __future__ import annotations
 
@@ -24,14 +19,7 @@ _registry_lock = threading.Lock()
 
 
 def register_tool(tool: "BaseTool") -> None:
-    """Register a tool in the global registry.
-
-    Args:
-        tool: The LangChain tool to register.
-
-    Raises:
-        ValueError: If a different tool with the same name is already registered.
-    """
+    """Register a tool in the global registry."""
     with _registry_lock:
         existing = _tool_registry.get(tool.name)
         if existing is not None and existing is not tool:
@@ -45,17 +33,7 @@ def register_tool(tool: "BaseTool") -> None:
 
 
 def get_tool(name: str) -> "BaseTool":
-    """Get a tool from the registry by name.
-
-    Args:
-        name: The name of the tool to retrieve.
-
-    Returns:
-        The registered BaseTool instance.
-
-    Raises:
-        KeyError: If no tool with the given name is registered.
-    """
+    """Get a tool from the registry by name."""
     with _registry_lock:
         if name not in _tool_registry:
             available = list(_tool_registry.keys())
@@ -64,11 +42,7 @@ def get_tool(name: str) -> "BaseTool":
 
 
 def get_all_tools() -> dict[str, "BaseTool"]:
-    """Get all registered tools.
-
-    Returns:
-        A copy of the tool registry dict.
-    """
+    """Get all registered tools."""
     with _registry_lock:
         return dict(_tool_registry)
 

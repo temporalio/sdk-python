@@ -1,9 +1,4 @@
-"""Temporal activities for LangGraph node execution.
-
-This module provides the activity that executes LangGraph nodes within
-Temporal workflows. The activity retrieves the graph from the registry,
-looks up the node, executes it, and captures the writes.
-"""
+"""Temporal activities for LangGraph node execution."""
 
 from __future__ import annotations
 
@@ -81,27 +76,7 @@ from langgraph.types import Send
 
 @activity.defn(name="execute_langgraph_node")
 async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
-    """Execute a LangGraph node as a Temporal activity.
-
-    This activity:
-    1. Retrieves the cached graph from the registry
-    2. Looks up the node by name
-    3. Executes the node with the provided state
-    4. Captures writes via CONFIG_KEY_SEND callback
-    5. Returns writes wrapped in ChannelWrite for type preservation
-
-    The activity uses heartbeats to report progress during execution.
-
-    Args:
-        input_data: The input data containing node name, graph ID, state, etc.
-
-    Returns:
-        NodeActivityOutput containing the writes produced by the node.
-
-    Raises:
-        ValueError: If the node is not found in the graph.
-        Exception: Any exception raised by the node during execution.
-    """
+    """Execute a LangGraph node as a Temporal activity."""
     logger.debug(
         "Executing node %s in graph %s",
         input_data.node_name,
@@ -356,22 +331,7 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
 async def execute_tool(
     input_data: ToolActivityInput,
 ) -> ToolActivityOutput:
-    """Execute a LangChain tool as a Temporal activity.
-
-    This activity executes tools that have been wrapped with temporal_tool().
-    It looks up the tool by name in the registry, executes it with the
-    provided input, and returns the result.
-
-    Args:
-        input_data: The input data containing tool name and input.
-
-    Returns:
-        ToolActivityOutput containing the tool's output.
-
-    Raises:
-        KeyError: If the tool is not found in the registry.
-        Exception: Any exception raised by the tool during execution.
-    """
+    """Execute a LangChain tool as a Temporal activity."""
     logger.debug("Executing tool %s", input_data.tool_name)
 
     from temporalio.contrib.langgraph._tool_registry import get_tool
@@ -392,22 +352,7 @@ async def execute_tool(
 async def execute_chat_model(
     input_data: ChatModelActivityInput,
 ) -> ChatModelActivityOutput:
-    """Execute a LangChain chat model call as a Temporal activity.
-
-    This activity executes LLM calls for models wrapped with temporal_model().
-    It looks up the model by name in the registry, deserializes the messages,
-    executes the model, and returns the serialized result.
-
-    Args:
-        input_data: The input data containing model name, messages, and options.
-
-    Returns:
-        ChatModelActivityOutput containing the serialized generations.
-
-    Raises:
-        KeyError: If the model is not found in the registry.
-        Exception: Any exception raised by the model during execution.
-    """
+    """Execute a LangChain chat model call as a Temporal activity."""
     model_name = input_data.model_name or "default"
     logger.debug("Executing chat model %s with %d messages", model_name, len(input_data.messages))
 

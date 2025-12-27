@@ -1,9 +1,4 @@
-"""Temporal-wrapped LangChain tools for durable execution.
-
-This module provides the temporal_tool() wrapper that converts LangChain tools
-to execute as Temporal activities, enabling durable tool execution within
-workflow-executed agentic nodes.
-"""
+"""Temporal-wrapped LangChain tools for durable execution."""
 
 from __future__ import annotations
 
@@ -21,11 +16,7 @@ if TYPE_CHECKING:
 
 
 class _TemporalToolWrapper:
-    """Internal wrapper that delegates tool execution to activities.
-
-    This class wraps a LangChain tool and intercepts its execution to route
-    it through a Temporal activity when running inside a workflow.
-    """
+    """Internal wrapper that delegates tool execution to activities."""
 
     def __init__(
         self,
@@ -41,20 +32,6 @@ class _TemporalToolWrapper:
         versioning_intent: Optional["VersioningIntent"] = None,
         priority: Optional["Priority"] = None,
     ) -> None:
-        """Initialize the temporal tool wrapper.
-
-        Args:
-            tool: The LangChain tool to wrap.
-            start_to_close_timeout: Timeout for the tool activity execution.
-            schedule_to_close_timeout: Total time from scheduling to completion.
-            schedule_to_start_timeout: Time from scheduling until start.
-            heartbeat_timeout: Heartbeat interval for long-running tools.
-            task_queue: Route to specific workers.
-            retry_policy: Temporal retry policy for failures.
-            cancellation_type: How cancellation is handled.
-            versioning_intent: Worker versioning intent.
-            priority: Task priority.
-        """
         self._tool = tool
         self._activity_options: dict[str, Any] = {
             "start_to_close_timeout": start_to_close_timeout,
@@ -81,7 +58,7 @@ class _TemporalToolWrapper:
             self._activity_options["priority"] = priority
 
     def _create_wrapper_class(self) -> Type["BaseTool"]:
-        """Create a dynamic BaseTool subclass that wraps the original tool."""
+        """Create a dynamic BaseTool subclass wrapping the original tool."""
         # Import here to avoid workflow sandbox issues
         with workflow.unsafe.imports_passed_through():
             from langchain_core.tools import BaseTool
@@ -198,86 +175,8 @@ def temporal_tool(
     .. warning::
         This API is experimental and may change in future versions.
 
-    Use this when running agentic nodes (like ``create_agent`` from LangChain
-    or ``create_react_agent`` from LangGraph). Tools wrapped with temporal_tool()
-    will execute durably as activities, providing retries and failure recovery.
-
-    The wrapped tool preserves all metadata from the original tool (name,
-    description, args_schema) so it works seamlessly with LangChain agents.
-
-    Args:
-        tool: A LangChain tool (BaseTool, StructuredTool, or @tool decorated
-            function). If a callable is passed, it will be converted to a
-            tool first.
-        start_to_close_timeout: Timeout for the tool activity execution.
-            Defaults to 5 minutes.
-        schedule_to_close_timeout: Total time allowed from scheduling to
-            completion, including retries.
-        schedule_to_start_timeout: Maximum time from scheduling until the
-            activity starts executing on a worker.
-        heartbeat_timeout: Maximum time between heartbeat requests. Use for
-            long-running tools that should report progress.
-        task_queue: Route this tool to a specific task queue (e.g., for
-            workers with specific capabilities). If None, uses the workflow's
-            task queue.
-        retry_policy: Temporal retry policy for the activity.
-        cancellation_type: How cancellation of this activity is handled.
-        versioning_intent: Whether to run on a compatible worker Build ID.
-        priority: Priority for task queue ordering.
-
-    Returns:
-        A wrapped BaseTool that executes as a Temporal activity when invoked
-        within a workflow.
-
-    Example:
-        Basic usage with @tool decorator:
-
-            >>> from langchain_core.tools import tool
-            >>> from temporalio.contrib.langgraph import temporal_tool
-            >>>
-            >>> @tool
-            >>> def search_web(query: str) -> str:
-            ...     '''Search the web for information.'''
-            ...     return requests.get(f"https://api.search.com?q={query}").text
-            >>>
-            >>> # Wrap for durable execution
-            >>> durable_search = temporal_tool(
-            ...     search_web,
-            ...     start_to_close_timeout=timedelta(minutes=2),
-            ...     retry_policy=RetryPolicy(maximum_attempts=3),
-            ... )
-
-        With existing tool instances:
-
-            >>> from langchain_community.tools import DuckDuckGoSearchRun
-            >>>
-            >>> search = temporal_tool(
-            ...     DuckDuckGoSearchRun(),
-            ...     start_to_close_timeout=timedelta(minutes=2),
-            ... )
-
-        Mixing durable and local tools with create_agent (LangChain 1.0+):
-
-            >>> from langchain.agents import create_agent
-            >>> tools = [
-            ...     temporal_tool(search_web, start_to_close_timeout=timedelta(minutes=2)),
-            ...     calculator,  # Runs locally in workflow (deterministic)
-            ... ]
-            >>> agent = create_agent(model="openai:gpt-4", tools=tools)
-
-        With create_react_agent (LangGraph prebuilt, legacy):
-
-            >>> from langgraph.prebuilt import create_react_agent
-            >>> tools = [
-            ...     temporal_tool(search_web, start_to_close_timeout=timedelta(minutes=2)),
-            ...     calculator,  # Runs locally in workflow (deterministic)
-            ... ]
-            >>> agent = create_react_agent(model, tools)
-
-    Note:
-        The tool must be registered with LangGraphPlugin for the activity
-        to find it. Tools are automatically registered when passed to
-        temporal_tool() and added to a graph registered with the plugin.
+    Wrapped tools execute durably as activities with retries and failure recovery.
+    The tool's metadata (name, description, args_schema) is preserved.
     """
     # Import here to avoid issues at module load time
     with workflow.unsafe.imports_passed_through():

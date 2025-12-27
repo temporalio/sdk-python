@@ -1,9 +1,4 @@
-"""Store implementation for LangGraph-Temporal integration.
-
-This module provides ActivityLocalStore, a store implementation that captures
-write operations for later replay in the Temporal workflow. It implements
-the LangGraph BaseStore interface.
-"""
+"""Store implementation for LangGraph-Temporal integration."""
 
 from __future__ import annotations
 
@@ -27,22 +22,12 @@ from temporalio.contrib.langgraph._models import StoreSnapshot, StoreWrite
 class ActivityLocalStore(BaseStore):
     """Store that captures writes and serves reads from a snapshot.
 
-    This store is used within Temporal activities to provide LangGraph nodes
-    with store access. It:
-    - Serves reads from a snapshot passed from the workflow
-    - Captures all write operations for replay in the workflow
-    - Supports read-your-writes within the same activity execution
-
-    The captured writes are returned to the workflow, which applies them
-    to its canonical store state.
+    Used within activities to provide store access to LangGraph nodes.
+    Supports read-your-writes within the same activity execution.
     """
 
     def __init__(self, snapshot: StoreSnapshot) -> None:
-        """Initialize the store with a snapshot.
-
-        Args:
-            snapshot: Store data snapshot from the workflow.
-        """
+        """Initialize the store with a snapshot from the workflow."""
         # Index snapshot items by (namespace, key) for fast lookup
         self._snapshot: dict[tuple[tuple[str, ...], str], dict[str, Any]] = {
             (tuple(item.namespace), item.key): item.value for item in snapshot.items
@@ -52,11 +37,7 @@ class ActivityLocalStore(BaseStore):
         self._local_cache: dict[tuple[tuple[str, ...], str], dict[str, Any] | None] = {}
 
     def get_writes(self) -> list[StoreWrite]:
-        """Get the list of write operations captured during execution.
-
-        Returns:
-            List of StoreWrite operations to apply to the workflow store.
-        """
+        """Get the list of write operations captured during execution."""
         return self._writes
 
     # =========================================================================
@@ -64,14 +45,7 @@ class ActivityLocalStore(BaseStore):
     # =========================================================================
 
     def batch(self, ops: Iterable[Op]) -> list[Result]:
-        """Execute a batch of operations.
-
-        Args:
-            ops: Iterable of store operations.
-
-        Returns:
-            List of results corresponding to each operation.
-        """
+        """Execute a batch of operations."""
         results: list[Result] = []
         for op in ops:
             if isinstance(op, GetOp):
@@ -91,14 +65,7 @@ class ActivityLocalStore(BaseStore):
         return results
 
     async def abatch(self, ops: Iterable[Op]) -> list[Result]:
-        """Async version of batch - delegates to sync implementation.
-
-        Args:
-            ops: Iterable of store operations.
-
-        Returns:
-            List of results corresponding to each operation.
-        """
+        """Async version of batch - delegates to sync implementation."""
         return self.batch(ops)
 
     # =========================================================================
@@ -106,15 +73,7 @@ class ActivityLocalStore(BaseStore):
     # =========================================================================
 
     def _get(self, namespace: tuple[str, ...], key: str) -> Item | None:
-        """Get a single item from the store.
-
-        Args:
-            namespace: The namespace tuple.
-            key: The key within the namespace.
-
-        Returns:
-            The Item if found, None otherwise.
-        """
+        """Get a single item from the store."""
         cache_key = (namespace, key)
 
         # Check local cache first (read-your-writes)
@@ -144,13 +103,7 @@ class ActivityLocalStore(BaseStore):
         return None
 
     def _put(self, namespace: tuple[str, ...], key: str, value: dict[str, Any]) -> None:
-        """Put a value into the store.
-
-        Args:
-            namespace: The namespace tuple.
-            key: The key within the namespace.
-            value: The value to store.
-        """
+        """Put a value into the store."""
         # Record write for workflow
         self._writes.append(
             StoreWrite(
@@ -164,12 +117,7 @@ class ActivityLocalStore(BaseStore):
         self._local_cache[(namespace, key)] = value
 
     def _delete(self, namespace: tuple[str, ...], key: str) -> None:
-        """Delete a value from the store.
-
-        Args:
-            namespace: The namespace tuple.
-            key: The key to delete.
-        """
+        """Delete a value from the store."""
         self._writes.append(
             StoreWrite(
                 operation="delete",
@@ -186,16 +134,7 @@ class ActivityLocalStore(BaseStore):
         filter: Optional[dict[str, Any]],
         limit: int,
     ) -> list[Item]:
-        """Search for items in a namespace.
-
-        Args:
-            namespace_prefix: Namespace prefix to search within.
-            filter: Optional filter conditions (not fully implemented).
-            limit: Maximum number of results.
-
-        Returns:
-            List of matching Items.
-        """
+        """Search for items in a namespace."""
         results: list[Item] = []
 
         # Combine snapshot and local cache
@@ -240,15 +179,7 @@ class ActivityLocalStore(BaseStore):
         match_conditions: Optional[Sequence[MatchCondition]],
         limit: int,
     ) -> list[tuple[str, ...]]:
-        """List namespaces in the store.
-
-        Args:
-            match_conditions: Optional conditions to filter namespaces.
-            limit: Maximum number of results.
-
-        Returns:
-            List of namespace tuples.
-        """
+        """List namespaces in the store."""
         namespaces: set[tuple[str, ...]] = set()
 
         # Collect namespaces from snapshot and local cache

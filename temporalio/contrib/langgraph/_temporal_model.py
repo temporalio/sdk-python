@@ -1,9 +1,4 @@
-"""Temporal-wrapped LangChain chat models for durable execution.
-
-This module provides the temporal_model() wrapper that converts LangChain
-chat models to execute LLM calls as Temporal activities, enabling durable
-model execution within workflow-executed agentic nodes.
-"""
+"""Temporal-wrapped LangChain chat models for durable execution."""
 
 from __future__ import annotations
 
@@ -29,11 +24,7 @@ if TYPE_CHECKING:
 
 
 class _TemporalChatModel:
-    """Internal wrapper that delegates chat model calls to activities.
-
-    This class creates a BaseChatModel subclass that routes LLM calls through
-    Temporal activities when running inside a workflow.
-    """
+    """Internal wrapper that delegates chat model calls to activities."""
 
     def __init__(
         self,
@@ -49,20 +40,6 @@ class _TemporalChatModel:
         versioning_intent: Optional["VersioningIntent"] = None,
         priority: Optional["Priority"] = None,
     ) -> None:
-        """Initialize the temporal model wrapper.
-
-        Args:
-            model: Model name string or BaseChatModel instance.
-            start_to_close_timeout: Timeout for each LLM call activity.
-            schedule_to_close_timeout: Total time from scheduling to completion.
-            schedule_to_start_timeout: Time from scheduling until start.
-            heartbeat_timeout: Heartbeat interval for long-running calls.
-            task_queue: Route to specific workers.
-            retry_policy: Temporal retry policy for failures.
-            cancellation_type: How cancellation is handled.
-            versioning_intent: Worker versioning intent.
-            priority: Task priority.
-        """
         self._model = model
         self._activity_options: dict[str, Any] = {
             "start_to_close_timeout": start_to_close_timeout,
@@ -89,7 +66,7 @@ class _TemporalChatModel:
             self._activity_options["priority"] = priority
 
     def _create_wrapper_class(self) -> type:
-        """Create a dynamic BaseChatModel subclass that wraps the original model."""
+        """Create a dynamic BaseChatModel subclass wrapping the original model."""
         # Import here to avoid workflow sandbox issues
         with workflow.unsafe.imports_passed_through():
             from langchain_core.language_models.chat_models import BaseChatModel
@@ -260,121 +237,8 @@ def temporal_model(
     .. warning::
         This API is experimental and may change in future versions.
 
-    Use this when running agentic nodes (like ``create_agent`` from LangChain
-    or ``create_react_agent`` from LangGraph). Each LLM invocation becomes a
-    separate activity, providing durability and retryability for each turn in
-    the agentic loop.
-
-    The wrapped model preserves the interface of BaseChatModel, so it works
-    seamlessly with LangChain agents and the LangGraph framework.
-
-    Args:
-        model: Model name string (e.g., "gpt-4o", "claude-3-opus") or a
-            BaseChatModel instance. If a string, the model will be instantiated
-            in the activity using the model registry.
-        start_to_close_timeout: Timeout for each LLM call activity.
-            Defaults to 2 minutes.
-        schedule_to_close_timeout: Total time allowed from scheduling to
-            completion, including retries.
-        schedule_to_start_timeout: Maximum time from scheduling until the
-            activity starts executing on a worker.
-        heartbeat_timeout: Maximum time between heartbeat requests. The
-            activity automatically heartbeats during LLM calls.
-        task_queue: Route LLM calls to a specific task queue (e.g., workers
-            with GPU or specific API keys). If None, uses the workflow's
-            task queue.
-        retry_policy: Temporal retry policy for transient failures (e.g.,
-            rate limits, temporary API errors).
-        cancellation_type: How cancellation of LLM calls is handled.
-        versioning_intent: Whether to run on a compatible worker Build ID.
-        priority: Priority for task queue ordering.
-
-    Returns:
-        A wrapped BaseChatModel that executes LLM calls as Temporal activities
-        when invoked within a workflow.
-
-    Example:
-        Basic usage with create_agent (LangChain 1.0+):
-
-            >>> from temporalio.contrib.langgraph import temporal_model
-            >>> from langchain.agents import create_agent
-            >>>
-            >>> model = temporal_model(
-            ...     "gpt-4o",
-            ...     start_to_close_timeout=timedelta(minutes=2),
-            ...     retry_policy=RetryPolicy(maximum_attempts=3),
-            ... )
-            >>>
-            >>> agent = create_agent(model=model, tools=tools)
-
-        With create_react_agent (LangGraph prebuilt, legacy):
-
-            >>> from temporalio.contrib.langgraph import temporal_model
-            >>> from langgraph.prebuilt import create_react_agent
-            >>>
-            >>> model = temporal_model(
-            ...     "gpt-4o",
-            ...     start_to_close_timeout=timedelta(minutes=2),
-            ...     retry_policy=RetryPolicy(maximum_attempts=3),
-            ... )
-            >>>
-            >>> agent = create_react_agent(model, tools)
-
-        With model instance:
-
-            >>> from langchain_openai import ChatOpenAI
-            >>>
-            >>> base_model = ChatOpenAI(model="gpt-4o", temperature=0)
-            >>> model = temporal_model(
-            ...     base_model,
-            ...     start_to_close_timeout=timedelta(minutes=5),
-            ... )
-
-        With heartbeat for long inference:
-
-            >>> model = temporal_model(
-            ...     "claude-3-opus",
-            ...     start_to_close_timeout=timedelta(minutes=10),
-            ...     heartbeat_timeout=timedelta(seconds=30),
-            ... )
-
-        Complete pattern with create_agent (recommended):
-
-            >>> from temporalio.contrib.langgraph import (
-            ...     temporal_model,
-            ...     temporal_tool,
-            ... )
-            >>> from langchain.agents import create_agent
-            >>>
-            >>> # Durable model
-            >>> model = temporal_model("gpt-4o")
-            >>>
-            >>> # Durable tools
-            >>> tools = [temporal_tool(search_web), calculator]
-            >>>
-            >>> # Create agent (LangChain 1.0+)
-            >>> agent = create_agent(model=model, tools=tools)
-
-        Complete pattern with create_react_agent (legacy):
-
-            >>> from temporalio.contrib.langgraph import (
-            ...     temporal_model,
-            ...     temporal_tool,
-            ... )
-            >>> from langgraph.prebuilt import create_react_agent
-            >>>
-            >>> # Durable model
-            >>> model = temporal_model("gpt-4o")
-            >>>
-            >>> # Durable tools
-            >>> tools = [temporal_tool(search_web), calculator]
-            >>>
-            >>> # Create react agent (LangGraph prebuilt)
-            >>> agent = create_react_agent(model, tools)
-
-    Note:
-        When using a model name string, you must register a model factory
-        with the model registry. See `register_model_factory()` for details.
+    Each LLM invocation becomes a separate activity with durability and retries.
+    The wrapped model preserves the BaseChatModel interface.
     """
     # Register model if it's an instance
     if not isinstance(model, str):

@@ -1,10 +1,4 @@
-"""LangGraph plugin for Temporal integration.
-
-This module provides the LangGraphPlugin class which handles:
-- Graph builder registration
-- Activity auto-registration
-- Data converter configuration
-"""
+"""LangGraph plugin for Temporal integration."""
 
 from __future__ import annotations
 
@@ -28,16 +22,7 @@ if TYPE_CHECKING:
 
 
 def _langgraph_data_converter(converter: DataConverter | None) -> DataConverter:
-    """Configure data converter for LangGraph serialization.
-
-    Uses PydanticPayloadConverter to handle LangChain message serialization.
-
-    Args:
-        converter: The existing data converter, if any.
-
-    Returns:
-        A DataConverter configured for LangGraph.
-    """
+    """Configure data converter with PydanticPayloadConverter for LangChain messages."""
     if converter is None:
         return DataConverter(payload_converter_class=PydanticPayloadConverter)
     elif converter.payload_converter_class is DefaultPayloadConverter:
@@ -54,42 +39,8 @@ class LangGraphPlugin(SimplePlugin):
         This class is experimental and may change in future versions.
         Use with caution in production environments.
 
-    This plugin provides seamless integration between LangGraph and Temporal:
-
-    1. **Graph Registration**: Register graph builders by ID for lookup during execution
-    2. **Activity Auto-Registration**: Node execution activities are automatically registered
-    3. **Data Converter**: Configures Pydantic converter for LangChain message serialization
-    4. **Graph Caching**: Compiled graphs are cached per worker process (thread-safe)
-
-    Example:
-        >>> from temporalio.client import Client
-        >>> from temporalio.worker import Worker
-        >>> from temporalio.contrib.langgraph import LangGraphPlugin
-        >>> from langgraph.graph import StateGraph
-        >>>
-        >>> # Define graph builders at module level
-        >>> def build_weather_agent():
-        ...     graph = StateGraph(AgentState)
-        ...     graph.add_node("fetch", fetch_weather)
-        ...     graph.add_node("process", process_data)
-        ...     # ... add edges ...
-        ...     return graph.compile()
-        >>>
-        >>> # Create plugin with registered graphs
-        >>> plugin = LangGraphPlugin(
-        ...     graphs={
-        ...         "weather_agent": build_weather_agent,
-        ...     },
-        ...     default_activity_timeout=timedelta(minutes=5),
-        ... )
-        >>>
-        >>> # Use with client - activities auto-registered
-        >>> client = await Client.connect("localhost:7233", plugins=[plugin])
-        >>> worker = Worker(
-        ...     client,
-        ...     task_queue="langgraph-workers",
-        ...     workflows=[WeatherAgentWorkflow],
-        ... )
+    Registers graph builders, auto-registers node execution activities,
+    and configures the Pydantic data converter for LangChain messages.
     """
 
     def __init__(
@@ -104,21 +55,10 @@ class LangGraphPlugin(SimplePlugin):
 
         Args:
             graphs: Mapping of graph_id to builder function.
-                Builder functions should return a compiled Pregel graph.
-                Example: {"my_agent": build_my_agent}
             default_activity_timeout: Default timeout for node activities.
-                Can be overridden per-node via metadata.
             default_max_retries: Default retry attempts for node activities.
-            default_activity_options: Default activity options for all nodes across
-                all graphs. Created via `node_activity_options()`. These are used
-                as base defaults that can be overridden by `compile()` or node metadata.
-            per_node_activity_options: Per-node activity options mapping node names
-                to options dicts. Created via `node_activity_options()`. These apply
-                to nodes across all graphs and can be overridden by `compile()` or
-                node metadata.
-
-        Raises:
-            ValueError: If duplicate graph IDs are provided.
+            default_activity_options: Default options for all nodes.
+            per_node_activity_options: Per-node options by node name.
         """
         self._graphs = graphs
         self.default_activity_timeout = default_activity_timeout
@@ -165,20 +105,9 @@ class LangGraphPlugin(SimplePlugin):
         )
 
     def get_graph_ids(self) -> list[str]:
-        """Get list of registered graph IDs.
-
-        Returns:
-            List of graph IDs registered with this plugin.
-        """
+        """Get list of registered graph IDs."""
         return list(self._graphs.keys())
 
     def is_graph_registered(self, graph_id: str) -> bool:
-        """Check if a graph is registered.
-
-        Args:
-            graph_id: The ID to check.
-
-        Returns:
-            True if the graph is registered, False otherwise.
-        """
+        """Check if a graph is registered."""
         return graph_id in self._graphs
