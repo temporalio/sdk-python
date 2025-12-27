@@ -17,7 +17,7 @@ This document captures discrepancies between the LangGraph integration (`tempora
 | 4 | ~~Docstrings~~ | ~~Low~~ | ~~Different style from SDK conventions~~ **FIXED** |
 | 5 | ~~Logging~~ | ~~Medium~~ | ~~No module-level logger defined~~ **FIXED** |
 | 6 | ~~Warnings suppression~~ | ~~Medium~~ | ~~Suppresses deprecation warnings~~ **FIXED** |
-| 7 | File organization | Low | Example file in production code |
+| 7 | ~~File organization~~ | ~~Low~~ | ~~Example file in production code~~ **FIXED** |
 | 8 | Test naming | Low | Uses `e2e_` prefix not standard in SDK |
 | 9 | ~~Type annotations~~ | ~~Low~~ | ~~Mixed `Optional[X]` and `X | None`~~ **FIXED** |
 | 10 | ~~Exceptions~~ | ~~Medium~~ | ~~Uses generic exceptions instead of domain-specific~~ **FIXED** |
@@ -182,21 +182,14 @@ logger = logging.getLogger(__name__)
 
 ---
 
-### 7. Example File in Production Code
+### 7. Example File in Production Code **FIXED**
 
 **Severity**: Low
 **Location**: `temporalio/contrib/langgraph/example.py`
 
-**Issue**: There's an `example.py` file (451 lines) in the production module directory.
+**Issue**: There was an `example.py` file in the production module directory.
 
-**SDK Convention**: Examples belong in:
-- `tests/` directory
-- Documentation
-- Separate `examples/` directory at repo root
-
-**Reference**: The `openai_agents` contrib doesn't have an example file in its module directory.
-
-**Recommendation**: Move `example.py` to `tests/contrib/langgraph/` or a top-level `examples/` directory.
+**Resolution**: Removed `example.py` from the module. Examples are maintained in the separate samples repository.
 
 ---
 
@@ -321,7 +314,7 @@ These should be documented as optional dependencies in `pyproject.toml`.
 
 ### Low Priority
 - [x] Convert Pydantic models to dataclasses (item #3) **FIXED** - Converted all models in `_models.py` to dataclasses
-- [ ] Move example file (item #7)
+- [x] Move example file (item #7) **FIXED** - Removed; examples in separate samples repo
 - [x] Standardize type annotation style (item #9) **FIXED** - Converted all `Optional[X]` to `X | None` syntax
 - [ ] Move design document (item #11)
 - [x] Align docstring style (item #4) **FIXED** - Module and attribute docstrings follow SDK conventions
