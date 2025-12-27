@@ -140,10 +140,17 @@ class _TemporalToolWrapper:
                     tool_input=tool_input,
                 )
 
+                # Build summary: tool_name(args) truncated to 100 chars
+                args_str = str(tool_input)
+                summary = f"{self.name}({args_str})"
+                if len(summary) > 100:
+                    summary = summary[:97] + "..."
+
                 # Execute as activity
                 result = await workflow.execute_activity(
                     execute_tool,
                     activity_input,
+                    summary=summary,
                     **self._activity_options,
                 )
 
