@@ -14,6 +14,8 @@ from temporalio.contrib.langgraph._graph_registry import (
 from temporalio.contrib.pydantic import PydanticPayloadConverter
 from temporalio.converter import DataConverter, DefaultPayloadConverter
 from temporalio.plugin import SimplePlugin
+from temporalio.worker import WorkflowRunner
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 logger = logging.getLogger(__name__)
 
@@ -100,10 +102,27 @@ class LangGraphPlugin(SimplePlugin):
                 execute_chat_model,
             ]
 
+        def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
+            """Configure sandbox passthrough for LangGraph dependencies."""
+            if not runner:
+                raise ValueError("No WorkflowRunner provided to LangGraphPlugin.")
+
+            # Add pydantic_core and langchain_core as passthrough modules
+            # to avoid sandbox warnings during workflow execution
+            if isinstance(runner, SandboxedWorkflowRunner):
+                return dataclasses.replace(
+                    runner,
+                    restrictions=runner.restrictions.with_passthrough_modules(
+                        "pydantic_core", "langchain_core", "annotated_types"
+                    ),
+                )
+            return runner
+
         super().__init__(
             name="LangGraphPlugin",
             data_converter=_langgraph_data_converter,
             activities=add_activities,
+            workflow_runner=workflow_runner,
         )
 
     def get_graph_ids(self) -> list[str]:
