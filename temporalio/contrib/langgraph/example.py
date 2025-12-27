@@ -48,6 +48,7 @@ from typing_extensions import TypedDict
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.common import RetryPolicy as TemporalRetryPolicy
+from temporalio.envconfig import ClientConfig
 from temporalio.worker import Worker
 
 from temporalio.contrib.langgraph import LangGraphPlugin, compile, node_activity_options
@@ -351,8 +352,12 @@ async def main():
         default_activity_timeout=timedelta(minutes=5),
     )
 
+    # Load configuration
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
+
     # Connect to Temporal with the plugin
-    client = await Client.connect("localhost:7233", plugins=[plugin])
+    client = await Client.connect(**config, plugins=[plugin])
 
     # Generate unique run ID for this execution
     run_id = uuid.uuid4().hex[:8]
