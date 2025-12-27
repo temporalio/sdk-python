@@ -21,7 +21,7 @@ class TestNodeExecutionActivity:
     def test_activity_captures_writes_via_config_key_send(self) -> None:
         """Activity should capture writes via CONFIG_KEY_SEND callback."""
         from temporalio.contrib.langgraph import LangGraphPlugin
-        from temporalio.contrib.langgraph._activities import execute_node
+        from temporalio.contrib.langgraph._activities import langgraph_node
         from temporalio.contrib.langgraph._models import NodeActivityInput
 
         class State(TypedDict, total=False):
@@ -54,7 +54,7 @@ class TestNodeExecutionActivity:
         # Execute activity (mock activity context)
         with patch("temporalio.activity.heartbeat"):
             result = asyncio.get_event_loop().run_until_complete(
-                execute_node(input_data)
+                langgraph_node(input_data)
             )
 
         # Verify writes were captured
@@ -68,7 +68,7 @@ class TestNodeExecutionActivity:
         from langchain_core.messages import AIMessage, HumanMessage
 
         from temporalio.contrib.langgraph import LangGraphPlugin
-        from temporalio.contrib.langgraph._activities import execute_node
+        from temporalio.contrib.langgraph._activities import langgraph_node
         from temporalio.contrib.langgraph._models import NodeActivityInput
 
         class State(TypedDict, total=False):
@@ -98,7 +98,7 @@ class TestNodeExecutionActivity:
 
         with patch("temporalio.activity.heartbeat"):
             result = asyncio.get_event_loop().run_until_complete(
-                execute_node(input_data)
+                langgraph_node(input_data)
             )
 
         # Verify message type was detected
@@ -110,7 +110,7 @@ class TestNodeExecutionActivity:
     def test_activity_raises_for_missing_node(self) -> None:
         """Activity should raise ApplicationError for missing node."""
         from temporalio.contrib.langgraph import LangGraphPlugin, NODE_NOT_FOUND_ERROR
-        from temporalio.contrib.langgraph._activities import execute_node
+        from temporalio.contrib.langgraph._activities import langgraph_node
         from temporalio.contrib.langgraph._models import NodeActivityInput
         from temporalio.exceptions import ApplicationError
 
@@ -138,7 +138,7 @@ class TestNodeExecutionActivity:
 
         with patch("temporalio.activity.heartbeat"):
             with pytest.raises(ApplicationError) as exc_info:
-                asyncio.get_event_loop().run_until_complete(execute_node(input_data))
+                asyncio.get_event_loop().run_until_complete(langgraph_node(input_data))
             assert exc_info.value.type == NODE_NOT_FOUND_ERROR
             assert "nonexistent_node" in str(exc_info.value)
 

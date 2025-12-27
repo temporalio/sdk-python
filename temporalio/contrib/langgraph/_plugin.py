@@ -88,12 +88,14 @@ class LangGraphPlugin(SimplePlugin):
             """Add LangGraph activities for node, tool, and model execution."""
             from temporalio.contrib.langgraph._activities import (
                 execute_chat_model,
-                execute_node,
                 execute_tool,
+                langgraph_node,
+                resume_langgraph_node,
             )
 
             return list(activities or []) + [
-                execute_node,
+                langgraph_node,
+                resume_langgraph_node,
                 execute_tool,
                 execute_chat_model,
             ]

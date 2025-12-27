@@ -9,7 +9,10 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, cast
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from temporalio.contrib.langgraph._activities import execute_node
+    from temporalio.contrib.langgraph._activities import (
+        langgraph_node,
+        resume_langgraph_node,
+    )
 
 from temporalio.contrib.langgraph._models import (
     InterruptValue,
@@ -438,9 +441,10 @@ class TemporalLangGraphRunner:
 
         # Execute activity
         result = await workflow.execute_activity(
-            execute_node,
+            langgraph_node,
             activity_input,
             activity_id=activity_id,
+            summary=task.name,
             **activity_options,
         )
 
@@ -497,9 +501,10 @@ class TemporalLangGraphRunner:
 
             # Execute activity
             result = await workflow.execute_activity(
-                execute_node,
+                langgraph_node,
                 activity_input,
                 activity_id=activity_id,
+                summary=packet.node,
                 **activity_options,
             )
 
@@ -564,9 +569,10 @@ class TemporalLangGraphRunner:
 
         # Execute activity
         result = await workflow.execute_activity(
-            execute_node,
+            resume_langgraph_node,
             activity_input,
             activity_id=activity_id,
+            summary=node_name,
             **activity_options,
         )
 

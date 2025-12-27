@@ -74,9 +74,8 @@ from langgraph.runtime import Runtime
 from langgraph.types import Send
 
 
-@activity.defn(name="execute_langgraph_node")
-async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
-    """Execute a LangGraph node as a Temporal activity."""
+async def _execute_node_impl(input_data: NodeActivityInput) -> NodeActivityOutput:
+    """Shared implementation for node execution activities."""
     logger.debug(
         "Executing node %s in graph %s",
         input_data.node_name,
@@ -325,6 +324,18 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
         store_writes=store_writes,
         send_packets=send_packets,
     )
+
+
+@activity.defn
+async def langgraph_node(input_data: NodeActivityInput) -> NodeActivityOutput:
+    """Execute a LangGraph node as a Temporal activity."""
+    return await _execute_node_impl(input_data)
+
+
+@activity.defn
+async def resume_langgraph_node(input_data: NodeActivityInput) -> NodeActivityOutput:
+    """Resume an interrupted LangGraph node as a Temporal activity."""
+    return await _execute_node_impl(input_data)
 
 
 @activity.defn(name="execute_langgraph_tool")
