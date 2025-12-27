@@ -15,7 +15,7 @@ This document is organized as follows:
 
 - **[Quick Start](#quick-start)** - Your first durable LangGraph agent
 - **[Per-Node Configuration](#per-node-configuration)** - Configuring timeouts, retries, and task queues
-- **[Agentic Execution](#agentic-execution)** - Using temporal_tool() and temporal_model()
+- **[Agentic Execution](#agentic-execution)** - Using create_durable_agent() and create_durable_react_agent()
 - **[Human-in-the-Loop](#human-in-the-loop-interrupts)** - Supporting interrupt() with Temporal signals
 - **[Compatibility](#compatibility)** - Feature support matrix
 
@@ -236,45 +236,38 @@ You can also use LangGraph's native `retry_policy` parameter on `add_node()`, wh
 
 ## Agentic Execution
 
-Run LLM-powered agents with durable tool execution and model calls. Both LangChain's new `create_agent` (recommended) and LangGraph's `create_react_agent` (legacy) are supported.
+Run LLM-powered agents with durable tool execution and model calls.
 
-### Using create_agent (LangChain 1.0+, Recommended)
+### Using Durable Agent Functions (Recommended)
+
+The simplest way to create durable agents is with `create_durable_agent` or `create_durable_react_agent`. These functions automatically wrap the model and tools for Temporal durability:
 
 ```python
 from datetime import timedelta
-from langchain.agents import create_agent
+from langchain_openai import ChatOpenAI
+from langchain_core.tools import tool
+from temporalio import workflow
 from temporalio.contrib.langgraph import (
-    temporal_model,
-    temporal_tool,
-    node_activity_options,
+    create_durable_agent,
     LangGraphPlugin,
     compile,
 )
-from temporalio import workflow
-from langchain_core.tools import tool
 
 
 @tool
 def search_web(query: str) -> str:
     """Search the web for information."""
-    # Your search implementation
     return f"Results for: {query}"
 
 
 def build_agent_graph():
-    # Wrap model for durable LLM calls
-    model = temporal_model(
-        "gpt-4o",
-        start_to_close_timeout=timedelta(minutes=2),
+    # Just pass your model and tools - wrapping is automatic!
+    return create_durable_agent(
+        ChatOpenAI(model="gpt-4o"),
+        [search_web],
+        model_start_to_close_timeout=timedelta(minutes=2),
+        tool_start_to_close_timeout=timedelta(minutes=1),
     )
-
-    # Wrap tools for durable execution
-    tools = [
-        temporal_tool(search_web, start_to_close_timeout=timedelta(minutes=1)),
-    ]
-
-    # Create agent using LangChain 1.0+ API
-    return create_agent(model=model, tools=tools)
 
 
 @workflow.defn
@@ -289,19 +282,48 @@ class AgentWorkflow:
 plugin = LangGraphPlugin(graphs={"my_agent": build_agent_graph})
 ```
 
-### Using create_react_agent (LangGraph Prebuilt, Legacy)
+For LangGraph's prebuilt agent, use `create_durable_react_agent`:
 
 ```python
-from langgraph.prebuilt import create_react_agent
-from temporalio.contrib.langgraph import temporal_model, temporal_tool
+from temporalio.contrib.langgraph import create_durable_react_agent
 
 
 def build_react_agent():
-    model = temporal_model("gpt-4o")
-    tools = [temporal_tool(search_web)]
+    return create_durable_react_agent(
+        ChatOpenAI(model="gpt-4o"),
+        [search_web],
+    )
+```
 
-    # Legacy API - still fully supported
-    return create_react_agent(model, tools)
+These functions:
+- Auto-wrap the model with `temporal_model()` for durable LLM calls
+- Auto-wrap tools with `temporal_tool()` for durable tool execution
+- Mark agent nodes to run inline in the workflow (model/tool calls as activities)
+
+This provides fine-grained durability where each LLM call and tool invocation is individually retryable and recoverable.
+
+### Manual Wrapping (Advanced)
+
+For more control, you can manually wrap models and tools:
+
+```python
+from langchain.agents import create_agent
+from temporalio.contrib.langgraph import temporal_model, temporal_tool
+
+
+def build_agent_graph():
+    # Manually wrap model for durable LLM calls
+    model = temporal_model(
+        ChatOpenAI(model="gpt-4o"),
+        start_to_close_timeout=timedelta(minutes=2),
+    )
+
+    # Manually wrap tools for durable execution
+    tools = [
+        temporal_tool(search_web, start_to_close_timeout=timedelta(minutes=1)),
+    ]
+
+    return create_agent(model=model, tools=tools)
 ```
 
 ### Hybrid Execution (Advanced)
@@ -582,8 +604,9 @@ async def node_with_subgraph(state: dict) -> dict:
 | Conditional edges | Full |
 | Send API | Full |
 | ToolNode | Full |
-| create_agent (LangChain 1.0+) | Full |
-| create_react_agent (legacy) | Full |
+| create_durable_agent | Full |
+| create_durable_react_agent | Full |
+| temporal_model / temporal_tool | Full |
 | interrupt() | Full |
 | Store API | Full |
 | Streaming | Limited (via queries) |
