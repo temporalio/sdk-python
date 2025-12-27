@@ -332,11 +332,44 @@ graph.add_node(
 )
 ```
 
+### Direct Tool Binding
+
+You can also use `bind_tools()` directly on a `temporal_model()` wrapper. This is useful when building custom graphs or using patterns that require explicit tool binding:
+
+```python
+from temporalio.contrib.langgraph import temporal_model
+from langchain_core.tools import tool
+
+
+@tool
+def get_weather(city: str) -> str:
+    """Get weather for a city."""
+    return f"Weather in {city}: Sunny, 72°F"
+
+
+def build_custom_graph():
+    # Create temporal model with tools bound
+    model = temporal_model(
+        "gpt-4o",
+        start_to_close_timeout=timedelta(minutes=2),
+    )
+    model_with_tools = model.bind_tools([get_weather], tool_choice="auto")
+
+    # Use in your custom graph
+    graph = StateGraph(MyState)
+    graph.add_node("agent", lambda state: {"response": model_with_tools.invoke(state["messages"])})
+    # ... add edges ...
+    return graph.compile()
+```
+
+The bound tools are serialized and passed to the activity, where they are bound to the actual model instance before execution.
+
 ### Key Benefits
 
 - **Durable LLM Calls**: Each model invocation is a separate activity with retries
 - **Durable Tool Execution**: Tool calls survive failures and can be retried
 - **Middleware Support**: `create_agent` supports hooks for human-in-the-loop, summarization, etc.
+- **Tool Binding**: Use `bind_tools()` on temporal models for custom graph patterns
 
 ## Human-in-the-Loop (Interrupts)
 
