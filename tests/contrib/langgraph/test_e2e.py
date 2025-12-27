@@ -553,9 +553,9 @@ class TestAgenticWorkflows:
             "expression" in s and "2 + 2" in s for s in tools_summaries
         ), f"Expected tool args in summary, got: {tools_summaries}"
 
-        # Verify the tool node uses langgraph_tool_node activity type
+        # Verify the tool node uses tool_node activity type
         for tool_summary in tools_summaries:
-            assert activity_types[tool_summary] == "langgraph_tool_node", (
-                f"Expected langgraph_tool_node activity type for tool, "
+            assert activity_types[tool_summary] == "tool_node", (
+                f"Expected tool_node activity type for tool, "
                 f"got: {activity_types[tool_summary]}"
             )

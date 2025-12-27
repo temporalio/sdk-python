@@ -220,6 +220,64 @@ class TestBuildActivitySummary:
         result = _build_activity_summary("tools", input_state)
         assert result == "calculator({'expression': '2 + 2'})"
 
+    def test_uses_node_metadata_description(self) -> None:
+        """Should use node metadata description when available."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        node_metadata = {"description": "Process user input and generate response"}
+        result = _build_activity_summary("agent", {"messages": []}, node_metadata)
+        assert result == "Process user input and generate response"
+
+    def test_truncates_long_description(self) -> None:
+        """Should truncate description longer than max_length."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        long_description = "A" * 200
+        node_metadata = {"description": long_description}
+        result = _build_activity_summary("node", {}, node_metadata, max_length=50)
+        assert len(result) == 50
+        assert result.endswith("...")
+
+    def test_tool_calls_take_precedence_over_description(self) -> None:
+        """For tools node with tool calls, tool info should take precedence over description."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        input_state = {
+            "__type": "tool_call_with_context",
+            "tool_call": {
+                "name": "get_weather",
+                "args": {"city": "NYC"},
+                "id": "call_123",
+            },
+        }
+        node_metadata = {"description": "Execute tool calls"}
+        result = _build_activity_summary("tools", input_state, node_metadata)
+        assert result == "get_weather({'city': 'NYC'})"
+
+    def test_description_used_when_no_tool_calls(self) -> None:
+        """For tools node without tool calls, should fall back to description."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        node_metadata = {"description": "Execute tool calls"}
+        result = _build_activity_summary("tools", {"messages": []}, node_metadata)
+        assert result == "Execute tool calls"
+
+    def test_ignores_non_string_description(self) -> None:
+        """Should ignore description if not a string."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        node_metadata = {"description": 123}  # Not a string
+        result = _build_activity_summary("agent", {}, node_metadata)
+        assert result == "agent"
+
+    def test_ignores_empty_description(self) -> None:
+        """Should ignore empty description."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        node_metadata = {"description": ""}
+        result = _build_activity_summary("agent", {}, node_metadata)
+        assert result == "agent"
+
 
 class TestCompileFunction:
     """Tests for the compile() public API."""

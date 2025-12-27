@@ -30,11 +30,16 @@ if TYPE_CHECKING:
     from langgraph.types import PregelExecutableTask
 
 
-def _build_activity_summary(node_name: str, input_state: Any, max_length: int = 100) -> str:
-    """Build a meaningful activity summary from node name and input state.
+def _build_activity_summary(
+    node_name: str,
+    input_state: Any,
+    node_metadata: dict[str, Any] | None = None,
+    max_length: int = 100,
+) -> str:
+    """Build a meaningful activity summary from node name, input state, and metadata.
 
     For tool nodes, extracts tool call information from messages or Send packets.
-    For other nodes, returns the node name.
+    For other nodes, uses metadata description if available, otherwise node name.
     """
     # For "tools" node (ToolNode from create_react_agent), extract tool calls
     if node_name == "tools" and isinstance(input_state, dict):
@@ -77,6 +82,14 @@ def _build_activity_summary(node_name: str, input_state: Any, max_length: int = 
             if len(summary) > max_length:
                 summary = summary[: max_length - 3] + "..."
             return summary
+
+    # Check for description in node metadata
+    if node_metadata and isinstance(node_metadata, dict):
+        description = node_metadata.get("description")
+        if description and isinstance(description, str):
+            if len(description) > max_length:
+                return description[: max_length - 3] + "..."
+            return description
 
     return node_name
 
@@ -501,8 +514,9 @@ class TemporalLangGraphRunner:
         )
         activity_id = f"inv{invocation_id}-{task.name}-{self._step_counter}"
 
-        # Build meaningful summary from node name and input
-        summary = _build_activity_summary(task.name, task.input)
+        # Build meaningful summary from node name, input, and metadata
+        node_metadata = self._get_full_node_metadata(task.name)
+        summary = _build_activity_summary(task.name, task.input, node_metadata)
 
         # Use langgraph_tool_node for "tools" node, langgraph_node for others
         activity_fn = langgraph_tool_node if task.name == "tools" else langgraph_node
@@ -567,8 +581,9 @@ class TemporalLangGraphRunner:
             )
             activity_id = f"inv{invocation_id}-send-{packet.node}-{self._step_counter}"
 
-            # Build meaningful summary from node name and input
-            summary = _build_activity_summary(packet.node, packet.arg)
+            # Build meaningful summary from node name, input, and metadata
+            node_metadata = self._get_full_node_metadata(packet.node)
+            summary = _build_activity_summary(packet.node, packet.arg, node_metadata)
 
             # Use langgraph_tool_node for "tools" node, langgraph_node for others
             activity_fn = (
@@ -643,8 +658,9 @@ class TemporalLangGraphRunner:
         )
         activity_id = f"inv{invocation_id}-resume-{node_name}-{self._step_counter}"
 
-        # Build meaningful summary from node name and input
-        summary = _build_activity_summary(node_name, input_state)
+        # Build meaningful summary from node name, input, and metadata
+        node_metadata = self._get_full_node_metadata(node_name)
+        summary = _build_activity_summary(node_name, input_state, node_metadata)
 
         # Execute activity
         result = await workflow.execute_activity(
@@ -693,13 +709,16 @@ class TemporalLangGraphRunner:
 
         return filtered
 
-    def _get_node_metadata(self, node_name: str) -> dict[str, Any]:
-        """Get Temporal-specific metadata for a node."""
+    def _get_full_node_metadata(self, node_name: str) -> dict[str, Any]:
+        """Get full metadata for a node (for activity summaries)."""
         node = self.pregel.nodes.get(node_name)
         if node is None:
             return {}
-        metadata = getattr(node, "metadata", None) or {}
-        return metadata.get("temporal", {})
+        return getattr(node, "metadata", None) or {}
+
+    def _get_node_metadata(self, node_name: str) -> dict[str, Any]:
+        """Get Temporal-specific metadata for a node."""
+        return self._get_full_node_metadata(node_name).get("temporal", {})
 
     def _get_node_activity_options(self, node_name: str) -> dict[str, Any]:
         """Get activity options for a node, merging defaults and metadata."""
