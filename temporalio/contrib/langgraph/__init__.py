@@ -34,6 +34,10 @@ from temporalio.contrib.langgraph._model_registry import (
 )
 from temporalio.contrib.langgraph._models import StateSnapshot
 from temporalio.contrib.langgraph._plugin import LangGraphPlugin
+from temporalio.contrib.langgraph._react_agent import (
+    create_durable_agent,
+    create_durable_react_agent,
+)
 from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
 from temporalio.contrib.langgraph._temporal_model import temporal_model
 from temporalio.contrib.langgraph._temporal_tool import temporal_tool
@@ -184,6 +188,8 @@ def compile(
 __all__ = [
     # Main API
     "compile",
+    "create_durable_agent",
+    "create_durable_react_agent",
     "LangGraphPlugin",
     "node_activity_options",
     "register_model",
