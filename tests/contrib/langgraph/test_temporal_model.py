@@ -66,10 +66,11 @@ class TestTemporalModel:
         assert model is not None
 
     def test_wrapped_model_raises_outside_workflow_with_string(self) -> None:
-        """When not in workflow with string model, should raise."""
+        """When not in workflow with string model not in registry, should raise."""
         from langchain_core.messages import HumanMessage
 
-        from temporalio.contrib.langgraph import temporal_model
+        from temporalio.contrib.langgraph import MODEL_NOT_FOUND_ERROR, temporal_model
+        from temporalio.exceptions import ApplicationError
 
         model = temporal_model(
             "gpt-4o-not-registered",
@@ -78,8 +79,9 @@ class TestTemporalModel:
 
         async def run_test():
             with patch("temporalio.workflow.in_workflow", return_value=False):
-                with pytest.raises(RuntimeError, match="Cannot invoke"):
+                with pytest.raises(ApplicationError) as exc_info:
                     await model._agenerate([HumanMessage(content="Hello")])
+                assert exc_info.value.type == MODEL_NOT_FOUND_ERROR
 
         asyncio.get_event_loop().run_until_complete(run_test())
 

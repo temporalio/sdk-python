@@ -80,26 +80,20 @@ class _TemporalChatModel:
         bound_tools = self._bound_tools
         tool_choice = self._tool_choice
 
-        # Get model name for activity
+        # Get model name - this is all we need to store (a simple string)
         if isinstance(original_model, str):
             model_name: str | None = original_model
-            model_instance: BaseChatModel | None = None
         else:
             model_name = getattr(original_model, "model_name", None) or getattr(
                 original_model, "model", None
             )
-            model_instance = original_model
 
         class TemporalChatModelWrapper(BaseChatModel):  # type: ignore[misc]
-            """Dynamic wrapper class for temporal chat model execution."""
+            """Dynamic wrapper class for temporal chat model execution.
 
-            # Store references as class attributes - use Any to avoid Pydantic validation
-            # issues with non-Pydantic types being passed
-            _temporal_model_name: Any = model_name
-            _temporal_model_instance: Any = model_instance
-            _temporal_activity_options: Any = activity_options
-            _temporal_bound_tools: Any = bound_tools
-            _temporal_tool_choice: Any = tool_choice
+            Uses closure variables for configuration to avoid Pydantic deepcopy
+            issues with non-serializable objects like HTTP clients.
+            """
 
             @property
             def _llm_type(self) -> str:
@@ -109,7 +103,20 @@ class _TemporalChatModel:
             @property
             def _identifying_params(self) -> dict[str, Any]:
                 """Return identifying parameters."""
-                return {"model_name": self._temporal_model_name}
+                return {"model_name": model_name}
+
+            # Expose closure variables as properties for testing
+            @property
+            def _temporal_bound_tools(self) -> list[dict[str, Any]] | None:
+                return bound_tools
+
+            @property
+            def _temporal_tool_choice(self) -> Any:
+                return tool_choice
+
+            @property
+            def _temporal_activity_options(self) -> dict[str, Any]:
+                return activity_options
 
             def _generate(
                 self,
@@ -137,17 +144,23 @@ class _TemporalChatModel:
                 """Async generation - routes to activity when in workflow."""
                 # Check if we're in a workflow
                 if not workflow.in_workflow():
-                    # Outside workflow, use model directly
-                    if self._temporal_model_instance is not None:
-                        return await self._temporal_model_instance._agenerate(
-                            messages, stop=stop, run_manager=run_manager, **kwargs
+                    # Outside workflow - look up model from registry and use directly
+                    with workflow.unsafe.imports_passed_through():
+                        from temporalio.contrib.langgraph._model_registry import (
+                            get_model,
                         )
-                    else:
-                        raise RuntimeError(
-                            "Cannot invoke temporal_model outside of a workflow "
-                            "when initialized with a model name string. "
-                            "Either use inside a workflow or pass a model instance."
+
+                    assert model_name is not None, "Model name required"
+                    actual_model = get_model(model_name)
+                    # Apply bound tools if any
+                    if bound_tools:
+                        model_with_tools = actual_model.bind_tools(
+                            bound_tools, tool_choice=tool_choice
                         )
+                        return await model_with_tools.ainvoke(messages, stop=stop, **kwargs)  # type: ignore[arg-type, return-value]
+                    return await actual_model._agenerate(
+                        messages, stop=stop, run_manager=run_manager, **kwargs
+                    )
 
                 # In workflow, execute as activity
                 with workflow.unsafe.imports_passed_through():
@@ -167,19 +180,19 @@ class _TemporalChatModel:
                 ]
 
                 activity_input = ChatModelActivityInput(
-                    model_name=self._temporal_model_name,
+                    model_name=model_name,
                     messages=serialized_messages,
                     stop=stop,
                     kwargs=kwargs,
-                    tools=self._temporal_bound_tools,
-                    tool_choice=self._temporal_tool_choice,
+                    tools=bound_tools,
+                    tool_choice=tool_choice,
                 )
 
                 # Execute as activity
                 result = await workflow.execute_activity(
                     execute_chat_model,
                     activity_input,
-                    **self._temporal_activity_options,
+                    **activity_options,
                 )
 
                 # Convert result back to ChatResult
