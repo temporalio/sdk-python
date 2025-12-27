@@ -20,7 +20,7 @@ This document captures discrepancies between the LangGraph integration (`tempora
 | 7 | File organization | Low | Example file in production code |
 | 8 | Test naming | Low | Uses `e2e_` prefix not standard in SDK |
 | 9 | Type annotations | Low | Mixed `Optional[X]` and `X | None` |
-| 10 | Exceptions | Medium | Uses generic exceptions instead of domain-specific |
+| 10 | ~~Exceptions~~ | ~~Medium~~ | ~~Uses generic exceptions instead of domain-specific~~ **FIXED** |
 | 11 | Design docs | Low | Design document in production directory |
 
 ---
@@ -257,42 +257,28 @@ config: dict[str, Any] | None = None
 
 ---
 
-### 10. Exception Handling Conventions
+### 10. Exception Handling Conventions **FIXED**
 
 **Severity**: Medium
-**Location**: `_graph_registry.py`, `_tool_registry.py`, `_model_registry.py`
+**Location**: `_exceptions.py`, `_graph_registry.py`, `_tool_registry.py`, `_model_registry.py`, `_activities.py`
 
-**Issue**: Registry modules raise generic `ValueError` and `KeyError`:
+**Issue**: Registry modules raised generic `ValueError` and `KeyError`.
 
-```python
-# LangGraph pattern:
-raise ValueError(
-    f"Graph '{graph_id}' is already registered. "
-    "Use a unique graph_id for each graph."
-)
+**Resolution**: Created `_exceptions.py` module with two categories of exceptions:
 
-raise KeyError(
-    f"Tool '{name}' not found in registry. "
-    f"Available tools: {available}."
-)
-```
+1. **Activity-Level Exceptions** (cross workflow/activity boundary): Use `ApplicationError` with specific `type` constants for proper Temporal error handling:
+   - `graph_not_found_error()` → `ApplicationError` with `type=GRAPH_NOT_FOUND_ERROR`
+   - `node_not_found_error()` → `ApplicationError` with `type=NODE_NOT_FOUND_ERROR`
+   - `tool_not_found_error()` → `ApplicationError` with `type=TOOL_NOT_FOUND_ERROR`
+   - `model_not_found_error()` → `ApplicationError` with `type=MODEL_NOT_FOUND_ERROR`
+   - All include relevant details via `ApplicationError.details` and are marked `non_retryable=True`
 
-**SDK Pattern**: Define domain-specific exceptions inheriting from `TemporalError`:
+2. **Configuration Exceptions** (do not cross boundaries): Use custom exception classes inheriting from `ValueError`:
+   - `GraphAlreadyRegisteredError`
+   - `ToolAlreadyRegisteredError`
+   - `ModelAlreadyRegisteredError`
 
-```python
-# SDK pattern (exceptions.py):
-class TemporalError(Exception):
-    """Base for all Temporal exceptions."""
-
-class WorkflowAlreadyStartedError(FailureError):
-    """Thrown when a workflow execution has already started."""
-```
-
-**Recommendation**: Consider defining:
-- `LangGraphError(TemporalError)` - base exception
-- `GraphNotFoundError(LangGraphError)` - for missing graphs
-- `GraphAlreadyRegisteredError(LangGraphError)` - for duplicate registrations
-- `ToolNotFoundError(LangGraphError)` - for missing tools
+Error type constants and exception classes are exported from `__init__.py` for user access.
 
 ---
 
@@ -345,7 +331,7 @@ These should be documented as optional dependencies in `pyproject.toml`.
 
 ### Medium Priority
 - [x] Review warning suppression approach (item #6) **FIXED** - Removed warning suppression by importing directly from `_internal`
-- [ ] Consider domain-specific exceptions (item #10)
+- [x] Consider domain-specific exceptions (item #10) **FIXED** - Created `_exceptions.py` with `ApplicationError` factory functions and configuration exceptions
 
 ### Low Priority
 - [ ] Move example file (item #7)

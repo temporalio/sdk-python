@@ -16,6 +16,7 @@ from temporalio import activity
 
 logger = logging.getLogger(__name__)
 
+from temporalio.contrib.langgraph._exceptions import node_not_found_error
 from temporalio.contrib.langgraph._graph_registry import get_graph
 from temporalio.contrib.langgraph._models import (
     ChannelWrite,
@@ -114,10 +115,7 @@ async def execute_node(input_data: NodeActivityInput) -> NodeActivityOutput:
     pregel_node = graph.nodes.get(input_data.node_name)
     if pregel_node is None:
         available = list(graph.nodes.keys())
-        raise ValueError(
-            f"Node '{input_data.node_name}' not found in graph "
-            f"'{input_data.graph_id}'. Available nodes: {available}"
-        )
+        raise node_not_found_error(input_data.node_name, input_data.graph_id, available)
 
     # Get the node's runnable
     node_runnable = pregel_node.node

@@ -10,6 +10,12 @@ import threading
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from temporalio.contrib.langgraph._exceptions import (
+    GraphAlreadyRegisteredError,
+    graph_not_found_error,
+    node_not_found_error,
+)
+
 if TYPE_CHECKING:
     from langgraph.pregel import Pregel
 
@@ -56,10 +62,7 @@ class GraphRegistry:
         """
         with self._lock:
             if graph_id in self._builders:
-                raise ValueError(
-                    f"Graph '{graph_id}' is already registered. "
-                    "Use a unique graph_id for each graph."
-                )
+                raise GraphAlreadyRegisteredError(graph_id)
             self._builders[graph_id] = builder
             # Eagerly build the graph to ensure compilation happens outside
             # the workflow sandbox where all Python types are available
@@ -96,10 +99,7 @@ class GraphRegistry:
 
             if graph_id not in self._builders:
                 available = list(self._builders.keys())
-                raise KeyError(
-                    f"Graph '{graph_id}' not found in registry. "
-                    f"Available graphs: {available}"
-                )
+                raise graph_not_found_error(graph_id, available)
 
             # Build and cache
             builder = self._builders[graph_id]
@@ -124,10 +124,7 @@ class GraphRegistry:
 
         if node_name not in graph.nodes:
             available = list(graph.nodes.keys())
-            raise KeyError(
-                f"Node '{node_name}' not found in graph '{graph_id}'. "
-                f"Available nodes: {available}"
-            )
+            raise node_not_found_error(node_name, graph_id, available)
 
         return graph.nodes[node_name]
 

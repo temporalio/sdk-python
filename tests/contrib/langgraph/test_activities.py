@@ -108,10 +108,11 @@ class TestNodeExecutionActivity:
         assert write.value_type == "message_list"
 
     def test_activity_raises_for_missing_node(self) -> None:
-        """Activity should raise ValueError for missing node."""
-        from temporalio.contrib.langgraph import LangGraphPlugin
+        """Activity should raise ApplicationError for missing node."""
+        from temporalio.contrib.langgraph import LangGraphPlugin, NODE_NOT_FOUND_ERROR
         from temporalio.contrib.langgraph._activities import execute_node
         from temporalio.contrib.langgraph._models import NodeActivityInput
+        from temporalio.exceptions import ApplicationError
 
         class State(TypedDict, total=False):
             value: int
@@ -136,8 +137,10 @@ class TestNodeExecutionActivity:
         )
 
         with patch("temporalio.activity.heartbeat"):
-            with pytest.raises(ValueError, match="not found"):
+            with pytest.raises(ApplicationError) as exc_info:
                 asyncio.get_event_loop().run_until_complete(execute_node(input_data))
+            assert exc_info.value.type == NODE_NOT_FOUND_ERROR
+            assert "nonexistent_node" in str(exc_info.value)
 
 
 class TestToolActivity:
@@ -168,17 +171,21 @@ class TestToolActivity:
         assert result.output == 8
 
     def test_tool_activity_raises_for_missing_tool(self) -> None:
-        """Tool activity should raise KeyError for unregistered tools."""
+        """Tool activity should raise ApplicationError for unregistered tools."""
+        from temporalio.contrib.langgraph import TOOL_NOT_FOUND_ERROR
         from temporalio.contrib.langgraph._activities import execute_tool
         from temporalio.contrib.langgraph._models import ToolActivityInput
+        from temporalio.exceptions import ApplicationError
 
         input_data = ToolActivityInput(
             tool_name="nonexistent_tool",
             tool_input={},
         )
 
-        with pytest.raises(KeyError, match="not found"):
+        with pytest.raises(ApplicationError) as exc_info:
             asyncio.get_event_loop().run_until_complete(execute_tool(input_data))
+        assert exc_info.value.type == TOOL_NOT_FOUND_ERROR
+        assert "nonexistent_tool" in str(exc_info.value)
 
 
 class TestChatModelActivity:
@@ -228,9 +235,11 @@ class TestChatModelActivity:
         assert result.llm_output == {"usage": {"tokens": 10}}
 
     def test_model_activity_raises_for_missing_model(self) -> None:
-        """Model activity should raise KeyError for unregistered models."""
+        """Model activity should raise ApplicationError for unregistered models."""
+        from temporalio.contrib.langgraph import MODEL_NOT_FOUND_ERROR
         from temporalio.contrib.langgraph._activities import execute_chat_model
         from temporalio.contrib.langgraph._models import ChatModelActivityInput
+        from temporalio.exceptions import ApplicationError
 
         input_data = ChatModelActivityInput(
             model_name="nonexistent-model",
@@ -239,5 +248,7 @@ class TestChatModelActivity:
             kwargs={},
         )
 
-        with pytest.raises(KeyError, match="not found"):
+        with pytest.raises(ApplicationError) as exc_info:
             asyncio.get_event_loop().run_until_complete(execute_chat_model(input_data))
+        assert exc_info.value.type == MODEL_NOT_FOUND_ERROR
+        assert "nonexistent-model" in str(exc_info.value)

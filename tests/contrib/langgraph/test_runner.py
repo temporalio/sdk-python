@@ -124,11 +124,13 @@ class TestCompileFunction:
         assert runner.graph_id == "compile_test"
 
     def test_compile_nonexistent_raises(self) -> None:
-        """compile() should raise KeyError for unregistered graph."""
-        from temporalio.contrib.langgraph import compile
+        """compile() should raise ApplicationError for unregistered graph."""
+        from temporalio.contrib.langgraph import GRAPH_NOT_FOUND_ERROR, compile
+        from temporalio.exceptions import ApplicationError
 
-        with pytest.raises(KeyError, match="not found"):
+        with pytest.raises(ApplicationError) as exc_info:
             compile("nonexistent_graph")
+        assert exc_info.value.type == GRAPH_NOT_FOUND_ERROR
 
     def test_compile_with_options(self) -> None:
         """compile() should pass options to runner."""

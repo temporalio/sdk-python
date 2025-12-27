@@ -58,6 +58,16 @@ from typing import Any, Optional
 import temporalio.common
 import temporalio.workflow
 
+from temporalio.contrib.langgraph._exceptions import (
+    GRAPH_DEFINITION_CHANGED_ERROR,
+    GRAPH_NOT_FOUND_ERROR,
+    MODEL_NOT_FOUND_ERROR,
+    NODE_NOT_FOUND_ERROR,
+    TOOL_NOT_FOUND_ERROR,
+    GraphAlreadyRegisteredError,
+    ModelAlreadyRegisteredError,
+    ToolAlreadyRegisteredError,
+)
 from temporalio.contrib.langgraph._graph_registry import (
     get_default_activity_options,
     get_graph,
@@ -439,6 +449,7 @@ def compile(
 
 
 __all__ = [
+    # Main API
     "compile",
     "LangGraphPlugin",
     "node_activity_options",
@@ -450,4 +461,14 @@ __all__ = [
     "temporal_node_metadata",
     "temporal_tool",
     "TemporalLangGraphRunner",
+    # Exception types (for catching configuration errors)
+    "GraphAlreadyRegisteredError",
+    "ModelAlreadyRegisteredError",
+    "ToolAlreadyRegisteredError",
+    # Error type constants (for catching ApplicationError.type)
+    "GRAPH_NOT_FOUND_ERROR",
+    "NODE_NOT_FOUND_ERROR",
+    "TOOL_NOT_FOUND_ERROR",
+    "MODEL_NOT_FOUND_ERROR",
+    "GRAPH_DEFINITION_CHANGED_ERROR",
 ]

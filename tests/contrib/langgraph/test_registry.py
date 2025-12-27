@@ -42,22 +42,26 @@ class TestGraphRegistry:
         assert graph1 is graph2
 
     def test_get_nonexistent_raises(self) -> None:
-        """Getting nonexistent graph should raise KeyError."""
+        """Getting nonexistent graph should raise ApplicationError."""
+        from temporalio.contrib.langgraph import GRAPH_NOT_FOUND_ERROR
         from temporalio.contrib.langgraph._graph_registry import GraphRegistry
+        from temporalio.exceptions import ApplicationError
 
         registry = GraphRegistry()
 
-        with pytest.raises(KeyError, match="not found"):
+        with pytest.raises(ApplicationError) as exc_info:
             registry.get_graph("nonexistent")
+        assert exc_info.value.type == GRAPH_NOT_FOUND_ERROR
 
     def test_register_duplicate_raises(self) -> None:
-        """Registering duplicate graph ID should raise ValueError."""
+        """Registering duplicate graph ID should raise GraphAlreadyRegisteredError."""
+        from temporalio.contrib.langgraph import GraphAlreadyRegisteredError
         from temporalio.contrib.langgraph._graph_registry import GraphRegistry
 
         registry = GraphRegistry()
         registry.register("dup", lambda: MagicMock())
 
-        with pytest.raises(ValueError, match="already registered"):
+        with pytest.raises(GraphAlreadyRegisteredError):
             registry.register("dup", lambda: MagicMock())
 
     def test_get_node(self) -> None:
@@ -129,11 +133,14 @@ class TestToolRegistry:
         assert retrieved is my_tool
 
     def test_get_nonexistent_tool_raises(self) -> None:
-        """Should raise KeyError for unregistered tools."""
+        """Should raise ApplicationError for unregistered tools."""
+        from temporalio.contrib.langgraph import TOOL_NOT_FOUND_ERROR
         from temporalio.contrib.langgraph._tool_registry import get_tool
+        from temporalio.exceptions import ApplicationError
 
-        with pytest.raises(KeyError, match="not found"):
+        with pytest.raises(ApplicationError) as exc_info:
             get_tool("nonexistent_tool")
+        assert exc_info.value.type == TOOL_NOT_FOUND_ERROR
 
     def test_register_duplicate_tool_same_instance(self) -> None:
         """Should allow re-registering the same tool instance."""
@@ -214,11 +221,14 @@ class TestModelRegistry:
         assert retrieved is mock_model
 
     def test_get_nonexistent_model_raises(self) -> None:
-        """Should raise KeyError for unregistered models."""
+        """Should raise ApplicationError for unregistered models."""
+        from temporalio.contrib.langgraph import MODEL_NOT_FOUND_ERROR
         from temporalio.contrib.langgraph._model_registry import get_model
+        from temporalio.exceptions import ApplicationError
 
-        with pytest.raises(KeyError, match="not found"):
+        with pytest.raises(ApplicationError) as exc_info:
             get_model("nonexistent-model")
+        assert exc_info.value.type == MODEL_NOT_FOUND_ERROR
 
     def test_register_model_factory(self) -> None:
         """Should support lazy model instantiation via factory."""

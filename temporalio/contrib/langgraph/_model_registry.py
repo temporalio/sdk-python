@@ -10,6 +10,8 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING, Callable, Optional
 
+from temporalio.contrib.langgraph._exceptions import model_not_found_error
+
 if TYPE_CHECKING:
     from langchain_core.language_models.chat_models import BaseChatModel
 
@@ -100,12 +102,7 @@ def get_model(name: str) -> "BaseChatModel":
             return auto_model
 
         available = list(set(_model_instances.keys()) | set(_model_factories.keys()))
-        raise KeyError(
-            f"Model '{name}' not found in registry. "
-            f"Available models: {available}. "
-            f"Register the model using register_model() or register_model_factory(), "
-            f"or pass a model instance to temporal_model() instead of a string."
-        )
+        raise model_not_found_error(name, available)
 
 
 def _try_auto_create_model(name: str) -> Optional["BaseChatModel"]:

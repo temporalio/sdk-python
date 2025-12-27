@@ -10,6 +10,11 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING
 
+from temporalio.contrib.langgraph._exceptions import (
+    ToolAlreadyRegisteredError,
+    tool_not_found_error,
+)
+
 if TYPE_CHECKING:
     from langchain_core.tools import BaseTool
 
@@ -35,10 +40,7 @@ def register_tool(tool: "BaseTool") -> None:
                 # Check if it's functionally the same tool
                 # (same name and description usually means same tool)
                 if existing.description != tool.description:
-                    raise ValueError(
-                        f"Tool '{tool.name}' is already registered with a different "
-                        f"implementation. Each tool name must be unique."
-                    )
+                    raise ToolAlreadyRegisteredError(tool.name)
         _tool_registry[tool.name] = tool
 
 
@@ -57,12 +59,7 @@ def get_tool(name: str) -> "BaseTool":
     with _registry_lock:
         if name not in _tool_registry:
             available = list(_tool_registry.keys())
-            raise KeyError(
-                f"Tool '{name}' not found in registry. "
-                f"Available tools: {available}. "
-                f"Make sure the tool is wrapped with temporal_tool() and "
-                f"the graph is registered with LangGraphPlugin."
-            )
+            raise tool_not_found_error(name, available)
         return _tool_registry[name]
 
 
