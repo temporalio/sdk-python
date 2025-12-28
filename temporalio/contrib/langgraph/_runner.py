@@ -30,6 +30,60 @@ if TYPE_CHECKING:
     from langgraph.types import PregelExecutableTask
 
 
+def _extract_model_name(node_metadata: dict[str, Any] | None) -> str | None:
+    """Extract model name from node metadata if available.
+
+    Looks for model name in metadata that may have been set by the LLM binding.
+    """
+    if not node_metadata:
+        return None
+
+    # Check for model_name in metadata (set by some LLM wrappers)
+    model_name = node_metadata.get("model_name")
+    if model_name:
+        return str(model_name)
+
+    # Check for ls_model_name (LangSmith model name convention)
+    ls_model_name = node_metadata.get("ls_model_name")
+    if ls_model_name:
+        return str(ls_model_name)
+
+    return None
+
+
+def _extract_last_human_message(input_state: Any, max_length: int = 80) -> str | None:
+    """Extract the last human message content from input state.
+
+    For agent workflows, this is typically the user's query.
+    """
+    if not isinstance(input_state, dict):
+        return None
+
+    messages = input_state.get("messages", [])
+    if not messages:
+        return None
+
+    # Find the last human message (searching from end)
+    for msg in reversed(messages):
+        msg_type = None
+        content = None
+
+        if hasattr(msg, "type"):
+            msg_type = msg.type
+            content = getattr(msg, "content", None)
+        elif isinstance(msg, dict):
+            msg_type = msg.get("type")
+            content = msg.get("content")
+
+        if msg_type == "human" and content:
+            content_str = str(content)
+            if len(content_str) > max_length:
+                return content_str[: max_length - 3] + "..."
+            return content_str
+
+    return None
+
+
 def _build_activity_summary(
     node_name: str,
     input_state: Any,
@@ -39,6 +93,7 @@ def _build_activity_summary(
     """Build a meaningful activity summary from node name, input state, and metadata.
 
     For tool nodes, extracts tool call information from messages or Send packets.
+    For model/agent nodes, shows model name and user query if available.
     For other nodes, uses metadata description if available, otherwise node name.
     """
     # For "tools" node (ToolNode from create_agent/create_react_agent), extract tool calls
@@ -79,6 +134,30 @@ def _build_activity_summary(
 
         if tool_calls:
             summary = ", ".join(tool_calls)
+            if len(summary) > max_length:
+                summary = summary[: max_length - 3] + "..."
+            return summary
+
+    # For model/agent nodes, build a summary with model name and query
+    # Common model node names in LangGraph: "agent", "model", "llm", "chatbot"
+    model_node_names = {"agent", "model", "llm", "chatbot", "chat_model"}
+    if node_name in model_node_names and isinstance(input_state, dict):
+        parts: list[str] = []
+
+        # Try to get model name from metadata
+        model_name = _extract_model_name(node_metadata)
+        if model_name:
+            parts.append(model_name)
+        else:
+            parts.append(node_name)
+
+        # Try to extract the user query from messages
+        query = _extract_last_human_message(input_state, max_length=60)
+        if query:
+            parts.append(f'"{query}"')
+
+        if len(parts) > 1:
+            summary = ": ".join(parts)
             if len(summary) > max_length:
                 summary = summary[: max_length - 3] + "..."
             return summary
@@ -710,11 +789,84 @@ class TemporalLangGraphRunner:
         return filtered
 
     def _get_full_node_metadata(self, node_name: str) -> dict[str, Any]:
-        """Get full metadata for a node (for activity summaries)."""
+        """Get full metadata for a node (for activity summaries).
+
+        Also attempts to extract model_name from the node's runnable if it's
+        a LangChain chat model (ChatOpenAI, ChatAnthropic, etc.).
+        """
         node = self.pregel.nodes.get(node_name)
         if node is None:
             return {}
-        return getattr(node, "metadata", None) or {}
+
+        metadata = dict(getattr(node, "metadata", None) or {})
+
+        # Try to extract model name from the node's runnable (for chat models)
+        # This handles create_react_agent where the model is bound to the node
+        if "model_name" not in metadata:
+            model_name = self._extract_model_name_from_runnable(node)
+            if model_name:
+                metadata["model_name"] = model_name
+
+        return metadata
+
+    def _extract_model_name_from_runnable(self, node: Any) -> str | None:
+        """Extract model name from a node's runnable if it's a chat model.
+
+        Supports ChatOpenAI, ChatAnthropic, and other LangChain chat models
+        that have model_name or model attributes. Also handles create_agent
+        where the model is captured in a closure.
+        """
+        runnable = getattr(node, "node", None)
+        if runnable is None:
+            return None
+
+        # Try common model name attributes used by LangChain chat models
+        # ChatOpenAI uses model_name, ChatAnthropic uses model
+        for attr in ("model_name", "model"):
+            value = getattr(runnable, attr, None)
+            if value and isinstance(value, str):
+                return value
+
+        # For RunnableSequence or wrapped models, try to find the model in the chain
+        # This handles cases like model.bind_tools(...)
+        bound = getattr(runnable, "bound", None)
+        if bound is not None:
+            for attr in ("model_name", "model"):
+                value = getattr(bound, attr, None)
+                if value and isinstance(value, str):
+                    return value
+
+        # Try first element if it's a sequence
+        first = getattr(runnable, "first", None)
+        if first is not None:
+            for attr in ("model_name", "model"):
+                value = getattr(first, attr, None)
+                if value and isinstance(value, str):
+                    return value
+
+        # For create_agent (LangChain 1.0+), the model is in the closure of the
+        # model_node function. The runnable is a RunnableSeq with steps, and
+        # the first step is a RunnableCallable wrapping model_node.
+        steps = getattr(runnable, "steps", None)
+        if steps and len(steps) > 0:
+            first_step = steps[0]
+            func = getattr(first_step, "func", None)
+            if func is not None:
+                closure = getattr(func, "__closure__", None)
+                if closure:
+                    for cell in closure:
+                        try:
+                            obj = cell.cell_contents
+                            # Check if this closure variable is a chat model
+                            for attr in ("model_name", "model"):
+                                value = getattr(obj, attr, None)
+                                if value and isinstance(value, str):
+                                    return value
+                        except ValueError:
+                            # Empty cell
+                            continue
+
+        return None
 
     def _get_node_metadata(self, node_name: str) -> dict[str, Any]:
         """Get Temporal-specific metadata for a node."""

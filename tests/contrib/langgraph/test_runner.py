@@ -98,14 +98,14 @@ class TestBuildActivitySummary:
     """Tests for the _build_activity_summary function."""
 
     def test_returns_node_name_for_non_tools_node(self) -> None:
-        """Non-tools nodes should return just the node name."""
+        """Non-tools/non-model nodes should return just the node name."""
         from temporalio.contrib.langgraph._runner import _build_activity_summary
-
-        result = _build_activity_summary("agent", {"messages": []})
-        assert result == "agent"
 
         result = _build_activity_summary("process", {"data": "value"})
         assert result == "process"
+
+        result = _build_activity_summary("custom_node", {"messages": []})
+        assert result == "custom_node"
 
     def test_returns_node_name_when_no_tool_calls(self) -> None:
         """Tools node without tool calls should return node name."""
@@ -275,8 +275,253 @@ class TestBuildActivitySummary:
         from temporalio.contrib.langgraph._runner import _build_activity_summary
 
         node_metadata = {"description": ""}
-        result = _build_activity_summary("agent", {}, node_metadata)
+        result = _build_activity_summary("process", {}, node_metadata)
+        assert result == "process"
+
+    # Model/agent node tests
+
+    def test_model_node_with_query(self) -> None:
+        """Model nodes should show user query from messages."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        input_state = {
+            "messages": [
+                {"type": "human", "content": "What is the weather in Tokyo?"},
+            ]
+        }
+        result = _build_activity_summary("agent", input_state)
+        assert result == 'agent: "What is the weather in Tokyo?"'
+
+    def test_model_node_with_langchain_message(self) -> None:
+        """Model nodes should work with LangChain HumanMessage objects."""
+        from langchain_core.messages import HumanMessage
+
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        input_state = {
+            "messages": [
+                HumanMessage(content="Tell me a joke"),
+            ]
+        }
+        result = _build_activity_summary("model", input_state)
+        assert result == 'model: "Tell me a joke"'
+
+    def test_model_node_with_model_name_metadata(self) -> None:
+        """Model nodes should include model name from metadata."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        input_state = {
+            "messages": [
+                {"type": "human", "content": "Hello"},
+            ]
+        }
+        node_metadata = {"model_name": "gpt-4o"}
+        result = _build_activity_summary("agent", input_state, node_metadata)
+        assert result == 'gpt-4o: "Hello"'
+
+    def test_model_node_with_ls_model_name_metadata(self) -> None:
+        """Model nodes should use ls_model_name from metadata."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        input_state = {
+            "messages": [
+                {"type": "human", "content": "Test query"},
+            ]
+        }
+        node_metadata = {"ls_model_name": "claude-3-opus"}
+        result = _build_activity_summary("llm", input_state, node_metadata)
+        assert result == 'claude-3-opus: "Test query"'
+
+    def test_model_node_extracts_last_human_message(self) -> None:
+        """Model nodes should use last human message when multiple messages present."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        input_state = {
+            "messages": [
+                {"type": "human", "content": "First question"},
+                {"type": "ai", "content": "First answer"},
+                {"type": "human", "content": "Second question"},
+            ]
+        }
+        result = _build_activity_summary("agent", input_state)
+        assert result == 'agent: "Second question"'
+
+    def test_model_node_truncates_long_query(self) -> None:
+        """Model nodes should truncate long queries."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        long_query = "What is " + "the meaning of life " * 10
+        input_state = {
+            "messages": [
+                {"type": "human", "content": long_query},
+            ]
+        }
+        result = _build_activity_summary("agent", input_state)
+        assert len(result) <= 100
+        assert "..." in result
+
+    def test_model_node_no_messages_returns_node_name(self) -> None:
+        """Model nodes with no messages should return just node name."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        result = _build_activity_summary("agent", {"messages": []})
         assert result == "agent"
+
+    def test_model_node_no_human_messages_returns_node_name(self) -> None:
+        """Model nodes with no human messages should return just node name."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        input_state = {
+            "messages": [
+                {"type": "ai", "content": "Hello!"},
+            ]
+        }
+        result = _build_activity_summary("agent", input_state)
+        assert result == "agent"
+
+    def test_all_model_node_names_supported(self) -> None:
+        """All common model node names should be supported."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        input_state = {
+            "messages": [
+                {"type": "human", "content": "Query"},
+            ]
+        }
+
+        for node_name in ["agent", "model", "llm", "chatbot", "chat_model"]:
+            result = _build_activity_summary(node_name, input_state)
+            assert result == f'{node_name}: "Query"', f"Failed for {node_name}"
+
+
+class TestExtractModelName:
+    """Tests for model name extraction from node runnables."""
+
+    def test_extract_model_name_from_closure(self) -> None:
+        """Should extract model name from create_agent closure."""
+        from unittest.mock import MagicMock
+
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        # Create a mock model with model_name
+        mock_model = MagicMock()
+        mock_model.model_name = "gpt-4o-mini"
+
+        # Create a function with the model in its closure
+        def model_node():
+            return mock_model  # Captures mock_model in closure
+
+        # Create mock RunnableCallable
+        mock_callable = MagicMock()
+        mock_callable.func = model_node
+
+        # Create mock RunnableSeq with steps
+        mock_runnable_seq = MagicMock()
+        mock_runnable_seq.steps = [mock_callable]
+        mock_runnable_seq.model_name = None
+        mock_runnable_seq.model = None
+        mock_runnable_seq.bound = None
+        mock_runnable_seq.first = None
+
+        # Create mock node
+        mock_node = MagicMock()
+        mock_node.node = mock_runnable_seq
+
+        # Create runner with mock pregel
+        mock_pregel = MagicMock()
+        mock_pregel.step_timeout = None
+        mock_pregel.nodes = {"model": mock_node}
+
+        runner = TemporalLangGraphRunner(mock_pregel, graph_id="test")
+        result = runner._extract_model_name_from_runnable(mock_node)
+
+        assert result == "gpt-4o-mini"
+
+    def test_extract_model_name_direct_attribute(self) -> None:
+        """Should extract model name from direct attribute on runnable."""
+        from unittest.mock import MagicMock
+
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        # Create mock runnable with model_name directly
+        mock_runnable = MagicMock()
+        mock_runnable.model_name = "claude-3-opus"
+        mock_runnable.model = None
+
+        mock_node = MagicMock()
+        mock_node.node = mock_runnable
+
+        mock_pregel = MagicMock()
+        mock_pregel.step_timeout = None
+        mock_pregel.nodes = {}
+
+        runner = TemporalLangGraphRunner(mock_pregel, graph_id="test")
+        result = runner._extract_model_name_from_runnable(mock_node)
+
+        assert result == "claude-3-opus"
+
+    def test_extract_model_name_from_bound(self) -> None:
+        """Should extract model name from bound model (e.g., model.bind_tools)."""
+        from unittest.mock import MagicMock
+
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        mock_bound = MagicMock()
+        mock_bound.model_name = "gpt-4-turbo"
+
+        mock_runnable = MagicMock()
+        mock_runnable.model_name = None
+        mock_runnable.model = None
+        mock_runnable.bound = mock_bound
+
+        mock_node = MagicMock()
+        mock_node.node = mock_runnable
+
+        mock_pregel = MagicMock()
+        mock_pregel.step_timeout = None
+        mock_pregel.nodes = {}
+
+        runner = TemporalLangGraphRunner(mock_pregel, graph_id="test")
+        result = runner._extract_model_name_from_runnable(mock_node)
+
+        assert result == "gpt-4-turbo"
+
+    def test_get_full_node_metadata_includes_model_name(self) -> None:
+        """_get_full_node_metadata should include extracted model_name."""
+        from unittest.mock import MagicMock
+
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        # Create mock model
+        mock_model = MagicMock()
+        mock_model.model_name = "test-model"
+
+        def model_node():
+            return mock_model
+
+        mock_callable = MagicMock()
+        mock_callable.func = model_node
+
+        mock_runnable_seq = MagicMock()
+        mock_runnable_seq.steps = [mock_callable]
+        mock_runnable_seq.model_name = None
+        mock_runnable_seq.model = None
+        mock_runnable_seq.bound = None
+        mock_runnable_seq.first = None
+
+        mock_node = MagicMock()
+        mock_node.node = mock_runnable_seq
+        mock_node.metadata = {"description": "Test node"}
+
+        mock_pregel = MagicMock()
+        mock_pregel.step_timeout = None
+        mock_pregel.nodes = {"model": mock_node}
+
+        runner = TemporalLangGraphRunner(mock_pregel, graph_id="test")
+        metadata = runner._get_full_node_metadata("model")
+
+        assert metadata["model_name"] == "test-model"
+        assert metadata["description"] == "Test node"
 
 
 class TestCompileFunction:
