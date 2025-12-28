@@ -325,6 +325,36 @@ plugin = LangGraphPlugin(
 - **Automatic Retries**: Failed LLM calls or tool executions are retried
 - **Crash Recovery**: Execution resumes from last completed node after failures
 
+### Subgraph Support
+
+When you add a compiled subgraph (like from `create_agent`) as a node in an outer graph, the Temporal integration automatically detects it and executes each **inner node** as a separate activity. This provides finer-grained durability than running the subgraph as a single activity.
+
+```python
+from langgraph.graph import StateGraph, START, END
+
+def build_outer_graph():
+    # Create an agent subgraph using create_agent
+    model = ChatOpenAI(model="gpt-4o")
+    agent_subgraph = create_agent(model, [search_web, get_weather])
+
+    # Add the subgraph as a node in an outer graph
+    workflow = StateGraph(AgentState)
+    workflow.add_node("my_agent", agent_subgraph)  # Subgraph as a node
+    workflow.add_node("post_process", post_process_fn)
+    workflow.add_edge(START, "my_agent")
+    workflow.add_edge("my_agent", "post_process")
+    workflow.add_edge("post_process", END)
+    return workflow.compile()
+```
+
+When `my_agent` executes:
+- The subgraph's inner nodes (`model`, `tools`) run as **separate Temporal activities**
+- Each inner node has its own retry/timeout configuration
+- If the worker crashes during the subgraph, execution resumes from the last completed inner node
+- Nested subgraphs are also recursively flattened
+
+This automatic subgraph detection means you get full durability without manually adding each node. Subgraphs are automatically registered with composite IDs (e.g., `outer_graph:my_agent`) for activity lookup.
+
 ## Human-in-the-Loop (Interrupts)
 
 Use LangGraph's `interrupt()` to pause for human input:

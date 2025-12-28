@@ -44,11 +44,56 @@ class GraphRegistry:
             self._builders[graph_id] = builder
             # Eagerly build the graph to ensure compilation happens outside
             # the workflow sandbox where all Python types are available
-            self._cache[graph_id] = builder()
+            graph = builder()
+            self._cache[graph_id] = graph
             if default_activity_options:
                 self._default_activity_options[graph_id] = default_activity_options
             if per_node_activity_options:
                 self._per_node_activity_options[graph_id] = per_node_activity_options
+
+            # Auto-register any subgraphs found in the graph's nodes
+            self._register_subgraphs(graph_id, graph, default_activity_options)
+
+    def _register_subgraphs(
+        self,
+        parent_graph_id: str,
+        graph: Pregel,
+        default_activity_options: dict[str, Any] | None = None,
+    ) -> None:
+        """Recursively register subgraphs found in a graph's nodes.
+
+        When a node contains a compiled subgraph (e.g., from create_agent),
+        this registers it with a composite ID like 'parent_graph_id:node_name'
+        so activities can look it up during execution.
+        """
+        for node_name, node in graph.nodes.items():
+            # Check if node has subgraphs (populated by LangGraph's find_subgraph_pregel)
+            subgraphs = getattr(node, "subgraphs", None)
+            if not subgraphs:
+                continue
+
+            for subgraph in subgraphs:
+                # Create composite ID for the subgraph
+                subgraph_id = f"{parent_graph_id}:{node_name}"
+
+                # Skip if already registered (prevent duplicates)
+                if subgraph_id in self._builders:
+                    continue
+
+                # Register the subgraph directly (not a builder since it's already built)
+                # Use a factory function to capture the subgraph reference
+                def make_builder(sg: Pregel) -> Callable[[], Pregel]:
+                    return lambda: sg
+
+                self._builders[subgraph_id] = make_builder(subgraph)
+                self._cache[subgraph_id] = subgraph
+
+                # Inherit default activity options from parent
+                if default_activity_options:
+                    self._default_activity_options[subgraph_id] = default_activity_options
+
+                # Recursively register nested subgraphs
+                self._register_subgraphs(subgraph_id, subgraph, default_activity_options)
 
     def get_graph(self, graph_id: str) -> Pregel:
         """Get a compiled graph by ID, building and caching if needed."""

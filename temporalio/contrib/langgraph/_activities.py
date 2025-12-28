@@ -245,16 +245,6 @@ async def _execute_node_impl(input_data: NodeActivityInput) -> NodeActivityOutpu
         "configurable": configurable,
     }
 
-    # Send heartbeat indicating execution start
-    activity.heartbeat(
-        {
-            "node": input_data.node_name,
-            "task_id": input_data.task_id,
-            "graph_id": input_data.graph_id,
-            "status": "executing",
-        }
-    )
-
     # Execute the node
     # The node_runnable includes the bound function and writers
     # Cast config to RunnableConfig for type checking

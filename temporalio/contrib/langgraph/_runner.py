@@ -528,6 +528,134 @@ class TemporalLangGraphRunner:
         temporal_config = metadata.get("temporal", {})
         return temporal_config.get("run_in_workflow", False)
 
+    def _get_subgraph(self, node_name: str) -> "Pregel | None":
+        """Get the subgraph for a node if it exists.
+
+        A node is a subgraph if it has a compiled LangGraph (Pregel) as its
+        bound runnable. This is detected via the node's subgraphs attribute
+        which is populated by LangGraph during graph construction.
+
+        Args:
+            node_name: Name of the node to check.
+
+        Returns:
+            The subgraph's Pregel instance if the node is a subgraph, None otherwise.
+        """
+        node = self.pregel.nodes.get(node_name)
+        if node is None:
+            return None
+
+        # Check if node has subgraphs (populated by LangGraph's find_subgraph_pregel)
+        subgraphs = getattr(node, "subgraphs", None)
+        if subgraphs and len(subgraphs) > 0:
+            # Return the first (and typically only) subgraph
+            return subgraphs[0]
+
+        return None
+
+    async def _execute_subgraph(
+        self,
+        task: "PregelExecutableTask",
+        subgraph: "Pregel",
+        resume_value: Any | None = None,
+    ) -> tuple[list[tuple[str, Any]], list[Any]]:
+        """Execute a subgraph node by running its inner nodes as separate activities.
+
+        Instead of running the entire subgraph as a single activity, this method
+        creates a nested TemporalRunner for the subgraph and executes it. This
+        ensures each inner node (e.g., 'model' and 'tools' in create_agent)
+        runs as a separate Temporal activity with its own retry/timeout settings.
+
+        Args:
+            task: The task representing the subgraph node.
+            subgraph: The subgraph's Pregel instance.
+            resume_value: Optional resume value for interrupt handling.
+
+        Returns:
+            Tuple of (writes, send_packets) from the subgraph execution.
+        """
+        workflow.logger.debug(
+            "Executing subgraph node %s with %d inner nodes",
+            task.name,
+            len(subgraph.nodes),
+        )
+
+        # Create a unique graph_id for the subgraph to avoid activity ID collisions
+        subgraph_id = f"{self.graph_id}:{task.name}"
+
+        # Create a nested runner for the subgraph
+        # Pass down activity options from the parent with subgraph-specific namespace
+        nested_runner = self.__class__(
+            pregel=subgraph,
+            graph_id=subgraph_id,
+            default_activity_options={"temporal": self.default_activity_options},
+            per_node_activity_options={
+                # Inherit per-node options if specified for subgraph nodes
+                # e.g., "retrieve_agent:model" would apply to the model node inside retrieve_agent
+                k.split(":", 1)[1]: v
+                for k, v in self.per_node_activity_options.items()
+                if k.startswith(f"{task.name}:")
+            },
+        )
+
+        # Execute the subgraph with the task's input
+        # The subgraph state schema may differ from the parent, so we pass input directly
+        config = cast("dict[str, Any]", task.config)
+        result = await nested_runner.ainvoke(task.input, config)
+
+        # Check for interrupt in the subgraph
+        if "__interrupt__" in result:
+            # Propagate interrupt to parent
+            # Store the interrupted state and node info for proper resume handling
+            self._interrupted_state = cast("dict[str, Any]", task.input)
+            self._interrupted_node_name = task.name
+            # Create interrupt value from the subgraph's interrupt
+            with workflow.unsafe.imports_passed_through():
+                from langgraph.types import Interrupt
+
+            interrupt_list = result.get("__interrupt__", [])
+            if interrupt_list:
+                interrupt_obj = interrupt_list[0]
+                interrupt_value = (
+                    interrupt_obj.value
+                    if isinstance(interrupt_obj, Interrupt)
+                    else interrupt_obj
+                )
+                self._pending_interrupt = InterruptValue(
+                    value=interrupt_value,
+                    node_name=task.name,
+                    task_id=task.id,
+                )
+            return [], []
+
+        # Extract writes from the subgraph result
+        # The result contains the final state - convert to channel writes
+        writes: list[tuple[str, Any]] = []
+        for key, value in result.items():
+            if not key.startswith("__"):  # Skip internal keys like __interrupt__
+                writes.append((key, value))
+
+        # Extract branch writes from the parent node's writers
+        # When a node is invoked normally, its "writers" emit branch signals for edge routing.
+        # Since we bypassed the node invocation, we need to emit these branch writes manually.
+        # Branch writes have channel names like "branch:to:next_node" and signal the next node to run.
+        parent_node = self.pregel.nodes.get(task.name)
+        if parent_node is not None:
+            node_writers = getattr(parent_node, "writers", None)
+            if node_writers:
+                for writer in node_writers:
+                    writer_writes = getattr(writer, "writes", None)
+                    if writer_writes:
+                        for write_entry in writer_writes:
+                            channel = getattr(write_entry, "channel", None)
+                            # Only include branch writes (edge routing signals)
+                            if channel and channel.startswith("branch:"):
+                                value = getattr(write_entry, "value", None)
+                                writes.append((channel, value))
+
+        # Subgraphs don't produce Send packets directly (they're handled internally)
+        return writes, []
+
     async def _execute_in_workflow(
         self,
         task: PregelExecutableTask,
@@ -566,6 +694,13 @@ class TemporalLangGraphRunner:
     ) -> tuple[list[tuple[str, Any]], list[Any]]:
         """Execute a task as a Temporal activity, returning writes and send packets."""
         self._step_counter += 1
+
+        # Check if this node is a subgraph - if so, execute it recursively
+        # This ensures inner nodes (e.g., 'model' and 'tools' in create_agent)
+        # run as separate activities instead of the subgraph running as one activity
+        subgraph = self._get_subgraph(task.name)
+        if subgraph is not None:
+            return await self._execute_subgraph(task, subgraph, resume_value)
 
         # Prepare store snapshot for the activity
         store_snapshot = self._prepare_store_snapshot()
