@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections import deque
 from typing import TYPE_CHECKING, Any, Sequence, cast
@@ -250,14 +249,8 @@ async def _execute_node_impl(input_data: NodeActivityInput) -> NodeActivityOutpu
     # Cast config to RunnableConfig for type checking
     runnable_config = cast("RunnableConfig", config)
     try:
-        if asyncio.iscoroutinefunction(
-            getattr(node_runnable, "ainvoke", None)
-        ) or asyncio.iscoroutinefunction(getattr(node_runnable, "invoke", None)):
-            result = await node_runnable.ainvoke(
-                input_data.input_state, runnable_config
-            )
-        else:
-            result = node_runnable.invoke(input_data.input_state, runnable_config)
+        # All LangChain Runnables implement ainvoke for async execution
+        result = await node_runnable.ainvoke(input_data.input_state, runnable_config)
     except LangGraphInterrupt as e:
         # Node called interrupt() - return interrupt data instead of writes
         logger.debug(
