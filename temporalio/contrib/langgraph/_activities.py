@@ -101,7 +101,55 @@ async def _execute_node_impl(input_data: NodeActivityInput) -> NodeActivityOutpu
     # The reader returns a merged view: input_state + captured writes
     # This is critical for conditional edges where the routing function
     # needs to see writes from the node that just executed
+    #
+    # Handle ToolCallWithContext from Send API - extract the nested state
+    # ToolCallWithContext has structure: {__type, tool_call, state}
+    # The actual state (with messages, etc.) is in the 'state' field
     base_state = input_data.input_state
+    if (
+        isinstance(base_state, dict)
+        and base_state.get("__type") == "tool_call_with_context"
+    ):
+        base_state = base_state.get("state", {})
+
+    def _convert_messages_if_needed(value: Any) -> Any:
+        """Convert serialized message dicts back to LangChain Message objects.
+
+        When data passes through Temporal serialization, LangChain message
+        objects become dicts. The routing functions in langchain.agents expect
+        proper Message objects (AIMessage, HumanMessage, etc.) not dicts.
+
+        This function detects serialized messages and converts them back.
+        """
+        if not isinstance(value, list):
+            return value
+
+        # Check if this looks like a list of serialized messages
+        # LangChain messages when serialized have 'type' key
+        if not value or not isinstance(value[0], dict) or "type" not in value[0]:
+            return value
+
+        try:
+            from langchain_core.messages import convert_to_messages
+
+            return convert_to_messages(value)
+        except Exception as e:
+            logger.debug("Failed to convert messages: %s", e)
+            return value
+
+    def _merge_channel_value(base_value: Any, write_value: Any) -> Any:
+        """Merge base state value with write value.
+
+        For list values (like messages channel with add_messages reducer),
+        concatenate base + writes to simulate the reducer behavior.
+        For other values, the write value replaces the base value.
+        """
+        if isinstance(base_value, list) and isinstance(write_value, list):
+            # Convert serialized message dicts back to Message objects
+            base_value = _convert_messages_if_needed(base_value)
+            write_value = _convert_messages_if_needed(write_value)
+            return base_value + write_value
+        return write_value
 
     def read_state(
         channel: str | Sequence[str], fresh: bool = False
@@ -110,7 +158,8 @@ async def _execute_node_impl(input_data: NodeActivityInput) -> NodeActivityOutpu
 
         This mimics the Pregel channel read behavior for activity execution.
         The merged view allows routing functions to see writes from the
-        node function that just executed.
+        node function that just executed. For list values (like messages),
+        writes are appended to base state to simulate add_messages reducer.
         """
         # Build a dict of the latest writes (later writes override earlier ones)
         write_values: dict[str, Any] = {}
@@ -118,18 +167,19 @@ async def _execute_node_impl(input_data: NodeActivityInput) -> NodeActivityOutpu
             write_values[ch] = val
 
         if isinstance(channel, str):
-            # Return write value if present, otherwise base state
+            base_value = base_state.get(channel)
             if channel in write_values:
-                return write_values[channel]
-            return base_state.get(channel)
+                return _merge_channel_value(base_value, write_values[channel])
+            return base_value
         else:
             # Return merged dict for multiple channels
             result: dict[str, Any] = {}
             for k in channel:
+                base_value = base_state.get(k)
                 if k in write_values:
-                    result[k] = write_values[k]
+                    result[k] = _merge_channel_value(base_value, write_values[k])
                 else:
-                    result[k] = base_state.get(k)
+                    result[k] = base_value
             return result
 
     # Build config with Pregel context callbacks injected

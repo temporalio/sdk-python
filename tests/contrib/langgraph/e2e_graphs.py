@@ -413,19 +413,14 @@ def build_command_graph():
 def build_react_agent_graph():
     """Build a react agent graph for E2E testing.
 
-    Note: We use langgraph.prebuilt.create_react_agent instead of langchain.agents.create_agent
-    because the latter has a bug where it doesn't handle messages without AIMessage properly,
-    causing UnboundLocalError in _fetch_last_ai_and_tool_messages. The deprecated
-    create_react_agent has proper guards for this case.
+    Uses langchain.agents.create_agent which is the modern API for creating
+    tool-calling agents.
     """
-    import warnings
-
     from langchain_core.language_models.chat_models import BaseChatModel
     from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
     from langchain_core.outputs import ChatGeneration, ChatResult
     from langchain_core.tools import tool
-    from langgraph.prebuilt import create_react_agent
-    from langgraph.warnings import LangGraphDeprecatedSinceV10
+    from langchain.agents import create_agent
 
     # Create a proper fake model that inherits from BaseChatModel
     class FakeToolCallingModel(BaseChatModel):
@@ -490,11 +485,8 @@ def build_react_agent_graph():
     # Create fake model
     model = FakeToolCallingModel()
 
-    # Create agent with plain tools - suppress deprecation warning as we're using the
-    # deprecated API intentionally (see docstring)
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=LangGraphDeprecatedSinceV10)
-        agent = create_react_agent(model, [calculator])
+    # Create agent with plain tools
+    agent = create_agent(model, [calculator])
 
     return agent
 
@@ -511,18 +503,14 @@ def build_native_react_agent_graph():
     temporal_model wrappers. The model and tools execute directly within
     the node activities.
 
-    Note: We use langgraph.prebuilt.create_react_agent instead of langchain.agents.create_agent
-    because the latter has a bug where it doesn't handle messages without AIMessage properly.
-    See build_react_agent_graph() docstring for details.
+    Uses langchain.agents.create_agent which is the modern API for creating
+    tool-calling agents.
     """
-    import warnings
-
     from langchain_core.language_models.chat_models import BaseChatModel
     from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
     from langchain_core.outputs import ChatGeneration, ChatResult
     from langchain_core.tools import tool
-    from langgraph.prebuilt import create_react_agent
-    from langgraph.warnings import LangGraphDeprecatedSinceV10
+    from langchain.agents import create_agent
 
     class FakeToolCallingModel(BaseChatModel):
         """Fake model that simulates a multi-step tool calling conversation.
@@ -607,11 +595,8 @@ def build_native_react_agent_graph():
     # Create model - NO temporal_model wrapper
     model = FakeToolCallingModel()
 
-    # Create agent - suppress deprecation warning as we're using the
-    # deprecated API intentionally (see docstring)
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=LangGraphDeprecatedSinceV10)
-        agent = create_react_agent(model, [get_weather, get_temperature])
+    # Create agent
+    agent = create_agent(model, [get_weather, get_temperature])
 
     return agent
 
