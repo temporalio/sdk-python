@@ -635,25 +635,76 @@ class TemporalLangGraphRunner:
             if not key.startswith("__"):  # Skip internal keys like __interrupt__
                 writes.append((key, value))
 
-        # Extract branch writes from the parent node's writers
-        # When a node is invoked normally, its "writers" emit branch signals for edge routing.
-        # Since we bypassed the node invocation, we need to emit these branch writes manually.
-        # Branch writes have channel names like "branch:to:next_node" and signal the next node to run.
+        # Invoke the parent node's writers to get proper edge routing
+        # Writers handle both static edges and conditional edges (routing functions).
+        # By invoking writers with the merged state, we get the correct branch writes.
         parent_node = self.pregel.nodes.get(task.name)
         if parent_node is not None:
             node_writers = getattr(parent_node, "writers", None)
             if node_writers:
-                for writer in node_writers:
-                    writer_writes = getattr(writer, "writes", None)
-                    if writer_writes:
-                        for write_entry in writer_writes:
-                            channel = getattr(write_entry, "channel", None)
-                            # Only include branch writes (edge routing signals)
-                            if channel and channel.startswith("branch:"):
-                                value = getattr(write_entry, "value", None)
-                                writes.append((channel, value))
+                # Use imports_passed_through for the entire writer invocation
+                # This allows conditional edge functions to access LangChain imports
+                with workflow.unsafe.imports_passed_through():
+                    from collections import deque
+
+                    from langgraph.constants import CONFIG_KEY_READ, CONFIG_KEY_SEND
+
+                    # Merge input state with subgraph output for writers
+                    merged_state = {**cast("dict[str, Any]", task.input), **result}
+
+                    # Setup write capture
+                    writer_writes: deque[tuple[str, Any]] = deque()
+
+                    # Create state reader function matching LangGraph's expected signature
+                    def read_state(channel: Any, fresh: bool = False) -> Any:
+                        if isinstance(channel, str):
+                            return merged_state.get(channel)
+                        return {c: merged_state.get(c) for c in channel}
+
+                    # Create config with callbacks for writers
+                    writer_config = {
+                        **cast("dict[str, Any]", task.config),
+                        "configurable": {
+                            **cast("dict[str, Any]", task.config).get(
+                                "configurable", {}
+                            ),
+                            CONFIG_KEY_SEND: writer_writes.extend,
+                            CONFIG_KEY_READ: read_state,
+                        },
+                    }
+
+                    # Invoke each writer to emit branch writes
+                    for writer in node_writers:
+                        try:
+                            if hasattr(writer, "invoke"):
+                                writer.invoke(merged_state, writer_config)
+                        except Exception as e:
+                            # Writers may fail if they expect specific state structure
+                            # or if conditional edge functions have issues (e.g., LLM calls)
+                            workflow.logger.warning(
+                                "Writer invocation failed for node %s: %s: %s",
+                                task.name,
+                                type(e).__name__,
+                                e,
+                            )
+
+                    # Add captured branch writes to our writes list
+                    for channel, value in writer_writes:
+                        if channel.startswith("branch:"):
+                            writes.append((channel, value))
+                            workflow.logger.debug(
+                                "Subgraph %s produced branch write: %s",
+                                task.name,
+                                channel,
+                            )
 
         # Subgraphs don't produce Send packets directly (they're handled internally)
+        workflow.logger.debug(
+            "Subgraph %s returning %d writes: %s",
+            task.name,
+            len(writes),
+            [w[0] for w in writes],
+        )
         return writes, []
 
     async def _execute_in_workflow(

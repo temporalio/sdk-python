@@ -628,3 +628,184 @@ def build_continue_as_new_graph():
     graph.add_edge(START, "increment")
     graph.add_edge("increment", END)
     return graph.compile()
+
+
+# ==============================================================================
+# Subgraph with create_agent followed by outer node
+# ==============================================================================
+
+
+class AgentSubgraphState(TypedDict, total=False):
+    """State for agent subgraph test."""
+
+    messages: Annotated[list[Any], operator.add]
+    processed: bool
+
+
+def _post_agent_node(state: AgentSubgraphState) -> AgentSubgraphState:
+    """Node that runs after the agent subgraph."""
+    return {"processed": True}
+
+
+def build_agent_subgraph():
+    """Build a graph with create_agent as subgraph followed by another node.
+
+    This tests that after the create_agent subgraph completes (including tool loops),
+    the outer graph continues to execute subsequent nodes.
+    """
+    from langchain.agents import create_agent
+    from langchain_core.language_models import BaseChatModel
+    from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+    from langchain_core.outputs import ChatGeneration, ChatResult
+    from langchain_core.tools import tool
+
+    # Create a fake model that calls a tool then responds
+    class LoopingFakeModel(BaseChatModel):
+        """Fake model that calls a tool on first call, then responds on second call."""
+
+        call_count: int = 0
+
+        @property
+        def _llm_type(self) -> str:
+            return "looping-fake"
+
+        def _generate(
+            self,
+            messages: list[BaseMessage],
+            stop: list[str] | None = None,
+            run_manager: Any = None,
+            **kwargs: Any,
+        ) -> ChatResult:
+            # Check if we have a tool result - if so, respond with final answer
+            has_tool_result = any(isinstance(m, ToolMessage) for m in messages)
+            if has_tool_result:
+                return ChatResult(
+                    generations=[
+                        ChatGeneration(
+                            message=AIMessage(content="Final agent response")
+                        )
+                    ]
+                )
+
+            # First call - request tool use
+            return ChatResult(
+                generations=[
+                    ChatGeneration(
+                        message=AIMessage(
+                            content="",
+                            tool_calls=[
+                                {
+                                    "id": "call_123",
+                                    "name": "simple_tool",
+                                    "args": {"query": "test"},
+                                }
+                            ],
+                        )
+                    )
+                ]
+            )
+
+        def bind_tools(self, tools: Any, **kwargs: Any) -> Any:
+            """Return self since we handle tools in _generate."""
+            return self
+
+    @tool
+    def simple_tool(query: str) -> str:
+        """A simple tool that returns a fixed response."""
+        return f"Result for: {query}"
+
+    model = LoopingFakeModel()
+    agent = create_agent(model, [simple_tool])
+
+    # Create outer graph with agent as subgraph, followed by conditional edge
+    def _grade_node(state: AgentSubgraphState) -> AgentSubgraphState:
+        """Node that grades the result."""
+        return {"processed": True}
+
+    def _route_after_grade(state: AgentSubgraphState) -> str:
+        """Route based on processed state."""
+        return "finish" if state.get("processed") else "retry"
+
+    def _finish_node(state: AgentSubgraphState) -> AgentSubgraphState:
+        """Final node."""
+        return {"processed": True}
+
+    outer = StateGraph(AgentSubgraphState)
+    outer.add_node("agent", agent)
+    outer.add_node("grade", _grade_node)
+    outer.add_node("finish", _finish_node)
+    outer.add_edge(START, "agent")
+    outer.add_edge("agent", "grade")
+    outer.add_conditional_edges(
+        "grade",
+        _route_after_grade,
+        {"finish": "finish", "retry": "agent"},
+    )
+    outer.add_edge("finish", END)
+
+    return outer.compile()
+
+
+# ==============================================================================
+# Subgraph followed by conditional edge
+# ==============================================================================
+
+
+class SubgraphConditionalState(TypedDict, total=False):
+    """State for subgraph with conditional edge test."""
+
+    value: int
+    child_result: int
+    route: str
+    final_result: int
+
+
+def _child_compute_node(state: SubgraphConditionalState) -> SubgraphConditionalState:
+    """Child node that computes a result."""
+    value = state.get("value", 0)
+    return {"child_result": value * 2}
+
+
+def _route_after_child(state: SubgraphConditionalState) -> str:
+    """Route based on child_result value."""
+    child_result = state.get("child_result", 0)
+    return "high" if child_result >= 20 else "low"
+
+
+def _high_node(state: SubgraphConditionalState) -> SubgraphConditionalState:
+    """Node for high values."""
+    return {"route": "high", "final_result": state.get("child_result", 0) + 100}
+
+
+def _low_node(state: SubgraphConditionalState) -> SubgraphConditionalState:
+    """Node for low values."""
+    return {"route": "low", "final_result": state.get("child_result", 0) + 10}
+
+
+def build_subgraph_with_conditional():
+    """Build a graph with subgraph followed by conditional edge.
+
+    This tests that after a subgraph completes, conditional routing works correctly.
+    """
+    # Create child subgraph
+    child = StateGraph(SubgraphConditionalState)
+    child.add_node("compute", _child_compute_node)
+    child.add_edge(START, "compute")
+    child.add_edge("compute", END)
+    child_compiled = child.compile()
+
+    # Create parent with conditional edge after subgraph
+    parent = StateGraph(SubgraphConditionalState)
+    parent.add_node("child_graph", child_compiled)
+    parent.add_node("high", _high_node)
+    parent.add_node("low", _low_node)
+    parent.add_edge(START, "child_graph")
+    parent.add_conditional_edges(
+        "child_graph",
+        _route_after_child,
+        {"high": "high", "low": "low"},
+    )
+    parent.add_edge("high", END)
+    parent.add_edge("low", END)
+
+    return parent.compile()

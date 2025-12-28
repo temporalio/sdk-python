@@ -23,6 +23,7 @@ from temporalio.client import Client
 from temporalio.contrib.langgraph import LangGraphPlugin
 
 from tests.contrib.langgraph.e2e_graphs import (
+    build_agent_subgraph,
     build_approval_graph,
     build_command_graph,
     build_counter_graph,
@@ -33,8 +34,10 @@ from tests.contrib.langgraph.e2e_graphs import (
     build_simple_graph,
     build_store_graph,
     build_subgraph,
+    build_subgraph_with_conditional,
 )
 from tests.contrib.langgraph.e2e_workflows import (
+    AgentSubgraphE2EWorkflow,
     ApprovalE2EWorkflow,
     CommandE2EWorkflow,
     MultiInterruptE2EWorkflow,
@@ -45,6 +48,7 @@ from tests.contrib.langgraph.e2e_workflows import (
     SendE2EWorkflow,
     SimpleE2EWorkflow,
     StoreE2EWorkflow,
+    SubgraphConditionalE2EWorkflow,
     SubgraphE2EWorkflow,
 )
 from tests.helpers import new_worker
@@ -401,6 +405,106 @@ class TestAdvancedFeatures:
             # child_process multiplies by 3 -> child_result=45
             # parent_end adds 100 -> final_result=145
             assert result.get("final_result") == 145
+
+    @pytest.mark.asyncio
+    async def test_subgraph_with_conditional_high(self, client: Client) -> None:
+        """Test that subgraph followed by conditional edge routes correctly (high path)."""
+        plugin = LangGraphPlugin(
+            graphs={"e2e_subgraph_conditional": build_subgraph_with_conditional},
+            default_activity_timeout=timedelta(seconds=30),
+        )
+
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
+
+        async with new_worker(plugin_client, SubgraphConditionalE2EWorkflow) as worker:
+            result = await plugin_client.execute_workflow(
+                SubgraphConditionalE2EWorkflow.run,
+                15,  # value=15, child_result=30 (>= 20), should route to "high"
+                id=f"e2e-subgraph-cond-high-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+
+            # value=15 -> child_result=30 -> route="high" -> final_result=130
+            assert result.get("route") == "high"
+            assert result.get("final_result") == 130
+
+    @pytest.mark.asyncio
+    async def test_subgraph_with_conditional_low(self, client: Client) -> None:
+        """Test that subgraph followed by conditional edge routes correctly (low path)."""
+        plugin = LangGraphPlugin(
+            graphs={"e2e_subgraph_conditional": build_subgraph_with_conditional},
+            default_activity_timeout=timedelta(seconds=30),
+        )
+
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
+
+        async with new_worker(plugin_client, SubgraphConditionalE2EWorkflow) as worker:
+            result = await plugin_client.execute_workflow(
+                SubgraphConditionalE2EWorkflow.run,
+                5,  # value=5, child_result=10 (< 20), should route to "low"
+                id=f"e2e-subgraph-cond-low-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+
+            # value=5 -> child_result=10 -> route="low" -> final_result=20
+            assert result.get("route") == "low"
+            assert result.get("final_result") == 20
+
+    @pytest.mark.asyncio
+    async def test_agent_subgraph_with_outer_node(self, client: Client) -> None:
+        """Test that create_agent subgraph followed by another node works."""
+        plugin = LangGraphPlugin(
+            graphs={"e2e_agent_subgraph": build_agent_subgraph},
+            default_activity_timeout=timedelta(seconds=30),
+        )
+
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
+
+        async with new_worker(plugin_client, AgentSubgraphE2EWorkflow) as worker:
+            workflow_id = f"e2e-agent-subgraph-{uuid.uuid4()}"
+            handle = await plugin_client.start_workflow(
+                AgentSubgraphE2EWorkflow.run,
+                "test query",
+                id=workflow_id,
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+            result = await handle.result()
+
+            # The agent should run and then post_agent should set processed=True
+            assert result.get("processed") is True
+
+            # Count activities in history to verify outer nodes ran as activities
+            activity_count = 0
+            activity_ids = []
+            async for event in handle.fetch_history_events():
+                if event.HasField("activity_task_scheduled_event_attributes"):
+                    activity_count += 1
+                    activity_ids.append(
+                        event.activity_task_scheduled_event_attributes.activity_id
+                    )
+
+            # Expected activities:
+            # - model (subgraph inner node, first call)
+            # - tool_node (subgraph inner node, tool call)
+            # - model (subgraph inner node, second call with tool result)
+            # - grade (outer node)
+            # - finish (outer node)
+            # Total: 5 activities minimum
+            assert activity_count >= 5, (
+                f"Expected at least 5 activities but got {activity_count}: {activity_ids}"
+            )
 
     @pytest.mark.asyncio
     async def test_command_goto_skip_node(self, client: Client) -> None:

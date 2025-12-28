@@ -405,3 +405,28 @@ class ContinueAsNewE2EWorkflow:
             )
 
         return result
+
+
+# ==============================================================================
+# Subgraph Test Workflows
+# ==============================================================================
+
+
+@workflow.defn
+class AgentSubgraphE2EWorkflow:
+    """Workflow that tests create_agent as subgraph followed by another node."""
+
+    @workflow.run
+    async def run(self, query: str) -> dict:
+        app = lg_compile("e2e_agent_subgraph")
+        return await app.ainvoke({"messages": [{"role": "human", "content": query}]})
+
+
+@workflow.defn
+class SubgraphConditionalE2EWorkflow:
+    """Workflow that tests subgraph followed by conditional edge."""
+
+    @workflow.run
+    async def run(self, value: int) -> dict:
+        app = lg_compile("e2e_subgraph_conditional")
+        return await app.ainvoke({"value": value})
