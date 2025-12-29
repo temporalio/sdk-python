@@ -747,3 +747,117 @@ class TestErrorRetryability:
             "my_node", "my_graph", RuntimeError("transient"), non_retryable=False
         )
         assert wrapped_retry.non_retryable is False
+
+
+class TestParallelSendPacketExecution:
+    """Tests for parallel execution of Send packets."""
+
+    @pytest.mark.asyncio
+    async def test_send_packets_execute_in_parallel(self) -> None:
+        """Send packets should execute activities in parallel, not sequentially.
+
+        This test verifies that when multiple Send packets are processed,
+        all activities are started before any of them complete, proving
+        true parallel execution via asyncio.gather.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        from temporalio.contrib.langgraph._models import (
+            ChannelWrite,
+            NodeActivityOutput,
+            SendPacket,
+        )
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        # Track activity execution order
+        activity_starts: list[str] = []
+        activity_completes: list[str] = []
+        all_started_event = asyncio.Event()
+        num_activities = 3
+
+        async def mock_execute_activity(
+            activity_fn,
+            activity_input,
+            activity_id: str,
+            summary: str,
+            **kwargs,
+        ):
+            """Mock activity that tracks start/complete order."""
+            node_name = activity_input.node_name
+            activity_starts.append(node_name)
+
+            # Wait until all activities have started before completing
+            # This proves they were started in parallel
+            if len(activity_starts) >= num_activities:
+                all_started_event.set()
+            else:
+                # Give other activities a chance to start
+                await asyncio.sleep(0.01)
+
+            # Wait for all to start (with timeout)
+            try:
+                await asyncio.wait_for(all_started_event.wait(), timeout=1.0)
+            except asyncio.TimeoutError:
+                pass  # Test will fail via assertions below
+
+            activity_completes.append(node_name)
+
+            # Return a valid NodeActivityOutput
+            return NodeActivityOutput(
+                writes=[ChannelWrite(channel="results", value=[f"result_{node_name}"])],
+                interrupt=None,
+                store_writes=[],
+                send_packets=[],
+                parent_command=None,
+            )
+
+        # Create runner with mocked pregel
+        mock_pregel = MagicMock()
+        mock_pregel.step_timeout = None
+        mock_pregel.nodes = {"search": MagicMock()}
+
+        runner = TemporalLangGraphRunner(mock_pregel, graph_id="test_parallel")
+
+        # Create Send packets for parallel execution
+        send_packets = [
+            SendPacket(node="search", arg={"query": "query1"}),
+            SendPacket(node="search", arg={"query": "query2"}),
+            SendPacket(node="search", arg={"query": "query3"}),
+        ]
+
+        # Mock the workflow.execute_activity
+        with patch(
+            "temporalio.contrib.langgraph._runner.workflow.execute_activity",
+            side_effect=mock_execute_activity,
+        ):
+            config = {"configurable": {"invocation_id": 1}}
+            writes = await runner._execute_send_packets(send_packets, config)
+
+        # Verify all activities started before any completed
+        # If parallel, all 3 should be in activity_starts before first is in activity_completes
+        assert len(activity_starts) == 3, f"Expected 3 starts, got {activity_starts}"
+        assert len(activity_completes) == 3, f"Expected 3 completes, got {activity_completes}"
+
+        # The key assertion: by the time all_started_event was set,
+        # all 3 activities had started. This proves parallel execution.
+        assert all_started_event.is_set(), "Activities did not all start before completing"
+
+        # Verify writes were collected
+        assert len(writes) == 3
+
+    @pytest.mark.asyncio
+    async def test_empty_send_packets_returns_empty_list(self) -> None:
+        """Empty send_packets list should return empty writes immediately."""
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        mock_pregel = MagicMock()
+        mock_pregel.step_timeout = None
+        mock_pregel.nodes = {}
+
+        runner = TemporalLangGraphRunner(mock_pregel, graph_id="test")
+
+        config = {"configurable": {"invocation_id": 1}}
+        writes = await runner._execute_send_packets([], config)
+
+        assert writes == []

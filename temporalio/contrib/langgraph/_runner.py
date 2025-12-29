@@ -856,14 +856,28 @@ class TemporalLangGraphRunner:
         send_packets: list[Any],
         config: Any,
     ) -> list[tuple[str, Any]]:
-        """Execute Send packets as separate activities."""
+        """Execute Send packets as separate activities in parallel."""
         all_writes: list[tuple[str, Any]] = []
+
+        if not send_packets:
+            return all_writes
+
+        # Phase 1: Prepare all activity inputs
+        # We do this first so step counters are assigned consistently
+        prepared_activities: list[
+            tuple[Any, NodeActivityInput, dict[str, Any], str, str, Callable[..., Any]]
+        ] = []
+
+        config_dict = cast("dict[str, Any]", config)
+        invocation_id = config_dict.get("configurable", {}).get(
+            "invocation_id", self._invocation_counter
+        )
+
+        # Prepare store snapshot once - all parallel activities see same snapshot
+        store_snapshot = self._prepare_store_snapshot()
 
         for packet in send_packets:
             self._step_counter += 1
-
-            # Prepare store snapshot
-            store_snapshot = self._prepare_store_snapshot()
 
             # Build activity input with Send.arg as the input state
             activity_input = NodeActivityInput(
@@ -882,10 +896,6 @@ class TemporalLangGraphRunner:
             activity_options = self._get_node_activity_options(packet.node)
 
             # Generate unique activity ID
-            config_dict = cast("dict[str, Any]", config)
-            invocation_id = config_dict.get("configurable", {}).get(
-                "invocation_id", self._invocation_counter
-            )
             activity_id = f"inv{invocation_id}-send-{packet.node}-{self._step_counter}"
 
             # Build meaningful summary from node name, input, and metadata
@@ -897,8 +907,19 @@ class TemporalLangGraphRunner:
                 langgraph_tool_node if packet.node == "tools" else langgraph_node
             )
 
-            # Execute activity
-            result = await workflow.execute_activity(
+            prepared_activities.append(
+                (packet, activity_input, activity_options, activity_id, summary, activity_fn)
+            )
+
+        # Phase 2: Execute all activities in parallel
+        async def execute_single_activity(
+            activity_fn: Callable[..., Any],
+            activity_input: NodeActivityInput,
+            activity_id: str,
+            summary: str,
+            activity_options: dict[str, Any],
+        ) -> Any:
+            return await workflow.execute_activity(
                 activity_fn,
                 activity_input,
                 activity_id=activity_id,
@@ -906,6 +927,27 @@ class TemporalLangGraphRunner:
                 **activity_options,
             )
 
+        tasks = [
+            execute_single_activity(
+                activity_fn, activity_input, activity_id, summary, activity_options
+            )
+            for (
+                _packet,
+                activity_input,
+                activity_options,
+                activity_id,
+                summary,
+                activity_fn,
+            ) in prepared_activities
+        ]
+
+        results = await asyncio.gather(*tasks)
+
+        # Phase 3: Process results sequentially
+        # This handles store writes, interrupts, parent commands, and nested sends
+        for (packet, _input, _opts, _id, _summary, _fn), result in zip(
+            prepared_activities, results
+        ):
             # Apply store writes
             if result.store_writes:
                 self._apply_store_writes(result.store_writes)
