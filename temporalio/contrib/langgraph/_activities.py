@@ -75,6 +75,106 @@ from langgraph.runtime import Runtime
 from langgraph.types import Send
 
 
+# =============================================================================
+# Helper Functions (extracted from _execute_node_impl for testability)
+# =============================================================================
+
+
+def _convert_messages_if_needed(value: Any) -> Any:
+    """Convert serialized message dicts back to LangChain Message objects.
+
+    When data passes through Temporal serialization, LangChain message
+    objects become dicts. The routing functions in langchain.agents expect
+    proper Message objects (AIMessage, HumanMessage, etc.) not dicts.
+
+    This function detects serialized messages and converts them back.
+    """
+    if not isinstance(value, list):
+        return value
+
+    # Check if this looks like a list of serialized messages
+    # LangChain messages when serialized have 'type' key
+    if not value or not isinstance(value[0], dict) or "type" not in value[0]:
+        return value
+
+    try:
+        from langchain_core.messages import convert_to_messages
+
+        return convert_to_messages(value)
+    except Exception as e:
+        logger.debug("Failed to convert messages: %s", e)
+        return value
+
+
+def _merge_channel_value(base_value: Any, write_value: Any) -> Any:
+    """Merge base state value with write value.
+
+    For list values (like messages channel with add_messages reducer),
+    concatenate base + writes to simulate the reducer behavior.
+    For other values, the write value replaces the base value.
+    """
+    if isinstance(base_value, list) and isinstance(write_value, list):
+        # Convert serialized message dicts back to Message objects
+        base_value = _convert_messages_if_needed(base_value)
+        write_value = _convert_messages_if_needed(write_value)
+        return base_value + write_value
+    return write_value
+
+
+def _get_null_resume(consume: bool) -> Any:
+    """Return None when interrupt() doesn't have a resume value.
+
+    Called when interrupt() doesn't have a resume value available.
+    Returns None to signal no resume value available.
+    """
+    return None
+
+
+class StateReader:
+    """Reads state from input_state dict merged with captured writes.
+
+    This mimics the Pregel channel read behavior for activity execution.
+    The merged view allows routing functions to see writes from the
+    node function that just executed. For list values (like messages),
+    writes are appended to base state to simulate add_messages reducer.
+    """
+
+    def __init__(self, base_state: dict[str, Any], writes: deque[tuple[str, Any]]):
+        """Initialize the state reader.
+
+        Args:
+            base_state: The base state dict (from input_state).
+            writes: The deque of captured writes from node execution.
+        """
+        self._base_state = base_state
+        self._writes = writes
+
+    def __call__(
+        self, channel: str | Sequence[str], fresh: bool = False
+    ) -> Any | dict[str, Any]:
+        """Read state from input_state dict merged with captured writes."""
+        # Build a dict of the latest writes (later writes override earlier ones)
+        write_values: dict[str, Any] = {}
+        for ch, val in self._writes:
+            write_values[ch] = val
+
+        if isinstance(channel, str):
+            base_value = self._base_state.get(channel)
+            if channel in write_values:
+                return _merge_channel_value(base_value, write_values[channel])
+            return base_value
+        else:
+            # Return merged dict for multiple channels
+            result: dict[str, Any] = {}
+            for k in channel:
+                base_value = self._base_state.get(k)
+                if k in write_values:
+                    result[k] = _merge_channel_value(base_value, write_values[k])
+                else:
+                    result[k] = base_value
+            return result
+
+
 async def _execute_node_impl(input_data: NodeActivityInput) -> NodeActivityOutput:
     """Shared implementation for node execution activities."""
     logger.debug(
@@ -101,7 +201,7 @@ async def _execute_node_impl(input_data: NodeActivityInput) -> NodeActivityOutpu
     # Writers in LangGraph call CONFIG_KEY_SEND callback with list of (channel, value) tuples
     writes: deque[tuple[str, Any]] = deque()
 
-    # Create state reader function for CONFIG_KEY_READ
+    # Create state reader for CONFIG_KEY_READ
     # This allows conditional edges and ChannelRead to access current state
     # The reader returns a merged view: input_state + captured writes
     # This is critical for conditional edges where the routing function
@@ -117,75 +217,8 @@ async def _execute_node_impl(input_data: NodeActivityInput) -> NodeActivityOutpu
     ):
         base_state = base_state.get("state", {})
 
-    def _convert_messages_if_needed(value: Any) -> Any:
-        """Convert serialized message dicts back to LangChain Message objects.
-
-        When data passes through Temporal serialization, LangChain message
-        objects become dicts. The routing functions in langchain.agents expect
-        proper Message objects (AIMessage, HumanMessage, etc.) not dicts.
-
-        This function detects serialized messages and converts them back.
-        """
-        if not isinstance(value, list):
-            return value
-
-        # Check if this looks like a list of serialized messages
-        # LangChain messages when serialized have 'type' key
-        if not value or not isinstance(value[0], dict) or "type" not in value[0]:
-            return value
-
-        try:
-            from langchain_core.messages import convert_to_messages
-
-            return convert_to_messages(value)
-        except Exception as e:
-            logger.debug("Failed to convert messages: %s", e)
-            return value
-
-    def _merge_channel_value(base_value: Any, write_value: Any) -> Any:
-        """Merge base state value with write value.
-
-        For list values (like messages channel with add_messages reducer),
-        concatenate base + writes to simulate the reducer behavior.
-        For other values, the write value replaces the base value.
-        """
-        if isinstance(base_value, list) and isinstance(write_value, list):
-            # Convert serialized message dicts back to Message objects
-            base_value = _convert_messages_if_needed(base_value)
-            write_value = _convert_messages_if_needed(write_value)
-            return base_value + write_value
-        return write_value
-
-    def read_state(
-        channel: str | Sequence[str], fresh: bool = False
-    ) -> Any | dict[str, Any]:
-        """Read state from input_state dict merged with captured writes.
-
-        This mimics the Pregel channel read behavior for activity execution.
-        The merged view allows routing functions to see writes from the
-        node function that just executed. For list values (like messages),
-        writes are appended to base state to simulate add_messages reducer.
-        """
-        # Build a dict of the latest writes (later writes override earlier ones)
-        write_values: dict[str, Any] = {}
-        for ch, val in writes:
-            write_values[ch] = val
-
-        if isinstance(channel, str):
-            base_value = base_state.get(channel)
-            if channel in write_values:
-                return _merge_channel_value(base_value, write_values[channel])
-            return base_value
-        else:
-            # Return merged dict for multiple channels
-            result: dict[str, Any] = {}
-            for k in channel:
-                base_value = base_state.get(k)
-                if k in write_values:
-                    result[k] = _merge_channel_value(base_value, write_values[k])
-                else:
-                    result[k] = base_value
-            return result
+    # Use StateReader class instead of nested function
+    read_state = StateReader(base_state, writes)
 
     # Build config with Pregel context callbacks injected
     # CONFIG_KEY_SEND is REQUIRED for capturing writes
@@ -203,26 +236,20 @@ async def _execute_node_impl(input_data: NodeActivityInput) -> NodeActivityOutpu
     if input_data.resume_value is not None:
         resume_values = [input_data.resume_value]
 
-    # Track interrupt index for matching resume values to interrupts
-    interrupt_idx = 0
+    # Track interrupt index using a mutable container (list) to avoid nonlocal
+    interrupt_idx = [0]
 
-    def interrupt_counter() -> int:
-        nonlocal interrupt_idx
-        idx = interrupt_idx
-        interrupt_idx += 1
+    def _interrupt_counter() -> int:
+        idx = interrupt_idx[0]
+        interrupt_idx[0] += 1
         return idx
-
-    def get_null_resume(consume: bool) -> Any:
-        # Called when interrupt() doesn't have a resume value
-        # Return None to signal no resume value available
-        return None
 
     scratchpad = PregelScratchpad(
         step=0,
         stop=1,
         call_counter=lambda: 0,
-        interrupt_counter=interrupt_counter,
-        get_null_resume=get_null_resume,
+        interrupt_counter=_interrupt_counter,
+        get_null_resume=_get_null_resume,
         resume=resume_values,
         subgraph_counter=lambda: 0,
     )
