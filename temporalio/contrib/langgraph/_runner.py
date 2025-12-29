@@ -16,6 +16,15 @@ with workflow.unsafe.imports_passed_through():
         resume_langgraph_node,
     )
 
+from temporalio.contrib.langgraph._constants import (
+    BRANCH_PREFIX,
+    CHECKPOINT_KEY,
+    INTERRUPT_KEY,
+    MODEL_NAME_ATTRS,
+    MODEL_NODE_NAMES,
+    START_NODE,
+    TOOLS_NODE,
+)
 from temporalio.contrib.langgraph._models import (
     InterruptValue,
     NodeActivityInput,
@@ -157,7 +166,7 @@ def _build_activity_summary(
     For other nodes, uses metadata description if available, otherwise node name.
     """
     # For "tools" node (ToolNode from create_agent/create_react_agent), extract tool calls
-    if node_name == "tools" and isinstance(input_state, dict):
+    if node_name == TOOLS_NODE and isinstance(input_state, dict):
         tool_calls: list[str] = []
 
         # Case 1: Send packet with tool_call_with_context (from create_agent/create_react_agent)
@@ -199,9 +208,7 @@ def _build_activity_summary(
             return summary
 
     # For model/agent nodes, build a summary with model name and query
-    # Common model node names in LangGraph: "agent", "model", "llm", "chatbot"
-    model_node_names = {"agent", "model", "llm", "chatbot", "chat_model"}
-    if node_name in model_node_names and isinstance(input_state, dict):
+    if node_name in MODEL_NODE_NAMES and isinstance(input_state, dict):
         parts: list[str] = []
 
         # Try to get model name from metadata
@@ -251,7 +258,7 @@ class TemporalLangGraphRunner:
 
     Wraps a compiled Pregel graph and executes nodes as Temporal activities.
     Uses AsyncPregelLoop for graph orchestration. Supports interrupts via
-    LangGraph's native API (``__interrupt__`` key and ``Command(resume=...)``).
+    LangGraph's native API (``INTERRUPT_KEY`` key and ``Command(resume=...)``).
     """
 
     def __init__(
@@ -313,7 +320,7 @@ class TemporalLangGraphRunner:
             should_continue: Callable returning False to stop for checkpointing.
 
         Returns:
-            Final state. May contain ``__interrupt__`` or ``__checkpoint__`` keys.
+            Final state. May contain ``INTERRUPT_KEY`` or ``CHECKPOINT_KEY`` keys.
         """
         workflow.logger.debug("Starting graph execution for %s", self.graph_id)
 
@@ -335,7 +342,7 @@ class TemporalLangGraphRunner:
         )
 
         # If we got an early return (checkpoint), return it directly
-        if "__checkpoint__" in output:
+        if CHECKPOINT_KEY in output:
             return output
 
         # Finalize output with interrupt markers
@@ -368,7 +375,7 @@ class TemporalLangGraphRunner:
             if self._interrupt.interrupted_state is None:
                 raise ValueError(
                     "Cannot resume with Command - no previous interrupt state. "
-                    "Call ainvoke() first and check for '__interrupt__' in the result."
+                    "Call ainvoke() first and check for INTERRUPT_KEY in the result."
                 )
             input_state = self._interrupt.interrupted_state
         else:
@@ -431,7 +438,7 @@ class TemporalLangGraphRunner:
                 value=self._interrupt.pending_interrupt.value,
                 ns="",
             )
-            return {**input_state, "__interrupt__": [interrupt_obj]}
+            return {**input_state, INTERRUPT_KEY: [interrupt_obj]}
 
         # Merge writes into input_state for final output
         for channel, value in resume_writes:
@@ -441,7 +448,7 @@ class TemporalLangGraphRunner:
         self._execution.resumed_node_writes[interrupted_node] = resume_writes
 
         # Update completed nodes tracking
-        self._execution.completed_nodes_in_cycle.discard("__start__")
+        self._execution.completed_nodes_in_cycle.discard(START_NODE)
         self._execution.completed_nodes_in_cycle.add(interrupted_node)
         self._interrupt.interrupted_node_name = None
 
@@ -573,7 +580,7 @@ class TemporalLangGraphRunner:
         """
         if should_continue is not None and not should_continue():
             output = cast("dict[str, Any]", loop.output) if loop.output else {}
-            output["__checkpoint__"] = self.get_state()
+            output[CHECKPOINT_KEY] = self.get_state()
             self._execution.last_output = output
             return output
         return None
@@ -616,13 +623,13 @@ class TemporalLangGraphRunner:
                 value=self._interrupt.pending_interrupt.value,
                 ns="",
             )
-            output = {**output, "__interrupt__": [interrupt_obj]}
+            output = {**output, INTERRUPT_KEY: [interrupt_obj]}
 
         self._execution.last_output = output
 
-        if "__interrupt__" in output:
+        if INTERRUPT_KEY in output:
             workflow.logger.debug("Graph %s execution paused at interrupt", self.graph_id)
-        elif "__checkpoint__" in output:
+        elif CHECKPOINT_KEY in output:
             workflow.logger.debug("Graph %s execution stopped for checkpoint", self.graph_id)
         else:
             workflow.logger.debug("Graph %s execution completed", self.graph_id)
@@ -684,10 +691,10 @@ class TemporalLangGraphRunner:
 
     def _should_run_in_workflow(self, node_name: str) -> bool:
         """Check if a node should run directly in the workflow."""
-        # __start__ is a built-in LangGraph node that only forwards input to
+        # START_NODE is a built-in LangGraph node that only forwards input to
         # state channels. It performs no I/O or non-deterministic operations,
         # so it can safely run inline in the workflow.
-        if node_name == "__start__":
+        if node_name == START_NODE:
             return True
 
         # Check node metadata
@@ -765,7 +772,7 @@ class TemporalLangGraphRunner:
         Returns:
             True if an interrupt was handled, False otherwise.
         """
-        if "__interrupt__" not in result:
+        if INTERRUPT_KEY not in result:
             return False
 
         self._interrupt.interrupted_state = cast("dict[str, Any]", task.input)
@@ -774,7 +781,7 @@ class TemporalLangGraphRunner:
         with workflow.unsafe.imports_passed_through():
             from langgraph.types import Interrupt
 
-        interrupt_list = result.get("__interrupt__", [])
+        interrupt_list = result.get(INTERRUPT_KEY, [])
         if interrupt_list:
             interrupt_obj = interrupt_list[0]
             interrupt_value = (
@@ -902,7 +909,7 @@ class TemporalLangGraphRunner:
                     )
 
             for channel, value in writer_writes:
-                if channel.startswith("branch:"):
+                if channel.startswith(BRANCH_PREFIX):
                     branch_writes.append((channel, value))
                     workflow.logger.debug(
                         "Subgraph %s produced branch write: %s",
@@ -1043,7 +1050,7 @@ class TemporalLangGraphRunner:
         summary = _build_activity_summary(task.name, task.input, node_metadata)
 
         # Use langgraph_tool_node for "tools" node, langgraph_node for others
-        activity_fn = langgraph_tool_node if task.name == "tools" else langgraph_node
+        activity_fn = langgraph_tool_node if task.name == TOOLS_NODE else langgraph_node
 
         # Execute activity
         result = await workflow.execute_activity(
@@ -1139,7 +1146,7 @@ class TemporalLangGraphRunner:
 
             # Use langgraph_tool_node for "tools" node, langgraph_node for others
             activity_fn = (
-                langgraph_tool_node if packet.node == "tools" else langgraph_node
+                langgraph_tool_node if packet.node == TOOLS_NODE else langgraph_node
             )
 
             prepared_activities.append(
@@ -1340,7 +1347,7 @@ class TemporalLangGraphRunner:
 
         # Try common model name attributes used by LangChain chat models
         # ChatOpenAI uses model_name, ChatAnthropic uses model
-        for attr in ("model_name", "model"):
+        for attr in MODEL_NAME_ATTRS:
             value = getattr(runnable, attr, None)
             if value and isinstance(value, str):
                 return value
@@ -1349,7 +1356,7 @@ class TemporalLangGraphRunner:
         # This handles cases like model.bind_tools(...)
         bound = getattr(runnable, "bound", None)
         if bound is not None:
-            for attr in ("model_name", "model"):
+            for attr in MODEL_NAME_ATTRS:
                 value = getattr(bound, attr, None)
                 if value and isinstance(value, str):
                     return value
@@ -1357,7 +1364,7 @@ class TemporalLangGraphRunner:
         # Try first element if it's a sequence
         first = getattr(runnable, "first", None)
         if first is not None:
-            for attr in ("model_name", "model"):
+            for attr in MODEL_NAME_ATTRS:
                 value = getattr(first, attr, None)
                 if value and isinstance(value, str):
                     return value
@@ -1376,7 +1383,7 @@ class TemporalLangGraphRunner:
                         try:
                             obj = cell.cell_contents
                             # Check if this closure variable is a chat model
-                            for attr in ("model_name", "model"):
+                            for attr in MODEL_NAME_ATTRS:
                                 value = getattr(obj, attr, None)
                                 if value and isinstance(value, str):
                                     return value
