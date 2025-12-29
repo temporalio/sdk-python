@@ -674,3 +674,76 @@ class TestParentCommandRouting:
 
         assert runner._pending_parent_command is not None
         assert runner._pending_parent_command.goto == ["target_node"]
+
+
+class TestErrorRetryability:
+    """Tests for error classification (retryable vs non-retryable)."""
+
+    def test_python_builtin_errors_are_non_retryable(self) -> None:
+        """Python built-in errors like TypeError, ValueError should not be retried."""
+        from temporalio.contrib.langgraph._exceptions import is_non_retryable_error
+
+        # These indicate bugs or bad input - retrying won't help
+        assert is_non_retryable_error(TypeError("bad type")) is True
+        assert is_non_retryable_error(ValueError("bad value")) is True
+        assert is_non_retryable_error(KeyError("missing key")) is True
+        assert is_non_retryable_error(AttributeError("no attribute")) is True
+        assert is_non_retryable_error(IndexError("out of range")) is True
+        assert is_non_retryable_error(AssertionError("assertion failed")) is True
+        assert is_non_retryable_error(NotImplementedError("not implemented")) is True
+
+    def test_generic_exceptions_are_retryable(self) -> None:
+        """Generic exceptions should be retried by default."""
+        from temporalio.contrib.langgraph._exceptions import is_non_retryable_error
+
+        # Unknown errors default to retryable (safer to retry than fail permanently)
+        assert is_non_retryable_error(Exception("generic error")) is False
+        assert is_non_retryable_error(RuntimeError("runtime error")) is False
+
+    def test_status_code_based_classification(self) -> None:
+        """Errors with status_code attribute should be classified by HTTP status."""
+        from temporalio.contrib.langgraph._exceptions import is_non_retryable_error
+
+        class HttpError(Exception):
+            def __init__(self, status_code: int) -> None:
+                self.status_code = status_code
+                super().__init__(f"HTTP {status_code}")
+
+        # 4xx client errors (except 429) are non-retryable
+        assert is_non_retryable_error(HttpError(400)) is True  # Bad Request
+        assert is_non_retryable_error(HttpError(401)) is True  # Unauthorized
+        assert is_non_retryable_error(HttpError(403)) is True  # Forbidden
+        assert is_non_retryable_error(HttpError(404)) is True  # Not Found
+        assert is_non_retryable_error(HttpError(422)) is True  # Unprocessable Entity
+
+        # 429 Rate Limit is retryable
+        assert is_non_retryable_error(HttpError(429)) is False
+
+        # 5xx server errors are retryable
+        assert is_non_retryable_error(HttpError(500)) is False
+        assert is_non_retryable_error(HttpError(502)) is False
+        assert is_non_retryable_error(HttpError(503)) is False
+        assert is_non_retryable_error(HttpError(504)) is False
+
+    def test_node_execution_error_wraps_with_retry_semantics(self) -> None:
+        """node_execution_error should wrap errors with appropriate non_retryable flag."""
+        from temporalio.contrib.langgraph._exceptions import (
+            NODE_EXECUTION_ERROR,
+            node_execution_error,
+        )
+
+        # Non-retryable error
+        original = ValueError("invalid input")
+        wrapped = node_execution_error("my_node", "my_graph", original, non_retryable=True)
+
+        assert wrapped.type == NODE_EXECUTION_ERROR
+        assert wrapped.non_retryable is True
+        assert "my_node" in str(wrapped)
+        assert "my_graph" in str(wrapped)
+        assert "ValueError" in str(wrapped)
+
+        # Retryable error
+        wrapped_retry = node_execution_error(
+            "my_node", "my_graph", RuntimeError("transient"), non_retryable=False
+        )
+        assert wrapped_retry.non_retryable is False

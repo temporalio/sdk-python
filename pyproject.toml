@@ -139,6 +139,8 @@ exclude = [
   # Ignore generated code
   'temporalio/api',
   'temporalio/bridge/proto',
+  # Ignore separate repos/worktrees
+  'crew-ai',
 ]
 
 [tool.pydocstyle]

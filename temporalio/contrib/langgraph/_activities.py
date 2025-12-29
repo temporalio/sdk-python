@@ -10,7 +10,11 @@ from temporalio import activity
 
 logger = logging.getLogger(__name__)
 
-from temporalio.contrib.langgraph._exceptions import node_not_found_error
+from temporalio.contrib.langgraph._exceptions import (
+    is_non_retryable_error,
+    node_execution_error,
+    node_not_found_error,
+)
 from temporalio.contrib.langgraph._graph_registry import get_graph
 from temporalio.contrib.langgraph._models import (
     ChannelWrite,
@@ -319,12 +323,14 @@ async def _execute_node_impl(input_data: NodeActivityInput) -> NodeActivityOutpu
             store_writes=store_writes,
             parent_command=CommandOutput.from_command(command),
         )
-    except Exception:
+    except Exception as e:
         # Send heartbeat indicating failure before re-raising
+        non_retryable = is_non_retryable_error(e)
         logger.debug(
-            "Node %s in graph %s failed with exception",
+            "Node %s in graph %s failed with exception (non_retryable=%s)",
             input_data.node_name,
             input_data.graph_id,
+            non_retryable,
             exc_info=True,
         )
         activity.heartbeat(
@@ -333,9 +339,16 @@ async def _execute_node_impl(input_data: NodeActivityInput) -> NodeActivityOutpu
                 "task_id": input_data.task_id,
                 "graph_id": input_data.graph_id,
                 "status": "failed",
+                "non_retryable": non_retryable,
             }
         )
-        raise
+        # Wrap in ApplicationError with appropriate retry semantics
+        raise node_execution_error(
+            input_data.node_name,
+            input_data.graph_id,
+            e,
+            non_retryable=non_retryable,
+        ) from e
 
     # Note: Writes are primarily captured via CONFIG_KEY_SEND callback above.
     # The callback is invoked by LangGraph's internal writer mechanism.
