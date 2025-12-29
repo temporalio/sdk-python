@@ -14,6 +14,7 @@ from temporalio.contrib.langgraph._exceptions import node_not_found_error
 from temporalio.contrib.langgraph._graph_registry import get_graph
 from temporalio.contrib.langgraph._models import (
     ChannelWrite,
+    CommandOutput,
     InterruptValue,
     NodeActivityInput,
     NodeActivityOutput,
@@ -65,6 +66,7 @@ from langgraph._internal._constants import (
 )
 from langgraph._internal._scratchpad import PregelScratchpad
 from langgraph.errors import GraphInterrupt as LangGraphInterrupt
+from langgraph.errors import ParentCommand
 from langgraph.runtime import Runtime
 from langgraph.types import Send
 
@@ -285,6 +287,37 @@ async def _execute_node_impl(input_data: NodeActivityInput) -> NodeActivityOutpu
                 task_id=input_data.task_id,
             ),
             store_writes=store_writes,
+        )
+    except ParentCommand as e:
+        # Subgraph node issued a Command to the parent graph
+        # This happens in supervisor patterns where an agent's tool node
+        # needs to send state updates and routing instructions back to the parent
+        # ParentCommand is an exception with Command in args[0]
+        command = e.args[0] if e.args else None
+        logger.debug(
+            "Node %s in graph %s raised ParentCommand: goto=%s",
+            input_data.node_name,
+            input_data.graph_id,
+            command.goto if command else None,
+        )
+        activity.heartbeat(
+            {
+                "node": input_data.node_name,
+                "task_id": input_data.task_id,
+                "graph_id": input_data.graph_id,
+                "status": "parent_command",
+                "goto": str(command.goto) if command else "",
+            }
+        )
+        # Collect store writes
+        store_writes = store.get_writes()
+        # Convert the Command to our serializable format
+        if command is None:
+            return NodeActivityOutput(writes=[], store_writes=store_writes)
+        return NodeActivityOutput(
+            writes=[],
+            store_writes=store_writes,
+            parent_command=CommandOutput.from_command(command),
         )
     except Exception:
         # Send heartbeat indicating failure before re-raising

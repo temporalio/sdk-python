@@ -274,3 +274,300 @@ class TestInterruptValue:
         assert interrupt.task_id == "task_456"
 
 
+class TestCommandOutput:
+    """Tests for CommandOutput model used in ParentCommand handling."""
+
+    def test_command_output_from_command_single_goto(self) -> None:
+        """CommandOutput should convert single goto to list."""
+        from unittest.mock import MagicMock
+
+        from temporalio.contrib.langgraph._models import CommandOutput
+
+        # Mock a Command object
+        mock_command = MagicMock()
+        mock_command.goto = "agent1"
+        mock_command.update = {"messages": ["new msg"]}
+        mock_command.resume = None
+
+        output = CommandOutput.from_command(mock_command)
+
+        assert output.goto == ["agent1"]
+        assert output.update == {"messages": ["new msg"]}
+        assert output.resume is None
+
+    def test_command_output_from_command_list_goto(self) -> None:
+        """CommandOutput should preserve list goto."""
+        from unittest.mock import MagicMock
+
+        from temporalio.contrib.langgraph._models import CommandOutput
+
+        mock_command = MagicMock()
+        mock_command.goto = ["agent1", "agent2", "agent3"]
+        mock_command.update = {"value": 100}
+        mock_command.resume = None
+
+        output = CommandOutput.from_command(mock_command)
+
+        assert output.goto == ["agent1", "agent2", "agent3"]
+        assert output.update == {"value": 100}
+
+    def test_command_output_from_command_no_goto(self) -> None:
+        """CommandOutput should handle None goto."""
+        from unittest.mock import MagicMock
+
+        from temporalio.contrib.langgraph._models import CommandOutput
+
+        mock_command = MagicMock()
+        mock_command.goto = None
+        mock_command.update = {"data": "value"}
+        mock_command.resume = None
+
+        output = CommandOutput.from_command(mock_command)
+
+        assert output.goto == []
+        assert output.update == {"data": "value"}
+
+    def test_command_output_from_command_with_send_object(self) -> None:
+        """CommandOutput should handle Send objects in goto."""
+        from unittest.mock import MagicMock
+
+        from temporalio.contrib.langgraph._models import CommandOutput
+
+        # Mock Send object
+        mock_send = MagicMock()
+        mock_send.node = "tools"
+
+        mock_command = MagicMock()
+        mock_command.goto = [mock_send, "agent1"]
+        mock_command.update = None
+        mock_command.resume = None
+
+        output = CommandOutput.from_command(mock_command)
+
+        # Send objects should extract their node attribute
+        assert output.goto == ["tools", "agent1"]
+
+
+class TestSendPacket:
+    """Tests for SendPacket model used in Send API handling."""
+
+    def test_send_packet_from_send(self) -> None:
+        """SendPacket should convert from langgraph Send object."""
+        from unittest.mock import MagicMock
+
+        from temporalio.contrib.langgraph._models import SendPacket
+
+        # Mock a Send object
+        mock_send = MagicMock()
+        mock_send.node = "tools"
+        mock_send.arg = {"messages": [], "tool_call": {"name": "calc"}}
+
+        packet = SendPacket.from_send(mock_send)
+
+        assert packet.node == "tools"
+        assert packet.arg == {"messages": [], "tool_call": {"name": "calc"}}
+
+    def test_send_packet_basic(self) -> None:
+        """SendPacket should store node name and arg."""
+        from temporalio.contrib.langgraph._models import SendPacket
+
+        packet = SendPacket(node="agent", arg={"value": 42})
+
+        assert packet.node == "agent"
+        assert packet.arg == {"value": 42}
+
+
+class TestNodeActivityOutputParentCommand:
+    """Tests for NodeActivityOutput with parent_command field."""
+
+    def test_output_with_parent_command(self) -> None:
+        """NodeActivityOutput should store parent_command."""
+        from temporalio.contrib.langgraph._models import (
+            CommandOutput,
+            NodeActivityOutput,
+        )
+
+        output = NodeActivityOutput(
+            writes=[],
+            parent_command=CommandOutput(
+                update={"messages": ["test"]},
+                goto=["agent1", "agent2"],
+            ),
+        )
+
+        assert output.parent_command is not None
+        assert output.parent_command.goto == ["agent1", "agent2"]
+        assert output.parent_command.update == {"messages": ["test"]}
+
+    def test_output_without_parent_command(self) -> None:
+        """NodeActivityOutput should default parent_command to None."""
+        from temporalio.contrib.langgraph._models import (
+            ChannelWrite,
+            NodeActivityOutput,
+        )
+
+        output = NodeActivityOutput(
+            writes=[ChannelWrite(channel="value", value=1)],
+        )
+
+        assert output.parent_command is None
+
+
+class TestMessageCoercion:
+    """Tests for LangChain message coercion in state values."""
+
+    def test_coerce_top_level_messages(self) -> None:
+        """Top-level messages in state should be coerced to LangChain types."""
+        from langchain_core.messages import AIMessage, HumanMessage
+
+        from temporalio.contrib.langgraph._models import _coerce_state_values
+
+        state = {
+            "messages": [
+                {"content": "hello", "type": "human"},
+                {
+                    "content": "",
+                    "type": "ai",
+                    "tool_calls": [
+                        {"name": "foo", "args": {"x": 1}, "id": "call_1", "type": "tool_call"}
+                    ],
+                },
+            ]
+        }
+
+        coerced = _coerce_state_values(state)
+
+        # Messages should be converted to LangChain types
+        assert isinstance(coerced["messages"][0], HumanMessage)
+        assert isinstance(coerced["messages"][1], AIMessage)
+        # AIMessage should have tool_calls attribute accessible
+        assert hasattr(coerced["messages"][1], "tool_calls")
+        assert coerced["messages"][1].tool_calls[0]["name"] == "foo"
+
+    def test_coerce_nested_messages_in_tool_call_with_context(self) -> None:
+        """Messages nested in tool_call_with_context.state should be coerced.
+
+        When using Send API with create_react_agent or create_supervisor,
+        the input state has structure:
+        {
+            "__type": "tool_call_with_context",
+            "tool_call": {...},
+            "state": {"messages": [...]}  # nested messages
+        }
+
+        The nested messages must also be coerced to LangChain types.
+        """
+        from langchain_core.messages import AIMessage, HumanMessage
+
+        from temporalio.contrib.langgraph._models import _coerce_state_values
+
+        state = {
+            "__type": "tool_call_with_context",
+            "tool_call": {
+                "name": "calculator",
+                "args": {"expression": "2 + 2"},
+                "id": "call_123",
+                "type": "tool_call",
+            },
+            "state": {
+                "messages": [
+                    {"content": "hello", "type": "human"},
+                    {
+                        "content": "",
+                        "type": "ai",
+                        "tool_calls": [
+                            {"name": "calculator", "args": {"expression": "2 + 2"}, "id": "call_123", "type": "tool_call"}
+                        ],
+                    },
+                ],
+                "remaining_steps": 24,
+            },
+        }
+
+        coerced = _coerce_state_values(state)
+
+        # The nested state should also be coerced
+        nested_state = coerced["state"]
+        assert isinstance(nested_state, dict)
+        assert "messages" in nested_state
+
+        # Nested messages should be LangChain message objects
+        assert isinstance(nested_state["messages"][0], HumanMessage)
+        assert isinstance(nested_state["messages"][1], AIMessage)
+
+        # AIMessage should have tool_calls as an attribute (not just dict key)
+        ai_msg = nested_state["messages"][1]
+        assert hasattr(ai_msg, "tool_calls"), "AIMessage should have tool_calls attribute"
+        assert ai_msg.tool_calls[0]["name"] == "calculator"
+
+    def test_coerce_deeply_nested_messages(self) -> None:
+        """Messages in arbitrarily nested dicts should be coerced."""
+        from langchain_core.messages import HumanMessage
+
+        from temporalio.contrib.langgraph._models import _coerce_state_values
+
+        state = {
+            "level1": {
+                "level2": {
+                    "messages": [
+                        {"content": "deeply nested", "type": "human"},
+                    ]
+                }
+            }
+        }
+
+        coerced = _coerce_state_values(state)
+
+        nested_msg = coerced["level1"]["level2"]["messages"][0]
+        assert isinstance(nested_msg, HumanMessage)
+        assert nested_msg.content == "deeply nested"
+
+    def test_node_activity_input_coerces_nested_state(self) -> None:
+        """NodeActivityInput.__post_init__ should coerce nested messages.
+
+        This simulates what happens when a tool node receives input via Send API
+        from langgraph-supervisor or create_react_agent with subgraphs.
+        """
+        from langchain_core.messages import AIMessage
+
+        from temporalio.contrib.langgraph._models import NodeActivityInput
+
+        # Simulate serialized input that would come from Temporal
+        # This is what tool_call_with_context looks like after JSON round-trip
+        input_data = NodeActivityInput(
+            node_name="tools",
+            task_id="task_1",
+            graph_id="test_graph",
+            input_state={
+                "__type": "tool_call_with_context",
+                "tool_call": {
+                    "name": "search",
+                    "args": {"query": "test"},
+                    "id": "call_abc",
+                    "type": "tool_call",
+                },
+                "state": {
+                    "messages": [
+                        {
+                            "content": "",
+                            "type": "ai",
+                            "tool_calls": [
+                                {"name": "search", "args": {"query": "test"}, "id": "call_abc", "type": "tool_call"}
+                            ],
+                        }
+                    ]
+                },
+            },
+            config={},
+            path=(),
+            triggers=[],
+        )
+
+        # After __post_init__, nested messages should be coerced
+        nested_state = input_data.input_state["state"]
+        ai_msg = nested_state["messages"][0]
+
+        assert isinstance(ai_msg, AIMessage), f"Expected AIMessage, got {type(ai_msg)}"
+        assert hasattr(ai_msg, "tool_calls"), "AIMessage should have tool_calls attribute"
+
+

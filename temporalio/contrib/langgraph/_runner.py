@@ -228,6 +228,8 @@ class TemporalLangGraphRunner:
         self._is_resume_invocation: bool = False
         # Pending interrupt from current execution (set by _execute_as_activity)
         self._pending_interrupt: InterruptValue | None = None
+        # Pending parent command from subgraph (for parent graph routing)
+        self._pending_parent_command: Any | None = None  # CommandOutput
         # Track nodes completed in current resume cycle (to avoid re-execution)
         self._completed_nodes_in_cycle: set[str] = set()
         # Cached writes from resumed nodes (injected into tasks to trigger successors)
@@ -628,6 +630,25 @@ class TemporalLangGraphRunner:
                 )
             return [], []
 
+        # Check if the subgraph has a pending parent command
+        # This happens when a subgraph node (like tool node) raises ParentCommand
+        # to route to a node in the parent graph (this graph)
+        send_packets: list[Any] = []
+        if nested_runner._pending_parent_command is not None:
+            cmd = nested_runner._pending_parent_command
+            workflow.logger.debug(
+                "Subgraph %s has pending parent command: goto=%s",
+                task.name,
+                cmd.goto,
+            )
+            # Convert goto to Send packets for routing in THIS (parent) graph context
+            if cmd.goto:
+                from temporalio.contrib.langgraph._models import SendPacket
+
+                # Use the subgraph's result (which includes the command.update) as input
+                for node_name in cmd.goto:
+                    send_packets.append(SendPacket(node=node_name, arg=result))
+
         # Extract writes from the subgraph result
         # The result contains the final state - convert to channel writes
         writes: list[tuple[str, Any]] = []
@@ -698,14 +719,17 @@ class TemporalLangGraphRunner:
                                 channel,
                             )
 
-        # Subgraphs don't produce Send packets directly (they're handled internally)
+        # Return writes and any send_packets from parent commands
+        # send_packets contains routing instructions for the parent graph when
+        # a subgraph node raises ParentCommand with goto targets
         workflow.logger.debug(
-            "Subgraph %s returning %d writes: %s",
+            "Subgraph %s returning %d writes, %d send_packets: %s",
             task.name,
             len(writes),
+            len(send_packets),
             [w[0] for w in writes],
         )
-        return writes, []
+        return writes, send_packets
 
     async def _execute_in_workflow(
         self,
@@ -806,6 +830,24 @@ class TemporalLangGraphRunner:
             self._pending_interrupt = result.interrupt
             return [], []
 
+        # Check if the node issued a parent command (from subgraph to parent)
+        # This happens in supervisor patterns where agent's tool node raises ParentCommand
+        # Store it for the parent to handle - don't execute goto in current context
+        if result.parent_command is not None:
+            cmd = result.parent_command
+            writes: list[tuple[str, Any]] = []
+
+            # Convert command.update to writes (state updates for current graph)
+            if cmd.update:
+                for channel, value in cmd.update.items():
+                    writes.append((channel, value))
+
+            # Store the parent command for the parent graph to handle
+            # The goto nodes exist in the parent, not in this graph
+            self._pending_parent_command = cmd
+
+            return writes, []
+
         # Return writes and send_packets separately
         return result.to_write_tuples(), list(result.send_packets)
 
@@ -874,6 +916,19 @@ class TemporalLangGraphRunner:
                 self._interrupted_node_name = packet.node
                 self._pending_interrupt = result.interrupt
                 return all_writes
+
+            # Check for parent command (from subgraph to parent)
+            # Store it for the parent to handle - don't execute goto in subgraph context
+            if result.parent_command is not None:
+                cmd = result.parent_command
+                # Add writes from command.update (state updates for the subgraph)
+                if cmd.update:
+                    for channel, value in cmd.update.items():
+                        all_writes.append((channel, value))
+                # Store the parent command for the parent graph to handle
+                # The goto nodes exist in the parent, not in this subgraph
+                self._pending_parent_command = cmd
+                continue  # Skip normal write/send_packet processing
 
             # Collect writes
             all_writes.extend(result.to_write_tuples())

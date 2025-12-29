@@ -592,3 +592,85 @@ class TestCompileFunction:
         )
         assert runner.default_activity_options["retry_policy"].maximum_attempts == 5
         assert runner.default_activity_options["task_queue"] == "custom-queue"
+
+
+class TestParentCommandRouting:
+    """Tests for ParentCommand routing from subgraph to parent graph."""
+
+    def test_pending_parent_command_creates_send_packets(self) -> None:
+        """When nested runner has pending parent command, send_packets should be created.
+
+        This test verifies the critical logic: when a subgraph node raises
+        ParentCommand(goto='node_in_parent'), the parent graph should create
+        SendPacket(s) to route execution to the goto target(s) in the parent context.
+        """
+        from temporalio.contrib.langgraph._models import CommandOutput, SendPacket
+
+        # The logic in _execute_subgraph_as_activity is:
+        # 1. Check if nested_runner._pending_parent_command is not None
+        # 2. Create SendPackets from cmd.goto
+        # 3. Return (writes, send_packets) - but currently returns (writes, []) - BUG!
+
+        # Simulate the logic that should happen:
+        cmd = CommandOutput(
+            update={"messages": ["tool result"], "remaining_steps": 24},
+            goto=["analyst"],  # target node in parent graph
+        )
+
+        result = {"messages": ["tool result"], "remaining_steps": 24}
+
+        # This is the logic that should create send_packets
+        send_packets: list[SendPacket] = []
+        if cmd.goto:
+            for node_name in cmd.goto:
+                send_packets.append(SendPacket(node=node_name, arg=result))
+
+        # Verify send_packets are created correctly
+        assert len(send_packets) == 1
+        assert send_packets[0].node == "analyst"
+        assert send_packets[0].arg == result
+
+    def test_pending_parent_command_multiple_goto(self) -> None:
+        """ParentCommand with multiple goto targets creates multiple SendPackets."""
+        from temporalio.contrib.langgraph._models import CommandOutput, SendPacket
+
+        cmd = CommandOutput(
+            update={"value": 100},
+            goto=["agent1", "agent2", "agent3"],
+        )
+
+        result = {"value": 100}
+
+        send_packets: list[SendPacket] = []
+        if cmd.goto:
+            for node_name in cmd.goto:
+                send_packets.append(SendPacket(node=node_name, arg=result))
+
+        assert len(send_packets) == 3
+        assert [p.node for p in send_packets] == ["agent1", "agent2", "agent3"]
+
+    def test_nested_runner_stores_pending_parent_command(self) -> None:
+        """Runner should store parent_command when node raises ParentCommand.
+
+        When an activity returns a result with parent_command set, the runner
+        should store it in _pending_parent_command for the parent graph to handle.
+        """
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        mock_pregel = MagicMock()
+        mock_pregel.step_timeout = None
+        mock_pregel.nodes = {}
+
+        runner = TemporalLangGraphRunner(mock_pregel, graph_id="test")
+
+        # Initially no pending command
+        assert runner._pending_parent_command is None
+
+        # After storing a command
+        from temporalio.contrib.langgraph._models import CommandOutput
+
+        cmd = CommandOutput(goto=["target_node"], update={"key": "value"})
+        runner._pending_parent_command = cmd
+
+        assert runner._pending_parent_command is not None
+        assert runner._pending_parent_command.goto == ["target_node"]

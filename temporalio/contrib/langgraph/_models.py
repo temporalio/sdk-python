@@ -32,15 +32,46 @@ def _coerce_to_message(value: Any) -> Any:
     return value
 
 
+def _coerce_value(value: Any) -> Any:
+    """Recursively coerce a value, converting message dicts to LangChain objects.
+
+    This handles:
+    - Individual message dicts -> LangChain message objects
+    - Lists -> recursively coerce each item
+    - Nested dicts -> recursively coerce values (for tool_call_with_context.state, etc.)
+    """
+    if isinstance(value, dict):
+        # First try to coerce as a message
+        coerced = _coerce_to_message(value)
+        if coerced is not value:
+            # Successfully coerced to a message, return it
+            return coerced
+        # Not a message dict, recursively coerce its values
+        return {k: _coerce_value(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        # Recursively coerce each item in the list
+        return [_coerce_value(item) for item in value]
+    else:
+        # Not a dict or list, return as-is
+        return value
+
+
 def _coerce_state_values(state: dict[str, Any]) -> dict[str, Any]:
-    """Coerce state dict values to LangChain message types where applicable."""
-    result: dict[str, Any] = {}
-    for key, value in state.items():
-        if isinstance(value, list):
-            result[key] = [_coerce_to_message(item) for item in value]
-        else:
-            result[key] = _coerce_to_message(value)
-    return result
+    """Coerce state dict values to LangChain message types where applicable.
+
+    This function recursively processes the state dict to convert serialized
+    message dicts back to proper LangChain message objects. This is necessary
+    because when state passes through Temporal serialization, LangChain message
+    objects become plain dicts.
+
+    Handles nested structures like tool_call_with_context:
+    {
+        "__type": "tool_call_with_context",
+        "tool_call": {...},
+        "state": {"messages": [...]}  # nested messages are coerced
+    }
+    """
+    return {key: _coerce_value(value) for key, value in state.items()}
 
 
 # ==============================================================================
@@ -216,6 +247,50 @@ class SendPacket:
 
 
 @dataclass
+class CommandOutput:
+    """Serializable representation of a LangGraph Command for parent graph control.
+
+    This captures Command objects that are raised via ParentCommand when a subgraph
+    node needs to send commands back to its parent graph (e.g., in supervisor patterns).
+    """
+
+    update: dict[str, Any] | None = None
+    """State updates to apply to the parent graph."""
+
+    goto: list[str] = field(default_factory=list)
+    """Node name(s) to navigate to in the parent graph."""
+
+    resume: Any | None = None
+    """Value to resume execution with (for interrupt handling)."""
+
+    @classmethod
+    def from_command(cls, command: Any) -> CommandOutput:
+        """Create a CommandOutput from a LangGraph Command object."""
+        # Normalize goto to a list
+        goto_list: list[str] = []
+        if command.goto:
+            if isinstance(command.goto, str):
+                goto_list = [command.goto]
+            elif isinstance(command.goto, (list, tuple)):
+                # Handle list of strings or Send objects
+                for item in command.goto:
+                    if isinstance(item, str):
+                        goto_list.append(item)
+                    elif hasattr(item, "node"):
+                        # Send object
+                        goto_list.append(item.node)
+            elif hasattr(command.goto, "node"):
+                # Single Send object
+                goto_list = [command.goto.node]
+
+        return cls(
+            update=command.update if command.update else None,
+            goto=goto_list,
+            resume=command.resume,
+        )
+
+
+@dataclass
 class NodeActivityOutput:
     """Output from the node execution activity."""
 
@@ -230,6 +305,9 @@ class NodeActivityOutput:
 
     send_packets: list[SendPacket] = field(default_factory=list)
     """List of Send packets for dynamic node dispatch."""
+
+    parent_command: CommandOutput | None = None
+    """Command to send to parent graph (from ParentCommand exception)."""
 
     def to_write_tuples(self) -> list[tuple[str, Any]]:
         """Convert writes to (channel, value) tuples."""
