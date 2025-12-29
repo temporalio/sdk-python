@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Callable, cast
 
@@ -28,6 +29,65 @@ if TYPE_CHECKING:
     from langchain_core.runnables import RunnableConfig
     from langgraph.pregel import Pregel
     from langgraph.types import PregelExecutableTask
+
+
+@dataclass
+class InterruptState:
+    """State related to interrupt handling in the runner.
+
+    Groups variables that track interrupt status, resume values,
+    and pending interrupts during graph execution.
+    """
+
+    interrupted_state: dict[str, Any] | None = None
+    """State snapshot when interrupt occurred."""
+
+    interrupted_node_name: str | None = None
+    """Name of the node that triggered the interrupt."""
+
+    resume_value: Any | None = None
+    """Value to resume with after interrupt."""
+
+    resume_used: bool = False
+    """Whether the resume value has been consumed."""
+
+    is_resume_invocation: bool = False
+    """Whether current invocation is resuming from interrupt."""
+
+    pending_interrupt: InterruptValue | None = None
+    """Pending interrupt from current execution."""
+
+
+@dataclass
+class ExecutionState:
+    """State related to execution tracking in the runner.
+
+    Groups variables that track execution progress, completed nodes,
+    and cached writes during graph execution.
+    """
+
+    step_counter: int = 0
+    """Counter for unique activity IDs within a step."""
+
+    invocation_counter: int = 0
+    """Counter for unique activity IDs across replays."""
+
+    completed_nodes_in_cycle: set[str] = field(default_factory=set)
+    """Nodes completed in current resume cycle (to avoid re-execution)."""
+
+    resumed_node_writes: dict[str, list[tuple[str, Any]]] = field(default_factory=dict)
+    """Cached writes from resumed nodes (injected to trigger successors)."""
+
+    last_output: dict[str, Any] | None = None
+    """Last output state for get_state()."""
+
+    pending_parent_command: Any | None = None
+    """Pending parent command from subgraph (for parent graph routing)."""
+
+    store_state: dict[tuple[tuple[str, ...], str], dict[str, Any]] = field(
+        default_factory=dict
+    )
+    """Store state for cross-node persistence."""
 
 
 def _extract_model_name(node_metadata: dict[str, Any] | None) -> str | None:
@@ -229,28 +289,10 @@ class TemporalLangGraphRunner:
             node_name: cfg.get("temporal", {})
             for node_name, cfg in (per_node_activity_options or {}).items()
         }
-        self._step_counter = 0
-        # Track invocation number for unique activity IDs across replays
-        self._invocation_counter = 0
-        # State for interrupt handling
-        self._interrupted_state: dict[str, Any] | None = None
-        self._interrupted_node_name: str | None = None  # Track which node interrupted
-        self._resume_value: Any | None = None
-        self._resume_used: bool = False
-        # Track whether current invocation is a resume (for cycle tracking)
-        self._is_resume_invocation: bool = False
-        # Pending interrupt from current execution (set by _execute_as_activity)
-        self._pending_interrupt: InterruptValue | None = None
-        # Pending parent command from subgraph (for parent graph routing)
-        self._pending_parent_command: Any | None = None  # CommandOutput
-        # Track nodes completed in current resume cycle (to avoid re-execution)
-        self._completed_nodes_in_cycle: set[str] = set()
-        # Cached writes from resumed nodes (injected into tasks to trigger successors)
-        self._resumed_node_writes: dict[str, list[tuple[str, Any]]] = {}
-        # Track the last output state for get_state()
-        self._last_output: dict[str, Any] | None = None
-        # Store state for cross-node persistence (key: (namespace, key), value: dict)
-        self._store_state: dict[tuple[tuple[str, ...], str], dict[str, Any]] = {}
+
+        # Initialize grouped state
+        self._interrupt = InterruptState()
+        self._execution = ExecutionState()
 
         # Restore from checkpoint if provided
         if checkpoint is not None:
@@ -282,7 +324,7 @@ class TemporalLangGraphRunner:
         config = self._prepare_config(config)
 
         # Handle resume: execute interrupted node first
-        if is_resume and self._interrupted_node_name:
+        if is_resume and self._interrupt.interrupted_node_name:
             early_return = await self._handle_resume_execution(input_state, config)
             if early_return is not None:
                 return early_return
@@ -323,22 +365,22 @@ class TemporalLangGraphRunner:
             is_resume = True
             if hasattr(input_state, "resume") and input_state.resume is not None:
                 resume_value = input_state.resume
-            if self._interrupted_state is None:
+            if self._interrupt.interrupted_state is None:
                 raise ValueError(
                     "Cannot resume with Command - no previous interrupt state. "
                     "Call ainvoke() first and check for '__interrupt__' in the result."
                 )
-            input_state = self._interrupted_state
+            input_state = self._interrupt.interrupted_state
         else:
-            self._completed_nodes_in_cycle.clear()
+            self._execution.completed_nodes_in_cycle.clear()
 
         # Update instance state for this invocation
-        self._resume_value = resume_value
-        self._resume_used = False
-        self._is_resume_invocation = is_resume
-        self._pending_interrupt = None
-        self._invocation_counter += 1
-        self._step_counter = 0
+        self._interrupt.resume_value = resume_value
+        self._interrupt.resume_used = False
+        self._interrupt.is_resume_invocation = is_resume
+        self._interrupt.pending_interrupt = None
+        self._execution.invocation_counter += 1
+        self._execution.step_counter = 0
 
         return input_state, is_resume
 
@@ -376,17 +418,17 @@ class TemporalLangGraphRunner:
         with workflow.unsafe.imports_passed_through():
             from langgraph.types import Interrupt
 
-        interrupted_node = self._interrupted_node_name
+        interrupted_node = self._interrupt.interrupted_node_name
         assert interrupted_node is not None  # Caller checks this
 
         resume_writes = await self._execute_resumed_node(
             interrupted_node, input_state, config
         )
 
-        if self._pending_interrupt is not None:
+        if self._interrupt.pending_interrupt is not None:
             # Node interrupted again - return immediately
             interrupt_obj = Interrupt.from_ns(
-                value=self._pending_interrupt.value,
+                value=self._interrupt.pending_interrupt.value,
                 ns="",
             )
             return {**input_state, "__interrupt__": [interrupt_obj]}
@@ -396,12 +438,12 @@ class TemporalLangGraphRunner:
             input_state[channel] = value
 
         # Cache writes for trigger mechanism
-        self._resumed_node_writes[interrupted_node] = resume_writes
+        self._execution.resumed_node_writes[interrupted_node] = resume_writes
 
         # Update completed nodes tracking
-        self._completed_nodes_in_cycle.discard("__start__")
-        self._completed_nodes_in_cycle.add(interrupted_node)
-        self._interrupted_node_name = None
+        self._execution.completed_nodes_in_cycle.discard("__start__")
+        self._execution.completed_nodes_in_cycle.add(interrupted_node)
+        self._interrupt.interrupted_node_name = None
 
         return None
 
@@ -501,8 +543,8 @@ class TemporalLangGraphRunner:
         This allows the trigger mechanism to schedule successor nodes.
         """
         for task in loop.tasks.values():
-            if task.name in self._resumed_node_writes:
-                cached_writes = self._resumed_node_writes.pop(task.name)
+            if task.name in self._execution.resumed_node_writes:
+                cached_writes = self._execution.resumed_node_writes.pop(task.name)
                 task.writes.extend(cached_writes)
 
     def _get_executable_tasks(self, loop: Any) -> list[Any]:
@@ -514,7 +556,7 @@ class TemporalLangGraphRunner:
         return [
             task
             for task in loop.tasks.values()
-            if not task.writes and task.name not in self._completed_nodes_in_cycle
+            if not task.writes and task.name not in self._execution.completed_nodes_in_cycle
         ]
 
     def _check_checkpoint(
@@ -532,7 +574,7 @@ class TemporalLangGraphRunner:
         if should_continue is not None and not should_continue():
             output = cast("dict[str, Any]", loop.output) if loop.output else {}
             output["__checkpoint__"] = self.get_state()
-            self._last_output = output
+            self._execution.last_output = output
             return output
         return None
 
@@ -569,14 +611,14 @@ class TemporalLangGraphRunner:
         with workflow.unsafe.imports_passed_through():
             from langgraph.types import Interrupt
 
-        if self._pending_interrupt is not None:
+        if self._interrupt.pending_interrupt is not None:
             interrupt_obj = Interrupt.from_ns(
-                value=self._pending_interrupt.value,
+                value=self._interrupt.pending_interrupt.value,
                 ns="",
             )
             output = {**output, "__interrupt__": [interrupt_obj]}
 
-        self._last_output = output
+        self._execution.last_output = output
 
         if "__interrupt__" in output:
             workflow.logger.debug("Graph %s execution paused at interrupt", self.graph_id)
@@ -593,12 +635,12 @@ class TemporalLangGraphRunner:
         # Only pass resume value to the specific node that was interrupted
         resume_for_task = None
         if (
-            self._resume_value is not None
-            and not self._resume_used
-            and self._interrupted_node_name == task.name
+            self._interrupt.resume_value is not None
+            and not self._interrupt.resume_used
+            and self._interrupt.interrupted_node_name == task.name
         ):
             # This is the node that was interrupted - pass the resume value
-            resume_for_task = self._resume_value
+            resume_for_task = self._interrupt.resume_value
 
         if self._should_run_in_workflow(task.name):
             # Execute directly in workflow (for deterministic operations)
@@ -612,19 +654,19 @@ class TemporalLangGraphRunner:
             )
 
         # Check if an interrupt occurred
-        if self._pending_interrupt is not None:
+        if self._interrupt.pending_interrupt is not None:
             # The task interrupted - don't mark resume as used
             return False
 
         # Task completed successfully - track it to prevent re-execution during resume
         # Only track during resume invocations to allow normal cyclic execution
-        if self._is_resume_invocation:
-            self._completed_nodes_in_cycle.add(task.name)
+        if self._interrupt.is_resume_invocation:
+            self._execution.completed_nodes_in_cycle.add(task.name)
 
         # If we provided a resume value and the task completed successfully,
         # it means the task consumed the resume value (interrupt() returned it)
         if resume_for_task is not None:
-            self._resume_used = True
+            self._interrupt.resume_used = True
 
         # Record writes to the loop
         # This is how activity results flow back into the Pregel state
@@ -634,7 +676,7 @@ class TemporalLangGraphRunner:
         # Send creates dynamic tasks with custom input (Send.arg)
         if send_packets:
             send_writes = await self._execute_send_packets(send_packets, task.config)
-            if self._pending_interrupt is not None:
+            if self._interrupt.pending_interrupt is not None:
                 return False
             task.writes.extend(send_writes)
 
@@ -726,8 +768,8 @@ class TemporalLangGraphRunner:
         if "__interrupt__" not in result:
             return False
 
-        self._interrupted_state = cast("dict[str, Any]", task.input)
-        self._interrupted_node_name = task.name
+        self._interrupt.interrupted_state = cast("dict[str, Any]", task.input)
+        self._interrupt.interrupted_node_name = task.name
 
         with workflow.unsafe.imports_passed_through():
             from langgraph.types import Interrupt
@@ -740,7 +782,7 @@ class TemporalLangGraphRunner:
                 if isinstance(interrupt_obj, Interrupt)
                 else interrupt_obj
             )
-            self._pending_interrupt = InterruptValue(
+            self._interrupt.pending_interrupt = InterruptValue(
                 value=interrupt_value,
                 node_name=task.name,
                 task_id=task.id,
@@ -763,10 +805,10 @@ class TemporalLangGraphRunner:
         Returns:
             List of SendPackets for routing in the parent graph.
         """
-        if nested_runner._pending_parent_command is None:
+        if nested_runner._execution.pending_parent_command is None:
             return []
 
-        cmd = nested_runner._pending_parent_command
+        cmd = nested_runner._execution.pending_parent_command
         workflow.logger.debug(
             "Subgraph %s has pending parent command: goto=%s",
             task.name,
@@ -961,7 +1003,7 @@ class TemporalLangGraphRunner:
         resume_value: Any | None = None,
     ) -> tuple[list[tuple[str, Any]], list[Any]]:
         """Execute a task as a Temporal activity, returning writes and send packets."""
-        self._step_counter += 1
+        self._execution.step_counter += 1
 
         # Check if this node is a subgraph - if so, execute it recursively
         # This ensures inner nodes (e.g., 'model' and 'tools' in create_agent)
@@ -992,9 +1034,9 @@ class TemporalLangGraphRunner:
         # Generate unique activity ID
         config_dict = cast("dict[str, Any]", task.config)
         invocation_id = config_dict.get("configurable", {}).get(
-            "invocation_id", self._invocation_counter
+            "invocation_id", self._execution.invocation_counter
         )
-        activity_id = f"inv{invocation_id}-{task.name}-{self._step_counter}"
+        activity_id = f"inv{invocation_id}-{task.name}-{self._execution.step_counter}"
 
         # Build meaningful summary from node name, input, and metadata
         node_metadata = self._get_full_node_metadata(task.name)
@@ -1018,9 +1060,9 @@ class TemporalLangGraphRunner:
 
         # Check if the node raised an interrupt
         if result.interrupt is not None:
-            self._interrupted_state = cast("dict[str, Any]", task.input)
-            self._interrupted_node_name = task.name
-            self._pending_interrupt = result.interrupt
+            self._interrupt.interrupted_state = cast("dict[str, Any]", task.input)
+            self._interrupt.interrupted_node_name = task.name
+            self._interrupt.pending_interrupt = result.interrupt
             return [], []
 
         # Check if the node issued a parent command (from subgraph to parent)
@@ -1037,7 +1079,7 @@ class TemporalLangGraphRunner:
 
             # Store the parent command for the parent graph to handle
             # The goto nodes exist in the parent, not in this graph
-            self._pending_parent_command = cmd
+            self._execution.pending_parent_command = cmd
 
             return writes, []
 
@@ -1063,19 +1105,19 @@ class TemporalLangGraphRunner:
 
         config_dict = cast("dict[str, Any]", config)
         invocation_id = config_dict.get("configurable", {}).get(
-            "invocation_id", self._invocation_counter
+            "invocation_id", self._execution.invocation_counter
         )
 
         # Prepare store snapshot once - all parallel activities see same snapshot
         store_snapshot = self._prepare_store_snapshot()
 
         for packet in send_packets:
-            self._step_counter += 1
+            self._execution.step_counter += 1
 
             # Build activity input with Send.arg as the input state
             activity_input = NodeActivityInput(
                 node_name=packet.node,
-                task_id=f"send-{packet.node}-{self._step_counter}",
+                task_id=f"send-{packet.node}-{self._execution.step_counter}",
                 graph_id=self.graph_id,
                 input_state=packet.arg,  # Send.arg is the custom input
                 config=self._filter_config(cast("dict[str, Any]", config)),
@@ -1089,7 +1131,7 @@ class TemporalLangGraphRunner:
             activity_options = self._get_node_activity_options(packet.node)
 
             # Generate unique activity ID
-            activity_id = f"inv{invocation_id}-send-{packet.node}-{self._step_counter}"
+            activity_id = f"inv{invocation_id}-send-{packet.node}-{self._execution.step_counter}"
 
             # Build meaningful summary from node name, input, and metadata
             node_metadata = self._get_full_node_metadata(packet.node)
@@ -1147,9 +1189,9 @@ class TemporalLangGraphRunner:
 
             # Check for interrupt
             if result.interrupt is not None:
-                self._interrupted_state = packet.arg
-                self._interrupted_node_name = packet.node
-                self._pending_interrupt = result.interrupt
+                self._interrupt.interrupted_state = packet.arg
+                self._interrupt.interrupted_node_name = packet.node
+                self._interrupt.pending_interrupt = result.interrupt
                 return all_writes
 
             # Check for parent command (from subgraph to parent)
@@ -1162,7 +1204,7 @@ class TemporalLangGraphRunner:
                         all_writes.append((channel, value))
                 # Store the parent command for the parent graph to handle
                 # The goto nodes exist in the parent, not in this subgraph
-                self._pending_parent_command = cmd
+                self._execution.pending_parent_command = cmd
                 continue  # Skip normal write/send_packet processing
 
             # Collect writes
@@ -1173,7 +1215,7 @@ class TemporalLangGraphRunner:
                 nested_writes = await self._execute_send_packets(
                     list(result.send_packets), config
                 )
-                if self._pending_interrupt is not None:
+                if self._interrupt.pending_interrupt is not None:
                     return all_writes
                 all_writes.extend(nested_writes)
 
@@ -1186,7 +1228,7 @@ class TemporalLangGraphRunner:
         config: dict[str, Any],
     ) -> list[tuple[str, Any]]:
         """Execute the interrupted node with the resume value."""
-        self._step_counter += 1
+        self._execution.step_counter += 1
 
         # Prepare store snapshot for the activity
         store_snapshot = self._prepare_store_snapshot()
@@ -1194,13 +1236,13 @@ class TemporalLangGraphRunner:
         # Build activity input with resume value
         activity_input = NodeActivityInput(
             node_name=node_name,
-            task_id=f"resume-{node_name}-{self._invocation_counter}",
+            task_id=f"resume-{node_name}-{self._execution.invocation_counter}",
             graph_id=self.graph_id,
             input_state=input_state,
             config=self._filter_config(config),
             path=tuple(),
             triggers=[],
-            resume_value=self._resume_value,
+            resume_value=self._interrupt.resume_value,
             store_snapshot=store_snapshot,
         )
 
@@ -1209,9 +1251,9 @@ class TemporalLangGraphRunner:
 
         # Generate unique activity ID
         invocation_id = config.get("configurable", {}).get(
-            "invocation_id", self._invocation_counter
+            "invocation_id", self._execution.invocation_counter
         )
-        activity_id = f"inv{invocation_id}-resume-{node_name}-{self._step_counter}"
+        activity_id = f"inv{invocation_id}-resume-{node_name}-{self._execution.step_counter}"
 
         # Build meaningful summary from node name, input, and metadata
         node_metadata = self._get_full_node_metadata(node_name)
@@ -1233,13 +1275,13 @@ class TemporalLangGraphRunner:
         # Check if the node interrupted again
         if result.interrupt is not None:
             # Update interrupted state
-            self._interrupted_state = input_state
-            self._interrupted_node_name = node_name
-            self._pending_interrupt = result.interrupt
+            self._interrupt.interrupted_state = input_state
+            self._interrupt.interrupted_node_name = node_name
+            self._interrupt.pending_interrupt = result.interrupt
             return []
 
         # Mark resume as consumed
-        self._resume_used = True
+        self._interrupt.resume_used = True
 
         # Convert ChannelWrite objects to tuples
         return result.to_write_tuples()
@@ -1459,35 +1501,35 @@ class TemporalLangGraphRunner:
         """Get the current state snapshot for checkpointing and continue-as-new."""
         # Determine next nodes based on current state
         next_nodes: tuple[str, ...] = ()
-        if self._interrupted_node_name is not None:
-            next_nodes = (self._interrupted_node_name,)
+        if self._interrupt.interrupted_node_name is not None:
+            next_nodes = (self._interrupt.interrupted_node_name,)
 
         # Build tasks tuple with interrupt info if present
         tasks: tuple[dict[str, Any], ...] = ()
-        if self._pending_interrupt is not None:
+        if self._interrupt.pending_interrupt is not None:
             tasks = (
                 {
-                    "interrupt_value": self._pending_interrupt.value,
-                    "interrupt_node": self._pending_interrupt.node_name,
-                    "interrupt_task_id": self._pending_interrupt.task_id,
+                    "interrupt_value": self._interrupt.pending_interrupt.value,
+                    "interrupt_node": self._interrupt.pending_interrupt.node_name,
+                    "interrupt_task_id": self._interrupt.pending_interrupt.task_id,
                 },
             )
 
         # For values, prefer interrupted_state when there's an interrupt
         # (since _last_output only contains the interrupt marker, not the full state)
         # Otherwise use _last_output for completed executions
-        if self._interrupted_state is not None:
-            values = self._interrupted_state
+        if self._interrupt.interrupted_state is not None:
+            values = self._interrupt.interrupted_state
         else:
-            values = self._last_output or {}
+            values = self._execution.last_output or {}
 
         return StateSnapshot(
             values=values,
             next=next_nodes,
             metadata={
-                "step": self._step_counter,
-                "invocation_counter": self._invocation_counter,
-                "completed_nodes": list(self._completed_nodes_in_cycle),
+                "step": self._execution.step_counter,
+                "invocation_counter": self._execution.invocation_counter,
+                "completed_nodes": list(self._execution.completed_nodes_in_cycle),
             },
             tasks=tasks,
             store_state=self._serialize_store_state(),
@@ -1496,25 +1538,25 @@ class TemporalLangGraphRunner:
     def _restore_from_checkpoint(self, checkpoint: dict[str, Any]) -> None:
         """Restore runner state from a checkpoint."""
         # Restore state values
-        self._last_output = checkpoint.get("values")
-        self._interrupted_state = checkpoint.get("values")
+        self._execution.last_output = checkpoint.get("values")
+        self._interrupt.interrupted_state = checkpoint.get("values")
 
         # Restore next node (interrupted node)
         next_nodes = checkpoint.get("next", ())
         if next_nodes:
-            self._interrupted_node_name = next_nodes[0]
+            self._interrupt.interrupted_node_name = next_nodes[0]
 
         # Restore metadata
         metadata = checkpoint.get("metadata", {})
-        self._step_counter = metadata.get("step", 0)
-        self._invocation_counter = metadata.get("invocation_counter", 0)
-        self._completed_nodes_in_cycle = set(metadata.get("completed_nodes", []))
+        self._execution.step_counter = metadata.get("step", 0)
+        self._execution.invocation_counter = metadata.get("invocation_counter", 0)
+        self._execution.completed_nodes_in_cycle = set(metadata.get("completed_nodes", []))
 
         # Restore interrupt info from tasks
         tasks = checkpoint.get("tasks", ())
         if tasks:
             task = tasks[0]
-            self._pending_interrupt = InterruptValue(
+            self._interrupt.pending_interrupt = InterruptValue(
                 value=task.get("interrupt_value"),
                 node_name=task.get("interrupt_node", ""),
                 task_id=task.get("interrupt_task_id", ""),
@@ -1522,19 +1564,19 @@ class TemporalLangGraphRunner:
 
         # Restore store state
         store_state = checkpoint.get("store_state", {})
-        self._store_state = {
+        self._execution.store_state = {
             (tuple(item["namespace"]), item["key"]): item["value"]
             for item in store_state
         }
 
     def _prepare_store_snapshot(self) -> StoreSnapshot | None:
         """Prepare a store snapshot for activity input."""
-        if not self._store_state:
+        if not self._execution.store_state:
             return None
 
         items = [
             StoreItem(namespace=ns, key=key, value=value)
-            for (ns, key), value in self._store_state.items()
+            for (ns, key), value in self._execution.store_state.items()
         ]
         return StoreSnapshot(items=items)
 
@@ -1543,13 +1585,13 @@ class TemporalLangGraphRunner:
         for write in writes:
             key = (tuple(write.namespace), write.key)
             if write.operation == "put" and write.value is not None:
-                self._store_state[key] = write.value
+                self._execution.store_state[key] = write.value
             elif write.operation == "delete":
-                self._store_state.pop(key, None)
+                self._execution.store_state.pop(key, None)
 
     def _serialize_store_state(self) -> list[dict[str, Any]]:
         """Serialize store state for checkpoint."""
         return [
             {"namespace": list(ns), "key": key, "value": value}
-            for (ns, key), value in self._store_state.items()
+            for (ns, key), value in self._execution.store_state.items()
         ]

@@ -687,16 +687,16 @@ class TestParentCommandRouting:
         runner = TemporalLangGraphRunner(mock_pregel, graph_id="test")
 
         # Initially no pending command
-        assert runner._pending_parent_command is None
+        assert runner._execution.pending_parent_command is None
 
         # After storing a command
         from temporalio.contrib.langgraph._models import CommandOutput
 
         cmd = CommandOutput(goto=["target_node"], update={"key": "value"})
-        runner._pending_parent_command = cmd
+        runner._execution.pending_parent_command = cmd
 
-        assert runner._pending_parent_command is not None
-        assert runner._pending_parent_command.goto == ["target_node"]
+        assert runner._execution.pending_parent_command is not None
+        assert runner._execution.pending_parent_command.goto == ["target_node"]
 
 
 class TestErrorRetryability:

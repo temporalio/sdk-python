@@ -163,13 +163,13 @@ class MultiInterruptE2EWorkflow:
         if self._app is None:
             return {"error": "no app"}
         return {
-            "has_interrupted_state": self._app._interrupted_state is not None,
-            "interrupted_state": self._app._interrupted_state,
-            "interrupted_node": self._app._interrupted_node_name,
-            "completed_nodes": list(self._app._completed_nodes_in_cycle),
-            "resume_value": self._app._resume_value,
-            "resume_used": self._app._resume_used,
-            "pending_interrupt": self._app._pending_interrupt,
+            "has_interrupted_state": self._app._interrupt.interrupted_state is not None,
+            "interrupted_state": self._app._interrupt.interrupted_state,
+            "interrupted_node": self._app._interrupt.interrupted_node_name,
+            "completed_nodes": list(self._app._execution.completed_nodes_in_cycle),
+            "resume_value": self._app._interrupt.resume_value,
+            "resume_used": self._app._interrupt.resume_used,
+            "pending_interrupt": self._app._interrupt.pending_interrupt,
         }
 
     @workflow.run
