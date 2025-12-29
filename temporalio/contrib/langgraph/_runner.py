@@ -275,20 +275,54 @@ class TemporalLangGraphRunner:
         """
         workflow.logger.debug("Starting graph execution for %s", self.graph_id)
 
-        # Import Command here to check type
+        # Prepare invocation state and detect resume
+        input_state, is_resume = self._prepare_invocation_state(input_state)
+
+        # Prepare config with defaults
+        config = self._prepare_config(config)
+
+        # Handle resume: execute interrupted node first
+        if is_resume and self._interrupted_node_name:
+            early_return = await self._handle_resume_execution(input_state, config)
+            if early_return is not None:
+                return early_return
+
+        # Create and run the Pregel loop
+        output, interrupted = await self._run_pregel_loop(
+            input_state, config, should_continue
+        )
+
+        # If we got an early return (checkpoint), return it directly
+        if "__checkpoint__" in output:
+            return output
+
+        # Finalize output with interrupt markers
+        return self._finalize_output(output, interrupted)
+
+    def _prepare_invocation_state(
+        self, input_state: dict[str, Any] | Any
+    ) -> tuple[dict[str, Any], bool]:
+        """Prepare input state and detect if this is a resume invocation.
+
+        Args:
+            input_state: Initial state or Command(resume=value).
+
+        Returns:
+            Tuple of (prepared_input_state, is_resume).
+
+        Raises:
+            ValueError: If resuming without previous interrupt state.
+        """
         with workflow.unsafe.imports_passed_through():
             from langgraph.types import Command
 
-        # Track resume state for this invocation
         resume_value: Any | None = None
-
-        # Check if input is a Command with resume value (LangGraph API)
         is_resume = False
+
         if isinstance(input_state, Command):
             is_resume = True
             if hasattr(input_state, "resume") and input_state.resume is not None:
                 resume_value = input_state.resume
-            # When resuming, use the state from the last interrupt
             if self._interrupted_state is None:
                 raise ValueError(
                     "Cannot resume with Command - no previous interrupt state. "
@@ -296,171 +330,252 @@ class TemporalLangGraphRunner:
                 )
             input_state = self._interrupted_state
         else:
-            # Fresh invocation - clear completed nodes tracking
             self._completed_nodes_in_cycle.clear()
 
+        # Update instance state for this invocation
         self._resume_value = resume_value
         self._resume_used = False
-        # Track whether this is a resume invocation (for cycle tracking)
         self._is_resume_invocation = is_resume
-        # Reset pending interrupt for this invocation
         self._pending_interrupt = None
-        # Increment invocation counter for unique activity IDs
         self._invocation_counter += 1
-        # Reset step counter for this invocation
         self._step_counter = 0
 
-        # Import here to avoid workflow sandbox issues
-        with workflow.unsafe.imports_passed_through():
-            from langgraph.pregel._loop import AsyncPregelLoop
-            from langgraph.types import Interrupt
+        return input_state, is_resume
 
+    def _prepare_config(self, config: dict[str, Any] | None) -> dict[str, Any]:
+        """Prepare configuration with required defaults.
+
+        Args:
+            config: Optional configuration dict.
+
+        Returns:
+            Configuration dict with required structure.
+        """
         config = config or {}
-
-        # Ensure config has required structure
         if "configurable" not in config:
             config["configurable"] = {}
         if "recursion_limit" not in config:
             config["recursion_limit"] = 25
+        return config
 
-        # Handle resume case: execute the interrupted node first and cache its writes
-        # The cached writes will be injected when the loop schedules this node,
-        # allowing the trigger mechanism to work for successor nodes
-        if is_resume and self._interrupted_node_name:
-            interrupted_node = self._interrupted_node_name
-            resume_writes = await self._execute_resumed_node(
-                interrupted_node, input_state, config
+    async def _handle_resume_execution(
+        self, input_state: dict[str, Any], config: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Handle resume by executing the interrupted node first.
+
+        Executes the interrupted node with the resume value and caches its
+        writes for the trigger mechanism.
+
+        Args:
+            input_state: Current input state (from interrupted state).
+            config: Execution configuration.
+
+        Returns:
+            Early return dict if node interrupted again, None otherwise.
+        """
+        with workflow.unsafe.imports_passed_through():
+            from langgraph.types import Interrupt
+
+        interrupted_node = self._interrupted_node_name
+        assert interrupted_node is not None  # Caller checks this
+
+        resume_writes = await self._execute_resumed_node(
+            interrupted_node, input_state, config
+        )
+
+        if self._pending_interrupt is not None:
+            # Node interrupted again - return immediately
+            interrupt_obj = Interrupt.from_ns(
+                value=self._pending_interrupt.value,
+                ns="",
             )
-            if self._pending_interrupt is not None:
-                # Node interrupted again - return immediately
-                interrupt_obj = Interrupt.from_ns(
-                    value=self._pending_interrupt.value,
-                    ns="",
-                )
-                return {**input_state, "__interrupt__": [interrupt_obj]}
+            return {**input_state, "__interrupt__": [interrupt_obj]}
 
-            # Merge the resumed node's writes into input_state
-            # This ensures the writes are part of the final output even if the loop
-            # doesn't schedule the resumed node (e.g., when it's the last node)
-            for channel, value in resume_writes:
-                input_state[channel] = value
+        # Merge writes into input_state for final output
+        for channel, value in resume_writes:
+            input_state[channel] = value
 
-            # Cache the writes for the trigger mechanism
-            self._resumed_node_writes[interrupted_node] = resume_writes
-            # ADD the resumed node to completed nodes (don't reset!)
-            # This preserves knowledge of previously completed nodes across invocations,
-            # preventing them from re-running when the graph continues.
-            # We do need __start__ to run again to trigger the graph traversal,
-            # but step1 (and other completed user nodes) should be skipped.
-            # Remove __start__ from completed to allow it to run again.
-            self._completed_nodes_in_cycle.discard("__start__")
-            # Add the interrupted node to completed (it just ran via _execute_resumed_node)
-            self._completed_nodes_in_cycle.add(interrupted_node)
-            # Clear interrupted node since we've handled it
-            self._interrupted_node_name = None
+        # Cache writes for trigger mechanism
+        self._resumed_node_writes[interrupted_node] = resume_writes
 
-        # Create AsyncPregelLoop with all required parameters
-        # Cast config to RunnableConfig for type checking
-        loop = AsyncPregelLoop(
+        # Update completed nodes tracking
+        self._completed_nodes_in_cycle.discard("__start__")
+        self._completed_nodes_in_cycle.add(interrupted_node)
+        self._interrupted_node_name = None
+
+        return None
+
+    def _create_pregel_loop(
+        self, input_state: dict[str, Any], config: dict[str, Any]
+    ) -> Any:
+        """Create an AsyncPregelLoop for graph execution.
+
+        Args:
+            input_state: Input state for the loop.
+            config: Execution configuration.
+
+        Returns:
+            Configured AsyncPregelLoop instance.
+        """
+        with workflow.unsafe.imports_passed_through():
+            from langgraph.pregel._loop import AsyncPregelLoop
+
+        return AsyncPregelLoop(
             input=input_state,
-            stream=None,  # No streaming for now
+            stream=None,
             config=cast("RunnableConfig", config),
             store=getattr(self.pregel, "store", None),
             cache=getattr(self.pregel, "cache", None),
-            checkpointer=None,  # Use Temporal's event history instead
+            checkpointer=None,
             nodes=self.pregel.nodes,
             specs=self.pregel.channels,
             trigger_to_nodes=getattr(self.pregel, "trigger_to_nodes", {}),
-            durability="sync",  # Temporal handles durability
+            durability="sync",
             input_keys=getattr(self.pregel, "input_channels", None) or [],
             output_keys=getattr(self.pregel, "output_channels", None) or [],
             stream_keys=getattr(self.pregel, "stream_channels_asis", None) or [],
         )
 
-        # Execute the Pregel loop manually (not using async with to avoid blocking)
-        # Enter the loop context
+    async def _run_pregel_loop(
+        self,
+        input_state: dict[str, Any],
+        config: dict[str, Any],
+        should_continue: Callable[[], bool] | None,
+    ) -> tuple[dict[str, Any], bool]:
+        """Run the Pregel loop to execute the graph.
+
+        Args:
+            input_state: Input state for the loop.
+            config: Execution configuration.
+            should_continue: Optional callable to check for checkpointing.
+
+        Returns:
+            Tuple of (output_dict, was_interrupted).
+        """
+        loop = self._create_pregel_loop(input_state, config)
+
         await loop.__aenter__()
         interrupted = False
+
         try:
-            # loop.tick() prepares the next tasks based on graph topology
-            # We execute tasks and call loop.after_tick() to process writes
             while loop.tick():
                 # Inject cached writes for resumed nodes
-                # This allows the trigger mechanism to schedule successor nodes
-                for task in loop.tasks.values():
-                    if task.name in self._resumed_node_writes:
-                        cached_writes = self._resumed_node_writes.pop(task.name)
-                        task.writes.extend(cached_writes)
+                self._inject_resumed_writes(loop)
 
-                # Get tasks that need to be executed (those without writes)
-                # Also skip nodes that already completed in this resume cycle
-                # (prevents re-execution when resuming from interrupted state)
-                tasks_to_execute = [
-                    task
-                    for task in loop.tasks.values()
-                    if not task.writes
-                    and task.name not in self._completed_nodes_in_cycle
-                ]
+                # Get executable tasks
+                tasks_to_execute = self._get_executable_tasks(loop)
 
-                # If no tasks to execute (all filtered out or have cached writes),
-                # process any pending writes and continue to next tick
+                # No tasks - process writes and check for checkpoint
                 if not tasks_to_execute:
                     loop.after_tick()
-                    # Check if we should stop for checkpointing
-                    if should_continue is not None and not should_continue():
-                        output = (
-                            cast("dict[str, Any]", loop.output) if loop.output else {}
-                        )
-                        output["__checkpoint__"] = self.get_state()
-                        self._last_output = output
-                        return output
+                    checkpoint_output = self._check_checkpoint(loop, should_continue)
+                    if checkpoint_output is not None:
+                        return checkpoint_output, False
                     continue
 
-                # Execute tasks sequentially for now (simplifies interrupt handling)
-                # TODO: Re-enable parallel execution with proper interrupt handling
-                task_interrupted = False
-                for task in tasks_to_execute:
-                    result = await self._execute_task(task, loop)
-                    if not result:
-                        task_interrupted = True
-                        break
+                # Execute tasks
+                task_interrupted = await self._execute_loop_tasks(tasks_to_execute, loop)
 
-                # Check if any task was interrupted
                 if task_interrupted:
-                    # An interrupt occurred - finalize writes before breaking
                     loop.after_tick()
                     interrupted = True
                     break
 
-                # Process writes and advance to next step
                 loop.after_tick()
 
-                # Check if we should stop for checkpointing
-                if should_continue is not None and not should_continue():
-                    output = cast("dict[str, Any]", loop.output) if loop.output else {}
-                    output["__checkpoint__"] = self.get_state()
-                    self._last_output = output
-                    return output
+                # Check for checkpoint after successful tick
+                checkpoint_output = self._check_checkpoint(loop, should_continue)
+                if checkpoint_output is not None:
+                    return checkpoint_output, False
+
         finally:
-            # Exit the loop context only if we completed normally (not interrupted)
-            # Calling __aexit__ on interrupted loop may block indefinitely
             if not interrupted:
                 await loop.__aexit__(None, None, None)
 
-        # Get the output from the loop
         output = cast("dict[str, Any]", loop.output) if loop.output else {}
+        return output, interrupted
 
-        # If there's a pending interrupt, add it to the result (LangGraph native API)
+    def _inject_resumed_writes(self, loop: Any) -> None:
+        """Inject cached writes from resumed nodes into loop tasks.
+
+        This allows the trigger mechanism to schedule successor nodes.
+        """
+        for task in loop.tasks.values():
+            if task.name in self._resumed_node_writes:
+                cached_writes = self._resumed_node_writes.pop(task.name)
+                task.writes.extend(cached_writes)
+
+    def _get_executable_tasks(self, loop: Any) -> list[Any]:
+        """Get tasks that need to be executed.
+
+        Filters out tasks that already have writes or were completed
+        in the current resume cycle.
+        """
+        return [
+            task
+            for task in loop.tasks.values()
+            if not task.writes and task.name not in self._completed_nodes_in_cycle
+        ]
+
+    def _check_checkpoint(
+        self, loop: Any, should_continue: Callable[[], bool] | None
+    ) -> dict[str, Any] | None:
+        """Check if we should stop for checkpointing.
+
+        Args:
+            loop: The Pregel loop.
+            should_continue: Optional callable to check for checkpointing.
+
+        Returns:
+            Output dict with checkpoint if stopping, None otherwise.
+        """
+        if should_continue is not None and not should_continue():
+            output = cast("dict[str, Any]", loop.output) if loop.output else {}
+            output["__checkpoint__"] = self.get_state()
+            self._last_output = output
+            return output
+        return None
+
+    async def _execute_loop_tasks(
+        self, tasks: list[Any], loop: Any
+    ) -> bool:
+        """Execute a list of tasks sequentially.
+
+        Args:
+            tasks: List of tasks to execute.
+            loop: The Pregel loop.
+
+        Returns:
+            True if a task was interrupted, False otherwise.
+        """
+        for task in tasks:
+            result = await self._execute_task(task, loop)
+            if not result:
+                return True
+        return False
+
+    def _finalize_output(
+        self, output: dict[str, Any], interrupted: bool
+    ) -> dict[str, Any]:
+        """Finalize the output with interrupt markers and logging.
+
+        Args:
+            output: Raw output from the loop.
+            interrupted: Whether execution was interrupted.
+
+        Returns:
+            Final output dict.
+        """
+        with workflow.unsafe.imports_passed_through():
+            from langgraph.types import Interrupt
+
         if self._pending_interrupt is not None:
-            # Create LangGraph Interrupt object to match native API
             interrupt_obj = Interrupt.from_ns(
                 value=self._pending_interrupt.value,
-                ns="",  # Empty namespace since we don't use checkpointing
+                ns="",
             )
-            # Merge with any existing state in output
             output = {**output, "__interrupt__": [interrupt_obj]}
 
-        # Track last output for get_state() checkpoint
         self._last_output = output
 
         if "__interrupt__" in output:
@@ -568,6 +683,193 @@ class TemporalLangGraphRunner:
 
         return None
 
+    def _create_nested_runner(
+        self,
+        task: "PregelExecutableTask",
+        subgraph: "Pregel",
+    ) -> "TemporalLangGraphRunner":
+        """Create a nested runner for executing a subgraph.
+
+        Args:
+            task: The task representing the subgraph node.
+            subgraph: The subgraph's Pregel instance.
+
+        Returns:
+            A new TemporalLangGraphRunner configured for the subgraph.
+        """
+        subgraph_id = f"{self.graph_id}:{task.name}"
+        return self.__class__(
+            pregel=subgraph,
+            graph_id=subgraph_id,
+            default_activity_options={"temporal": self.default_activity_options},
+            per_node_activity_options={
+                k.split(":", 1)[1]: v
+                for k, v in self.per_node_activity_options.items()
+                if k.startswith(f"{task.name}:")
+            },
+        )
+
+    def _handle_subgraph_interrupt(
+        self,
+        task: "PregelExecutableTask",
+        result: dict[str, Any],
+    ) -> bool:
+        """Handle interrupt propagation from a subgraph.
+
+        Args:
+            task: The task representing the subgraph node.
+            result: The result from the subgraph execution.
+
+        Returns:
+            True if an interrupt was handled, False otherwise.
+        """
+        if "__interrupt__" not in result:
+            return False
+
+        self._interrupted_state = cast("dict[str, Any]", task.input)
+        self._interrupted_node_name = task.name
+
+        with workflow.unsafe.imports_passed_through():
+            from langgraph.types import Interrupt
+
+        interrupt_list = result.get("__interrupt__", [])
+        if interrupt_list:
+            interrupt_obj = interrupt_list[0]
+            interrupt_value = (
+                interrupt_obj.value
+                if isinstance(interrupt_obj, Interrupt)
+                else interrupt_obj
+            )
+            self._pending_interrupt = InterruptValue(
+                value=interrupt_value,
+                node_name=task.name,
+                task_id=task.id,
+            )
+        return True
+
+    def _handle_subgraph_parent_command(
+        self,
+        nested_runner: "TemporalLangGraphRunner",
+        task: "PregelExecutableTask",
+        result: dict[str, Any],
+    ) -> list[Any]:
+        """Handle parent command from a subgraph.
+
+        Args:
+            nested_runner: The nested runner that executed the subgraph.
+            task: The task representing the subgraph node.
+            result: The result from the subgraph execution.
+
+        Returns:
+            List of SendPackets for routing in the parent graph.
+        """
+        if nested_runner._pending_parent_command is None:
+            return []
+
+        cmd = nested_runner._pending_parent_command
+        workflow.logger.debug(
+            "Subgraph %s has pending parent command: goto=%s",
+            task.name,
+            cmd.goto,
+        )
+
+        if not cmd.goto:
+            return []
+
+        from temporalio.contrib.langgraph._models import SendPacket
+
+        return [SendPacket(node=node_name, arg=result) for node_name in cmd.goto]
+
+    def _extract_subgraph_writes(
+        self,
+        result: dict[str, Any],
+    ) -> list[tuple[str, Any]]:
+        """Extract writes from subgraph result.
+
+        Args:
+            result: The result from the subgraph execution.
+
+        Returns:
+            List of (channel, value) tuples for non-internal keys.
+        """
+        return [
+            (key, value)
+            for key, value in result.items()
+            if not key.startswith("__")
+        ]
+
+    def _invoke_subgraph_writers(
+        self,
+        task: "PregelExecutableTask",
+        result: dict[str, Any],
+    ) -> list[tuple[str, Any]]:
+        """Invoke parent node writers to get proper edge routing.
+
+        Writers handle both static edges and conditional edges (routing functions).
+        By invoking writers with the merged state, we get the correct branch writes.
+
+        Args:
+            task: The task representing the subgraph node.
+            result: The result from the subgraph execution.
+
+        Returns:
+            List of branch writes (channel, value) tuples.
+        """
+        parent_node = self.pregel.nodes.get(task.name)
+        if parent_node is None:
+            return []
+
+        node_writers = getattr(parent_node, "writers", None)
+        if not node_writers:
+            return []
+
+        branch_writes: list[tuple[str, Any]] = []
+
+        with workflow.unsafe.imports_passed_through():
+            from collections import deque
+
+            from langgraph.constants import CONFIG_KEY_READ, CONFIG_KEY_SEND
+
+            merged_state = {**cast("dict[str, Any]", task.input), **result}
+            writer_writes: deque[tuple[str, Any]] = deque()
+
+            def read_state(channel: Any, fresh: bool = False) -> Any:
+                if isinstance(channel, str):
+                    return merged_state.get(channel)
+                return {c: merged_state.get(c) for c in channel}
+
+            writer_config = {
+                **cast("dict[str, Any]", task.config),
+                "configurable": {
+                    **cast("dict[str, Any]", task.config).get("configurable", {}),
+                    CONFIG_KEY_SEND: writer_writes.extend,
+                    CONFIG_KEY_READ: read_state,
+                },
+            }
+
+            for writer in node_writers:
+                try:
+                    if hasattr(writer, "invoke"):
+                        writer.invoke(merged_state, writer_config)
+                except Exception as e:
+                    workflow.logger.warning(
+                        "Writer invocation failed for node %s: %s: %s",
+                        task.name,
+                        type(e).__name__,
+                        e,
+                    )
+
+            for channel, value in writer_writes:
+                if channel.startswith("branch:"):
+                    branch_writes.append((channel, value))
+                    workflow.logger.debug(
+                        "Subgraph %s produced branch write: %s",
+                        task.name,
+                        channel,
+                    )
+
+        return branch_writes
+
     async def _execute_subgraph(
         self,
         task: "PregelExecutableTask",
@@ -595,146 +897,24 @@ class TemporalLangGraphRunner:
             len(subgraph.nodes),
         )
 
-        # Create a unique graph_id for the subgraph to avoid activity ID collisions
-        subgraph_id = f"{self.graph_id}:{task.name}"
-
-        # Create a nested runner for the subgraph
-        # Pass down activity options from the parent with subgraph-specific namespace
-        nested_runner = self.__class__(
-            pregel=subgraph,
-            graph_id=subgraph_id,
-            default_activity_options={"temporal": self.default_activity_options},
-            per_node_activity_options={
-                # Inherit per-node options if specified for subgraph nodes
-                # e.g., "retrieve_agent:model" would apply to the model node inside retrieve_agent
-                k.split(":", 1)[1]: v
-                for k, v in self.per_node_activity_options.items()
-                if k.startswith(f"{task.name}:")
-            },
-        )
-
-        # Execute the subgraph with the task's input
-        # The subgraph state schema may differ from the parent, so we pass input directly
+        nested_runner = self._create_nested_runner(task, subgraph)
         config = cast("dict[str, Any]", task.config)
         result = await nested_runner.ainvoke(task.input, config)
 
-        # Check for interrupt in the subgraph
-        if "__interrupt__" in result:
-            # Propagate interrupt to parent
-            # Store the interrupted state and node info for proper resume handling
-            self._interrupted_state = cast("dict[str, Any]", task.input)
-            self._interrupted_node_name = task.name
-            # Create interrupt value from the subgraph's interrupt
-            with workflow.unsafe.imports_passed_through():
-                from langgraph.types import Interrupt
-
-            interrupt_list = result.get("__interrupt__", [])
-            if interrupt_list:
-                interrupt_obj = interrupt_list[0]
-                interrupt_value = (
-                    interrupt_obj.value
-                    if isinstance(interrupt_obj, Interrupt)
-                    else interrupt_obj
-                )
-                self._pending_interrupt = InterruptValue(
-                    value=interrupt_value,
-                    node_name=task.name,
-                    task_id=task.id,
-                )
+        # Handle interrupt propagation
+        if self._handle_subgraph_interrupt(task, result):
             return [], []
 
-        # Check if the subgraph has a pending parent command
-        # This happens when a subgraph node (like tool node) raises ParentCommand
-        # to route to a node in the parent graph (this graph)
-        send_packets: list[Any] = []
-        if nested_runner._pending_parent_command is not None:
-            cmd = nested_runner._pending_parent_command
-            workflow.logger.debug(
-                "Subgraph %s has pending parent command: goto=%s",
-                task.name,
-                cmd.goto,
-            )
-            # Convert goto to Send packets for routing in THIS (parent) graph context
-            if cmd.goto:
-                from temporalio.contrib.langgraph._models import SendPacket
+        # Handle parent command routing
+        send_packets = self._handle_subgraph_parent_command(nested_runner, task, result)
 
-                # Use the subgraph's result (which includes the command.update) as input
-                for node_name in cmd.goto:
-                    send_packets.append(SendPacket(node=node_name, arg=result))
+        # Extract writes from result
+        writes = self._extract_subgraph_writes(result)
 
-        # Extract writes from the subgraph result
-        # The result contains the final state - convert to channel writes
-        writes: list[tuple[str, Any]] = []
-        for key, value in result.items():
-            if not key.startswith("__"):  # Skip internal keys like __interrupt__
-                writes.append((key, value))
+        # Invoke writers for edge routing
+        branch_writes = self._invoke_subgraph_writers(task, result)
+        writes.extend(branch_writes)
 
-        # Invoke the parent node's writers to get proper edge routing
-        # Writers handle both static edges and conditional edges (routing functions).
-        # By invoking writers with the merged state, we get the correct branch writes.
-        parent_node = self.pregel.nodes.get(task.name)
-        if parent_node is not None:
-            node_writers = getattr(parent_node, "writers", None)
-            if node_writers:
-                # Use imports_passed_through for the entire writer invocation
-                # This allows conditional edge functions to access LangChain imports
-                with workflow.unsafe.imports_passed_through():
-                    from collections import deque
-
-                    from langgraph.constants import CONFIG_KEY_READ, CONFIG_KEY_SEND
-
-                    # Merge input state with subgraph output for writers
-                    merged_state = {**cast("dict[str, Any]", task.input), **result}
-
-                    # Setup write capture
-                    writer_writes: deque[tuple[str, Any]] = deque()
-
-                    # Create state reader function matching LangGraph's expected signature
-                    def read_state(channel: Any, fresh: bool = False) -> Any:
-                        if isinstance(channel, str):
-                            return merged_state.get(channel)
-                        return {c: merged_state.get(c) for c in channel}
-
-                    # Create config with callbacks for writers
-                    writer_config = {
-                        **cast("dict[str, Any]", task.config),
-                        "configurable": {
-                            **cast("dict[str, Any]", task.config).get(
-                                "configurable", {}
-                            ),
-                            CONFIG_KEY_SEND: writer_writes.extend,
-                            CONFIG_KEY_READ: read_state,
-                        },
-                    }
-
-                    # Invoke each writer to emit branch writes
-                    for writer in node_writers:
-                        try:
-                            if hasattr(writer, "invoke"):
-                                writer.invoke(merged_state, writer_config)
-                        except Exception as e:
-                            # Writers may fail if they expect specific state structure
-                            # or if conditional edge functions have issues (e.g., LLM calls)
-                            workflow.logger.warning(
-                                "Writer invocation failed for node %s: %s: %s",
-                                task.name,
-                                type(e).__name__,
-                                e,
-                            )
-
-                    # Add captured branch writes to our writes list
-                    for channel, value in writer_writes:
-                        if channel.startswith("branch:"):
-                            writes.append((channel, value))
-                            workflow.logger.debug(
-                                "Subgraph %s produced branch write: %s",
-                                task.name,
-                                channel,
-                            )
-
-        # Return writes and any send_packets from parent commands
-        # send_packets contains routing instructions for the parent graph when
-        # a subgraph node raises ParentCommand with goto targets
         workflow.logger.debug(
             "Subgraph %s returning %d writes, %d send_packets: %s",
             task.name,
