@@ -98,7 +98,7 @@ class TestBuildActivitySummary:
     """Tests for the _build_activity_summary function."""
 
     def test_returns_node_name_for_non_tools_node(self) -> None:
-        """Non-tools/non-model nodes should return just the node name."""
+        """Non-tools/non-model nodes without query fields return just the node name."""
         from temporalio.contrib.langgraph._runner import _build_activity_summary
 
         result = _build_activity_summary("process", {"data": "value"})
@@ -106,6 +106,29 @@ class TestBuildActivitySummary:
 
         result = _build_activity_summary("custom_node", {"messages": []})
         assert result == "custom_node"
+
+    def test_extracts_query_from_generic_node(self) -> None:
+        """Generic nodes with query-like fields should show the query in summary."""
+        from temporalio.contrib.langgraph._runner import _build_activity_summary
+
+        # Test "query" field
+        result = _build_activity_summary("search", {"query": "LangGraph definition"})
+        assert result == 'search: "LangGraph definition"'
+
+        # Test "search_query" field
+        result = _build_activity_summary("search", {"search_query": "Temporal features"})
+        assert result == 'search: "Temporal features"'
+
+        # Test "question" field
+        result = _build_activity_summary("qa", {"question": "What is AI?"})
+        assert result == 'qa: "What is AI?"'
+
+        # Test truncation of long queries
+        long_query = "a" * 100
+        result = _build_activity_summary("search", {"query": long_query})
+        assert result.startswith('search: "aaa')
+        assert result.endswith('..."')
+        assert len(result) <= 100
 
     def test_returns_node_name_when_no_tool_calls(self) -> None:
         """Tools node without tool calls should return node name."""

@@ -162,6 +162,19 @@ def _build_activity_summary(
                 summary = summary[: max_length - 3] + "..."
             return summary
 
+    # For other nodes, try to extract query-like fields from input state
+    # Common field names for search/query operations
+    if isinstance(input_state, dict):
+        query_fields = ["query", "search_query", "question", "input", "text", "prompt"]
+        for field in query_fields:
+            value = input_state.get(field)
+            if value and isinstance(value, str):
+                truncated = value if len(value) <= 60 else value[:57] + "..."
+                summary = f'{node_name}: "{truncated}"'
+                if len(summary) > max_length:
+                    summary = summary[: max_length - 3] + "..."
+                return summary
+
     # Check for description in node metadata
     if node_metadata and isinstance(node_metadata, dict):
         description = node_metadata.get("description")
