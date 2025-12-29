@@ -15,7 +15,7 @@ This document is organized as follows:
 
 - **[Quick Start](#quick-start)** - Your first durable LangGraph agent
 - **[Per-Node Configuration](#per-node-configuration)** - Configuring timeouts, retries, and task queues
-- **[Agentic Execution](#agentic-execution)** - Using LangGraph's create_react_agent with Temporal
+- **[Agentic Execution](#agentic-execution)** - Using LangChain's create_agent with Temporal
 - **[Human-in-the-Loop](#human-in-the-loop-interrupts)** - Supporting interrupt() with Temporal signals
 - **[Compatibility](#compatibility)** - Feature support matrix
 
