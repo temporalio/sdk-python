@@ -31,6 +31,7 @@ from tests.contrib.langgraph.e2e_graphs import (
     build_native_react_agent_graph,
     build_react_agent_graph,
     build_run_in_workflow_graph,
+    build_sandbox_enforcement_graph,
     build_send_graph,
     build_simple_graph,
     build_store_graph,
@@ -47,6 +48,7 @@ from tests.contrib.langgraph.e2e_workflows import (
     ReactAgentE2EWorkflow,
     RejectionE2EWorkflow,
     RunInWorkflowE2EWorkflow,
+    SandboxEnforcementE2EWorkflow,
     SendE2EWorkflow,
     SimpleE2EWorkflow,
     StoreE2EWorkflow,
@@ -756,3 +758,51 @@ class TestRunInWorkflow:
             # final node adds 5 -> final_result=25
             assert result.get("activity_result") == 20
             assert result.get("final_result") == 25
+
+    @pytest.mark.asyncio
+    async def test_sandbox_enforced_for_run_in_workflow_nodes(
+        self, client: Client
+    ) -> None:
+        """Test that sandbox restrictions are enforced for run_in_workflow nodes.
+
+        This test verifies that non-deterministic code (using random module)
+        in a run_in_workflow node is caught by the sandbox, causing the
+        workflow task to fail repeatedly (blocking the workflow).
+
+        Note: Sandbox errors don't fail workflows - they block them by causing
+        workflow task failures. We use a short timeout to verify the workflow
+        doesn't complete.
+        """
+        plugin = LangGraphPlugin(
+            graphs={"e2e_sandbox_enforcement": build_sandbox_enforcement_graph},
+            default_activity_timeout=timedelta(seconds=30),
+        )
+
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
+
+        async with new_worker(
+            plugin_client,
+            SandboxEnforcementE2EWorkflow,
+        ) as worker:
+            # The workflow should not complete - sandbox blocks it.
+            # Use a short timeout to avoid waiting too long.
+            with pytest.raises(Exception) as exc_info:
+                await plugin_client.execute_workflow(
+                    SandboxEnforcementE2EWorkflow.run,
+                    10,
+                    id=f"e2e-sandbox-enforcement-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    execution_timeout=timedelta(seconds=3),
+                )
+
+            # Workflow failed because sandbox blocked the random module access.
+            # The exception is WorkflowFailureError wrapping a timeout (workflow
+            # tasks kept failing due to sandbox restriction).
+            from temporalio.client import WorkflowFailureError
+
+            assert isinstance(exc_info.value, WorkflowFailureError), (
+                f"Expected WorkflowFailureError, got: {type(exc_info.value).__name__}"
+            )

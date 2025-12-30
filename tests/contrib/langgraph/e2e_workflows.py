@@ -451,3 +451,17 @@ class RunInWorkflowE2EWorkflow:
     async def run(self, input_value: int) -> dict:
         app = lg_compile("e2e_run_in_workflow")
         return await app.ainvoke({"value": input_value})
+
+
+@workflow.defn
+class SandboxEnforcementE2EWorkflow:
+    """Workflow that tests sandbox enforcement for run_in_workflow nodes.
+
+    This workflow should fail because the node uses non-deterministic code
+    (random module) which is blocked by the workflow sandbox.
+    """
+
+    @workflow.run
+    async def run(self, input_value: int) -> dict:
+        app = lg_compile("e2e_sandbox_enforcement")
+        return await app.ainvoke({"value": input_value})

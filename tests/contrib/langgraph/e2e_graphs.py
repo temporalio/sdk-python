@@ -111,6 +111,50 @@ def build_run_in_workflow_graph():
 
 
 # ==============================================================================
+# Sandbox Enforcement Graph (tests that sandbox catches non-deterministic code)
+# ==============================================================================
+
+
+class SandboxTestState(TypedDict, total=False):
+    """State for sandbox enforcement test."""
+
+    value: int
+
+
+async def _non_deterministic_node(state: SandboxTestState) -> SandboxTestState:
+    """Node with non-deterministic code that should be caught by sandbox.
+
+    This uses random module which is blocked by the workflow sandbox.
+    Must be async to avoid LangChain's run_in_executor wrapping.
+    """
+    import random
+
+    return {"value": random.randint(1, 100)}
+
+
+def build_sandbox_enforcement_graph():
+    """Build a graph that tests sandbox enforcement.
+
+    This graph has a run_in_workflow node that uses non-deterministic code.
+    The sandbox should catch this and raise an error.
+    """
+    from temporalio.contrib.langgraph import temporal_node_metadata
+
+    graph = StateGraph(SandboxTestState)
+
+    graph.add_node(
+        "non_deterministic",
+        _non_deterministic_node,
+        metadata=temporal_node_metadata(run_in_workflow=True),
+    )
+
+    graph.add_edge(START, "non_deterministic")
+    graph.add_edge("non_deterministic", END)
+
+    return graph.compile()
+
+
+# ==============================================================================
 # Approval Graph (single interrupt)
 # ==============================================================================
 
