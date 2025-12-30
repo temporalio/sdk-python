@@ -90,10 +90,14 @@ class GraphRegistry:
 
                 # Inherit default activity options from parent
                 if default_activity_options:
-                    self._default_activity_options[subgraph_id] = default_activity_options
+                    self._default_activity_options[subgraph_id] = (
+                        default_activity_options
+                    )
 
                 # Recursively register nested subgraphs
-                self._register_subgraphs(subgraph_id, subgraph, default_activity_options)
+                self._register_subgraphs(
+                    subgraph_id, subgraph, default_activity_options
+                )
 
     def get_graph(self, graph_id: str) -> Pregel:
         """Get a compiled graph by ID, building and caching if needed."""

@@ -1,4 +1,34 @@
-"""Temporal activities for LangGraph node execution."""
+"""Temporal activities for LangGraph node execution.
+
+LangGraph Internal API Usage
+============================
+
+This module uses LangGraph internal APIs (langgraph._internal.*) because we
+execute individual graph nodes as separate Temporal activities, outside of
+LangGraph's normal Pregel execution loop.
+
+WHY WE NEED THESE:
+LangGraph's Pregel executor injects special config keys when running nodes:
+
+- CONFIG_KEY_SEND: Callback to capture node outputs (writes to channels)
+- CONFIG_KEY_READ: Callback to read current state (for conditional edges)
+- CONFIG_KEY_SCRATCHPAD: Tracks interrupt state for interrupt() to work
+- CONFIG_KEY_RUNTIME: Provides store access and other runtime services
+- CONFIG_KEY_CHECKPOINT_NS: Namespace for checkpoint operations
+- PregelScratchpad: Class that manages interrupt/resume state
+
+Since we run nodes individually in activities, we must inject this same
+context to make nodes behave as if they're running inside Pregel.
+
+RISKS:
+These are private APIs that may change in future LangGraph versions.
+If LangGraph changes these, this integration will need updates.
+
+ALTERNATIVES CONSIDERED:
+- Defining our own string constants: Fragile if LangGraph changes values
+- Running entire graph in one activity: Loses per-node retry/timeout control
+- Requesting public API from LangGraph: Best long-term, but uncertain timeline
+"""
 
 from __future__ import annotations
 
@@ -6,10 +36,20 @@ import logging
 from collections import deque
 from typing import TYPE_CHECKING, Any, Sequence, cast
 
+from langgraph._internal._constants import (
+    CONFIG_KEY_CHECKPOINT_NS,
+    CONFIG_KEY_READ,
+    CONFIG_KEY_RUNTIME,
+    CONFIG_KEY_SCRATCHPAD,
+    CONFIG_KEY_SEND,
+)
+from langgraph._internal._scratchpad import PregelScratchpad
+from langgraph.errors import GraphInterrupt as LangGraphInterrupt
+from langgraph.errors import ParentCommand
+from langgraph.runtime import Runtime
+from langgraph.types import Send
+
 from temporalio import activity
-
-logger = logging.getLogger(__name__)
-
 from temporalio.contrib.langgraph._exceptions import (
     is_non_retryable_error,
     node_execution_error,
@@ -29,50 +69,7 @@ from temporalio.contrib.langgraph._store import ActivityLocalStore
 if TYPE_CHECKING:
     from langchain_core.runnables import RunnableConfig
 
-# =============================================================================
-# LangGraph Internal API Usage
-# =============================================================================
-#
-# This module uses LangGraph internal APIs (langgraph._internal.*) because we
-# execute individual graph nodes as separate Temporal activities, outside of
-# LangGraph's normal Pregel execution loop.
-#
-# WHY WE NEED THESE:
-# LangGraph's Pregel executor injects special config keys when running nodes:
-#
-# - CONFIG_KEY_SEND: Callback to capture node outputs (writes to channels)
-# - CONFIG_KEY_READ: Callback to read current state (for conditional edges)
-# - CONFIG_KEY_SCRATCHPAD: Tracks interrupt state for interrupt() to work
-# - CONFIG_KEY_RUNTIME: Provides store access and other runtime services
-# - CONFIG_KEY_CHECKPOINT_NS: Namespace for checkpoint operations
-# - PregelScratchpad: Class that manages interrupt/resume state
-#
-# Since we run nodes individually in activities, we must inject this same
-# context to make nodes behave as if they're running inside Pregel.
-#
-# RISKS:
-# These are private APIs that may change in future LangGraph versions.
-# If LangGraph changes these, this integration will need updates.
-#
-# ALTERNATIVES CONSIDERED:
-# - Defining our own string constants: Fragile if LangGraph changes values
-# - Running entire graph in one activity: Loses per-node retry/timeout control
-# - Requesting public API from LangGraph: Best long-term, but uncertain timeline
-#
-# =============================================================================
-
-from langgraph._internal._constants import (
-    CONFIG_KEY_CHECKPOINT_NS,
-    CONFIG_KEY_READ,
-    CONFIG_KEY_RUNTIME,
-    CONFIG_KEY_SCRATCHPAD,
-    CONFIG_KEY_SEND,
-)
-from langgraph._internal._scratchpad import PregelScratchpad
-from langgraph.errors import GraphInterrupt as LangGraphInterrupt
-from langgraph.errors import ParentCommand
-from langgraph.runtime import Runtime
-from langgraph.types import Send
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================

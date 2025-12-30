@@ -21,7 +21,6 @@ import pytest
 
 from temporalio.client import Client
 from temporalio.contrib.langgraph import LangGraphPlugin
-
 from tests.contrib.langgraph.e2e_graphs import (
     build_agent_subgraph,
     build_approval_graph,
@@ -52,7 +51,6 @@ from tests.contrib.langgraph.e2e_workflows import (
     SubgraphE2EWorkflow,
 )
 from tests.helpers import new_worker
-
 
 # ==============================================================================
 # Basic Execution Tests
@@ -502,9 +500,9 @@ class TestAdvancedFeatures:
             # - grade (outer node)
             # - finish (outer node)
             # Total: 5 activities minimum
-            assert activity_count >= 5, (
-                f"Expected at least 5 activities but got {activity_count}: {activity_ids}"
-            )
+            assert (
+                activity_count >= 5
+            ), f"Expected at least 5 activities but got {activity_count}: {activity_ids}"
 
     @pytest.mark.asyncio
     async def test_command_goto_skip_node(self, client: Client) -> None:
@@ -706,6 +704,6 @@ class TestAgenticWorkflows:
                 f"got {result['message_count']}"
             )
             # Verify final answer contains expected content
-            assert "sunny" in result["answer"].lower() or "72" in result["answer"], (
-                f"Expected weather info in answer, got: {result['answer']}"
-            )
+            assert (
+                "sunny" in result["answer"].lower() or "72" in result["answer"]
+            ), f"Expected weather info in answer, got: {result['answer']}"

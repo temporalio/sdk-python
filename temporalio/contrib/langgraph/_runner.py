@@ -523,7 +523,9 @@ class TemporalLangGraphRunner:
                     continue
 
                 # Execute tasks
-                task_interrupted = await self._execute_loop_tasks(tasks_to_execute, loop)
+                task_interrupted = await self._execute_loop_tasks(
+                    tasks_to_execute, loop
+                )
 
                 if task_interrupted:
                     loop.after_tick()
@@ -563,7 +565,8 @@ class TemporalLangGraphRunner:
         return [
             task
             for task in loop.tasks.values()
-            if not task.writes and task.name not in self._execution.completed_nodes_in_cycle
+            if not task.writes
+            and task.name not in self._execution.completed_nodes_in_cycle
         ]
 
     def _check_checkpoint(
@@ -585,9 +588,7 @@ class TemporalLangGraphRunner:
             return output
         return None
 
-    async def _execute_loop_tasks(
-        self, tasks: list[Any], loop: Any
-    ) -> bool:
+    async def _execute_loop_tasks(self, tasks: list[Any], loop: Any) -> bool:
         """Execute a list of tasks sequentially.
 
         Args:
@@ -628,9 +629,13 @@ class TemporalLangGraphRunner:
         self._execution.last_output = output
 
         if INTERRUPT_KEY in output:
-            workflow.logger.debug("Graph %s execution paused at interrupt", self.graph_id)
+            workflow.logger.debug(
+                "Graph %s execution paused at interrupt", self.graph_id
+            )
         elif CHECKPOINT_KEY in output:
-            workflow.logger.debug("Graph %s execution stopped for checkpoint", self.graph_id)
+            workflow.logger.debug(
+                "Graph %s execution stopped for checkpoint", self.graph_id
+            )
         else:
             workflow.logger.debug("Graph %s execution completed", self.graph_id)
 
@@ -842,9 +847,7 @@ class TemporalLangGraphRunner:
             List of (channel, value) tuples for non-internal keys.
         """
         return [
-            (key, value)
-            for key, value in result.items()
-            if not key.startswith("__")
+            (key, value) for key, value in result.items() if not key.startswith("__")
         ]
 
     def _invoke_subgraph_writers(
@@ -980,6 +983,7 @@ class TemporalLangGraphRunner:
         """Execute a task directly in the workflow for deterministic operations."""
         with workflow.unsafe.imports_passed_through():
             from collections import deque
+
             from langgraph.constants import CONFIG_KEY_SEND
 
         # Setup write capture
@@ -1138,7 +1142,9 @@ class TemporalLangGraphRunner:
             activity_options = self._get_node_activity_options(packet.node)
 
             # Generate unique activity ID
-            activity_id = f"inv{invocation_id}-send-{packet.node}-{self._execution.step_counter}"
+            activity_id = (
+                f"inv{invocation_id}-send-{packet.node}-{self._execution.step_counter}"
+            )
 
             # Build meaningful summary from node name, input, and metadata
             node_metadata = self._get_full_node_metadata(packet.node)
@@ -1150,7 +1156,14 @@ class TemporalLangGraphRunner:
             )
 
             prepared_activities.append(
-                (packet, activity_input, activity_options, activity_id, summary, activity_fn)
+                (
+                    packet,
+                    activity_input,
+                    activity_options,
+                    activity_id,
+                    summary,
+                    activity_fn,
+                )
             )
 
         # Phase 2: Execute all activities in parallel
@@ -1260,7 +1273,9 @@ class TemporalLangGraphRunner:
         invocation_id = config.get("configurable", {}).get(
             "invocation_id", self._execution.invocation_counter
         )
-        activity_id = f"inv{invocation_id}-resume-{node_name}-{self._execution.step_counter}"
+        activity_id = (
+            f"inv{invocation_id}-resume-{node_name}-{self._execution.step_counter}"
+        )
 
         # Build meaningful summary from node name, input, and metadata
         node_metadata = self._get_full_node_metadata(node_name)
@@ -1557,7 +1572,9 @@ class TemporalLangGraphRunner:
         metadata = checkpoint.get("metadata", {})
         self._execution.step_counter = metadata.get("step", 0)
         self._execution.invocation_counter = metadata.get("invocation_counter", 0)
-        self._execution.completed_nodes_in_cycle = set(metadata.get("completed_nodes", []))
+        self._execution.completed_nodes_in_cycle = set(
+            metadata.get("completed_nodes", [])
+        )
 
         # Restore interrupt info from tasks
         tasks = checkpoint.get("tasks", ())

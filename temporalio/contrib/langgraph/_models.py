@@ -332,5 +332,3 @@ class StateSnapshot:
 
     store_state: list[dict[str, Any]] = field(default_factory=list)
     """Serialized store data."""
-
-

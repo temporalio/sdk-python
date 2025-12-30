@@ -429,7 +429,12 @@ class TestMessageCoercion:
                     "content": "",
                     "type": "ai",
                     "tool_calls": [
-                        {"name": "foo", "args": {"x": 1}, "id": "call_1", "type": "tool_call"}
+                        {
+                            "name": "foo",
+                            "args": {"x": 1},
+                            "id": "call_1",
+                            "type": "tool_call",
+                        }
                     ],
                 },
             ]
@@ -476,7 +481,12 @@ class TestMessageCoercion:
                         "content": "",
                         "type": "ai",
                         "tool_calls": [
-                            {"name": "calculator", "args": {"expression": "2 + 2"}, "id": "call_123", "type": "tool_call"}
+                            {
+                                "name": "calculator",
+                                "args": {"expression": "2 + 2"},
+                                "id": "call_123",
+                                "type": "tool_call",
+                            }
                         ],
                     },
                 ],
@@ -497,7 +507,9 @@ class TestMessageCoercion:
 
         # AIMessage should have tool_calls as an attribute (not just dict key)
         ai_msg = nested_state["messages"][1]
-        assert hasattr(ai_msg, "tool_calls"), "AIMessage should have tool_calls attribute"
+        assert hasattr(
+            ai_msg, "tool_calls"
+        ), "AIMessage should have tool_calls attribute"
         assert ai_msg.tool_calls[0]["name"] == "calculator"
 
     def test_coerce_deeply_nested_messages(self) -> None:
@@ -552,7 +564,12 @@ class TestMessageCoercion:
                             "content": "",
                             "type": "ai",
                             "tool_calls": [
-                                {"name": "search", "args": {"query": "test"}, "id": "call_abc", "type": "tool_call"}
+                                {
+                                    "name": "search",
+                                    "args": {"query": "test"},
+                                    "id": "call_abc",
+                                    "type": "tool_call",
+                                }
                             ],
                         }
                     ]
@@ -568,6 +585,6 @@ class TestMessageCoercion:
         ai_msg = nested_state["messages"][0]
 
         assert isinstance(ai_msg, AIMessage), f"Expected AIMessage, got {type(ai_msg)}"
-        assert hasattr(ai_msg, "tool_calls"), "AIMessage should have tool_calls attribute"
-
-
+        assert hasattr(
+            ai_msg, "tool_calls"
+        ), "AIMessage should have tool_calls attribute"

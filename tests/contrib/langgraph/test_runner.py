@@ -10,11 +10,10 @@ from datetime import timedelta
 from unittest.mock import MagicMock
 
 import pytest
+from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
-from langgraph.graph import END, START, StateGraph
 from temporalio.common import RetryPolicy
-
 from temporalio.contrib.langgraph import activity_options
 
 
@@ -116,7 +115,9 @@ class TestBuildActivitySummary:
         assert result == 'search: "LangGraph definition"'
 
         # Test "search_query" field
-        result = _build_activity_summary("search", {"search_query": "Temporal features"})
+        result = _build_activity_summary(
+            "search", {"search_query": "Temporal features"}
+        )
         assert result == 'search: "Temporal features"'
 
         # Test "question" field
@@ -757,7 +758,9 @@ class TestErrorRetryability:
 
         # Non-retryable error
         original = ValueError("invalid input")
-        wrapped = node_execution_error("my_node", "my_graph", original, non_retryable=True)
+        wrapped = node_execution_error(
+            "my_node", "my_graph", original, non_retryable=True
+        )
 
         assert wrapped.type == NODE_EXECUTION_ERROR
         assert wrapped.non_retryable is True
@@ -860,11 +863,15 @@ class TestParallelSendPacketExecution:
         # Verify all activities started before any completed
         # If parallel, all 3 should be in activity_starts before first is in activity_completes
         assert len(activity_starts) == 3, f"Expected 3 starts, got {activity_starts}"
-        assert len(activity_completes) == 3, f"Expected 3 completes, got {activity_completes}"
+        assert (
+            len(activity_completes) == 3
+        ), f"Expected 3 completes, got {activity_completes}"
 
         # The key assertion: by the time all_started_event was set,
         # all 3 activities had started. This proves parallel execution.
-        assert all_started_event.is_set(), "Activities did not all start before completing"
+        assert (
+            all_started_event.is_set()
+        ), "Activities did not all start before completing"
 
         # Verify writes were collected
         assert len(writes) == 3

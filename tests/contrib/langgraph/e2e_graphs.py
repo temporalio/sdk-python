@@ -15,11 +15,9 @@ import operator
 from datetime import timedelta
 from typing import Annotated, Any
 
-from typing_extensions import TypedDict
-
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, Send
-
+from typing_extensions import TypedDict
 
 # ==============================================================================
 # Simple Graph (no interrupts)
@@ -416,11 +414,11 @@ def build_react_agent_graph():
     Uses langchain.agents.create_agent which is the modern API for creating
     tool-calling agents.
     """
+    from langchain.agents import create_agent
     from langchain_core.language_models.chat_models import BaseChatModel
     from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
     from langchain_core.outputs import ChatGeneration, ChatResult
     from langchain_core.tools import tool
-    from langchain.agents import create_agent
 
     # Create a proper fake model that inherits from BaseChatModel
     class FakeToolCallingModel(BaseChatModel):
@@ -506,11 +504,11 @@ def build_native_react_agent_graph():
     Uses langchain.agents.create_agent which is the modern API for creating
     tool-calling agents.
     """
+    from langchain.agents import create_agent
     from langchain_core.language_models.chat_models import BaseChatModel
     from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
     from langchain_core.outputs import ChatGeneration, ChatResult
     from langchain_core.tools import tool
-    from langchain.agents import create_agent
 
     class FakeToolCallingModel(BaseChatModel):
         """Fake model that simulates a multi-step tool calling conversation.

@@ -12,7 +12,6 @@ from typing import Any
 
 import temporalio.common
 import temporalio.workflow
-
 from temporalio.contrib.langgraph._exceptions import (
     GRAPH_DEFINITION_CHANGED_ERROR,
     GRAPH_NOT_FOUND_ERROR,

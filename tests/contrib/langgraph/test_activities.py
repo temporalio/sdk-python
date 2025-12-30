@@ -10,9 +10,8 @@ import asyncio
 from unittest.mock import patch
 
 import pytest
-from typing_extensions import TypedDict
-
 from langgraph.graph import END, START, StateGraph
+from typing_extensions import TypedDict
 
 
 class TestNodeExecutionActivity:
@@ -109,7 +108,7 @@ class TestNodeExecutionActivity:
 
     def test_activity_raises_for_missing_node(self) -> None:
         """Activity should raise ApplicationError for missing node."""
-        from temporalio.contrib.langgraph import LangGraphPlugin, NODE_NOT_FOUND_ERROR
+        from temporalio.contrib.langgraph import NODE_NOT_FOUND_ERROR, LangGraphPlugin
         from temporalio.contrib.langgraph._activities import langgraph_node
         from temporalio.contrib.langgraph._models import NodeActivityInput
         from temporalio.exceptions import ApplicationError
@@ -257,5 +256,3 @@ class TestNodeExecutionActivity:
         assert result.parent_command is not None
         assert result.parent_command.goto == ["agent1", "agent2", "agent3"]
         assert result.parent_command.update == {"value": 100}
-
-

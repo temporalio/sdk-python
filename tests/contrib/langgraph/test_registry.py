@@ -8,9 +8,8 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
-from typing_extensions import TypedDict
-
 from langgraph.graph import END, START, StateGraph
+from typing_extensions import TypedDict
 
 
 class TestGraphRegistry:
@@ -108,5 +107,3 @@ class TestGraphRegistry:
         registry.clear()
 
         assert not registry.is_registered("graph")
-
-

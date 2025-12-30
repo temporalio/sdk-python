@@ -8,9 +8,8 @@ from __future__ import annotations
 from datetime import timedelta
 from unittest.mock import MagicMock
 
-from typing_extensions import TypedDict
-
 from langgraph.graph import END, START, StateGraph
+from typing_extensions import TypedDict
 
 
 class TestLangGraphPlugin:
