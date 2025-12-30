@@ -36,6 +36,7 @@ import logging
 from collections import deque
 from typing import TYPE_CHECKING, Any, Sequence, cast
 
+from langchain_core.runnables.config import var_child_runnable_config
 from langgraph._internal._constants import (
     CONFIG_KEY_CHECKPOINT_NS,
     CONFIG_KEY_READ,
@@ -278,6 +279,11 @@ async def _execute_node_impl(input_data: NodeActivityInput) -> NodeActivityOutpu
     # The node_runnable includes the bound function and writers
     # Cast config to RunnableConfig for type checking
     runnable_config = cast("RunnableConfig", config)
+
+    # Set the config in the ContextVar so get_config()/get_store() work inside nodes
+    # This is required because LangGraph's get_config() reads from var_child_runnable_config
+    # and ainvoke() uses copy_context() which copies current ContextVar state
+    config_token = var_child_runnable_config.set(runnable_config)
     try:
         # All LangChain Runnables implement ainvoke for async execution
         result = await node_runnable.ainvoke(input_data.input_state, runnable_config)
@@ -373,6 +379,9 @@ async def _execute_node_impl(input_data: NodeActivityInput) -> NodeActivityOutpu
             e,
             non_retryable=non_retryable,
         ) from e
+    finally:
+        # Reset the ContextVar to clean up after node execution
+        var_child_runnable_config.reset(config_token)
 
     # Note: Writes are primarily captured via CONFIG_KEY_SEND callback above.
     # The callback is invoked by LangGraph's internal writer mechanism.
