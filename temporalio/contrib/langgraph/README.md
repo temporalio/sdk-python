@@ -17,7 +17,8 @@ This document is organized as follows:
 - **[Per-Node Configuration](#per-node-configuration)** - Configuring timeouts, retries, and task queues
 - **[Agentic Execution](#agentic-execution)** - Using LangChain's create_agent with Temporal
 - **[Human-in-the-Loop](#human-in-the-loop-interrupts)** - Supporting interrupt() with Temporal signals
-- **[Compatibility](#compatibility)** - Feature support matrix
+- **[Command API](#command-api-dynamic-routing)** - Dynamic routing with Command(goto=...)
+- **[Sample Applications](#sample-applications)** - Complete working examples
 
 ## Architecture
 
@@ -63,12 +64,12 @@ pip install temporalio langgraph langchain-core
 ## Quick Start
 
 ```python
-from datetime import timedelta
 from langgraph.graph import StateGraph, START, END
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.worker import Worker
 from temporalio.contrib.langgraph import LangGraphPlugin, compile
+from temporalio.envconfig import ClientConfig
+from temporalio.worker import Worker
 from typing_extensions import TypedDict
 
 
@@ -108,8 +109,10 @@ async def main():
         graphs={"my_graph": build_my_graph}
     )
 
-    # Connect to Temporal
-    client = await Client.connect("localhost:7233", plugins=[plugin])
+    # Connect to Temporal (uses TEMPORAL_* env vars if set)
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
+    client = await Client.connect(**config, plugins=[plugin])
 
     # Start worker
     async with Worker(
@@ -242,50 +245,58 @@ By default, all nodes run as Temporal activities. Use `temporal_node_metadata(ru
 from temporalio import workflow
 from temporalio.contrib.langgraph import temporal_node_metadata
 
-# Define an activity to call from the workflow node
-@workflow.defn
-class MyWorkflow:
-    @workflow.run
-    async def run(self, input: str) -> dict:
-        app = compile("my_graph")
-        return await app.ainvoke({"query": input})
+async def orchestrator_node(state: dict) -> dict:
+    """Node that orchestrates multiple activity calls from the workflow.
 
-# Node that calls Temporal operations
-async def fetch_with_activity(state: MyState) -> dict:
-    """Node that executes a Temporal activity."""
-    result = await workflow.execute_activity(
-        fetch_data,
-        state["query"],
-        start_to_close_timeout=timedelta(minutes=5),
-    )
-    return {"data": result}
+    This node runs directly in the workflow (run_in_workflow=True) so it can:
+    - Call multiple Temporal activities
+    - Use workflow features like timers, signals, queries
+    - Implement complex orchestration logic
+    """
+    data = state.get("data", "")
 
-async def wait_for_approval(state: MyState) -> dict:
-    """Node that waits for a Temporal signal."""
-    approved = await workflow.wait_condition(
-        lambda: state.get("approval_received", False)
+    # Call validation activity
+    is_valid = await workflow.execute_activity(
+        "validate_data",
+        data,
+        start_to_close_timeout=timedelta(seconds=30),
     )
-    return {"approved": approved}
+
+    if not is_valid:
+        return {"validated": False, "result": "Validation failed"}
+
+    # Call enrichment activity
+    enriched = await workflow.execute_activity(
+        "enrich_data",
+        data,
+        start_to_close_timeout=timedelta(seconds=30),
+    )
+
+    return {"validated": True, "enriched_data": enriched}
+
+
+def finalize_node(state: dict) -> dict:
+    """Final processing - runs as a regular activity."""
+    enriched = state.get("enriched_data", "")
+    return {"result": f"Processed: {enriched}"}
+
 
 # Build graph with in-workflow nodes
 graph = StateGraph(MyState)
 graph.add_node(
-    "fetch",
-    fetch_with_activity,
-    metadata=temporal_node_metadata(run_in_workflow=True),
+    "orchestrator",
+    orchestrator_node,
+    metadata=temporal_node_metadata(run_in_workflow=True),  # Runs in workflow
 )
-graph.add_node(
-    "wait_approval",
-    wait_for_approval,
-    metadata=temporal_node_metadata(run_in_workflow=True),
-)
-graph.add_node("llm_call", call_llm)  # Runs as activity (default)
+graph.add_node("finalize", finalize_node)  # Runs as activity (default)
+graph.add_edge(START, "orchestrator")
+graph.add_edge("orchestrator", "finalize")
+graph.add_edge("finalize", END)
 ```
 
 **When to use `run_in_workflow=True`:**
 - Calling Temporal activities with custom configuration
 - Starting child workflows
-- Waiting for signals or updates
 - Using workflow timers or sleep
 - Any node that needs direct access to Temporal workflow APIs
 
@@ -294,7 +305,7 @@ graph.add_node("llm_call", call_llm)  # Runs as activity (default)
 - Operations that don't need Temporal workflow primitives
 - Code that uses libraries incompatible with the workflow sandbox
 
-> **Note:** Nodes running in the workflow execute within Temporal's workflow sandbox, which restricts certain operations (file I/O, network calls, non-deterministic code). Ensure your in-workflow node functions only use Temporal APIs and deterministic Python code.
+> **Note:** Nodes running in the workflow execute within Temporal's workflow sandbox, which enforces determinism. Ensure your in-workflow node functions only use Temporal APIs and deterministic Python code. See the [activity_from_node sample](https://github.com/temporalio/samples-python/tree/main/langgraph_samples/activity_from_node) for a complete example.
 
 ## Agentic Execution
 
@@ -389,28 +400,50 @@ plugin = LangGraphPlugin(
 
 ### Subgraph Support
 
-When you add a compiled subgraph (like from `create_agent`) as a node in an outer graph, the Temporal integration automatically detects it and executes each **inner node** as a separate activity. This provides finer-grained durability than running the subgraph as a single activity.
+When you add a compiled subgraph as a node in an outer graph, the Temporal integration automatically detects it and executes each **inner node** as a separate activity. This provides finer-grained durability than running the subgraph as a single activity.
 
 ```python
 from langgraph.graph import StateGraph, START, END
 
-def build_outer_graph():
+# Example 1: Explicit subgraph
+def build_graph_with_subgraph():
+    # Create child subgraph
+    child = StateGraph(ChildState)
+    child.add_node("child_process", child_process_node)
+    child.add_edge(START, "child_process")
+    child.add_edge("child_process", END)
+    child_compiled = child.compile()
+
+    # Create parent graph with child as a node
+    parent = StateGraph(ParentState)
+    parent.add_node("parent_start", parent_start_node)
+    parent.add_node("child_graph", child_compiled)  # Subgraph as a node
+    parent.add_node("parent_end", parent_end_node)
+    parent.add_edge(START, "parent_start")
+    parent.add_edge("parent_start", "child_graph")
+    parent.add_edge("child_graph", "parent_end")
+    parent.add_edge("parent_end", END)
+    return parent.compile()
+
+
+# Example 2: Agent as subgraph
+def build_graph_with_agent_subgraph():
     # Create an agent subgraph using create_agent
     model = ChatOpenAI(model="gpt-4o")
     agent_subgraph = create_agent(model, [search_web, get_weather])
 
-    # Add the subgraph as a node in an outer graph
-    workflow = StateGraph(AgentState)
-    workflow.add_node("my_agent", agent_subgraph)  # Subgraph as a node
-    workflow.add_node("post_process", post_process_fn)
-    workflow.add_edge(START, "my_agent")
-    workflow.add_edge("my_agent", "post_process")
-    workflow.add_edge("post_process", END)
-    return workflow.compile()
+    # Add the agent as a node in an outer graph
+    outer = StateGraph(AgentState)
+    outer.add_node("my_agent", agent_subgraph)  # Agent subgraph as a node
+    outer.add_node("post_process", post_process_fn)
+    outer.add_edge(START, "my_agent")
+    outer.add_edge("my_agent", "post_process")
+    outer.add_edge("post_process", END)
+    return outer.compile()
 ```
 
-When `my_agent` executes:
-- The subgraph's inner nodes (`model`, `tools`) run as **separate Temporal activities**
+When subgraphs execute:
+- Each inner node runs as a **separate Temporal activity**
 - Each inner node has its own retry/timeout configuration
 - If the worker crashes during the subgraph, execution resumes from the last completed inner node
 - Nested subgraphs are also recursively flattened
@@ -438,10 +471,27 @@ def approval_node(state: dict) -> dict:
 class ApprovalWorkflow:
     def __init__(self):
         self._human_response = None
+        self._interrupt_value = None
 
     @workflow.signal
     def provide_approval(self, response: dict):
+        """Signal to provide approval response."""
         self._human_response = response
+
+    @workflow.query
+    def get_pending_approval(self) -> dict | None:
+        """Query to check if approval is pending and get details."""
+        return self._interrupt_value
+
+    @workflow.query
+    def get_status(self) -> str:
+        """Query to get the current workflow status."""
+        if self._interrupt_value is None:
+            return "processing"
+        elif self._human_response is None:
+            return "waiting_for_approval"
+        else:
+            return "approved" if self._human_response.get("approved") else "rejected"
 
     @workflow.run
     async def run(self, input_data: dict) -> dict:
@@ -450,17 +500,17 @@ class ApprovalWorkflow:
 
         # Check for interrupt
         if "__interrupt__" in result:
-            interrupt_info = result["__interrupt__"][0]
-            # interrupt_info.value contains the data passed to interrupt()
+            # Store interrupt value for queries
+            self._interrupt_value = result["__interrupt__"][0].value
 
-            # Request approval from external system (email, Slack, etc.)
+            # Notify approvers (email, Slack, etc.)
             await workflow.execute_activity(
-                request_approval,
-                interrupt_info.value,
+                notify_approver,
+                self._interrupt_value,
                 start_to_close_timeout=timedelta(seconds=30),
             )
 
-            # Wait for human input via signal
+            # Wait for human input via signal (with optional timeout)
             await workflow.wait_condition(
                 lambda: self._human_response is not None
             )
@@ -470,6 +520,59 @@ class ApprovalWorkflow:
 
         return result
 ```
+
+See the [approval_workflow sample](https://github.com/temporalio/samples-python/tree/main/langgraph_samples/approval_workflow) for a complete example with timeout handling.
+
+### Using Temporal Signals/Updates Directly
+
+As an alternative to LangGraph's `interrupt()`, you can use Temporal signals or updates directly from nodes that run in the workflow context (`run_in_workflow=True`). This gives you full access to Temporal's workflow primitives:
+
+```python
+from temporalio import workflow
+from temporalio.contrib.langgraph import temporal_node_metadata
+
+
+@workflow.defn
+class DirectSignalWorkflow:
+    def __init__(self):
+        self._user_input = None
+
+    @workflow.signal
+    def provide_input(self, data: dict):
+        """Signal to provide user input."""
+        self._user_input = data
+
+    @workflow.run
+    async def run(self, input_data: dict) -> dict:
+        app = compile("my_graph")
+        return await app.ainvoke(input_data)
+
+
+async def wait_for_user_node(state: dict) -> dict:
+    """Node that waits for user input via Temporal signal.
+
+    This node runs in the workflow context and can access
+    workflow instance state directly.
+    """
+    # Access the workflow instance
+    wf = workflow.instance()
+
+    # Wait for signal
+    await workflow.wait_condition(lambda: wf._user_input is not None)
+
+    return {"user_response": wf._user_input}
+
+
+# Register node to run in workflow
+graph = StateGraph(MyState)
+graph.add_node(
+    "wait_for_user",
+    wait_for_user_node,
+    metadata=temporal_node_metadata(run_in_workflow=True),
+)
+```
+
+This approach simplifies long-running human-in-the-loop scenarios by keeping the wait logic inside the graph node rather than handling interrupts at the workflow level.
 
 ## Store API (Cross-Node Persistence)
 
@@ -494,6 +597,47 @@ def node_with_store(state: dict) -> dict:
 ```
 
 Store data persists across nodes within the same workflow execution and can be checkpointed for continue-as-new.
+
+## Command API (Dynamic Routing)
+
+Use LangGraph's `Command` to combine state updates with dynamic navigation:
+
+```python
+from langgraph.types import Command
+
+def router_node(state: dict) -> Command:
+    """Node that routes based on state."""
+    if state.get("value", 0) > 10:
+        # Skip to finish node
+        return Command(goto="finish", update={"path": ["router"]})
+    else:
+        # Go through processing
+        return Command(goto="process", update={"path": ["router"]})
+
+
+def process_node(state: dict) -> dict:
+    """Regular processing node."""
+    path = state.get("path", [])
+    return {"value": state["value"] * 2, "path": path + ["process"]}
+
+
+def finish_node(state: dict) -> dict:
+    """Final node."""
+    path = state.get("path", [])
+    return {"path": path + ["finish"]}
+
+
+# Build graph - Command handles routing, no static edges needed from router
+graph = StateGraph(MyState)
+graph.add_node("router", router_node)
+graph.add_node("process", process_node)
+graph.add_node("finish", finish_node)
+graph.add_edge(START, "router")
+graph.add_edge("process", "finish")
+graph.add_edge("finish", END)
+```
+
+> **Note:** When using `Command(goto=...)`, don't add static edges from that node—the Command determines routing. If both exist, both paths will execute.
 
 ## Continue-as-New (Long-Running Workflows)
 
@@ -566,69 +710,29 @@ Activity options can be set at multiple levels with the following priority (high
 
 Options at each level are merged, so you can set base defaults at the plugin level and selectively override specific options in `compile()` or node metadata.
 
-## Full Example
+## Sample Applications
 
-See [`example.py`](./example.py) for a complete customer support agent example demonstrating:
+For complete working examples, see the [langgraph_samples](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples) directory in the `langgraph_plugin` branch of the samples repository:
 
-- Multi-node graph with conditional routing
-- Per-node timeouts and retry policies
-- LangChain message handling
-- Integration with Temporal workflows
-
-Run with:
-
-```bash
-# Start Temporal server
-temporal server start-dev
-
-# Run the example
-python -m temporalio.contrib.langgraph.example
-```
+| Sample | Description |
+|--------|-------------|
+| [hello_world](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples/hello_world) | Simple starter demonstrating basic plugin setup |
+| [react_agent](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples/react_agent) | ReAct agent with tool calling |
+| [approval_workflow](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples/approval_workflow) | Human-in-the-loop with interrupt/resume |
+| [activity_from_node](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples/activity_from_node) | Calling Temporal activities from nodes |
+| [supervisor](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples/supervisor) | Multi-agent supervisor pattern |
+| [agentic_rag](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples/agentic_rag) | RAG with document grading |
+| [plan_and_execute](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples/plan_and_execute) | Plan-and-execute pattern |
 
 ## Important Notes
 
 ### Activity Registration
 
-Activities are automatically registered by the plugin. Do not manually add them to the worker.
+LangGraph node execution activities (`node`, `tool_node`, `resume_node`) are automatically registered by the plugin. Do not manually add them to the worker.
 
 ### Streaming
 
 Real-time streaming is not supported. For progress updates, use:
 - Temporal queries to check workflow state
 - Activity heartbeats for long-running nodes
-
-### Subgraphs
-
-Subgraphs execute inline. For better isolation, use child workflows:
-
-```python
-@workflow.defn
-class SubgraphWorkflow:
-    @workflow.run
-    async def run(self, input_data: dict) -> dict:
-        app = compile("subgraph")
-        return await app.ainvoke(input_data)
-
-
-# In parent graph node
-async def node_with_subgraph(state: dict) -> dict:
-    result = await workflow.execute_child_workflow(
-        SubgraphWorkflow.run,
-        state["data"],
-        id=f"subgraph-{state['id']}",
-    )
-    return {"subgraph_result": result}
-```
-
-## Compatibility
-
-| Feature | Support |
-|---------|---------|
-| StateGraph | Full |
-| Conditional edges | Full |
-| Send API | Full |
-| ToolNode | Full |
-| create_agent | Full |
-| interrupt() | Full |
-| Store API | Full |
-| Streaming | Limited (via queries) |
+- An external system (like Redis) to stream updates to frontends
