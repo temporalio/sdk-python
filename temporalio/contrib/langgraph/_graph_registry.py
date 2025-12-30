@@ -24,6 +24,7 @@ class GraphRegistry:
     """
 
     def __init__(self) -> None:
+        """Initialize empty registry with no builders or cached graphs."""
         self._builders: dict[str, Callable[[], Pregel]] = {}
         self._cache: dict[str, Pregel] = {}
         self._default_activity_options: dict[str, dict[str, Any]] = {}

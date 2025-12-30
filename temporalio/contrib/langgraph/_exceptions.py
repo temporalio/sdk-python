@@ -179,5 +179,6 @@ class GraphAlreadyRegisteredError(ValueError):
     """Raised when registering a graph with a duplicate ID."""
 
     def __init__(self, graph_id: str) -> None:
+        """Initialize with the duplicate graph ID."""
         self.graph_id = graph_id
         super().__init__(f"Graph '{graph_id}' is already registered.")

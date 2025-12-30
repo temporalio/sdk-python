@@ -484,7 +484,7 @@ def build_react_agent_graph():
     model = FakeToolCallingModel()
 
     # Create agent with plain tools
-    agent = create_agent(model, [calculator])
+    agent: Any = create_agent(model, [calculator])
 
     return agent
 
@@ -594,7 +594,7 @@ def build_native_react_agent_graph():
     model = FakeToolCallingModel()
 
     # Create agent
-    agent = create_agent(model, [get_weather, get_temperature])
+    agent: Any = create_agent(model, [get_weather, get_temperature])
 
     return agent
 
@@ -713,7 +713,7 @@ def build_agent_subgraph():
         return f"Result for: {query}"
 
     model = LoopingFakeModel()
-    agent = create_agent(model, [simple_tool])
+    agent: Any = create_agent(model, [simple_tool])
 
     # Create outer graph with agent as subgraph, followed by conditional edge
     def _grade_node(state: AgentSubgraphState) -> AgentSubgraphState:

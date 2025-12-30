@@ -1513,7 +1513,7 @@ class TemporalLangGraphRunner:
         input_state: dict[str, Any],
         config: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Synchronous invoke is not supported. Use ainvoke()."""
+        """Raise NotImplementedError since sync execution is unsupported."""
         raise NotImplementedError(
             "Synchronous invoke() is not supported in Temporal workflows. "
             "Use ainvoke() instead."
