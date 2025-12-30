@@ -985,8 +985,9 @@ class TemporalLangGraphRunner:
         This is used for nodes marked with run_in_workflow=True, which need
         to call Temporal operations (activities, child workflows, etc.) directly.
 
-        Uses sandbox_unrestricted() to allow LangGraph's callback machinery
-        to work normally, following the pattern from langchain_interceptor.py.
+        The user's function runs under sandbox restrictions to catch non-deterministic
+        code. Only LangGraph setup/cleanup uses sandbox_unrestricted(), following
+        the pattern from langchain_interceptor.py.
         """
         with workflow.unsafe.imports_passed_through():
             from collections import deque
@@ -1005,21 +1006,58 @@ class TemporalLangGraphRunner:
             },
         }
 
-        # Execute the task's proc (the node's runnable)
-        # Use sandbox_unrestricted() to allow LangGraph's callback machinery
-        # (which may do file I/O for tracing) to work inside the workflow.
-        # The user explicitly opts in via run_in_workflow=True.
+        result: Any = None
+
         if task.proc is not None:
             runnable_config = cast("RunnableConfig", config)
-            with workflow.unsafe.sandbox_unrestricted():
-                with workflow.unsafe.imports_passed_through():
-                    if asyncio.iscoroutinefunction(getattr(task.proc, "ainvoke", None)):
-                        result = await task.proc.ainvoke(task.input, runnable_config)
-                    else:
-                        result = task.proc.invoke(task.input, runnable_config)
+
+            # Try to extract the raw user function from the runnable chain.
+            # LangGraph wraps user functions in RunnableSeq with steps:
+            # - steps[0]: RunnableCallable containing user's func/afunc
+            # - steps[1]: ChannelWrite for state management and edge traversal
+            raw_func = None
+            channel_write_step = None
+            steps = getattr(task.proc, "steps", None)
+            if steps and len(steps) >= 2:
+                first_step = steps[0]
+                # RunnableCallable uses afunc for async, func for sync
+                raw_func = getattr(first_step, "afunc", None) or getattr(
+                    first_step, "func", None
+                )
+                channel_write_step = steps[1]
+
+            if raw_func is not None and channel_write_step is not None:
+                # Execute the user's function SANDBOXED (outside sandbox_unrestricted).
+                # This catches non-deterministic code while still allowing
+                # Temporal operations (activities, child workflows, etc.).
+                if asyncio.iscoroutinefunction(raw_func):
+                    result = await raw_func(task.input)
+                else:
+                    result = raw_func(task.input)
+
+                # Run ChannelWrite step UNRESTRICTED to handle state updates
+                # and edge traversal. This follows the langchain_interceptor pattern.
+                with workflow.unsafe.sandbox_unrestricted():
+                    with workflow.unsafe.imports_passed_through():
+                        if asyncio.iscoroutinefunction(
+                            getattr(channel_write_step, "ainvoke", None)
+                        ):
+                            await channel_write_step.ainvoke(result, runnable_config)
+                        else:
+                            channel_write_step.invoke(result, runnable_config)
+            else:
+                # Fallback for complex runnables that don't expose steps.
+                # Use sandbox_unrestricted() to allow LangGraph machinery to work.
+                with workflow.unsafe.sandbox_unrestricted():
+                    with workflow.unsafe.imports_passed_through():
+                        if asyncio.iscoroutinefunction(
+                            getattr(task.proc, "ainvoke", None)
+                        ):
+                            result = await task.proc.ainvoke(task.input, runnable_config)
+                        else:
+                            result = task.proc.invoke(task.input, runnable_config)
 
             # Capture writes from the result if it's a dict
-            # (in addition to writes captured via CONFIG_KEY_SEND callback)
             if isinstance(result, dict):
                 for key, value in result.items():
                     if (key, value) not in writes:
