@@ -430,3 +430,24 @@ class SubgraphConditionalE2EWorkflow:
     async def run(self, value: int) -> dict:
         app = lg_compile("e2e_subgraph_conditional")
         return await app.ainvoke({"value": value})
+
+
+# ==============================================================================
+# Run-in-Workflow Workflows
+# ==============================================================================
+
+
+@workflow.defn
+class RunInWorkflowE2EWorkflow:
+    """Workflow that tests run_in_workflow=True for nodes calling Temporal operations.
+
+    This tests that a node marked with run_in_workflow=True:
+    1. Executes directly in the workflow (not as an activity)
+    2. Can call Temporal operations like execute_activity
+    3. Works correctly with the sandbox
+    """
+
+    @workflow.run
+    async def run(self, input_value: int) -> dict:
+        app = lg_compile("e2e_run_in_workflow")
+        return await app.ainvoke({"value": input_value})

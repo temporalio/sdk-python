@@ -980,7 +980,14 @@ class TemporalLangGraphRunner:
         self,
         task: PregelExecutableTask,
     ) -> list[tuple[str, Any]]:
-        """Execute a task directly in the workflow for deterministic operations."""
+        """Execute a task directly in the workflow.
+
+        This is used for nodes marked with run_in_workflow=True, which need
+        to call Temporal operations (activities, child workflows, etc.) directly.
+
+        Uses sandbox_unrestricted() to allow LangGraph's callback machinery
+        to work normally, following the pattern from langchain_interceptor.py.
+        """
         with workflow.unsafe.imports_passed_through():
             from collections import deque
 
@@ -999,12 +1006,24 @@ class TemporalLangGraphRunner:
         }
 
         # Execute the task's proc (the node's runnable)
+        # Use sandbox_unrestricted() to allow LangGraph's callback machinery
+        # (which may do file I/O for tracing) to work inside the workflow.
+        # The user explicitly opts in via run_in_workflow=True.
         if task.proc is not None:
             runnable_config = cast("RunnableConfig", config)
-            if asyncio.iscoroutinefunction(getattr(task.proc, "ainvoke", None)):
-                await task.proc.ainvoke(task.input, runnable_config)
-            else:
-                task.proc.invoke(task.input, runnable_config)
+            with workflow.unsafe.sandbox_unrestricted():
+                with workflow.unsafe.imports_passed_through():
+                    if asyncio.iscoroutinefunction(getattr(task.proc, "ainvoke", None)):
+                        result = await task.proc.ainvoke(task.input, runnable_config)
+                    else:
+                        result = task.proc.invoke(task.input, runnable_config)
+
+            # Capture writes from the result if it's a dict
+            # (in addition to writes captured via CONFIG_KEY_SEND callback)
+            if isinstance(result, dict):
+                for key, value in result.items():
+                    if (key, value) not in writes:
+                        writes.append((key, value))
 
         return list(writes)
 

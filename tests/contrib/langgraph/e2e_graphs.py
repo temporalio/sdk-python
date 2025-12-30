@@ -46,6 +46,71 @@ def build_simple_graph():
 
 
 # ==============================================================================
+# Run-in-Workflow Graph (nodes execute in workflow to call Temporal operations)
+# ==============================================================================
+
+
+class RunInWorkflowState(TypedDict, total=False):
+    """State for run-in-workflow test."""
+
+    value: int
+    activity_result: int
+    final_result: int
+
+
+async def _workflow_node_with_activity(
+    state: RunInWorkflowState,
+) -> RunInWorkflowState:
+    """Node that runs in workflow and calls a Temporal activity.
+
+    This demonstrates the primary use case for run_in_workflow=True:
+    calling Temporal operations (activities, child workflows, signals, etc.)
+    directly from a graph node.
+    """
+    from temporalio import workflow
+
+    # Call activity from within the workflow
+    result = await workflow.execute_activity(
+        "multiply_value",
+        state.get("value", 0),
+        start_to_close_timeout=timedelta(seconds=30),
+    )
+    return {"activity_result": result}
+
+
+def _final_step(state: RunInWorkflowState) -> RunInWorkflowState:
+    """Final step - runs as activity (default)."""
+    return {"final_result": state.get("activity_result", 0) + 5}
+
+
+def build_run_in_workflow_graph():
+    """Build a graph with a node that runs in the workflow.
+
+    This tests the run_in_workflow=True metadata option for nodes that
+    need to call Temporal operations directly.
+    """
+    from temporalio.contrib.langgraph import temporal_node_metadata
+
+    graph = StateGraph(RunInWorkflowState)
+
+    # This node runs in the workflow to call Temporal activities
+    graph.add_node(
+        "call_activity",
+        _workflow_node_with_activity,
+        metadata=temporal_node_metadata(run_in_workflow=True),
+    )
+
+    # This node runs as an activity (default behavior)
+    graph.add_node("final", _final_step)
+
+    graph.add_edge(START, "call_activity")
+    graph.add_edge("call_activity", "final")
+    graph.add_edge("final", END)
+
+    return graph.compile()
+
+
+# ==============================================================================
 # Approval Graph (single interrupt)
 # ==============================================================================
 

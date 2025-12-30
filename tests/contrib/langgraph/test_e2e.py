@@ -19,6 +19,7 @@ from datetime import timedelta
 
 import pytest
 
+from temporalio import activity
 from temporalio.client import Client
 from temporalio.contrib.langgraph import LangGraphPlugin
 from tests.contrib.langgraph.e2e_graphs import (
@@ -29,6 +30,7 @@ from tests.contrib.langgraph.e2e_graphs import (
     build_multi_interrupt_graph,
     build_native_react_agent_graph,
     build_react_agent_graph,
+    build_run_in_workflow_graph,
     build_send_graph,
     build_simple_graph,
     build_store_graph,
@@ -44,6 +46,7 @@ from tests.contrib.langgraph.e2e_workflows import (
     NativeReactAgentE2EWorkflow,
     ReactAgentE2EWorkflow,
     RejectionE2EWorkflow,
+    RunInWorkflowE2EWorkflow,
     SendE2EWorkflow,
     SimpleE2EWorkflow,
     StoreE2EWorkflow,
@@ -707,3 +710,49 @@ class TestAgenticWorkflows:
             assert (
                 "sunny" in result["answer"].lower() or "72" in result["answer"]
             ), f"Expected weather info in answer, got: {result['answer']}"
+
+
+# ==============================================================================
+# Run-in-Workflow Tests
+# ==============================================================================
+
+
+@activity.defn(name="multiply_value")
+async def multiply_value_activity(value: int) -> int:
+    """Activity that multiplies a value by 2."""
+    return value * 2
+
+
+class TestRunInWorkflow:
+    """Tests for nodes that run directly in the workflow."""
+
+    @pytest.mark.asyncio
+    async def test_run_in_workflow_calls_activity(self, client: Client) -> None:
+        """Test that a run_in_workflow node can call a Temporal activity."""
+        plugin = LangGraphPlugin(
+            graphs={"e2e_run_in_workflow": build_run_in_workflow_graph},
+            default_activity_timeout=timedelta(seconds=30),
+        )
+
+        new_config = client.config()
+        existing_plugins = new_config.get("plugins", [])
+        new_config["plugins"] = list(existing_plugins) + [plugin]
+        plugin_client = Client(**new_config)
+
+        async with new_worker(
+            plugin_client,
+            RunInWorkflowE2EWorkflow,
+            activities=[multiply_value_activity],
+        ) as worker:
+            result = await plugin_client.execute_workflow(
+                RunInWorkflowE2EWorkflow.run,
+                10,  # input_value
+                id=f"e2e-run-in-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+
+            # value=10 -> multiply_value activity returns 20 -> activity_result=20
+            # final node adds 5 -> final_result=25
+            assert result.get("activity_result") == 20
+            assert result.get("final_result") == 25

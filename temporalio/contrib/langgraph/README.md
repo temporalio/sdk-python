@@ -234,6 +234,68 @@ All parameters mirror `workflow.execute_activity()` options:
 
 You can also use LangGraph's native `retry_policy` parameter on `add_node()`, which is automatically mapped to Temporal's retry policy. If both are specified, `activity_options(retry_policy=...)` takes precedence.
 
+### Running Nodes in the Workflow
+
+By default, all nodes run as Temporal activities. Use `temporal_node_metadata(run_in_workflow=True)` when you need to call Temporal operations directly from a node:
+
+```python
+from temporalio import workflow
+from temporalio.contrib.langgraph import temporal_node_metadata
+
+# Define an activity to call from the workflow node
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self, input: str) -> dict:
+        app = compile("my_graph")
+        return await app.ainvoke({"query": input})
+
+# Node that calls Temporal operations
+async def fetch_with_activity(state: MyState) -> dict:
+    """Node that executes a Temporal activity."""
+    result = await workflow.execute_activity(
+        fetch_data,
+        state["query"],
+        start_to_close_timeout=timedelta(minutes=5),
+    )
+    return {"data": result}
+
+async def wait_for_approval(state: MyState) -> dict:
+    """Node that waits for a Temporal signal."""
+    approved = await workflow.wait_condition(
+        lambda: state.get("approval_received", False)
+    )
+    return {"approved": approved}
+
+# Build graph with in-workflow nodes
+graph = StateGraph(MyState)
+graph.add_node(
+    "fetch",
+    fetch_with_activity,
+    metadata=temporal_node_metadata(run_in_workflow=True),
+)
+graph.add_node(
+    "wait_approval",
+    wait_for_approval,
+    metadata=temporal_node_metadata(run_in_workflow=True),
+)
+graph.add_node("llm_call", call_llm)  # Runs as activity (default)
+```
+
+**When to use `run_in_workflow=True`:**
+- Calling Temporal activities with custom configuration
+- Starting child workflows
+- Waiting for signals or updates
+- Using workflow timers or sleep
+- Any node that needs direct access to Temporal workflow APIs
+
+**When to keep as activity (default):**
+- LLM calls and other LangChain operations
+- Operations that don't need Temporal workflow primitives
+- Code that uses libraries incompatible with the workflow sandbox
+
+> **Note:** Nodes running in the workflow execute within Temporal's workflow sandbox, which restricts certain operations (file I/O, network calls, non-deterministic code). Ensure your in-workflow node functions only use Temporal APIs and deterministic Python code.
+
 ## Agentic Execution
 
 LangChain's agent APIs work directly with the Temporal integration. Each graph node (agent reasoning, tool execution) runs as a Temporal activity, providing automatic retries and failure recovery.
