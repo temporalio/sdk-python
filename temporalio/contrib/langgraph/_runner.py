@@ -1676,3 +1676,221 @@ class TemporalLangGraphRunner:
             {"namespace": list(ns), "key": key, "value": value}
             for (ns, key), value in self._execution.store_state.items()
         ]
+
+    def get_graph_mermaid(self, *, with_styles: bool = True) -> str:
+        """Get a Mermaid diagram of the graph with execution state.
+
+        Returns a Mermaid flowchart showing the graph structure with nodes
+        colored based on their execution status:
+        - Green (completed): Nodes that have finished executing
+        - Yellow (current): Node currently executing or interrupted
+        - Gray (pending): Nodes not yet executed
+
+        Args:
+            with_styles: If True, include CSS class definitions for styling.
+                Set to False for simpler output.
+
+        Returns:
+            Mermaid diagram string that can be rendered in GitHub, Notion,
+            or any Mermaid-compatible viewer.
+
+        Example output::
+
+            graph TD;
+                __start__([__start__]):::completed
+                validate(validate):::completed
+                process(process):::current
+                __end__([__end__]):::pending
+                __start__ --> validate;
+                validate --> process;
+                process --> __end__;
+                classDef completed fill:#90EE90
+                classDef current fill:#FFD700
+                classDef pending fill:#D3D3D3
+        """
+        # Get the base mermaid diagram from LangGraph
+        graph = self.pregel.get_graph()
+        base_mermaid = graph.draw_mermaid()
+
+        # Determine node statuses
+        completed_nodes = set(self._execution.completed_nodes_in_cycle)
+        current_node = self._interrupt.interrupted_node_name
+
+        # Build status map
+        node_status: dict[str, str] = {}
+        for node_name in graph.nodes:
+            if node_name == "__start__":
+                node_status[node_name] = "first"
+            elif node_name == "__end__":
+                node_status[node_name] = "last" if not completed_nodes else "pending"
+            elif node_name == current_node:
+                node_status[node_name] = "current"
+            elif node_name in completed_nodes:
+                node_status[node_name] = "completed"
+            else:
+                node_status[node_name] = "pending"
+
+        # Parse and rebuild mermaid with status classes
+        lines = base_mermaid.strip().split("\n")
+        new_lines: list[str] = []
+
+        for line in lines:
+            stripped = line.strip()
+            # Skip existing classDef lines - we'll add our own
+            if stripped.startswith("classDef"):
+                continue
+            # Add status class to node definitions
+            elif stripped and not stripped.startswith("---") and not stripped.startswith("graph") and not stripped.startswith("config:") and not stripped.startswith("flowchart:") and not stripped.startswith("curve:"):
+                # Check if this is a node definition (not an edge)
+                if "-->" not in stripped and "-.->" not in stripped:
+                    # Find which node this line defines
+                    for node_name, status in node_status.items():
+                        # Match node definitions like "validate(validate)" or "__start__([...])"
+                        if stripped.startswith(f"{node_name}(") or stripped.startswith(f"{node_name}["):
+                            # Remove any existing class and add status class
+                            if ":::" in stripped:
+                                stripped = stripped.rsplit(":::", 1)[0]
+                            line = f"\t{stripped}:::{status}"
+                            break
+            new_lines.append(line)
+
+        # Add status class definitions if requested
+        if with_styles:
+            new_lines.append("\tclassDef completed fill:#90EE90,stroke:#228B22")
+            new_lines.append("\tclassDef current fill:#FFD700,stroke:#FFA500")
+            new_lines.append("\tclassDef pending fill:#D3D3D3,stroke:#A9A9A9")
+            new_lines.append("\tclassDef first fill-opacity:0")
+            new_lines.append("\tclassDef last fill:#bfb6fc")
+
+        return "\n".join(new_lines)
+
+    def get_graph_ascii(self, *, show_legend: bool = True) -> str:
+        """Get an ASCII art diagram of the graph with execution progress.
+
+        Returns a text-based representation of the graph showing:
+        - Node execution status with symbols (✓ completed, ▶ current, ○ pending)
+        - The graph structure as a vertical flowchart
+        - Optional legend explaining the symbols
+
+        Args:
+            show_legend: If True, include a legend at the bottom explaining
+                the status symbols.
+
+        Returns:
+            ASCII art string showing the graph structure and execution state.
+
+        Example output::
+
+            ┌───────────┐
+            │   START   │ ✓
+            └─────┬─────┘
+                  │
+                  ▼
+            ┌───────────┐
+            │  validate │ ✓
+            └─────┬─────┘
+                  │
+                  ▼
+            ┌───────────┐
+            │  process  │ ▶ INTERRUPTED
+            └─────┬─────┘
+                  │
+                  ▼
+            ┌───────────┐
+            │    END    │ ○
+            └───────────┘
+
+            Legend: ✓ completed  ▶ current/interrupted  ○ pending
+        """
+        graph = self.pregel.get_graph()
+
+        # Determine node statuses
+        completed_nodes = set(self._execution.completed_nodes_in_cycle)
+        current_node = self._interrupt.interrupted_node_name
+        is_interrupted = self._interrupt.pending_interrupt is not None
+
+        # Get nodes in topological order (simple linear for now)
+        # Filter out internal nodes
+        visible_nodes = [
+            name for name in graph.nodes
+            if not name.startswith("__") or name in ("__start__", "__end__")
+        ]
+
+        # Build edge map for ordering
+        edge_map: dict[str, list[str]] = {}
+        for edge in graph.edges:
+            if edge.source not in edge_map:
+                edge_map[edge.source] = []
+            edge_map[edge.source].append(edge.target)
+
+        # Simple topological sort for linear graphs
+        ordered_nodes: list[str] = []
+        visited: set[str] = set()
+
+        def visit(node: str) -> None:
+            if node in visited or node not in visible_nodes:
+                return
+            visited.add(node)
+            ordered_nodes.append(node)
+            for target in edge_map.get(node, []):
+                visit(target)
+
+        # Start from __start__ if present
+        if "__start__" in visible_nodes:
+            visit("__start__")
+
+        # Add any remaining nodes
+        for node in visible_nodes:
+            if node not in visited:
+                visit(node)
+
+        # Build ASCII diagram
+        lines: list[str] = []
+        max_name_len = max((len(n.replace("__", "").upper() if n.startswith("__") else n) for n in ordered_nodes), default=7)
+        box_width = max(max_name_len + 4, 11)  # Minimum width of 11
+
+        for i, node_name in enumerate(ordered_nodes):
+            # Determine display name
+            if node_name == "__start__":
+                display_name = "START"
+            elif node_name == "__end__":
+                display_name = "END"
+            else:
+                display_name = node_name
+
+            # Determine status
+            if node_name == "__start__":
+                status_symbol = "✓"
+                status_text = ""
+            elif node_name == current_node:
+                status_symbol = "▶"
+                status_text = " INTERRUPTED" if is_interrupted else " RUNNING"
+            elif node_name in completed_nodes:
+                status_symbol = "✓"
+                status_text = ""
+            else:
+                status_symbol = "○"
+                status_text = ""
+
+            # Calculate padding for centering
+            name_padding = (box_width - 2 - len(display_name)) // 2
+            name_line = "│" + " " * name_padding + display_name + " " * (box_width - 2 - name_padding - len(display_name)) + "│"
+
+            # Build box
+            lines.append("┌" + "─" * (box_width - 2) + "┐")
+            lines.append(f"{name_line} {status_symbol}{status_text}")
+            if i < len(ordered_nodes) - 1:
+                # Add connector to next node
+                connector_padding = (box_width - 2) // 2
+                lines.append("└" + "─" * connector_padding + "┬" + "─" * (box_width - 3 - connector_padding) + "┘")
+                lines.append(" " * (connector_padding + 1) + "│")
+                lines.append(" " * (connector_padding + 1) + "▼")
+            else:
+                lines.append("└" + "─" * (box_width - 2) + "┘")
+
+        # Add legend
+        if show_legend:
+            lines.append("")
+            lines.append("Legend: ✓ completed  ▶ current/interrupted  ○ pending")
+
+        return "\n".join(lines)
