@@ -17,6 +17,7 @@ This document is organized as follows:
 - **[Per-Node Configuration](#per-node-configuration)** - Configuring timeouts, retries, and task queues
 - **[Agentic Execution](#agentic-execution)** - Using LangChain's create_agent with Temporal
 - **[Human-in-the-Loop](#human-in-the-loop-interrupts)** - Supporting interrupt() with Temporal signals
+- **[Graph Visualization](#graph-visualization-queries)** - ASCII and Mermaid diagrams via queries
 - **[Command API](#command-api-dynamic-routing)** - Dynamic routing with Command(goto=...)
 - **[Sample Applications](#sample-applications)** - Complete working examples
 
@@ -573,6 +574,109 @@ graph.add_node(
 ```
 
 This approach simplifies long-running human-in-the-loop scenarios by keeping the wait logic inside the graph node rather than handling interrupts at the workflow level.
+
+## Graph Visualization Queries
+
+The `TemporalLangGraphRunner` provides methods to visualize graph structure and execution progress. Expose these via Temporal queries to monitor running workflows:
+
+```python
+from dataclasses import dataclass
+from typing import Any, cast
+
+from temporalio import workflow
+from temporalio.contrib.langgraph import compile
+
+# Import your graph's state type
+from my_graph import MyState
+
+
+@dataclass
+class GraphStateResponse:
+    """Response from get_graph_state query."""
+    values: MyState
+    next: list[str]
+    step: int
+    interrupted: bool
+    interrupt_node: str | None
+    interrupt_value: dict[str, Any] | None
+
+
+@workflow.defn
+class MyWorkflow:
+    def __init__(self):
+        self._app = None
+
+    @workflow.query
+    def get_graph_ascii(self) -> str:
+        """Get ASCII diagram of graph execution progress."""
+        if self._app is None:
+            return "Graph not yet initialized"
+        return self._app.get_graph_ascii()
+
+    @workflow.query
+    def get_graph_mermaid(self) -> str:
+        """Get Mermaid diagram with nodes colored by status."""
+        if self._app is None:
+            return "Graph not yet initialized"
+        return self._app.get_graph_mermaid()
+
+    @workflow.query
+    def get_graph_state(self) -> GraphStateResponse:
+        """Get current graph execution state."""
+        if self._app is None:
+            return GraphStateResponse(
+                values=cast(MyState, {}), next=[], step=0,
+                interrupted=False, interrupt_node=None, interrupt_value=None,
+            )
+        snapshot = self._app.get_state()
+        interrupt_task = snapshot.tasks[0] if snapshot.tasks else None
+        return GraphStateResponse(
+            values=cast(MyState, snapshot.values),
+            next=list(snapshot.next),
+            step=snapshot.metadata.get("step", 0) if snapshot.metadata else 0,
+            interrupted=bool(snapshot.tasks),
+            interrupt_node=interrupt_task.get("interrupt_node") if interrupt_task else None,
+            interrupt_value=interrupt_task.get("interrupt_value") if interrupt_task else None,
+        )
+
+    @workflow.run
+    async def run(self, input_data: dict) -> dict:
+        self._app = compile("my_graph")
+        return await self._app.ainvoke(input_data)
+```
+
+Query the workflow from the CLI:
+
+```bash
+# ASCII diagram with progress indicators
+temporal workflow query --workflow-id my-workflow --type get_graph_ascii
+# Output:
+# ┌───────────────────┐
+# │       START       │ ✓
+# └─────────┬─────────┘
+#           │
+#           ▼
+# ┌───────────────────┐
+# │  request_approval │ ▶ INTERRUPTED
+# └─────────┬─────────┘
+#           │
+#           ▼
+# ┌───────────────────┐
+# │        END        │ ○
+# └───────────────────┘
+# Legend: ✓ completed  ▶ current/interrupted  ○ pending
+
+# Mermaid diagram (renders in GitHub, Notion, etc.)
+temporal workflow query --workflow-id my-workflow --type get_graph_mermaid
+
+# Full state with typed values
+temporal workflow query --workflow-id my-workflow --type get_graph_state
+```
+
+The visualization methods show:
+- **Completed nodes** (✓ / green): Nodes that have finished executing
+- **Current node** (▶ / yellow): Node currently executing or interrupted
+- **Pending nodes** (○ / gray): Nodes not yet executed
 
 ## Store API (Cross-Node Persistence)
 
