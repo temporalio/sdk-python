@@ -775,6 +775,116 @@ class TestErrorRetryability:
         assert wrapped_retry.non_retryable is False
 
 
+class TestParallelBranchExecution:
+    """Tests for parallel execution of parallel branches (BSP model).
+
+    LangGraph uses a Bulk Synchronous Parallel (BSP) model where nodes that are
+    ready to execute in the same step should run concurrently. This tests that
+    the runner properly executes parallel branches concurrently, not sequentially.
+    """
+
+    @pytest.mark.asyncio
+    async def test_parallel_branches_execute_concurrently(self) -> None:
+        """Parallel branches should execute concurrently, not sequentially.
+
+        This test creates a graph with fan-out pattern (START → [A, B, C] → END)
+        and verifies that all three nodes start executing before any complete.
+        If execution is sequential, only one node will be executing at a time.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from temporalio.contrib.langgraph._models import (
+            ChannelWrite,
+            NodeActivityOutput,
+        )
+        from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+        # Track execution timing
+        activity_starts: list[str] = []
+        activity_completes: list[str] = []
+        all_started_event = asyncio.Event()
+        num_parallel_nodes = 3
+        start_barrier = asyncio.Barrier(num_parallel_nodes)
+
+        async def mock_execute_activity(
+            activity_fn,
+            activity_input,
+            activity_id: str,
+            summary: str,
+            **kwargs,
+        ):
+            """Mock activity that tracks execution order."""
+            node_name = activity_input.node_name
+            activity_starts.append(node_name)
+
+            # Wait for all parallel nodes to start (proves concurrent execution)
+            try:
+                await asyncio.wait_for(start_barrier.wait(), timeout=2.0)
+                all_started_event.set()
+            except asyncio.TimeoutError:
+                # If timeout, not all nodes started concurrently (sequential execution)
+                pass
+
+            activity_completes.append(node_name)
+
+            return NodeActivityOutput(
+                writes=[ChannelWrite(channel="value", value=node_name)],
+                interrupt=None,
+                store_writes=[],
+                send_packets=[],
+                parent_command=None,
+            )
+
+        # Create mock tasks that simulate parallel branches
+        mock_tasks = []
+        for node_name in ["node_a", "node_b", "node_c"]:
+            task = MagicMock()
+            task.name = node_name
+            task.id = f"task-{node_name}"
+            task.input = {"value": 0}
+            task.config = {"configurable": {}}
+            task.path = tuple()
+            task.triggers = []
+            task.writes = []
+            mock_tasks.append(task)
+
+        # Create runner with mock pregel
+        mock_pregel = MagicMock()
+        mock_pregel.step_timeout = None
+        mock_pregel.nodes = {
+            "node_a": MagicMock(metadata=None, subgraphs=None),
+            "node_b": MagicMock(metadata=None, subgraphs=None),
+            "node_c": MagicMock(metadata=None, subgraphs=None),
+        }
+
+        runner = TemporalLangGraphRunner(mock_pregel, graph_id="test_parallel")
+
+        # Mock loop
+        mock_loop = MagicMock()
+
+        # Patch execute_activity and run _execute_loop_tasks
+        with patch(
+            "temporalio.contrib.langgraph._runner.workflow.execute_activity",
+            side_effect=mock_execute_activity,
+        ):
+            result = await runner._execute_loop_tasks(mock_tasks, mock_loop)
+
+        # Assertions
+        assert result is False, "No interrupt should have occurred"
+        assert len(activity_starts) == 3, f"Expected 3 starts, got {activity_starts}"
+        assert (
+            len(activity_completes) == 3
+        ), f"Expected 3 completes, got {activity_completes}"
+
+        # THE KEY ASSERTION: If parallel, all 3 should have started before barrier timeout
+        # If sequential, the barrier.wait() will timeout for each task
+        assert all_started_event.is_set(), (
+            "PARALLEL EXECUTION BUG: Tasks executed sequentially instead of concurrently. "
+            "All 3 parallel branches should start before any complete, but they ran one at a time."
+        )
+
+
 class TestParallelSendPacketExecution:
     """Tests for parallel execution of Send packets."""
 

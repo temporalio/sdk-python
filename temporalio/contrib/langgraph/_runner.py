@@ -589,20 +589,30 @@ class TemporalLangGraphRunner:
         return None
 
     async def _execute_loop_tasks(self, tasks: list[Any], loop: Any) -> bool:
-        """Execute a list of tasks sequentially.
+        """Execute a list of tasks in parallel (BSP model).
+
+        LangGraph uses a Bulk Synchronous Parallel (BSP) model where all tasks
+        that are ready to execute in a step run concurrently. This method
+        executes all tasks in parallel using asyncio.gather().
 
         Args:
             tasks: List of tasks to execute.
             loop: The Pregel loop.
 
         Returns:
-            True if a task was interrupted, False otherwise.
+            True if any task was interrupted, False otherwise.
         """
-        for task in tasks:
-            result = await self._execute_task(task, loop)
-            if not result:
-                return True
-        return False
+        if not tasks:
+            return False
+
+        # Execute all tasks in parallel
+        results = await asyncio.gather(
+            *[self._execute_task(task, loop) for task in tasks]
+        )
+
+        # Check if any task was interrupted (returned False)
+        # In BSP model, if any task interrupts, the step is interrupted
+        return not all(results)
 
     def _finalize_output(
         self, output: dict[str, Any], interrupted: bool
