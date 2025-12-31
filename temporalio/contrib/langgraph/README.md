@@ -305,7 +305,7 @@ graph.add_edge("finalize", END)
 - Operations that don't need Temporal workflow primitives
 - Code that uses libraries incompatible with the workflow sandbox
 
-> **Note:** Nodes running in the workflow execute within Temporal's workflow sandbox, which enforces determinism. Ensure your in-workflow node functions only use Temporal APIs and deterministic Python code. See the [activity_from_node sample](https://github.com/temporalio/samples-python/tree/main/langgraph_samples/activity_from_node) for a complete example.
+> **Note:** Nodes running in the workflow execute within Temporal's workflow sandbox, which enforces determinism. Ensure your in-workflow node functions only use Temporal APIs and deterministic Python code. See the [activity_from_node sample](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/activity_from_node) for a complete example.
 
 ## Agentic Execution
 
@@ -521,7 +521,7 @@ class ApprovalWorkflow:
         return result
 ```
 
-See the [approval_workflow sample](https://github.com/temporalio/samples-python/tree/main/langgraph_samples/approval_workflow) for a complete example with timeout handling.
+See the [human_in_the_loop samples](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/human_in_the_loop) for complete examples with timeout handling.
 
 ### Using Temporal Signals/Updates Directly
 
@@ -712,17 +712,17 @@ Options at each level are merged, so you can set base defaults at the plugin lev
 
 ## Sample Applications
 
-For complete working examples, see the [langgraph_samples](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples) directory in the `langgraph_plugin` branch of the samples repository:
+For complete working examples, see the [langgraph_plugin](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin) directory in the `langgraph_plugin` branch of the samples repository:
 
 | Sample | Description |
 |--------|-------------|
-| [hello_world](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples/hello_world) | Simple starter demonstrating basic plugin setup |
-| [react_agent](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples/react_agent) | ReAct agent with tool calling |
-| [approval_workflow](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples/approval_workflow) | Human-in-the-loop with interrupt/resume |
-| [activity_from_node](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples/activity_from_node) | Calling Temporal activities from nodes |
-| [supervisor](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples/supervisor) | Multi-agent supervisor pattern |
-| [agentic_rag](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples/agentic_rag) | RAG with document grading |
-| [plan_and_execute](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_samples/plan_and_execute) | Plan-and-execute pattern |
+| [hello_world](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/hello_world) | Simple starter demonstrating basic plugin setup |
+| [react_agent](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/react_agent) | ReAct agent with tool calling |
+| [human_in_the_loop](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/human_in_the_loop) | Human-in-the-loop with interrupt/resume (two approaches) |
+| [activity_from_node](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/activity_from_node) | Calling Temporal activities from nodes |
+| [supervisor](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/supervisor) | Multi-agent supervisor pattern |
+| [agentic_rag](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/agentic_rag) | RAG with document grading |
+| [plan_and_execute](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/plan_and_execute) | Plan-and-execute pattern |
 
 ## Important Notes
 
