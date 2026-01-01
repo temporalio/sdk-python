@@ -127,7 +127,7 @@ async def test_execute_activity_wrong_result_type_assignment() -> None:
 
     # assert-type-error-pyright: 'Type "int" is not assignable to declared type "str"'
     _wrong: str = await client.execute_activity(  # type: ignore
-        increment,
+        increment,  # type: ignore[arg-type]
         args=[1],
         id="activity-id",
         task_queue="tq",
@@ -183,7 +183,7 @@ async def test_activity_handle_typed_correctly() -> None:
         task_queue="tq",
         start_to_close_timeout=timedelta(seconds=5),
     )
-    _none_result: None = await handle_none.result()
+    _none_result: None = await handle_none.result()  # type: ignore[func-returns-value]
 
 
 async def test_activity_handle_wrong_type_parameter() -> None:
@@ -191,7 +191,7 @@ async def test_activity_handle_wrong_type_parameter() -> None:
 
     # assert-type-error-pyright: 'Type "ActivityHandle\[int\]" is not assignable to declared type "ActivityHandle\[str\]"'
     _handle: ActivityHandle[str] = await client.start_activity(  # type: ignore
-        increment,
+        increment,  # type: ignore[arg-type]
         args=[1],
         id="activity-id",
         task_queue="tq",
