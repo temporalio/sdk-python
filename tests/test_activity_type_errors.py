@@ -70,6 +70,30 @@ async def test_execute_activity_typed_callable_happy_path() -> None:
     )
 
 
+async def test_start_activity_positional_arg_happy_path() -> None:
+    client = Client(service_client=Mock(spec=ServiceClient))
+
+    _handle: ActivityHandle[int] = await client.start_activity(
+        increment,
+        1,
+        id="activity-id",
+        task_queue="tq",
+        start_to_close_timeout=timedelta(seconds=5),
+    )
+
+
+async def test_execute_activity_positional_arg_happy_path() -> None:
+    client = Client(service_client=Mock(spec=ServiceClient))
+
+    _result: int = await client.execute_activity(
+        increment,
+        1,
+        id="activity-id",
+        task_queue="tq",
+        start_to_close_timeout=timedelta(seconds=5),
+    )
+
+
 async def test_start_activity_string_name_with_result_type() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
@@ -175,30 +199,6 @@ async def test_activity_handle_wrong_type_parameter() -> None:
     )
 
 
-async def test_start_activity_single_arg_overload() -> None:
-    client = Client(service_client=Mock(spec=ServiceClient))
-
-    _handle: ActivityHandle[int] = await client.start_activity(
-        increment,
-        1,
-        id="activity-id",
-        task_queue="tq",
-        start_to_close_timeout=timedelta(seconds=5),
-    )
-
-
-async def test_execute_activity_single_arg_overload() -> None:
-    client = Client(service_client=Mock(spec=ServiceClient))
-
-    _result: int = await client.execute_activity(
-        increment,
-        1,
-        id="activity-id",
-        task_queue="tq",
-        start_to_close_timeout=timedelta(seconds=5),
-    )
-
-
 async def test_start_activity_sync_activity() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
@@ -231,18 +231,6 @@ async def test_start_activity_sync_no_param() -> None:
     _handle: ActivityHandle[str] = await client.start_activity(
         # assert-type-error-pyright: 'cannot be assigned to parameter "activity"'
         no_param_sync,  # type: ignore
-        id="activity-id",
-        task_queue="tq",
-        start_to_close_timeout=timedelta(seconds=5),
-    )
-
-
-async def test_start_activity_single_arg_wrong_type() -> None:
-    client = Client(service_client=Mock(spec=ServiceClient))
-
-    await client.start_activity(
-        increment,
-        "not an int",
         id="activity-id",
         task_queue="tq",
         start_to_close_timeout=timedelta(seconds=5),
