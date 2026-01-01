@@ -1273,6 +1273,7 @@ class Client:
     async def start_activity(
         self,
         activity: str | Callable[..., Awaitable[ReturnType]],
+        arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
         id: str,
@@ -1299,7 +1300,8 @@ class Client:
 
         Args:
             activity: String name or callable activity function to execute.
-            args: Arguments to pass to the activity.
+            arg: Single argument to the activity.
+            args: Multiple arguments to the activity. Cannot be set if arg is.
             id: Unique identifier for the activity. Required.
             task_queue: Task queue to send the activity to.
             result_type: For string name activities, optional type to deserialize result into.
@@ -1328,7 +1330,7 @@ class Client:
         return await self._impl.start_activity(
             StartActivityInput(
                 activity_type=name,
-                args=args,
+                args=temporalio.common._arg_or_args(arg, args),
                 id=id,
                 task_queue=task_queue,
                 result_type=result_type or result_type_from_type_annotation,
@@ -1351,6 +1353,7 @@ class Client:
     async def execute_activity(
         self,
         activity: str | Callable[..., Awaitable[ReturnType]],
+        arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
         id: str,
@@ -1386,6 +1389,7 @@ class Client:
         """
         handle = await self.start_activity(
             activity,
+            arg,
             args=args,
             id=id,
             task_queue=task_queue,
