@@ -107,6 +107,76 @@ async def test_start_activity_string_name_with_result_type() -> None:
     )
 
 
+async def test_start_activity_no_param_async_happy_path() -> None:
+    client = Client(service_client=Mock(spec=ServiceClient))
+
+    _handle: ActivityHandle[str] = await client.start_activity(
+        no_param_async,
+        id="activity-id",
+        task_queue="tq",
+        start_to_close_timeout=timedelta(seconds=5),
+    )
+
+
+async def test_execute_activity_no_param_async_happy_path() -> None:
+    client = Client(service_client=Mock(spec=ServiceClient))
+
+    _result: str = await client.execute_activity(
+        no_param_async,
+        id="activity-id",
+        task_queue="tq",
+        start_to_close_timeout=timedelta(seconds=5),
+    )
+
+
+async def test_start_activity_no_param_sync_happy_path() -> None:
+    client = Client(service_client=Mock(spec=ServiceClient))
+
+    _handle: ActivityHandle[str] = await client.start_activity(
+        no_param_sync,
+        id="activity-id",
+        task_queue="tq",
+        start_to_close_timeout=timedelta(seconds=5),
+    )
+
+
+async def test_execute_activity_no_param_sync_happy_path() -> None:
+    client = Client(service_client=Mock(spec=ServiceClient))
+
+    _result: str = await client.execute_activity(
+        no_param_sync,
+        id="activity-id",
+        task_queue="tq",
+        start_to_close_timeout=timedelta(seconds=5),
+    )
+
+
+async def test_start_activity_wrong_arg_type() -> None:
+    client = Client(service_client=Mock(spec=ServiceClient))
+
+    _handle: ActivityHandle[int] = await client.start_activity(
+        increment,
+        # assert-type-error-pyright: 'cannot be assigned to parameter'
+        "wrong type",  # type: ignore
+        id="activity-id",
+        task_queue="tq",
+        start_to_close_timeout=timedelta(seconds=5),
+    )
+
+
+async def test_execute_activity_wrong_arg_type() -> None:
+    client = Client(service_client=Mock(spec=ServiceClient))
+
+    _result: int = await client.execute_activity(
+        increment,
+        # assert-type-error-pyright: 'cannot be assigned to parameter'
+        "wrong type",  # type: ignore
+        id="activity-id",
+        task_queue="tq",
+        start_to_close_timeout=timedelta(seconds=5),
+    )
+
+
 async def test_start_activity_wrong_result_type_assignment() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
