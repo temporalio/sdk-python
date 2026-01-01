@@ -9,6 +9,7 @@ from temporalio import activity, workflow
 from temporalio.client import ActivityFailedError, Client
 from temporalio.common import ActivityExecutionStatus
 from temporalio.exceptions import ApplicationError, CancelledError
+from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import Worker
 
 
@@ -121,7 +122,6 @@ async def test_manual_completion(client: Client):
 
 
 async def test_manual_cancellation(client: Client):
-    pytest.skip(reason="https://temporalio.atlassian.net/browse/ACT-647")
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     wait_for_signal_workflow_id = str(uuid.uuid4())
@@ -142,6 +142,7 @@ async def test_manual_cancellation(client: Client):
         activities=[async_activity],
         workflows=[WaitForSignalWorkflow],
     ):
+        # Wait for activity to start
         await client.execute_workflow(
             WaitForSignalWorkflow.run,
             id=wait_for_signal_workflow_id,
@@ -151,7 +152,19 @@ async def test_manual_cancellation(client: Client):
             activity_id=activity_id,
             run_id=activity_handle.activity_run_id,
         )
+
+        # report_cancellation fails if activity is not in CANCELLATION_REQUESTED state
+        with pytest.raises(RPCError) as err:
+            await async_activity_handle.report_cancellation("Test cancellation")
+        assert err.value.status == RPCStatusCode.FAILED_PRECONDITION
+        assert "invalid transition from Started" in str(err.value)
+
+        # Request cancellation to transition activity to CANCELLATION_REQUESTED state
+        await activity_handle.cancel()
+
+        # Now report_cancellation succeeds
         await async_activity_handle.report_cancellation("Test cancellation")
+
         with pytest.raises(ActivityFailedError) as err:
             await activity_handle.result()
         assert isinstance(err.value.cause, CancelledError)
