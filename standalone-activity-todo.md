@@ -153,48 +153,23 @@ Tests for different ways to call `start_activity`/`execute_activity`:
 
 #### Type Checking Tests (using `tests/test_type_errors.py` machinery)
 
-Create a new file `tests/test_activity_type_errors.py` with type error assertions similar to `tests/test_client_type_errors.py`.
+✅ **DONE** - Created `tests/test_activity_type_errors.py`
 
-Tests for correct type inference (no errors expected):
-```python
-# Good: typed activity returns typed handle
-_handle: ActivityHandle[int] = await client.start_activity(
-    increment, args=[1], id="id", task_queue="tq", start_to_close_timeout=timedelta(seconds=5)
-)
+**Working type checks:**
+- Infers `ActivityHandle[ReturnType]` from typed async activity callables
+- Catches wrong type assignments for `handle.result()` and `execute_activity()` results
+- Catches missing required parameters (`id`, `task_queue`)
+- Catches `ActivityHandle` type parameter mismatches
 
-# Good: result has correct type
-_result: int = await _handle.result()
+**TDD tests for missing overloads** (currently marked with `# assert-type-error-pyright:`):
+- `test_start_activity_single_arg_overload` - Single positional `arg` parameter (not `args=[]`)
+- `test_execute_activity_single_arg_overload` - Same for execute
+- `test_start_activity_sync_activity` - Sync activity function (`def foo() -> int`)
+- `test_execute_activity_sync_activity` - Same for execute
+- `test_start_activity_sync_no_param` - Sync no-param activity
+- `test_start_activity_single_arg_wrong_type` - Wrong type for single arg
 
-# Good: execute_activity returns correct type
-_result2: int = await client.execute_activity(
-    increment, args=[1], id="id", task_queue="tq", start_to_close_timeout=timedelta(seconds=5)
-)
-```
-
-Tests for expected type errors (use `# assert-type-error-pyright:` comments):
-```python
-# Required parameters
-# assert-type-error-pyright: '...'
-await client.start_activity(increment, args=[1])  # type: ignore  # missing id, task_queue, timeout
-
-# assert-type-error-pyright: '...'
-await client.start_activity(increment, args=[1], id="id", task_queue="tq")  # type: ignore  # missing timeout
-
-# Wrong argument types
-# assert-type-error-pyright: '...'
-await client.start_activity(
-    increment,
-    args=["not an int"],  # type: ignore  # wrong arg type for increment(int) -> int
-    id="id", task_queue="tq", start_to_close_timeout=timedelta(seconds=5)
-)
-
-# Type mismatch with result_type (for string activity names)
-# assert-type-error-pyright: '...'
-_wrong: str = await client.execute_activity(
-    increment, args=[1], id="id", task_queue="tq",
-    start_to_close_timeout=timedelta(seconds=5)
-)  # type: ignore  # increment returns int, not str
-```
+When overloads are added, these tests will fail (expecting error but none found), signaling to remove the markers.
 
 ---
 
