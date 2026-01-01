@@ -1808,10 +1808,28 @@ class Client:
             )
         )
 
+    @overload
     def get_activity_handle(
         self,
-        *,
         activity_id: str,
+        *,
+        activity_run_id: str | None = None,
+    ) -> ActivityHandle[Any]: ...
+
+    @overload
+    def get_activity_handle(
+        self,
+        activity_id: str,
+        *,
+        result_type: Type[ReturnType],
+        activity_run_id: str | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    def get_activity_handle(
+        self,
+        activity_id: str,
+        *,
+        result_type: Type | None = None,
         activity_run_id: str | None = None,
     ) -> ActivityHandle[Any]:
         """Get a handle to an existing activity, as the caller of that activity.
@@ -1824,13 +1842,19 @@ class Client:
 
         Args:
             activity_id: The activity ID.
+            result_type: The result type to deserialize into.
             activity_run_id: The activity run ID. If not provided, targets the
                          latest run.
 
         Returns:
             A handle to the activity.
         """
-        raise NotImplementedError
+        return ActivityHandle(
+            self,
+            activity_id,
+            activity_run_id=activity_run_id,
+            result_type=result_type,
+        )
 
     @overload
     def get_async_activity_handle(
@@ -3868,7 +3892,7 @@ class ActivityHandle(Generic[ReturnType]):
         client: Client,
         activity_id: str,
         *,
-        activity_run_id: str,
+        activity_run_id: str | None = None,
         result_type: Type | None = None,
         data_converter_override: DataConverter | None = None,
     ) -> None:
@@ -3888,7 +3912,7 @@ class ActivityHandle(Generic[ReturnType]):
         return self._activity_id
 
     @property
-    def activity_run_id(self) -> str:
+    def activity_run_id(self) -> str | None:
         """Run ID of the activity."""
         return self._activity_run_id
 
@@ -3982,7 +4006,7 @@ class ActivityHandle(Generic[ReturnType]):
         req = temporalio.api.workflowservice.v1.PollActivityExecutionRequest(
             namespace=self._client.namespace,
             activity_id=self._activity_id,
-            run_id=self._activity_run_id,
+            run_id=self._activity_run_id or "",
         )
 
         # Continue polling as long as we have no outcome
