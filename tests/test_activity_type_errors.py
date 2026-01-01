@@ -180,8 +180,7 @@ async def test_start_activity_single_arg_overload() -> None:
 
     _handle: ActivityHandle[int] = await client.start_activity(
         increment,
-        # assert-type-error-pyright: 'Expected 1 positional argument'
-        1,  # type: ignore
+        1,
         id="activity-id",
         task_queue="tq",
         start_to_close_timeout=timedelta(seconds=5),
@@ -193,8 +192,7 @@ async def test_execute_activity_single_arg_overload() -> None:
 
     _result: int = await client.execute_activity(
         increment,
-        # assert-type-error-pyright: 'Expected 1 positional argument'
-        1,  # type: ignore
+        1,
         id="activity-id",
         task_queue="tq",
         start_to_close_timeout=timedelta(seconds=5),
@@ -244,8 +242,7 @@ async def test_start_activity_single_arg_wrong_type() -> None:
 
     await client.start_activity(
         increment,
-        # assert-type-error-pyright: 'Expected 1 positional argument'
-        "not an int",  # type: ignore
+        "not an int",
         id="activity-id",
         task_queue="tq",
         start_to_close_timeout=timedelta(seconds=5),
