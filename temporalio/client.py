@@ -1268,11 +1268,81 @@ class Client:
             )
         )
 
-    # - TODO: Overloads for no-param, single-param, multi-param
-    # - TODO: Support sync and async activity functions
+    @overload
     async def start_activity(
         self,
-        activity: str | Callable[..., Awaitable[ReturnType]],
+        activity: Callable[..., Awaitable[ReturnType]],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str,
+        result_type: Type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    @overload
+    async def start_activity(
+        self,
+        activity: Callable[..., ReturnType],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str,
+        result_type: Type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    @overload
+    async def start_activity(
+        self,
+        activity: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str,
+        result_type: Type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[Any]: ...
+
+    async def start_activity(
+        self,
+        activity: str | Callable[..., Awaitable[ReturnType]] | Callable[..., ReturnType],
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
@@ -1350,9 +1420,81 @@ class Client:
             )
         )
 
+    @overload
     async def execute_activity(
         self,
-        activity: str | Callable[..., Awaitable[ReturnType]],
+        activity: Callable[..., Awaitable[ReturnType]],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str,
+        result_type: Type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    @overload
+    async def execute_activity(
+        self,
+        activity: Callable[..., ReturnType],
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str,
+        result_type: Type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    @overload
+    async def execute_activity(
+        self,
+        activity: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str,
+        result_type: Type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> Any: ...
+
+    async def execute_activity(
+        self,
+        activity: str | Callable[..., Awaitable[ReturnType]] | Callable[..., ReturnType],
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],

@@ -138,7 +138,7 @@ async def test_execute_activity_wrong_result_type_assignment() -> None:
 async def test_start_activity_missing_required_params() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
-    # assert-type-error-pyright: 'Argument missing for parameter "id"'
+    # assert-type-error-pyright: 'No overloads for "start_activity" match'
     await client.start_activity(  # type: ignore
         increment,
         args=[1],
@@ -146,7 +146,7 @@ async def test_start_activity_missing_required_params() -> None:
         start_to_close_timeout=timedelta(seconds=5),
     )
 
-    # assert-type-error-pyright: 'Argument missing for parameter "task_queue"'
+    # assert-type-error-pyright: 'No overloads for "start_activity" match'
     await client.start_activity(  # type: ignore
         increment,
         args=[1],
@@ -203,8 +203,7 @@ async def test_start_activity_sync_activity() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[int] = await client.start_activity(
-        # assert-type-error-pyright: 'cannot be assigned to parameter "activity"'
-        increment_sync,  # type: ignore
+        increment_sync,
         args=[1],
         id="activity-id",
         task_queue="tq",
@@ -216,8 +215,7 @@ async def test_execute_activity_sync_activity() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _result: int = await client.execute_activity(
-        # assert-type-error-pyright: 'cannot be assigned to parameter "activity"'
-        increment_sync,  # type: ignore
+        increment_sync,
         args=[1],
         id="activity-id",
         task_queue="tq",
@@ -229,8 +227,7 @@ async def test_start_activity_sync_no_param() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[str] = await client.start_activity(
-        # assert-type-error-pyright: 'cannot be assigned to parameter "activity"'
-        no_param_sync,  # type: ignore
+        no_param_sync,
         id="activity-id",
         task_queue="tq",
         start_to_close_timeout=timedelta(seconds=5),
