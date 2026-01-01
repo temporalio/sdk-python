@@ -65,6 +65,45 @@ async def test_get_result(client: Client):
         assert await result_via_execute_activity == 2
 
 
+async def test_get_activity_handle(client: Client):
+    activity_id = str(uuid.uuid4())
+    task_queue = str(uuid.uuid4())
+
+    activity_handle = await client.start_activity(
+        increment,
+        1,
+        id=activity_id,
+        task_queue=task_queue,
+        start_to_close_timeout=timedelta(seconds=5),
+    )
+
+    handle_by_id = client.get_activity_handle(activity_id)
+    assert handle_by_id.activity_id == activity_id
+    assert handle_by_id.activity_run_id is None
+
+    handle_by_id_and_run_id = client.get_activity_handle(
+        activity_id,
+        activity_run_id=activity_handle.activity_run_id,
+    )
+    assert handle_by_id_and_run_id.activity_id == activity_id
+    assert handle_by_id_and_run_id.activity_run_id == activity_handle.activity_run_id
+
+    handle_with_result_type = client.get_activity_handle(
+        activity_id,
+        result_type=int,
+        activity_run_id=activity_handle.activity_run_id,
+    )
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        activities=[increment],
+    ):
+        assert await handle_by_id.result() == 2
+        assert await handle_by_id_and_run_id.result() == 2
+        assert await handle_with_result_type.result() == 2
+
+
 @dataclass
 class ActivityInput:
     wait_for_signal_workflow_id: str
