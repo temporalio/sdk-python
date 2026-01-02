@@ -10,32 +10,25 @@ Reference: See `cross-sdk-design.md` for the full cross-SDK design specification
 
 | Category | Status |
 |----------|--------|
-| Core client methods (`start_activity`, `execute_activity`, `list_activities`, `count_activities`) | ✅ Complete |
+| Core client methods (`start_activity`, `execute_activity`, `list_activities`, `count_activities`, `get_activity_handle`) | ✅ Complete |
 | `ActivityHandle` with `result()`, `describe()`, `cancel()`, `terminate()` | ✅ Complete |
+| Type-safe overloads (matching workflow activities) | ✅ Complete |
 | `ActivityExecution` and `ActivityExecutionDescription` dataclasses | ⚠️ Missing fields |
 | Interceptor support | ✅ Complete |
 | `activity.Info` changes | ✅ Complete |
 | `ActivitySerializationContext` changes | ✅ Complete |
 | Basic tests | ✅ Complete |
+| Type checking tests | ✅ Complete |
 
 ---
 
 ## Must Complete (Missing from Spec)
 
 ### 1. `get_activity_handle()` Implementation
-- **Status:** ❌ Not implemented (raises `NotImplementedError`)
+- **Status:** ✅ Complete
 - **Location:** `temporalio/client.py`
-- **Description:** Should return a handle to an existing standalone activity by ID, allowing callers to get results, describe, cancel, or terminate an activity they didn't start.
-- **Effort:** Medium
-
-```python
-def get_activity_handle(
-    self,
-    *,
-    activity_id: str,
-    activity_run_id: str | None = None,
-) -> ActivityHandle[Any]:
-```
+- **Description:** Returns a handle to an existing standalone activity by ID, allowing callers to get results, describe, cancel, or terminate an activity they didn't start.
+- **Test:** `tests/test_activity.py::test_get_activity_handle`
 
 ### 2. Missing Field: `ActivityExecution.state_transition_count`
 - **Status:** ❌ Not implemented
@@ -112,7 +105,7 @@ These items are implemented but not documented in the spec. The spec should be u
 
 | Field | Spec | Implementation | Notes |
 |-------|------|----------------|-------|
-| `ActivityHandle.activity_run_id` | `Optional[str]` | `str` | Implementation is correct - `StartActivityExecution` response always returns a run_id |
+| `ActivityHandle.activity_run_id` | `Optional[str]` | ✅ `str \| None` | Fixed - now matches spec |
 | `ActivityExecutionDescription.retry_policy` | `Optional` | Not optional | Should verify proto field optionality |
 
 ---
@@ -122,6 +115,7 @@ These items are implemented but not documented in the spec. The spec should be u
 ### Existing Tests (`tests/test_activity.py`)
 - ✅ `test_describe` - Describe a running activity
 - ✅ `test_get_result` - Get result after activity completes
+- ✅ `test_get_activity_handle` - Get handle by ID, with/without run_id and result_type
 - ✅ `test_manual_completion` - Complete activity manually via async handle
 - ✅ `test_manual_cancellation` - Cancel activity then report cancellation via async handle
 - ✅ `test_manual_failure` - Fail activity manually via async handle
@@ -130,7 +124,6 @@ These items are implemented but not documented in the spec. The spec should be u
 ### Additional Tests Needed
 
 #### Functional Tests
-- [ ] Test `get_activity_handle()` once implemented
 - [ ] Test `list_activities()` with various queries
 - [ ] Test `count_activities()` with various queries
 - [ ] Test activity ID reuse policies
@@ -143,33 +136,33 @@ These items are implemented but not documented in the spec. The spec should be u
 
 #### Overload/API Variation Tests
 Tests for different ways to call `start_activity`/`execute_activity`:
-- [ ] Activity by callable (typed): `client.start_activity(my_activity, args=[arg1, arg2], ...)`
-- [ ] Activity by name (string): `client.start_activity("my_activity", args=[arg1], result_type=MyResult, ...)`
-- [ ] Single arg as positional (when overloads added): `client.start_activity(my_activity, arg1, ...)`
-- [ ] Async activity function (`async def my_activity`)
-- [ ] Sync activity function (`def my_activity`) - if supported for standalone
-- [ ] With explicit `result_type` parameter
-- [ ] Without `result_type` (inferred from callable)
+- ✅ Activity by callable (typed): `client.start_activity(my_activity, args=[arg1, arg2], ...)`
+- ✅ Activity by name (string): `client.start_activity("my_activity", args=[arg1], result_type=MyResult, ...)`
+- ✅ Single arg as positional: `client.start_activity(my_activity, arg1, ...)`
+- ✅ Async activity function (`async def my_activity`)
+- ✅ Sync activity function (`def my_activity`)
+- ✅ With explicit `result_type` parameter
+- ✅ Without `result_type` (inferred from callable)
 
 #### Type Checking Tests (using `tests/test_type_errors.py` machinery)
 
 ✅ **DONE** - Created `tests/test_activity_type_errors.py`
 
 **Working type checks:**
-- Infers `ActivityHandle[ReturnType]` from typed async activity callables
+- Infers `ActivityHandle[ReturnType]` from typed async/sync activity callables
 - Catches wrong type assignments for `handle.result()` and `execute_activity()` results
 - Catches missing required parameters (`id`, `task_queue`)
 - Catches `ActivityHandle` type parameter mismatches
+- Catches wrong argument types with type-safe single-param overloads
 
-**TDD tests for missing overloads** (currently marked with `# assert-type-error-pyright:`):
-- `test_start_activity_single_arg_overload` - Single positional `arg` parameter (not `args=[]`)
-- `test_execute_activity_single_arg_overload` - Same for execute
-- `test_start_activity_sync_activity` - Sync activity function (`def foo() -> int`)
-- `test_execute_activity_sync_activity` - Same for execute
-- `test_start_activity_sync_no_param` - Sync no-param activity
-- `test_start_activity_single_arg_wrong_type` - Wrong type for single arg
-
-When overloads are added, these tests will fail (expecting error but none found), signaling to remove the markers.
+**Overloads implemented** (matching workflow activity overloads):
+1. `CallableAsyncNoParam[ReturnType]` - async, no params
+2. `CallableSyncNoParam[ReturnType]` - sync, no params
+3. `CallableAsyncSingleParam[ParamType, ReturnType]` with `arg: ParamType` - async, typed single param
+4. `CallableSyncSingleParam[ParamType, ReturnType]` with `arg: ParamType` - sync, typed single param
+5. `Callable[..., Awaitable[ReturnType]]` with `args: Sequence[Any]` - async, multi-param
+6. `Callable[..., ReturnType]` with `args: Sequence[Any]` - sync, multi-param
+7. `str` with `arg: Any`, `args: Sequence[Any]` - string name
 
 ---
 
