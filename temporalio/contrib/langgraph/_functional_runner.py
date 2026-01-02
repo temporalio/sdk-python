@@ -1,15 +1,39 @@
 """Runner for LangGraph functional API with Temporal integration.
 
-This module provides the TemporalFunctionalRunner that wraps a LangGraph
-@entrypoint (Pregel object) and injects CONFIG_KEY_CALL to route task calls
-to Temporal activities.
+This module provides the TemporalFunctionalRunner that executes LangGraph
+@entrypoint functions directly (bypassing Pregel's runner) with CONFIG_KEY_CALL
+injected to route @task calls to Temporal activities.
+
+LangGraph Internal API Usage
+============================
+
+This module uses LangGraph internal APIs because we execute the entrypoint
+function directly, bypassing Pregel's normal execution loop. This allows us
+to inject our own CONFIG_KEY_CALL callback that routes @task calls to
+Temporal activities.
+
+WHY WE BYPASS PREGEL'S RUNNER:
+Pregel's runner always overwrites CONFIG_KEY_CALL with its own implementation.
+By extracting and executing the entrypoint function directly, we can inject
+our callback and have @task calls routed to Temporal activities.
+
+CONTEXT KEYS WE INJECT:
+- CONFIG_KEY_CALL: Our callback that routes @task to activities
+- CONFIG_KEY_SCRATCHPAD: For interrupt() support
+- CONFIG_KEY_RUNTIME: For get_store()/get_stream_writer() support
+- CONFIG_KEY_CHECKPOINT_NS: Namespace for checkpoint operations
+
+RISKS:
+These are private APIs that may change in future LangGraph versions.
 """
 
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, cast
 
@@ -32,6 +56,20 @@ if TYPE_CHECKING:
     from langgraph.types import Command
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class FunctionalExecutionState:
+    """Tracks state during functional API entrypoint execution."""
+
+    pending_interrupt: Any | None = None
+    """Pending interrupt value from interrupt() call."""
+
+    pending_parent_command: Any | None = None
+    """Pending parent command from subgraph (for parent graph routing)."""
+
+    resume_value: Any | None = None
+    """Value to resume with after interrupt."""
 
 
 def _get_task_identifier(func: Any) -> str | None:
@@ -225,6 +263,132 @@ class TemporalFunctionalRunner:
         future: TemporalTaskFuture[Any] = TemporalTaskFuture(activity_handle=handle)
         return future
 
+    def _extract_entrypoint_function(self, pregel: Pregel) -> Callable[..., Any]:
+        """Extract the underlying entrypoint function from the Pregel wrapper.
+
+        The @entrypoint decorator creates a single-node Pregel graph where
+        the node contains the user's function wrapped in a RunnableCallable.
+
+        Returns:
+            The underlying async or sync entrypoint function.
+        """
+        # Get the single node from the entrypoint Pregel
+        if len(pregel.nodes) != 1:
+            raise ValueError(
+                f"Expected single-node Pregel from @entrypoint, got {len(pregel.nodes)} nodes"
+            )
+
+        node_name = next(iter(pregel.nodes.keys()))
+        node = pregel.nodes[node_name]
+        bound = node.bound
+
+        # Extract the function from RunnableCallable
+        # For async functions: afunc is the actual function
+        # For sync functions: func is the actual function, afunc is run_in_executor wrapper
+        afunc = getattr(bound, "afunc", None)
+        func = getattr(bound, "func", None)
+
+        if afunc is not None:
+            # Check if afunc is a partial (sync function wrapped in run_in_executor)
+            if isinstance(afunc, functools.partial):
+                # This is a sync function - use func directly
+                if func is not None:
+                    return func
+            else:
+                # This is an async function
+                return afunc
+
+        if func is not None:
+            return func
+
+        raise ValueError(f"Cannot extract function from entrypoint node {node_name}")
+
+    def _build_execution_config(
+        self,
+        call_callback: Callable[..., Any],
+        user_config: dict[str, Any] | None,
+        execution_state: FunctionalExecutionState,
+    ) -> dict[str, Any]:
+        """Build the config dict with all required context keys injected.
+
+        This injects:
+        - CONFIG_KEY_CALL: Our callback for routing @task to activities
+        - CONFIG_KEY_SCRATCHPAD: For interrupt() support
+        - CONFIG_KEY_RUNTIME: For get_store()/get_stream_writer()
+        - CONFIG_KEY_CHECKPOINT_NS: Namespace for checkpoints
+        """
+        from langgraph._internal._constants import (
+            CONF,
+            CONFIG_KEY_CALL,
+            CONFIG_KEY_CHECKPOINT_NS,
+            CONFIG_KEY_RUNTIME,
+            CONFIG_KEY_SCRATCHPAD,
+        )
+        from langgraph._internal._scratchpad import PregelScratchpad
+        from langgraph.runtime import Runtime
+
+        # Create scratchpad for interrupt handling
+        # Track interrupt index using a mutable container
+        interrupt_idx = [0]
+
+        def _interrupt_counter() -> int:
+            idx = interrupt_idx[0]
+            interrupt_idx[0] += 1
+            return idx
+
+        def _get_null_resume(consume: bool) -> Any:
+            return None
+
+        # Set up resume values if resuming from interrupt
+        resume_values: list[Any] = []
+        if execution_state.resume_value is not None:
+            resume_values = [execution_state.resume_value]
+
+        scratchpad = PregelScratchpad(
+            step=0,
+            stop=1,
+            call_counter=lambda: 0,
+            interrupt_counter=_interrupt_counter,
+            get_null_resume=_get_null_resume,
+            resume=resume_values,
+            subgraph_counter=lambda: 0,
+        )
+
+        # Create runtime (without store for now - can add later)
+        runtime = Runtime(store=None)
+
+        # Build configurable dict with all context keys
+        configurable: dict[str, Any] = {
+            CONFIG_KEY_CALL: call_callback,
+            CONFIG_KEY_SCRATCHPAD: scratchpad,
+            CONFIG_KEY_RUNTIME: runtime,
+            CONFIG_KEY_CHECKPOINT_NS: "",
+        }
+
+        # Merge with user config
+        if user_config:
+            user_configurable = user_config.get("configurable", {})
+            # User config goes first, our keys take precedence
+            configurable = {
+                **user_configurable,
+                **configurable,
+            }
+
+        # Build full config
+        injected_config: dict[str, Any] = {
+            "configurable": configurable,
+            CONF: configurable,  # LangGraph internals use CONF key
+            "callbacks": None,  # Required by call() in langgraph/pregel/_call.py
+        }
+
+        # Copy other user config keys
+        if user_config:
+            for key, value in user_config.items():
+                if key not in ("configurable", CONF):
+                    injected_config[key] = value
+
+        return injected_config
+
     async def ainvoke(
         self,
         input_state: Any,
@@ -232,6 +396,9 @@ class TemporalFunctionalRunner:
         on_interrupt: Callable[[Any], Awaitable[Any]] | None = None,
     ) -> dict[str, Any]:
         """Invoke the entrypoint asynchronously.
+
+        This executes the entrypoint function directly (bypassing Pregel's runner)
+        with our CONFIG_KEY_CALL injected, so @task calls are routed to activities.
 
         Args:
             input_state: Input to pass to the entrypoint.
@@ -242,68 +409,107 @@ class TemporalFunctionalRunner:
             The result from the entrypoint execution.
         """
         from langchain_core.runnables.config import var_child_runnable_config
-        from langgraph._internal._constants import (
-            CONF,
-            CONFIG_KEY_CALL,
-        )
+        from langgraph.errors import GraphInterrupt as LangGraphInterrupt
+        from langgraph.errors import ParentCommand
 
         pregel = self._get_pregel()
+        execution_state = FunctionalExecutionState()
+
+        # Extract the underlying entrypoint function
+        entrypoint_func = self._extract_entrypoint_function(pregel)
 
         # Create our custom call callback
         call_callback = self._create_temporal_call_callback()
 
-        # Build config with our callback
-        injected_config: dict[str, Any] = {
-            "configurable": {
-                CONFIG_KEY_CALL: call_callback,
-            }
-        }
+        # Build config with all required context keys
+        injected_config = self._build_execution_config(
+            call_callback, config, execution_state
+        )
 
-        # Merge with user config
-        if config:
-            user_configurable = config.get("configurable", {})
-            injected_config["configurable"] = {
-                **user_configurable,
-                CONFIG_KEY_CALL: call_callback,  # Our callback takes precedence
-            }
-            # Copy other config keys
-            for key, value in config.items():
-                if key != "configurable":
-                    injected_config[key] = value
-
-        # Ensure CONF key exists for LangGraph internals
-        if CONF not in injected_config:
-            injected_config[CONF] = injected_config["configurable"]
-
-        # Set context var and run
-        # Cast to RunnableConfig for type checking (it's a TypedDict that accepts extra keys)
+        # Set context var so get_config() works inside the entrypoint
         runnable_config = cast("RunnableConfig", injected_config)
         token = var_child_runnable_config.set(runnable_config)
+
         try:
-            result = await pregel.ainvoke(input_state, runnable_config)
+            # Execute the entrypoint function directly
+            if asyncio.iscoroutinefunction(entrypoint_func):
+                result = await entrypoint_func(input_state)
+            else:
+                # For sync functions, run in the workflow context
+                # Note: This runs synchronously which is fine for workflow code
+                result = entrypoint_func(input_state)
 
-            # Handle interrupts if callback provided
-            if isinstance(result, dict) and "__interrupt__" in result and on_interrupt:
-                interrupt_value = result["__interrupt__"]
-                if isinstance(interrupt_value, list) and interrupt_value:
-                    # Get the first interrupt's value
-                    interrupt_data = interrupt_value[0]
-                    if hasattr(interrupt_data, "value"):
-                        interrupt_data = interrupt_data.value
-
-                    # Call the interrupt handler
-                    resume_value = await on_interrupt(interrupt_data)
-
-                    # Resume with Command
-                    from langgraph.types import Command
-
-                    result = await self.ainvoke(
-                        Command(resume=resume_value),
-                        config=config,
-                        on_interrupt=on_interrupt,
-                    )
+            # Wrap result in dict if needed (entrypoint returns are typically dicts)
+            if not isinstance(result, dict):
+                result = {"result": result}
 
             return result
+
+        except LangGraphInterrupt as e:
+            # Handle interrupt() calls from within the entrypoint
+            logger.debug("Entrypoint %s raised interrupt", self._entrypoint_id)
+
+            # Extract interrupt value
+            interrupt_value = None
+            if e.args and len(e.args) > 0:
+                interrupts = e.args[0]
+                if interrupts and len(interrupts) > 0:
+                    interrupt_value = interrupts[0].value
+
+            execution_state.pending_interrupt = interrupt_value
+
+            # If callback provided, handle the interrupt
+            if on_interrupt and interrupt_value is not None:
+                resume_value = await on_interrupt(interrupt_value)
+
+                # Resume execution with the resume value
+                execution_state.resume_value = resume_value
+                execution_state.pending_interrupt = None
+
+                # Rebuild config with resume value
+                injected_config = self._build_execution_config(
+                    call_callback, config, execution_state
+                )
+                runnable_config = cast("RunnableConfig", injected_config)
+
+                # Reset context var for resumed execution
+                var_child_runnable_config.reset(token)
+                token = var_child_runnable_config.set(runnable_config)
+
+                # Re-execute with resume value
+                if asyncio.iscoroutinefunction(entrypoint_func):
+                    result = await entrypoint_func(input_state)
+                else:
+                    result = entrypoint_func(input_state)
+
+                if not isinstance(result, dict):
+                    result = {"result": result}
+                return result
+
+            # Return interrupt marker for caller to handle
+            return {"__interrupt__": [{"value": interrupt_value}]}
+
+        except ParentCommand as e:
+            # Handle commands from subgraphs back to parent
+            logger.debug("Entrypoint %s raised ParentCommand", self._entrypoint_id)
+
+            command = e.args[0] if e.args else None
+            execution_state.pending_parent_command = command
+
+            # Extract any state updates from the command
+            command_result: dict[str, Any] = {}
+            if command and hasattr(command, "update") and command.update:
+                command_result.update(command.update)
+
+            # Add marker for parent to handle routing
+            if command and hasattr(command, "goto") and command.goto:
+                command_result["__parent_command__"] = {
+                    "goto": command.goto,
+                    "graph": getattr(command, "graph", None),
+                }
+
+            return command_result
+
         finally:
             var_child_runnable_config.reset(token)
 

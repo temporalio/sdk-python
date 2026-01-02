@@ -11,6 +11,7 @@ import concurrent.futures
 from typing import TYPE_CHECKING, Any, Generator, Generic, TypeVar, cast
 
 if TYPE_CHECKING:
+    from temporalio.contrib.langgraph._functional_models import TaskActivityOutput
     from temporalio.workflow import ActivityHandle
 
 T = TypeVar("T")
@@ -119,7 +120,19 @@ class TemporalTaskFuture(Generic[T], concurrent.futures.Future[T]):
 
         if self._activity_handle is not None:
             # Yield from the activity handle's awaitable
-            result = yield from self._activity_handle.__await__()
+            # The activity returns TaskActivityOutput, we need to extract the result
+            activity_output = yield from self._activity_handle.__await__()
+
+            # Unwrap TaskActivityOutput to get the actual result
+            from temporalio.contrib.langgraph._functional_models import (
+                TaskActivityOutput,
+            )
+
+            if isinstance(activity_output, TaskActivityOutput):
+                result = cast(T, activity_output.result)
+            else:
+                result = cast(T, activity_output)
+
             self._result_value = result
             self._done = True
             return result
