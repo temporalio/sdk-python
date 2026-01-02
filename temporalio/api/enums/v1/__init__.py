@@ -1,3 +1,8 @@
+from .activity_pb2 import (
+    ActivityExecutionStatus,
+    ActivityIdConflictPolicy,
+    ActivityIdReusePolicy,
+)
 from .batch_operation_pb2 import BatchOperationState, BatchOperationType
 from .command_type_pb2 import CommandType
 from .common_pb2 import (
@@ -55,6 +60,9 @@ from .workflow_pb2 import (
 )
 
 __all__ = [
+    "ActivityExecutionStatus",
+    "ActivityIdConflictPolicy",
+    "ActivityIdReusePolicy",
     "ApplicationErrorCategory",
     "ArchivalState",
     "BatchOperationState",
