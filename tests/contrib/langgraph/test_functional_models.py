@@ -153,7 +153,9 @@ class TestFunctionalRunnerConfig:
         )
 
         assert "slow_task" in config.task_options
-        assert config.task_options["slow_task"]["start_to_close_timeout_seconds"] == 900.0
+        assert (
+            config.task_options["slow_task"]["start_to_close_timeout_seconds"] == 900.0
+        )
 
     def test_get_task_timeout_with_default(self) -> None:
         """get_task_timeout should return default for unknown tasks."""

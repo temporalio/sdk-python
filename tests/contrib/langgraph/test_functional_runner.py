@@ -17,10 +17,10 @@ class TestGetTaskIdentifier:
 
     def test_regular_function(self) -> None:
         """Should return module.qualname for regular functions."""
-        from temporalio.contrib.langgraph._functional_runner import _get_task_identifier
-
         # Use a module-level function for this test (json.dumps is a good example)
         import json
+
+        from temporalio.contrib.langgraph._functional_runner import _get_task_identifier
 
         result = _get_task_identifier(json.dumps)
 
@@ -83,7 +83,9 @@ class TestContextDetection:
 
     def test_is_in_workflow_context_outside_workflow(self) -> None:
         """Should return False when not in workflow."""
-        from temporalio.contrib.langgraph._functional_runner import _is_in_workflow_context
+        from temporalio.contrib.langgraph._functional_runner import (
+            _is_in_workflow_context,
+        )
 
         # Outside workflow context
         result = _is_in_workflow_context()
@@ -92,7 +94,9 @@ class TestContextDetection:
 
     def test_is_in_activity_context_outside_activity(self) -> None:
         """Should return False when not in activity."""
-        from temporalio.contrib.langgraph._functional_runner import _is_in_activity_context
+        from temporalio.contrib.langgraph._functional_runner import (
+            _is_in_activity_context,
+        )
 
         # Outside activity context
         result = _is_in_activity_context()
@@ -102,7 +106,9 @@ class TestContextDetection:
     @patch("temporalio.contrib.langgraph._functional_runner.workflow")
     def test_is_in_workflow_context_in_workflow(self, mock_workflow: MagicMock) -> None:
         """Should return True when in workflow sandbox."""
-        from temporalio.contrib.langgraph._functional_runner import _is_in_workflow_context
+        from temporalio.contrib.langgraph._functional_runner import (
+            _is_in_workflow_context,
+        )
 
         mock_workflow.unsafe.in_sandbox.return_value = True
 
@@ -113,7 +119,9 @@ class TestContextDetection:
     @patch("temporalio.contrib.langgraph._functional_runner.activity")
     def test_is_in_activity_context_in_activity(self, mock_activity: MagicMock) -> None:
         """Should return True when activity.info() succeeds."""
-        from temporalio.contrib.langgraph._functional_runner import _is_in_activity_context
+        from temporalio.contrib.langgraph._functional_runner import (
+            _is_in_activity_context,
+        )
 
         mock_activity.info.return_value = MagicMock()
 
@@ -143,7 +151,9 @@ class TestTemporalFunctionalRunner:
 
     def test_initialization_defaults(self) -> None:
         """Runner should initialize with default values."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
         )
@@ -159,7 +169,9 @@ class TestTemporalFunctionalRunner:
 
     def test_initialization_with_custom_timeout(self) -> None:
         """Runner should accept custom default timeout."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
         )
@@ -176,7 +188,9 @@ class TestTemporalFunctionalRunner:
 
     def test_initialization_with_task_options(self) -> None:
         """Runner should store per-task options."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
         )
@@ -195,7 +209,9 @@ class TestTemporalFunctionalRunner:
 
     def test_merges_registered_task_options(self) -> None:
         """Runner should merge with options from registry."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
         )
@@ -217,7 +233,9 @@ class TestTemporalFunctionalRunner:
 
     def test_get_pregel(self) -> None:
         """_get_pregel should return registered pregel."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
         )
@@ -232,7 +250,9 @@ class TestTemporalFunctionalRunner:
 
     def test_get_task_timeout_default(self) -> None:
         """_get_task_timeout should return default for unknown task."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
         )
@@ -251,7 +271,9 @@ class TestTemporalFunctionalRunner:
 
     def test_get_task_timeout_override(self) -> None:
         """_get_task_timeout should return task-specific timeout."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
         )
@@ -272,7 +294,9 @@ class TestTemporalFunctionalRunner:
 
     def test_get_task_timeout_from_seconds(self) -> None:
         """_get_task_timeout should convert numeric seconds to timedelta."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
         )
@@ -293,7 +317,9 @@ class TestTemporalFunctionalRunner:
 
     def test_execute_task_inline_sync(self) -> None:
         """_execute_task_inline should execute sync function."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
         )
@@ -313,7 +339,9 @@ class TestTemporalFunctionalRunner:
 
     def test_execute_task_inline_with_exception(self) -> None:
         """_execute_task_inline should capture exceptions."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
         )
@@ -335,7 +363,9 @@ class TestTemporalFunctionalRunner:
 
     def test_execute_task_inline_unwraps_func(self) -> None:
         """_execute_task_inline should unwrap .func attribute."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
         )
@@ -357,7 +387,9 @@ class TestTemporalFunctionalRunner:
 
     def test_get_graph(self) -> None:
         """get_graph should return the pregel."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
         )
@@ -392,7 +424,9 @@ class TestCompileFunctional:
 
     def test_returns_runner(self) -> None:
         """compile_functional should return TemporalFunctionalRunner."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
             compile_functional,
@@ -408,7 +442,9 @@ class TestCompileFunctional:
 
     def test_passes_timeout(self) -> None:
         """compile_functional should pass timeout to runner."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import compile_functional
 
         mock_pregel = MagicMock()
@@ -423,7 +459,9 @@ class TestCompileFunctional:
 
     def test_passes_task_options(self) -> None:
         """compile_functional should pass task_options to runner."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import compile_functional
 
         mock_pregel = MagicMock()
@@ -458,7 +496,9 @@ class TestTemporalCallCallback:
 
     def test_callback_raises_for_non_importable_function(self) -> None:
         """Callback should raise ValueError for lambdas/closures."""
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
         )
@@ -491,7 +531,9 @@ class TestTemporalCallCallback:
     ) -> None:
         """Callback should execute inline when not in Temporal context."""
         from temporalio.contrib.langgraph._functional_future import InlineFuture
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
         )
@@ -525,7 +567,9 @@ class TestTemporalCallCallback:
     ) -> None:
         """Callback should execute inline when in activity context."""
         from temporalio.contrib.langgraph._functional_future import InlineFuture
-        from temporalio.contrib.langgraph._functional_registry import register_entrypoint
+        from temporalio.contrib.langgraph._functional_registry import (
+            register_entrypoint,
+        )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
         )

@@ -18,6 +18,16 @@ from temporalio.contrib.langgraph._exceptions import (
     NODE_NOT_FOUND_ERROR,
     GraphAlreadyRegisteredError,
 )
+from temporalio.contrib.langgraph._functional_activity import execute_langgraph_task
+from temporalio.contrib.langgraph._functional_plugin import LangGraphFunctionalPlugin
+from temporalio.contrib.langgraph._functional_registry import (
+    get_entrypoint,
+    register_entrypoint,
+)
+from temporalio.contrib.langgraph._functional_runner import (
+    TemporalFunctionalRunner,
+    compile_functional,
+)
 from temporalio.contrib.langgraph._graph_registry import (
     get_default_activity_options,
     get_graph,
@@ -173,13 +183,20 @@ def compile(
 
 
 __all__ = [
-    # Main API
+    # Main API - Graph API
     "activity_options",
     "compile",
     "LangGraphPlugin",
     "StateSnapshot",
     "temporal_node_metadata",
     "TemporalLangGraphRunner",
+    # Main API - Functional API
+    "compile_functional",
+    "execute_langgraph_task",
+    "get_entrypoint",
+    "LangGraphFunctionalPlugin",
+    "register_entrypoint",
+    "TemporalFunctionalRunner",
     # Exception types (for catching configuration errors)
     "GraphAlreadyRegisteredError",
     # Error type constants (for catching ApplicationError.type)

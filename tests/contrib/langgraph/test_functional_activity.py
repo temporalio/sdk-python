@@ -218,7 +218,11 @@ class TestExecuteLangGraphTask:
         from temporalio.contrib.langgraph._functional_models import TaskActivityInput
 
         test_module = ModuleType("test_tasks_kwargs")
-        setattr(test_module, "format_message", lambda name, greeting="Hello": f"{greeting}, {name}!")
+        setattr(
+            test_module,
+            "format_message",
+            lambda name, greeting="Hello": f"{greeting}, {name}!",
+        )
         sys.modules["test_tasks_kwargs"] = test_module
 
         try:

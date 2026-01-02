@@ -1063,7 +1063,9 @@ class TemporalLangGraphRunner:
                         if asyncio.iscoroutinefunction(
                             getattr(task.proc, "ainvoke", None)
                         ):
-                            result = await task.proc.ainvoke(task.input, runnable_config)
+                            result = await task.proc.ainvoke(
+                                task.input, runnable_config
+                            )
                         else:
                             result = task.proc.invoke(task.input, runnable_config)
 
@@ -1750,13 +1752,22 @@ class TemporalLangGraphRunner:
             if stripped.startswith("classDef"):
                 continue
             # Add status class to node definitions
-            elif stripped and not stripped.startswith("---") and not stripped.startswith("graph") and not stripped.startswith("config:") and not stripped.startswith("flowchart:") and not stripped.startswith("curve:"):
+            elif (
+                stripped
+                and not stripped.startswith("---")
+                and not stripped.startswith("graph")
+                and not stripped.startswith("config:")
+                and not stripped.startswith("flowchart:")
+                and not stripped.startswith("curve:")
+            ):
                 # Check if this is a node definition (not an edge)
                 if "-->" not in stripped and "-.->" not in stripped:
                     # Find which node this line defines
                     for node_name, status in node_status.items():
                         # Match node definitions like "validate(validate)" or "__start__([...])"
-                        if stripped.startswith(f"{node_name}(") or stripped.startswith(f"{node_name}["):
+                        if stripped.startswith(f"{node_name}(") or stripped.startswith(
+                            f"{node_name}["
+                        ):
                             # Remove any existing class and add status class
                             if ":::" in stripped:
                                 stripped = stripped.rsplit(":::", 1)[0]
@@ -1822,7 +1833,8 @@ class TemporalLangGraphRunner:
         # Get nodes in topological order (simple linear for now)
         # Filter out internal nodes
         visible_nodes = [
-            name for name in graph.nodes
+            name
+            for name in graph.nodes
             if not name.startswith("__") or name in ("__start__", "__end__")
         ]
 
@@ -1856,7 +1868,13 @@ class TemporalLangGraphRunner:
 
         # Build ASCII diagram
         lines: list[str] = []
-        max_name_len = max((len(n.replace("__", "").upper() if n.startswith("__") else n) for n in ordered_nodes), default=7)
+        max_name_len = max(
+            (
+                len(n.replace("__", "").upper() if n.startswith("__") else n)
+                for n in ordered_nodes
+            ),
+            default=7,
+        )
         box_width = max(max_name_len + 4, 11)  # Minimum width of 11
 
         for i, node_name in enumerate(ordered_nodes):
@@ -1884,7 +1902,13 @@ class TemporalLangGraphRunner:
 
             # Calculate padding for centering
             name_padding = (box_width - 2 - len(display_name)) // 2
-            name_line = "│" + " " * name_padding + display_name + " " * (box_width - 2 - name_padding - len(display_name)) + "│"
+            name_line = (
+                "│"
+                + " " * name_padding
+                + display_name
+                + " " * (box_width - 2 - name_padding - len(display_name))
+                + "│"
+            )
 
             # Build box
             lines.append("┌" + "─" * (box_width - 2) + "┐")
@@ -1892,7 +1916,13 @@ class TemporalLangGraphRunner:
             if i < len(ordered_nodes) - 1:
                 # Add connector to next node
                 connector_padding = (box_width - 2) // 2
-                lines.append("└" + "─" * connector_padding + "┬" + "─" * (box_width - 3 - connector_padding) + "┘")
+                lines.append(
+                    "└"
+                    + "─" * connector_padding
+                    + "┬"
+                    + "─" * (box_width - 3 - connector_padding)
+                    + "┘"
+                )
                 lines.append(" " * (connector_padding + 1) + "│")
                 lines.append(" " * (connector_padding + 1) + "▼")
             else:

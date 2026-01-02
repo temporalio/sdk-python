@@ -803,6 +803,6 @@ class TestRunInWorkflow:
             # tasks kept failing due to sandbox restriction).
             from temporalio.client import WorkflowFailureError
 
-            assert isinstance(exc_info.value, WorkflowFailureError), (
-                f"Expected WorkflowFailureError, got: {type(exc_info.value).__name__}"
-            )
+            assert isinstance(
+                exc_info.value, WorkflowFailureError
+            ), f"Expected WorkflowFailureError, got: {type(exc_info.value).__name__}"

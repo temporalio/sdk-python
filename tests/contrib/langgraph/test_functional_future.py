@@ -29,7 +29,9 @@ class TestTemporalTaskFuture:
         from temporalio.contrib.langgraph._functional_future import TemporalTaskFuture
 
         mock_handle = MagicMock()
-        future: TemporalTaskFuture[int] = TemporalTaskFuture(activity_handle=mock_handle)
+        future: TemporalTaskFuture[int] = TemporalTaskFuture(
+            activity_handle=mock_handle
+        )
 
         assert future.done() is False
         assert future.running() is True
@@ -95,7 +97,9 @@ class TestTemporalTaskFuture:
         from temporalio.contrib.langgraph._functional_future import TemporalTaskFuture
 
         mock_handle = MagicMock()
-        future: TemporalTaskFuture[int] = TemporalTaskFuture(activity_handle=mock_handle)
+        future: TemporalTaskFuture[int] = TemporalTaskFuture(
+            activity_handle=mock_handle
+        )
 
         with pytest.raises(RuntimeError, match="Cannot block"):
             future.result()
@@ -158,7 +162,9 @@ class TestTemporalTaskFuture:
 
         mock_handle = MockHandle()
 
-        future: TemporalTaskFuture[int] = TemporalTaskFuture(activity_handle=mock_handle)  # type: ignore[arg-type]
+        future: TemporalTaskFuture[int] = TemporalTaskFuture(
+            activity_handle=mock_handle  # type: ignore[arg-type]
+        )
 
         result = await future
 

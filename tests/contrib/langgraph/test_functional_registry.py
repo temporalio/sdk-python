@@ -275,7 +275,9 @@ class TestGlobalRegistry:
 
         mock_pregel = MagicMock()
         default_options = {"start_to_close_timeout_seconds": 600.0}
-        register_entrypoint("test_ep", mock_pregel, default_task_options=default_options)
+        register_entrypoint(
+            "test_ep", mock_pregel, default_task_options=default_options
+        )
 
         result = get_entrypoint_default_options("test_ep")
 
