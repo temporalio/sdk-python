@@ -113,6 +113,7 @@ class LangGraphFunctionalPlugin(SimplePlugin):
 
             # Add passthrough modules for LangGraph functional API
             # langgraph is needed because @entrypoint runs in workflow sandbox
+            # langsmith is needed because langchain_core checks for tracing
             if isinstance(runner, SandboxedWorkflowRunner):
                 return dataclasses.replace(
                     runner,
@@ -121,6 +122,7 @@ class LangGraphFunctionalPlugin(SimplePlugin):
                         "langchain_core",
                         "annotated_types",
                         "langgraph",
+                        "langsmith",
                     ),
                 )
             return runner
