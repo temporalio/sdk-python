@@ -44,7 +44,7 @@ def no_param_sync() -> str:
     return "done"
 
 
-async def test_start_activity_typed_callable_happy_path() -> None:
+async def _test_start_activity_typed_callable_happy_path() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[int] = await client.start_activity(
@@ -58,7 +58,7 @@ async def test_start_activity_typed_callable_happy_path() -> None:
     _result: int = await _handle.result()
 
 
-async def test_execute_activity_typed_callable_happy_path() -> None:
+async def _test_execute_activity_typed_callable_happy_path() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _result: int = await client.execute_activity(
@@ -70,7 +70,7 @@ async def test_execute_activity_typed_callable_happy_path() -> None:
     )
 
 
-async def test_start_activity_positional_arg_happy_path() -> None:
+async def _test_start_activity_positional_arg_happy_path() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[int] = await client.start_activity(
@@ -82,7 +82,7 @@ async def test_start_activity_positional_arg_happy_path() -> None:
     )
 
 
-async def test_execute_activity_positional_arg_happy_path() -> None:
+async def _test_execute_activity_positional_arg_happy_path() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _result: int = await client.execute_activity(
@@ -94,7 +94,7 @@ async def test_execute_activity_positional_arg_happy_path() -> None:
     )
 
 
-async def test_start_activity_string_name_with_result_type() -> None:
+async def _test_start_activity_string_name_with_result_type() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle = await client.start_activity(
@@ -107,7 +107,7 @@ async def test_start_activity_string_name_with_result_type() -> None:
     )
 
 
-async def test_start_activity_no_param_async_happy_path() -> None:
+async def _test_start_activity_no_param_async_happy_path() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[str] = await client.start_activity(
@@ -118,7 +118,7 @@ async def test_start_activity_no_param_async_happy_path() -> None:
     )
 
 
-async def test_execute_activity_no_param_async_happy_path() -> None:
+async def _test_execute_activity_no_param_async_happy_path() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _result: str = await client.execute_activity(
@@ -129,7 +129,7 @@ async def test_execute_activity_no_param_async_happy_path() -> None:
     )
 
 
-async def test_start_activity_no_param_sync_happy_path() -> None:
+async def _test_start_activity_no_param_sync_happy_path() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[str] = await client.start_activity(
@@ -140,7 +140,7 @@ async def test_start_activity_no_param_sync_happy_path() -> None:
     )
 
 
-async def test_execute_activity_no_param_sync_happy_path() -> None:
+async def _test_execute_activity_no_param_sync_happy_path() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _result: str = await client.execute_activity(
@@ -151,7 +151,7 @@ async def test_execute_activity_no_param_sync_happy_path() -> None:
     )
 
 
-async def test_start_activity_wrong_arg_type() -> None:
+async def _test_start_activity_wrong_arg_type() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[int] = await client.start_activity(
@@ -164,7 +164,7 @@ async def test_start_activity_wrong_arg_type() -> None:
     )
 
 
-async def test_execute_activity_wrong_arg_type() -> None:
+async def _test_execute_activity_wrong_arg_type() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _result: int = await client.execute_activity(
@@ -177,7 +177,7 @@ async def test_execute_activity_wrong_arg_type() -> None:
     )
 
 
-async def test_start_activity_wrong_result_type_assignment() -> None:
+async def _test_start_activity_wrong_result_type_assignment() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     handle = await client.start_activity(
@@ -192,7 +192,7 @@ async def test_start_activity_wrong_result_type_assignment() -> None:
     _wrong: str = await handle.result()  # type: ignore
 
 
-async def test_execute_activity_wrong_result_type_assignment() -> None:
+async def _test_execute_activity_wrong_result_type_assignment() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     # assert-type-error-pyright: 'Type "int" is not assignable to declared type "str"'
@@ -205,7 +205,7 @@ async def test_execute_activity_wrong_result_type_assignment() -> None:
     )
 
 
-async def test_start_activity_missing_required_params() -> None:
+async def _test_start_activity_missing_required_params() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     # assert-type-error-pyright: 'No overloads for "start_activity" match'
@@ -225,7 +225,7 @@ async def test_start_activity_missing_required_params() -> None:
     )
 
 
-async def test_activity_handle_typed_correctly() -> None:
+async def _test_activity_handle_typed_correctly() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     handle_int: ActivityHandle[int] = await client.start_activity(
@@ -256,7 +256,7 @@ async def test_activity_handle_typed_correctly() -> None:
     _none_result: None = await handle_none.result()  # type: ignore[func-returns-value]
 
 
-async def test_activity_handle_wrong_type_parameter() -> None:
+async def _test_activity_handle_wrong_type_parameter() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     # assert-type-error-pyright: 'Type "ActivityHandle\[int\]" is not assignable to declared type "ActivityHandle\[str\]"'
@@ -269,7 +269,7 @@ async def test_activity_handle_wrong_type_parameter() -> None:
     )
 
 
-async def test_start_activity_sync_activity() -> None:
+async def _test_start_activity_sync_activity() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[int] = await client.start_activity(
@@ -281,7 +281,7 @@ async def test_start_activity_sync_activity() -> None:
     )
 
 
-async def test_execute_activity_sync_activity() -> None:
+async def _test_execute_activity_sync_activity() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _result: int = await client.execute_activity(
@@ -293,7 +293,7 @@ async def test_execute_activity_sync_activity() -> None:
     )
 
 
-async def test_start_activity_sync_no_param() -> None:
+async def _test_start_activity_sync_no_param() -> None:
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[str] = await client.start_activity(
