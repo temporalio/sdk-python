@@ -1378,22 +1378,36 @@ class TemporalLangGraphRunner:
         return result.to_write_tuples()
 
     def _filter_config(self, config: dict[str, Any]) -> dict[str, Any]:
-        """Filter configuration to remove internal LangGraph keys."""
+        """Filter configuration to remove internal LangGraph keys and non-serializable values."""
         # Keys to exclude from serialization
         exclude_prefixes = ("__pregel_", "__lg_")
+        # Top-level keys to exclude (non-serializable)
+        exclude_keys = {"callbacks"}
 
         filtered: dict[str, Any] = {}
         for key, value in config.items():
-            if not any(key.startswith(prefix) for prefix in exclude_prefixes):
-                if key == "configurable" and isinstance(value, dict):
-                    # Also filter configurable dict
-                    filtered[key] = {
-                        k: v
-                        for k, v in value.items()
-                        if not any(k.startswith(prefix) for prefix in exclude_prefixes)
-                    }
-                else:
-                    filtered[key] = value
+            if key in exclude_keys:
+                continue
+            if any(key.startswith(prefix) for prefix in exclude_prefixes):
+                continue
+
+            if key == "configurable" and isinstance(value, dict):
+                # Also filter configurable dict
+                filtered[key] = {
+                    k: v
+                    for k, v in value.items()
+                    if not any(k.startswith(prefix) for prefix in exclude_prefixes)
+                }
+            elif key == "metadata" and isinstance(value, dict):
+                # Filter metadata to remove temporal options (handled separately)
+                # and non-serializable values like timedelta
+                filtered[key] = {
+                    k: v
+                    for k, v in value.items()
+                    if k != "temporal"  # Handled by _get_node_activity_options
+                }
+            else:
+                filtered[key] = value
 
         return filtered
 

@@ -588,7 +588,11 @@ class TestCompileFunction:
 
     def test_compile_with_options(self) -> None:
         """compile() should pass options to runner."""
-        from temporalio.contrib.langgraph import LangGraphPlugin, compile
+        from temporalio.contrib.langgraph import (
+            LangGraphPlugin,
+            TemporalLangGraphRunner,
+            compile,
+        )
 
         class State(TypedDict, total=False):
             value: int
@@ -611,6 +615,8 @@ class TestCompileFunction:
             ),
         )
 
+        # Assert runner is a graph runner (not functional runner)
+        assert isinstance(runner, TemporalLangGraphRunner)
         assert runner.default_activity_options["start_to_close_timeout"] == timedelta(
             minutes=10
         )
@@ -805,7 +811,9 @@ class TestParallelBranchExecution:
         activity_completes: list[str] = []
         all_started_event = asyncio.Event()
         num_parallel_nodes = 3
-        start_barrier = asyncio.Barrier(num_parallel_nodes)
+        # Simple barrier using counter and event (works on Python 3.10+)
+        start_count = 0
+        start_count_event = asyncio.Event()
 
         async def mock_execute_activity(
             activity_fn,
@@ -815,13 +823,19 @@ class TestParallelBranchExecution:
             **kwargs,
         ):
             """Mock activity that tracks execution order."""
+            nonlocal start_count
             node_name = activity_input.node_name
             activity_starts.append(node_name)
 
+            # Increment counter and check if all parallel nodes have started
+            start_count += 1
+            if start_count >= num_parallel_nodes:
+                start_count_event.set()
+                all_started_event.set()
+
             # Wait for all parallel nodes to start (proves concurrent execution)
             try:
-                await asyncio.wait_for(start_barrier.wait(), timeout=2.0)
-                all_started_event.set()
+                await asyncio.wait_for(start_count_event.wait(), timeout=2.0)
             except asyncio.TimeoutError:
                 # If timeout, not all nodes started concurrently (sequential execution)
                 pass

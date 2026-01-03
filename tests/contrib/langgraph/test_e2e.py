@@ -21,7 +21,7 @@ import pytest
 
 from temporalio import activity
 from temporalio.client import Client
-from temporalio.contrib.langgraph import LangGraphPlugin
+from temporalio.contrib.langgraph import LangGraphPlugin, activity_options
 from tests.contrib.langgraph.e2e_graphs import (
     build_agent_subgraph,
     build_approval_graph,
@@ -70,7 +70,9 @@ class TestBasicExecution:
         """Test basic graph execution without interrupts."""
         plugin = LangGraphPlugin(
             graphs={"e2e_simple": build_simple_graph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -103,7 +105,9 @@ class TestInterrupts:
         """Test interrupt flow with signal-based resume."""
         plugin = LangGraphPlugin(
             graphs={"e2e_approval": build_approval_graph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -151,7 +155,9 @@ class TestInterrupts:
         # Use a different graph ID to avoid registry conflicts
         plugin = LangGraphPlugin(
             graphs={"e2e_rejection": build_approval_graph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -187,7 +193,9 @@ class TestInterrupts:
         """Test workflow that handles multiple interrupts in sequence."""
         plugin = LangGraphPlugin(
             graphs={"e2e_multi_interrupt": build_multi_interrupt_graph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -281,7 +289,9 @@ class TestStore:
         """Test that store data persists across node executions."""
         plugin = LangGraphPlugin(
             graphs={"e2e_store": build_store_graph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -314,7 +324,9 @@ class TestStore:
         """
         plugin = LangGraphPlugin(
             graphs={"e2e_counter": build_counter_graph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -361,7 +373,9 @@ class TestAdvancedFeatures:
         """Test that Send API creates dynamic parallel tasks."""
         plugin = LangGraphPlugin(
             graphs={"e2e_send": build_send_graph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -387,7 +401,9 @@ class TestAdvancedFeatures:
         """Test that subgraphs execute correctly."""
         plugin = LangGraphPlugin(
             graphs={"e2e_subgraph": build_subgraph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -414,7 +430,9 @@ class TestAdvancedFeatures:
         """Test that subgraph followed by conditional edge routes correctly (high path)."""
         plugin = LangGraphPlugin(
             graphs={"e2e_subgraph_conditional": build_subgraph_with_conditional},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -440,7 +458,9 @@ class TestAdvancedFeatures:
         """Test that subgraph followed by conditional edge routes correctly (low path)."""
         plugin = LangGraphPlugin(
             graphs={"e2e_subgraph_conditional": build_subgraph_with_conditional},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -466,7 +486,9 @@ class TestAdvancedFeatures:
         """Test that create_agent subgraph followed by another node works."""
         plugin = LangGraphPlugin(
             graphs={"e2e_agent_subgraph": build_agent_subgraph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -514,7 +536,9 @@ class TestAdvancedFeatures:
         """Test that Command(goto=) can skip nodes."""
         plugin = LangGraphPlugin(
             graphs={"e2e_command": build_command_graph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -543,7 +567,9 @@ class TestAdvancedFeatures:
         """Test that Command(goto=) follows normal path when condition not met."""
         plugin = LangGraphPlugin(
             graphs={"e2e_command": build_command_graph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -581,7 +607,9 @@ class TestAgenticWorkflows:
         """Test react agent using temporal_tool for durable tool execution."""
         plugin = LangGraphPlugin(
             graphs={"e2e_react_agent": build_react_agent_graph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -611,7 +639,9 @@ class TestAgenticWorkflows:
         """Test that tools node activity summary shows tool name and args."""
         plugin = LangGraphPlugin(
             graphs={"e2e_react_agent": build_react_agent_graph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -685,7 +715,9 @@ class TestAgenticWorkflows:
         """
         plugin = LangGraphPlugin(
             graphs={"e2e_native_react_agent": build_native_react_agent_graph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -733,7 +765,9 @@ class TestRunInWorkflow:
         """Test that a run_in_workflow node can call a Temporal activity."""
         plugin = LangGraphPlugin(
             graphs={"e2e_run_in_workflow": build_run_in_workflow_graph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()
@@ -775,7 +809,9 @@ class TestRunInWorkflow:
         """
         plugin = LangGraphPlugin(
             graphs={"e2e_sandbox_enforcement": build_sandbox_enforcement_graph},
-            default_activity_timeout=timedelta(seconds=30),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30),
+            ),
         )
 
         new_config = client.config()

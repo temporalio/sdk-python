@@ -19,7 +19,12 @@ from temporalio import workflow
 with workflow.unsafe.imports_passed_through():
     from langgraph.types import Command
 
-    from temporalio.contrib.langgraph import compile as lg_compile
+    from temporalio.contrib.langgraph import (
+        TemporalLangGraphRunner,
+    )
+    from temporalio.contrib.langgraph import (
+        compile as lg_compile,
+    )
 
 
 # ==============================================================================
@@ -380,6 +385,7 @@ class ContinueAsNewE2EWorkflow:
 
         # Compile graph with checkpoint if provided (from previous continue-as-new)
         app = lg_compile("e2e_continue_as_new", checkpoint=input_data.checkpoint)
+        assert isinstance(app, TemporalLangGraphRunner)
 
         # Define should_continue to stop after 2 ticks
         def should_continue() -> bool:

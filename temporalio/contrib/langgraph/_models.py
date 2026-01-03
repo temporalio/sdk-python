@@ -64,12 +64,7 @@ def _coerce_state_values(state: dict[str, Any]) -> dict[str, Any]:
     because when state passes through Temporal serialization, LangChain message
     objects become plain dicts.
 
-    Handles nested structures like tool_call_with_context:
-    {
-        "__type": "tool_call_with_context",
-        "tool_call": {...},
-        "state": {"messages": [...]}  # nested messages are coerced
-    }
+    Handles nested structures like tool_call_with_context with nested messages.
     """
     return {key: _coerce_value(value) for key, value in state.items()}
 

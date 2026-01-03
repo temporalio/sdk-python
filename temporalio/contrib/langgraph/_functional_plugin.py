@@ -43,8 +43,8 @@ class LangGraphFunctionalPlugin(SimplePlugin):
     Registers @entrypoint functions, auto-registers the dynamic task activity,
     and configures the Pydantic data converter for LangChain messages.
 
-    Example:
-        ```python
+    Example::
+
         from langgraph.func import entrypoint, task
 
         @task
@@ -58,7 +58,6 @@ class LangGraphFunctionalPlugin(SimplePlugin):
         plugin = LangGraphFunctionalPlugin(
             entrypoints={"my_entrypoint": my_entrypoint},
         )
-        ```
     """
 
     def __init__(

@@ -562,16 +562,6 @@ def compile_functional(
 
     Returns:
         A TemporalFunctionalRunner that can be used to invoke the entrypoint.
-
-    Example:
-        ```python
-        @workflow.defn
-        class MyWorkflow:
-            @workflow.run
-            async def run(self, input: str) -> dict:
-                app = compile_functional("my_entrypoint")
-                return await app.ainvoke(input)
-        ```
     """
     return TemporalFunctionalRunner(
         entrypoint_id=entrypoint_id,

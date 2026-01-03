@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any, Union
 
 import temporalio.common
 import temporalio.workflow
@@ -19,23 +19,36 @@ from temporalio.contrib.langgraph._exceptions import (
     GraphAlreadyRegisteredError,
 )
 from temporalio.contrib.langgraph._functional_activity import execute_langgraph_task
-from temporalio.contrib.langgraph._functional_plugin import LangGraphFunctionalPlugin
+
+# Backward compatibility - LangGraphFunctionalPlugin is now deprecated
+# Use LangGraphPlugin with entrypoints in the graphs parameter instead
+from temporalio.contrib.langgraph._functional_plugin import (
+    LangGraphFunctionalPlugin,
+)
 from temporalio.contrib.langgraph._functional_registry import (
     get_entrypoint,
     register_entrypoint,
 )
+from temporalio.contrib.langgraph._functional_registry import (
+    get_global_entrypoint_registry as _get_functional_registry,
+)
 from temporalio.contrib.langgraph._functional_runner import (
     TemporalFunctionalRunner,
-    compile_functional,
 )
 from temporalio.contrib.langgraph._graph_registry import (
     get_default_activity_options,
     get_graph,
     get_per_node_activity_options,
 )
+from temporalio.contrib.langgraph._graph_registry import (
+    get_global_registry as _get_graph_registry,
+)
 from temporalio.contrib.langgraph._models import StateSnapshot
 from temporalio.contrib.langgraph._plugin import LangGraphPlugin
 from temporalio.contrib.langgraph._runner import TemporalLangGraphRunner
+
+if TYPE_CHECKING:
+    from temporalio.contrib.langgraph._plugin import ActivityOptionsKey
 
 
 def activity_options(
@@ -53,14 +66,7 @@ def activity_options(
 ) -> dict[str, Any]:
     """Create activity options for LangGraph integration.
 
-    Use with Graph API:
-    - ``graph.add_node(metadata=activity_options(...))`` for node activities
-    - ``LangGraphPlugin(per_node_activity_options={"node": activity_options(...)})``
-
-    Use with Functional API:
-    - ``compile_functional(task_options={"task_name": activity_options(...)})``
-    - ``LangGraphFunctionalPlugin(task_options={"task": activity_options(...)})``
-
+    Use with plugin registration or compile() for workflow-level overrides.
     Parameters mirror ``workflow.execute_activity()``.
     """
     config: dict[str, Any] = {}
@@ -95,7 +101,7 @@ def temporal_node_metadata(
     """Create node metadata combining activity options and execution flags.
 
     Args:
-        activity_options: Options from ``node_activity_options()``.
+        activity_options: Options from ``activity_options()``.
         run_in_workflow: If True, run in workflow instead of as activity.
     """
     # Start with activity options if provided, otherwise empty temporal config
@@ -118,23 +124,75 @@ def compile(
     graph_id: str,
     *,
     default_activity_options: dict[str, Any] | None = None,
-    per_node_activity_options: dict[str, dict[str, Any]] | None = None,
+    activity_options: dict[str, dict[str, Any]] | None = None,
     checkpoint: dict | None = None,
-) -> TemporalLangGraphRunner:
-    """Compile a registered graph for Temporal execution.
+) -> Union[TemporalLangGraphRunner, TemporalFunctionalRunner]:
+    """Compile a registered graph or entrypoint for Temporal execution.
+
+    This function auto-detects whether the ID refers to a Graph API graph
+    (StateGraph) or a Functional API entrypoint (@entrypoint/@task).
 
     .. warning::
         This API is experimental and may change in future versions.
 
     Args:
-        graph_id: ID of graph registered with LangGraphPlugin.
-        default_activity_options: Default options for all nodes.
-        per_node_activity_options: Per-node options by node name.
+        graph_id: ID of graph or entrypoint registered with LangGraphPlugin.
+        default_activity_options: Default options for all nodes/tasks.
+            Use activity_options() helper to create.
+        activity_options: Per-node/task options by name.
+            Use activity_options() helper to create values.
         checkpoint: Checkpoint from previous get_state() for continue-as-new.
+            Only applies to Graph API graphs.
+
+    Returns:
+        TemporalLangGraphRunner for Graph API graphs, or
+        TemporalFunctionalRunner for Functional API entrypoints.
 
     Raises:
-        ApplicationError: If no graph with the given ID is registered.
+        ApplicationError: If no graph or entrypoint with the given ID is registered.
     """
+    # Check which registry has this ID
+    graph_registry = _get_graph_registry()
+    functional_registry = _get_functional_registry()
+
+    is_graph = graph_registry.is_registered(graph_id)
+    is_entrypoint = functional_registry.is_registered(graph_id)
+
+    if is_graph:
+        return _compile_graph(
+            graph_id,
+            default_activity_options=default_activity_options,
+            per_node_activity_options=activity_options,
+            checkpoint=checkpoint,
+        )
+    elif is_entrypoint:
+        return _compile_entrypoint(
+            graph_id,
+            default_activity_options=default_activity_options,
+            task_options=activity_options,
+        )
+    else:
+        # Neither registry has it - raise error
+        from temporalio.exceptions import ApplicationError
+
+        graph_ids = graph_registry.list_graphs()
+        entrypoint_ids = functional_registry.list_entrypoints()
+        all_ids = graph_ids + entrypoint_ids
+        raise ApplicationError(
+            f"'{graph_id}' not found. Available: {all_ids}",
+            type=GRAPH_NOT_FOUND_ERROR,
+            non_retryable=True,
+        )
+
+
+def _compile_graph(
+    graph_id: str,
+    *,
+    default_activity_options: dict[str, Any] | None = None,
+    per_node_activity_options: dict[str, dict[str, Any]] | None = None,
+    checkpoint: dict | None = None,
+) -> TemporalLangGraphRunner:
+    """Compile a Graph API graph for Temporal execution."""
     # Get graph from registry
     pregel = get_graph(graph_id)
 
@@ -145,11 +203,7 @@ def compile(
     def _merge_activity_options(
         base: dict[str, Any], override: dict[str, Any]
     ) -> dict[str, Any]:
-        """Merge activity options, with override taking precedence.
-
-        Both dicts have structure {"temporal": {...}} from node_activity_options().
-        We need to merge the inner "temporal" dicts.
-        """
+        """Merge activity options, with override taking precedence."""
         base_temporal = base.get("temporal", {})
         override_temporal = override.get("temporal", {})
         return {"temporal": {**base_temporal, **override_temporal}}
@@ -186,21 +240,115 @@ def compile(
     )
 
 
+def _compile_entrypoint(
+    entrypoint_id: str,
+    *,
+    default_activity_options: dict[str, Any] | None = None,
+    task_options: dict[str, dict[str, Any]] | None = None,
+) -> TemporalFunctionalRunner:
+    """Compile a Functional API entrypoint for Temporal execution."""
+    from temporalio.contrib.langgraph._functional_registry import (
+        get_entrypoint_default_options,
+        get_entrypoint_task_options,
+    )
+
+    # Get plugin-level options from registry
+    plugin_default_options = get_entrypoint_default_options(entrypoint_id)
+    plugin_task_options = get_entrypoint_task_options(entrypoint_id)
+
+    # Merge default options
+    merged_default_options: dict[str, Any] | None = None
+    if plugin_default_options or default_activity_options:
+        # Unwrap activity_options format if needed
+        base = plugin_default_options or {}
+        override = default_activity_options or {}
+        if "temporal" in base:
+            base = base.get("temporal", {})
+        if "temporal" in override:
+            override = override.get("temporal", {})
+        merged_default_options = {**base, **override}
+
+    # Merge per-task options
+    merged_task_options: dict[str, dict[str, Any]] | None = None
+    if plugin_task_options or task_options:
+        merged_task_options = {}
+        # Start with plugin options
+        for task_name, opts in (plugin_task_options or {}).items():
+            merged_task_options[task_name] = opts
+        # Merge compile options
+        if task_options:
+            for task_name, opts in task_options.items():
+                if task_name in merged_task_options:
+                    # Merge the options
+                    base = merged_task_options[task_name]
+                    if "temporal" in base:
+                        base = base.get("temporal", {})
+                    override = opts
+                    if "temporal" in override:
+                        override = override.get("temporal", {})
+                    merged_task_options[task_name] = {**base, **override}
+                else:
+                    # Unwrap if needed
+                    if "temporal" in opts:
+                        merged_task_options[task_name] = opts.get("temporal", {})
+                    else:
+                        merged_task_options[task_name] = opts
+
+    # Get default timeout from merged options
+    default_timeout = timedelta(minutes=5)
+    if merged_default_options:
+        if "start_to_close_timeout" in merged_default_options:
+            default_timeout = merged_default_options["start_to_close_timeout"]
+
+    return TemporalFunctionalRunner(
+        entrypoint_id=entrypoint_id,
+        default_task_timeout=default_timeout,
+        task_options=merged_task_options,
+    )
+
+
+# Keep compile_functional for backward compatibility (deprecated)
+def compile_functional(
+    entrypoint_id: str,
+    default_task_timeout: timedelta = timedelta(minutes=5),
+    task_options: dict[str, dict[str, Any]] | None = None,
+) -> TemporalFunctionalRunner:
+    """Compile a registered entrypoint for Temporal execution.
+
+    .. deprecated::
+        Use ``compile()`` instead, which auto-detects graph vs entrypoint.
+
+    Args:
+        entrypoint_id: ID of the registered entrypoint.
+        default_task_timeout: Default timeout for task activities.
+        task_options: Per-task activity options.
+
+    Returns:
+        A TemporalFunctionalRunner that can be used to invoke the entrypoint.
+    """
+    return TemporalFunctionalRunner(
+        entrypoint_id=entrypoint_id,
+        default_task_timeout=default_task_timeout,
+        task_options=task_options,
+    )
+
+
 __all__ = [
-    # Main API - Graph API
+    # Main unified API
     "activity_options",
     "compile",
     "LangGraphPlugin",
     "StateSnapshot",
     "temporal_node_metadata",
+    # Runner types (for type annotations)
     "TemporalLangGraphRunner",
-    # Main API - Functional API
+    "TemporalFunctionalRunner",
+    # Deprecated (kept for backward compatibility)
     "compile_functional",
     "execute_langgraph_task",
     "get_entrypoint",
     "LangGraphFunctionalPlugin",
     "register_entrypoint",
-    "TemporalFunctionalRunner",
     # Exception types (for catching configuration errors)
     "GraphAlreadyRegisteredError",
     # Error type constants (for catching ApplicationError.type)
