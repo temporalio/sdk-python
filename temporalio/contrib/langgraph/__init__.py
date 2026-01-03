@@ -53,9 +53,13 @@ def activity_options(
 ) -> dict[str, Any]:
     """Create activity options for LangGraph integration.
 
-    Use with:
+    Use with Graph API:
     - ``graph.add_node(metadata=activity_options(...))`` for node activities
-    - ``compile(default_activity_options=activity_options(...))`` for defaults
+    - ``LangGraphPlugin(per_node_activity_options={"node": activity_options(...)})``
+
+    Use with Functional API:
+    - ``compile_functional(task_options={"task_name": activity_options(...)})``
+    - ``LangGraphFunctionalPlugin(task_options={"task": activity_options(...)})``
 
     Parameters mirror ``workflow.execute_activity()``.
     """

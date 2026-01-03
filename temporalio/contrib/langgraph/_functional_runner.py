@@ -151,9 +151,22 @@ class TemporalFunctionalRunner:
         """Get the Pregel object for this entrypoint."""
         return get_entrypoint(self._entrypoint_id)
 
+    def _get_task_options(self, task_name: str) -> dict[str, Any]:
+        """Get activity options for a specific task.
+
+        Supports both raw options and activity_options() format:
+        - Raw: {"start_to_close_timeout": timedelta(...)}
+        - activity_options(): {"temporal": {"start_to_close_timeout": ...}}
+        """
+        task_opts = self._task_options.get(task_name, {})
+        # Unwrap activity_options() format if present
+        if "temporal" in task_opts:
+            return task_opts["temporal"]
+        return task_opts
+
     def _get_task_timeout(self, task_name: str) -> timedelta:
         """Get the timeout for a specific task."""
-        task_opts = self._task_options.get(task_name, {})
+        task_opts = self._get_task_options(task_name)
         timeout = task_opts.get("start_to_close_timeout", self._default_task_timeout)
         if isinstance(timeout, (int, float)):
             return timedelta(seconds=timeout)
