@@ -53,7 +53,9 @@ class ContinueAsNewFunctionalWorkflow:
     @workflow.run
     async def run(self, input_data: ContinueAsNewInput) -> dict[str, Any]:
         # Compile with checkpoint if provided (from previous continue-as-new)
-        app = compile("e2e_continue_as_new_functional", checkpoint=input_data.checkpoint)
+        app = compile(
+            "e2e_continue_as_new_functional", checkpoint=input_data.checkpoint
+        )
 
         # Run the entrypoint
         result = await app.ainvoke(input_data.value)
@@ -119,10 +121,12 @@ class PartialExecutionWorkflow:
 
         if input_data.phase == 1:
             # First run: execute only first 3 tasks
-            result = await app.ainvoke({
-                "value": input_data.value,
-                "stop_after": 3,
-            })
+            result = await app.ainvoke(
+                {
+                    "value": input_data.value,
+                    "stop_after": 3,
+                }
+            )
 
             # Get checkpoint with cached task results
             checkpoint: dict[str, Any] = app.get_state()  # type: ignore[assignment]
@@ -137,9 +141,11 @@ class PartialExecutionWorkflow:
             )
 
         # Phase 2: execute all 5 tasks (but 1-3 are cached)
-        result = await app.ainvoke({
-            "value": input_data.value,
-            "stop_after": 5,
-        })
+        result = await app.ainvoke(
+            {
+                "value": input_data.value,
+                "stop_after": 5,
+            }
+        )
 
         return result

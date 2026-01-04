@@ -103,9 +103,7 @@ class TestFunctionalAPIContinueAsNew:
         new_config["plugins"] = list(existing_plugins) + [plugin]
         plugin_client = Client(**new_config)
 
-        async with new_worker(
-            plugin_client, ContinueAsNewFunctionalWorkflow
-        ) as worker:
+        async with new_worker(plugin_client, ContinueAsNewFunctionalWorkflow) as worker:
             result = await plugin_client.execute_workflow(
                 ContinueAsNewFunctionalWorkflow.run,
                 ContinueAsNewInput(value=10),
@@ -119,9 +117,15 @@ class TestFunctionalAPIContinueAsNew:
 
             # Verify each task was only executed once (cached for continue-as-new)
             counts = get_task_execution_counts()
-            assert counts.get("task_a", 0) == 1, f"task_a executed {counts.get('task_a', 0)} times, expected 1"
-            assert counts.get("task_b", 0) == 1, f"task_b executed {counts.get('task_b', 0)} times, expected 1"
-            assert counts.get("task_c", 0) == 1, f"task_c executed {counts.get('task_c', 0)} times, expected 1"
+            assert (
+                counts.get("task_a", 0) == 1
+            ), f"task_a executed {counts.get('task_a', 0)} times, expected 1"
+            assert (
+                counts.get("task_b", 0) == 1
+            ), f"task_b executed {counts.get('task_b', 0)} times, expected 1"
+            assert (
+                counts.get("task_c", 0) == 1
+            ), f"task_c executed {counts.get('task_c', 0)} times, expected 1"
 
 
 class TestFunctionalAPIPartialExecution:
@@ -176,8 +180,18 @@ class TestFunctionalAPIPartialExecution:
 
             # Verify each task was executed exactly once
             counts = get_task_execution_counts()
-            assert counts.get("step_1", 0) == 1, f"step_1 executed {counts.get('step_1', 0)} times, expected 1"
-            assert counts.get("step_2", 0) == 1, f"step_2 executed {counts.get('step_2', 0)} times, expected 1"
-            assert counts.get("step_3", 0) == 1, f"step_3 executed {counts.get('step_3', 0)} times, expected 1"
-            assert counts.get("step_4", 0) == 1, f"step_4 executed {counts.get('step_4', 0)} times, expected 1"
-            assert counts.get("step_5", 0) == 1, f"step_5 executed {counts.get('step_5', 0)} times, expected 1"
+            assert (
+                counts.get("step_1", 0) == 1
+            ), f"step_1 executed {counts.get('step_1', 0)} times, expected 1"
+            assert (
+                counts.get("step_2", 0) == 1
+            ), f"step_2 executed {counts.get('step_2', 0)} times, expected 1"
+            assert (
+                counts.get("step_3", 0) == 1
+            ), f"step_3 executed {counts.get('step_3', 0)} times, expected 1"
+            assert (
+                counts.get("step_4", 0) == 1
+            ), f"step_4 executed {counts.get('step_4', 0)} times, expected 1"
+            assert (
+                counts.get("step_5", 0) == 1
+            ), f"step_5 executed {counts.get('step_5', 0)} times, expected 1"

@@ -154,9 +154,7 @@ class InMemoryCache(Generic[ValueT]):
             self._cache.clear()
         else:
             namespace_set = set(namespaces)
-            keys_to_delete = [
-                key for key in self._cache if key[0] in namespace_set
-            ]
+            keys_to_delete = [key for key in self._cache if key[0] in namespace_set]
             for key in keys_to_delete:
                 del self._cache[key]
 

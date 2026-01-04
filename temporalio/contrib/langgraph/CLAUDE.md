@@ -145,6 +145,50 @@ The `ActivityLocalStore` in `_store.py` provides LangGraph's `BaseStore` interfa
 - Returns `StoreWrite` operations back to workflow
 - Workflow maintains canonical store state
 
+### 10. Task Result Caching for Continue-as-New (Functional API)
+
+The Functional API supports continue-as-new via task result caching. Unlike the Graph API which snapshots full channel state, the Functional API caches individual task results.
+
+**How it works:**
+
+1. `InMemoryCache` in `_functional_cache.py` stores task results keyed by `(task_id, args_hash)`
+2. When a task completes, the result is cached via `on_result` callback in `TemporalTaskFuture`
+3. Before continue-as-new, call `runner.get_state()` to serialize the cache
+4. Pass the checkpoint to the new workflow execution
+5. New execution calls `compile(graph_id, checkpoint=checkpoint)` to restore cache
+6. Subsequent task calls check cache first - cache hits return `InlineFuture` immediately
+
+**Usage pattern:**
+
+```python
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self, input: MyInput) -> dict:
+        app = compile("my_entrypoint", checkpoint=input.checkpoint)
+        result = await app.ainvoke(input.value)
+
+        # Before continue-as-new, capture state
+        checkpoint = app.get_state()
+
+        if should_continue_as_new:
+            workflow.continue_as_new(MyInput(
+                value=input.value,
+                checkpoint=checkpoint,  # Pass cache state
+            ))
+
+        return result
+```
+
+**Key difference from Graph API:**
+- Graph API: Checkpoints full execution state, can resume mid-graph
+- Functional API: Caches completed task results, re-executes entrypoint from start but skips cached tasks
+
+**Cache key generation:**
+The cache key is a SHA-256 hash of `task_id:args_json:kwargs_json`, ensuring that:
+- Same task with same arguments returns cached result
+- Different arguments execute fresh
+
 ## File Structure
 
 | File | Purpose |
@@ -153,6 +197,8 @@ The `ActivityLocalStore` in `_store.py` provides LangGraph's `BaseStore` interfa
 | `_plugin.py` | Unified plugin with auto-detection of graph vs entrypoint |
 | `_runner.py` | Graph API runner using `AsyncPregelLoop` |
 | `_functional_runner.py` | Functional API runner with `CONFIG_KEY_CALL` injection |
+| `_functional_cache.py` | InMemoryCache for task result caching (continue-as-new) |
+| `_functional_future.py` | Future types for async task execution |
 | `_activities.py` | Activity implementations for node execution |
 | `_functional_activity.py` | Activity for @task execution |
 | `_models.py` | Dataclasses for activity I/O serialization |
