@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import collections
+import concurrent.futures
 import contextvars
 import inspect
 import json
@@ -2647,6 +2648,31 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
     def time(self) -> float:
         return self._time_ns / 1e9
+
+    def is_running(self) -> bool:
+        # The workflow event loop is always considered "running" when code
+        # is executing inside the workflow. This is needed for libraries like
+        # LangGraph that check loop.is_running() to determine execution context.
+        return True
+
+    def run_in_executor(  # type: ignore[override]
+        self,
+        executor: concurrent.futures.Executor | None,
+        func: Callable[..., _T],
+        *args: Any,
+    ) -> asyncio.Future[_T]:
+        # In a workflow, we can't use a real thread pool executor because that
+        # would be non-deterministic. Instead, we run the function directly
+        # in the workflow context. This is needed for libraries like LangGraph
+        # that use run_in_executor to run sync functions.
+        # Note: This means sync functions will block the workflow thread.
+        future: asyncio.Future[_T] = self.create_future()
+        try:
+            result = func(*args)
+            future.set_result(result)
+        except Exception as e:
+            future.set_exception(e)
+        return future
 
     def create_future(self) -> asyncio.Future[Any]:
         return asyncio.Future(loop=self)
