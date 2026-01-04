@@ -19,12 +19,6 @@ from temporalio.contrib.langgraph._exceptions import (
     GraphAlreadyRegisteredError,
 )
 from temporalio.contrib.langgraph._functional_activity import execute_langgraph_task
-
-# Backward compatibility - LangGraphFunctionalPlugin is now deprecated
-# Use LangGraphPlugin with entrypoints in the graphs parameter instead
-from temporalio.contrib.langgraph._functional_plugin import (
-    LangGraphFunctionalPlugin,
-)
 from temporalio.contrib.langgraph._functional_registry import (
     get_entrypoint,
     register_entrypoint,
@@ -307,32 +301,6 @@ def _compile_entrypoint(
     )
 
 
-# Keep compile_functional for backward compatibility (deprecated)
-def compile_functional(
-    entrypoint_id: str,
-    default_task_timeout: timedelta = timedelta(minutes=5),
-    task_options: dict[str, dict[str, Any]] | None = None,
-) -> TemporalFunctionalRunner:
-    """Compile a registered entrypoint for Temporal execution.
-
-    .. deprecated::
-        Use ``compile()`` instead, which auto-detects graph vs entrypoint.
-
-    Args:
-        entrypoint_id: ID of the registered entrypoint.
-        default_task_timeout: Default timeout for task activities.
-        task_options: Per-task activity options.
-
-    Returns:
-        A TemporalFunctionalRunner that can be used to invoke the entrypoint.
-    """
-    return TemporalFunctionalRunner(
-        entrypoint_id=entrypoint_id,
-        default_task_timeout=default_task_timeout,
-        task_options=task_options,
-    )
-
-
 __all__ = [
     # Main unified API
     "activity_options",
@@ -343,12 +311,6 @@ __all__ = [
     # Runner types (for type annotations)
     "TemporalLangGraphRunner",
     "TemporalFunctionalRunner",
-    # Deprecated (kept for backward compatibility)
-    "compile_functional",
-    "execute_langgraph_task",
-    "get_entrypoint",
-    "LangGraphFunctionalPlugin",
-    "register_entrypoint",
     # Exception types (for catching configuration errors)
     "GraphAlreadyRegisteredError",
     # Error type constants (for catching ApplicationError.type)

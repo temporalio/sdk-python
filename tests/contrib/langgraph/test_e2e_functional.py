@@ -11,7 +11,7 @@ from datetime import timedelta
 import pytest
 
 from temporalio.client import Client
-from temporalio.contrib.langgraph import LangGraphFunctionalPlugin
+from temporalio.contrib.langgraph import LangGraphPlugin, activity_options
 from tests.contrib.langgraph.e2e_functional_entrypoints import (
     simple_functional_entrypoint,
 )
@@ -29,16 +29,18 @@ class TestFunctionalAPIBasicExecution:
         """Test basic functional API entrypoint execution.
 
         This test verifies that:
-        1. The functional API plugin correctly registers entrypoints
-        2. compile_functional works inside a workflow
+        1. The unified plugin correctly registers entrypoints
+        2. compile works inside a workflow
         3. @task functions are executed as activities
         4. The result is returned correctly
 
         Expected: input 10 -> double (20) -> add 10 (30) -> result: 30
         """
-        plugin = LangGraphFunctionalPlugin(
-            entrypoints={"e2e_simple_functional": simple_functional_entrypoint},
-            default_task_timeout=timedelta(seconds=30),
+        plugin = LangGraphPlugin(
+            graphs={"e2e_simple_functional": simple_functional_entrypoint},
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(seconds=30)
+            ),
         )
 
         new_config = client.config()

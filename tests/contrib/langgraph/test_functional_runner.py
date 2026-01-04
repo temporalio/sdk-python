@@ -403,8 +403,8 @@ class TestTemporalFunctionalRunner:
         assert result is mock_pregel
 
 
-class TestCompileFunctional:
-    """Tests for compile_functional factory function."""
+class TestCompileUnified:
+    """Tests for unified compile() function with entrypoints."""
 
     def setup_method(self) -> None:
         """Clear registry before each test."""
@@ -422,56 +422,70 @@ class TestCompileFunctional:
 
         get_global_entrypoint_registry().clear()
 
-    def test_returns_runner(self) -> None:
-        """compile_functional should return TemporalFunctionalRunner."""
+    def test_returns_runner_for_entrypoint(self) -> None:
+        """compile should return TemporalFunctionalRunner for entrypoints."""
+        from temporalio.contrib.langgraph import compile
         from temporalio.contrib.langgraph._functional_registry import (
             register_entrypoint,
         )
         from temporalio.contrib.langgraph._functional_runner import (
             TemporalFunctionalRunner,
-            compile_functional,
         )
 
         mock_pregel = MagicMock()
         register_entrypoint("test_ep", mock_pregel)
 
-        result = compile_functional("test_ep")
+        result = compile("test_ep")
 
         assert isinstance(result, TemporalFunctionalRunner)
         assert result._entrypoint_id == "test_ep"
 
-    def test_passes_timeout(self) -> None:
-        """compile_functional should pass timeout to runner."""
+    def test_passes_timeout_via_activity_options(self) -> None:
+        """compile should pass timeout from activity_options to runner."""
+        from temporalio.contrib.langgraph import activity_options, compile
         from temporalio.contrib.langgraph._functional_registry import (
             register_entrypoint,
         )
-        from temporalio.contrib.langgraph._functional_runner import compile_functional
+        from temporalio.contrib.langgraph._functional_runner import (
+            TemporalFunctionalRunner,
+        )
 
         mock_pregel = MagicMock()
         register_entrypoint("test_ep", mock_pregel)
 
-        result = compile_functional(
+        result = compile(
             "test_ep",
-            default_task_timeout=timedelta(minutes=15),
+            default_activity_options=activity_options(
+                start_to_close_timeout=timedelta(minutes=15),
+            ),
         )
 
+        assert isinstance(result, TemporalFunctionalRunner)
         assert result._default_task_timeout == timedelta(minutes=15)
 
     def test_passes_task_options(self) -> None:
-        """compile_functional should pass task_options to runner."""
+        """compile should pass activity_options to runner as task_options."""
+        from temporalio.contrib.langgraph import activity_options, compile
         from temporalio.contrib.langgraph._functional_registry import (
             register_entrypoint,
         )
-        from temporalio.contrib.langgraph._functional_runner import compile_functional
+        from temporalio.contrib.langgraph._functional_runner import (
+            TemporalFunctionalRunner,
+        )
 
         mock_pregel = MagicMock()
         register_entrypoint("test_ep", mock_pregel)
 
-        result = compile_functional(
+        result = compile(
             "test_ep",
-            task_options={"my_task": {"timeout": 100}},
+            activity_options={
+                "my_task": activity_options(
+                    start_to_close_timeout=timedelta(seconds=100)
+                )
+            },
         )
 
+        assert isinstance(result, TemporalFunctionalRunner)
         assert "my_task" in result._task_options
 
 

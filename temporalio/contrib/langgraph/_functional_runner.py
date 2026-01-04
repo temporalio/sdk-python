@@ -543,28 +543,3 @@ class TemporalFunctionalRunner:
             return self._get_pregel().get_graph().draw_mermaid()
         except Exception:
             return "Graph visualization not available"
-
-
-def compile_functional(
-    entrypoint_id: str,
-    default_task_timeout: timedelta = timedelta(minutes=5),
-    task_options: dict[str, dict[str, Any]] | None = None,
-) -> TemporalFunctionalRunner:
-    """Compile a registered entrypoint for Temporal execution.
-
-    This is the main entry point for using functional API entrypoints
-    in Temporal workflows.
-
-    Args:
-        entrypoint_id: ID of the registered entrypoint.
-        default_task_timeout: Default timeout for task activities.
-        task_options: Per-task activity options.
-
-    Returns:
-        A TemporalFunctionalRunner that can be used to invoke the entrypoint.
-    """
-    return TemporalFunctionalRunner(
-        entrypoint_id=entrypoint_id,
-        default_task_timeout=default_task_timeout,
-        task_options=task_options,
-    )
