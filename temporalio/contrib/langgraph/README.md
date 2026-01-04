@@ -58,8 +58,14 @@ The workflow orchestrates the graph execution, maintaining state and handling in
 
 ## Installation
 
+> **Note:** This integration is not yet released. Install from the development branch:
+
 ```bash
-pip install temporalio langgraph langchain-core
+# Install temporalio from the development branch (currently on fork)
+pip install "temporalio @ git+https://github.com/mfateev/sdk-python.git@langgraph-plugin"
+
+# Install LangGraph dependencies
+pip install langgraph langchain-core
 ```
 
 ## Quick Start
