@@ -136,7 +136,7 @@ def compile(
         activity_options: Per-node/task options by name.
             Use activity_options() helper to create values.
         checkpoint: Checkpoint from previous get_state() for continue-as-new.
-            Only applies to Graph API graphs.
+            Applies to both Graph API graphs and Functional API entrypoints.
 
     Returns:
         TemporalLangGraphRunner for Graph API graphs, or
@@ -164,6 +164,7 @@ def compile(
             graph_id,
             default_activity_options=default_activity_options,
             task_options=activity_options,
+            checkpoint=checkpoint,
         )
     else:
         # Neither registry has it - raise error
@@ -239,6 +240,7 @@ def _compile_entrypoint(
     *,
     default_activity_options: dict[str, Any] | None = None,
     task_options: dict[str, dict[str, Any]] | None = None,
+    checkpoint: dict[str, Any] | None = None,
 ) -> TemporalFunctionalRunner:
     """Compile a Functional API entrypoint for Temporal execution."""
     from temporalio.contrib.langgraph._functional_registry import (
@@ -298,6 +300,7 @@ def _compile_entrypoint(
         entrypoint_id=entrypoint_id,
         default_task_timeout=default_timeout,
         task_options=merged_task_options,
+        checkpoint=checkpoint,
     )
 
 

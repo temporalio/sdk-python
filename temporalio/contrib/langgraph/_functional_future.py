@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Generator, Generic, TypeVar, cast
 
 if TYPE_CHECKING:
@@ -28,14 +29,21 @@ class TemporalTaskFuture(Generic[T], concurrent.futures.Future[T]):
     since blocking is not allowed. Use 'await' instead.
     """
 
-    def __init__(self, activity_handle: ActivityHandle[T] | None = None) -> None:
+    def __init__(
+        self,
+        activity_handle: ActivityHandle[T] | None = None,
+        on_result: Callable[[T], None] | None = None,
+    ) -> None:
         """Initialize the future.
 
         Args:
             activity_handle: The Temporal activity handle to wrap.
+            on_result: Optional callback to invoke when the result is obtained.
+                       Used to cache results for continue-as-new.
         """
         # Don't call super().__init__() - we manage state ourselves
         self._activity_handle: ActivityHandle[T] | None = activity_handle
+        self._on_result = on_result
         self._result_value: T | None = None
         self._exception: BaseException | None = None
         self._done = False
@@ -135,6 +143,11 @@ class TemporalTaskFuture(Generic[T], concurrent.futures.Future[T]):
 
             self._result_value = result
             self._done = True
+
+            # Call the on_result callback if provided (for caching)
+            if self._on_result is not None:
+                self._on_result(result)
+
             return result
 
         raise RuntimeError("Future not properly initialized - no activity handle")

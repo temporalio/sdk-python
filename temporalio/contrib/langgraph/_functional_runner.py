@@ -31,6 +31,8 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import hashlib
+import json
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
@@ -39,6 +41,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from temporalio import activity, workflow
 from temporalio.contrib.langgraph._functional_activity import execute_langgraph_task
+from temporalio.contrib.langgraph._functional_cache import InMemoryCache
 from temporalio.contrib.langgraph._functional_future import (
     InlineFuture,
     TemporalTaskFuture,
@@ -113,11 +116,39 @@ def _is_in_activity_context() -> bool:
         return False
 
 
+def _make_cache_key(task_id: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
+    """Create a deterministic cache key from task identifier and arguments.
+
+    Args:
+        task_id: Full module path to the task function.
+        args: Positional arguments.
+        kwargs: Keyword arguments.
+
+    Returns:
+        A string key suitable for caching.
+    """
+    # Create a deterministic representation of arguments
+    # Note: This assumes args/kwargs are JSON-serializable (LangGraph requirement)
+    try:
+        args_str = json.dumps(args, sort_keys=True, default=str)
+        kwargs_str = json.dumps(kwargs, sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        # Fallback to repr if JSON fails
+        args_str = repr(args)
+        kwargs_str = repr(sorted(kwargs.items()))
+
+    key_input = f"{task_id}:{args_str}:{kwargs_str}"
+    return hashlib.sha256(key_input.encode()).hexdigest()[:32]
+
+
 class TemporalFunctionalRunner:
     """Runner that executes LangGraph entrypoints with Temporal task routing.
 
     This wraps a Pregel object (from @entrypoint) and injects a custom
     CONFIG_KEY_CALL callback that routes task calls to Temporal activities.
+
+    The runner maintains an in-memory cache of task results that can be
+    serialized for continue-as-new workflows via get_state().
     """
 
     def __init__(
@@ -125,6 +156,7 @@ class TemporalFunctionalRunner:
         entrypoint_id: str,
         default_task_timeout: timedelta = timedelta(minutes=5),
         task_options: dict[str, dict[str, Any]] | None = None,
+        checkpoint: dict[str, Any] | None = None,
     ) -> None:
         """Initialize the runner.
 
@@ -132,10 +164,16 @@ class TemporalFunctionalRunner:
             entrypoint_id: ID of the registered entrypoint.
             default_task_timeout: Default timeout for task activities.
             task_options: Per-task activity options.
+            checkpoint: Optional checkpoint from previous execution (for continue-as-new).
+                       Should contain 'cache_state' from a previous get_state() call.
         """
         self._entrypoint_id = entrypoint_id
         self._default_task_timeout = default_task_timeout
         self._task_options = task_options or {}
+
+        # Initialize cache from checkpoint or create new
+        cache_state = checkpoint.get("cache_state") if checkpoint else None
+        self._cache: InMemoryCache[Any] = InMemoryCache(state=cache_state)
 
         # Merge with registered options
         registered_options = get_entrypoint_task_options(entrypoint_id)
@@ -176,6 +214,11 @@ class TemporalFunctionalRunner:
         self,
     ) -> Callable[..., Any]:
         """Create the CONFIG_KEY_CALL callback that routes to Temporal activities."""
+        # Import cache types for key generation
+        from temporalio.contrib.langgraph._functional_cache import FullKey, Namespace
+
+        # Use a fixed namespace for task results
+        task_namespace: Namespace = ("temporal", "tasks")
 
         def temporal_call_callback(
             func: Any,
@@ -199,6 +242,16 @@ class TemporalFunctionalRunner:
             # Extract task name for options lookup
             task_name = task_id.rsplit(".", 1)[-1]
 
+            # Generate cache key
+            cache_key_str = _make_cache_key(task_id, args, kwargs)
+            full_key: FullKey = (task_namespace, cache_key_str)
+
+            # Check cache for previously computed result (from continue-as-new)
+            cached = self._cache.get([full_key])
+            if full_key in cached:
+                logger.debug("Cache hit for task %s (key=%s)", task_id, cache_key_str)
+                return InlineFuture(result=cached[full_key])
+
             # Check execution context
             if _is_in_activity_context():
                 # We're inside an activity - execute inline
@@ -208,7 +261,9 @@ class TemporalFunctionalRunner:
             if _is_in_workflow_context():
                 # We're in workflow - schedule as activity
                 logger.debug("Scheduling task %s as activity", task_id)
-                return self._schedule_task_activity(task_id, task_name, args, kwargs)
+                return self._schedule_task_activity(
+                    task_id, task_name, args, kwargs, full_key
+                )
 
             # Not in Temporal context - execute inline (for testing)
             logger.debug("Executing task %s inline (not in Temporal context)", task_id)
@@ -253,8 +308,17 @@ class TemporalFunctionalRunner:
         task_name: str,
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
+        cache_key: tuple[tuple[str, ...], str] | None = None,
     ) -> TemporalTaskFuture[Any]:
-        """Schedule a task as a Temporal activity."""
+        """Schedule a task as a Temporal activity.
+
+        Args:
+            task_id: Full module path to the task function.
+            task_name: Short name of the task for options lookup.
+            args: Positional arguments for the task.
+            kwargs: Keyword arguments for the task.
+            cache_key: Optional cache key to store the result for continue-as-new.
+        """
         timeout = self._get_task_timeout(task_name)
 
         # Create the activity input
@@ -272,8 +336,16 @@ class TemporalFunctionalRunner:
             start_to_close_timeout=timeout,
         )
 
-        # Create and return the future
-        future: TemporalTaskFuture[Any] = TemporalTaskFuture(activity_handle=handle)
+        # Create future with cache callback
+        def on_result(result: Any) -> None:
+            """Store result in cache when activity completes."""
+            if cache_key is not None:
+                self._cache.set({cache_key: (result, None)})  # No TTL
+
+        future: TemporalTaskFuture[Any] = TemporalTaskFuture(
+            activity_handle=handle,
+            on_result=on_result,
+        )
         return future
 
     def _extract_entrypoint_function(self, pregel: Pregel) -> Callable[..., Any]:
@@ -543,3 +615,24 @@ class TemporalFunctionalRunner:
             return self._get_pregel().get_graph().draw_mermaid()
         except Exception:
             return "Graph visualization not available"
+
+    def get_state(self) -> dict[str, Any]:
+        """Get the current state for continue-as-new.
+
+        Returns a serializable dict containing the cache state that can be
+        passed to a new workflow execution via the `checkpoint` parameter.
+
+        Usage:
+            # Before continue-as-new
+            checkpoint = runner.get_state()
+            workflow.continue_as_new(checkpoint=checkpoint)
+
+            # In the new workflow
+            runner = compile("my_entrypoint", checkpoint=checkpoint)
+
+        Returns:
+            Dict with 'cache_state' containing serialized task result cache.
+        """
+        return {
+            "cache_state": self._cache.get_state(),
+        }
