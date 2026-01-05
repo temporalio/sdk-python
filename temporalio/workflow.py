@@ -1565,6 +1565,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         self.workflow_info_on_extra = True
         self.full_workflow_info_on_extra = False
         self.log_during_replay = False
+        self._unsafe_disable_sandbox = False
 
     def process(
         self, msg: Any, kwargs: MutableMapping[str, Any]
@@ -1598,7 +1599,22 @@ class LoggerAdapter(logging.LoggerAdapter):
         kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
         if msg_extra:
             msg = f"{msg} ({msg_extra})"
-        return (msg, kwargs)
+        return msg, kwargs
+
+    def log(
+        self,
+        level: int,
+        msg: object,
+        *args: Any,
+        **kwargs: Any,
+    ):
+        """Override to potentially disable the sandbox."""
+        if self._unsafe_disable_sandbox:
+            with unsafe.sandbox_unrestricted():
+                with unsafe.imports_passed_through():
+                    super().log(level, msg, *args, **kwargs)
+        else:
+            super().log(level, msg, *args, **kwargs)
 
     def isEnabledFor(self, level: int) -> bool:
         """Override to ignore replay logs."""
@@ -1612,6 +1628,12 @@ class LoggerAdapter(logging.LoggerAdapter):
         handlers/formatters.
         """
         return self.logger
+
+    def unsafe_disable_sandbox(self, value: bool = True):
+        """Disable the sandbox during log processing.
+        Can be turned back on with unsafe_disable_sandbox(False).
+        """
+        self._unsafe_disable_sandbox = value
 
 
 logger = LoggerAdapter(logging.getLogger(__name__), None)
