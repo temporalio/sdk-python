@@ -1915,7 +1915,7 @@ def _assert_dynamic_handler_args(
         or arg_types[0] != str
         or (
             arg_types[1] != Sequence[temporalio.common.RawValue]
-            and arg_types[1] != typing.Sequence[temporalio.common.RawValue]
+            and arg_types[1] != typing.Sequence[temporalio.common.RawValue]  # type: ignore[reportDeprecated]
         )
     ):
         raise RuntimeError(

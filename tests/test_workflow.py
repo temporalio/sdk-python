@@ -76,19 +76,19 @@ class GoodDefnDeprecatedTypes(GoodDefnBase):
     # Just having the definition here is enough to confirm the signatures
     # do not trigger a RuntimeError
     @workflow.run
-    async def run(self, name: str) -> str:
+    async def run(self, _name: str) -> str:
         raise NotImplementedError
 
     @workflow.signal(dynamic=True)
-    def signal(self, name: str, args: typing.Sequence[RawValue]):
+    def signal(self, _name: str, _args: typing.Sequence[RawValue]):  # type: ignore[reportDeprecated]
         pass
 
     @workflow.query(dynamic=True)
-    def query(self, name: str, args: typing.Sequence[RawValue]):
+    def query(self, _name: str, _args: typing.Sequence[RawValue]):  # type: ignore[reportDeprecated]
         pass
 
     @workflow.update(dynamic=True)
-    def update(self, name: str, args: typing.Sequence[RawValue]):
+    def update(self, _name: str, _args: typing.Sequence[RawValue]):  # type: ignore[reportDeprecated]
         pass
 
 
