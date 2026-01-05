@@ -823,17 +823,31 @@ Options at each level are merged, so you can set base defaults at the plugin lev
 
 ## Sample Applications
 
-For complete working examples, see the [langgraph_plugin](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin) directory in the `langgraph_plugin` branch of the samples repository:
+For complete working examples, see the [langgraph_plugin](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin) directory in the `langgraph_plugin` branch of the samples repository.
+
+### Graph API Samples
 
 | Sample | Description |
 |--------|-------------|
-| [hello_world](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/hello_world) | Simple starter demonstrating basic plugin setup |
-| [react_agent](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/react_agent) | ReAct agent with tool calling |
-| [human_in_the_loop](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/human_in_the_loop) | Human-in-the-loop with interrupt/resume (two approaches) |
-| [activity_from_node](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/activity_from_node) | Calling Temporal activities from nodes |
-| [supervisor](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/supervisor) | Multi-agent supervisor pattern |
-| [agentic_rag](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/agentic_rag) | RAG with document grading |
-| [plan_and_execute](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/plan_and_execute) | Plan-and-execute pattern |
+| [hello_world](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/graph_api/hello_world) | Simple starter demonstrating basic plugin setup |
+| [react_agent](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/graph_api/react_agent) | ReAct agent with tool calling |
+| [human_in_the_loop](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/graph_api/human_in_the_loop) | Human-in-the-loop with interrupt/resume (two approaches) |
+| [activity_from_node](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/graph_api/activity_from_node) | Calling Temporal activities from nodes |
+| [supervisor](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/graph_api/supervisor) | Multi-agent supervisor pattern |
+| [agentic_rag](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/graph_api/agentic_rag) | RAG with document grading |
+| [plan_and_execute](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/graph_api/plan_and_execute) | Plan-and-execute pattern |
+
+### Functional API Samples
+
+| Sample | Description |
+|--------|-------------|
+| [hello_world](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/functional_api/hello_world) | Simple starter with @task and @entrypoint |
+| [react_agent](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/functional_api/react_agent) | ReAct agent using tasks |
+| [human_in_the_loop](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/functional_api/human_in_the_loop) | Human-in-the-loop with interrupt() |
+| [continue_as_new](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/functional_api/continue_as_new) | Task result caching across continue-as-new |
+| [supervisor](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/functional_api/supervisor) | Multi-agent supervisor pattern |
+| [agentic_rag](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/functional_api/agentic_rag) | RAG with document grading |
+| [plan_and_execute](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/functional_api/plan_and_execute) | Plan-and-execute pattern |
 
 ## Functional API (`@entrypoint`/`@task`)
 
