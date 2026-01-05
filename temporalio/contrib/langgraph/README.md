@@ -20,6 +20,7 @@ This document is organized as follows:
 - **[Graph Visualization](#graph-visualization-queries)** - ASCII and Mermaid diagrams via queries
 - **[Command API](#command-api-dynamic-routing)** - Dynamic routing with Command(goto=...)
 - **[Sample Applications](#sample-applications)** - Complete working examples
+- **[Functional API](#functional-api-entrypointtask)** - Using @entrypoint/@task decorators
 
 ## Architecture
 
@@ -833,6 +834,101 @@ For complete working examples, see the [langgraph_plugin](https://github.com/tem
 | [supervisor](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/supervisor) | Multi-agent supervisor pattern |
 | [agentic_rag](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/agentic_rag) | RAG with document grading |
 | [plan_and_execute](https://github.com/temporalio/samples-python/tree/langgraph_plugin/langgraph_plugin/plan_and_execute) | Plan-and-execute pattern |
+
+## Functional API (`@entrypoint`/`@task`)
+
+In addition to the Graph API (`StateGraph`), LangGraph also provides a Functional API using `@entrypoint` and `@task` decorators. This integration supports both APIs.
+
+### Basic Usage
+
+```python
+from langgraph.func import entrypoint, task
+
+@task
+def fetch_data(url: str) -> dict:
+    """Tasks execute as Temporal activities."""
+    return requests.get(url).json()
+
+@task
+def process_data(data: dict) -> str:
+    """Each task is automatically retried on failure."""
+    return transform(data)
+
+@entrypoint()
+async def my_pipeline(url: str) -> dict:
+    """Entrypoint orchestrates task execution."""
+    data = await fetch_data(url)
+    result = await process_data(data)
+    return {"result": result}
+```
+
+Register and use in a workflow:
+
+```python
+from temporalio.contrib.langgraph import LangGraphPlugin, compile
+
+# Register with the plugin (auto-detects Graph vs Functional API)
+plugin = LangGraphPlugin(
+    graphs={"my_pipeline": my_pipeline},
+    default_activity_options=activity_options(
+        start_to_close_timeout=timedelta(minutes=5)
+    ),
+)
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self, url: str) -> dict:
+        app = compile("my_pipeline")
+        return await app.ainvoke(url)
+```
+
+### Continue-as-New with Task Caching
+
+The Functional API supports continue-as-new via task result caching. When a task completes, its result is cached. After continue-as-new, the cache is restored and previously-completed tasks return immediately without re-execution.
+
+```python
+@dataclass
+class PipelineInput:
+    url: str
+    checkpoint: dict | None = None
+    phase: int = 1
+
+@workflow.defn
+class LongRunningPipeline:
+    @workflow.run
+    async def run(self, input: PipelineInput) -> dict:
+        # Restore cache from checkpoint if continuing
+        app = compile("my_pipeline", checkpoint=input.checkpoint)
+
+        if input.phase == 1:
+            # First phase: run some tasks
+            result = await app.ainvoke({"url": input.url, "stop_after": 3})
+
+            # Capture cache state before continue-as-new
+            checkpoint = app.get_state()
+
+            workflow.continue_as_new(PipelineInput(
+                url=input.url,
+                checkpoint=checkpoint,  # Pass cached task results
+                phase=2,
+            ))
+
+        # Second phase: remaining tasks use cached results
+        return await app.ainvoke({"url": input.url})
+```
+
+**Key differences from Graph API:**
+- Graph API checkpoints full execution state and can resume mid-graph
+- Functional API caches task results; the entrypoint re-executes but cached tasks return instantly
+
+### Task Requirements
+
+Tasks must be importable module-level functions:
+- ✅ Functions defined at module level
+- ❌ Functions in `__main__`
+- ❌ Closures or lambdas
+- ❌ Functions defined inside other functions
 
 ## Important Notes
 
