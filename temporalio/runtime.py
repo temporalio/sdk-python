@@ -12,9 +12,7 @@ from typing import (
     ClassVar,
     Generic,
     NewType,
-    Optional,
     TypeVar,
-    Union,
 )
 
 from typing_extensions import Protocol, Self
@@ -38,7 +36,6 @@ class _RuntimeRef:
                     "Cannot create default Runtime after Runtime.prevent_default has been called"
                 )
             self._default_runtime = Runtime(telemetry=TelemetryConfig())
-            self._default_created = True
         return self._default_runtime
 
     def prevent_default(self):

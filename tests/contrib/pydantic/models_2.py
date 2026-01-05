@@ -7,13 +7,7 @@ from enum import Enum, IntEnum
 from re import Pattern
 from typing import (
     Any,
-    Dict,
-    List,
     NamedTuple,
-    Optional,
-    Set,
-    Tuple,
-    Union,
     cast,
 )
 

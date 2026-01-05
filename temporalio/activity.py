@@ -22,12 +22,7 @@ from datetime import datetime, timedelta
 from typing import (
     TYPE_CHECKING,
     Any,
-    List,
     NoReturn,
-    Optional,
-    Tuple,
-    Type,
-    Union,
     overload,
 )
 
@@ -593,7 +588,7 @@ class _Definition:
         if hasattr(fn, "__temporal_activity_definition"):
             raise ValueError("Function already contains activity definition")
         elif not callable(fn):
-            raise TypeError("Activity is not callable")
+            raise TypeError("Activity is not callable")  # type:ignore[reportUnreachable]
         # We do not allow keyword only arguments in activities
         sig = inspect.signature(fn)
         for param in sig.parameters.values():

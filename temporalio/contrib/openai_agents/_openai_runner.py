@@ -1,6 +1,5 @@
 import dataclasses
-import typing
-from typing import Any, Optional, Union
+from typing import Any
 
 from agents import (
     Agent,
@@ -12,7 +11,6 @@ from agents import (
     RunResultStreaming,
     SQLiteSession,
     TContext,
-    Tool,
     TResponseInputItem,
 )
 from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner

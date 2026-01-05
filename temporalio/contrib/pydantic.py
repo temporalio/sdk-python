@@ -14,7 +14,7 @@ Pydantic v1 is not supported.
 """
 
 from dataclasses import dataclass
-from typing import Any, Optional, Type
+from typing import Any
 
 from pydantic import TypeAdapter
 from pydantic_core import SchemaSerializer, to_json

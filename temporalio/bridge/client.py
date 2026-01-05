@@ -8,13 +8,15 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, Tuple, Type, TypeVar, Union
+from typing import TypeVar
 
 import google.protobuf.message
 
 import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
-from temporalio.bridge.temporal_sdk_bridge import RPCError
+from temporalio.bridge.temporal_sdk_bridge import (
+    RPCError,  # type:ignore[reportUnusedImport]
+)
 
 
 @dataclass

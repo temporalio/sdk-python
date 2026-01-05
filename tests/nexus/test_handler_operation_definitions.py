@@ -4,7 +4,7 @@ and input/output types.
 """
 
 from dataclasses import dataclass
-from typing import Any, Type
+from typing import Any
 
 import nexusrpc.handler
 import pytest
@@ -35,7 +35,7 @@ class NotCalled(_TestCase):
     class Service:
         @workflow_run_operation
         async def my_workflow_run_operation_handler(
-            self, ctx: WorkflowRunOperationContext, input: Input
+            self, _ctx: WorkflowRunOperationContext, _input: Input
         ) -> nexus.WorkflowHandle[Output]:
             raise NotImplementedError
 
@@ -54,7 +54,7 @@ class CalledWithoutArgs(_TestCase):
     class Service:
         @workflow_run_operation
         async def my_workflow_run_operation_handler(
-            self, ctx: WorkflowRunOperationContext, input: Input
+            self, _ctx: WorkflowRunOperationContext, _input: Input
         ) -> nexus.WorkflowHandle[Output]:
             raise NotImplementedError
 
@@ -66,7 +66,7 @@ class CalledWithNameOverride(_TestCase):
     class Service:
         @workflow_run_operation(name="operation-name")
         async def workflow_run_operation_with_name_override(
-            self, ctx: WorkflowRunOperationContext, input: Input
+            self, _ctx: WorkflowRunOperationContext, _input: Input
         ) -> nexus.WorkflowHandle[Output]:
             raise NotImplementedError
 

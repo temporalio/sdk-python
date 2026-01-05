@@ -8,10 +8,8 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import (
     Any,
-    Optional,
-    Type,
+    TypeAlias,
     TypeVar,
-    Union,
     cast,
 )
 
@@ -31,7 +29,7 @@ from temporalio.worker import (
 
 T = TypeVar("T")
 
-PluginParameter = Union[None, T, Callable[[Optional[T]], T]]
+PluginParameter: TypeAlias = None | T | Callable[[T | None], T]
 
 
 class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
@@ -234,7 +232,7 @@ def _resolve_parameter(existing: T | None, parameter: PluginParameter[T]) -> T |
     if parameter is None:
         return existing
     elif callable(parameter):
-        return cast(Callable[[Optional[T]], Optional[T]], parameter)(existing)
+        return cast(Callable[[T | None], T | None], parameter)(existing)
     else:
         return parameter
 
@@ -245,8 +243,8 @@ def _resolve_append_parameter(
     if parameter is None:
         return existing
     elif callable(parameter):
-        return cast(
-            Callable[[Optional[Sequence[T]]], Optional[Sequence[T]]], parameter
-        )(existing)
+        return cast(Callable[[Sequence[T] | None], Sequence[T] | None], parameter)(
+            existing
+        )
     else:
         return list(existing or []) + list(parameter)

@@ -1,7 +1,7 @@
 """Advanced types."""
 
 from collections.abc import Awaitable, Callable
-from typing import Any, Type, TypeVar, Union
+from typing import Any, TypeVar
 
 from typing_extensions import ParamSpec, Protocol
 
@@ -15,11 +15,11 @@ CallableType = TypeVar("CallableType", bound=Callable[..., Any])
 CallableAsyncType = TypeVar("CallableAsyncType", bound=Callable[..., Awaitable[Any]])
 CallableSyncOrAsyncType = TypeVar(
     "CallableSyncOrAsyncType",
-    bound=Callable[..., Union[Any, Awaitable[Any]]],
+    bound=Callable[..., Any | Awaitable[Any]],
 )
 CallableSyncOrAsyncReturnNoneType = TypeVar(
     "CallableSyncOrAsyncReturnNoneType",
-    bound=Callable[..., Union[None, Awaitable[None]]],
+    bound=Callable[..., None | Awaitable[None]],
 )
 MultiParamSpec = ParamSpec("MultiParamSpec")
 

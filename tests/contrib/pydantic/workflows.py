@@ -1,6 +1,5 @@
 import dataclasses
 from datetime import datetime, timedelta
-from typing import List
 from uuid import UUID
 
 from pydantic import BaseModel, create_model
@@ -26,7 +25,7 @@ def clone_objects(objects: list[PydanticModels]) -> list[PydanticModels]:
     new_objects = []
     for o in objects:
         fields = {}
-        for name, f in o.model_fields.items():
+        for name, f in o.model_fields.items():  # type: ignore[reportDeprecated]
             fields[name] = (f.annotation, f)
         model = create_model(o.__class__.__name__, **fields)  # type: ignore
         new_objects.append(model(**o.model_dump(by_alias=True)))
@@ -171,5 +170,5 @@ class PydanticModelWithStrictFieldWorkflow:
 @workflow.defn
 class NoTypeAnnotationsWorkflow:
     @workflow.run
-    async def run(self, arg):
+    async def run(self, arg):  # type: ignore[reportMissingParameterType]
         return arg

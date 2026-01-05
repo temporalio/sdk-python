@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum, IntEnum
-from typing import Any, Optional, Union
+from typing import Any
 from unittest.mock import patch
 
 import pytest

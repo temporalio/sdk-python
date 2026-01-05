@@ -10,6 +10,7 @@ import inspect
 import json
 import sys
 import traceback
+import typing
 import uuid
 import warnings
 from abc import ABC, abstractmethod
@@ -22,20 +23,13 @@ from logging import getLogger
 from typing import (
     Any,
     ClassVar,
-    Dict,
-    List,
     Literal,
     NewType,
-    Optional,
-    Tuple,
-    Type,
     TypeVar,
-    Union,
     get_type_hints,
     overload,
 )
 
-import google.protobuf.duration_pb2
 import google.protobuf.json_format
 import google.protobuf.message
 import google.protobuf.symbol_database
@@ -46,7 +40,6 @@ from typing_extensions import Self
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.failure.v1
-import temporalio.api.sdk.v1
 import temporalio.common
 import temporalio.exceptions
 import temporalio.types
@@ -56,7 +49,7 @@ if sys.version_info < (3, 11):
     from dateutil import parser  # type: ignore
 # StrEnum is available in 3.11+
 if sys.version_info >= (3, 11):
-    from enum import StrEnum
+    from enum import StrEnum  # type: ignore[reportUnreachable]
 
 from types import UnionType
 
@@ -151,7 +144,7 @@ class WithSerializationContext(ABC):
     to_payload/from_payload, etc) to use the context.
     """
 
-    def with_context(self, context: SerializationContext) -> Self:
+    def with_context(self, context: SerializationContext) -> Self:  # type: ignore[reportUnusedParameter]
         """Return a copy of this object configured to use the given context.
 
         Args:
@@ -549,7 +542,7 @@ class JSONProtoPayloadConverter(EncodingPayloadConverter):
         """See base class."""
         if (
             isinstance(value, google.protobuf.message.Message)
-            and value.DESCRIPTOR is not None
+            and value.DESCRIPTOR is not None  # type:ignore[reportUnnecessaryComparison]
         ):
             # We have to convert to dict then to JSON because MessageToJson does
             # not have a compact option removing spaces and newlines
@@ -599,7 +592,7 @@ class BinaryProtoPayloadConverter(EncodingPayloadConverter):
         """See base class."""
         if (
             isinstance(value, google.protobuf.message.Message)
-            and value.DESCRIPTOR is not None
+            and value.DESCRIPTOR is not None  # type:ignore[reportUnnecessaryComparison]
         ):
             return temporalio.api.common.v1.Payload(
                 metadata={
@@ -1476,7 +1469,7 @@ def encode_search_attribute_values(
         vals: List of values to convert.
     """
     if not isinstance(vals, list):
-        raise TypeError("Search attribute values must be lists")
+        raise TypeError("Search attribute values must be lists")  # type:ignore[reportUnreachable]
     # Confirm all types are the same
     val_type: type | None = None
     # Convert dates to strings
@@ -1502,7 +1495,7 @@ def encode_search_attribute_values(
     return default().payload_converter.to_payloads([safe_vals])[0]
 
 
-def _encode_maybe_typed_search_attributes(
+def _encode_maybe_typed_search_attributes(  # type:ignore[reportUnusedFunction]
     non_typed_attributes: temporalio.common.SearchAttributes | None,
     typed_attributes: temporalio.common.TypedSearchAttributes | None,
     api: temporalio.api.common.v1.SearchAttributes,
@@ -1524,10 +1517,10 @@ def _get_iso_datetime_parser() -> Callable[[str], datetime]:
         A callable to parse date strings into datetimes.
     """
     if sys.version_info >= (3, 11):
-        return datetime.fromisoformat  # noqa
+        return datetime.fromisoformat  # type:ignore[reportUnreachable] # noqa
     else:
         # Isolate import for py > 3.11, as dependency only installed for < 3.11
-        return parser.isoparse
+        return parser.isoparse  # type:ignore[reportUnreachable]
 
 
 def decode_search_attributes(
@@ -1607,7 +1600,7 @@ def decode_typed_search_attributes(
     return temporalio.common.TypedSearchAttributes(pairs)
 
 
-def _decode_search_attribute_value(
+def _decode_search_attribute_value(  # type:ignore[reportUnusedFunction]
     payload: temporalio.api.common.v1.Payload,
 ) -> temporalio.common.SearchAttributeValue:
     val = default().payload_converter.from_payload(payload)
@@ -1698,7 +1691,7 @@ def value_to_type(
             raise TypeError(f"Value {value} not in literal values {type_args}")
         return value
 
-    is_union = origin is Union
+    is_union = origin is typing.Union  # type:ignore[reportDeprecated]
     is_union = is_union or isinstance(origin, UnionType)
 
     # Union
@@ -1837,7 +1830,7 @@ def value_to_type(
 
     # StrEnum, available in 3.11+
     if sys.version_info >= (3, 11):
-        if inspect.isclass(hint) and issubclass(hint, StrEnum):
+        if inspect.isclass(hint) and issubclass(hint, StrEnum):  # type:ignore[reportUnreachable]
             if not isinstance(value, str):
                 raise TypeError(
                     f"Cannot convert to enum {hint}, value not a string, value is {type(value)}"

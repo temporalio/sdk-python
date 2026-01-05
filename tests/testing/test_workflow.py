@@ -1,10 +1,9 @@
 import asyncio
 import platform
-import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 from time import monotonic
-from typing import Any, Optional, Union
+from typing import Any
 
 import pytest
 
@@ -13,7 +12,6 @@ from temporalio.client import (
     Client,
     Interceptor,
     OutboundInterceptor,
-    RPCError,
     StartWorkflowInput,
     WorkflowFailureError,
     WorkflowHandle,
@@ -30,6 +28,7 @@ from temporalio.exceptions import (
     TimeoutError,
     TimeoutType,
 )
+from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import new_worker

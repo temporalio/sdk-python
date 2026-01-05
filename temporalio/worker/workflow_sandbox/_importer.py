@@ -19,12 +19,7 @@ from collections.abc import Callable, Iterator, Mapping, MutableMapping, Sequenc
 from contextlib import ExitStack, contextmanager
 from typing import (
     Any,
-    Dict,
     Generic,
-    List,
-    Optional,
-    Set,
-    Tuple,
     TypeVar,
     no_type_check,
 )
@@ -79,7 +74,7 @@ class Importer:
         )
         if builtin_matcher:
 
-            def restrict_built_in(name: str, orig: Any, *args, **kwargs):
+            def restrict_built_in(name: str, orig: Any, *args: Any, **kwargs: Any):
                 # Check if restricted against matcher
                 if (
                     builtin_matcher
@@ -147,7 +142,9 @@ class Importer:
         try:
             with _thread_local_sys_modules.applied(sys, "modules", self.new_modules):
                 with _thread_local_import.applied(
-                    builtins, "__import__", self.import_func
+                    builtins,
+                    "__import__",
+                    self.import_func,  # type: ignore[reportArgumentType]
                 ):
                     with self._builtins_restricted():
                         yield None
@@ -480,15 +477,11 @@ class _ThreadLocalSysModules(
     def __or__(
         self, other: Mapping[str, types.ModuleType]
     ) -> dict[str, types.ModuleType]:
-        if sys.version_info < (3, 9):
-            raise NotImplementedError
         return self.current.__or__(other)  # type: ignore[operator]
 
     def __ior__(
         self, other: Mapping[str, types.ModuleType]
     ) -> dict[str, types.ModuleType]:
-        if sys.version_info < (3, 9):
-            raise NotImplementedError
         return self.current.__ior__(other)
 
     __ror__ = __or__
@@ -497,7 +490,7 @@ class _ThreadLocalSysModules(
         return self.current.copy()
 
     @classmethod
-    def fromkeys(cls, *args, **kwargs) -> Any:
+    def fromkeys(cls, *args: Any, **kwargs: Any) -> Any:
         return dict.fromkeys(*args, **kwargs)
 
     def _lazily_passthrough_if_available(self, key: str) -> types.ModuleType | None:

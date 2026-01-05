@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Dict, List, Optional, cast
+from typing import Any, cast
 
 import nexusrpc
 import opentelemetry.context
@@ -96,7 +96,7 @@ class TracingWorkflowActionContinueAsNew:
 @workflow.defn
 class ExpectCancelNexusWorkflow:
     @workflow.run
-    async def run(self, input: str):
+    async def run(self, _input: str):
         try:
             await asyncio.wait_for(asyncio.Future(), 2)
         except asyncio.TimeoutError:
@@ -705,9 +705,7 @@ class ReadBaggageTestWorkflow:
         )
 
 
-async def test_opentelemetry_baggage_propagation_basic(
-    client_with_tracing: Client, env: WorkflowEnvironment
-):
+async def test_opentelemetry_baggage_propagation_basic(client_with_tracing: Client):
     task_queue = f"task_queue_{uuid.uuid4()}"
     async with Worker(
         client_with_tracing,
@@ -732,13 +730,10 @@ async def test_opentelemetry_baggage_propagation_basic(
 
 @activity.defn
 async def read_baggage_local_activity() -> dict[str, str]:
-    return cast(
-        dict[str, str],
-        {
-            "user_id": get_baggage_value("user.id"),
-            "tenant_id": get_baggage_value("tenant.id"),
-        },
-    )
+    return {
+        "user_id": get_baggage_value("user.id"),
+        "tenant_id": get_baggage_value("tenant.id"),
+    }
 
 
 @workflow.defn
@@ -752,7 +747,7 @@ class LocalActivityBaggageTestWorkflow:
 
 
 async def test_opentelemetry_baggage_propagation_local_activity(
-    client_with_tracing: Client, env: WorkflowEnvironment
+    client_with_tracing: Client,
 ):
     task_queue = f"task_queue_{uuid.uuid4()}"
     async with Worker(
@@ -799,7 +794,7 @@ class RetryBaggageTestWorkflow:
 
 
 async def test_opentelemetry_baggage_propagation_with_retries(
-    client_with_tracing: Client, env: WorkflowEnvironment
+    client_with_tracing: Client,
 ) -> None:
     global retry_attempt_baggage_values
     retry_attempt_baggage_values = []
@@ -855,7 +850,6 @@ class ContextClearWorkflow:
 )
 async def test_opentelemetry_context_restored_after_activity(
     client_with_tracing: Client,
-    env: WorkflowEnvironment,
     activity: Callable[[], None],
     expect_failure: bool,
 ) -> None:
@@ -864,12 +858,12 @@ async def test_opentelemetry_context_restored_after_activity(
     original_attach = context.attach
     original_detach = context.detach
 
-    def tracked_attach(ctx):
+    def tracked_attach(ctx):  # type:ignore[reportMissingParameterType]
         nonlocal attach_count
         attach_count += 1
         return original_attach(ctx)
 
-    def tracked_detach(token):
+    def tracked_detach(token):  # type:ignore[reportMissingParameterType]
         nonlocal detach_count
         detach_count += 1
         return original_detach(token)
@@ -924,7 +918,7 @@ class SimpleNoContextWorkflow:
 
 
 async def test_opentelemetry_interceptor_works_if_no_context(
-    client_with_tracing: Client, env: WorkflowEnvironment
+    client_with_tracing: Client,
 ):
     task_queue = f"task_queue_{uuid.uuid4()}"
     async with Worker(
@@ -952,13 +946,13 @@ async def test_opentelemetry_interceptor_works_if_no_context(
 
 def test_opentelemetry_safe_detach():
     class _fake_self:
-        def _load_workflow_context_carrier(*args):
+        def _load_workflow_context_carrier(*_args):
             return None
 
-        def _set_on_context(self, ctx):
+        def _set_on_context(self, ctx: Any):
             return opentelemetry.context.set_value("test-key", "test-value", ctx)
 
-        def _completed_span(*args, **kwargs):
+        def _completed_span(*args: Any, **_kwargs: Any):
             pass
 
     # create a context manager and force enter to happen on this thread

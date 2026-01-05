@@ -6,7 +6,7 @@ import os
 import uuid
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Optional, Tuple, Union, cast
+from typing import Any, cast
 from unittest import mock
 
 import google.protobuf.any_pb2
@@ -46,8 +46,6 @@ from temporalio.client import (
     Interceptor,
     OutboundInterceptor,
     QueryWorkflowInput,
-    RPCError,
-    RPCStatusCode,
     Schedule,
     ScheduleActionExecutionStartWorkflow,
     ScheduleActionStartWorkflow,
@@ -86,6 +84,10 @@ from temporalio.common import (
 )
 from temporalio.converter import DataConverter
 from temporalio.exceptions import WorkflowAlreadyStartedError
+from temporalio.service import (
+    RPCError,
+    RPCStatusCode,
+)
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     assert_eq_eventually,
@@ -378,7 +380,7 @@ async def test_query(client: Client, worker: ExternalWorker):
     await handle.result()
     assert "some query arg" == await handle.query("some query", "some query arg")
     # Try a query not on the workflow
-    with pytest.raises(WorkflowQueryFailedError) as err:
+    with pytest.raises(WorkflowQueryFailedError):
         await handle.query("does not exist")
 
 
@@ -899,7 +901,7 @@ async def test_schedule_basics(
     # Update but error
     with pytest.raises(RuntimeError) as err:
 
-        def update_fail(input: ScheduleUpdateInput) -> ScheduleUpdate:
+        def update_fail(_input: ScheduleUpdateInput) -> ScheduleUpdate:
             raise RuntimeError("Oh no")
 
         await handle.update(update_fail)
@@ -919,7 +921,7 @@ async def test_schedule_basics(
     )
     assert isinstance(new_schedule.action, ScheduleActionStartWorkflow)
 
-    async def update_schedule_basic(input: ScheduleUpdateInput) -> ScheduleUpdate:
+    async def update_schedule_basic(_input: ScheduleUpdateInput) -> ScheduleUpdate:
         return ScheduleUpdate(new_schedule)
 
     await handle.update(update_schedule_basic)
@@ -1163,7 +1165,7 @@ async def test_schedule_backfill(
 
 
 async def test_schedule_create_limited_actions_validation(
-    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+    client: Client, worker: ExternalWorker
 ):
     sched = Schedule(
         action=ScheduleActionStartWorkflow(
@@ -1561,7 +1563,7 @@ class TestForkCreateClient(_TestFork):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot create client across forks"
         )
-        self._env = env
+        self._env = env  # type:ignore[reportUninitializedInstanceVariable]
         self.run(mp_fork_ctx)
 
 
@@ -1579,5 +1581,5 @@ class TestForkUseClient(_TestFork):
         self._expected = _ForkTestResult.assertion_error(
             "Cannot use client across forks"
         )
-        self._client = client
+        self._client = client  # type:ignore[reportUninitializedInstanceVariable]
         self.run(mp_fork_ctx)

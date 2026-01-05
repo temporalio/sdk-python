@@ -14,14 +14,8 @@ from typing import (
     Any,
     ClassVar,
     Generic,
-    List,
-    Optional,
-    Text,
-    Tuple,
-    Type,
     TypeAlias,
     TypeVar,
-    Union,
     get_origin,
     get_type_hints,
     overload,
@@ -198,13 +192,13 @@ class RawValue:
 # We choose to make this a list instead of an sequence so we can catch if people
 # are not sending lists each time but maybe accidentally sending a string (which
 # is a sequence)
-SearchAttributeValues: TypeAlias = Union[
-    list[str], list[int], list[float], list[bool], list[datetime]
-]
+SearchAttributeValues: TypeAlias = (
+    list[str] | list[int] | list[float] | list[bool] | list[datetime]
+)
 
 SearchAttributes: TypeAlias = Mapping[str, SearchAttributeValues]
 
-SearchAttributeValue: TypeAlias = Union[str, int, float, bool, datetime, Sequence[str]]
+SearchAttributeValue: TypeAlias = str | int | float | bool | datetime | Sequence[str]
 
 SearchAttributeValueType = TypeVar(
     "SearchAttributeValueType", str, int, float, bool, datetime, Sequence[str]
@@ -492,7 +486,7 @@ class TypedSearchAttributes(Collection[SearchAttributePair]):
 
         This uses key equality so the key must be the same name and type.
         """
-        return any(k == key for k, v in self)
+        return any(k == key for k, _v in self)
 
     @overload
     def get(
@@ -544,7 +538,7 @@ class TypedSearchAttributes(Collection[SearchAttributePair]):
 TypedSearchAttributes.empty = TypedSearchAttributes(search_attributes=[])
 
 
-def _warn_on_deprecated_search_attributes(
+def _warn_on_deprecated_search_attributes(  # type:ignore[reportUnusedFunction]
     attributes: SearchAttributes | Any | None,
     stack_level: int = 2,
 ) -> None:
@@ -556,7 +550,7 @@ def _warn_on_deprecated_search_attributes(
         )
 
 
-MetricAttributes: TypeAlias = Mapping[str, Union[str, int, float, bool]]
+MetricAttributes: TypeAlias = Mapping[str, str | int | float | bool]
 
 
 class MetricMeter(ABC):
@@ -1157,7 +1151,7 @@ class AutoUpgradeVersioningOverride(VersioningOverride):
 _arg_unset = object()
 
 
-def _arg_or_args(arg: Any, args: Sequence[Any]) -> Sequence[Any]:
+def _arg_or_args(arg: Any, args: Sequence[Any]) -> Sequence[Any]:  # type:ignore[reportUnusedFunction]
     if arg is not _arg_unset:
         if args:
             raise ValueError("Cannot have arg and args")
@@ -1165,7 +1159,7 @@ def _arg_or_args(arg: Any, args: Sequence[Any]) -> Sequence[Any]:
     return args
 
 
-def _apply_headers(
+def _apply_headers(  # type:ignore[reportUnusedFunction]
     source: Mapping[str, temporalio.api.common.v1.Payload] | None,
     dest: google.protobuf.internal.containers.MessageMap[
         str, temporalio.api.common.v1.Payload
@@ -1192,7 +1186,7 @@ _non_user_defined_callables = (
 )
 
 
-def _type_hints_from_func(
+def _type_hints_from_func(  # type:ignore[reportUnusedFunction]
     func: Callable,
 ) -> tuple[list[type] | None, type | None]:
     """Extracts the type hints from the function.
