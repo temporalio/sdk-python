@@ -2,8 +2,6 @@
 File used in conjunction with external_stack_trace.py to test filenames in multi-file workflows.
 """
 
-from typing import List
-
 from temporalio import workflow
 
 

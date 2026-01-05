@@ -2,7 +2,7 @@
 
 import uuid
 from types import TracebackType
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from agents import SpanData, Trace, TracingProcessor
 from agents.tracing import (

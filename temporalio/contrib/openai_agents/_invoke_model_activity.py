@@ -7,7 +7,7 @@ import asyncio
 import enum
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, NoReturn, Union
+from typing import Any, NoReturn
 
 from agents import (
     AgentOutputSchemaBase,
@@ -35,10 +35,9 @@ from openai import (
 )
 from openai.types.responses import ResponseErrorEvent
 from openai.types.responses.tool_param import Mcp
-from pydantic_core import to_json
 from typing_extensions import Required, TypedDict
 
-from temporalio import activity, workflow
+from temporalio import activity
 from temporalio.contrib.openai_agents._heartbeat_decorator import _auto_heartbeater
 from temporalio.contrib.openai_agents._model_parameters import StreamingOptions
 from temporalio.exceptions import ApplicationError
@@ -78,14 +77,14 @@ class HostedMCPToolInput:
     tool_config: Mcp
 
 
-ToolInput = Union[
-    FunctionToolInput,
-    FileSearchTool,
-    WebSearchTool,
-    ImageGenerationTool,
-    CodeInterpreterTool,
-    HostedMCPToolInput,
-]
+ToolInput = (
+    FunctionToolInput
+    | FileSearchTool
+    | WebSearchTool
+    | ImageGenerationTool
+    | CodeInterpreterTool
+    | HostedMCPToolInput
+)
 
 
 @dataclass
@@ -312,11 +311,11 @@ class ModelActivity:
         return result
 
 
-async def _empty_on_invoke_tool(ctx: RunContextWrapper[Any], input: str) -> str:
+async def _empty_on_invoke_tool(_ctx: RunContextWrapper[Any], _input: str) -> str:
     return ""
 
 
-async def _empty_on_invoke_handoff(ctx: RunContextWrapper[Any], input: str) -> Any:
+async def _empty_on_invoke_handoff(_ctx: RunContextWrapper[Any], _input: str) -> Any:
     return None
 
 
@@ -344,7 +343,7 @@ def _make_tool(tool: ToolInput) -> Tool:
             strict_json_schema=tool.strict_json_schema,
         )
     else:
-        raise UserError(f"Unknown tool type: {tool.name}")
+        raise UserError(f"Unknown tool type: {tool.name}")  # type: ignore[reportUnreachable]
 
 
 def _make_tools(input: ActivityModelInput) -> list[Tool]:

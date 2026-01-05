@@ -5,7 +5,6 @@ import typing
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from datetime import timedelta
-from typing import Union
 
 from agents import ModelProvider, set_trace_provider
 from agents.run import get_default_agent_runner, set_default_agent_runner
@@ -185,7 +184,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
         model_params: ModelActivityParameters | None = None,
         model_provider: ModelProvider | None = None,
         mcp_server_providers: Sequence[
-            Union["StatelessMCPServerProvider", "StatefulMCPServerProvider"]
+            "StatelessMCPServerProvider | StatefulMCPServerProvider"
         ] = (),
         register_activities: bool = True,
         streaming_options: StreamingOptions = StreamingOptions(),

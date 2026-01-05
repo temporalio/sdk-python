@@ -9,14 +9,10 @@ from datetime import timedelta
 from typing import (
     Any,
     Generic,
-    List,
     NoReturn,
-    Optional,
-    Type,
-    Union,
 )
 
-import nexusrpc.handler
+import nexusrpc
 from nexusrpc import InputT, OutputT
 
 import temporalio.activity
@@ -49,7 +45,8 @@ class Interceptor:
         return next
 
     def workflow_interceptor_class(
-        self, input: WorkflowInterceptorClassInput
+        self,
+        input: WorkflowInterceptorClassInput,  # type:ignore[reportUnusedParameter]
     ) -> type[WorkflowInboundInterceptor] | None:
         """Class that will be instantiated and used to intercept workflows.
 
@@ -65,6 +62,20 @@ class Interceptor:
             The class to construct to intercept each workflow.
         """
         return None
+
+    def intercept_nexus_operation(
+        self, next: NexusOperationInboundInterceptor
+    ) -> NexusOperationInboundInterceptor:
+        """Method called for intercepting a Nexus operation.
+
+        Args:
+            next: The underlying inbound this interceptor
+             should delegate to.
+
+        Returns:
+            The new interceptor that should be used for the Nexus operation.
+        """
+        return next
 
 
 @dataclass(frozen=True)
@@ -465,3 +476,50 @@ class WorkflowOutboundInterceptor:
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
         """Called for every :py:func:`temporalio.workflow.NexusClient.start_operation` call."""
         return await self.next.start_nexus_operation(input)
+
+
+@dataclass
+class ExecuteNexusOperationStartInput:
+    """Input for :pyt:meth:`NexusOperationInboundInterceptor.start_operation"""
+
+    ctx: nexusrpc.handler.StartOperationContext
+    input: Any
+
+
+@dataclass
+class ExecuteNexusOperationCancelInput:
+    """Input for :pyt:meth:`NexusOperationInboundInterceptor.cancel_operation"""
+
+    ctx: nexusrpc.handler.CancelOperationContext
+    token: str
+
+
+class NexusOperationInboundInterceptor:
+    """Inbound interceptor to wrap Nexus operation starting and cancelling.
+
+    This should be extended by any Nexus operation inbound interceptors.
+    """
+
+    def __init__(self, next: NexusOperationInboundInterceptor) -> None:
+        """Create the inbound interceptor.
+
+        Args:
+            next: The next interceptor in the chain. The default implementation
+                of all calls is to delegate to the next interceptor.
+        """
+        self.next = next
+
+    async def execute_nexus_operation_start(
+        self, input: ExecuteNexusOperationStartInput
+    ) -> (
+        nexusrpc.handler.StartOperationResultSync[Any]
+        | nexusrpc.handler.StartOperationResultAsync
+    ):
+        """Called to start a Nexus operation"""
+        return await self.next.execute_nexus_operation_start(input)
+
+    async def execute_nexus_operation_cancel(
+        self, input: ExecuteNexusOperationCancelInput
+    ) -> None:
+        """Called to cancel an in progress Nexus operation"""
+        return await self.next.execute_nexus_operation_cancel(input)

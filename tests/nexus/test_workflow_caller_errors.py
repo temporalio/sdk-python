@@ -61,14 +61,14 @@ class NonTerminatingWorkflow:
 class ErrorTestService:
     @nexusrpc.handler.sync_operation
     def retried_due_to_exception(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: ErrorTestInput
+        self, _ctx: nexusrpc.handler.StartOperationContext, input: ErrorTestInput
     ) -> None:
         operation_invocation_counts[input.id] += 1
         raise Exception
 
     @nexusrpc.handler.sync_operation
     def retried_due_to_retryable_application_error(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: ErrorTestInput
+        self, _ctx: nexusrpc.handler.StartOperationContext, input: ErrorTestInput
     ) -> None:
         operation_invocation_counts[input.id] += 1
         raise ApplicationError(
@@ -79,7 +79,7 @@ class ErrorTestService:
 
     @nexusrpc.handler.sync_operation
     def retried_due_to_resource_exhausted_handler_error(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: ErrorTestInput
+        self, _ctx: nexusrpc.handler.StartOperationContext, input: ErrorTestInput
     ) -> None:
         operation_invocation_counts[input.id] += 1
         raise nexusrpc.HandlerError(
@@ -89,7 +89,7 @@ class ErrorTestService:
 
     @nexusrpc.handler.sync_operation
     def retried_due_to_internal_handler_error(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: ErrorTestInput
+        self, _ctx: nexusrpc.handler.StartOperationContext, input: ErrorTestInput
     ) -> None:
         operation_invocation_counts[input.id] += 1
         raise nexusrpc.HandlerError(
@@ -99,7 +99,7 @@ class ErrorTestService:
 
     @nexusrpc.handler.sync_operation
     async def fails_due_to_workflow_already_started(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: ErrorTestInput
+        self, _ctx: nexusrpc.handler.StartOperationContext, input: ErrorTestInput
     ) -> None:
         operation_invocation_counts[input.id] += 1
         for _ in range(2):
@@ -240,7 +240,7 @@ _start_operation_sync_complete = threading.Event()
 class StartTimeoutTestService:
     @sync_operation
     async def expect_timeout_cancellation_async(
-        self, ctx: StartOperationContext, input: None
+        self, ctx: StartOperationContext, _input: None
     ) -> None:
         try:
             await asyncio.wait_for(ctx.task_cancellation.wait_until_cancelled(), 1)
@@ -249,7 +249,7 @@ class StartTimeoutTestService:
 
     @sync_operation
     def expect_timeout_cancellation_sync(
-        self, ctx: StartOperationContext, input: None
+        self, ctx: StartOperationContext, _input: None
     ) -> None:
         global _start_operation_sync_complete
         cancelled = ctx.task_cancellation.wait_until_cancelled_sync(1)

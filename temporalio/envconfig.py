@@ -9,16 +9,16 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional, TypeAlias, Union, cast
+from typing import Any, Literal, TypeAlias, cast
 
 from typing_extensions import Self, TypedDict
 
 import temporalio.service
 from temporalio.bridge.temporal_sdk_bridge import envconfig as _bridge_envconfig
 
-DataSource: TypeAlias = Union[
-    Path, str, bytes
-]  # str represents a file contents, bytes represents raw data
+DataSource: TypeAlias = (
+    Path | str | bytes
+)  # str represents a file contents, bytes represents raw data
 
 
 # We define typed dictionaries for what these configs look like as TOML.
@@ -76,7 +76,7 @@ def _source_to_path_and_data(
     elif isinstance(source, bytes):
         data = source
     elif source is not None:
-        raise TypeError(
+        raise TypeError(  # type: ignore[reportUnreachable]
             "config_source must be one of pathlib.Path, str, bytes, or None, "
             f"but got {type(source).__name__}"
         )
@@ -93,7 +93,7 @@ def _read_source(source: DataSource | None) -> bytes | None:
         return source.encode("utf-8")
     if isinstance(source, bytes):
         return source
-    raise TypeError(
+    raise TypeError(  # type: ignore[reportUnreachable]
         f"Source must be one of pathlib.Path, str, or bytes, but got {type(source).__name__}"
     )
 
@@ -248,7 +248,7 @@ class ClientConfigProfile:
             config["rpc_metadata"] = self.grpc_meta
 
         # Cast to ClientConnectConfig - this is safe because we've only included non-None values
-        return cast(ClientConnectConfig, config)
+        return cast(ClientConnectConfig, config)  # type: ignore[reportInvalidCast]
 
     @staticmethod
     def load(

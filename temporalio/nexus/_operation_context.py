@@ -134,7 +134,7 @@ def _nexus_backing_workflow_start_context() -> Generator[None]:
         _temporal_nexus_backing_workflow_start_context.reset(token)
 
 
-def _in_nexus_backing_workflow_start_context() -> bool:
+def _in_nexus_backing_workflow_start_context() -> bool:  # type:ignore[reportUnusedClass]
     return _temporal_nexus_backing_workflow_start_context.get(False)
 
 

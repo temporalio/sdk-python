@@ -4,7 +4,6 @@ import contextvars
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Optional
 
 from temporalio.api.enums.v1.command_type_pb2 import CommandType
 from temporalio.bridge._visitor import PayloadVisitor, VisitorFunctions

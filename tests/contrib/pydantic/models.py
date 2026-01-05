@@ -7,12 +7,8 @@ from pathlib import Path
 from typing import (
     Annotated,
     Any,
-    Dict,
     Generic,
-    List,
-    Tuple,
     TypeVar,
-    Union,
     cast,
 )
 
@@ -370,21 +366,21 @@ def _assert_timedelta_validity(td: timedelta):
     assert issubclass(td.__class__, timedelta)
 
 
-PydanticModels = Union[
-    StandardTypesModel,
-    StrictStandardTypesModel,
-    ComplexTypesModel,
-    SpecialTypesModel,
-    StrictSpecialTypesModel,
-    ParentModel,
-    FieldFeaturesModel,
-    AnnotatedFieldsModel,
-    GenericModel[Any],
-    UnionModel,
-    PydanticDatetimeModel,
-    PydanticDateModel,
-    PydanticTimedeltaModel,
-]
+PydanticModels = (
+    StandardTypesModel
+    | StrictStandardTypesModel
+    | ComplexTypesModel
+    | SpecialTypesModel
+    | StrictSpecialTypesModel
+    | ParentModel
+    | FieldFeaturesModel
+    | AnnotatedFieldsModel
+    | GenericModel[Any]
+    | UnionModel
+    | PydanticDatetimeModel
+    | PydanticDateModel
+    | PydanticTimedeltaModel
+)
 
 
 def make_list_of_pydantic_objects() -> list[PydanticModels]:
@@ -419,7 +415,7 @@ def make_dataclass_objects() -> list[MyDataClass]:
 
 
 ComplexCustomType = tuple[list[MyDataClass], list[PydanticModels]]
-ComplexCustomUnionType = list[Union[MyDataClass, PydanticModels]]
+ComplexCustomUnionType = list[MyDataClass | PydanticModels]
 
 
 class PydanticModelWithStrictField(BaseModel):

@@ -7,7 +7,7 @@ import typing
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 from datetime import timedelta
-from typing import Any, Optional, Type
+from typing import Any
 
 import nexusrpc
 from agents import (
@@ -203,7 +203,7 @@ def nexus_operation_as_tool(
         >>> # Use tool with an OpenAI agent
     """
 
-    def operation_callable(input):
+    def operation_callable(input: Any):  # type: ignore[reportUnusedParameter]
         raise NotImplementedError("This function definition is used as a type only")
 
     operation_callable.__annotations__ = {
@@ -214,7 +214,7 @@ def nexus_operation_as_tool(
 
     schema = function_schema(operation_callable)
 
-    async def run_operation(ctx: RunContextWrapper[Any], input: str) -> Any:
+    async def run_operation(_ctx: RunContextWrapper[Any], input: str) -> Any:
         try:
             json_data = json.loads(input)
         except Exception as e:

@@ -15,7 +15,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any, List, Literal, Optional, Type
+from typing import Any, Literal
 
 import nexusrpc
 import pytest
@@ -837,7 +837,7 @@ class UpdateSerializationContextTestWorkflow:
         self.input: TraceData | None = None
 
     @workflow.run
-    async def run(self, pass_validation: bool) -> TraceData:
+    async def run(self, _pass_validation: bool) -> TraceData:
         await workflow.wait_condition(lambda: self.input is not None)
         assert self.input
         return self.input
@@ -1583,7 +1583,7 @@ class PayloadEncryptionWorkflow:
         self.received_update = False
 
     @workflow.run
-    async def run(self, data: str) -> str:
+    async def run(self, _data: str) -> str:
         await workflow.wait_condition(
             lambda: (self.received_signal and self.received_update)
         )
@@ -1705,7 +1705,7 @@ class NexusOperationTestServiceHandler:
 @workflow.defn
 class NexusOperationTestWorkflow:
     @workflow.run
-    async def run(self, data: str) -> None:
+    async def run(self, _data: str) -> None:
         nexus_client = workflow.create_nexus_client(
             service=NexusOperationTestServiceHandler,
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),

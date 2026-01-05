@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use temporalio_sdk_core::ephemeral_server;
 
@@ -47,7 +47,7 @@ pub fn start_dev_server<'a>(
     runtime_ref: &runtime::RuntimeRef,
     config: DevServerConfig,
 ) -> PyResult<Bound<'a, PyAny>> {
-    let opts: ephemeral_server::TemporalDevServerConfig = config.try_into()?;
+    let opts: ephemeral_server::TemporalDevServerConfig = config.into();
     let runtime = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
         Ok(EphemeralServerRef {
@@ -64,7 +64,7 @@ pub fn start_test_server<'a>(
     runtime_ref: &runtime::RuntimeRef,
     config: TestServerConfig,
 ) -> PyResult<Bound<'a, PyAny>> {
-    let opts: ephemeral_server::TestServerConfig = config.try_into()?;
+    let opts: ephemeral_server::TestServerConfig = config.into();
     let runtime = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
         Ok(EphemeralServerRef {
@@ -109,11 +109,9 @@ impl EphemeralServerRef {
     }
 }
 
-impl TryFrom<DevServerConfig> for ephemeral_server::TemporalDevServerConfig {
-    type Error = PyErr;
-
-    fn try_from(conf: DevServerConfig) -> PyResult<Self> {
-        ephemeral_server::TemporalDevServerConfigBuilder::default()
+impl From<DevServerConfig> for ephemeral_server::TemporalDevServerConfig {
+    fn from(conf: DevServerConfig) -> Self {
+        ephemeral_server::TemporalDevServerConfig::builder()
             .exe(if let Some(existing_path) = conf.existing_path {
                 ephemeral_server::EphemeralExe::ExistingPath(existing_path.to_owned())
             } else {
@@ -132,21 +130,18 @@ impl TryFrom<DevServerConfig> for ephemeral_server::TemporalDevServerConfig {
             })
             .namespace(conf.namespace)
             .ip(conf.ip)
-            .port(conf.port)
-            .db_filename(conf.database_filename)
+            .maybe_port(conf.port)
+            .maybe_db_filename(conf.database_filename)
             .ui(conf.ui)
             .log((conf.log_format, conf.log_level))
             .extra_args(conf.extra_args)
             .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid Temporalite config: {err}")))
     }
 }
 
-impl TryFrom<TestServerConfig> for ephemeral_server::TestServerConfig {
-    type Error = PyErr;
-
-    fn try_from(conf: TestServerConfig) -> PyResult<Self> {
-        ephemeral_server::TestServerConfigBuilder::default()
+impl From<TestServerConfig> for ephemeral_server::TestServerConfig {
+    fn from(conf: TestServerConfig) -> Self {
+        ephemeral_server::TestServerConfig::builder()
             .exe(if let Some(existing_path) = conf.existing_path {
                 ephemeral_server::EphemeralExe::ExistingPath(existing_path.to_owned())
             } else {
@@ -163,9 +158,8 @@ impl TryFrom<TestServerConfig> for ephemeral_server::TestServerConfig {
                     ttl: conf.download_ttl_ms.map(Duration::from_millis),
                 }
             })
-            .port(conf.port)
+            .maybe_port(conf.port)
             .extra_args(conf.extra_args)
             .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid test server config: {err}")))
     }
 }

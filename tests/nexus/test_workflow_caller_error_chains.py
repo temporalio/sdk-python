@@ -33,7 +33,7 @@ class ErrorConversionTestCase:
     action_in_nexus_operation: Callable[..., Any]
     expected_exception_chain_in_workflow: list[tuple[type[Exception], dict[str, Any]]]
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, **kwargs):  # type:ignore[reportMissingParameterType]
         super().__init_subclass__(**kwargs)
         assert cls.__name__ not in error_conversion_test_cases
         error_conversion_test_cases[cls.__name__] = cls
@@ -353,7 +353,7 @@ class ErrorTestInput:
 @nexusrpc.handler.service_handler
 class ErrorTestService:
     @sync_operation
-    async def op(self, ctx: StartOperationContext, input: ErrorTestInput) -> None:
+    async def op(self, _ctx: StartOperationContext, input: ErrorTestInput) -> None:
         error_conversion_test_cases[input.name].action_in_nexus_operation()
 
 

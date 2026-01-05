@@ -48,7 +48,7 @@ from temporalio.contrib.openai_agents._invoke_model_activity import (
 )
 
 
-class _TemporalModelStub(Model):
+class _TemporalModelStub(Model):  # type:ignore[reportUnusedClass]
     """A stub that allows invoking models as Temporal activities."""
 
     def __init__(
@@ -245,37 +245,6 @@ class _TemporalModelStub(Model):
             return self.agent.name
         else:
             return None
-
-
-def _extract_summary(input: str | list[TResponseInputItem]) -> str:
-    ### Activity summary shown in the UI
-    try:
-        max_size = 100
-        if isinstance(input, str):
-            return input[:max_size]
-        elif isinstance(input, list):
-            # Find all message inputs, which are reasonably summarizable
-            messages: list[TResponseInputItem] = [
-                item for item in input if item.get("type", "message") == "message"
-            ]
-            if not messages:
-                return ""
-
-            content: Any = messages[-1].get("content", "")
-
-            # In the case of multiple contents, take the last one
-            if isinstance(content, list):
-                if not content:
-                    return ""
-                content = content[-1]
-
-            # Take the text field from the content if present
-            if isinstance(content, dict) and content.get("text") is not None:
-                content = content.get("text")
-            return str(content)[:max_size]
-    except Exception as e:
-        logger.error(f"Error getting summary: {e}")
-    return ""
 
 
 def _make_tool_input(tool: Tool) -> ToolInput:

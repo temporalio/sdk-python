@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 from typing_extensions import Protocol
 

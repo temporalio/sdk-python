@@ -10,7 +10,7 @@ import dataclasses
 import uuid
 from collections.abc import Coroutine
 from dataclasses import dataclass, field
-from typing import Any, Type, Union
+from typing import Any
 
 import pytest
 from nexusrpc.handler import (

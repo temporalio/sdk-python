@@ -8,9 +8,6 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
     Any,
-    Awaitable,
-    Optional,
-    Union,
     cast,
 )
 
@@ -58,27 +55,19 @@ from agents.items import (
     HandoffOutputItem,
     ToolCallItem,
     ToolCallOutputItem,
-    TResponseOutputItem,
     TResponseStreamEvent,
 )
 from agents.mcp import MCPServer, MCPServerStdio
 from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
-    EasyInputMessageParam,
     ResponseCodeInterpreterToolCall,
     ResponseErrorEvent,
     ResponseFileSearchToolCall,
-    ResponseFunctionToolCall,
-    ResponseFunctionToolCallParam,
     ResponseFunctionWebSearch,
-    ResponseInputTextParam,
-    ResponseOutputMessage,
-    ResponseOutputText,
     ResponseTextDeltaEvent,
 )
 from openai.types.responses.response_file_search_tool_call import Result
 from openai.types.responses.response_function_web_search import ActionSearch
-from openai.types.responses.response_input_item_param import Message
 from openai.types.responses.response_output_item import (
     ImageGenerationCall,
     McpApprovalRequest,
@@ -100,7 +89,6 @@ from temporalio.contrib.openai_agents import (
 )
 from temporalio.contrib.openai_agents._openai_runner import _convert_agent
 from temporalio.contrib.openai_agents._temporal_model_stub import (
-    _extract_summary,
     _TemporalModelStub,
 )
 from temporalio.contrib.openai_agents.testing import (
@@ -179,7 +167,7 @@ async def get_weather(city: str) -> Weather:
 
 
 @activity.defn
-async def get_weather_country(city: str, country: str) -> Weather:
+async def get_weather_country(city: str, country: str) -> Weather:  # type: ignore[reportUnusedParameter]
     """
     Get the weather for a given city in a country.
     """
@@ -229,7 +217,9 @@ class WeatherService:
 class WeatherServiceHandler:
     @nexusrpc.handler.sync_operation
     async def get_weather_nexus_operation(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: WeatherInput
+        self,
+        ctx: nexusrpc.handler.StartOperationContext,  # type: ignore[reportUnusedParameter]
+        input: WeatherInput,  # type: ignore[reportUnusedParameter]
     ) -> Weather:
         return Weather(
             city=input.city, temperature_range="14-20C", conditions="Sunny with wind."
@@ -434,7 +424,7 @@ async def test_tool_workflow(client: Client, use_local_model: bool):
 
 
 @activity.defn
-async def get_weather_failure(city: str) -> Weather:
+async def get_weather_failure(city: str) -> Weather:  # type: ignore[reportUnusedParameter]
     """
     Get the weather for a given city.
     """
@@ -473,7 +463,7 @@ async def test_tool_failure_workflow(client: Client):
                 execution_timeout=timedelta(seconds=2),
             )
             with pytest.raises(WorkflowFailureError) as e:
-                result = await workflow_handle.result()
+                await workflow_handle.result()
             cause = e.value.cause
             assert isinstance(cause, ApplicationError)
             assert "Workflow failure exception in Agents Framework" in cause.message
@@ -943,7 +933,7 @@ class CustomerServiceWorkflow:
         self.input_items = input_items
 
     @workflow.run
-    async def run(self, input_items: list[TResponseInputItem] = []):
+    async def run(self, _input_items: list[TResponseInputItem] = []):
         await workflow.wait_condition(lambda: False)
         workflow.continue_as_new(self.input_items)
 
@@ -1171,7 +1161,7 @@ guardrail_agent: Agent = Agent(
 @input_guardrail
 async def math_guardrail(
     context: RunContextWrapper[None],
-    agent: Agent,
+    _agent: Agent,
     input: str | list[TResponseInputItem],
 ) -> GuardrailFunctionOutput:
     """This is an input guardrail function, which happens to call an agent to check if the input
@@ -1289,7 +1279,7 @@ class MessageOutput(BaseModel):
 
 @output_guardrail
 async def sensitive_data_check(
-    context: RunContextWrapper, agent: Agent, output: MessageOutput
+    _context: RunContextWrapper, _agent: Agent, output: MessageOutput
 ) -> GuardrailFunctionOutput:
     phone_number_in_response = "650" in output.response
     phone_number_in_reasoning = "650" in output.reasoning
@@ -1421,7 +1411,7 @@ async def test_response_serialization():
         usage=Usage(),
         response_id="",
     )
-    encoded = await pydantic_data_converter.encode([model_response])
+    await pydantic_data_converter.encode([model_response])
 
 
 async def assert_status_retry_behavior(status: int, client: Client, should_retry: bool):
@@ -1456,7 +1446,7 @@ async def assert_status_retry_behavior(status: int, client: Client, should_retry
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=10),
             )
-            with pytest.raises(WorkflowFailureError) as e:
+            with pytest.raises(WorkflowFailureError):
                 await workflow_handle.result()
 
             found = False
@@ -1522,7 +1512,7 @@ class WaitModel(Model):
         output_schema: AgentOutputSchemaBase | None,
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        **kwargs,
+        **kwargs,  # type:ignore[reportMissingParameterType]
     ) -> ModelResponse:
         activity.logger.info("Waiting")
         await asyncio.sleep(1.0)
@@ -1538,7 +1528,7 @@ class WaitModel(Model):
         output_schema: AgentOutputSchemaBase | None,
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        **kwargs,
+        **kwargs,  # type:ignore[reportMissingParameterType]
     ) -> AsyncIterator[TResponseStreamEvent]:
         raise NotImplementedError()
 
@@ -1611,40 +1601,6 @@ async def test_heartbeat(client: Client, env: WorkflowEnvironment):
             await workflow_handle.result()
 
 
-def test_summary_extraction():
-    input: list[TResponseInputItem] = [
-        EasyInputMessageParam(
-            content="First message",
-            role="user",
-        )
-    ]
-
-    assert _extract_summary(input) == "First message"
-
-    input.append(
-        Message(
-            content=[
-                ResponseInputTextParam(
-                    text="Second message",
-                    type="input_text",
-                )
-            ],
-            role="user",
-        )
-    )
-    assert _extract_summary(input) == "Second message"
-
-    input.append(
-        ResponseFunctionToolCallParam(
-            arguments="",
-            call_id="",
-            name="",
-            type="function_call",
-        )
-    )
-    assert _extract_summary(input) == "Second message"
-
-
 @workflow.defn
 class SessionWorkflow:
     @workflow.run
@@ -1690,13 +1646,15 @@ async def test_session(client: Client):
             await assert_eventually(check)
 
 
-async def test_lite_llm(client: Client, env: WorkflowEnvironment):
+async def test_lite_llm(client: Client):
     if not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
     if sys.version_info >= (3, 14):
-        pytest.skip("Lite LLM does not yet support Python 3.14")
+        pytest.skip("Lite LLM does not yet support Python 3.14")  # type:ignore[reportUnreachable]
 
-    from agents.extensions.models.litellm_provider import LitellmProvider
+    from agents.extensions.models.litellm_provider import (
+        LitellmProvider,  # type:ignore[reportUnreachable]
+    )
 
     async with AgentEnvironment(
         model_provider=LitellmProvider(),
@@ -1704,13 +1662,13 @@ async def test_lite_llm(client: Client, env: WorkflowEnvironment):
             start_to_close_timeout=timedelta(seconds=30),
         ),
     ) as agent_env:
-        client = agent_env.applied_on_client(client)
+        client = agent_env.applied_on_client(client)  # type:ignore[reportUnreachable]
 
         async with new_worker(
             client,
             HelloWorldAgent,
         ) as worker:
-            workflow_handle = await client.start_workflow(
+            workflow_handle = await client.start_workflow(  # type:ignore[reportUnreachable]
                 HelloWorldAgent.run,
                 "Tell me about recursion in programming",
                 id=f"lite-llm-{uuid.uuid4()}",
@@ -1771,7 +1729,7 @@ class FileSearchToolWorkflow:
 
 
 @pytest.mark.parametrize("use_local_model", [True, False])
-async def test_file_search_tool(client: Client, use_local_model):
+async def test_file_search_tool(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
 
@@ -1845,7 +1803,7 @@ class ImageGenerationWorkflow:
 
 # Can't currently validate against real server, we aren't verified for image generation
 @pytest.mark.parametrize("use_local_model", [True])
-async def test_image_generation_tool(client: Client, use_local_model):
+async def test_image_generation_tool(client: Client, use_local_model: bool):
     if not use_local_model and not os.environ.get("OPENAI_API_KEY"):
         pytest.skip("No openai API key")
 
@@ -1869,7 +1827,7 @@ async def test_image_generation_tool(client: Client, use_local_model):
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=30),
             )
-            result = await workflow_handle.result()
+            await workflow_handle.result()
 
 
 def code_interpreter_mock_model():
@@ -2104,7 +2062,7 @@ async def test_multiple_models(client: Client):
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=10),
             )
-            result = await workflow_handle.result()
+            await workflow_handle.result()
             assert provider.model_names == {None, "gpt-4o-mini"}
 
 
@@ -2129,7 +2087,7 @@ async def test_run_config_models(client: Client):
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=10),
             )
-            result = await workflow_handle.result()
+            await workflow_handle.result()
 
             # Only the model from the runconfig override is used
             assert provider.model_names == {"gpt-4o"}
@@ -2165,7 +2123,7 @@ async def test_summary_provider(client: Client):
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(seconds=10),
             )
-            result = await workflow_handle.result()
+            await workflow_handle.result()
             async for e in workflow_handle.fetch_history_events():
                 if e.HasField("activity_task_scheduled_event_attributes"):
                     assert e.user_metadata.summary.data == b'"My summary"'
@@ -2230,7 +2188,7 @@ async def test_output_type(client: Client):
 class McpServerWorkflow:
     @workflow.run
     async def run(self, caching: bool, factory_argument: Any | None) -> str:
-        from agents.mcp import MCPServer
+        from agents.mcp import MCPServer  # type: ignore[reportUnusedImport]
 
         server: MCPServer = openai_agents.workflow.stateless_mcp_server(
             "HelloServer", cache_tools_list=caching, factory_argument=factory_argument
@@ -2482,7 +2440,7 @@ async def test_mcp_server_factory_argument(client: Client, stateful: bool):
             client, McpServerStatefulWorkflow, McpServerWorkflow
         ) as worker:
             if stateful:
-                result = await client.execute_workflow(
+                await client.execute_workflow(
                     McpServerStatefulWorkflow.run,
                     args=[timedelta(seconds=30), headers],
                     id=f"mcp-server-{uuid.uuid4()}",
@@ -2490,7 +2448,7 @@ async def test_mcp_server_factory_argument(client: Client, stateful: bool):
                     execution_timeout=timedelta(seconds=30),
                 )
             else:
-                result = await client.execute_workflow(
+                await client.execute_workflow(
                     McpServerWorkflow.run,
                     args=[False, headers],
                     id=f"mcp-server-{uuid.uuid4()}",
@@ -2631,9 +2589,7 @@ async def test_split_workers(client: Client):
         new_config["plugins"] = [activity_plugin]
         activity_client = Client(**new_config)
         # Activity Worker
-        async with new_worker(
-            activity_client, task_queue=worker.task_queue
-        ) as activity_worker:
+        async with new_worker(activity_client, task_queue=worker.task_queue):
             result = await activity_client.execute_workflow(
                 HelloWorldAgent.run,
                 "Tell me about recursion in programming.",

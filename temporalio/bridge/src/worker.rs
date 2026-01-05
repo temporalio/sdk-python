@@ -5,7 +5,6 @@ use prost::Message;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::sync::{Arc, OnceLock};
@@ -183,8 +182,8 @@ pub struct WorkerTaskTypes {
     enable_nexus: bool,
 }
 
-impl From<&WorkerTaskTypes> for temporalio_common::worker::WorkerTaskTypes {
-    fn from(t: &WorkerTaskTypes) -> Self {
+impl From<WorkerTaskTypes> for temporalio_common::worker::WorkerTaskTypes {
+    fn from(t: WorkerTaskTypes) -> Self {
         Self {
             enable_workflows: t.enable_workflows,
             enable_local_activities: t.enable_local_activities,
@@ -711,17 +710,17 @@ fn convert_worker_config(
 ) -> PyResult<temporalio_sdk_core::WorkerConfig> {
     let converted_tuner = convert_tuner_holder(conf.tuner, task_locals)?;
     let converted_versioning_strategy = convert_versioning_strategy(conf.versioning_strategy);
-    temporalio_sdk_core::WorkerConfigBuilder::default()
+    temporalio_sdk_core::WorkerConfig::builder()
         .namespace(conf.namespace)
         .task_queue(conf.task_queue)
         .versioning_strategy(converted_versioning_strategy)
-        .client_identity_override(conf.identity_override)
+        .maybe_client_identity_override(conf.identity_override)
         .max_cached_workflows(conf.max_cached_workflows)
-        .workflow_task_poller_behavior(conf.workflow_task_poller_behavior)
+        .workflow_task_poller_behavior(conf.workflow_task_poller_behavior.into())
         .tuner(Arc::new(converted_tuner))
         .nonsticky_to_sticky_poll_ratio(conf.nonsticky_to_sticky_poll_ratio)
-        .activity_task_poller_behavior(conf.activity_task_poller_behavior)
-        .task_types(&conf.task_types)
+        .activity_task_poller_behavior(conf.activity_task_poller_behavior.into())
+        .task_types(conf.task_types.into())
         .sticky_queue_schedule_to_start_timeout(Duration::from_millis(
             conf.sticky_queue_schedule_to_start_timeout_millis,
         ))
@@ -731,8 +730,8 @@ fn convert_worker_config(
         .default_heartbeat_throttle_interval(Duration::from_millis(
             conf.default_heartbeat_throttle_interval_millis,
         ))
-        .max_worker_activities_per_second(conf.max_activities_per_second)
-        .max_task_queue_activities_per_second(conf.max_task_queue_activities_per_second)
+        .maybe_max_worker_activities_per_second(conf.max_activities_per_second)
+        .maybe_max_task_queue_activities_per_second(conf.max_task_queue_activities_per_second)
         // Even though grace period is optional, if it is not set then the
         // auto-cancel-activity behavior of shutdown will not occur, so we
         // always set it even if 0.
@@ -751,9 +750,9 @@ fn convert_worker_config(
                         HashSet::from([WorkflowErrorType::Nondeterminism]),
                     )
                 })
-                .collect::<HashMap<String, HashSet<WorkflowErrorType>>>(),
+                .collect(),
         )
-        .nexus_task_poller_behavior(conf.nexus_task_poller_behavior)
+        .nexus_task_poller_behavior(conf.nexus_task_poller_behavior.into())
         .plugins(
             conf.plugins
                 .into_iter()
@@ -761,7 +760,7 @@ fn convert_worker_config(
                     name,
                     version: String::new(),
                 })
-                .collect::<Vec<_>>(),
+                .collect(),
         )
         .build()
         .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {err}")))
@@ -815,17 +814,13 @@ fn convert_tuner_holder(
         ));
     }
 
-    let mut options = temporalio_sdk_core::TunerHolderOptionsBuilder::default();
-    if let Some(first) = first {
-        options.resource_based_options(
-            temporalio_sdk_core::ResourceBasedSlotsOptionsBuilder::default()
+    Ok(temporalio_sdk_core::TunerHolderOptions::builder()
+        .maybe_resource_based_options(first.map(|first| {
+            temporalio_sdk_core::ResourceBasedSlotsOptions::builder()
                 .target_mem_usage(first.target_memory_usage)
                 .target_cpu_usage(first.target_cpu_usage)
                 .build()
-                .expect("Building ResourceBasedSlotsOptions is infallible"),
-        );
-    };
-    options
+        }))
         .workflow_slot_options(convert_slot_supplier(
             holder.workflow_slot_supplier,
             task_locals.clone(),
@@ -841,8 +836,7 @@ fn convert_tuner_holder(
         .nexus_slot_options(convert_slot_supplier(
             holder.nexus_slot_supplier,
             task_locals,
-        )?);
-    Ok(options
+        )?)
         .build()
         .map_err(|e| PyValueError::new_err(format!("Invalid tuner holder options: {e}")))?
         .build_tuner_holder()
