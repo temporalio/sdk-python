@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pathlib
-import sys
 from dataclasses import dataclass
 from typing import ClassVar
 
