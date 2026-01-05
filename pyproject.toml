@@ -1,6 +1,6 @@
 [project]
 name = "temporalio"
-version = "1.21.0"
+version = "1.21.1"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.10"
@@ -38,6 +38,7 @@ Documentation = "https://docs.temporal.io/docs/python"
 
 [dependency-groups]
 dev = [
+  "basedpyright==1.34.0",
   "cibuildwheel>=2.22.0,<3",
   "grpcio-tools>=1.48.2,<2",
   "mypy==1.18.2",
@@ -96,6 +97,7 @@ lint-docs = "uv run pydocstyle --ignore-decorators=overload"
 lint-types = [
   { cmd = "uv run pyright" },
   { cmd = "uv run mypy --namespace-packages --check-untyped-defs ." },
+  { cmd = "uv run basedpyright" }
 ]
 run-bench = "uv run python scripts/run_bench.py"
 test = "uv run pytest"
@@ -200,11 +202,13 @@ reportUnknownVariableType = "none"
 reportUnnecessaryIsInstance = "none"
 reportUnnecessaryTypeIgnoreComment = "none"
 reportUnusedCallResult = "none"
+reportUnknownLambdaType = "none"
 include = ["temporalio", "tests"]
 exclude = [
   # Exclude auto generated files
   "temporalio/api",
   "temporalio/bridge/proto",
+  "temporalio/bridge/_visitor.py",
   "tests/worker/workflow_sandbox/testmodules/proto",
 ]
 

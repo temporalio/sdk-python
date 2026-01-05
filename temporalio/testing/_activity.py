@@ -8,7 +8,7 @@ import threading
 from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional, Set, TypeVar
+from typing import Any, TypeVar
 
 from typing_extensions import ParamSpec
 
@@ -182,7 +182,7 @@ class _Activity:
         )
         self.task: asyncio.Task | None = None
 
-    def run(self, *args, **kwargs) -> Any:
+    def run(self, *args: Any, **kwargs: Any) -> Any:
         if self.cancel_thread_raiser:
             thread_id = threading.current_thread().ident
             if thread_id is not None:

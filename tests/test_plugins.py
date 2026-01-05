@@ -1,10 +1,9 @@
 import dataclasses
 import uuid
 import warnings
-from collections import Counter
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from typing import Optional, cast
+from typing import cast
 
 import pytest
 
@@ -182,7 +181,7 @@ async def test_worker_duplicated_plugin(client: Client) -> None:
     client = Client(**new_config)
 
     with warnings.catch_warnings(record=True) as warning_list:
-        worker = Worker(
+        Worker(
             client,
             task_queue="queue" + str(uuid.uuid4()),
             activities=[never_run_activity],
@@ -194,7 +193,7 @@ async def test_worker_duplicated_plugin(client: Client) -> None:
 
 
 async def test_worker_sandbox_restrictions(client: Client) -> None:
-    with warnings.catch_warnings(record=True) as warning_list:
+    with warnings.catch_warnings(record=True):
         worker = Worker(
             client,
             task_queue="queue" + str(uuid.uuid4()),

@@ -1,7 +1,7 @@
 """Testing utilities for OpenAI agents."""
 
 from collections.abc import AsyncIterator, Callable, Sequence
-from typing import Optional, Union
+from typing import Any
 
 from agents import (
     AgentOutputSchemaBase,
@@ -161,7 +161,7 @@ class TestModel(Model):
         output_schema: AgentOutputSchemaBase | None,
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        **kwargs,
+        **kwargs: Any,
     ) -> ModelResponse:
         """Get a response from the mocked model, by calling the callable passed to the constructor."""
         return self.fn()
@@ -175,7 +175,7 @@ class TestModel(Model):
         output_schema: AgentOutputSchemaBase | None,
         handoffs: list[Handoff],
         tracing: ModelTracing,
-        **kwargs,
+        **kwargs: Any,
     ) -> AsyncIterator[TResponseStreamEvent]:
         """Get a streamed response from the model. Unimplemented."""
         raise NotImplementedError()
@@ -268,7 +268,7 @@ class AgentEnvironment:
 
         return self
 
-    async def __aexit__(self, *args) -> None:
+    async def __aexit__(self, *args: Any) -> None:
         """Exit the async context manager."""
         # No cleanup needed currently
         pass

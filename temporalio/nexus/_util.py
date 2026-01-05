@@ -7,8 +7,6 @@ import warnings
 from collections.abc import Awaitable, Callable
 from typing import (
     Any,
-    Optional,
-    Type,
     TypeVar,
 )
 

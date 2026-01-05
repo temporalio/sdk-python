@@ -4,9 +4,8 @@ import asyncio
 from collections.abc import Sequence
 from datetime import timedelta
 from enum import IntEnum
-from typing import Any, Optional, Tuple
+from typing import Any
 
-import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.failure.v1
 

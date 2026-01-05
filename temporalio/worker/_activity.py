@@ -21,8 +21,6 @@ from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
     NoReturn,
-    Optional,
-    Union,
 )
 
 import google.protobuf.duration_pb2
@@ -627,7 +625,7 @@ class _ActivityWorker:
         impl.init(_ActivityOutboundImpl(self, running_activity.info))
         return await impl.execute_activity(input)
 
-    def assert_activity_valid(self, activity) -> None:
+    def assert_activity_valid(self, activity: str) -> None:
         if self._dynamic_activity:
             return
         activity_def = self._activities.get(activity)

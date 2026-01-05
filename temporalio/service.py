@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import IntEnum
-from typing import ClassVar, Optional, Tuple, Type, TypeVar, Union
+from typing import ClassVar, TypeVar
 
 import google.protobuf.message
 
@@ -22,8 +22,9 @@ import temporalio.bridge.proto.health.v1
 import temporalio.bridge.services_generated
 import temporalio.exceptions
 import temporalio.runtime
+from temporalio.bridge.client import RPCError as BridgeRPCError
 
-__version__ = "1.21.0"
+__version__ = "1.21.1"
 
 ServiceRequest = TypeVar("ServiceRequest", bound=google.protobuf.message.Message)
 ServiceResponse = TypeVar("ServiceResponse", bound=google.protobuf.message.Message)
@@ -376,7 +377,7 @@ class _BridgeServiceClient(ServiceClient):
             if LOG_PROTOS:
                 logger.debug("Service %s response from %s: %s", service, rpc, resp)
             return resp
-        except temporalio.bridge.client.RPCError as err:
+        except BridgeRPCError as err:
             # Intentionally swallowing the cause instead of using "from"
             status, message, details = err.args
             raise RPCError(message, RPCStatusCode(status), details)

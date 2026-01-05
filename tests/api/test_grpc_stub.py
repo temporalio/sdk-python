@@ -1,7 +1,7 @@
 import re
 from collections.abc import Mapping
 from datetime import timedelta
-from typing import Any, Union, cast
+from typing import Any, cast
 
 import pytest
 from google.protobuf.empty_pb2 import Empty

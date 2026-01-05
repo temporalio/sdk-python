@@ -12,7 +12,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import IntEnum
-from typing import Any, Dict, List, Optional, Set, Type
+from typing import Any
 
 import pytest
 
@@ -194,7 +194,7 @@ async def test_workflow_sandbox_restrictions(client: Client):
         # We can only validate this restriction prior to 3.14 because we had to exempt it due to
         # https://github.com/python/cpython/issues/140228
         if sys.version_info < (3, 14):
-            invalid_code_to_check.append("import os.path\nos.path.abspath('foo')")
+            invalid_code_to_check.append("import os.path\nos.path.abspath('foo')")  # type: ignore[reportUnreachable]
 
         for code in invalid_code_to_check:
             with pytest.raises(WorkflowFailureError) as err:
@@ -500,7 +500,7 @@ class _TestWorkflowInboundInterceptor(WorkflowInboundInterceptor):
         with workflow.unsafe.sandbox_import_notification_policy(
             workflow.SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH
         ):
-            import tests.worker.workflow_sandbox.testmodules.lazy_module_interceptor  # noqa: F401
+            import tests.worker.workflow_sandbox.testmodules.lazy_module_interceptor  #  type:ignore[reportUnusedImport] # noqa: F401
 
         return await super().execute_workflow(input)
 
@@ -517,7 +517,7 @@ class LazyImportWorkflow:
     @workflow.run
     async def run(self) -> None:
         try:
-            import tests.worker.workflow_sandbox.testmodules.lazy_module  # noqa: F401
+            import tests.worker.workflow_sandbox.testmodules.lazy_module  #  type:ignore[reportUnusedImport] # noqa: F401
         except UnintentionalPassthroughError as err:
             raise ApplicationError(
                 str(err), type="UnintentionalPassthroughError"
@@ -626,7 +626,7 @@ class SupressWarningsLazyImportWorkflow:
             SandboxImportNotificationPolicy.SILENT
         ):
             try:
-                import tests.worker.workflow_sandbox.testmodules.lazy_module  # noqa: F401
+                import tests.worker.workflow_sandbox.testmodules.lazy_module  #  type:ignore[reportUnusedImport] # noqa: F401
             except UserWarning:
                 raise ApplicationError("No warnings were expected")
 

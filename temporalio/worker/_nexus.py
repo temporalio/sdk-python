@@ -33,6 +33,7 @@ import temporalio.client
 import temporalio.common
 import temporalio.converter
 import temporalio.nexus
+from temporalio.bridge.worker import PollShutdownError
 from temporalio.exceptions import (
     ApplicationError,
     WorkflowAlreadyStartedError,
@@ -60,7 +61,7 @@ class _RunningNexusTask:
         self.task.cancel()
 
 
-class _NexusWorker:
+class _NexusWorker:  # type:ignore[reportUnusedClass]
     def __init__(
         self,
         *,
@@ -165,7 +166,7 @@ class _NexusWorker:
                 else:
                     raise NotImplementedError(f"Invalid Nexus task: {nexus_task}")
 
-            except temporalio.bridge.worker.PollShutdownError:
+            except PollShutdownError:
                 exception_task.cancel()
                 return
 
@@ -183,7 +184,7 @@ class _NexusWorker:
                 )
                 completion.error.failure.message = "Worker shutting down"
                 await self._bridge_worker().complete_nexus_task(completion)
-            except temporalio.bridge.worker.PollShutdownError:
+            except PollShutdownError:
                 return
 
     # Only call this after run()/drain_poll_queue() have returned. This will not
@@ -460,14 +461,14 @@ class _DummyPayloadSerializer:
     data_converter: temporalio.converter.DataConverter
     payload: temporalio.api.common.v1.Payload
 
-    async def serialize(self, value: Any) -> nexusrpc.Content:
+    async def serialize(self, value: Any) -> nexusrpc.Content:  # type:ignore[reportUnusedParameter]
         raise NotImplementedError(
             "The serialize method of the Serializer is not used by handlers"
         )
 
     async def deserialize(
         self,
-        content: nexusrpc.Content,
+        content: nexusrpc.Content,  # type:ignore[reportUnusedParameter]
         as_type: type[Any] | None = None,
     ) -> Any:
         try:

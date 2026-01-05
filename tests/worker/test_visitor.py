@@ -99,14 +99,6 @@ async def test_workflow_activation():
         ]
     )
 
-    async def visitor(payload: Payload) -> Payload:
-        # Mark visited by prefixing data
-        new_payload = Payload()
-        new_payload.metadata.update(payload.metadata)
-        new_payload.metadata["visited"] = b"True"
-        new_payload.data = payload.data
-        return new_payload
-
     act = original.__deepcopy__()
     await PayloadVisitor().visit(Visitor(), act)
     assert act.jobs[0].initialize_workflow.arguments[0].metadata["visited"]

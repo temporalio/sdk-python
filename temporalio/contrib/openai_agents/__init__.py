@@ -17,9 +17,6 @@ from temporalio.contrib.openai_agents._temporal_openai_agents import (
     OpenAIAgentsPlugin,
     OpenAIPayloadConverter,
 )
-from temporalio.contrib.openai_agents._trace_interceptor import (
-    OpenAIAgentsTracingInterceptor,
-)
 from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 
 from . import testing, workflow
