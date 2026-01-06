@@ -98,7 +98,7 @@ async def _cancel_workflow(
         raise HandlerError(
             "Failed to decode operation token as a workflow operation token. "
             "Canceling non-workflow operations is not supported.",
-            type=HandlerErrorType.NOT_FOUND,
+            error_type=HandlerErrorType.NOT_FOUND,
         ) from err
 
     ctx = _temporal_cancel_operation_context.get()
@@ -109,6 +109,6 @@ async def _cancel_workflow(
     except Exception as err:
         raise HandlerError(
             "Failed to construct workflow handle from workflow operation token",
-            type=HandlerErrorType.NOT_FOUND,
+            error_type=HandlerErrorType.NOT_FOUND,
         ) from err
     await client_workflow_handle.cancel(**kwargs)
