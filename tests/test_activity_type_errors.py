@@ -88,7 +88,7 @@ class ActivityHolder:
         return "done"
 
 
-async def _test_start_activity_typed_callable_happy_path() -> None:
+async def _test_start_activity_typed_callable_happy_path() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[int] = await client.start_activity(
@@ -102,7 +102,7 @@ async def _test_start_activity_typed_callable_happy_path() -> None:
     _result: int = await _handle.result()
 
 
-async def _test_execute_activity_typed_callable_happy_path() -> None:
+async def _test_execute_activity_typed_callable_happy_path() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _result: int = await client.execute_activity(
@@ -114,7 +114,7 @@ async def _test_execute_activity_typed_callable_happy_path() -> None:
     )
 
 
-async def _test_start_activity_positional_arg_happy_path() -> None:
+async def _test_start_activity_positional_arg_happy_path() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[int] = await client.start_activity(
@@ -126,7 +126,7 @@ async def _test_start_activity_positional_arg_happy_path() -> None:
     )
 
 
-async def _test_execute_activity_positional_arg_happy_path() -> None:
+async def _test_execute_activity_positional_arg_happy_path() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _result: int = await client.execute_activity(
@@ -138,7 +138,7 @@ async def _test_execute_activity_positional_arg_happy_path() -> None:
     )
 
 
-async def _test_start_activity_string_name_with_result_type() -> None:
+async def _test_start_activity_string_name_with_result_type() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle = await client.start_activity(
@@ -162,7 +162,7 @@ async def _test_start_activity_no_param_async_happy_path() -> None:
     )
 
 
-async def _test_execute_activity_no_param_async_happy_path() -> None:
+async def _test_execute_activity_no_param_async_happy_path() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _result: str = await client.execute_activity(
@@ -184,7 +184,7 @@ async def _test_start_activity_no_param_sync_happy_path() -> None:
     )
 
 
-async def _test_execute_activity_no_param_sync_happy_path() -> None:
+async def _test_execute_activity_no_param_sync_happy_path() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _result: str = await client.execute_activity(
@@ -208,7 +208,7 @@ async def _test_start_activity_wrong_arg_type() -> None:
     )
 
 
-async def _test_execute_activity_wrong_arg_type() -> None:
+async def _test_execute_activity_wrong_arg_type() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _result: int = await client.execute_activity(
@@ -236,7 +236,7 @@ async def _test_start_activity_wrong_result_type_assignment() -> None:
     _wrong: str = await handle.result()  # type: ignore
 
 
-async def _test_execute_activity_wrong_result_type_assignment() -> None:
+async def _test_execute_activity_wrong_result_type_assignment() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     # assert-type-error-pyright: 'Type "int" is not assignable to declared type "str"'
@@ -269,7 +269,7 @@ async def _test_start_activity_missing_required_params() -> None:
     )
 
 
-async def _test_activity_handle_typed_correctly() -> None:
+async def _test_activity_handle_typed_correctly() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     handle_int: ActivityHandle[int] = await client.start_activity(
@@ -313,7 +313,7 @@ async def _test_activity_handle_wrong_type_parameter() -> None:
     )
 
 
-async def _test_start_activity_sync_activity() -> None:
+async def _test_start_activity_sync_activity() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[int] = await client.start_activity(
@@ -337,7 +337,7 @@ async def _test_execute_activity_sync_activity() -> None:
     )
 
 
-async def _test_start_activity_sync_no_param() -> None:
+async def _test_start_activity_sync_no_param() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[str] = await client.start_activity(
@@ -352,7 +352,7 @@ async def _test_start_activity_sync_no_param() -> None:
 # Note: Type inference for callable classes is limited; use args= form
 
 
-async def _test_start_activity_class_single_param() -> None:
+async def _test_start_activity_class_single_param() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[int] = await client.start_activity_class(
@@ -364,7 +364,7 @@ async def _test_start_activity_class_single_param() -> None:
     )
 
 
-async def _test_execute_activity_class_single_param() -> None:
+async def _test_execute_activity_class_single_param() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _result: int = await client.execute_activity_class(
@@ -387,7 +387,7 @@ async def _test_start_activity_class_no_param() -> None:
     )
 
 
-async def _test_execute_activity_class_no_param() -> None:
+async def _test_execute_activity_class_no_param() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _result: str = await client.execute_activity_class(
@@ -401,7 +401,7 @@ async def _test_execute_activity_class_no_param() -> None:
 # Tests for sync callable classes
 
 
-async def _test_start_activity_class_sync_single_param() -> None:
+async def _test_start_activity_class_sync_single_param() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[int] = await client.start_activity_class(
@@ -425,7 +425,7 @@ async def _test_execute_activity_class_sync_single_param() -> None:
     )
 
 
-async def _test_start_activity_class_sync_no_param() -> None:
+async def _test_start_activity_class_sync_no_param() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     _handle: ActivityHandle[str] = await client.start_activity_class(
@@ -441,7 +441,7 @@ async def _test_start_activity_class_sync_no_param() -> None:
 # For bound methods accessed via instance, use start_activity directly.
 
 
-async def _test_start_activity_method_unbound() -> None:
+async def _test_start_activity_method_unbound() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     # Using unbound method reference
@@ -454,7 +454,7 @@ async def _test_start_activity_method_unbound() -> None:
     )
 
 
-async def _test_execute_activity_method_unbound() -> None:
+async def _test_execute_activity_method_unbound() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     # Using unbound method reference
@@ -479,7 +479,7 @@ async def _test_start_activity_method_no_param_unbound() -> None:
     )
 
 
-async def _test_execute_activity_method_no_param_unbound() -> None:
+async def _test_execute_activity_method_no_param_unbound() -> None:  # type:ignore[reportUnusedFunction]
     client = Client(service_client=Mock(spec=ServiceClient))
 
     # Using unbound method reference

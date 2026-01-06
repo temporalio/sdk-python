@@ -1281,7 +1281,7 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1303,7 +1303,7 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1326,7 +1326,7 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1349,7 +1349,7 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1372,7 +1372,7 @@ class Client:
         args: Sequence[Any],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1395,7 +1395,7 @@ class Client:
         args: Sequence[Any],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1419,7 +1419,7 @@ class Client:
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1444,7 +1444,7 @@ class Client:
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         # Either schedule_to_close_timeout or start_to_close_timeout must be present
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
@@ -1523,7 +1523,7 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1545,7 +1545,7 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1568,7 +1568,7 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1591,7 +1591,7 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1614,7 +1614,7 @@ class Client:
         args: Sequence[Any],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1637,7 +1637,7 @@ class Client:
         args: Sequence[Any],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1661,7 +1661,7 @@ class Client:
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1686,7 +1686,7 @@ class Client:
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         # Either schedule_to_close_timeout or start_to_close_timeout must be present
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
@@ -1741,11 +1741,11 @@ class Client:
     @overload
     async def start_activity_class(
         self,
-        activity: Type[CallableAsyncNoParam[ReturnType]],
+        activity: type[CallableAsyncNoParam[ReturnType]],
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1764,11 +1764,11 @@ class Client:
     @overload
     async def start_activity_class(
         self,
-        activity: Type[CallableSyncNoParam[ReturnType]],
+        activity: type[CallableSyncNoParam[ReturnType]],
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1787,12 +1787,12 @@ class Client:
     @overload
     async def start_activity_class(
         self,
-        activity: Type[CallableAsyncSingleParam[ParamType, ReturnType]],
+        activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
         arg: ParamType,
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1811,12 +1811,12 @@ class Client:
     @overload
     async def start_activity_class(
         self,
-        activity: Type[CallableSyncSingleParam[ParamType, ReturnType]],
+        activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
         arg: ParamType,
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1835,12 +1835,12 @@ class Client:
     @overload
     async def start_activity_class(
         self,
-        activity: Type[Callable[..., Awaitable[ReturnType]]],
+        activity: type[Callable[..., Awaitable[ReturnType]]],
         *,
         args: Sequence[Any],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1859,12 +1859,12 @@ class Client:
     @overload
     async def start_activity_class(
         self,
-        activity: Type[Callable[..., ReturnType]],
+        activity: type[Callable[..., ReturnType]],
         *,
         args: Sequence[Any],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1881,13 +1881,13 @@ class Client:
 
     async def start_activity_class(
         self,
-        activity: Type[Callable],
+        activity: type[Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1933,11 +1933,11 @@ class Client:
     @overload
     async def execute_activity_class(
         self,
-        activity: Type[CallableAsyncNoParam[ReturnType]],
+        activity: type[CallableAsyncNoParam[ReturnType]],
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1956,11 +1956,11 @@ class Client:
     @overload
     async def execute_activity_class(
         self,
-        activity: Type[CallableSyncNoParam[ReturnType]],
+        activity: type[CallableSyncNoParam[ReturnType]],
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -1979,12 +1979,12 @@ class Client:
     @overload
     async def execute_activity_class(
         self,
-        activity: Type[CallableAsyncSingleParam[ParamType, ReturnType]],
+        activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
         arg: ParamType,
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -2003,12 +2003,12 @@ class Client:
     @overload
     async def execute_activity_class(
         self,
-        activity: Type[CallableSyncSingleParam[ParamType, ReturnType]],
+        activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
         arg: ParamType,
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -2027,12 +2027,12 @@ class Client:
     @overload
     async def execute_activity_class(
         self,
-        activity: Type[Callable[..., Awaitable[ReturnType]]],
+        activity: type[Callable[..., Awaitable[ReturnType]]],
         *,
         args: Sequence[Any],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -2051,12 +2051,12 @@ class Client:
     @overload
     async def execute_activity_class(
         self,
-        activity: Type[Callable[..., ReturnType]],
+        activity: type[Callable[..., ReturnType]],
         *,
         args: Sequence[Any],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -2073,13 +2073,13 @@ class Client:
 
     async def execute_activity_class(
         self,
-        activity: Type[Callable],
+        activity: type[Callable],
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -2129,7 +2129,7 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -2153,7 +2153,7 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -2179,7 +2179,7 @@ class Client:
         args: Sequence[Any],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -2203,7 +2203,7 @@ class Client:
         args: Sequence[Any],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -2226,7 +2226,7 @@ class Client:
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -2276,7 +2276,7 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -2300,7 +2300,7 @@ class Client:
         *,
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -2326,7 +2326,7 @@ class Client:
         args: Sequence[Any],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -2350,7 +2350,7 @@ class Client:
         args: Sequence[Any],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -2373,7 +2373,7 @@ class Client:
         args: Sequence[Any] = [],
         id: str,
         task_queue: str,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         schedule_to_close_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
@@ -2501,7 +2501,7 @@ class Client:
         self,
         activity_id: str,
         *,
-        result_type: Type[ReturnType],
+        result_type: type[ReturnType],
         activity_run_id: str | None = None,
     ) -> ActivityHandle[ReturnType]: ...
 
@@ -2509,7 +2509,7 @@ class Client:
         self,
         activity_id: str,
         *,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         activity_run_id: str | None = None,
     ) -> ActivityHandle[Any]:
         """Get a handle to an existing activity, as the caller of that activity.
@@ -4567,7 +4567,7 @@ class ActivityHandle(Generic[ReturnType]):
         activity_id: str,
         *,
         activity_run_id: str | None = None,
-        result_type: Type | None = None,
+        result_type: type | None = None,
         data_converter_override: DataConverter | None = None,
     ) -> None:
         """Create activity handle."""
@@ -4968,7 +4968,7 @@ class WorkflowExecution:
             key: Key to get memo value for.
             default: Default to use if key is not present. If unset, a
                 :py:class:`KeyError` is raised when the key does not exist.
-            type_hint: Type hint to use when converting.
+            type_hint: type hint to use when converting.
 
         Returns:
             Memo value, converted with the type hint if present.
@@ -6512,7 +6512,7 @@ class ScheduleDescription:
             key: Key to get memo value for.
             default: Default to use if key is not present. If unset, a
                 :py:class:`KeyError` is raised when the key does not exist.
-            type_hint: Type hint to use when converting.
+            type_hint: type hint to use when converting.
 
         Returns:
             Memo value, converted with the type hint if present.
@@ -6761,7 +6761,7 @@ class ScheduleListDescription:
             key: Key to get memo value for.
             default: Default to use if key is not present. If unset, a
                 :py:class:`KeyError` is raised when the key does not exist.
-            type_hint: Type hint to use when converting.
+            type_hint: type hint to use when converting.
 
         Returns:
             Memo value, converted with the type hint if present.
@@ -7405,7 +7405,7 @@ class StartActivityInput:
     args: Sequence[Any]
     id: str
     task_queue: str
-    result_type: Type | None
+    result_type: type | None
     schedule_to_close_timeout: timedelta | None
     start_to_close_timeout: timedelta | None
     schedule_to_start_timeout: timedelta | None
@@ -7476,7 +7476,7 @@ class GetActivityResultInput(Generic[ReturnType]):
 
     activity_id: str
     activity_run_id: str | None
-    result_type: Type[ReturnType] | None
+    result_type: type[ReturnType] | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
 
