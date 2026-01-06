@@ -1,3 +1,5 @@
+from temporalio.contrib.opentelemetry import workflowfrom temporalio.contrib.opentelemetry import workflowfrom temporalio.contrib.openai_agents import OpenAIAgentsPlugin
+
 # OpenAI Agents SDK Integration for Temporal
 
 ⚠️ **Public Preview** - The interface to this module is subject to change prior to General Availability.
@@ -18,6 +20,8 @@ This document is organized as follows:
 - **[Background Concepts](#core-concepts).** Background on durable execution and AI agents.
 - **[Full Example](#full-example)** Running the Hello World Durable Agent example.
 - **[Tool Calling](#tool-calling).** Calling agent Tools in Temporal.
+- **[MCP Support](#mcp-support).** Calling MCP Tools in Temporal.
+- **[Streaming](#streaming).** Streaming LLM Responses.
 - **[Feature Support](#feature-support).** Compatibility matrix.
 
 The [samples repository](https://github.com/temporalio/samples-python/tree/main/openai_agents) contains examples including basic usage, common agent patterns, and more complete samples.
@@ -362,6 +366,106 @@ You need to understand your MCP server's behavior to choose the correct wrapper:
 
 The code below gives an example of using a stateless MCP server.
 
+## Streaming
+
+Streaming can be enabled by using Agents SDK's `Runner.run_streamed` API, and configured via `streaming_options` on the `OpenAIAgentsPlugin` constructor.
+
+This integration provides two mechanisms for streaming content from the LLMs which can also potentially be used together.
+
+### Callback Based Streaming
+
+Callback Based Streaming should be used when the streaming logic is _output only_. That is, when the partial results of the stream will not be used to modify control flow in the workflow.
+Most frequently, this involves sending the partial results to some user experience. In this model, the callbacks are defined when the worker is created and are invoked on streaming results when LLM activities are executed.
+
+```python
+from temporalio.contrib.openai_agents import (
+    OpenAIAgentsPlugin,
+    StreamingOptions
+)
+from agents import ModelSettings, Runner
+from agents.items import TResponseStreamEvent
+
+events = []
+async def callback(settings: ModelSettings, event: TResponseStreamEvent) -> None:
+    events.append(event)
+
+plugin = OpenAIAgentsPlugin(
+    streaming_options=StreamingOptions(
+        callback=callback,
+    ),
+)
+
+...
+
+async for event in Runner.run_streamed(...).stream_events():
+    pass
+```
+
+Note that while `run_streamed` still returns an asynchronous iterator, stream events will not be delivered to the workflow until a full LLM activity has completed, at which point they will be delivered together.
+Signal Based Streaming addresses this gap.
+
+The `settings` argument to the callback can be used to differentiate what to do in the callback from the invocation point of the stream:
+```python
+from agents import ModelSettings, Runner, RunConfig
+from agents.items import TResponseStreamEvent
+
+events = []
+async def callback(settings: ModelSettings, event: TResponseStreamEvent) -> None:
+    value = settings.extra_args.get("key")
+    # Use value to choose what to do with the stream event
+    
+    events.append(event)
+    
+...
+
+Runner.run_streamed(
+    ..., 
+    run_config=RunConfig(model_settings=ModelSettings(extra_args={"key": 1}))
+)
+```
+
+
+### Signal Based Streaming
+
+Signal Based Streaming allows a workflow to take a durable action based on the result of a stream event. This is done by sending batches of stream events back to the workflow via signals, which comes at an additional cost as there are more network operations needed.
+
+
+```python
+from temporalio import workflow
+from temporalio.contrib.openai_agents import (
+    OpenAIAgentsPlugin,
+    StreamingOptions
+)
+from agents import Runner
+
+plugin = OpenAIAgentsPlugin(
+    streaming_options=StreamingOptions(
+        use_signals=True,
+        signal_batch_latency_seconds=2.0,
+    ),
+)
+
+...
+
+async for event in Runner.run_streamed(...).stream_events():
+    # Do something with the event, like start an activity
+    pass
+```
+
+One important thing to consider however, is how to handle cases where the LLM activity fails. Temporal will automatically retry depending the specific activity configuration, but because the signals are made durable, the workflow will see all stream events, not just from the most recent run.
+The application code should choose how to handle a failure, potentially resetting a user experience for example.
+
+```python
+from agents import Runner
+from temporalio.contrib.openai_agents import workflow
+
+async for event in Runner.run_streamed(...).stream_events():
+    if workflow.is_activity_failure_event(event):
+        # Handle the failure
+        pass
+    pass
+```
+
 #### Worker Configuration
 
 ```python
@@ -469,9 +573,9 @@ Certain tools are not suitable for a distributed computing environment, so these
 This integration does not presently support streaming.
 
 | Model Response | Supported |
-| :------------- | :-------: |
+| :------------- |:---------:|
 | Get Response   |    Yes    |
-| Streaming      |    No     |
+| Streaming      |    Yes    |
 
 ### Tools
 
