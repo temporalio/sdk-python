@@ -106,7 +106,7 @@ class WorkflowOpHandler(
         test_context.cancel_handler_released.set_result(datetime.now(timezone.utc))
         raise nexusrpc.HandlerError(
             "Deliberate non-retryable error in cancel handler",
-            type=nexusrpc.HandlerErrorType.BAD_REQUEST,
+            error_type=nexusrpc.HandlerErrorType.BAD_REQUEST,
         )
 
 
