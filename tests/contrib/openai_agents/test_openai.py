@@ -61,7 +61,6 @@ from agents.mcp import MCPServer, MCPServerStdio
 from openai import APIStatusError, AsyncOpenAI, BaseModel
 from openai.types.responses import (
     ResponseCodeInterpreterToolCall,
-    ResponseErrorEvent,
     ResponseFileSearchToolCall,
     ResponseFunctionWebSearch,
     ResponseTextDeltaEvent,
@@ -98,6 +97,7 @@ from temporalio.contrib.openai_agents.testing import (
     TestModel,
     TestModelProvider,
 )
+from temporalio.contrib.openai_agents.workflow import is_activity_failure_event
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import ApplicationError, CancelledError, TemporalError
 from temporalio.testing import WorkflowEnvironment
@@ -2613,15 +2613,17 @@ class StreamingHelloWorldAgent:
             instructions="You are a helpful assistant.",
         )
 
-        result = Runner.run_streamed(starting_agent=agent, input=prompt)
+        result = Runner.run_streamed(
+            starting_agent=agent,
+            input=prompt,
+            run_config=RunConfig(model_settings=ModelSettings(extra_args={"key": 1})),
+        )
         async for event in result.stream_events():
             if event.type == "raw_response_event" and isinstance(
                 event.data, ResponseTextDeltaEvent
             ):
                 self.events.append(event.data.delta)
-            if event.type == "raw_response_event" and isinstance(
-                event.data, ResponseErrorEvent
-            ):
+            if is_activity_failure_event(event):
                 self._has_failure = True
 
         return result.final_output if result else None
