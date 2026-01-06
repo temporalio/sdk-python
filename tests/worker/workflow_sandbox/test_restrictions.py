@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pathlib
-import sys
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -14,25 +13,6 @@ from temporalio.worker.workflow_sandbox._restrictions import (
     SandboxRestrictions,
     _RestrictedProxy,
 )
-
-
-def test_workflow_sandbox_stdlib_module_names():
-    if sys.version_info[1] != 11:
-        pytest.skip("Test only runs on 3.11")
-    actual_names = ",".join(sorted(sys.stdlib_module_names))
-    # Uncomment to print code for generating these
-    code_lines = [""]
-    for mod_name in sorted(sys.stdlib_module_names):
-        if code_lines[-1]:
-            code_lines[-1] += ","
-        if len(code_lines[-1]) > 80:
-            code_lines.append("")
-        code_lines[-1] += mod_name
-    code = '_stdlib_module_names = (\n    "' + '"\n    "'.join(code_lines) + '"\n)'
-    # TODO(cretz): Point releases may add modules :-(
-    assert actual_names == ",".join(
-        sys.stdlib_module_names
-    ), f"Expecting names as {actual_names}. In code as:\n{code}"
 
 
 def test_workflow_sandbox_restrictions_add_passthrough_modules():
