@@ -146,6 +146,110 @@ class WorkflowIDConflictPolicy(IntEnum):
     )
 
 
+class ActivityIDReusePolicy(IntEnum):
+    """How already-closed activity IDs are handled on start.
+
+    .. warning::
+       This API is experimental.
+
+    See :py:class:`temporalio.api.enums.v1.ActivityIdReusePolicy`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.ActivityIdReusePolicy.ACTIVITY_ID_REUSE_POLICY_UNSPECIFIED
+    )
+    ALLOW_DUPLICATE = int(
+        temporalio.api.enums.v1.ActivityIdReusePolicy.ACTIVITY_ID_REUSE_POLICY_ALLOW_DUPLICATE
+    )
+    ALLOW_DUPLICATE_FAILED_ONLY = int(
+        temporalio.api.enums.v1.ActivityIdReusePolicy.ACTIVITY_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY
+    )
+    REJECT_DUPLICATE = int(
+        temporalio.api.enums.v1.ActivityIdReusePolicy.ACTIVITY_ID_REUSE_POLICY_REJECT_DUPLICATE
+    )
+
+
+class ActivityIDConflictPolicy(IntEnum):
+    """How already-running activity IDs are handled on start.
+
+    .. warning::
+       This API is experimental.
+
+    See :py:class:`temporalio.api.enums.v1.ActivityIdConflictPolicy`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.ActivityIdConflictPolicy.ACTIVITY_ID_CONFLICT_POLICY_UNSPECIFIED
+    )
+    FAIL = int(
+        temporalio.api.enums.v1.ActivityIdConflictPolicy.ACTIVITY_ID_CONFLICT_POLICY_FAIL
+    )
+    USE_EXISTING = int(
+        temporalio.api.enums.v1.ActivityIdConflictPolicy.ACTIVITY_ID_CONFLICT_POLICY_USE_EXISTING
+    )
+
+
+class ActivityExecutionStatus(IntEnum):
+    """Status of an activity execution.
+
+    .. warning::
+       This API is experimental.
+
+    See :py:class:`temporalio.api.enums.v1.ActivityExecutionStatus`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_UNSPECIFIED
+    )
+    RUNNING = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_RUNNING
+    )
+    COMPLETED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_COMPLETED
+    )
+    FAILED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_FAILED
+    )
+    CANCELED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_CANCELED
+    )
+    TERMINATED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_TERMINATED
+    )
+    TIMED_OUT = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_TIMED_OUT
+    )
+
+
+class PendingActivityState(IntEnum):
+    """State of a pending activity.
+
+    .. warning::
+       This API is experimental.
+
+    See :py:class:`temporalio.api.enums.v1.PendingActivityState`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_UNSPECIFIED
+    )
+    SCHEDULED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_SCHEDULED
+    )
+    STARTED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_STARTED
+    )
+    CANCEL_REQUESTED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_CANCEL_REQUESTED
+    )
+    PAUSED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_PAUSED
+    )
+    PAUSE_REQUESTED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_PAUSE_REQUESTED
+    )
+
+
 class QueryRejectCondition(IntEnum):
     """Whether a query should be rejected in certain conditions.
 
