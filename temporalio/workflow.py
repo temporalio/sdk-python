@@ -6,6 +6,7 @@ import asyncio
 import contextvars
 import inspect
 import logging
+import sys
 import threading
 import typing
 import uuid
@@ -1610,6 +1611,9 @@ class LoggerAdapter(logging.LoggerAdapter):
         **kwargs: Any,
     ):
         """Override to potentially disable the sandbox."""
+        if sys.version_info < (3, 11):
+            # An additional stacklevel is needed on 3.10 because it doesn't skip internal frames until after stacklevel
+            stacklevel += 1
         stacklevel += 1
         if self.disable_sandbox:
             with unsafe.sandbox_unrestricted():
