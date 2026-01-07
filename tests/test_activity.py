@@ -100,7 +100,8 @@ async def test_describe(client: Client):
 class ActivityTracingInterceptor(Interceptor):
     """Test interceptor that tracks all activity interceptor calls."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        super().__init__()
         self.start_activity_calls: list[StartActivityInput] = []
         self.get_activity_result_calls: list[GetActivityResultInput] = []
         self.describe_activity_calls: list[DescribeActivityInput] = []

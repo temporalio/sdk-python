@@ -29,7 +29,6 @@ from typing import (
     Any,
     Concatenate,
     Generic,
-    Type,
     cast,
     overload,
 )
@@ -1835,7 +1834,7 @@ class Client:
     @overload
     async def start_activity_class(
         self,
-        activity: type[Callable[..., Awaitable[ReturnType]]],
+        activity: type[Callable[..., Awaitable[ReturnType]]],  # type: ignore[reportInvalidTypeForm]
         *,
         args: Sequence[Any],
         id: str,
@@ -1859,7 +1858,7 @@ class Client:
     @overload
     async def start_activity_class(
         self,
-        activity: type[Callable[..., ReturnType]],
+        activity: type[Callable[..., ReturnType]],  # type: ignore[reportInvalidTypeForm]
         *,
         args: Sequence[Any],
         id: str,
@@ -1881,7 +1880,7 @@ class Client:
 
     async def start_activity_class(
         self,
-        activity: type[Callable],
+        activity: type[Callable],  # type: ignore[reportInvalidTypeForm]
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
@@ -2027,7 +2026,7 @@ class Client:
     @overload
     async def execute_activity_class(
         self,
-        activity: type[Callable[..., Awaitable[ReturnType]]],
+        activity: type[Callable[..., Awaitable[ReturnType]]],  # type: ignore[reportInvalidTypeForm]
         *,
         args: Sequence[Any],
         id: str,
@@ -2051,7 +2050,7 @@ class Client:
     @overload
     async def execute_activity_class(
         self,
-        activity: type[Callable[..., ReturnType]],
+        activity: type[Callable[..., ReturnType]],  # type: ignore[reportInvalidTypeForm]
         *,
         args: Sequence[Any],
         id: str,
@@ -2073,7 +2072,7 @@ class Client:
 
     async def execute_activity_class(
         self,
-        activity: type[Callable],
+        activity: type[Callable],  # type: ignore[reportInvalidTypeForm]
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
@@ -4651,7 +4650,7 @@ class ActivityHandle(Generic[ReturnType]):
             return cast(ReturnType, self._cached_result)
 
         result = await self._client._impl.get_activity_result(
-            GetActivityResultInput(
+            GetActivityResultInput[ReturnType](
                 activity_id=self._activity_id,
                 activity_run_id=self._activity_run_id,
                 result_type=self._result_type,
@@ -8554,7 +8553,7 @@ class _ClientImpl(OutboundInterceptor):
             )
 
         # Decode result
-        type_hints: list[Type] | None = (
+        type_hints: list[type] | None = (
             [input.result_type] if input.result_type else None
         )
         results = await data_converter.decode(outcome.result.payloads, type_hints)

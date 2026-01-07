@@ -23,7 +23,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     NoReturn,
-    Type,
     overload,
 )
 
@@ -598,7 +597,7 @@ class _Definition:
     @classmethod
     def get_name_and_result_type(
         cls, name_or_run_fn: str | Callable[..., Any]
-    ) -> tuple[str, Type | None]:
+    ) -> tuple[str, type | None]:
         if isinstance(name_or_run_fn, str):
             return name_or_run_fn, None
         elif callable(name_or_run_fn):
@@ -607,7 +606,7 @@ class _Definition:
                 raise ValueError(f"Activity {name_or_run_fn} definition has no name")
             return defn.name, defn.ret_type
         else:
-            raise TypeError("Activity must be a string or callable")
+            raise TypeError("Activity must be a string or callable")  # type:ignore[reportUnreachable]
 
     @staticmethod
     def _apply_to_callable(

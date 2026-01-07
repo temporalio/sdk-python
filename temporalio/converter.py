@@ -25,7 +25,6 @@ from typing import (
     ClassVar,
     Literal,
     NewType,
-    Optional,
     TypeVar,
     get_type_hints,
     overload,
@@ -99,7 +98,7 @@ class WorkflowSerializationContext(SerializationContext):
     namespace: str
     """Namespace."""
 
-    workflow_id: Optional[str]
+    workflow_id: str | None
     """Workflow ID."""
 
 
@@ -124,7 +123,7 @@ class ActivitySerializationContext(SerializationContext):
     namespace: str
     """Namespace."""
 
-    activity_id: Optional[str]
+    activity_id: str | None
     """Activity ID. Optional if this is an activity started from a workflow."""
 
     activity_type: str
@@ -133,10 +132,10 @@ class ActivitySerializationContext(SerializationContext):
     activity_task_queue: str
     """Activity task queue."""
 
-    workflow_id: Optional[str]
+    workflow_id: str | None
     """Workflow ID if this is an activity started from a workflow."""
 
-    workflow_type: Optional[str]
+    workflow_type: str | None
     """Workflow type if this is an activity started from a workflow."""
 
     is_local: bool
