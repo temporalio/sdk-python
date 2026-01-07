@@ -4148,7 +4148,7 @@ class ActivityExecution:
         cls,
         info: temporalio.api.activity.v1.ActivityExecutionListInfo,
         namespace: str,
-        converter: temporalio.converter.DataConverter,
+        _converter: temporalio.converter.DataConverter,
     ) -> Self:
         """Create from raw proto activity list info."""
         return cls(
@@ -8445,12 +8445,11 @@ class _ClientImpl(OutboundInterceptor):
             req.user_metadata.CopyFrom(metadata)
 
         # Set headers
-        if input.headers is not None:
+        if input.headers:
             await self._apply_headers(input.headers, req.header.fields)
 
         # Set priority
-        if input.priority is not None:
-            req.priority.CopyFrom(input.priority._to_proto())
+        req.priority.CopyFrom(input.priority._to_proto())
 
         return req
 
