@@ -158,28 +158,6 @@ The Functional API supports continue-as-new via task result caching. Unlike the 
 5. New execution calls `compile(graph_id, checkpoint=checkpoint)` to restore cache
 6. Subsequent task calls check cache first - cache hits return `InlineFuture` immediately
 
-**Usage pattern:**
-
-```python
-@workflow.defn
-class MyWorkflow:
-    @workflow.run
-    async def run(self, input: MyInput) -> dict:
-        app = compile("my_entrypoint", checkpoint=input.checkpoint)
-        result = await app.ainvoke(input.value)
-
-        # Before continue-as-new, capture state
-        checkpoint = app.get_state()
-
-        if should_continue_as_new:
-            workflow.continue_as_new(MyInput(
-                value=input.value,
-                checkpoint=checkpoint,  # Pass cache state
-            ))
-
-        return result
-```
-
 **Key difference from Graph API:**
 - Graph API: Checkpoints full execution state, can resume mid-graph
 - Functional API: Caches completed task results, re-executes entrypoint from start but skips cached tasks
@@ -188,6 +166,72 @@ class MyWorkflow:
 The cache key is a SHA-256 hash of `task_id:args_json:kwargs_json`, ensuring that:
 - Same task with same arguments returns cached result
 - Different arguments execute fresh
+
+### 11. should_continue Callback for Checkpointing
+
+Both APIs support a `should_continue` callback that allows workflows to checkpoint execution at controlled points. This is useful for long-running workflows that need to continue-as-new periodically.
+
+**Graph API** (`TemporalLangGraphRunner`):
+- `should_continue` is called after each graph step (tick)
+- When it returns `False`, execution stops and `CHECKPOINT_KEY` is added to the result
+- The checkpoint contains full graph state including channel values and next nodes
+
+**Functional API** (`TemporalFunctionalRunner`):
+- `should_continue` is called after each task completes (in `TemporalTaskFuture.__await__`)
+- When it returns `False`, a `CheckpointInterrupt` exception is raised
+- The runner catches this and returns `{CHECKPOINT_KEY: checkpoint_state}`
+- The checkpoint contains the task result cache for skip-on-resume
+
+**Usage pattern (both APIs):**
+
+```python
+from temporalio.contrib.langgraph import CHECKPOINT_KEY, compile
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self, input: MyInput) -> dict:
+        # Track execution progress
+        tasks_executed = 0
+
+        def should_continue() -> bool:
+            nonlocal tasks_executed
+            tasks_executed += 1
+            return tasks_executed <= input.max_tasks_per_execution
+
+        app = compile("my_graph_or_entrypoint", checkpoint=input.checkpoint)
+
+        # Pass should_continue to ainvoke
+        result = await app.ainvoke(
+            {"value": input.value},
+            should_continue=should_continue,
+        )
+
+        # Check if we stopped for checkpointing
+        if CHECKPOINT_KEY in result:
+            checkpoint = result[CHECKPOINT_KEY]
+            workflow.continue_as_new(MyInput(
+                value=input.value,
+                checkpoint=checkpoint,
+                max_tasks_per_execution=input.max_tasks_per_execution,
+            ))
+
+        return result
+```
+
+**Implementation details:**
+
+For Graph API in `_runner.py`:
+- `_check_checkpoint()` is called after each tick in `_run_pregel_loop()`
+- Creates `StateSnapshot` with current channel values and next nodes
+- Returns early with checkpoint before graph completes
+
+For Functional API in `_functional_runner.py` and `_functional_future.py`:
+- `should_continue` is passed through `_create_temporal_call_callback()` to `_schedule_task_activity()`
+- `TemporalTaskFuture` stores the callback and checks it in `__await__` after task completion
+- `CheckpointInterrupt` exception propagates up to `ainvoke()` which returns checkpoint
+
+**Important:** The entrypoint/graph has NO knowledge of checkpointing - it's entirely controlled by the workflow via the callback. This keeps the graph logic clean and reusable.
 
 ## File Structure
 
@@ -198,7 +242,7 @@ The cache key is a SHA-256 hash of `task_id:args_json:kwargs_json`, ensuring tha
 | `_runner.py` | Graph API runner using `AsyncPregelLoop` |
 | `_functional_runner.py` | Functional API runner with `CONFIG_KEY_CALL` injection |
 | `_functional_cache.py` | InMemoryCache for task result caching (continue-as-new) |
-| `_functional_future.py` | Future types for async task execution |
+| `_functional_future.py` | Future types for async task execution, `CheckpointInterrupt` |
 | `_activities.py` | Activity implementations for node execution |
 | `_functional_activity.py` | Activity for @task execution |
 | `_models.py` | Dataclasses for activity I/O serialization |
