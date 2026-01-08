@@ -98,6 +98,15 @@ class ExecutionState:
     )
     """Store state for cross-node persistence."""
 
+    last_task_writes: dict[str, list[tuple[str, Any]]] = field(default_factory=dict)
+    """Writes from the last executed tasks (for continue-as-new trigger injection)."""
+
+    pending_next_nodes: tuple[str, ...] = ()
+    """Next nodes to execute (set when should_continue stops execution)."""
+
+    restored_from_checkpoint: bool = False
+    """Whether state was restored from a checkpoint (for continue-as-new)."""
+
 
 def _extract_model_name(node_metadata: dict[str, Any] | None) -> str | None:
     """Extract model name from node metadata if available.
@@ -322,7 +331,12 @@ class TemporalLangGraphRunner:
         Returns:
             Final state. May contain ``INTERRUPT_KEY`` or ``CHECKPOINT_KEY`` keys.
         """
-        workflow.logger.debug("Starting graph execution for %s", self.graph_id)
+        workflow.logger.debug(
+            "Starting graph execution for %s. completed_nodes=%s, pending_next=%s",
+            self.graph_id,
+            self._execution.completed_nodes_in_cycle,
+            self._execution.pending_next_nodes,
+        )
 
         # Prepare invocation state and detect resume
         input_state, is_resume = self._prepare_invocation_state(input_state)
@@ -378,6 +392,14 @@ class TemporalLangGraphRunner:
                     "Call ainvoke() first and check for INTERRUPT_KEY in the result."
                 )
             input_state = self._interrupt.interrupted_state
+        elif self._execution.restored_from_checkpoint:
+            # First invocation after checkpoint restore - preserve completed nodes
+            # and use checkpoint values as input state
+            is_resume = True
+            if self._interrupt.interrupted_state is not None:
+                input_state = self._interrupt.interrupted_state
+            # Clear the flag - subsequent invocations should behave normally
+            self._execution.restored_from_checkpoint = False
         else:
             self._execution.completed_nodes_in_cycle.clear()
 
@@ -514,8 +536,15 @@ class TemporalLangGraphRunner:
                 # Get executable tasks
                 tasks_to_execute = self._get_executable_tasks(loop)
 
-                # No tasks - process writes and check for checkpoint
+                # No tasks - check for should_continue resume trigger injection
                 if not tasks_to_execute:
+                    # For should_continue resume: inject trigger writes to schedule next nodes
+                    if self._inject_next_node_triggers(loop):
+                        # Triggers injected - process them and continue
+                        loop.after_tick()
+                        continue
+
+                    # Normal case: process writes and check for checkpoint
                     loop.after_tick()
                     checkpoint_output = self._check_checkpoint(loop, should_continue)
                     if checkpoint_output is not None:
@@ -556,17 +585,90 @@ class TemporalLangGraphRunner:
                 cached_writes = self._execution.resumed_node_writes.pop(task.name)
                 task.writes.extend(cached_writes)
 
+    def _inject_next_node_triggers(self, loop: Any) -> bool:
+        """Inject trigger writes to directly schedule next nodes.
+
+        This is used for should_continue resume to skip completed nodes and
+        directly trigger the next nodes in the graph.
+
+        The key insight is that we inject the cached BRANCH writes from the LAST
+        completed node into ANY currently scheduled completed task. Branch writes
+        (channel names starting with BRANCH_PREFIX) are what trigger successor
+        nodes - state channel writes should NOT be injected as they conflict
+        with the restored input state.
+
+        Args:
+            loop: The Pregel loop.
+
+        Returns:
+            True if triggers were injected, False otherwise.
+        """
+        if not self._execution.pending_next_nodes:
+            return False
+
+        if not self._execution.last_task_writes:
+            workflow.logger.debug(
+                "pending_next_nodes=%s but no last_task_writes",
+                self._execution.pending_next_nodes,
+            )
+            return False
+
+        # Collect ONLY branch writes (edge triggers) - not state channel writes
+        branch_writes: list[tuple[str, Any]] = []
+        for cached_writes in self._execution.last_task_writes.values():
+            for channel, value in cached_writes:
+                if channel.startswith(BRANCH_PREFIX):
+                    branch_writes.append((channel, value))
+
+        # If no branch writes found, create synthetic trigger for next nodes
+        # This handles linear graphs with static edges (no conditional routing)
+        if not branch_writes:
+            # For static edges, we need to create a write to the trigger channel
+            # that will cause the next nodes to be scheduled
+            for next_node in self._execution.pending_next_nodes:
+                # Use the standard branch prefix format for triggers
+                trigger_channel = f"{BRANCH_PREFIX}:to:{next_node}"
+                branch_writes.append((trigger_channel, next_node))
+
+        # Find ANY completed task to inject writes into
+        # The writes will be processed by after_tick() to trigger next nodes
+        for task in loop.tasks.values():
+            if task.name in self._execution.completed_nodes_in_cycle:
+                workflow.logger.debug(
+                    "Injecting %d branch writes into task %s for next nodes %s",
+                    len(branch_writes),
+                    task.name,
+                    self._execution.pending_next_nodes,
+                )
+                task.writes.extend(branch_writes)
+
+                # Clear the cached writes and pending_next_nodes
+                self._execution.last_task_writes.clear()
+                self._execution.pending_next_nodes = ()
+                return True
+
+        workflow.logger.debug(
+            "No completed task found for injection. pending_next_nodes=%s, tasks=%s",
+            self._execution.pending_next_nodes,
+            [t.name for t in loop.tasks.values()],
+        )
+        return False
+
     def _get_executable_tasks(self, loop: Any) -> list[Any]:
         """Get tasks that need to be executed.
 
         Filters out tasks that already have writes or were completed
-        in the current resume cycle.
+        in the current resume cycle. Note: __start__ is never filtered
+        because it's needed to initialize state channels from input.
         """
         return [
             task
             for task in loop.tasks.values()
             if not task.writes
-            and task.name not in self._execution.completed_nodes_in_cycle
+            and (
+                task.name == START_NODE
+                or task.name not in self._execution.completed_nodes_in_cycle
+            )
         ]
 
     def _check_checkpoint(
@@ -582,9 +684,37 @@ class TemporalLangGraphRunner:
             Output dict with checkpoint if stopping, None otherwise.
         """
         if should_continue is not None and not should_continue():
-            output = cast("dict[str, Any]", loop.output) if loop.output else {}
+            # Read current channel state BEFORE tick() which might modify channels
+            # (loop.output is only set when graph completes)
+            channel_values: dict[str, Any] = {}
+            for channel_name, channel in loop.channels.items():
+                # Skip internal channels (branches, etc.)
+                if channel_name.startswith(BRANCH_PREFIX):
+                    continue
+                try:
+                    channel_values[channel_name] = channel.get()
+                except Exception:
+                    # Some channels may not have values or be empty
+                    pass
+
+            # Peek at next nodes by calling tick() - this schedules what would run next
+            # Since we're about to return the checkpoint, it's safe to advance the loop
+            has_more = loop.tick()
+            if has_more:
+                # Extract node names from scheduled tasks
+                next_nodes = tuple(task.name for task in loop.tasks.values())
+                self._execution.pending_next_nodes = next_nodes
+            else:
+                # Graph would complete - no more work to do
+                # Don't create checkpoint - let normal completion flow handle it
+                return None
+
+            # Set last_output to the channel values for get_state() to use
+            self._execution.last_output = channel_values
+
+            # Create output with checkpoint
+            output = channel_values.copy()
             output[CHECKPOINT_KEY] = self.get_state()
-            self._execution.last_output = output
             return output
         return None
 
@@ -681,8 +811,12 @@ class TemporalLangGraphRunner:
             return False
 
         # Task completed successfully - track it to prevent re-execution during resume
-        # Only track during resume invocations to allow normal cyclic execution
-        if self._interrupt.is_resume_invocation:
+        # Only track during resume scenarios to allow normal cyclic execution
+        # (e.g., agent loops where 'model' node runs multiple times)
+        if (
+            self._interrupt.is_resume_invocation
+            or self._execution.restored_from_checkpoint
+        ):
             self._execution.completed_nodes_in_cycle.add(task.name)
 
         # If we provided a resume value and the task completed successfully,
@@ -701,6 +835,10 @@ class TemporalLangGraphRunner:
             if self._interrupt.pending_interrupt is not None:
                 return False
             task.writes.extend(send_writes)
+
+        # Capture writes for continue-as-new support
+        # These writes may be needed to trigger successor nodes on restore
+        self._execution.last_task_writes[task.name] = list(task.writes)
 
         return True
 
@@ -1605,8 +1743,11 @@ class TemporalLangGraphRunner:
     def get_state(self) -> StateSnapshot:
         """Get the current state snapshot for checkpointing and continue-as-new."""
         # Determine next nodes based on current state
+        # Priority: pending_next_nodes (from should_continue stop) > interrupted_node_name
         next_nodes: tuple[str, ...] = ()
-        if self._interrupt.interrupted_node_name is not None:
+        if self._execution.pending_next_nodes:
+            next_nodes = self._execution.pending_next_nodes
+        elif self._interrupt.interrupted_node_name is not None:
             next_nodes = (self._interrupt.interrupted_node_name,)
 
         # Build tasks tuple with interrupt info if present
@@ -1620,13 +1761,31 @@ class TemporalLangGraphRunner:
                 },
             )
 
-        # For values, prefer interrupted_state when there's an interrupt
-        # (since _last_output only contains the interrupt marker, not the full state)
-        # Otherwise use _last_output for completed executions
-        if self._interrupt.interrupted_state is not None:
+        # For values:
+        # - If there's a pending interrupt, use interrupted_state (which has the full state
+        #   before the interrupt, since last_output only has the interrupt marker)
+        # - Otherwise use last_output (for should_continue checkpoints or completed executions)
+        if (
+            self._interrupt.pending_interrupt is not None
+            and self._interrupt.interrupted_state is not None
+        ):
             values = self._interrupt.interrupted_state
         else:
             values = self._execution.last_output or {}
+
+        # Serialize last_task_writes for continue-as-new trigger injection
+        serialized_writes: dict[str, list[list[Any]]] = {}
+        for node_name, writes in self._execution.last_task_writes.items():
+            serialized_writes[node_name] = [[ch, val] for ch, val in writes]
+
+        # For completed_nodes metadata, use:
+        # - completed_nodes_in_cycle if populated (during resume scenarios)
+        # - last_task_writes keys otherwise (during normal execution with should_continue)
+        completed_nodes = (
+            list(self._execution.completed_nodes_in_cycle)
+            if self._execution.completed_nodes_in_cycle
+            else list(self._execution.last_task_writes.keys())
+        )
 
         return StateSnapshot(
             values=values,
@@ -1634,7 +1793,8 @@ class TemporalLangGraphRunner:
             metadata={
                 "step": self._execution.step_counter,
                 "invocation_counter": self._execution.invocation_counter,
-                "completed_nodes": list(self._execution.completed_nodes_in_cycle),
+                "completed_nodes": completed_nodes,
+                "last_task_writes": serialized_writes,
             },
             tasks=tasks,
             store_state=self._serialize_store_state(),
@@ -1646,11 +1806,6 @@ class TemporalLangGraphRunner:
         self._execution.last_output = checkpoint.get("values")
         self._interrupt.interrupted_state = checkpoint.get("values")
 
-        # Restore next node (interrupted node)
-        next_nodes = checkpoint.get("next", ())
-        if next_nodes:
-            self._interrupt.interrupted_node_name = next_nodes[0]
-
         # Restore metadata
         metadata = checkpoint.get("metadata", {})
         self._execution.step_counter = metadata.get("step", 0)
@@ -1659,7 +1814,7 @@ class TemporalLangGraphRunner:
             metadata.get("completed_nodes", [])
         )
 
-        # Restore interrupt info from tasks
+        # Restore interrupt info from tasks (indicates interrupt-style resume)
         tasks = checkpoint.get("tasks", ())
         if tasks:
             task = tasks[0]
@@ -1668,6 +1823,22 @@ class TemporalLangGraphRunner:
                 node_name=task.get("interrupt_node", ""),
                 task_id=task.get("interrupt_task_id", ""),
             )
+            # For interrupt resume, set interrupted_node_name
+            next_nodes = checkpoint.get("next", ())
+            if next_nodes:
+                self._interrupt.interrupted_node_name = next_nodes[0]
+        else:
+            # For should_continue resume (no interrupt), store next nodes
+            # for direct trigger injection
+            next_nodes = checkpoint.get("next", ())
+            self._execution.pending_next_nodes = tuple(next_nodes)
+
+        # Restore last_task_writes for trigger injection
+        serialized_writes = metadata.get("last_task_writes", {})
+        for node_name, writes in serialized_writes.items():
+            self._execution.last_task_writes[node_name] = [
+                (ch, val) for ch, val in writes
+            ]
 
         # Restore store state
         store_state = checkpoint.get("store_state", {})
@@ -1675,6 +1846,10 @@ class TemporalLangGraphRunner:
             (tuple(item["namespace"]), item["key"]): item["value"]
             for item in store_state
         }
+
+        # Mark that we restored from checkpoint - this prevents clearing
+        # completed_nodes_in_cycle in the first ainvoke() call
+        self._execution.restored_from_checkpoint = True
 
     def _prepare_store_snapshot(self) -> StoreSnapshot | None:
         """Prepare a store snapshot for activity input."""

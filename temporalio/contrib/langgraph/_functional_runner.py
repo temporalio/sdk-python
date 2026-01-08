@@ -43,6 +43,7 @@ from temporalio import activity, workflow
 from temporalio.contrib.langgraph._functional_activity import execute_langgraph_task
 from temporalio.contrib.langgraph._functional_cache import InMemoryCache
 from temporalio.contrib.langgraph._functional_future import (
+    CheckpointInterrupt,
     InlineFuture,
     TemporalTaskFuture,
 )
@@ -212,8 +213,14 @@ class TemporalFunctionalRunner:
 
     def _create_temporal_call_callback(
         self,
+        should_continue: Callable[[], bool] | None = None,
     ) -> Callable[..., Any]:
-        """Create the CONFIG_KEY_CALL callback that routes to Temporal activities."""
+        """Create the CONFIG_KEY_CALL callback that routes to Temporal activities.
+
+        Args:
+            should_continue: Optional callback to check if execution should continue.
+                           Passed to TemporalTaskFuture to check after each task.
+        """
         # Import cache types for key generation
         from temporalio.contrib.langgraph._functional_cache import FullKey, Namespace
 
@@ -262,7 +269,7 @@ class TemporalFunctionalRunner:
                 # We're in workflow - schedule as activity
                 logger.debug("Scheduling task %s as activity", task_id)
                 return self._schedule_task_activity(
-                    task_id, task_name, args, kwargs, full_key
+                    task_id, task_name, args, kwargs, full_key, should_continue
                 )
 
             # Not in Temporal context - execute inline (for testing)
@@ -309,6 +316,7 @@ class TemporalFunctionalRunner:
         args: tuple[Any, ...],
         kwargs: dict[str, Any],
         cache_key: tuple[tuple[str, ...], str] | None = None,
+        should_continue: Callable[[], bool] | None = None,
     ) -> TemporalTaskFuture[Any]:
         """Schedule a task as a Temporal activity.
 
@@ -318,6 +326,7 @@ class TemporalFunctionalRunner:
             args: Positional arguments for the task.
             kwargs: Keyword arguments for the task.
             cache_key: Optional cache key to store the result for continue-as-new.
+            should_continue: Optional callback to check if execution should continue.
         """
         timeout = self._get_task_timeout(task_name)
 
@@ -345,6 +354,7 @@ class TemporalFunctionalRunner:
         future: TemporalTaskFuture[Any] = TemporalTaskFuture(
             activity_handle=handle,
             on_result=on_result,
+            should_continue=should_continue,
         )
         return future
 
@@ -478,7 +488,9 @@ class TemporalFunctionalRunner:
         self,
         input_state: Any,
         config: dict[str, Any] | None = None,
+        *,
         on_interrupt: Callable[[Any], Awaitable[Any]] | None = None,
+        should_continue: Callable[[], bool] | None = None,
     ) -> dict[str, Any]:
         """Invoke the entrypoint asynchronously.
 
@@ -489,13 +501,18 @@ class TemporalFunctionalRunner:
             input_state: Input to pass to the entrypoint.
             config: Optional LangGraph config to merge.
             on_interrupt: Callback for handling interrupts.
+            should_continue: Callable returning False to stop for checkpointing.
+                           Called after each task completes. If returns False,
+                           execution stops and returns checkpoint state.
 
         Returns:
-            The result from the entrypoint execution.
+            Final state. May contain ``CHECKPOINT_KEY`` if stopped for checkpointing.
         """
         from langchain_core.runnables.config import var_child_runnable_config
         from langgraph.errors import GraphInterrupt as LangGraphInterrupt
         from langgraph.errors import ParentCommand
+
+        from temporalio.contrib.langgraph._constants import CHECKPOINT_KEY
 
         pregel = self._get_pregel()
         execution_state = FunctionalExecutionState()
@@ -503,8 +520,8 @@ class TemporalFunctionalRunner:
         # Extract the underlying entrypoint function
         entrypoint_func = self._extract_entrypoint_function(pregel)
 
-        # Create our custom call callback
-        call_callback = self._create_temporal_call_callback()
+        # Create our custom call callback with should_continue
+        call_callback = self._create_temporal_call_callback(should_continue)
 
         # Build config with all required context keys
         injected_config = self._build_execution_config(
@@ -594,6 +611,16 @@ class TemporalFunctionalRunner:
                 }
 
             return command_result
+
+        except CheckpointInterrupt:
+            # Handle should_continue() returning False
+            logger.debug(
+                "Entrypoint %s stopped for checkpointing", self._entrypoint_id
+            )
+
+            # Return checkpoint state for continue-as-new
+            checkpoint_state = self.get_state()
+            return {CHECKPOINT_KEY: checkpoint_state}
 
         finally:
             var_child_runnable_config.reset(token)

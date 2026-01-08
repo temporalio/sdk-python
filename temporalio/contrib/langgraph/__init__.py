@@ -12,6 +12,10 @@ from typing import TYPE_CHECKING, Any, Union
 
 import temporalio.common
 import temporalio.workflow
+from temporalio.contrib.langgraph._constants import (
+    CHECKPOINT_KEY,
+    INTERRUPT_KEY,
+)
 from temporalio.contrib.langgraph._exceptions import (
     GRAPH_DEFINITION_CHANGED_ERROR,
     GRAPH_NOT_FOUND_ERROR,
@@ -320,4 +324,7 @@ __all__ = [
     "GRAPH_NOT_FOUND_ERROR",
     "NODE_NOT_FOUND_ERROR",
     "GRAPH_DEFINITION_CHANGED_ERROR",
+    # Constants for checking result state
+    "CHECKPOINT_KEY",
+    "INTERRUPT_KEY",
 ]

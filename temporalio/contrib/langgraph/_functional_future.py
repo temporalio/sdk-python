@@ -18,6 +18,12 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
+class CheckpointInterrupt(Exception):
+    """Raised when should_continue() returns False to trigger checkpointing."""
+
+    pass
+
+
 class TemporalTaskFuture(Generic[T], concurrent.futures.Future[T]):
     """Future that wraps a Temporal activity handle for LangGraph task execution.
 
@@ -33,6 +39,7 @@ class TemporalTaskFuture(Generic[T], concurrent.futures.Future[T]):
         self,
         activity_handle: ActivityHandle[T] | None = None,
         on_result: Callable[[T], None] | None = None,
+        should_continue: Callable[[], bool] | None = None,
     ) -> None:
         """Initialize the future.
 
@@ -40,10 +47,13 @@ class TemporalTaskFuture(Generic[T], concurrent.futures.Future[T]):
             activity_handle: The Temporal activity handle to wrap.
             on_result: Optional callback to invoke when the result is obtained.
                        Used to cache results for continue-as-new.
+            should_continue: Optional callback to check if execution should continue.
+                           If returns False after task completes, raises CheckpointInterrupt.
         """
         # Don't call super().__init__() - we manage state ourselves
         self._activity_handle: ActivityHandle[T] | None = activity_handle
         self._on_result = on_result
+        self._should_continue = should_continue
         self._result_value: T | None = None
         self._exception: BaseException | None = None
         self._done = False
@@ -147,6 +157,10 @@ class TemporalTaskFuture(Generic[T], concurrent.futures.Future[T]):
             # Call the on_result callback if provided (for caching)
             if self._on_result is not None:
                 self._on_result(result)
+
+            # Check if we should continue after task completion
+            if self._should_continue is not None and not self._should_continue():
+                raise CheckpointInterrupt()
 
             return result
 
