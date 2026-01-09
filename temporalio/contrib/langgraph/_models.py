@@ -56,16 +56,20 @@ def _coerce_value(value: Any) -> Any:
         return value
 
 
-def _coerce_state_values(state: dict[str, Any]) -> dict[str, Any]:
-    """Coerce state dict values to LangChain message types where applicable.
+def _coerce_state_values(state: Any) -> Any:
+    """Coerce state values to LangChain message types where applicable.
 
-    This function recursively processes the state dict to convert serialized
+    This function recursively processes the state to convert serialized
     message dicts back to proper LangChain message objects. This is necessary
     because when state passes through Temporal serialization, LangChain message
     objects become plain dicts.
 
     Handles nested structures like tool_call_with_context with nested messages.
+    For non-dict inputs (e.g., Functional API string inputs), returns as-is.
     """
+    if not isinstance(state, dict):
+        # Non-dict inputs (strings, etc.) are returned as-is
+        return state
     return {key: _coerce_value(value) for key, value in state.items()}
 
 
@@ -188,8 +192,11 @@ class NodeActivityInput:
     graph_id: str
     """Graph ID for registry lookup."""
 
-    input_state: dict[str, Any]
-    """State to pass to node (coerced to LangChain messages on deserialization)."""
+    input_state: Any
+    """State to pass to node (coerced to LangChain messages on deserialization).
+
+    For Graph API, this is always a dict. For Functional API, it can be any type.
+    """
 
     config: dict[str, Any]
     """Filtered RunnableConfig."""
