@@ -91,7 +91,6 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         )
 
         self._data_converter = data_converter
-        # TODO(nexus-preview): interceptors
         self._interceptors = interceptors
 
         self._running_tasks: dict[bytes, _RunningNexusTask] = {}
