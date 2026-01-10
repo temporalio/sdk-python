@@ -16,6 +16,7 @@ from temporalio.contrib.openai_agents._model_parameters import ModelActivityPara
 from temporalio.contrib.openai_agents._otel_tracing import (
     OtelTracingPlugin,
     setup_tracing,
+    workflow_span,
 )
 from temporalio.contrib.openai_agents._temporal_openai_agents import (
     OpenAIAgentsPlugin,
@@ -36,4 +37,5 @@ __all__ = [
     "StatefulMCPServerProvider",
     "testing",
     "workflow",
+    "workflow_span",
 ]
