@@ -36,9 +36,6 @@ Repository = "https://github.com/temporalio/sdk-python"
 Documentation = "https://docs.temporal.io/docs/python"
 "Bug Tracker" = "https://github.com/temporalio/sdk-python/issues"
 
-[project.entry-points."opentelemetry_context"]
-temporal_aware_context = "temporalio.contrib.otel_context:TemporalAwareContext"
-
 [dependency-groups]
 dev = [
   "basedpyright==1.34.0",
