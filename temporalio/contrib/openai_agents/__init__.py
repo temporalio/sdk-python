@@ -13,6 +13,10 @@ from temporalio.contrib.openai_agents._mcp import (
     StatelessMCPServerProvider,
 )
 from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
+from temporalio.contrib.openai_agents._otel_tracing import (
+    OtelTracingPlugin,
+    setup_tracing,
+)
 from temporalio.contrib.openai_agents._temporal_openai_agents import (
     OpenAIAgentsPlugin,
     OpenAIPayloadConverter,
@@ -26,6 +30,8 @@ __all__ = [
     "ModelActivityParameters",
     "OpenAIAgentsPlugin",
     "OpenAIPayloadConverter",
+    "OtelTracingPlugin",
+    "setup_tracing",
     "StatelessMCPServerProvider",
     "StatefulMCPServerProvider",
     "testing",
