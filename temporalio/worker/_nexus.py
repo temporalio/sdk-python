@@ -74,8 +74,6 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         metric_meter: temporalio.common.MetricMeter,
         executor: concurrent.futures.ThreadPoolExecutor | None,
     ) -> None:
-        # TODO: make it possible to query task queue of bridge worker instead of passing
-        # unused task_queue into _NexusWorker, _ActivityWorker, etc?
         self._bridge_worker = bridge_worker
         self._client = client
         self._task_queue = task_queue
@@ -91,7 +89,6 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         )
 
         self._data_converter = data_converter
-        self._interceptors = interceptors
 
         self._running_tasks: dict[bytes, _RunningNexusTask] = {}
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
