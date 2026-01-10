@@ -5476,9 +5476,6 @@ class NexusClient(ABC, Generic[ServiceT]):
         summary: str | None = None,
     ) -> OutputT: ...
 
-    # TODO(nexus-preview): in practice, both these overloads match an async def sync
-    # operation (i.e. either can be deleted without causing a type error).
-
     # Overload for sync_operation methods (async def)
     @overload
     @abstractmethod
