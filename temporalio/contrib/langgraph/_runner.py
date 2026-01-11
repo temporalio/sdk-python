@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable, Sequence, cast
 
 from temporalio import workflow
 
@@ -37,6 +37,7 @@ from temporalio.contrib.langgraph._models import (
 if TYPE_CHECKING:
     from langchain_core.runnables import RunnableConfig
     from langgraph.pregel import Pregel
+    from langgraph.pregel._loop import AsyncPregelLoop
     from langgraph.types import PregelExecutableTask
 
 
@@ -268,6 +269,9 @@ class TemporalLangGraphRunner:
     Wraps a compiled Pregel graph and executes nodes as Temporal activities.
     Uses AsyncPregelLoop for graph orchestration. Supports interrupts via
     LangGraph's native API (``INTERRUPT_KEY`` key and ``Command(resume=...)``).
+
+    .. warning::
+        This class is experimental and may change in future versions.
     """
 
     def __init__(
@@ -478,7 +482,7 @@ class TemporalLangGraphRunner:
 
     def _create_pregel_loop(
         self, input_state: dict[str, Any], config: dict[str, Any]
-    ) -> Any:
+    ) -> "AsyncPregelLoop":
         """Create an AsyncPregelLoop for graph execution.
 
         Args:
@@ -575,7 +579,7 @@ class TemporalLangGraphRunner:
         output = cast("dict[str, Any]", loop.output) if loop.output else {}
         return output, interrupted
 
-    def _inject_resumed_writes(self, loop: Any) -> None:
+    def _inject_resumed_writes(self, loop: "AsyncPregelLoop") -> None:
         """Inject cached writes from resumed nodes into loop tasks.
 
         This allows the trigger mechanism to schedule successor nodes.
@@ -585,7 +589,7 @@ class TemporalLangGraphRunner:
                 cached_writes = self._execution.resumed_node_writes.pop(task.name)
                 task.writes.extend(cached_writes)
 
-    def _inject_next_node_triggers(self, loop: Any) -> bool:
+    def _inject_next_node_triggers(self, loop: "AsyncPregelLoop") -> bool:
         """Inject trigger writes to directly schedule next nodes.
 
         This is used for should_continue resume to skip completed nodes and
@@ -654,7 +658,9 @@ class TemporalLangGraphRunner:
         )
         return False
 
-    def _get_executable_tasks(self, loop: Any) -> list[Any]:
+    def _get_executable_tasks(
+        self, loop: "AsyncPregelLoop"
+    ) -> list["PregelExecutableTask"]:
         """Get tasks that need to be executed.
 
         Filters out tasks that already have writes or were completed
@@ -672,7 +678,7 @@ class TemporalLangGraphRunner:
         ]
 
     def _check_checkpoint(
-        self, loop: Any, should_continue: Callable[[], bool] | None
+        self, loop: "AsyncPregelLoop", should_continue: Callable[[], bool] | None
     ) -> dict[str, Any] | None:
         """Check if we should stop for checkpointing.
 
@@ -718,7 +724,9 @@ class TemporalLangGraphRunner:
             return output
         return None
 
-    async def _execute_loop_tasks(self, tasks: list[Any], loop: Any) -> bool:
+    async def _execute_loop_tasks(
+        self, tasks: Sequence["PregelExecutableTask"], loop: "AsyncPregelLoop"
+    ) -> bool:
         """Execute a list of tasks in parallel (BSP model).
 
         LangGraph uses a Bulk Synchronous Parallel (BSP) model where all tasks
@@ -781,7 +789,9 @@ class TemporalLangGraphRunner:
 
         return output
 
-    async def _execute_task(self, task: PregelExecutableTask, loop: Any) -> bool:
+    async def _execute_task(
+        self, task: "PregelExecutableTask", loop: "AsyncPregelLoop"
+    ) -> bool:
         """Execute a single task. Returns False if interrupted."""
         # Determine if this task should receive the resume value
         # Only pass resume value to the specific node that was interrupted

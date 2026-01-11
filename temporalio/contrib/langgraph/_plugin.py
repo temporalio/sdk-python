@@ -8,6 +8,8 @@ from collections.abc import Callable, Sequence
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, cast
 
+from typing_extensions import TypeAlias
+
 from temporalio.contrib.langgraph._functional_activity import execute_langgraph_task
 from temporalio.contrib.langgraph._functional_registry import register_entrypoint
 from temporalio.contrib.langgraph._graph_registry import register_graph
@@ -26,7 +28,7 @@ if TYPE_CHECKING:
 # Can be:
 #   - str: "node_or_task_name" (global - applies to all graphs/entrypoints)
 #   - tuple: ("graph_or_entrypoint_id", "node_or_task_name") (scoped)
-ActivityOptionsKey = str | tuple[str, str]
+ActivityOptionsKey: TypeAlias = str | tuple[str, str]
 
 
 def _langgraph_data_converter(converter: DataConverter | None) -> DataConverter:

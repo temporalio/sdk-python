@@ -5,6 +5,8 @@ Tests for TaskActivityInput, TaskActivityOutput, and FunctionalRunnerConfig.
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 
 class TestTaskActivityInput:
     """Tests for TaskActivityInput model."""
@@ -122,7 +124,7 @@ class TestFunctionalRunnerConfig:
         config = FunctionalRunnerConfig(entrypoint_id="my_entrypoint")
 
         assert config.entrypoint_id == "my_entrypoint"
-        assert config.default_task_timeout_seconds == 300.0
+        assert config.default_task_timeout == timedelta(minutes=5)
         assert config.task_options == {}
 
     def test_functional_runner_config_custom_timeout(self) -> None:
@@ -133,10 +135,10 @@ class TestFunctionalRunnerConfig:
 
         config = FunctionalRunnerConfig(
             entrypoint_id="my_entrypoint",
-            default_task_timeout_seconds=600.0,
+            default_task_timeout=timedelta(minutes=10),
         )
 
-        assert config.default_task_timeout_seconds == 600.0
+        assert config.default_task_timeout == timedelta(minutes=10)
 
     def test_functional_runner_config_with_task_options(self) -> None:
         """FunctionalRunnerConfig should store per-task options."""
@@ -165,11 +167,11 @@ class TestFunctionalRunnerConfig:
 
         config = FunctionalRunnerConfig(
             entrypoint_id="my_entrypoint",
-            default_task_timeout_seconds=120.0,
+            default_task_timeout=timedelta(minutes=2),
         )
 
         timeout = config.get_task_timeout("unknown_task")
-        assert timeout == 120.0
+        assert timeout == timedelta(minutes=2)
 
     def test_get_task_timeout_with_override(self) -> None:
         """get_task_timeout should return task-specific timeout."""
@@ -179,15 +181,15 @@ class TestFunctionalRunnerConfig:
 
         config = FunctionalRunnerConfig(
             entrypoint_id="my_entrypoint",
-            default_task_timeout_seconds=120.0,
+            default_task_timeout=timedelta(minutes=2),
             task_options={
-                "custom_task": {"start_to_close_timeout_seconds": 600.0},
+                "custom_task": {"start_to_close_timeout": timedelta(minutes=10)},
             },
         )
 
         timeout = config.get_task_timeout("custom_task")
-        assert timeout == 600.0
+        assert timeout == timedelta(minutes=10)
 
         # Other tasks should still get default
         default_timeout = config.get_task_timeout("other_task")
-        assert default_timeout == 120.0
+        assert default_timeout == timedelta(minutes=2)

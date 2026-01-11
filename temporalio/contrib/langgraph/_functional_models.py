@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Any
 
 
@@ -41,15 +42,13 @@ class FunctionalRunnerConfig:
     entrypoint_id: str
     """ID of the entrypoint being executed."""
 
-    default_task_timeout_seconds: float = 300.0
+    default_task_timeout: timedelta = field(default_factory=lambda: timedelta(minutes=5))
     """Default timeout for task activities (5 minutes)."""
 
     task_options: dict[str, dict[str, Any]] = field(default_factory=dict)
     """Per-task activity options, keyed by task name."""
 
-    def get_task_timeout(self, task_name: str) -> float:
+    def get_task_timeout(self, task_name: str) -> timedelta:
         """Get timeout for a specific task."""
         task_opts = self.task_options.get(task_name, {})
-        return task_opts.get(
-            "start_to_close_timeout_seconds", self.default_task_timeout_seconds
-        )
+        return task_opts.get("start_to_close_timeout", self.default_task_timeout)

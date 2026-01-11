@@ -78,7 +78,7 @@ def _coerce_state_values(state: Any) -> Any:
 # ==============================================================================
 
 
-@dataclass
+@dataclass(frozen=True)
 class StoreItem:
     """A key-value pair within a namespace."""
 
@@ -92,7 +92,7 @@ class StoreItem:
     """The stored value."""
 
 
-@dataclass
+@dataclass(frozen=True)
 class StoreWrite:
     """A store write operation (put or delete)."""
 
@@ -109,7 +109,7 @@ class StoreWrite:
     """The value to store (None for delete operations)."""
 
 
-@dataclass
+@dataclass(frozen=True)
 class StoreSnapshot:
     """Snapshot of store data passed to an activity."""
 
@@ -139,7 +139,7 @@ def _is_langchain_message_list(value: Any) -> bool:
     return _is_langchain_message(value[0])
 
 
-@dataclass
+@dataclass(frozen=True)
 class ChannelWrite:
     """A write to a LangGraph channel with type preservation for messages."""
 
@@ -179,7 +179,7 @@ class ChannelWrite:
         return (self.channel, self.reconstruct_value())
 
 
-@dataclass
+@dataclass(frozen=True)
 class NodeActivityInput:
     """Input for the node execution activity."""
 
@@ -215,10 +215,12 @@ class NodeActivityInput:
 
     def __post_init__(self) -> None:
         """Coerce state values to LangChain messages after deserialization."""
-        self.input_state = _coerce_state_values(self.input_state)
+        object.__setattr__(
+            self, "input_state", _coerce_state_values(self.input_state)
+        )
 
 
-@dataclass
+@dataclass(frozen=True)
 class InterruptValue:
     """Data about an interrupt raised by a node."""
 
@@ -232,7 +234,7 @@ class InterruptValue:
     """Task ID of the interrupted execution."""
 
 
-@dataclass
+@dataclass(frozen=True)
 class SendPacket:
     """Serializable representation of a LangGraph Send object."""
 
@@ -248,7 +250,7 @@ class SendPacket:
         return cls(node=send.node, arg=send.arg)
 
 
-@dataclass
+@dataclass(frozen=True)
 class CommandOutput:
     """Serializable representation of a LangGraph Command for parent graph control.
 
@@ -292,7 +294,7 @@ class CommandOutput:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class NodeActivityOutput:
     """Output from the node execution activity."""
 
@@ -316,9 +318,13 @@ class NodeActivityOutput:
         return [write.to_tuple() for write in self.writes]
 
 
-@dataclass
+@dataclass(frozen=True)
 class StateSnapshot:
-    """Snapshot of graph execution state for checkpointing and continue-as-new."""
+    """Snapshot of graph execution state for checkpointing and continue-as-new.
+
+    .. warning::
+        This class is experimental and may change in future versions.
+    """
 
     values: dict[str, Any]
     """Current state values."""

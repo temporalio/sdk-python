@@ -150,6 +150,9 @@ class TemporalFunctionalRunner:
 
     The runner maintains an in-memory cache of task results that can be
     serialized for continue-as-new workflows via get_state().
+
+    .. warning::
+        This class is experimental and may change in future versions.
     """
 
     def __init__(

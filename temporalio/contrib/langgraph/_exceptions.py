@@ -176,7 +176,11 @@ def graph_definition_changed_error(
 
 
 class GraphAlreadyRegisteredError(ValueError):
-    """Raised when registering a graph with a duplicate ID."""
+    """Raised when registering a graph with a duplicate ID.
+
+    .. warning::
+        This class is experimental and may change in future versions.
+    """
 
     def __init__(self, graph_id: str) -> None:
         """Initialize with the duplicate graph ID."""

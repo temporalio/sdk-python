@@ -66,6 +66,9 @@ def activity_options(
 
     Use with plugin registration or compile() for workflow-level overrides.
     Parameters mirror ``workflow.execute_activity()``.
+
+    .. warning::
+        This API is experimental and may change in future versions.
     """
     config: dict[str, Any] = {}
     if schedule_to_close_timeout is not None:
@@ -101,6 +104,9 @@ def temporal_node_metadata(
     Args:
         activity_options: Options from ``activity_options()``.
         run_in_workflow: If True, run in workflow instead of as activity.
+
+    .. warning::
+        This API is experimental and may change in future versions.
     """
     # Start with activity options if provided, otherwise empty temporal config
     if activity_options:
