@@ -239,33 +239,36 @@ class LangGraphPlugin(SimplePlugin):
             )
         elif callable(value):
             # It's a callable - could be lazy graph builder or entrypoint
-            # Try to call it and detect
+            # Call it and detect the result type
             try:
                 result = value()
-                if _is_entrypoint(result):
-                    self._register_as_entrypoint(
-                        entry_id,
-                        cast("Pregel", result),
-                        default_opts,
-                        per_item_opts,
-                    )
-                elif _is_compiled_graph(result):
-                    self._register_as_graph(
-                        entry_id,
-                        _make_graph_builder(cast("Pregel", result)),
-                        default_opts,
-                        per_item_opts,
-                    )
-                else:
-                    raise ValueError(
-                        f"Callable '{entry_id}' returned {type(result)}, "
-                        "expected CompiledGraph or @entrypoint"
-                    )
-            except Exception as e:
+            except (TypeError, AttributeError, RuntimeError) as e:
+                # Catch common errors from calling the builder
                 raise ValueError(
-                    f"Failed to process '{entry_id}': {e}. "
-                    "Expected CompiledGraph, @entrypoint, or callable returning one."
+                    f"Failed to call builder for '{entry_id}': {e}. "
+                    "Callable should return CompiledGraph or @entrypoint."
                 ) from e
+
+            # Now register based on result type (let registration errors propagate)
+            if _is_entrypoint(result):
+                self._register_as_entrypoint(
+                    entry_id,
+                    cast("Pregel", result),
+                    default_opts,
+                    per_item_opts,
+                )
+            elif _is_compiled_graph(result):
+                self._register_as_graph(
+                    entry_id,
+                    _make_graph_builder(cast("Pregel", result)),
+                    default_opts,
+                    per_item_opts,
+                )
+            else:
+                raise ValueError(
+                    f"Callable '{entry_id}' returned {type(result)}, "
+                    "expected CompiledGraph or @entrypoint"
+                )
         else:
             raise ValueError(
                 f"Unknown type for '{entry_id}': {type(value)}. "

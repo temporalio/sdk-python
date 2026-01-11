@@ -617,9 +617,7 @@ class TemporalFunctionalRunner:
 
         except CheckpointInterrupt:
             # Handle should_continue() returning False
-            logger.debug(
-                "Entrypoint %s stopped for checkpointing", self._entrypoint_id
-            )
+            logger.debug("Entrypoint %s stopped for checkpointing", self._entrypoint_id)
 
             # Return checkpoint state for continue-as-new
             checkpoint_state = self.get_state()

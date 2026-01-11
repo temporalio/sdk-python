@@ -42,7 +42,9 @@ class FunctionalRunnerConfig:
     entrypoint_id: str
     """ID of the entrypoint being executed."""
 
-    default_task_timeout: timedelta = field(default_factory=lambda: timedelta(minutes=5))
+    default_task_timeout: timedelta = field(
+        default_factory=lambda: timedelta(minutes=5)
+    )
     """Default timeout for task activities (5 minutes)."""
 
     task_options: dict[str, dict[str, Any]] = field(default_factory=dict)

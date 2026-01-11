@@ -37,6 +37,7 @@ from temporalio.contrib.langgraph._graph_registry import (
     get_default_activity_options,
     get_graph,
     get_per_node_activity_options,
+    register_graph,
 )
 from temporalio.contrib.langgraph._graph_registry import (
     get_global_registry as _get_graph_registry,
@@ -324,6 +325,9 @@ __all__ = [
     # Runner types (for type annotations)
     "TemporalLangGraphRunner",
     "TemporalFunctionalRunner",
+    # Registry functions (for direct registration outside LangGraphPlugin)
+    "register_graph",
+    "register_entrypoint",
     # Exception types (for catching configuration errors)
     "GraphAlreadyRegisteredError",
     # Error type constants (for catching ApplicationError.type)

@@ -3,7 +3,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
+
+if TYPE_CHECKING:
+    from langchain_core.messages import BaseMessage
+
+# TypeVar for pass-through typing
+_T = TypeVar("_T")
+
+
+@overload
+def _coerce_to_message(value: dict[str, Any]) -> "BaseMessage | dict[str, Any]": ...
+
+
+@overload
+def _coerce_to_message(value: _T) -> _T: ...
 
 
 def _coerce_to_message(value: Any) -> Any:
@@ -54,6 +68,14 @@ def _coerce_value(value: Any) -> Any:
     else:
         # Not a dict or list, return as-is
         return value
+
+
+@overload
+def _coerce_state_values(state: dict[str, Any]) -> dict[str, Any]: ...
+
+
+@overload
+def _coerce_state_values(state: _T) -> _T: ...
 
 
 def _coerce_state_values(state: Any) -> Any:
@@ -215,9 +237,7 @@ class NodeActivityInput:
 
     def __post_init__(self) -> None:
         """Coerce state values to LangChain messages after deserialization."""
-        object.__setattr__(
-            self, "input_state", _coerce_state_values(self.input_state)
-        )
+        object.__setattr__(self, "input_state", _coerce_state_values(self.input_state))
 
 
 @dataclass(frozen=True)
