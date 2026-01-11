@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import dataclasses
 from typing import TYPE_CHECKING
 
 from temporalio.plugin import SimplePlugin
+from temporalio.worker import WorkflowRunner
 
 from ._replay_filtering_processor import ReplayFilteringSpanProcessor
 from ._tracing_interceptor import TracingInterceptor
@@ -20,7 +22,7 @@ class OtelTracingPlugin(SimplePlugin):
 
     This plugin provides:
     1. Context propagation via TracingInterceptor (with create_spans=False)
-    2. Sandbox passthrough configuration for opentelemetry module
+    2. Automatic sandbox passthrough configuration for opentelemetry module
     3. Optional replay filtering for span processors
 
     The plugin uses TracingInterceptor with create_spans=False, which means
@@ -45,14 +47,11 @@ class OtelTracingPlugin(SimplePlugin):
             plugins=[plugin],
         )
 
-        # IMPORTANT: Configure sandbox to passthrough opentelemetry
+        # Sandbox passthrough is configured automatically by the plugin
         worker = Worker(
             client,
             task_queue="my-queue",
             workflows=[MyWorkflow],
-            workflow_runner=SandboxedWorkflowRunner(
-                restrictions=plugin.sandbox_restrictions
-            ),
         )
     """
 
@@ -76,10 +75,27 @@ class OtelTracingPlugin(SimplePlugin):
             self._wrap_with_replay_filter(tracer_provider)
 
         interceptor = TracingInterceptor(create_spans=False)
+
+        def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner | None:
+            """Auto-configure sandbox to passthrough opentelemetry."""
+            from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
+
+            if runner is None:
+                return None
+            if isinstance(runner, SandboxedWorkflowRunner):
+                return dataclasses.replace(
+                    runner,
+                    restrictions=runner.restrictions.with_passthrough_modules(
+                        "opentelemetry"
+                    ),
+                )
+            return runner
+
         super().__init__(
             name="OtelTracingPlugin",
             worker_interceptors=[interceptor],
             client_interceptors=[interceptor],
+            workflow_runner=workflow_runner,
         )
 
     @property
