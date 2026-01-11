@@ -61,6 +61,9 @@ dev = [
   "openai-agents[litellm]>=0.3,<0.7; python_version < '3.14'",
   "googleapis-common-protos==1.70.0",
   "pytest-rerunfailures>=16.1",
+  # LangGraph integration tests
+  "langchain>=1.2.0,<2",
+  "langgraph>=1.0.0,<2",
 ]
 
 [tool.poe.tasks]
@@ -138,6 +141,8 @@ exclude = [
   # Ignore generated code
   'temporalio/api',
   'temporalio/bridge/proto',
+  # Ignore separate repos/worktrees
+  'crew-ai',
 ]
 
 [tool.pydocstyle]
