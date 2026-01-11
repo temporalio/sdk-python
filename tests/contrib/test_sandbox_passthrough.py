@@ -10,9 +10,6 @@ from typing import Any
 import pytest
 
 import opentelemetry.trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from temporalio import workflow
 from temporalio.client import Client
@@ -44,16 +41,6 @@ class SandboxSpanTestWorkflow:
             "has_tracer_header": has_tracer_header,
             "span_str": str(span),
         }
-
-
-@pytest.fixture
-def tracer_provider_and_exporter():
-    """Create a tracer provider with in-memory exporter."""
-    exporter = InMemorySpanExporter()
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
-    opentelemetry.trace.set_tracer_provider(provider)
-    return provider, exporter
 
 
 @pytest.mark.asyncio
