@@ -92,7 +92,7 @@ writes = [("messages", {"content": "Hello", "type": "ai", ...})]  # Dict!
 **Solution**: The `ChannelWrite` model in `_models.py` includes a `value_type` field that enables reconstruction:
 
 ```python
-@dataclass
+@dataclass(frozen=True)
 class ChannelWrite:
     channel: str
     value: Any
@@ -237,7 +237,7 @@ For Functional API in `_functional_runner.py` and `_functional_future.py`:
 
 | File | Purpose |
 |------|---------|
-| `__init__.py` | Public API: `compile()`, `activity_options()`, `LangGraphPlugin` |
+| `__init__.py` | Public API: `compile()`, `activity_options()`, `LangGraphPlugin`, `register_graph()`, `register_entrypoint()` |
 | `_plugin.py` | Unified plugin with auto-detection of graph vs entrypoint |
 | `_runner.py` | Graph API runner using `AsyncPregelLoop` |
 | `_functional_runner.py` | Functional API runner with `CONFIG_KEY_CALL` injection |
