@@ -1,3 +1,4 @@
 [submodule "sdk-core"]
 	path = temporalio/bridge/sdk-core
-	url = https://github.com/temporalio/sdk-core.git
+	url = https://github.com/jmaeagle99/temporalio-sdk-core.git
+	branch = update-upstream-api
