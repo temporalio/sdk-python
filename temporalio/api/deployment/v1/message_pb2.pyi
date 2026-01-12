@@ -379,6 +379,7 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
     CURRENT_SINCE_TIME_FIELD_NUMBER: builtins.int
     RAMPING_SINCE_TIME_FIELD_NUMBER: builtins.int
     FIRST_ACTIVATION_TIME_FIELD_NUMBER: builtins.int
+    LAST_CURRENT_TIME_FIELD_NUMBER: builtins.int
     LAST_DEACTIVATION_TIME_FIELD_NUMBER: builtins.int
     RAMP_PERCENTAGE_FIELD_NUMBER: builtins.int
     TASK_QUEUE_INFOS_FIELD_NUMBER: builtins.int
@@ -415,8 +416,15 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
     def first_activation_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Timestamp when this version first became current or ramping."""
     @property
+    def last_current_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Timestamp when this version last became current.
+        Can be used to determine whether a version has ever been Current.
+        """
+    @property
     def last_deactivation_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Timestamp when this version last stopped being current or ramping."""
+        """Timestamp when this version last stopped being current or ramping.
+        Cleared if the version becomes current or ramping again.
+        """
     ramp_percentage: builtins.float
     """Range: [0, 100]. Must be zero if the version is not ramping (i.e. `ramping_since_time` is nil).
     Can be in the range [0, 100] if the version is ramping.
@@ -461,6 +469,7 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
         current_since_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         ramping_since_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         first_activation_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        last_current_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         last_deactivation_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         ramp_percentage: builtins.float = ...,
         task_queue_infos: collections.abc.Iterable[
@@ -483,6 +492,8 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
             b"drainage_info",
             "first_activation_time",
             b"first_activation_time",
+            "last_current_time",
+            b"last_current_time",
             "last_deactivation_time",
             b"last_deactivation_time",
             "metadata",
@@ -508,6 +519,8 @@ class WorkerDeploymentVersionInfo(google.protobuf.message.Message):
             b"drainage_info",
             "first_activation_time",
             b"first_activation_time",
+            "last_current_time",
+            b"last_current_time",
             "last_deactivation_time",
             b"last_deactivation_time",
             "metadata",
@@ -606,6 +619,7 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
         RAMPING_SINCE_TIME_FIELD_NUMBER: builtins.int
         ROUTING_UPDATE_TIME_FIELD_NUMBER: builtins.int
         FIRST_ACTIVATION_TIME_FIELD_NUMBER: builtins.int
+        LAST_CURRENT_TIME_FIELD_NUMBER: builtins.int
         LAST_DEACTIVATION_TIME_FIELD_NUMBER: builtins.int
         version: builtins.str
         """Deprecated. Use `deployment_version`."""
@@ -644,8 +658,15 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
         def first_activation_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
             """Timestamp when this version first became current or ramping."""
         @property
+        def last_current_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+            """Timestamp when this version last became current.
+            Can be used to determine whether a version has ever been Current.
+            """
+        @property
         def last_deactivation_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-            """Timestamp when this version last stopped being current or ramping."""
+            """Timestamp when this version last stopped being current or ramping.
+            Cleared if the version becomes current or ramping again.
+            """
         def __init__(
             self,
             *,
@@ -659,6 +680,7 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
             ramping_since_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
             routing_update_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
             first_activation_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+            last_current_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
             last_deactivation_time: google.protobuf.timestamp_pb2.Timestamp
             | None = ...,
         ) -> None: ...
@@ -675,6 +697,8 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
                 b"drainage_info",
                 "first_activation_time",
                 b"first_activation_time",
+                "last_current_time",
+                b"last_current_time",
                 "last_deactivation_time",
                 b"last_deactivation_time",
                 "ramping_since_time",
@@ -698,6 +722,8 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
                 b"drainage_status",
                 "first_activation_time",
                 b"first_activation_time",
+                "last_current_time",
+                b"last_current_time",
                 "last_deactivation_time",
                 b"last_deactivation_time",
                 "ramping_since_time",
@@ -717,6 +743,7 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
     ROUTING_CONFIG_FIELD_NUMBER: builtins.int
     LAST_MODIFIER_IDENTITY_FIELD_NUMBER: builtins.int
     MANAGER_IDENTITY_FIELD_NUMBER: builtins.int
+    ROUTING_CONFIG_UPDATE_STATE_FIELD_NUMBER: builtins.int
     name: builtins.str
     """Identifies a Worker Deployment. Must be unique within the namespace."""
     @property
@@ -746,6 +773,12 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
     If this is set, clients whose identity does not match `manager_identity` will not be able to make changes
     to this Worker Deployment. They can either set their own identity as the manager or unset the field to proceed.
     """
+    routing_config_update_state: (
+        temporalio.api.enums.v1.task_queue_pb2.RoutingConfigUpdateState.ValueType
+    )
+    """Indicates whether the routing_config has been fully propagated to all
+    relevant task queues and their partitions.
+    """
     def __init__(
         self,
         *,
@@ -758,6 +791,7 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
         routing_config: global___RoutingConfig | None = ...,
         last_modifier_identity: builtins.str = ...,
         manager_identity: builtins.str = ...,
+        routing_config_update_state: temporalio.api.enums.v1.task_queue_pb2.RoutingConfigUpdateState.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -778,6 +812,8 @@ class WorkerDeploymentInfo(google.protobuf.message.Message):
             b"name",
             "routing_config",
             b"routing_config",
+            "routing_config_update_state",
+            b"routing_config_update_state",
             "version_summaries",
             b"version_summaries",
         ],
@@ -878,6 +914,7 @@ class RoutingConfig(google.protobuf.message.Message):
     CURRENT_VERSION_CHANGED_TIME_FIELD_NUMBER: builtins.int
     RAMPING_VERSION_CHANGED_TIME_FIELD_NUMBER: builtins.int
     RAMPING_VERSION_PERCENTAGE_CHANGED_TIME_FIELD_NUMBER: builtins.int
+    REVISION_NUMBER_FIELD_NUMBER: builtins.int
     @property
     def current_deployment_version(self) -> global___WorkerDeploymentVersion:
         """Specifies which Deployment Version should receive new workflow executions and tasks of
@@ -917,6 +954,10 @@ class RoutingConfig(google.protobuf.message.Message):
         """Last time ramping version percentage was changed.
         If ramping version is changed, this is also updated, even if the percentage stays the same.
         """
+    revision_number: builtins.int
+    """Monotonically increasing value which is incremented on every mutation 
+    to any field of this message to achieve eventual consistency between task queues and their partitions.
+    """
     def __init__(
         self,
         *,
@@ -931,6 +972,7 @@ class RoutingConfig(google.protobuf.message.Message):
         | None = ...,
         ramping_version_percentage_changed_time: google.protobuf.timestamp_pb2.Timestamp
         | None = ...,
+        revision_number: builtins.int = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -966,7 +1008,47 @@ class RoutingConfig(google.protobuf.message.Message):
             b"ramping_version_percentage",
             "ramping_version_percentage_changed_time",
             b"ramping_version_percentage_changed_time",
+            "revision_number",
+            b"revision_number",
         ],
     ) -> None: ...
 
 global___RoutingConfig = RoutingConfig
+
+class InheritedAutoUpgradeInfo(google.protobuf.message.Message):
+    """Used as part of WorkflowExecutionStartedEventAttributes to pass down the AutoUpgrade behavior and source deployment version
+    to a workflow execution whose parent/previous workflow has an AutoUpgrade behavior.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SOURCE_DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
+    SOURCE_DEPLOYMENT_REVISION_NUMBER_FIELD_NUMBER: builtins.int
+    @property
+    def source_deployment_version(self) -> global___WorkerDeploymentVersion:
+        """The source deployment version of the parent/previous workflow."""
+    source_deployment_revision_number: builtins.int
+    """The revision number of the source deployment version of the parent/previous workflow."""
+    def __init__(
+        self,
+        *,
+        source_deployment_version: global___WorkerDeploymentVersion | None = ...,
+        source_deployment_revision_number: builtins.int = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "source_deployment_version", b"source_deployment_version"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "source_deployment_revision_number",
+            b"source_deployment_revision_number",
+            "source_deployment_version",
+            b"source_deployment_version",
+        ],
+    ) -> None: ...
+
+global___InheritedAutoUpgradeInfo = InheritedAutoUpgradeInfo
