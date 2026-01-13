@@ -67,6 +67,7 @@ Design Notes - Cross-Process Trace Propagation:
     are created - only context is propagated for other instrumentation.
 """
 
+from ._id_generator import TemporalIdGenerator
 from ._otel_tracing_plugin import OtelTracingPlugin
 from ._tracing_interceptor import (
     TracingInterceptor,
@@ -76,9 +77,10 @@ from ._tracing_interceptor import (
 )
 
 __all__ = [
+    "OtelTracingPlugin",
+    "TemporalIdGenerator",
     "TracingInterceptor",
     "TracingWorkflowInboundInterceptor",
     "default_text_map_propagator",
     "workflow",
-    "OtelTracingPlugin",
 ]

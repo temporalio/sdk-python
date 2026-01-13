@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 from typing import TYPE_CHECKING
 
 from temporalio.plugin import SimplePlugin
@@ -15,6 +16,8 @@ if TYPE_CHECKING:
     from opentelemetry.sdk.trace import TracerProvider
 
     from temporalio.worker.workflow_sandbox import SandboxRestrictions
+
+_logger = logging.getLogger(__name__)
 
 
 class OtelTracingPlugin(SimplePlugin):
@@ -73,20 +76,29 @@ class OtelTracingPlugin(SimplePlugin):
         self,
         tracer_provider: TracerProvider | None = None,
         filter_replay_spans: bool = True,
+        deterministic_ids: bool = False,
     ) -> None:
         """Initialize the OTEL tracing plugin.
 
         Args:
-            tracer_provider: Optional tracer provider to wrap with replay
-                filtering. If provided and filter_replay_spans is True,
-                existing span processors will be wrapped with
-                ReplayFilteringSpanProcessor.
+            tracer_provider: Optional tracer provider to configure. If provided,
+                replay filtering and/or deterministic IDs will be configured
+                based on the other parameters.
             filter_replay_spans: If True and tracer_provider is provided,
                 wrap span processors to filter out spans created during replay.
                 Defaults to True.
+            deterministic_ids: If True and tracer_provider is provided,
+                configure the tracer provider to use deterministic span ID
+                generation in workflow context. This enables real-duration
+                spans in workflows by ensuring the same span IDs are generated
+                on replay (which are then filtered by ReplayFilteringSpanProcessor).
+                Defaults to False.
         """
-        if tracer_provider and filter_replay_spans:
-            self._wrap_with_replay_filter(tracer_provider)
+        if tracer_provider:
+            if deterministic_ids:
+                self._configure_deterministic_ids(tracer_provider)
+            if filter_replay_spans:
+                self._wrap_with_replay_filter(tracer_provider)
 
         interceptor = TracingInterceptor(create_spans=False)
 
@@ -154,3 +166,24 @@ class OtelTracingPlugin(SimplePlugin):
                 for p in processor._span_processors:
                     wrapped.append(ReplayFilteringSpanProcessor(p))
                 processor._span_processors = tuple(wrapped)
+
+    def _configure_deterministic_ids(self, tracer_provider: TracerProvider) -> None:
+        """Configure tracer provider for deterministic span ID generation.
+
+        This modifies the tracer provider in place to use TemporalIdGenerator,
+        which produces deterministic span/trace IDs when running in workflow
+        context using workflow.random().
+
+        Args:
+            tracer_provider: The tracer provider to configure.
+        """
+        from ._id_generator import TemporalIdGenerator
+
+        if hasattr(tracer_provider, "id_generator"):
+            tracer_provider.id_generator = TemporalIdGenerator()
+        else:
+            _logger.warning(
+                "Could not configure deterministic span IDs: "
+                "TracerProvider does not have id_generator attribute. "
+                "Span IDs will be random, which may cause issues during replay."
+            )
