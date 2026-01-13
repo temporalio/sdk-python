@@ -307,6 +307,7 @@ class AddOrUpdateRemoteClusterRequest(google.protobuf.message.Message):
     FRONTEND_ADDRESS_FIELD_NUMBER: builtins.int
     ENABLE_REMOTE_CLUSTER_CONNECTION_FIELD_NUMBER: builtins.int
     FRONTEND_HTTP_ADDRESS_FIELD_NUMBER: builtins.int
+    ENABLE_REPLICATION_FIELD_NUMBER: builtins.int
     frontend_address: builtins.str
     """Frontend Address is a cross cluster accessible address for gRPC traffic. This field is required."""
     enable_remote_cluster_connection: builtins.bool
@@ -315,18 +316,23 @@ class AddOrUpdateRemoteClusterRequest(google.protobuf.message.Message):
     """Frontend HTTP Address is a cross cluster accessible address for HTTP traffic. This field is optional. If not provided
      on update, the existing HTTP address will be removed.
     """
+    enable_replication: builtins.bool
+    """Controls whether replication streams are active."""
     def __init__(
         self,
         *,
         frontend_address: builtins.str = ...,
         enable_remote_cluster_connection: builtins.bool = ...,
         frontend_http_address: builtins.str = ...,
+        enable_replication: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
             "enable_remote_cluster_connection",
             b"enable_remote_cluster_connection",
+            "enable_replication",
+            b"enable_replication",
             "frontend_address",
             b"frontend_address",
             "frontend_http_address",
@@ -431,6 +437,7 @@ class ClusterMetadata(google.protobuf.message.Message):
     INITIAL_FAILOVER_VERSION_FIELD_NUMBER: builtins.int
     HISTORY_SHARD_COUNT_FIELD_NUMBER: builtins.int
     IS_CONNECTION_ENABLED_FIELD_NUMBER: builtins.int
+    IS_REPLICATION_ENABLED_FIELD_NUMBER: builtins.int
     cluster_name: builtins.str
     """Name of the cluster name."""
     cluster_id: builtins.str
@@ -445,6 +452,8 @@ class ClusterMetadata(google.protobuf.message.Message):
     """History service shard number."""
     is_connection_enabled: builtins.bool
     """A flag to indicate if a connection is active."""
+    is_replication_enabled: builtins.bool
+    """A flag to indicate if replication is enabled."""
     def __init__(
         self,
         *,
@@ -455,6 +464,7 @@ class ClusterMetadata(google.protobuf.message.Message):
         initial_failover_version: builtins.int = ...,
         history_shard_count: builtins.int = ...,
         is_connection_enabled: builtins.bool = ...,
+        is_replication_enabled: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
@@ -473,6 +483,8 @@ class ClusterMetadata(google.protobuf.message.Message):
             b"initial_failover_version",
             "is_connection_enabled",
             b"is_connection_enabled",
+            "is_replication_enabled",
+            b"is_replication_enabled",
         ],
     ) -> None: ...
 

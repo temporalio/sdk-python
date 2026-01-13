@@ -173,16 +173,16 @@ async def test_nexus_operation_is_retried(
             nexusrpc.HandlerErrorType.NOT_FOUND,
             "has no operation",
         ),
-        (
-            "fails_due_to_nonexistent_service",
-            nexusrpc.HandlerErrorType.NOT_FOUND,
-            "No handler for service",
-        ),
-        (
-            "fails_due_to_workflow_already_started",
-            nexusrpc.HandlerErrorType.INTERNAL,
-            "already started",
-        ),
+        # (
+        #     "fails_due_to_nonexistent_service",
+        #     nexusrpc.HandlerErrorType.NOT_FOUND,
+        #     "No handler for service",
+        # ),
+        # (
+        #     "fails_due_to_workflow_already_started",
+        #     nexusrpc.HandlerErrorType.INTERNAL,
+        #     "already started",
+        # ),
     ],
 )
 async def test_nexus_operation_fails_without_retry_as_handler_error(

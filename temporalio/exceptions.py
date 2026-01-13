@@ -418,6 +418,30 @@ class NexusOperationError(FailureError):
         return self._operation_token
 
 
+class ResetWorkflowError(FailureError):
+    """Error raised when a workflow is reset."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        last_heartbeat_details: Sequence[Any],
+    ) -> None:
+        """Initialize a reset workflow error.
+
+        Args:
+            message: The error message.
+            last_heartbeat_details: The last heartbeat details from the reset workflow.
+        """
+        super().__init__(message)
+        self._last_heartbeat_details = last_heartbeat_details
+
+    @property
+    def last_heartbeat_details(self) -> Sequence[Any]:
+        """Last heartbeat details from the reset workflow."""
+        return self._last_heartbeat_details
+
+
 def is_cancelled_exception(exception: BaseException) -> bool:
     """Check whether the given exception is considered a cancellation exception
     according to Temporal.

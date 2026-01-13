@@ -4,10 +4,12 @@ isort:skip_file
 """
 
 import builtins
+import collections.abc
 import sys
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
+import google.protobuf.internal.containers
 import google.protobuf.message
 
 import temporalio.api.common.v1.message_pb2
@@ -293,6 +295,8 @@ class ChildWorkflowExecutionFailureInfo(google.protobuf.message.Message):
 global___ChildWorkflowExecutionFailureInfo = ChildWorkflowExecutionFailureInfo
 
 class NexusOperationFailureInfo(google.protobuf.message.Message):
+    """Representation of the Temporal SDK NexusOperationError object that is returned to workflow callers."""
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SCHEDULED_EVENT_ID_FIELD_NUMBER: builtins.int
@@ -374,6 +378,67 @@ class NexusHandlerFailureInfo(google.protobuf.message.Message):
 
 global___NexusHandlerFailureInfo = NexusHandlerFailureInfo
 
+class NexusSDKOperationFailureInfo(google.protobuf.message.Message):
+    """Representation of the Nexus SDK OperationError object."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    STATE_FIELD_NUMBER: builtins.int
+    state: builtins.str
+    def __init__(
+        self,
+        *,
+        state: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["state", b"state"]
+    ) -> None: ...
+
+global___NexusSDKOperationFailureInfo = NexusSDKOperationFailureInfo
+
+class NexusSDKFailureErrorFailureInfo(google.protobuf.message.Message):
+    """Representation of the Nexus SDK FailureError object."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class MetadataEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        value: builtins.str
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: builtins.str = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
+
+    METADATA_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    @property
+    def metadata(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
+    data: builtins.bytes
+    def __init__(
+        self,
+        *,
+        metadata: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
+        data: builtins.bytes = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal["data", b"data", "metadata", b"metadata"],
+    ) -> None: ...
+
+global___NexusSDKFailureErrorFailureInfo = NexusSDKFailureErrorFailureInfo
+
 class Failure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -392,6 +457,8 @@ class Failure(google.protobuf.message.Message):
     CHILD_WORKFLOW_EXECUTION_FAILURE_INFO_FIELD_NUMBER: builtins.int
     NEXUS_OPERATION_EXECUTION_FAILURE_INFO_FIELD_NUMBER: builtins.int
     NEXUS_HANDLER_FAILURE_INFO_FIELD_NUMBER: builtins.int
+    NEXUS_SDK_OPERATION_FAILURE_INFO_FIELD_NUMBER: builtins.int
+    NEXUS_SDK_FAILURE_ERROR_INFO_FIELD_NUMBER: builtins.int
     message: builtins.str
     source: builtins.str
     """The source this Failure originated in, e.g. TypeScriptSDK / JavaSDK
@@ -442,6 +509,14 @@ class Failure(google.protobuf.message.Message):
     ) -> global___NexusOperationFailureInfo: ...
     @property
     def nexus_handler_failure_info(self) -> global___NexusHandlerFailureInfo: ...
+    @property
+    def nexus_sdk_operation_failure_info(
+        self,
+    ) -> global___NexusSDKOperationFailureInfo: ...
+    @property
+    def nexus_sdk_failure_error_info(
+        self,
+    ) -> global___NexusSDKFailureErrorFailureInfo: ...
     def __init__(
         self,
         *,
@@ -462,6 +537,10 @@ class Failure(google.protobuf.message.Message):
         nexus_operation_execution_failure_info: global___NexusOperationFailureInfo
         | None = ...,
         nexus_handler_failure_info: global___NexusHandlerFailureInfo | None = ...,
+        nexus_sdk_operation_failure_info: global___NexusSDKOperationFailureInfo
+        | None = ...,
+        nexus_sdk_failure_error_info: global___NexusSDKFailureErrorFailureInfo
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -484,6 +563,10 @@ class Failure(google.protobuf.message.Message):
             b"nexus_handler_failure_info",
             "nexus_operation_execution_failure_info",
             b"nexus_operation_execution_failure_info",
+            "nexus_sdk_failure_error_info",
+            b"nexus_sdk_failure_error_info",
+            "nexus_sdk_operation_failure_info",
+            b"nexus_sdk_operation_failure_info",
             "reset_workflow_failure_info",
             b"reset_workflow_failure_info",
             "server_failure_info",
@@ -517,6 +600,10 @@ class Failure(google.protobuf.message.Message):
             b"nexus_handler_failure_info",
             "nexus_operation_execution_failure_info",
             b"nexus_operation_execution_failure_info",
+            "nexus_sdk_failure_error_info",
+            b"nexus_sdk_failure_error_info",
+            "nexus_sdk_operation_failure_info",
+            b"nexus_sdk_operation_failure_info",
             "reset_workflow_failure_info",
             b"reset_workflow_failure_info",
             "server_failure_info",
@@ -545,6 +632,8 @@ class Failure(google.protobuf.message.Message):
             "child_workflow_execution_failure_info",
             "nexus_operation_execution_failure_info",
             "nexus_handler_failure_info",
+            "nexus_sdk_operation_failure_info",
+            "nexus_sdk_failure_error_info",
         ]
         | None
     ): ...

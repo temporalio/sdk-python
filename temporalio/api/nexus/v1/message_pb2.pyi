@@ -14,6 +14,7 @@ import google.protobuf.timestamp_pb2
 
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.nexus_pb2
+import temporalio.api.failure.v1.message_pb2
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -297,6 +298,26 @@ class Request(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    class Capabilities(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        TEMPORAL_FAILURE_RESPONSES_FIELD_NUMBER: builtins.int
+        temporal_failure_responses: builtins.bool
+        """If set, handlers may use temporalio.api.failure.v1.Failure instances to return failures to the server.
+        This also allows handler and operation errors to have their own messages and stack traces.
+        """
+        def __init__(
+            self,
+            *,
+            temporal_failure_responses: builtins.bool = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "temporal_failure_responses", b"temporal_failure_responses"
+            ],
+        ) -> None: ...
+
     class HeaderEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -317,8 +338,10 @@ class Request(google.protobuf.message.Message):
 
     HEADER_FIELD_NUMBER: builtins.int
     SCHEDULED_TIME_FIELD_NUMBER: builtins.int
+    CAPABILITIES_FIELD_NUMBER: builtins.int
     START_OPERATION_FIELD_NUMBER: builtins.int
     CANCEL_OPERATION_FIELD_NUMBER: builtins.int
+    ENDPOINT_FIELD_NUMBER: builtins.int
     @property
     def header(
         self,
@@ -333,22 +356,32 @@ class Request(google.protobuf.message.Message):
             aip.dev/not-precedent: Not following linter rules. --)
         """
     @property
+    def capabilities(self) -> global___Request.Capabilities: ...
+    @property
     def start_operation(self) -> global___StartOperationRequest: ...
     @property
     def cancel_operation(self) -> global___CancelOperationRequest: ...
+    endpoint: builtins.str
+    """The endpoint this request was addressed to before forwarding to the worker.
+    Supported from server version 1.30.0.
+    """
     def __init__(
         self,
         *,
         header: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         scheduled_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        capabilities: global___Request.Capabilities | None = ...,
         start_operation: global___StartOperationRequest | None = ...,
         cancel_operation: global___CancelOperationRequest | None = ...,
+        endpoint: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "cancel_operation",
             b"cancel_operation",
+            "capabilities",
+            b"capabilities",
             "scheduled_time",
             b"scheduled_time",
             "start_operation",
@@ -362,6 +395,10 @@ class Request(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "cancel_operation",
             b"cancel_operation",
+            "capabilities",
+            b"capabilities",
+            "endpoint",
+            b"endpoint",
             "header",
             b"header",
             "scheduled_time",
@@ -455,6 +492,7 @@ class StartOperationResponse(google.protobuf.message.Message):
     SYNC_SUCCESS_FIELD_NUMBER: builtins.int
     ASYNC_SUCCESS_FIELD_NUMBER: builtins.int
     OPERATION_ERROR_FIELD_NUMBER: builtins.int
+    FAILURE_FIELD_NUMBER: builtins.int
     @property
     def sync_success(self) -> global___StartOperationResponse.Sync: ...
     @property
@@ -462,18 +500,26 @@ class StartOperationResponse(google.protobuf.message.Message):
     @property
     def operation_error(self) -> global___UnsuccessfulOperationError:
         """The operation completed unsuccessfully (failed or canceled)."""
+    @property
+    def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """The operation completed unsuccessfully (failed or canceled).
+        Failure object must contain a NexusSDKOperationFailureInfo object.
+        """
     def __init__(
         self,
         *,
         sync_success: global___StartOperationResponse.Sync | None = ...,
         async_success: global___StartOperationResponse.Async | None = ...,
         operation_error: global___UnsuccessfulOperationError | None = ...,
+        failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "async_success",
             b"async_success",
+            "failure",
+            b"failure",
             "operation_error",
             b"operation_error",
             "sync_success",
@@ -487,6 +533,8 @@ class StartOperationResponse(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "async_success",
             b"async_success",
+            "failure",
+            b"failure",
             "operation_error",
             b"operation_error",
             "sync_success",
@@ -498,7 +546,9 @@ class StartOperationResponse(google.protobuf.message.Message):
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["variant", b"variant"]
     ) -> (
-        typing_extensions.Literal["sync_success", "async_success", "operation_error"]
+        typing_extensions.Literal[
+            "sync_success", "async_success", "operation_error", "failure"
+        ]
         | None
     ): ...
 

@@ -114,6 +114,11 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
 
                 if nexus_task.HasField("task"):
                     task = nexus_task.task
+                    # Check if the server supports the new temporal failure format
+                    use_temporal_failure = (
+                        task.request.HasField("capabilities")
+                        and task.request.capabilities.temporal_failure_responses
+                    )
                     if task.request.HasField("start_operation"):
                         task_cancellation = _NexusTaskCancellation()
                         start_op_task = asyncio.create_task(
@@ -122,6 +127,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                                 task.request.start_operation,
                                 dict(task.request.header),
                                 task_cancellation,
+                                use_temporal_failure,
                             )
                         )
                         self._running_tasks[task.task_token] = _RunningNexusTask(
@@ -135,6 +141,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                                 task.request.cancel_operation,
                                 dict(task.request.header),
                                 task_cancellation,
+                                use_temporal_failure,
                             )
                         )
                         self._running_tasks[task.task_token] = _RunningNexusTask(
@@ -200,6 +207,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         request: temporalio.api.nexus.v1.CancelOperationRequest,
         headers: Mapping[str, str],
         task_cancellation: nexusrpc.handler.OperationTaskCancellation,
+        use_temporal_failure: bool,
     ) -> None:
         """Handle a cancel operation task.
 
@@ -229,12 +237,19 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                 )
             except BaseException as err:
                 logger.warning("Failed to execute Nexus cancel operation method")
-                completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
-                    task_token=task_token,
-                    error=await self._handler_error_to_proto(
-                        _exception_to_handler_error(err)
-                    ),
-                )
+                handler_error = _exception_to_handler_error(err)
+                if use_temporal_failure:
+                    completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                        task_token=task_token,
+                        failure=await self._handler_error_to_temporal_failure(
+                            handler_error
+                        ),
+                    )
+                else:
+                    completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                        task_token=task_token,
+                        error=await self._handler_error_to_proto(handler_error),
+                    )
             else:
                 completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
                     task_token=task_token,
@@ -260,6 +275,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         start_request: temporalio.api.nexus.v1.StartOperationRequest,
         headers: Mapping[str, str],
         task_cancellation: nexusrpc.handler.OperationTaskCancellation,
+        use_temporal_failure: bool,
     ) -> None:
         """Handle a start operation task.
 
@@ -269,7 +285,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         try:
             try:
                 start_response = await self._start_operation(
-                    start_request, headers, task_cancellation
+                    start_request, headers, task_cancellation, use_temporal_failure
                 )
             except asyncio.CancelledError:
                 completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
@@ -278,12 +294,17 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                 )
             except BaseException as err:
                 logger.warning("Failed to execute Nexus start operation method")
-                completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
-                    task_token=task_token,
-                    error=await self._handler_error_to_proto(
-                        _exception_to_handler_error(err)
-                    ),
-                )
+                if use_temporal_failure:
+                    completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                        task_token=task_token,
+                    )
+                    await self._data_converter.encode_failure(err, completion.failure)
+                else:
+                    handler_error = _exception_to_handler_error(err)
+                    completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                        task_token=task_token,
+                        error=await self._handler_error_to_proto(handler_error),
+                    )
 
                 if isinstance(err, concurrent.futures.BrokenExecutor):
                     self._fail_worker_exception_queue.put_nowait(err)
@@ -311,6 +332,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         start_request: temporalio.api.nexus.v1.StartOperationRequest,
         headers: Mapping[str, str],
         cancellation: nexusrpc.handler.OperationTaskCancellation,
+        use_temporal_failure: bool,
     ) -> temporalio.api.nexus.v1.StartOperationResponse:
         """Invoke the Nexus handler's start_operation method and construct the StartOperationResponse.
 
@@ -375,9 +397,14 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                     )
                 )
         except nexusrpc.OperationError as err:
-            return temporalio.api.nexus.v1.StartOperationResponse(
-                operation_error=await self._operation_error_to_proto(err),
-            )
+            if use_temporal_failure:
+                return temporalio.api.nexus.v1.StartOperationResponse(
+                    failure=await self._operation_error_to_temporal_failure(err),
+                )
+            else:
+                return temporalio.api.nexus.v1.StartOperationResponse(
+                    operation_error=await self._operation_error_to_proto(err),
+                )
 
     async def _nexus_error_to_nexus_failure_proto(
         self,
@@ -437,7 +464,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
     async def _handler_error_to_proto(
         self, handler_error: nexusrpc.HandlerError
     ) -> temporalio.api.nexus.v1.HandlerError:
-        """Serialize ``handler_error`` as a Nexus HandlerError proto."""
+        """Serialize ``handler_error`` as a Nexus HandlerError proto (legacy format)."""
         retry_behavior = (
             temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
             if handler_error.retryable_override is True
@@ -450,6 +477,67 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
             failure=await self._nexus_error_to_nexus_failure_proto(handler_error),
             retry_behavior=retry_behavior,
         )
+
+    async def _handler_error_to_temporal_failure(
+        self, handler_error: nexusrpc.HandlerError
+    ) -> temporalio.api.failure.v1.Failure:
+        """Serialize ``handler_error`` as a Temporal Failure proto (new format).
+
+        This format is used when the server supports temporal_failure_responses capability.
+        """
+        import traceback
+
+        retry_behavior = (
+            temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+            if handler_error.retryable_override is True
+            else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+            if handler_error.retryable_override is False
+            else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+        )
+
+        failure = temporalio.api.failure.v1.Failure(
+            message=str(handler_error),
+            nexus_handler_failure_info=temporalio.api.failure.v1.NexusHandlerFailureInfo(
+                type=handler_error.type.value,
+                retry_behavior=retry_behavior,
+            ),
+        )
+
+        if handler_error.__traceback__:
+            failure.stack_trace = "\n".join(
+                traceback.format_tb(handler_error.__traceback__)
+            )
+
+        if handler_error.__cause__:
+            await self._data_converter.encode_failure(
+                handler_error.__cause__, failure.cause
+            )
+
+        return failure
+
+    async def _operation_error_to_temporal_failure(
+        self, err: nexusrpc.OperationError
+    ) -> temporalio.api.failure.v1.Failure:
+        """Serialize ``err`` as a Temporal Failure proto (new format).
+
+        This format is used when the server supports temporal_failure_responses capability.
+        """
+        import traceback
+
+        failure = temporalio.api.failure.v1.Failure(
+            message=str(err),
+            nexus_sdk_operation_failure_info=temporalio.api.failure.v1.NexusSDKOperationFailureInfo(
+                state=err.state.value,
+            ),
+        )
+
+        if err.__traceback__:
+            failure.stack_trace = "\n".join(traceback.format_tb(err.__traceback__))
+
+        if err.__cause__:
+            await self._data_converter.encode_failure(err.__cause__, failure.cause)
+
+        return failure
 
 
 @dataclass

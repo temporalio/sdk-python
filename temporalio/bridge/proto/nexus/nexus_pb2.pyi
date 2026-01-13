@@ -164,6 +164,7 @@ class NexusTaskCompletion(google.protobuf.message.Message):
     COMPLETED_FIELD_NUMBER: builtins.int
     ERROR_FIELD_NUMBER: builtins.int
     ACK_CANCEL_FIELD_NUMBER: builtins.int
+    FAILURE_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The unique identifier for this task provided in the poll response"""
     @property
@@ -173,13 +174,16 @@ class NexusTaskCompletion(google.protobuf.message.Message):
         """
     @property
     def error(self) -> temporalio.api.nexus.v1.message_pb2.HandlerError:
-        """The handler could not complete the request for some reason."""
+        """The handler could not complete the request for some reason. Deprecated, use failure."""
     ack_cancel: builtins.bool
     """The lang SDK acknowledges that it is responding to a `CancelNexusTask` and thus the
     response is irrelevant. This is not the only way to respond to a cancel, the other
     variants can still be used, but this variant should be used when the handler was aborted
     by cancellation.
     """
+    @property
+    def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """The handler could not complete the request for some reason."""
     def __init__(
         self,
         *,
@@ -187,6 +191,7 @@ class NexusTaskCompletion(google.protobuf.message.Message):
         completed: temporalio.api.nexus.v1.message_pb2.Response | None = ...,
         error: temporalio.api.nexus.v1.message_pb2.HandlerError | None = ...,
         ack_cancel: builtins.bool = ...,
+        failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -197,6 +202,8 @@ class NexusTaskCompletion(google.protobuf.message.Message):
             b"completed",
             "error",
             b"error",
+            "failure",
+            b"failure",
             "status",
             b"status",
         ],
@@ -210,6 +217,8 @@ class NexusTaskCompletion(google.protobuf.message.Message):
             b"completed",
             "error",
             b"error",
+            "failure",
+            b"failure",
             "status",
             b"status",
             "task_token",
@@ -218,7 +227,9 @@ class NexusTaskCompletion(google.protobuf.message.Message):
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["status", b"status"]
-    ) -> typing_extensions.Literal["completed", "error", "ack_cancel"] | None: ...
+    ) -> (
+        typing_extensions.Literal["completed", "error", "ack_cancel", "failure"] | None
+    ): ...
 
 global___NexusTaskCompletion = NexusTaskCompletion
 

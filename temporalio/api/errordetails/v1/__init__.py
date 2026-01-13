@@ -1,4 +1,5 @@
 from .message_pb2 import (
+    ActivityExecutionAlreadyStartedFailure,
     CancellationAlreadyRequestedFailure,
     ClientVersionNotSupportedFailure,
     MultiOperationExecutionFailure,
@@ -19,6 +20,7 @@ from .message_pb2 import (
 )
 
 __all__ = [
+    "ActivityExecutionAlreadyStartedFailure",
     "CancellationAlreadyRequestedFailure",
     "ClientVersionNotSupportedFailure",
     "MultiOperationExecutionFailure",
