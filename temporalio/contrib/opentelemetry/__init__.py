@@ -41,6 +41,30 @@ instrumentation like OpenInference):
 The plugin automatically:
 - Configures opentelemetry as a sandbox passthrough module
 - Wraps tracer provider span processors with replay filtering
+
+Design Notes - Cross-Process Trace Propagation:
+
+    OpenTelemetry spans are process-local by design. The OTEL specification
+    states: "Spans are not meant to be used to propagate information within
+    a process." Only SpanContext (trace_id, span_id, trace_flags) crosses
+    process boundaries via propagators.
+
+    This is intentional - Span objects contain mutable state, thread locks,
+    and processor references that cannot be serialized. SpanContext is an
+    immutable tuple designed for cross-process propagation.
+
+    For Temporal workflows that may execute across multiple workers:
+
+    - TracingInterceptor serializes SpanContext (not Span) into headers
+    - Remote workers deserialize SpanContext and wrap it in NonRecordingSpan
+    - Child spans created in remote workers link to the parent via span_id
+    - No span is ever "opened" in one process and "closed" in another
+
+    With create_spans=True, workflow spans are created and immediately ended
+    (same start/end timestamp) to avoid cross-process lifecycle issues.
+
+    With create_spans=False (OtelTracingPlugin default), no Temporal spans
+    are created - only context is propagated for other instrumentation.
 """
 
 from ._otel_tracing_plugin import OtelTracingPlugin

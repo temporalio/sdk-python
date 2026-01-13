@@ -30,6 +30,20 @@ class OtelTracingPlugin(SimplePlugin):
     its own spans. This allows you to use your own instrumentation
     (like OpenInference) while still getting proper context propagation.
 
+    Why create_spans=False?
+
+    OpenTelemetry spans cannot cross process boundaries - only SpanContext
+    can be propagated. Temporal workflows may execute across multiple workers
+    (different processes/machines), so we propagate context only and let
+    your instrumentation (e.g., OpenInference) create spans locally.
+
+    Trace continuity is maintained via parent-child relationships:
+
+    - Client creates a span, its SpanContext is propagated via headers
+    - Worker receives SpanContext, wraps it in NonRecordingSpan
+    - Your instrumentation creates child spans with the correct parent
+    - Backend correlates spans by trace_id and parent span_id
+
     Usage:
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import SimpleSpanProcessor

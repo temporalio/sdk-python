@@ -281,9 +281,17 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
             if link_span is not opentelemetry.trace.INVALID_SPAN:
                 links = [opentelemetry.trace.Link(link_span.get_span_context())]
 
-        # We start and end the span immediately because it is not replay-safe to
-        # keep an unended long-running span. We set the end time the same as the
-        # start time to make it clear it has no duration.
+        # OpenTelemetry Design: Spans are process-local, only SpanContext crosses
+        # process boundaries. Temporal workflows may execute across multiple workers,
+        # so we cannot keep a long-running span open.
+        #
+        # Solution: Create and immediately end workflow spans with the same timestamp.
+        # This provides:
+        # 1. A span_id for child operations to reference as parent
+        # 2. Attributes (workflow type, ID) recorded in the trace
+        # 3. Replay safety - no state survives across workflow tasks
+        #
+        # The span appears as a zero-duration marker with children beneath it.
         span = self.tracer.start_span(
             params.name,
             context,
