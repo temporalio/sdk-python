@@ -1578,6 +1578,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         input: Any,
         output_type: type[OutputT] | None,
         schedule_to_close_timeout: timedelta | None,
+        schedule_to_start_timeout: timedelta | None,
+        start_to_close_timeout: timedelta | None,
         cancellation_type: temporalio.workflow.NexusOperationCancellationType,
         headers: Mapping[str, str] | None,
         summary: str | None,
@@ -1591,6 +1593,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 input=input,
                 output_type=output_type,
                 schedule_to_close_timeout=schedule_to_close_timeout,
+                schedule_to_start_timeout=schedule_to_start_timeout,
+                start_to_close_timeout=start_to_close_timeout,
                 cancellation_type=cancellation_type,
                 headers=headers,
                 summary=summary,
@@ -3308,6 +3312,14 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         if self._input.schedule_to_close_timeout is not None:
             v.schedule_to_close_timeout.FromTimedelta(
                 self._input.schedule_to_close_timeout
+            )
+        if self._input.schedule_to_start_timeout is not None:
+            v.schedule_to_start_timeout.FromTimedelta(
+                self._input.schedule_to_start_timeout
+            )
+        if self._input.start_to_close_timeout is not None:
+            v.start_to_close_timeout.FromTimedelta(
+                self._input.start_to_close_timeout
             )
         v.cancellation_type = cast(
             temporalio.bridge.proto.nexus.NexusOperationCancellationType.ValueType,
