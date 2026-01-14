@@ -1054,7 +1054,6 @@ class DefaultFailureConverter(FailureConverter):
             failure.child_workflow_execution_failure_info.retry_state = (
                 temporalio.api.enums.v1.RetryState.ValueType(error.retry_state or 0)
             )
-        # TODO(nexus-preview): missing test coverage
         elif isinstance(error, temporalio.exceptions.NexusOperationError):
             failure.nexus_operation_execution_failure_info.SetInParent()
             failure.nexus_operation_execution_failure_info.scheduled_event_id = (

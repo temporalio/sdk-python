@@ -44,7 +44,14 @@ from temporalio.converter import (
     encode_search_attribute_values,
     value_to_type,
 )
-from temporalio.exceptions import ApplicationError, FailureError
+import nexusrpc
+from temporalio.api.enums.v1 import NexusHandlerErrorRetryBehavior
+from temporalio.exceptions import (
+    ApplicationError,
+    FailureError,
+    NexusOperationError,
+    ResetWorkflowError,
+)
 
 # StrEnum is available in 3.11+
 if sys.version_info >= (3, 11):
@@ -594,6 +601,329 @@ async def test_failure_encoded_attributes():
         not in failure.application_failure_info.details.payloads[0].metadata
     )
     assert failure == orig_failure
+
+
+@pytest.mark.parametrize(
+    "handler_type,retryable_override,expected_retryable",
+    [
+        (nexusrpc.HandlerErrorType.BAD_REQUEST, None, None),
+        (nexusrpc.HandlerErrorType.BAD_REQUEST, True, True),
+        (nexusrpc.HandlerErrorType.BAD_REQUEST, False, False),
+        (nexusrpc.HandlerErrorType.INTERNAL, None, None),
+        (nexusrpc.HandlerErrorType.INTERNAL, True, True),
+        (nexusrpc.HandlerErrorType.NOT_FOUND, False, False),
+        (nexusrpc.HandlerErrorType.RESOURCE_EXHAUSTED, None, None),
+        (nexusrpc.HandlerErrorType.UNAVAILABLE, True, True),
+        (nexusrpc.HandlerErrorType.UPSTREAM_TIMEOUT, None, None),
+        (nexusrpc.HandlerErrorType.UNAUTHENTICATED, None, None),
+        (nexusrpc.HandlerErrorType.UNAUTHORIZED, None, None),
+    ],
+)
+async def test_nexus_handler_error_round_trip(
+    handler_type: nexusrpc.HandlerErrorType,
+    retryable_override: bool | None,
+    expected_retryable: bool | None,
+):
+    """Test round-trip conversion of nexusrpc.HandlerError through failure converter."""
+    message = f"test message for {handler_type.name}"
+    original_error = nexusrpc.HandlerError(
+        message,
+        type=handler_type,
+        retryable_override=retryable_override,
+    )
+
+    # Convert to failure
+    failure = Failure()
+    await DataConverter.default.encode_failure(original_error, failure)
+
+    # Verify failure structure
+    assert failure.HasField("nexus_handler_failure_info")
+    assert failure.nexus_handler_failure_info.type == handler_type.name
+    assert failure.message == message
+
+    # Verify retryable behavior mapping
+    if retryable_override is True:
+        assert (
+            failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+        )
+    elif retryable_override is False:
+        assert (
+            failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+        )
+    else:
+        assert (
+            failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+        )
+
+    # Convert back to error
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Verify result
+    assert isinstance(result_error, nexusrpc.HandlerError)
+    assert result_error.type == handler_type
+    assert result_error.retryable_override == expected_retryable
+    assert str(result_error) == message
+
+
+async def test_nexus_handler_error_with_cause():
+    """Test HandlerError with a cause chain is properly converted."""
+    # Create a cause chain
+    root_cause = ValueError("root cause")
+    middle_cause = RuntimeError("middle cause")
+    middle_cause.__cause__ = root_cause
+
+    handler_error = nexusrpc.HandlerError(
+        "handler error message",
+        type=nexusrpc.HandlerErrorType.INTERNAL,
+    )
+    handler_error.__cause__ = middle_cause
+
+    # Convert to failure
+    failure = Failure()
+    await DataConverter.default.encode_failure(handler_error, failure)
+
+    # Verify message and cause chain in failure
+    assert failure.message == "handler error message"
+    assert failure.HasField("cause")
+    assert failure.cause.message == "middle cause"
+    assert failure.cause.application_failure_info.type == "RuntimeError"
+    assert failure.cause.HasField("cause")
+    assert failure.cause.cause.message == "root cause"
+    assert failure.cause.cause.application_failure_info.type == "ValueError"
+
+    # Convert back
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Verify cause chain with messages (ApplicationError prepends type to message in str())
+    assert isinstance(result_error, nexusrpc.HandlerError)
+    assert str(result_error) == "handler error message"
+    assert result_error.__cause__ is not None
+    assert isinstance(result_error.__cause__, ApplicationError)
+    assert str(result_error.__cause__) == "RuntimeError: middle cause"
+    assert result_error.__cause__.__cause__ is not None
+    assert str(result_error.__cause__.__cause__) == "ValueError: root cause"
+
+
+async def test_nexus_handler_error_unknown_type_fallback():
+    """Test that unknown HandlerErrorType falls back to INTERNAL during from_failure."""
+    # Create a failure with an unknown type
+    failure = Failure()
+    failure.message = "unknown type error"
+    failure.nexus_handler_failure_info.type = "UNKNOWN_TYPE_XYZ"
+
+    # Convert to error
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Should fall back to INTERNAL with message preserved
+    assert isinstance(result_error, nexusrpc.HandlerError)
+    assert result_error.type == nexusrpc.HandlerErrorType.INTERNAL
+    assert str(result_error) == "unknown type error"
+
+
+async def test_nexus_operation_error_round_trip():
+    """Test round-trip conversion of NexusOperationError."""
+    test_cases = [
+        # (scheduled_event_id, endpoint, service, operation, operation_token)
+        (123, "my-endpoint", "MyService", "myOperation", "token-abc"),
+        (0, "", "", "", ""),  # Empty values
+        (999, "endpoint-2", "ServiceB", "op2", ""),  # Empty token
+        (1, "e", "s", "o", "very-long-token-" + "x" * 100),
+    ]
+
+    for scheduled_event_id, endpoint, service, operation, operation_token in test_cases:
+        message = "nexus operation failed"
+        original_error = NexusOperationError(
+            message,
+            scheduled_event_id=scheduled_event_id,
+            endpoint=endpoint,
+            service=service,
+            operation=operation,
+            operation_token=operation_token,
+        )
+
+        # Convert to failure
+        failure = Failure()
+        await DataConverter.default.encode_failure(original_error, failure)
+
+        # Verify failure structure and message
+        assert failure.message == message
+        assert failure.HasField("nexus_operation_execution_failure_info")
+        info = failure.nexus_operation_execution_failure_info
+        assert info.scheduled_event_id == scheduled_event_id
+        assert info.endpoint == endpoint
+        assert info.service == service
+        assert info.operation == operation
+        assert info.operation_token == operation_token
+
+        # Convert back
+        result_error = await DataConverter.default.decode_failure(failure)
+
+        # Verify result including message
+        assert isinstance(result_error, NexusOperationError)
+        assert result_error.message == message
+        assert result_error.scheduled_event_id == scheduled_event_id
+        assert result_error.endpoint == endpoint
+        assert result_error.service == service
+        assert result_error.operation == operation
+        assert result_error.operation_token == operation_token
+
+
+async def test_nexus_operation_error_with_cause():
+    """Test NexusOperationError with a HandlerError as cause."""
+    # Create NexusOperationError with HandlerError as cause
+    cause_error = nexusrpc.HandlerError(
+        "handler failed",
+        type=nexusrpc.HandlerErrorType.NOT_FOUND,
+    )
+
+    original_error = NexusOperationError(
+        "nexus operation failed",
+        scheduled_event_id=42,
+        endpoint="test-endpoint",
+        service="TestService",
+        operation="testOp",
+        operation_token="token123",
+    )
+    original_error.__cause__ = cause_error
+
+    # Convert to failure
+    failure = Failure()
+    await DataConverter.default.encode_failure(original_error, failure)
+
+    # Verify message and cause is present
+    assert failure.message == "nexus operation failed"
+    assert failure.HasField("cause")
+    assert failure.cause.HasField("nexus_handler_failure_info")
+    assert failure.cause.message == "handler failed"
+
+    # Convert back
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Verify messages preserved
+    assert isinstance(result_error, NexusOperationError)
+    assert result_error.message == "nexus operation failed"
+    assert result_error.__cause__ is not None
+    assert isinstance(result_error.__cause__, nexusrpc.HandlerError)
+    assert result_error.__cause__.type == nexusrpc.HandlerErrorType.NOT_FOUND
+    assert str(result_error.__cause__) == "handler failed"
+
+
+async def test_nexus_sdk_operation_error_from_failure():
+    """Test conversion of nexus_sdk_operation_failure_info to OperationError (one-way)."""
+    # nexus_sdk_operation_failure_info is generated by the server, so this is a one-way test
+    test_cases = [
+        nexusrpc.OperationErrorState.FAILED,
+        nexusrpc.OperationErrorState.CANCELED,
+    ]
+
+    for state in test_cases:
+        # Create a failure with nexus_sdk_operation_failure_info directly
+        message = f"operation error with state {state.value}"
+        failure = Failure()
+        failure.message = message
+        failure.nexus_sdk_operation_failure_info.state = state.value
+
+        # Convert to error
+        result_error = await DataConverter.default.decode_failure(failure)
+
+        # Verify state and message
+        assert isinstance(result_error, nexusrpc.OperationError)
+        assert result_error.state == state
+        assert str(result_error) == message
+
+
+async def test_nexus_sdk_operation_error_unknown_state_fallback():
+    """Test that unknown OperationErrorState falls back to FAILED during from_failure."""
+    # Create a failure with an unknown state
+    failure = Failure()
+    failure.message = "unknown state error"
+    failure.nexus_sdk_operation_failure_info.state = "unknown_state_xyz"
+
+    # Convert to error
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Should fall back to FAILED with message preserved
+    assert isinstance(result_error, nexusrpc.OperationError)
+    assert result_error.state == nexusrpc.OperationErrorState.FAILED
+    assert str(result_error) == "unknown state error"
+
+
+async def test_nexus_sdk_failure_error_info():
+    """Test that nexus_sdk_failure_error_info creates FailureError (one-way conversion)."""
+    # Create a failure with nexus_sdk_failure_error_info
+    failure = Failure()
+    failure.message = "nexus sdk failure error"
+    failure.nexus_sdk_failure_error_info.metadata["key1"] = "value1"
+    failure.nexus_sdk_failure_error_info.data = b"some data"
+
+    # Convert to error
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Should be a FailureError with the failure attached
+    assert isinstance(result_error, FailureError)
+    assert result_error.message == "nexus sdk failure error"
+    assert result_error.failure is not None
+    assert result_error.failure.HasField("nexus_sdk_failure_error_info")
+
+
+async def test_reset_workflow_error_round_trip():
+    """Test round-trip conversion of ResetWorkflowError."""
+    test_cases = [
+        # (message, last_heartbeat_details)
+        ("reset with details", ["detail1", 42, {"key": "value"}]),
+        ("reset with single detail", [123]),
+    ]
+
+    for message, last_heartbeat_details in test_cases:
+        original_error = ResetWorkflowError(
+            message,
+            last_heartbeat_details=last_heartbeat_details,
+        )
+
+        # Convert to failure
+        failure = Failure()
+        await DataConverter.default.encode_failure(original_error, failure)
+
+        # Verify failure structure and message
+        assert failure.message == message
+        assert failure.HasField("reset_workflow_failure_info")
+        assert failure.reset_workflow_failure_info.HasField("last_heartbeat_details")
+
+        # Convert back
+        result_error = await DataConverter.default.decode_failure(failure)
+
+        # Verify message and details preserved
+        assert isinstance(result_error, ResetWorkflowError)
+        assert result_error.message == message
+        assert list(result_error.last_heartbeat_details) == last_heartbeat_details
+
+
+async def test_reset_workflow_error_empty_details():
+    """Test ResetWorkflowError with empty last_heartbeat_details."""
+    message = "reset with no details"
+    original_error = ResetWorkflowError(
+        message,
+        last_heartbeat_details=[],
+    )
+
+    # Convert to failure
+    failure = Failure()
+    await DataConverter.default.encode_failure(original_error, failure)
+
+    # Should have reset_workflow_failure_info with message
+    assert failure.message == message
+    assert failure.HasField("reset_workflow_failure_info")
+
+    # Convert back
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Verify message and empty details
+    assert isinstance(result_error, ResetWorkflowError)
+    assert result_error.message == message
+    assert list(result_error.last_heartbeat_details) == []
 
 
 class IPv4AddressPayloadConverter(CompositePayloadConverter):
