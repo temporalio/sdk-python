@@ -498,6 +498,16 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerResponse.FromString,
         )
+        self.PauseWorkflowExecution = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/PauseWorkflowExecution",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseWorkflowExecutionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseWorkflowExecutionResponse.FromString,
+        )
+        self.UnpauseWorkflowExecution = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/UnpauseWorkflowExecution",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseWorkflowExecutionRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseWorkflowExecutionResponse.FromString,
+        )
         self.StartActivityExecution = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/StartActivityExecution",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartActivityExecutionRequest.SerializeToString,
@@ -852,8 +862,9 @@ class WorkflowServiceServicer(object):
     def ResetWorkflowExecution(self, request, context):
         """ResetWorkflowExecution will reset an existing workflow execution to a specified
         `WORKFLOW_TASK_COMPLETED` event (exclusive). It will immediately terminate the current
-        execution instance.
-        TODO: Does exclusive here mean *just* the completed event, or also WFT started? Otherwise the task is doomed to time out?
+        execution instance. "Exclusive" means the identified completed event itself is not replayed
+        in the reset history; the preceding `WORKFLOW_TASK_STARTED` event remains and will be marked as failed
+        immediately, and a new workflow task will be scheduled to retry it.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
@@ -1539,6 +1550,31 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def PauseWorkflowExecution(self, request, context):
+        """Note: This is an experimental API and the behavior may change in a future release.
+        PauseWorkflowExecution pauses the workflow execution specified in the request. Pausing a workflow execution results in
+        - The workflow execution status changes to `PAUSED` and a new WORKFLOW_EXECUTION_PAUSED event is added to the history
+        - No new workflow tasks or activity tasks are dispatched.
+        - Any workflow task currently executing on the worker will be allowed to complete.
+        - Any activity task currently executing will be paused.
+        - All server-side events will continue to be processed by the server.
+        - Queries & Updates on a paused workflow will be rejected.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def UnpauseWorkflowExecution(self, request, context):
+        """Note: This is an experimental API and the behavior may change in a future release.
+        UnpauseWorkflowExecution unpauses a previously paused workflow execution specified in the request.
+        Unpausing a workflow execution results in
+        - The workflow execution status changes to `RUNNING` and a new WORKFLOW_EXECUTION_UNPAUSED event is added to the history
+        - Workflow tasks and activity tasks are resumed.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def StartActivityExecution(self, request, context):
         """StartActivityExecution starts a new activity execution.
 
@@ -2087,6 +2123,16 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             servicer.DescribeWorker,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerResponse.SerializeToString,
+        ),
+        "PauseWorkflowExecution": grpc.unary_unary_rpc_method_handler(
+            servicer.PauseWorkflowExecution,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseWorkflowExecutionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseWorkflowExecutionResponse.SerializeToString,
+        ),
+        "UnpauseWorkflowExecution": grpc.unary_unary_rpc_method_handler(
+            servicer.UnpauseWorkflowExecution,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseWorkflowExecutionRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseWorkflowExecutionResponse.SerializeToString,
         ),
         "StartActivityExecution": grpc.unary_unary_rpc_method_handler(
             servicer.StartActivityExecution,
@@ -4866,6 +4912,64 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/DescribeWorker",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.DescribeWorkerResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def PauseWorkflowExecution(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/PauseWorkflowExecution",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseWorkflowExecutionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.PauseWorkflowExecutionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def UnpauseWorkflowExecution(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/UnpauseWorkflowExecution",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseWorkflowExecutionRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseWorkflowExecutionResponse.FromString,
             options,
             channel_credentials,
             insecure,

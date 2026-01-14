@@ -72,6 +72,7 @@ class ActivityOptions(google.protobuf.message.Message):
     START_TO_CLOSE_TIMEOUT_FIELD_NUMBER: builtins.int
     HEARTBEAT_TIMEOUT_FIELD_NUMBER: builtins.int
     RETRY_POLICY_FIELD_NUMBER: builtins.int
+    PRIORITY_FIELD_NUMBER: builtins.int
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
     @property
@@ -107,6 +108,11 @@ class ActivityOptions(google.protobuf.message.Message):
     @property
     def retry_policy(self) -> temporalio.api.common.v1.message_pb2.RetryPolicy:
         """The retry policy for the activity. Will never exceed `schedule_to_close_timeout`."""
+    @property
+    def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
+        """Priority metadata. If this message is not present, or any fields are not
+        present, they inherit the values from the workflow.
+        """
     def __init__(
         self,
         *,
@@ -116,12 +122,15 @@ class ActivityOptions(google.protobuf.message.Message):
         start_to_close_timeout: google.protobuf.duration_pb2.Duration | None = ...,
         heartbeat_timeout: google.protobuf.duration_pb2.Duration | None = ...,
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
+        priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "heartbeat_timeout",
             b"heartbeat_timeout",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "schedule_to_close_timeout",
@@ -139,6 +148,8 @@ class ActivityOptions(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "heartbeat_timeout",
             b"heartbeat_timeout",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "schedule_to_close_timeout",

@@ -290,6 +290,14 @@ impl ClientRef {
                 "pause_activity" => {
                     rpc_call!(retry_client, call, WorkflowService, pause_activity)
                 }
+                "pause_workflow_execution" => {
+                    rpc_call!(
+                        retry_client,
+                        call,
+                        WorkflowService,
+                        pause_workflow_execution
+                    )
+                }
                 "poll_activity_execution" => {
                     rpc_call!(retry_client, call, WorkflowService, poll_activity_execution)
                 }
@@ -560,6 +568,14 @@ impl ClientRef {
                 }
                 "unpause_activity" => {
                     rpc_call!(retry_client, call, WorkflowService, unpause_activity)
+                }
+                "unpause_workflow_execution" => {
+                    rpc_call!(
+                        retry_client,
+                        call,
+                        WorkflowService,
+                        unpause_workflow_execution
+                    )
                 }
                 "update_activity_options" => {
                     rpc_call!(retry_client, call, WorkflowService, update_activity_options)

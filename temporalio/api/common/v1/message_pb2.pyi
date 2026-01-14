@@ -95,8 +95,26 @@ class Payload(google.protobuf.message.Message):
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
+    class ExternalPayloadDetails(google.protobuf.message.Message):
+        """Describes an externally stored object referenced by this payload."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        SIZE_BYTES_FIELD_NUMBER: builtins.int
+        size_bytes: builtins.int
+        """Size in bytes of the externally stored payload"""
+        def __init__(
+            self,
+            *,
+            size_bytes: builtins.int = ...,
+        ) -> None: ...
+        def ClearField(
+            self, field_name: typing_extensions.Literal["size_bytes", b"size_bytes"]
+        ) -> None: ...
+
     METADATA_FIELD_NUMBER: builtins.int
     DATA_FIELD_NUMBER: builtins.int
+    EXTERNAL_PAYLOADS_FIELD_NUMBER: builtins.int
     @property
     def metadata(
         self,
@@ -104,15 +122,33 @@ class Payload(google.protobuf.message.Message):
         builtins.str, builtins.bytes
     ]: ...
     data: builtins.bytes
+    @property
+    def external_payloads(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___Payload.ExternalPayloadDetails
+    ]:
+        """Details about externally stored payloads associated with this payload."""
     def __init__(
         self,
         *,
         metadata: collections.abc.Mapping[builtins.str, builtins.bytes] | None = ...,
         data: builtins.bytes = ...,
+        external_payloads: collections.abc.Iterable[
+            global___Payload.ExternalPayloadDetails
+        ]
+        | None = ...,
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal["data", b"data", "metadata", b"metadata"],
+        field_name: typing_extensions.Literal[
+            "data",
+            b"data",
+            "external_payloads",
+            b"external_payloads",
+            "metadata",
+            b"metadata",
+        ],
     ) -> None: ...
 
 global___Payload = Payload

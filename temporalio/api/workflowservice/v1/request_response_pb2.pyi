@@ -1072,7 +1072,6 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
-    WORKER_HEARTBEAT_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
@@ -1098,9 +1097,6 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
         """Worker deployment options that user has set in the worker.
         Experimental. Worker Deployments are experimental and might significantly change in the future.
         """
-    @property
-    def worker_heartbeat(self) -> temporalio.api.worker.v1.message_pb2.WorkerHeartbeat:
-        """Worker info to be sent to the server."""
     def __init__(
         self,
         *,
@@ -1112,8 +1108,6 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
         | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
-        worker_heartbeat: temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
-        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1122,8 +1116,6 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
             b"deployment_options",
             "task_queue",
             b"task_queue",
-            "worker_heartbeat",
-            b"worker_heartbeat",
             "worker_version_capabilities",
             b"worker_version_capabilities",
         ],
@@ -1141,8 +1133,6 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "task_queue",
             b"task_queue",
-            "worker_heartbeat",
-            b"worker_heartbeat",
             "worker_version_capabilities",
             b"worker_version_capabilities",
         ],
@@ -1796,7 +1786,6 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
     TASK_QUEUE_METADATA_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
-    WORKER_HEARTBEAT_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
@@ -1819,9 +1808,6 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that user has set in the worker."""
-    @property
-    def worker_heartbeat(self) -> temporalio.api.worker.v1.message_pb2.WorkerHeartbeat:
-        """Worker info to be sent to the server."""
     def __init__(
         self,
         *,
@@ -1834,8 +1820,6 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
         | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
-        worker_heartbeat: temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
-        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1846,8 +1830,6 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
             b"task_queue",
             "task_queue_metadata",
             b"task_queue_metadata",
-            "worker_heartbeat",
-            b"worker_heartbeat",
             "worker_version_capabilities",
             b"worker_version_capabilities",
         ],
@@ -1865,8 +1847,6 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
             b"task_queue",
             "task_queue_metadata",
             b"task_queue_metadata",
-            "worker_heartbeat",
-            b"worker_heartbeat",
             "worker_version_capabilities",
             b"worker_version_capabilities",
         ],
@@ -7966,6 +7946,7 @@ class UpdateWorkflowExecutionOptionsRequest(google.protobuf.message.Message):
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_OPTIONS_FIELD_NUMBER: builtins.int
     UPDATE_MASK_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """The namespace name of the target Workflow."""
     @property
@@ -7986,6 +7967,8 @@ class UpdateWorkflowExecutionOptionsRequest(google.protobuf.message.Message):
         """Controls which fields from `workflow_execution_options` will be applied.
         To unset a field, set it to null and use the update mask to indicate that it should be mutated.
         """
+    identity: builtins.str
+    """Optional. The identity of the client who initiated this request."""
     def __init__(
         self,
         *,
@@ -7995,6 +7978,7 @@ class UpdateWorkflowExecutionOptionsRequest(google.protobuf.message.Message):
         workflow_execution_options: temporalio.api.workflow.v1.message_pb2.WorkflowExecutionOptions
         | None = ...,
         update_mask: google.protobuf.field_mask_pb2.FieldMask | None = ...,
+        identity: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -8010,6 +7994,8 @@ class UpdateWorkflowExecutionOptionsRequest(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
             "namespace",
             b"namespace",
             "update_mask",
@@ -8614,7 +8600,12 @@ class SetWorkerDeploymentCurrentVersionResponse(google.protobuf.message.Message)
     def previous_deployment_version(
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion:
-        """The version that was current before executing this operation."""
+        """The version that was current before executing this operation.
+        Deprecated in favor of idempotency of the API. Use `DescribeWorkerDeployment` to get the
+        Current version info before calling this API. By passing the `conflict_token` got from the
+        `DescribeWorkerDeployment` call to this API you can ensure there is no interfering changes
+        between the two calls.
+        """
     def __init__(
         self,
         *,
@@ -8760,9 +8751,19 @@ class SetWorkerDeploymentRampingVersionResponse(google.protobuf.message.Message)
     def previous_deployment_version(
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion:
-        """The version that was ramping before executing this operation."""
+        """The version that was ramping before executing this operation.
+        Deprecated in favor of idempotency of the API. Use `DescribeWorkerDeployment` to get the
+        Ramping version info before calling this API. By passing the `conflict_token` got from the
+        `DescribeWorkerDeployment` call to this API you can ensure there is no interfering changes
+        between the two calls.
+        """
     previous_percentage: builtins.float
-    """The ramping version percentage before executing this operation."""
+    """The ramping version percentage before executing this operation.
+    Deprecated in favor of idempotency of the API. Use `DescribeWorkerDeployment` to get the
+    Ramping version info before calling this API. By passing the `conflict_token` got from the
+    `DescribeWorkerDeployment` call to this API you can ensure there is no interfering changes
+    between the two calls.
+    """
     def __init__(
         self,
         *,
@@ -9266,7 +9267,12 @@ class SetWorkerDeploymentManagerResponse(google.protobuf.message.Message):
     did not change between this API call and a future write.
     """
     previous_manager_identity: builtins.str
-    """What the `manager_identity` field was before this change."""
+    """What the `manager_identity` field was before this change.
+    Deprecated in favor of idempotency of the API. Use `DescribeWorkerDeployment` to get the
+    manager identity before calling this API. By passing the `conflict_token` got from the
+    `DescribeWorkerDeployment` call to this API you can ensure there is no interfering changes
+    between the two calls.
+    """
     def __init__(
         self,
         *,
@@ -9864,12 +9870,32 @@ class UpdateTaskQueueConfigRequest(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
+    class SetFairnessWeightOverridesEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        value: builtins.float
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: builtins.float = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+        ) -> None: ...
+
     NAMESPACE_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     TASK_QUEUE_FIELD_NUMBER: builtins.int
     TASK_QUEUE_TYPE_FIELD_NUMBER: builtins.int
     UPDATE_QUEUE_RATE_LIMIT_FIELD_NUMBER: builtins.int
     UPDATE_FAIRNESS_KEY_RATE_LIMIT_DEFAULT_FIELD_NUMBER: builtins.int
+    SET_FAIRNESS_WEIGHT_OVERRIDES_FIELD_NUMBER: builtins.int
+    UNSET_FAIRNESS_WEIGHT_OVERRIDES_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     identity: builtins.str
     task_queue: builtins.str
@@ -9892,6 +9918,21 @@ class UpdateTaskQueueConfigRequest(google.protobuf.message.Message):
         If not set, this configuration is unchanged.
         If the `rate_limit` field in the `RateLimitUpdate` is missing, remove the existing rate limit.
         """
+    @property
+    def set_fairness_weight_overrides(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.float]:
+        """If set, overrides the fairness weight for each specified fairness key.
+        Fairness keys not listed in this map will keep their existing overrides (if any).
+        """
+    @property
+    def unset_fairness_weight_overrides(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """If set, removes any existing fairness weight overrides for each specified fairness key.
+        Fairness weights for corresponding keys fall back to the values set during task creation (if any),
+        or to the default weight of 1.0.
+        """
     def __init__(
         self,
         *,
@@ -9902,6 +9943,12 @@ class UpdateTaskQueueConfigRequest(google.protobuf.message.Message):
         update_queue_rate_limit: global___UpdateTaskQueueConfigRequest.RateLimitUpdate
         | None = ...,
         update_fairness_key_rate_limit_default: global___UpdateTaskQueueConfigRequest.RateLimitUpdate
+        | None = ...,
+        set_fairness_weight_overrides: collections.abc.Mapping[
+            builtins.str, builtins.float
+        ]
+        | None = ...,
+        unset_fairness_weight_overrides: collections.abc.Iterable[builtins.str]
         | None = ...,
     ) -> None: ...
     def HasField(
@@ -9920,10 +9967,14 @@ class UpdateTaskQueueConfigRequest(google.protobuf.message.Message):
             b"identity",
             "namespace",
             b"namespace",
+            "set_fairness_weight_overrides",
+            b"set_fairness_weight_overrides",
             "task_queue",
             b"task_queue",
             "task_queue_type",
             b"task_queue_type",
+            "unset_fairness_weight_overrides",
+            b"unset_fairness_weight_overrides",
             "update_fairness_key_rate_limit_default",
             b"update_fairness_key_rate_limit_default",
             "update_queue_rate_limit",
@@ -10162,6 +10213,132 @@ class DescribeWorkerResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___DescribeWorkerResponse = DescribeWorkerResponse
+
+class PauseWorkflowExecutionRequest(google.protobuf.message.Message):
+    """Request to pause a workflow execution."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Namespace of the workflow to pause."""
+    workflow_id: builtins.str
+    """ID of the workflow execution to be paused. Required."""
+    run_id: builtins.str
+    """Run ID of the workflow execution to be paused. Optional. If not provided, the current run of the workflow will be paused."""
+    identity: builtins.str
+    """The identity of the client who initiated this request."""
+    reason: builtins.str
+    """Reason to pause the workflow execution."""
+    request_id: builtins.str
+    """A unique identifier for this pause request for idempotence. Typically UUIDv4."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        workflow_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+        identity: builtins.str = ...,
+        reason: builtins.str = ...,
+        request_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "reason",
+            b"reason",
+            "request_id",
+            b"request_id",
+            "run_id",
+            b"run_id",
+            "workflow_id",
+            b"workflow_id",
+        ],
+    ) -> None: ...
+
+global___PauseWorkflowExecutionRequest = PauseWorkflowExecutionRequest
+
+class PauseWorkflowExecutionResponse(google.protobuf.message.Message):
+    """Response to a successful PauseWorkflowExecution request."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___PauseWorkflowExecutionResponse = PauseWorkflowExecutionResponse
+
+class UnpauseWorkflowExecutionRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Namespace of the workflow to unpause."""
+    workflow_id: builtins.str
+    """ID of the workflow execution to be paused. Required."""
+    run_id: builtins.str
+    """Run ID of the workflow execution to be paused. Optional. If not provided, the current run of the workflow will be paused."""
+    identity: builtins.str
+    """The identity of the client who initiated this request."""
+    reason: builtins.str
+    """Reason to unpause the workflow execution."""
+    request_id: builtins.str
+    """A unique identifier for this unpause request for idempotence. Typically UUIDv4."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        workflow_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+        identity: builtins.str = ...,
+        reason: builtins.str = ...,
+        request_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "reason",
+            b"reason",
+            "request_id",
+            b"request_id",
+            "run_id",
+            b"run_id",
+            "workflow_id",
+            b"workflow_id",
+        ],
+    ) -> None: ...
+
+global___UnpauseWorkflowExecutionRequest = UnpauseWorkflowExecutionRequest
+
+class UnpauseWorkflowExecutionResponse(google.protobuf.message.Message):
+    """Response to a successful UnpauseWorkflowExecution request."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___UnpauseWorkflowExecutionResponse = UnpauseWorkflowExecutionResponse
 
 class StartActivityExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

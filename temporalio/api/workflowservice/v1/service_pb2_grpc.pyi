@@ -301,8 +301,9 @@ class WorkflowServiceStub:
     ]
     """ResetWorkflowExecution will reset an existing workflow execution to a specified
     `WORKFLOW_TASK_COMPLETED` event (exclusive). It will immediately terminate the current
-    execution instance.
-    TODO: Does exclusive here mean *just* the completed event, or also WFT started? Otherwise the task is doomed to time out?
+    execution instance. "Exclusive" means the identified completed event itself is not replayed
+    in the reset history; the preceding `WORKFLOW_TASK_STARTED` event remains and will be marked as failed
+    immediately, and a new workflow task will be scheduled to retry it.
     """
     TerminateWorkflowExecution: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.TerminateWorkflowExecutionRequest,
@@ -915,6 +916,29 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse,
     ]
     """DescribeWorker returns information about the specified worker."""
+    PauseWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionResponse,
+    ]
+    """Note: This is an experimental API and the behavior may change in a future release.
+    PauseWorkflowExecution pauses the workflow execution specified in the request. Pausing a workflow execution results in
+    - The workflow execution status changes to `PAUSED` and a new WORKFLOW_EXECUTION_PAUSED event is added to the history
+    - No new workflow tasks or activity tasks are dispatched.
+      - Any workflow task currently executing on the worker will be allowed to complete.
+      - Any activity task currently executing will be paused.
+    - All server-side events will continue to be processed by the server.
+    - Queries & Updates on a paused workflow will be rejected.
+    """
+    UnpauseWorkflowExecution: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionResponse,
+    ]
+    """Note: This is an experimental API and the behavior may change in a future release.
+    UnpauseWorkflowExecution unpauses a previously paused workflow execution specified in the request.
+    Unpausing a workflow execution results in
+    - The workflow execution status changes to `RUNNING` and a new WORKFLOW_EXECUTION_UNPAUSED event is added to the history
+    - Workflow tasks and activity tasks are resumed.
+    """
     StartActivityExecution: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionResponse,
@@ -1329,8 +1353,9 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.ResetWorkflowExecutionResponse:
         """ResetWorkflowExecution will reset an existing workflow execution to a specified
         `WORKFLOW_TASK_COMPLETED` event (exclusive). It will immediately terminate the current
-        execution instance.
-        TODO: Does exclusive here mean *just* the completed event, or also WFT started? Otherwise the task is doomed to time out?
+        execution instance. "Exclusive" means the identified completed event itself is not replayed
+        in the reset history; the preceding `WORKFLOW_TASK_STARTED` event remains and will be marked as failed
+        immediately, and a new workflow task will be scheduled to retry it.
         """
     @abc.abstractmethod
     def TerminateWorkflowExecution(
@@ -2089,6 +2114,33 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerResponse:
         """DescribeWorker returns information about the specified worker."""
+    @abc.abstractmethod
+    def PauseWorkflowExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.PauseWorkflowExecutionResponse:
+        """Note: This is an experimental API and the behavior may change in a future release.
+        PauseWorkflowExecution pauses the workflow execution specified in the request. Pausing a workflow execution results in
+        - The workflow execution status changes to `PAUSED` and a new WORKFLOW_EXECUTION_PAUSED event is added to the history
+        - No new workflow tasks or activity tasks are dispatched.
+          - Any workflow task currently executing on the worker will be allowed to complete.
+          - Any activity task currently executing will be paused.
+        - All server-side events will continue to be processed by the server.
+        - Queries & Updates on a paused workflow will be rejected.
+        """
+    @abc.abstractmethod
+    def UnpauseWorkflowExecution(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.UnpauseWorkflowExecutionResponse:
+        """Note: This is an experimental API and the behavior may change in a future release.
+        UnpauseWorkflowExecution unpauses a previously paused workflow execution specified in the request.
+        Unpausing a workflow execution results in
+        - The workflow execution status changes to `RUNNING` and a new WORKFLOW_EXECUTION_UNPAUSED event is added to the history
+        - Workflow tasks and activity tasks are resumed.
+        """
     @abc.abstractmethod
     def StartActivityExecution(
         self,

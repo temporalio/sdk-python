@@ -24,7 +24,7 @@ from temporalio.api.nexus.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n6temporal/api/operatorservice/v1/request_response.proto\x12\x1ftemporal.api.operatorservice.v1\x1a"temporal/api/enums/v1/common.proto\x1a#temporal/api/nexus/v1/message.proto\x1a\x1egoogle/protobuf/duration.proto"\xff\x01\n\x1a\x41\x64\x64SearchAttributesRequest\x12l\n\x11search_attributes\x18\x01 \x03(\x0b\x32Q.temporal.api.operatorservice.v1.AddSearchAttributesRequest.SearchAttributesEntry\x12\x11\n\tnamespace\x18\x02 \x01(\t\x1a`\n\x15SearchAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01"\x1d\n\x1b\x41\x64\x64SearchAttributesResponse"M\n\x1dRemoveSearchAttributesRequest\x12\x19\n\x11search_attributes\x18\x01 \x03(\t\x12\x11\n\tnamespace\x18\x02 \x01(\t" \n\x1eRemoveSearchAttributesResponse"0\n\x1bListSearchAttributesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t"\xe2\x04\n\x1cListSearchAttributesResponse\x12n\n\x11\x63ustom_attributes\x18\x01 \x03(\x0b\x32S.temporal.api.operatorservice.v1.ListSearchAttributesResponse.CustomAttributesEntry\x12n\n\x11system_attributes\x18\x02 \x03(\x0b\x32S.temporal.api.operatorservice.v1.ListSearchAttributesResponse.SystemAttributesEntry\x12h\n\x0estorage_schema\x18\x03 \x03(\x0b\x32P.temporal.api.operatorservice.v1.ListSearchAttributesResponse.StorageSchemaEntry\x1a`\n\x15\x43ustomAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01\x1a`\n\x15SystemAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01\x1a\x34\n\x12StorageSchemaEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"|\n\x16\x44\x65leteNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x14\n\x0cnamespace_id\x18\x02 \x01(\t\x12\x39\n\x16namespace_delete_delay\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration"4\n\x17\x44\x65leteNamespaceResponse\x12\x19\n\x11\x64\x65leted_namespace\x18\x01 \x01(\t"\x84\x01\n\x1f\x41\x64\x64OrUpdateRemoteClusterRequest\x12\x18\n\x10\x66rontend_address\x18\x01 \x01(\t\x12(\n enable_remote_cluster_connection\x18\x02 \x01(\x08\x12\x1d\n\x15\x66rontend_http_address\x18\x03 \x01(\t""\n AddOrUpdateRemoteClusterResponse"2\n\x1aRemoveRemoteClusterRequest\x12\x14\n\x0c\x63luster_name\x18\x01 \x01(\t"\x1d\n\x1bRemoveRemoteClusterResponse"A\n\x13ListClustersRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"s\n\x14ListClustersResponse\x12\x42\n\x08\x63lusters\x18\x01 \x03(\x0b\x32\x30.temporal.api.operatorservice.v1.ClusterMetadata\x12\x17\n\x0fnext_page_token\x18\x04 \x01(\x0c"\xc0\x01\n\x0f\x43lusterMetadata\x12\x14\n\x0c\x63luster_name\x18\x01 \x01(\t\x12\x12\n\ncluster_id\x18\x02 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x03 \x01(\t\x12\x14\n\x0chttp_address\x18\x07 \x01(\t\x12 \n\x18initial_failover_version\x18\x04 \x01(\x03\x12\x1b\n\x13history_shard_count\x18\x05 \x01(\x05\x12\x1d\n\x15is_connection_enabled\x18\x06 \x01(\x08"%\n\x17GetNexusEndpointRequest\x12\n\n\x02id\x18\x01 \x01(\t"M\n\x18GetNexusEndpointResponse\x12\x31\n\x08\x65ndpoint\x18\x01 \x01(\x0b\x32\x1f.temporal.api.nexus.v1.Endpoint"O\n\x1a\x43reateNexusEndpointRequest\x12\x31\n\x04spec\x18\x01 \x01(\x0b\x32#.temporal.api.nexus.v1.EndpointSpec"P\n\x1b\x43reateNexusEndpointResponse\x12\x31\n\x08\x65ndpoint\x18\x01 \x01(\x0b\x32\x1f.temporal.api.nexus.v1.Endpoint"l\n\x1aUpdateNexusEndpointRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\x03\x12\x31\n\x04spec\x18\x03 \x01(\x0b\x32#.temporal.api.nexus.v1.EndpointSpec"P\n\x1bUpdateNexusEndpointResponse\x12\x31\n\x08\x65ndpoint\x18\x01 \x01(\x0b\x32\x1f.temporal.api.nexus.v1.Endpoint"9\n\x1a\x44\x65leteNexusEndpointRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\x03"\x1d\n\x1b\x44\x65leteNexusEndpointResponse"U\n\x19ListNexusEndpointsRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c\x12\x0c\n\x04name\x18\x03 \x01(\t"i\n\x1aListNexusEndpointsResponse\x12\x17\n\x0fnext_page_token\x18\x01 \x01(\x0c\x12\x32\n\tendpoints\x18\x02 \x03(\x0b\x32\x1f.temporal.api.nexus.v1.EndpointB\xbe\x01\n"io.temporal.api.operatorservice.v1B\x14RequestResponseProtoP\x01Z5go.temporal.io/api/operatorservice/v1;operatorservice\xaa\x02!Temporalio.Api.OperatorService.V1\xea\x02$Temporalio::Api::OperatorService::V1b\x06proto3'
+    b'\n6temporal/api/operatorservice/v1/request_response.proto\x12\x1ftemporal.api.operatorservice.v1\x1a"temporal/api/enums/v1/common.proto\x1a#temporal/api/nexus/v1/message.proto\x1a\x1egoogle/protobuf/duration.proto"\xff\x01\n\x1a\x41\x64\x64SearchAttributesRequest\x12l\n\x11search_attributes\x18\x01 \x03(\x0b\x32Q.temporal.api.operatorservice.v1.AddSearchAttributesRequest.SearchAttributesEntry\x12\x11\n\tnamespace\x18\x02 \x01(\t\x1a`\n\x15SearchAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01"\x1d\n\x1b\x41\x64\x64SearchAttributesResponse"M\n\x1dRemoveSearchAttributesRequest\x12\x19\n\x11search_attributes\x18\x01 \x03(\t\x12\x11\n\tnamespace\x18\x02 \x01(\t" \n\x1eRemoveSearchAttributesResponse"0\n\x1bListSearchAttributesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t"\xe2\x04\n\x1cListSearchAttributesResponse\x12n\n\x11\x63ustom_attributes\x18\x01 \x03(\x0b\x32S.temporal.api.operatorservice.v1.ListSearchAttributesResponse.CustomAttributesEntry\x12n\n\x11system_attributes\x18\x02 \x03(\x0b\x32S.temporal.api.operatorservice.v1.ListSearchAttributesResponse.SystemAttributesEntry\x12h\n\x0estorage_schema\x18\x03 \x03(\x0b\x32P.temporal.api.operatorservice.v1.ListSearchAttributesResponse.StorageSchemaEntry\x1a`\n\x15\x43ustomAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01\x1a`\n\x15SystemAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01\x1a\x34\n\x12StorageSchemaEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"|\n\x16\x44\x65leteNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x14\n\x0cnamespace_id\x18\x02 \x01(\t\x12\x39\n\x16namespace_delete_delay\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration"4\n\x17\x44\x65leteNamespaceResponse\x12\x19\n\x11\x64\x65leted_namespace\x18\x01 \x01(\t"\xa0\x01\n\x1f\x41\x64\x64OrUpdateRemoteClusterRequest\x12\x18\n\x10\x66rontend_address\x18\x01 \x01(\t\x12(\n enable_remote_cluster_connection\x18\x02 \x01(\x08\x12\x1d\n\x15\x66rontend_http_address\x18\x03 \x01(\t\x12\x1a\n\x12\x65nable_replication\x18\x04 \x01(\x08""\n AddOrUpdateRemoteClusterResponse"2\n\x1aRemoveRemoteClusterRequest\x12\x14\n\x0c\x63luster_name\x18\x01 \x01(\t"\x1d\n\x1bRemoveRemoteClusterResponse"A\n\x13ListClustersRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"s\n\x14ListClustersResponse\x12\x42\n\x08\x63lusters\x18\x01 \x03(\x0b\x32\x30.temporal.api.operatorservice.v1.ClusterMetadata\x12\x17\n\x0fnext_page_token\x18\x04 \x01(\x0c"\xe0\x01\n\x0f\x43lusterMetadata\x12\x14\n\x0c\x63luster_name\x18\x01 \x01(\t\x12\x12\n\ncluster_id\x18\x02 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x03 \x01(\t\x12\x14\n\x0chttp_address\x18\x07 \x01(\t\x12 \n\x18initial_failover_version\x18\x04 \x01(\x03\x12\x1b\n\x13history_shard_count\x18\x05 \x01(\x05\x12\x1d\n\x15is_connection_enabled\x18\x06 \x01(\x08\x12\x1e\n\x16is_replication_enabled\x18\x08 \x01(\x08"%\n\x17GetNexusEndpointRequest\x12\n\n\x02id\x18\x01 \x01(\t"M\n\x18GetNexusEndpointResponse\x12\x31\n\x08\x65ndpoint\x18\x01 \x01(\x0b\x32\x1f.temporal.api.nexus.v1.Endpoint"O\n\x1a\x43reateNexusEndpointRequest\x12\x31\n\x04spec\x18\x01 \x01(\x0b\x32#.temporal.api.nexus.v1.EndpointSpec"P\n\x1b\x43reateNexusEndpointResponse\x12\x31\n\x08\x65ndpoint\x18\x01 \x01(\x0b\x32\x1f.temporal.api.nexus.v1.Endpoint"l\n\x1aUpdateNexusEndpointRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\x03\x12\x31\n\x04spec\x18\x03 \x01(\x0b\x32#.temporal.api.nexus.v1.EndpointSpec"P\n\x1bUpdateNexusEndpointResponse\x12\x31\n\x08\x65ndpoint\x18\x01 \x01(\x0b\x32\x1f.temporal.api.nexus.v1.Endpoint"9\n\x1a\x44\x65leteNexusEndpointRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\x03"\x1d\n\x1b\x44\x65leteNexusEndpointResponse"U\n\x19ListNexusEndpointsRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c\x12\x0c\n\x04name\x18\x03 \x01(\t"i\n\x1aListNexusEndpointsResponse\x12\x17\n\x0fnext_page_token\x18\x01 \x01(\x0c\x12\x32\n\tendpoints\x18\x02 \x03(\x0b\x32\x1f.temporal.api.nexus.v1.EndpointB\xbe\x01\n"io.temporal.api.operatorservice.v1B\x14RequestResponseProtoP\x01Z5go.temporal.io/api/operatorservice/v1;operatorservice\xaa\x02!Temporalio.Api.OperatorService.V1\xea\x02$Temporalio::Api::OperatorService::V1b\x06proto3'
 )
 
 
@@ -452,37 +452,37 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _DELETENAMESPACERESPONSE._serialized_start = 1387
     _DELETENAMESPACERESPONSE._serialized_end = 1439
     _ADDORUPDATEREMOTECLUSTERREQUEST._serialized_start = 1442
-    _ADDORUPDATEREMOTECLUSTERREQUEST._serialized_end = 1574
-    _ADDORUPDATEREMOTECLUSTERRESPONSE._serialized_start = 1576
-    _ADDORUPDATEREMOTECLUSTERRESPONSE._serialized_end = 1610
-    _REMOVEREMOTECLUSTERREQUEST._serialized_start = 1612
-    _REMOVEREMOTECLUSTERREQUEST._serialized_end = 1662
-    _REMOVEREMOTECLUSTERRESPONSE._serialized_start = 1664
-    _REMOVEREMOTECLUSTERRESPONSE._serialized_end = 1693
-    _LISTCLUSTERSREQUEST._serialized_start = 1695
-    _LISTCLUSTERSREQUEST._serialized_end = 1760
-    _LISTCLUSTERSRESPONSE._serialized_start = 1762
-    _LISTCLUSTERSRESPONSE._serialized_end = 1877
-    _CLUSTERMETADATA._serialized_start = 1880
-    _CLUSTERMETADATA._serialized_end = 2072
-    _GETNEXUSENDPOINTREQUEST._serialized_start = 2074
-    _GETNEXUSENDPOINTREQUEST._serialized_end = 2111
-    _GETNEXUSENDPOINTRESPONSE._serialized_start = 2113
-    _GETNEXUSENDPOINTRESPONSE._serialized_end = 2190
-    _CREATENEXUSENDPOINTREQUEST._serialized_start = 2192
-    _CREATENEXUSENDPOINTREQUEST._serialized_end = 2271
-    _CREATENEXUSENDPOINTRESPONSE._serialized_start = 2273
-    _CREATENEXUSENDPOINTRESPONSE._serialized_end = 2353
-    _UPDATENEXUSENDPOINTREQUEST._serialized_start = 2355
-    _UPDATENEXUSENDPOINTREQUEST._serialized_end = 2463
-    _UPDATENEXUSENDPOINTRESPONSE._serialized_start = 2465
-    _UPDATENEXUSENDPOINTRESPONSE._serialized_end = 2545
-    _DELETENEXUSENDPOINTREQUEST._serialized_start = 2547
-    _DELETENEXUSENDPOINTREQUEST._serialized_end = 2604
-    _DELETENEXUSENDPOINTRESPONSE._serialized_start = 2606
-    _DELETENEXUSENDPOINTRESPONSE._serialized_end = 2635
-    _LISTNEXUSENDPOINTSREQUEST._serialized_start = 2637
-    _LISTNEXUSENDPOINTSREQUEST._serialized_end = 2722
-    _LISTNEXUSENDPOINTSRESPONSE._serialized_start = 2724
-    _LISTNEXUSENDPOINTSRESPONSE._serialized_end = 2829
+    _ADDORUPDATEREMOTECLUSTERREQUEST._serialized_end = 1602
+    _ADDORUPDATEREMOTECLUSTERRESPONSE._serialized_start = 1604
+    _ADDORUPDATEREMOTECLUSTERRESPONSE._serialized_end = 1638
+    _REMOVEREMOTECLUSTERREQUEST._serialized_start = 1640
+    _REMOVEREMOTECLUSTERREQUEST._serialized_end = 1690
+    _REMOVEREMOTECLUSTERRESPONSE._serialized_start = 1692
+    _REMOVEREMOTECLUSTERRESPONSE._serialized_end = 1721
+    _LISTCLUSTERSREQUEST._serialized_start = 1723
+    _LISTCLUSTERSREQUEST._serialized_end = 1788
+    _LISTCLUSTERSRESPONSE._serialized_start = 1790
+    _LISTCLUSTERSRESPONSE._serialized_end = 1905
+    _CLUSTERMETADATA._serialized_start = 1908
+    _CLUSTERMETADATA._serialized_end = 2132
+    _GETNEXUSENDPOINTREQUEST._serialized_start = 2134
+    _GETNEXUSENDPOINTREQUEST._serialized_end = 2171
+    _GETNEXUSENDPOINTRESPONSE._serialized_start = 2173
+    _GETNEXUSENDPOINTRESPONSE._serialized_end = 2250
+    _CREATENEXUSENDPOINTREQUEST._serialized_start = 2252
+    _CREATENEXUSENDPOINTREQUEST._serialized_end = 2331
+    _CREATENEXUSENDPOINTRESPONSE._serialized_start = 2333
+    _CREATENEXUSENDPOINTRESPONSE._serialized_end = 2413
+    _UPDATENEXUSENDPOINTREQUEST._serialized_start = 2415
+    _UPDATENEXUSENDPOINTREQUEST._serialized_end = 2523
+    _UPDATENEXUSENDPOINTRESPONSE._serialized_start = 2525
+    _UPDATENEXUSENDPOINTRESPONSE._serialized_end = 2605
+    _DELETENEXUSENDPOINTREQUEST._serialized_start = 2607
+    _DELETENEXUSENDPOINTREQUEST._serialized_end = 2664
+    _DELETENEXUSENDPOINTRESPONSE._serialized_start = 2666
+    _DELETENEXUSENDPOINTRESPONSE._serialized_end = 2695
+    _LISTNEXUSENDPOINTSREQUEST._serialized_start = 2697
+    _LISTNEXUSENDPOINTSREQUEST._serialized_end = 2782
+    _LISTNEXUSENDPOINTSRESPONSE._serialized_start = 2784
+    _LISTNEXUSENDPOINTSRESPONSE._serialized_end = 2889
 # @@protoc_insertion_point(module_scope)
