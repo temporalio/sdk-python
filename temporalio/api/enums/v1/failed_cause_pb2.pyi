@@ -469,6 +469,10 @@ class _ResourceExhaustedCauseEnumTypeWrapper(
     """Circuit breaker is open/half-open."""
     RESOURCE_EXHAUSTED_CAUSE_OPS_LIMIT: _ResourceExhaustedCause.ValueType  # 9
     """Namespace exceeds operations rate limit."""
+    RESOURCE_EXHAUSTED_CAUSE_WORKER_DEPLOYMENT_LIMITS: (
+        _ResourceExhaustedCause.ValueType
+    )  # 10
+    """Limits related to Worker Deployments are reached."""
 
 class ResourceExhaustedCause(
     _ResourceExhaustedCause, metaclass=_ResourceExhaustedCauseEnumTypeWrapper
@@ -495,6 +499,10 @@ RESOURCE_EXHAUSTED_CAUSE_CIRCUIT_BREAKER_OPEN: ResourceExhaustedCause.ValueType 
 """Circuit breaker is open/half-open."""
 RESOURCE_EXHAUSTED_CAUSE_OPS_LIMIT: ResourceExhaustedCause.ValueType  # 9
 """Namespace exceeds operations rate limit."""
+RESOURCE_EXHAUSTED_CAUSE_WORKER_DEPLOYMENT_LIMITS: (
+    ResourceExhaustedCause.ValueType
+)  # 10
+"""Limits related to Worker Deployments are reached."""
 global___ResourceExhaustedCause = ResourceExhaustedCause
 
 class _ResourceExhaustedScope:

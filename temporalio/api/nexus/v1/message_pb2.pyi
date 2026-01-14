@@ -319,6 +319,7 @@ class Request(google.protobuf.message.Message):
     SCHEDULED_TIME_FIELD_NUMBER: builtins.int
     START_OPERATION_FIELD_NUMBER: builtins.int
     CANCEL_OPERATION_FIELD_NUMBER: builtins.int
+    ENDPOINT_FIELD_NUMBER: builtins.int
     @property
     def header(
         self,
@@ -336,6 +337,10 @@ class Request(google.protobuf.message.Message):
     def start_operation(self) -> global___StartOperationRequest: ...
     @property
     def cancel_operation(self) -> global___CancelOperationRequest: ...
+    endpoint: builtins.str
+    """The endpoint this request was addressed to before forwarding to the worker.
+    Supported from server version 1.30.0.
+    """
     def __init__(
         self,
         *,
@@ -343,6 +348,7 @@ class Request(google.protobuf.message.Message):
         scheduled_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         start_operation: global___StartOperationRequest | None = ...,
         cancel_operation: global___CancelOperationRequest | None = ...,
+        endpoint: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -362,6 +368,8 @@ class Request(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "cancel_operation",
             b"cancel_operation",
+            "endpoint",
+            b"endpoint",
             "header",
             b"header",
             "scheduled_time",
