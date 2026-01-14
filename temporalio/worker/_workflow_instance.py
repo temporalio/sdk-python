@@ -3318,9 +3318,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
                 self._input.schedule_to_start_timeout
             )
         if self._input.start_to_close_timeout is not None:
-            v.start_to_close_timeout.FromTimedelta(
-                self._input.start_to_close_timeout
-            )
+            v.start_to_close_timeout.FromTimedelta(self._input.start_to_close_timeout)
         v.cancellation_type = cast(
             temporalio.bridge.proto.nexus.NexusOperationCancellationType.ValueType,
             int(self._input.cancellation_type),
