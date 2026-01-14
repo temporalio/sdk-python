@@ -852,6 +852,8 @@ class _Runtime(ABC):
         input: Any,
         output_type: type[OutputT] | None,
         schedule_to_close_timeout: timedelta | None,
+        schedule_to_start_timeout: timedelta | None,
+        start_to_close_timeout: timedelta | None,
         cancellation_type: temporalio.workflow.NexusOperationCancellationType,
         headers: Mapping[str, str] | None,
         summary: str | None,
