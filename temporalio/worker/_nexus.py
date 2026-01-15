@@ -119,6 +119,13 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
 
                 if nexus_task.HasField("task"):
                     task = nexus_task.task
+                    request_deadline = (
+                        nexus_task.request_deadline.ToDatetime().replace(
+                            tzinfo=timezone.utc
+                        )
+                        if nexus_task.HasField("request_deadline")
+                        else None
+                    )
                     if task.request.HasField("start_operation"):
                         task_cancellation = _NexusTaskCancellation()
                         start_op_task = asyncio.create_task(
@@ -127,13 +134,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                                 start_request=task.request.start_operation,
                                 headers=dict(task.request.header),
                                 task_cancellation=task_cancellation,
-                                request_deadline=(
-                                    nexus_task.request_deadline.ToDatetime().replace(
-                                        tzinfo=timezone.utc
-                                    )
-                                    if nexus_task.HasField("request_deadline")
-                                    else None
-                                ),
+                                request_deadline=request_deadline,
                             )
                         )
                         self._running_tasks[task.task_token] = _RunningNexusTask(
@@ -147,13 +148,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                                 request=task.request.cancel_operation,
                                 headers=dict(task.request.header),
                                 task_cancellation=task_cancellation,
-                                request_deadline=(
-                                    nexus_task.request_deadline.ToDatetime().replace(
-                                        tzinfo=timezone.utc
-                                    )
-                                    if nexus_task.HasField("request_deadline")
-                                    else None
-                                ),
+                                request_deadline=request_deadline,
                             )
                         )
                         self._running_tasks[task.task_token] = _RunningNexusTask(
