@@ -70,12 +70,14 @@ class ServiceClient:
         self,
         operation: str,
         token: str,
+        headers: Mapping[str, str] = {},
     ) -> httpx.Response:
         async with httpx.AsyncClient() as http_client:
             return await http_client.post(
                 f"http://{self.server_address}/nexus/endpoints/{self.endpoint}/services/{self.service}/{operation}/cancel",
                 # Token can also be sent as "Nexus-Operation-Token" header
                 params={"token": token},
+                headers=headers,
             )
 
     @staticmethod

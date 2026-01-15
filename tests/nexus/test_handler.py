@@ -279,13 +279,25 @@ class MyServiceHandler:
     ) -> NonSerializableOutput:
         return NonSerializableOutput()
 
-    @sync_operation
-    async def check_request_deadline(
-        self, ctx: StartOperationContext, _input: Input
-    ) -> Output:
-        assert ctx.request_deadline is not None, "request_deadline should be set"
-        # Return ISO format string so we can verify the value
-        return Output(value=ctx.request_deadline.isoformat())
+    class OperationHandlerCheckingRequestDeadline(OperationHandler[Input, Output]):
+        async def start(  # type: ignore[override]
+            self,
+            ctx: StartOperationContext,
+            input: Input,
+        ) -> StartOperationResultSync[Output]:
+            assert ctx.request_deadline is not None, "request_deadline should be set"
+            # Return ISO format string so we can verify the value
+            return StartOperationResultSync(
+                Output(value=ctx.request_deadline.isoformat())
+            )
+
+        async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
+            assert ctx.request_deadline is not None, "request_deadline should be set"
+            return
+
+    @operation_handler
+    def check_request_deadline(self) -> OperationHandler[Input, Output]:
+        return MyServiceHandler.OperationHandlerCheckingRequestDeadline()
 
 
 # Immutable dicts that can be used as dataclass field defaults
@@ -1023,7 +1035,7 @@ async def test_request_deadline_is_present_in_start_operation_context(
         resp = await service_client.start_operation(
             "check_request_deadline",
             dataclass_as_dict(Input("test")),
-            {"Request-Timeout": "30s"},
+            headers={"Request-Timeout": "30s"},
         )
         after = datetime.now(timezone.utc)
 
@@ -1037,6 +1049,37 @@ async def test_request_deadline_is_present_in_start_operation_context(
         assert (
             expected_min <= deadline <= expected_max
         ), f"Deadline {deadline} not in expected range [{expected_min}, {expected_max}]"
+
+
+async def test_request_deadline_is_present_in_cancel_operation_context(
+    env: WorkflowEnvironment,
+):
+    """Test that request_deadline is populated from Request-Timeout header."""
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    task_queue = str(uuid.uuid4())
+    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    service_client = ServiceClient(
+        server_address=ServiceClient.default_server_address(env),
+        endpoint=endpoint,
+        service=MyService.__name__,
+    )
+
+    decorator = service_handler(service=MyService)
+    user_service_handler = decorator(MyServiceHandler)()
+
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[user_service_handler],
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+    ):
+        resp = await service_client.cancel_operation(
+            "check_request_deadline",
+            "test-token",
+        )
+        assert resp.status_code == 202
 
 
 @workflow.defn
