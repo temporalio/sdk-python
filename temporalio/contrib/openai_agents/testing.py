@@ -226,6 +226,8 @@ class AgentEnvironment:
             StatelessMCPServerProvider | StatefulMCPServerProvider
         ] = (),
         register_activities: bool = True,
+        add_temporal_spans: bool = True,
+        use_otel: bool = False,
     ) -> None:
         """Initialize the AgentEnvironment.
 
@@ -242,6 +244,10 @@ class AgentEnvironment:
                 If both are provided, model_provider will be used.
             mcp_server_providers: Sequence of MCP servers to automatically register with the worker.
             register_activities: Whether to register activities during worker execution.
+            add_temporal_spans: Whether to add temporal spans to traces
+            auto_close_spans_in_workflows: Whether to auto-close spans in workflows.
+                This is needed when the underlying tracing system cannot complete spans in a different location
+                from where they started, as with Otel for instance.
 
         .. warning::
            This API is experimental and may change in the future.
@@ -255,6 +261,8 @@ class AgentEnvironment:
         self._mcp_server_providers = mcp_server_providers
         self._register_activities = register_activities
         self._plugin: OpenAIAgentsPlugin | None = None
+        self._add_temporal_spans = add_temporal_spans
+        self._use_otel = use_otel
 
     async def __aenter__(self) -> "AgentEnvironment":
         """Enter the async context manager."""
@@ -264,6 +272,8 @@ class AgentEnvironment:
             model_provider=self._model_provider,
             mcp_server_providers=self._mcp_server_providers,
             register_activities=self._register_activities,
+            add_temporal_spans=self._add_temporal_spans,
+            use_otel=self._use_otel,
         )
 
         return self

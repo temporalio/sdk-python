@@ -1,5 +1,6 @@
 """Provides support for integration with OpenAI Agents SDK tracing across workflows"""
-
+import random
+import traceback
 import uuid
 from types import TracebackType
 from typing import Any, cast
@@ -13,9 +14,10 @@ from agents.tracing.provider import (
     SynchronousMultiTracingProcessor,
 )
 from agents.tracing.spans import Span
+from opentelemetry.sdk.trace import IdGenerator
+from opentelemetry.trace import INVALID_SPAN_ID, INVALID_TRACE_ID
 
 from temporalio import workflow
-from temporalio.contrib.openai_agents._trace_interceptor import RunIdRandom
 from temporalio.workflow import ReadOnlyContextError
 
 
@@ -79,11 +81,12 @@ def activity_span(
 
 class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
     def __init__(
-        self, impl: SynchronousMultiTracingProcessor, auto_close_in_workflows: bool
+        self, impl: SynchronousMultiTracingProcessor, auto_close_in_workflows: bool, start_spans_in_replay: bool
     ):
         super().__init__()
         self._impl = impl
         self._auto_close_in_workflows = auto_close_in_workflows
+        self._start_spans_in_replay = start_spans_in_replay
 
     def add_tracing_processor(self, tracing_processor: TracingProcessor):
         self._impl.add_tracing_processor(tracing_processor)
@@ -92,10 +95,16 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
         self._impl.set_processors(processors)
 
     def on_trace_start(self, trace: Trace) -> None:
-        if workflow.in_workflow() and workflow.unsafe.is_replaying():
-            # In replay mode, don't report
-            return
+        print("on_trace_start 1:", self._start_spans_in_replay, workflow.in_workflow())
+        if not self._start_spans_in_replay:
+            print("on_trace_start 2:", self._start_spans_in_replay, workflow.in_workflow(), workflow.unsafe.is_replaying())
+            if workflow.in_workflow() and workflow.unsafe.is_replaying():
+                print("on_trace_start 3:", self._start_spans_in_replay, workflow.in_workflow(), workflow.unsafe.is_replaying())
+                # In replay mode, don't report
+                return
 
+        print("on_trace_start", trace)
+        traceback.print_stack()
         self._impl.on_trace_start(trace)
         if self._auto_close_in_workflows and workflow.in_workflow():
             self._impl.on_trace_end(trace)
@@ -110,10 +119,11 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
         self._impl.on_trace_end(trace)
 
     def on_span_start(self, span: Span[Any]) -> None:
-        if workflow.in_workflow() and workflow.unsafe.is_replaying():
-            # In replay mode, don't report
-            return
-
+        if not self._start_spans_in_replay:
+            if workflow.in_workflow() and workflow.unsafe.is_replaying():
+                # In replay mode, don't report
+                return
+        print("on_span_start", span.export())
         self._impl.on_span_start(span)
         if self._auto_close_in_workflows and workflow.in_workflow():
             self._impl.on_span_end(span)
@@ -133,6 +143,20 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
     def force_flush(self) -> None:
         self._impl.force_flush()
 
+class RunIdRandom:
+    """Random uuid generator seeded by the run id of the workflow.
+    Doesn't currently support replay over reset correctly.
+    """
+
+    def __init__(self):
+        """Create a new random UUID generator."""
+        self._random = random.Random("OpenAIPlugin" + workflow.info().run_id)
+
+    def uuid4(self) -> str:
+        """Generate a random UUID."""
+        return uuid.UUID(
+            bytes=random.getrandbits(16 * 8).to_bytes(16, "big"), version=4
+        ).hex[:24]
 
 def _workflow_uuid() -> str:
     random = cast(
@@ -141,16 +165,53 @@ def _workflow_uuid() -> str:
     return random.uuid4()
 
 
+class TemporalIdGenerator(IdGenerator):
+    def __init__(self):
+        self.traces = []
+        self.spans = []
+
+    def generate_span_id(self) -> int:
+        if workflow.in_workflow():
+            get_rand_bits = workflow.random().getrandbits
+        else:
+            import random
+            get_rand_bits = random.getrandbits
+
+        if len(self.spans) > 0:
+            print("Generating span id from cache:", self.spans)
+            return self.spans.pop()
+
+        span_id = get_rand_bits(64)
+        while span_id == INVALID_SPAN_ID:
+            span_id = get_rand_bits(64)
+        return span_id
+
+    def generate_trace_id(self) -> int:
+        if workflow.in_workflow():
+            get_rand_bits = workflow.random().getrandbits
+        else:
+            import random
+            get_rand_bits = random.getrandbits
+        if len(self.traces) > 0:
+            print("Generating trace id from cache:", self.traces)
+            return self.traces.pop()
+
+        trace_id = get_rand_bits(128)
+        while trace_id == INVALID_TRACE_ID:
+            trace_id = get_rand_bits(128)
+        return trace_id
+
 class TemporalTraceProvider(DefaultTraceProvider):
     """A trace provider that integrates with Temporal workflows."""
 
-    def __init__(self, auto_close_in_workflows: bool = False):
+    def __init__(self, auto_close_in_workflows: bool = False, start_spans_in_replay: bool = False):
         """Initialize the TemporalTraceProvider."""
         super().__init__()
         self._original_provider = cast(DefaultTraceProvider, get_trace_provider())
         self._multi_processor = _TemporalTracingProcessor(
             self._original_provider._multi_processor,
             auto_close_in_workflows,
+            start_spans_in_replay,
         )
 
     def time_iso(self) -> str:
@@ -201,3 +262,4 @@ class TemporalTraceProvider(DefaultTraceProvider):
     ):
         """Exit the context of the Temporal trace provider."""
         self._multi_processor.shutdown()
+

@@ -989,3 +989,4 @@ def test_opentelemetry_safe_detach():
         assert (
             capturer.find(otel_context_error) is None
         ), "Detach from context message should not be logged"
+

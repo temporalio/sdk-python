@@ -6,6 +6,8 @@ from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from datetime import timedelta
 
+import temporalio
+import temporalio.client
 from agents import ModelProvider, set_trace_provider
 from agents.run import get_default_agent_runner, set_default_agent_runner
 from agents.tracing import get_trace_provider
@@ -20,7 +22,7 @@ from temporalio.contrib.openai_agents._temporal_trace_provider import (
     TemporalTraceProvider,
 )
 from temporalio.contrib.openai_agents._trace_interceptor import (
-    OpenAIAgentsTracingInterceptor,
+    OpenAIAgentsContextPropagationInterceptor,
 )
 from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 from temporalio.contrib.pydantic import (
@@ -46,6 +48,7 @@ if typing.TYPE_CHECKING:
 def set_open_ai_agent_temporal_overrides(
     model_params: ModelActivityParameters,
     auto_close_tracing_in_workflows: bool = False,
+    start_spans_in_replay: bool = False,
 ):
     """Configure Temporal-specific overrides for OpenAI agents.
 
@@ -66,6 +69,7 @@ def set_open_ai_agent_temporal_overrides(
     Args:
         model_params: Configuration parameters for Temporal activity execution of model calls.
         auto_close_tracing_in_workflows: If set to true, close tracing spans immediately.
+        start_spans_in_replay: If set to true, start spans even during replay. Primarily used for otel integration.
 
     Returns:
         A context manager that yields the configured TemporalTraceProvider.
@@ -73,7 +77,8 @@ def set_open_ai_agent_temporal_overrides(
     previous_runner = get_default_agent_runner()
     previous_trace_provider = get_trace_provider()
     provider = TemporalTraceProvider(
-        auto_close_in_workflows=auto_close_tracing_in_workflows
+        auto_close_in_workflows=auto_close_tracing_in_workflows,
+        start_spans_in_replay=start_spans_in_replay,
     )
 
     try:
@@ -181,6 +186,8 @@ class OpenAIAgentsPlugin(SimplePlugin):
             "StatelessMCPServerProvider | StatefulMCPServerProvider"
         ] = (),
         register_activities: bool = True,
+        add_temporal_spans: bool = True,
+        use_otel: bool = False,
     ) -> None:
         """Initialize the OpenAI agents plugin.
 
@@ -196,6 +203,8 @@ class OpenAIAgentsPlugin(SimplePlugin):
             register_activities: Whether to register activities during the worker execution.
                 This can be disabled on some workers to allow a separation of workflows and activities
                 but should not be disabled on all workers, or agents will not be able to progress.
+            add_temporal_spans: Whether to add temporal spans to traces
+            start_spans_in_replay: Whether to start spans during replay. Primarily used for otel integration.
         """
         if model_params is None:
             model_params = ModelActivityParameters()
@@ -246,13 +255,14 @@ class OpenAIAgentsPlugin(SimplePlugin):
 
         @asynccontextmanager
         async def run_context() -> AsyncIterator[None]:
-            with set_open_ai_agent_temporal_overrides(model_params):
+            with set_open_ai_agent_temporal_overrides(model_params, start_spans_in_replay=use_otel):
                 yield
+
 
         super().__init__(
             name="OpenAIAgentsPlugin",
             data_converter=_data_converter,
-            worker_interceptors=[OpenAIAgentsTracingInterceptor()],
+            client_interceptors=[OpenAIAgentsContextPropagationInterceptor(add_temporal_spans=add_temporal_spans, start_traces=use_otel)],
             activities=add_activities,
             workflow_runner=workflow_runner,
             workflow_failure_exception_types=[AgentsWorkflowError],
