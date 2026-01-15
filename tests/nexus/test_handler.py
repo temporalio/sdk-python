@@ -21,6 +21,7 @@ import uuid
 from collections.abc import Callable, Mapping
 from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from types import MappingProxyType
 from typing import Any
 
@@ -102,6 +103,7 @@ class MyService:
     operation_error_failed: nexusrpc.Operation[Input, Output]
     idempotency_check: nexusrpc.Operation[None, Output]
     non_serializable_output: nexusrpc.Operation[Input, NonSerializableOutput]
+    check_request_deadline: nexusrpc.Operation[Input, Output]
 
 
 @workflow.defn
@@ -276,6 +278,14 @@ class MyServiceHandler:
         self, _ctx: StartOperationContext, _input: Input
     ) -> NonSerializableOutput:
         return NonSerializableOutput()
+
+    @sync_operation
+    async def check_request_deadline(
+        self, ctx: StartOperationContext, _input: Input
+    ) -> Output:
+        assert ctx.request_deadline is not None, "request_deadline should be set"
+        # Return ISO format string so we can verify the value
+        return Output(value=ctx.request_deadline.isoformat())
 
 
 # Immutable dicts that can be used as dataclass field defaults
@@ -983,6 +993,50 @@ async def test_request_id_is_received_by_sync_operation(
         )
         assert resp.status_code == 200
         assert resp.json() == {"value": f"request_id: {request_id}"}
+
+
+async def test_request_deadline_is_present_in_start_operation_context(
+    env: WorkflowEnvironment,
+):
+    """Test that request_deadline is populated from Request-Timeout header."""
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    task_queue = str(uuid.uuid4())
+    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    service_client = ServiceClient(
+        server_address=ServiceClient.default_server_address(env),
+        endpoint=endpoint,
+        service=MyService.__name__,
+    )
+
+    decorator = service_handler(service=MyService)
+    user_service_handler = decorator(MyServiceHandler)()
+
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[user_service_handler],
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+    ):
+        before = datetime.now(timezone.utc)
+        resp = await service_client.start_operation(
+            "check_request_deadline",
+            dataclass_as_dict(Input("test")),
+            {"Request-Timeout": "30s"},
+        )
+        after = datetime.now(timezone.utc)
+
+        assert resp.status_code == 200
+        deadline_str = resp.json()["value"]
+        deadline = datetime.fromisoformat(deadline_str)
+
+        # Deadline should be approximately 30s from request time
+        expected_min = before + timedelta(seconds=29)
+        expected_max = after + timedelta(seconds=31)
+        assert (
+            expected_min <= deadline <= expected_max
+        ), f"Deadline {deadline} not in expected range [{expected_min}, {expected_max}]"
 
 
 @workflow.defn
