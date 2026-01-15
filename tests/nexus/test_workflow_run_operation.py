@@ -14,8 +14,8 @@ from nexusrpc.handler import (
 )
 from nexusrpc.handler._decorators import operation_handler
 
-from temporalio import workflow
-from temporalio.nexus import WorkflowRunOperationContext
+from temporalio import nexus, workflow
+from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.nexus._operation_handlers import WorkflowRunOperationHandler
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
@@ -64,32 +64,20 @@ class SubclassingHappyPath:
         return MyOperation()
 
 
-class RequestDeadlineOperation(WorkflowRunOperationHandler):
-    """Operation that asserts request_deadline is accessible."""
-
-    def __init__(self):  # type: ignore[reportMissingSuperCall]
-        pass
-
-    async def start(
-        self, ctx: StartOperationContext, input: Input
-    ) -> StartOperationResultAsync:
+@service_handler
+class RequestDeadlineHandler:
+    @workflow_run_operation
+    async def op(
+        self, ctx: WorkflowRunOperationContext, input: Input
+    ) -> nexus.WorkflowHandle[str]:
         assert (
             ctx.request_deadline is not None
         ), "request_deadline should be set in workflow_run_operation"
-        tctx = WorkflowRunOperationContext._from_start_operation_context(ctx)
-        handle = await tctx.start_workflow(
+        return await ctx.start_workflow(
             EchoWorkflow.run,
             input.value,
             id=str(uuid.uuid4()),
         )
-        return StartOperationResultAsync(handle.to_token())
-
-
-@service_handler
-class RequestDeadlineHandler:
-    @operation_handler
-    def op(self) -> OperationHandler[Input, str]:
-        return RequestDeadlineOperation()
 
 
 @service
