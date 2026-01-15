@@ -684,3 +684,187 @@ def test_value_to_type_literal_key():
 
     # Function executes without error
     value_to_type(hint_with_bug, value_to_convert, custom_converters)
+
+
+@dataclass
+class MyCustomDetail:
+    name: str
+    value: int
+    timestamp: datetime
+
+
+async def test_application_error_details_with_type_hints():
+    """Test ApplicationError details with type hints functionality."""
+    
+    # Test data
+    detail_str = "error detail"
+    detail_int = 123
+    detail_custom = MyCustomDetail("test", 42, datetime(2023, 1, 1, 12, 0, 0))
+    
+    # Create an ApplicationError directly with various details
+    original_error = ApplicationError(
+        "Test error message",
+        detail_str,
+        detail_int,
+        detail_custom,
+        type="TestError"
+    )
+    
+    # Convert to failure and back through the converter (simulating round-trip)
+    failure = Failure()
+    converter = DataConverter.default
+    await converter.encode_failure(original_error, failure)
+    decoded_error = await converter.decode_failure(failure)
+    
+    assert isinstance(decoded_error, ApplicationError)
+    assert decoded_error.message == "Test error message"
+    assert decoded_error.type == "TestError"
+    
+    # Test accessing details without type hints (default behavior)
+    details = decoded_error.details
+    assert len(details) == 3
+    assert details[0] == detail_str
+    assert details[1] == detail_int
+    # Custom object becomes a dict when no type hint is provided
+    assert isinstance(details[2], dict)
+    assert details[2]["name"] == "test"
+    assert details[2]["value"] == 42
+    assert details[2]["timestamp"] == "2023-01-01T12:00:00"
+    
+    # Test accessing details with type hints
+    typed_details = decoded_error.details_with_type_hints([str, int, MyCustomDetail])
+    assert len(typed_details) == 3
+    assert typed_details[0] == detail_str
+    assert typed_details[1] == detail_int
+    # Custom object is properly reconstructed with type hint
+    assert isinstance(typed_details[2], MyCustomDetail)
+    assert typed_details[2].name == "test"
+    assert typed_details[2].value == 42
+    assert typed_details[2].timestamp == datetime(2023, 1, 1, 12, 0, 0)
+
+
+async def test_application_error_details_empty():
+    """Test ApplicationError with no details."""
+    
+    error = ApplicationError("No details error", type="NoDetails")
+    
+    failure = Failure()
+    converter = DataConverter.default
+    await converter.encode_failure(error, failure)
+    decoded_error = await converter.decode_failure(failure)
+    
+    assert isinstance(decoded_error, ApplicationError)
+    assert len(decoded_error.details) == 0
+    assert len(decoded_error.details_with_type_hints([])) == 0
+
+
+async def test_application_error_details_partial_type_hints():
+    """Test ApplicationError details with partial type hints."""
+    
+    detail1 = "string detail"
+    detail2 = 456
+    detail3 = MyCustomDetail("partial", 99, datetime(2023, 6, 15, 9, 30, 0))
+    
+    error = ApplicationError(
+        "Partial hints error",
+        detail1,
+        detail2, 
+        detail3,
+        type="PartialHints"
+    )
+    
+    failure = Failure()
+    converter = DataConverter.default
+    await converter.encode_failure(error, failure)
+    decoded_error = await converter.decode_failure(failure)
+    
+    # Provide type hints for only the first two details
+    typed_details = decoded_error.details_with_type_hints([str, int])
+    assert len(typed_details) == 3
+    assert typed_details[0] == detail1
+    assert typed_details[1] == detail2
+    # Third detail has no type hint, so it remains as dict
+    assert isinstance(typed_details[2], dict)
+    assert typed_details[2]["name"] == "partial"
+
+
+async def test_application_error_details_direct_creation():
+    """Test ApplicationError created directly with payload converter."""
+    
+    detail1 = "direct detail"
+    detail2 = MyCustomDetail("direct", 777, datetime(2023, 12, 25, 14, 15, 0))
+    
+    # Create error with payload converter directly
+    converter = DataConverter.default.payload_converter
+    payloads_wrapper = converter.to_payloads_wrapper([detail1, detail2])
+    
+    error = ApplicationError._from_failure(
+        "Direct creation error",
+        payloads_wrapper,
+        converter,
+        type="Direct",
+    )
+    
+    # Test default details access
+    details = error.details
+    assert len(details) == 2
+    assert details[0] == detail1
+    assert isinstance(details[1], dict)  # No type hint
+    
+    # Test with type hints
+    typed_details = error.details_with_type_hints([str, MyCustomDetail])
+    assert len(typed_details) == 2
+    assert typed_details[0] == detail1
+    assert isinstance(typed_details[1], MyCustomDetail)
+    assert typed_details[1].name == "direct"
+    assert typed_details[1].value == 777
+
+
+async def test_application_error_details_none_payload_converter():
+    """Test ApplicationError when no payload converter is set."""
+    
+    detail1 = "no converter detail"
+    detail2 = 999
+    
+    # Create error without payload converter 
+    error = ApplicationError(
+        "No converter error",
+        detail1,
+        detail2,
+        type="NoConverter"
+    )
+    
+    # Both methods should return the same result - the raw details tuple
+    details = error.details
+    typed_details = error.details_with_type_hints([str, int])
+    
+    assert details == (detail1, detail2)
+    assert typed_details == (detail1, detail2)
+
+
+def test_application_error_details_edge_cases():
+    """Test edge cases for ApplicationError details."""
+    
+    # Test with None payload converter and empty Payloads
+    from temporalio.api.common.v1 import Payloads
+    empty_payloads = Payloads()
+    
+    error = ApplicationError._from_failure(
+        "Empty payloads",
+        empty_payloads,
+        DataConverter.default.payload_converter,
+    )
+    
+    assert len(error.details) == 0
+    assert len(error.details_with_type_hints([str])) == 0
+    
+    # Test with non-Payloads details when payload_converter is set
+    error2 = ApplicationError(
+        "Non-payloads details",
+        "string",
+        123,
+    )
+    
+    # Should return the raw details since they're not Payloads
+    assert error2.details == ("string", 123)
+    assert error2.details_with_type_hints([str, int]) == ("string", 123)

@@ -1118,9 +1118,10 @@ class DefaultFailureConverter(FailureConverter):
         err: temporalio.exceptions.FailureError | nexusrpc.HandlerError
         if failure.HasField("application_failure_info"):
             app_info = failure.application_failure_info
-            err = temporalio.exceptions.ApplicationError(
+            err = temporalio.exceptions.ApplicationError._from_failure(
                 failure.message or "Application error",
-                *payload_converter.from_payloads_wrapper(app_info.details),
+                app_info.details if app_info.details and app_info.details.payloads else None,
+                payload_converter,
                 type=app_info.type or None,
                 non_retryable=app_info.non_retryable,
                 next_retry_delay=app_info.next_retry_delay.ToTimedelta(),

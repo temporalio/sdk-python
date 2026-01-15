@@ -1,6 +1,7 @@
 """Common Temporal exceptions."""
 
 import asyncio
+import typing
 from collections.abc import Sequence
 from datetime import timedelta
 from enum import IntEnum
@@ -8,6 +9,10 @@ from typing import Any
 
 import temporalio.api.enums.v1
 import temporalio.api.failure.v1
+from temporalio.api.common.v1.message_pb2 import Payloads
+
+if typing.TYPE_CHECKING:
+    from temporalio.converter import PayloadConverter
 
 
 class TemporalError(Exception):
@@ -106,10 +111,46 @@ class ApplicationError(FailureError):
         self._non_retryable = non_retryable
         self._next_retry_delay = next_retry_delay
         self._category = category
+        self._payload_converter = None
+
+    @classmethod
+    def _from_failure(
+        cls,
+        message: str,
+        payloads: Payloads | None,
+        payload_converter: "PayloadConverter",
+        *,
+        type: str | None = None,
+        non_retryable: bool = False,
+        next_retry_delay: timedelta | None = None,
+        category: ApplicationErrorCategory = ApplicationErrorCategory.UNSPECIFIED,
+    ) -> "ApplicationError":
+        """Create an ApplicationError from failure payloads (internal use only)."""
+        # Create instance using regular constructor first
+        instance = cls(
+            message,
+            type=type,
+            non_retryable=non_retryable,
+            next_retry_delay=next_retry_delay,
+            category=category,
+        )
+        # Override details and payload converter for lazy loading if payloads exist
+        if payloads is not None:
+            instance._details = payloads
+            instance._payload_converter = payload_converter
+        return instance
 
     @property
     def details(self) -> Sequence[Any]:
         """User-defined details on the error."""
+        return self.details_with_type_hints()
+
+    def details_with_type_hints(self, type_hints: list[type] | None = None) -> Sequence[Any]:
+        """User-defined details on the error with type hints for deserialization."""
+        if self._payload_converter and isinstance(self._details, Payloads):
+            if not self._details or not self._details.payloads:
+                return []
+            return self._payload_converter.from_payloads(self._details.payloads, type_hints)
         return self._details
 
     @property
