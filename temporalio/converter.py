@@ -1120,7 +1120,9 @@ class DefaultFailureConverter(FailureConverter):
             app_info = failure.application_failure_info
             err = temporalio.exceptions.ApplicationError._from_failure(
                 failure.message or "Application error",
-                app_info.details if app_info.details and app_info.details.payloads else None,
+                app_info.details
+                if app_info.details and app_info.details.payloads
+                else None,
                 payload_converter,
                 type=app_info.type or None,
                 non_retryable=app_info.non_retryable,

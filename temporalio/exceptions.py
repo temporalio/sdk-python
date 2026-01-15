@@ -107,11 +107,12 @@ class ApplicationError(FailureError):
             exc_args=(message if not type else f"{type}: {message}",),
         )
         self._details = details
+        self._payloads: Payloads | None = None
         self._type = type
         self._non_retryable = non_retryable
         self._next_retry_delay = next_retry_delay
         self._category = category
-        self._payload_converter = None
+        self._payload_converter: "PayloadConverter | None" = None
 
     @classmethod
     def _from_failure(
@@ -136,7 +137,7 @@ class ApplicationError(FailureError):
         )
         # Override details and payload converter for lazy loading if payloads exist
         if payloads is not None:
-            instance._details = payloads
+            instance._payloads = payloads
             instance._payload_converter = payload_converter
         return instance
 
@@ -145,12 +146,16 @@ class ApplicationError(FailureError):
         """User-defined details on the error."""
         return self.details_with_type_hints()
 
-    def details_with_type_hints(self, type_hints: list[type] | None = None) -> Sequence[Any]:
+    def details_with_type_hints(
+        self, type_hints: list[type] | None = None
+    ) -> Sequence[Any]:
         """User-defined details on the error with type hints for deserialization."""
-        if self._payload_converter and isinstance(self._details, Payloads):
-            if not self._details or not self._details.payloads:
+        if self._payload_converter and self._payloads is not None:
+            if not self._payloads or not self._payloads.payloads:
                 return []
-            return self._payload_converter.from_payloads(self._details.payloads, type_hints)
+            return self._payload_converter.from_payloads(
+                self._payloads.payloads, type_hints
+            )
         return self._details
 
     @property
