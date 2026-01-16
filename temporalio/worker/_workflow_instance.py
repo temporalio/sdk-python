@@ -3253,9 +3253,6 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         await self._instance._cancel_external_workflow(command)
 
 
-# TODO(nexus-preview): are we sure we don't want to inherit from asyncio.Task as
-# ActivityHandle and ChildWorkflowHandle do? I worry that we should provide .done(),
-# .result(), .exception() etc for consistency.
 class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
     def __init__(
         self,
