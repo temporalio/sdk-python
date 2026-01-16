@@ -273,6 +273,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._is_replaying: bool = False
         self._random = random.Random(det.randomness_seed)
         self._read_only = False
+        self._in_query_or_validator = False
 
         # Patches we have been notified of and memoized patch responses
         self._patches_notified: set[str] = set()
@@ -618,7 +619,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 )
 
                 if job.run_validator and defn.validator is not None:
-                    with self._as_read_only():
+                    with self._as_read_only(in_query_or_validator=True):
                         self._inbound.handle_update_validator(handler_input)
                         # Re-process arguments to avoid any problems caused by user mutation of them during validation
                         args = self._process_handler_args(
@@ -710,7 +711,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # Wrap entire bunch of work in a task
         async def run_query() -> None:
             try:
-                with self._as_read_only():
+                with self._as_read_only(in_query_or_validator=True):
                     # Named query or dynamic
                     defn = self._queries.get(job.query_type) or self._queries.get(None)
                     if not defn:
@@ -1217,6 +1218,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
     def workflow_is_replaying(self) -> bool:
         return self._is_replaying
+
+    def workflow_is_replaying_history_events(self) -> bool:
+        return self._is_replaying and not self._in_query_or_validator
 
     def workflow_memo(self) -> Mapping[str, Any]:
         if self._untyped_converted_memo is None:
@@ -2008,13 +2012,16 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         return self._current_completion.successful.commands.add()
 
     @contextmanager
-    def _as_read_only(self) -> Iterator[None]:
-        prev_val = self._read_only
+    def _as_read_only(self, *, in_query_or_validator: bool) -> Iterator[None]:
+        prev_read_only = self._read_only
+        prev_in_query_or_validator = self._in_query_or_validator
         self._read_only = True
+        self._in_query_or_validator = in_query_or_validator
         try:
             yield None
         finally:
-            self._read_only = prev_val
+            self._read_only = prev_read_only
+            self._in_query_or_validator = prev_in_query_or_validator
 
     def _assert_not_read_only(
         self, action_attempted: str, *, allow_during_delete: bool = False
@@ -2191,7 +2198,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if self._defn.name is None and self._defn.dynamic_config_fn is not None:
             dynamic_config = None
             try:
-                with self._as_read_only():
+                with self._as_read_only(in_query_or_validator=False):
                     dynamic_config = self._defn.dynamic_config_fn(workflow_instance)
             except Exception as err:
                 logger.exception(
