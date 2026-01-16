@@ -1,5 +1,6 @@
 .venv
 __pycache__
+.mypy_cache
 /build
 /dist
 temporalio/bridge/target/
