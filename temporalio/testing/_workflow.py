@@ -91,6 +91,7 @@ class WorkflowEnvironment:
         dev_server_download_version: str = "default",
         dev_server_extra_args: Sequence[str] = [],
         dev_server_download_ttl: timedelta | None = None,
+        ui_port: int | None = None,
     ) -> WorkflowEnvironment:
         """Start a full Temporal server locally, downloading if necessary.
 
@@ -149,6 +150,7 @@ class WorkflowEnvironment:
             dev_server_extra_args: Extra arguments for the CLI binary.
             dev_server_download_ttl: TTL for the downloaded CLI binary. If unset, it will be
                 cached indefinitely.
+            ui_port: UI port to use if UI is enabled.
 
         Returns:
             The started CLI dev server workflow environment.
@@ -173,6 +175,7 @@ class WorkflowEnvironment:
                 new_args.append(f"{attr.name}={attr._metadata_type}")
             new_args += dev_server_extra_args
             dev_server_extra_args = new_args
+
         # Start CLI dev server
         runtime = runtime or temporalio.runtime.Runtime.default()
         download_ttl_ms = None
@@ -191,12 +194,14 @@ class WorkflowEnvironment:
                 port=port,
                 database_filename=dev_server_database_filename,
                 ui=ui,
+                ui_port=ui_port,
                 log_format=dev_server_log_format,
                 log_level=dev_server_log_level,
                 extra_args=dev_server_extra_args,
                 download_ttl_ms=download_ttl_ms,
             ),
         )
+
         # If we can't connect to the server, we should shut it down
         try:
             return _EphemeralServerWorkflowEnvironment(

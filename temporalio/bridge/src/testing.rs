@@ -25,6 +25,7 @@ pub struct DevServerConfig {
     port: Option<u16>,
     database_filename: Option<String>,
     ui: bool,
+    ui_port: Option<u16>,
     log_format: String,
     log_level: String,
     extra_args: Vec<String>,
@@ -133,6 +134,7 @@ impl From<DevServerConfig> for ephemeral_server::TemporalDevServerConfig {
             .maybe_port(conf.port)
             .maybe_db_filename(conf.database_filename)
             .ui(conf.ui)
+            .maybe_ui_port(conf.ui_port)
             .log((conf.log_format, conf.log_level))
             .extra_args(conf.extra_args)
             .build()
