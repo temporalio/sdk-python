@@ -14,8 +14,8 @@ from nexusrpc.handler import (
 )
 from nexusrpc.handler._decorators import operation_handler
 
-from temporalio import workflow
-from temporalio.nexus import WorkflowRunOperationContext
+from temporalio import nexus, workflow
+from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.nexus._operation_handlers import WorkflowRunOperationHandler
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
@@ -62,6 +62,22 @@ class SubclassingHappyPath:
     @operation_handler
     def op(self) -> OperationHandler[Input, str]:
         return MyOperation()
+
+
+@service_handler
+class RequestDeadlineHandler:
+    @workflow_run_operation
+    async def op(
+        self, ctx: WorkflowRunOperationContext, input: Input
+    ) -> nexus.WorkflowHandle[str]:
+        assert (
+            ctx.request_deadline is not None
+        ), "request_deadline should be set in workflow_run_operation"
+        return await ctx.start_workflow(
+            EchoWorkflow.run,
+            input.value,
+            id=str(uuid.uuid4()),
+        )
 
 
 @service
@@ -117,3 +133,32 @@ async def test_workflow_run_operation(
             assert re.search(message, failure.message)
         else:
             assert resp.status_code == 201
+
+
+async def test_request_deadline_is_accessible_in_workflow_run_operation(
+    env: WorkflowEnvironment,
+):
+    """Test that request_deadline is accessible in WorkflowRunOperationContext."""
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    task_queue = str(uuid.uuid4())
+    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    assert (service_defn := nexusrpc.get_service_definition(RequestDeadlineHandler))
+    service_client = ServiceClient(
+        server_address=ServiceClient.default_server_address(env),
+        endpoint=endpoint,
+        service=service_defn.name,
+    )
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[RequestDeadlineHandler()],
+    ):
+        resp = await service_client.start_operation(
+            "op",
+            dataclass_as_dict(Input(value="test")),
+            {"Request-Timeout": "30s"},
+        )
+        # The assertion in the handler verified request_deadline was accessible
+        assert resp.status_code == 201
