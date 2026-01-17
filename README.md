@@ -164,7 +164,7 @@ from temporalio import workflow
 
 # Import our activity, passing it through the sandbox
 with workflow.unsafe.imports_passed_through():
-    from .activities import say_hello
+    from activities import say_hello
 
 @workflow.defn
 class SayHello:
@@ -184,8 +184,8 @@ from temporalio.client import Client
 from temporalio.worker import Worker
 
 # Import the activity and workflow from our other files
-from .activities import say_hello
-from .workflows import SayHello
+from activities import say_hello
+from workflows import SayHello
 
 async def main():
     # Create client connected to server at the given address
@@ -220,7 +220,7 @@ import asyncio
 from temporalio.client import Client
 
 # Import the workflow from the previous code
-from .workflows import SayHello
+from workflows import SayHello
 
 async def main():
     # Create client connected to server at the given address
