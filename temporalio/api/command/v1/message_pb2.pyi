@@ -594,6 +594,7 @@ class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Me
     MEMO_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     INHERIT_BUILD_ID_FIELD_NUMBER: builtins.int
+    INITIAL_VERSIONING_BEHAVIOR_FIELD_NUMBER: builtins.int
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
     @property
@@ -634,6 +635,13 @@ class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Me
     the assignment rules will be used to independently assign a Build ID to the new execution.
     Deprecated. Only considered for versioning v0.2.
     """
+    initial_versioning_behavior: (
+        temporalio.api.enums.v1.workflow_pb2.ContinueAsNewVersioningBehavior.ValueType
+    )
+    """Experimental. Optionally decide the versioning behavior that the first task of the new run should use.
+    For example, choose to AutoUpgrade on continue-as-new instead of inheriting the pinned version
+    of the previous run.
+    """
     def __init__(
         self,
         *,
@@ -654,6 +662,7 @@ class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Me
         search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
         | None = ...,
         inherit_build_id: builtins.bool = ...,
+        initial_versioning_behavior: temporalio.api.enums.v1.workflow_pb2.ContinueAsNewVersioningBehavior.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -697,6 +706,8 @@ class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Me
             b"header",
             "inherit_build_id",
             b"inherit_build_id",
+            "initial_versioning_behavior",
+            b"initial_versioning_behavior",
             "initiator",
             b"initiator",
             "input",
