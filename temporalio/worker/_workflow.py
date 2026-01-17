@@ -23,6 +23,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow
+from temporalio.api.enums.v1 import WorkflowTaskFailedCause
 from temporalio.bridge.worker import PollShutdownError
 
 from . import _command_aware_visitor
@@ -371,6 +372,21 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 completion,
                 data_converter,
                 encode_headers=self._encode_headers,
+            )
+        except temporalio.exceptions.PayloadSizeError as err:
+            # TODO: Would like to use temporalio.workflow.logger here, but
+            # that requires being in the workflow event loop. Possibly refactor
+            # the logger core functionality into shareable class and update
+            # LoggerAdapter to be a decorator.
+            logger.warning(
+                "Workflow task failed: payloads size exceeded the error limit. Size: %d bytes, Limit: %d bytes",
+                err.payloads_size,
+                err.payloads_limit,
+            )
+            completion.failed.Clear()
+            await data_converter.encode_failure(err, completion.failed.failure)
+            completion.failed.force_cause = (
+                WorkflowTaskFailedCause.WORKFLOW_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE
             )
         except Exception as err:
             logger.exception(

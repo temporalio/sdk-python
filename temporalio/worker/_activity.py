@@ -380,6 +380,19 @@ class _ActivityWorker:
                         temporalio.exceptions.CancelledError("Cancelled"),
                         completion.result.cancelled.failure,
                     )
+                elif isinstance(
+                    err,
+                    temporalio.exceptions.PayloadSizeError,
+                ):
+                    temporalio.activity.logger.warning(
+                        "Activity task failed: payloads size exceeded the error limit. Size: %d bytes, Limit: %d bytes",
+                        err.payloads_size,
+                        err.payloads_limit,
+                        extra={"__temporal_error_identifier": "ActivityFailure"},
+                    )
+                    await data_converter.encode_failure(
+                        err, completion.result.failed.failure
+                    )
                 else:
                     if (
                         isinstance(

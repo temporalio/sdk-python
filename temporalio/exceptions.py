@@ -446,3 +446,28 @@ def is_cancelled_exception(exception: BaseException) -> bool:
             and isinstance(exception.cause, CancelledError)
         )
     )
+
+
+class PayloadSizeError(TemporalError):
+    """Error raised when payloads size exceeds payload size limits."""
+
+    def __init__(self, size: int, limit: int):
+        """Initialize a payloads limit error.
+
+        Args:
+            size: Actual payloads size in bytes.
+            limit: Payloads size limit in bytes.
+        """
+        super().__init__("Payloads size exceeded the error limit")
+        self._size = size
+        self._limit = limit
+
+    @property
+    def payloads_size(self) -> int:
+        """Actual payloads size in bytes."""
+        return self._size
+
+    @property
+    def payloads_limit(self) -> int:
+        """Payloads size limit in bytes."""
+        return self._limit
