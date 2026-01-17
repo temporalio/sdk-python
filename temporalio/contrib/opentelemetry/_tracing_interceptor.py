@@ -80,6 +80,7 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         tracer: opentelemetry.trace.Tracer | None = None,
         *,
         always_create_workflow_spans: bool = False,
+        create_spans: bool = True,
     ) -> None:
         """Initialize a OpenTelemetry tracing interceptor.
 
@@ -94,6 +95,12 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
                 create spans in workflows no matter what, but there is a risk of
                 them being orphans since they may not have a parent span after
                 replaying.
+            create_spans: When true, the default, spans are created for Temporal
+                operations (StartWorkflow, RunActivity, etc.). When false, only
+                context propagation is performed without creating any spans.
+                This is useful when you want to use Temporal's robust W3C
+                TraceContext propagation but have another instrumentation
+                library (like OpenInference) create the actual spans.
         """
         self.tracer = tracer or opentelemetry.trace.get_tracer(__name__)
         # To customize any of this, users must subclass. We intentionally don't
@@ -105,6 +112,7 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         # TODO(cretz): Should I be using the configured one at the client and activity level?
         self.payload_converter = temporalio.converter.PayloadConverter.default
         self._always_create_workflow_spans = always_create_workflow_spans
+        self._create_spans = create_spans
 
     def intercept_client(
         self, next: temporalio.client.OutboundInterceptor
@@ -182,6 +190,31 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         kind: opentelemetry.trace.SpanKind,
         context: Context | None = None,
     ) -> Iterator[None]:
+        # If create_spans is False, only propagate context without creating spans
+        if not self._create_spans:
+            # Attach incoming context if provided (for activities/inbound)
+            token = opentelemetry.context.attach(context) if context else None
+            try:
+                # Still propagate context via headers (for outbound)
+                if input_with_headers:
+                    input_with_headers.headers = self._context_to_headers(
+                        input_with_headers.headers
+                    )
+                if input_with_ctx:
+                    carrier: _CarrierDict = {}
+                    self.text_map_propagator.inject(carrier)
+                    input_with_ctx.ctx = dataclasses.replace(
+                        input_with_ctx.ctx,
+                        headers=_carrier_to_nexus_headers(
+                            carrier, input_with_ctx.ctx.headers
+                        ),
+                    )
+                yield None
+            finally:
+                if token and context is opentelemetry.context.get_current():
+                    opentelemetry.context.detach(token)
+            return
+
         token = opentelemetry.context.attach(context) if context else None
         try:
             with self.tracer.start_as_current_span(
@@ -228,6 +261,10 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         # Carrier to context, start span, set span as current on context,
         # context back to carrier
 
+        # If create_spans is False, just return the existing context without creating spans
+        if not self._create_spans:
+            return params.context
+
         # If the parent is missing and user hasn't said to always create, do not
         # create
         if params.parent_missing and not self._always_create_workflow_spans:
@@ -244,9 +281,17 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
             if link_span is not opentelemetry.trace.INVALID_SPAN:
                 links = [opentelemetry.trace.Link(link_span.get_span_context())]
 
-        # We start and end the span immediately because it is not replay-safe to
-        # keep an unended long-running span. We set the end time the same as the
-        # start time to make it clear it has no duration.
+        # OpenTelemetry Design: Spans are process-local, only SpanContext crosses
+        # process boundaries. Temporal workflows may execute across multiple workers,
+        # so we cannot keep a long-running span open.
+        #
+        # Solution: Create and immediately end workflow spans with the same timestamp.
+        # This provides:
+        # 1. A span_id for child operations to reference as parent
+        # 2. Attributes (workflow type, ID) recorded in the trace
+        # 3. Replay safety - no state survives across workflow tasks
+        #
+        # The span appears as a zero-duration marker with children beneath it.
         span = self.tracer.start_span(
             params.name,
             context,
