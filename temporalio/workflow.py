@@ -1611,8 +1611,9 @@ class LoggerAdapter(logging.LoggerAdapter):
         **kwargs: Any,
     ):
         """Override to potentially disable the sandbox."""
-        if sys.version_info < (3, 11):
+        if sys.version_info < (3, 11) and stacklevel == 1:
             # An additional stacklevel is needed on 3.10 because it doesn't skip internal frames until after stacklevel
+            # is decremented, so it needs an additional stacklevel to skip the internal frame.
             stacklevel += 1  # type: ignore[reportUnreachable]
         stacklevel += 1
         if self.disable_sandbox:
