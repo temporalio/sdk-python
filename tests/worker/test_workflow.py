@@ -2065,6 +2065,98 @@ async def test_workflow_logging(client: Client):
         assert capturer.find_log("Signal: finish")
 
 
+async def test_workflow_logging_flatten_mode(client: Client):
+    """Test that flatten mode produces OTel-safe scalar attributes."""
+    # Save original mode and set to flatten
+    original_mode = workflow.logger.temporal_extra_mode
+    workflow.logger.temporal_extra_mode = "flatten"
+
+    try:
+        with LogCapturer().logs_captured(workflow.logger.base_logger) as capturer:
+            async with new_worker(
+                client, LoggingWorkflow, max_cached_workflows=0
+            ) as worker:
+                handle = await client.start_workflow(
+                    LoggingWorkflow.run,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+                await handle.signal(LoggingWorkflow.my_signal, "signal 1")
+                await handle.execute_update(
+                    LoggingWorkflow.my_update, "update 1", id="update-1"
+                )
+                await handle.signal(LoggingWorkflow.my_signal, "finish")
+                await handle.result()
+
+            # Check signal log record
+            record = capturer.find_log("Signal: signal 1")
+            assert record is not None
+
+            # Should NOT have nested dict
+            assert "temporal_workflow" not in record.__dict__
+
+            # Should have flattened keys with temporal.workflow prefix
+            assert record.__dict__["temporal.workflow.workflow_type"] == "LoggingWorkflow"
+            assert "temporal.workflow.workflow_id" in record.__dict__
+            assert "temporal.workflow.run_id" in record.__dict__
+            assert "temporal.workflow.namespace" in record.__dict__
+            assert "temporal.workflow.task_queue" in record.__dict__
+            assert record.__dict__["temporal.workflow.attempt"] == 1
+
+            # Verify all temporal.workflow.* values are primitives (OTel-safe)
+            for key, value in record.__dict__.items():
+                if key.startswith("temporal.workflow."):
+                    assert isinstance(
+                        value, (str, int, float, bool, type(None))
+                    ), f"Key {key} has non-primitive value: {type(value)}"
+
+            # Check update log record has flattened update fields
+            update_record = capturer.find_log("Update: update 1")
+            assert update_record is not None
+            assert update_record.__dict__["temporal.workflow.update_id"] == "update-1"
+            assert update_record.__dict__["temporal.workflow.update_name"] == "my_update"
+    finally:
+        workflow.logger.temporal_extra_mode = original_mode
+
+
+async def test_workflow_logging_json_mode(client: Client):
+    """Test that json mode produces a JSON string value."""
+    # Save original mode and set to json
+    original_mode = workflow.logger.temporal_extra_mode
+    workflow.logger.temporal_extra_mode = "json"
+
+    try:
+        with LogCapturer().logs_captured(workflow.logger.base_logger) as capturer:
+            async with new_worker(
+                client, LoggingWorkflow, max_cached_workflows=0
+            ) as worker:
+                handle = await client.start_workflow(
+                    LoggingWorkflow.run,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+                await handle.signal(LoggingWorkflow.my_signal, "signal 1")
+                await handle.signal(LoggingWorkflow.my_signal, "finish")
+                await handle.result()
+
+            # Check log record
+            record = capturer.find_log("Signal: signal 1")
+            assert record is not None
+
+            # Should have temporal_workflow as a JSON string
+            assert "temporal_workflow" in record.__dict__
+            json_str = record.__dict__["temporal_workflow"]
+            assert isinstance(json_str, str)
+
+            # Should be valid JSON
+            parsed = json.loads(json_str)
+            assert parsed["workflow_type"] == "LoggingWorkflow"
+            assert "workflow_id" in parsed
+            assert "run_id" in parsed
+    finally:
+        workflow.logger.temporal_extra_mode = original_mode
+
+
 @activity.defn
 async def task_fail_once_activity() -> None:
     if activity.info().attempt == 1:

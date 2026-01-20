@@ -61,6 +61,11 @@ import temporalio.nexus
 import temporalio.workflow
 from temporalio.nexus._util import ServiceHandlerT
 
+from ._log_utils import (
+    TemporalLogExtraMode,
+    _apply_temporal_context_to_extra,
+    _update_temporal_context_in_extra,
+)
 from .types import (
     AnyType,
     CallableAsyncNoParam,
@@ -1569,6 +1574,11 @@ class LoggerAdapter(logging.LoggerAdapter):
             use by others. Default is False.
         log_during_replay: Boolean for whether logs should occur during replay.
             Default is False.
+        temporal_extra_mode: Controls how workflow context is added to log
+            ``extra``. Default is ``"dict"`` (current behavior). Set to
+            ``"flatten"`` for OpenTelemetry compatibility (scalar attributes
+            with ``temporal.workflow.`` prefix), or ``"json"`` for a single JSON
+            string value.
 
     Values added to ``extra`` are merged with the ``extra`` dictionary from a
     logging call, with values from the logging call taking precedence. I.e. the
@@ -1582,6 +1592,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         self.workflow_info_on_extra = True
         self.full_workflow_info_on_extra = False
         self.log_during_replay = False
+        self.temporal_extra_mode: TemporalLogExtraMode = "dict"
         self.disable_sandbox = False
 
     def process(
@@ -1602,7 +1613,13 @@ class LoggerAdapter(logging.LoggerAdapter):
                 if self.workflow_info_on_message:
                     msg_extra.update(workflow_details)
                 if self.workflow_info_on_extra:
-                    extra["temporal_workflow"] = workflow_details
+                    _apply_temporal_context_to_extra(
+                        extra,
+                        key="temporal_workflow",
+                        prefix="temporal.workflow",
+                        ctx=workflow_details,
+                        mode=self.temporal_extra_mode,
+                    )
                 if self.full_workflow_info_on_extra:
                     extra["workflow_info"] = runtime.workflow_info()
             update_info = current_update_info()
@@ -1611,7 +1628,13 @@ class LoggerAdapter(logging.LoggerAdapter):
                 if self.workflow_info_on_message:
                     msg_extra.update(update_details)
                 if self.workflow_info_on_extra:
-                    extra.setdefault("temporal_workflow", {}).update(update_details)
+                    _update_temporal_context_in_extra(
+                        extra,
+                        key="temporal_workflow",
+                        prefix="temporal.workflow",
+                        update_ctx=update_details,
+                        mode=self.temporal_extra_mode,
+                    )
 
         kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
         if msg_extra:

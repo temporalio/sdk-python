@@ -32,6 +32,7 @@ import temporalio.bridge.proto.activity_task
 import temporalio.common
 import temporalio.converter
 
+from ._log_utils import TemporalLogExtraMode, _apply_temporal_context_to_extra
 from .types import CallableType
 
 if TYPE_CHECKING:
@@ -500,6 +501,11 @@ class LoggerAdapter(logging.LoggerAdapter):
             value will be added to the ``extra`` dictionary with the entire
             activity info, making it present on the ``LogRecord.__dict__`` for
             use by others. Default is False.
+        temporal_extra_mode: Controls how activity context is added to log
+            ``extra``. Default is ``"dict"`` (current behavior). Set to
+            ``"flatten"`` for OpenTelemetry compatibility (scalar attributes
+            with ``temporal.activity.`` prefix), or ``"json"`` for a single JSON
+            string value.
     """
 
     def __init__(self, logger: logging.Logger, extra: Mapping[str, Any] | None) -> None:
@@ -508,6 +514,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         self.activity_info_on_message = True
         self.activity_info_on_extra = True
         self.full_activity_info_on_extra = False
+        self.temporal_extra_mode: TemporalLogExtraMode = "dict"
 
     def process(
         self, msg: Any, kwargs: MutableMapping[str, Any]
@@ -525,7 +532,13 @@ class LoggerAdapter(logging.LoggerAdapter):
                 if self.activity_info_on_extra:
                     # Extra can be absent or None, this handles both
                     extra = kwargs.get("extra", None) or {}
-                    extra["temporal_activity"] = context.logger_details
+                    _apply_temporal_context_to_extra(
+                        extra,
+                        key="temporal_activity",
+                        prefix="temporal.activity",
+                        ctx=context.logger_details,
+                        mode=self.temporal_extra_mode,
+                    )
                     kwargs["extra"] = extra
                 if self.full_activity_info_on_extra:
                     # Extra can be absent or None, this handles both
