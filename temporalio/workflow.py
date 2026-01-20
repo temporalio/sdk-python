@@ -1611,9 +1611,9 @@ class LoggerAdapter(logging.LoggerAdapter):
                 if self.workflow_info_on_extra:
                     extra.setdefault("temporal_workflow", {}).update(update_details)
 
-        kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
-        if msg_extra:
-            msg = f"{msg} ({msg_extra})"
+            kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
+            if msg_extra:
+                msg = f"{msg} ({msg_extra})"
         return (msg, kwargs)
 
     def isEnabledFor(self, level: int) -> bool:
