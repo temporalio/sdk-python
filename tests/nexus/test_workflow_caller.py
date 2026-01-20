@@ -54,7 +54,6 @@ from tests.helpers import find_free_port, new_worker
 from tests.helpers.metrics import PromMetricMatcher
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
-# TODO(nexus-prerelease): test availability of Temporal client etc in async context set by worker
 # TODO(nexus-preview): test worker shutdown, wait_all_completed, drain etc
 
 # -----------------------------------------------------------------------------
@@ -549,8 +548,6 @@ async def test_sync_response(
             task_queue=task_queue,
         )
 
-        # TODO(nexus-prerelease): check bidi links for sync operation
-
         # The operation result is returned even when request_cancel=True, because the
         # response was synchronous and it could not be cancelled. See explanation below.
         if exception_in_operation_start:
@@ -628,7 +625,6 @@ async def test_async_response(
             )
             return
 
-        # TODO(nexus-prerelease): race here? How do we know it hasn't been canceled already?
         handler_wf_info = await handler_wf_handle.describe()
         assert handler_wf_info.status in [
             WorkflowExecutionStatus.RUNNING,
