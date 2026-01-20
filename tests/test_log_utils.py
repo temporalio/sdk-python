@@ -320,6 +320,120 @@ class TestNamespaceSafety:
             ), f"Key {key} doesn't have temporal prefix"
 
 
+class TestFlattenModeOTelSafety:
+    """Critical tests to verify flatten mode is fully OTel-safe."""
+
+    def test_flatten_mode_produces_zero_dicts_for_temporal_keys(self) -> None:
+        """Verify flatten mode has zero dict values for any temporal keys.
+
+        This is the critical OTel compatibility requirement - nested dicts
+        cause OTel pipelines to reject or drop the attributes.
+        """
+        ctx = {
+            "workflow_id": "wf-001",
+            "workflow_type": "TestWorkflow",
+            "run_id": "run-001",
+            "namespace": "default",
+            "task_queue": "test-queue",
+            "attempt": 1,
+        }
+        extra: dict[str, Any] = {}
+        _apply_temporal_context_to_extra(
+            extra,
+            key="temporal_workflow",
+            prefix="temporal.workflow",
+            ctx=ctx,
+            mode="flatten",
+        )
+
+        # Assert no dict-valued keys exist at all
+        for key, value in extra.items():
+            assert not isinstance(value, dict), (
+                f"Flatten mode violation: {key}={type(value).__name__} "
+                f"(expected primitive, got dict)"
+            )
+
+        # Assert legacy nested keys don't exist in flatten mode
+        assert (
+            "temporal_workflow" not in extra
+        ), "Legacy nested key 'temporal_workflow' should not exist in flatten mode"
+        assert (
+            "temporal_activity" not in extra
+        ), "Legacy nested key 'temporal_activity' should not exist in flatten mode"
+
+    def test_flatten_mode_activity_produces_zero_dicts(self) -> None:
+        """Verify activity flatten mode has zero dict values."""
+        ctx = {
+            "activity_id": "act-001",
+            "activity_type": "TestActivity",
+            "attempt": 1,
+            "namespace": "default",
+            "task_queue": "test-queue",
+            "workflow_id": "wf-001",
+            "workflow_run_id": "run-001",
+            "workflow_type": "TestWorkflow",
+        }
+        extra: dict[str, Any] = {}
+        _apply_temporal_context_to_extra(
+            extra,
+            key="temporal_activity",
+            prefix="temporal.activity",
+            ctx=ctx,
+            mode="flatten",
+        )
+
+        # Assert no dict-valued keys exist
+        for key, value in extra.items():
+            assert not isinstance(
+                value, dict
+            ), f"Flatten mode violation: {key}={type(value).__name__}"
+
+        # Assert legacy nested key doesn't exist
+        assert "temporal_activity" not in extra
+
+    def test_flatten_mode_with_update_produces_zero_dicts(self) -> None:
+        """Verify flatten mode with update info still produces zero dicts."""
+        workflow_ctx = {
+            "workflow_id": "wf-001",
+            "workflow_type": "TestWorkflow",
+        }
+        update_ctx = {
+            "update_id": "upd-001",
+            "update_name": "my_update",
+        }
+        extra: dict[str, Any] = {}
+
+        # Apply workflow context
+        _apply_temporal_context_to_extra(
+            extra,
+            key="temporal_workflow",
+            prefix="temporal.workflow",
+            ctx=workflow_ctx,
+            mode="flatten",
+        )
+        # Apply update context
+        _update_temporal_context_in_extra(
+            extra,
+            key="temporal_workflow",
+            prefix="temporal.workflow",
+            update_ctx=update_ctx,
+            mode="flatten",
+        )
+
+        # Assert no dict-valued keys exist after both operations
+        for key, value in extra.items():
+            assert not isinstance(
+                value, dict
+            ), f"Flatten mode violation after update: {key}={type(value).__name__}"
+
+        # Assert legacy nested key doesn't exist
+        assert "temporal_workflow" not in extra
+
+        # Verify all expected keys are present as flat primitives
+        assert extra["temporal.workflow.workflow_id"] == "wf-001"
+        assert extra["temporal.workflow.update_id"] == "upd-001"
+
+
 class TestLogRecordAccessibility:
     """Tests to verify flattened attributes are accessible on LogRecord.__dict__."""
 
