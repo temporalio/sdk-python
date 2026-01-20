@@ -6,7 +6,7 @@ import random
 import uuid
 from collections.abc import Mapping
 from contextlib import contextmanager
-from typing import Any, Protocol, cast
+from typing import Any, Protocol
 
 from agents import CustomSpanData, custom_span, get_current_span, trace
 from agents.tracing import (
@@ -22,7 +22,6 @@ import temporalio.converter
 import temporalio.worker
 import temporalio.workflow
 from temporalio import activity, workflow
-from temporalio.contrib.openai_agents._temporal_trace_provider import TemporalTraceProvider
 
 HEADER_KEY = "__openai_span"
 
@@ -31,9 +30,7 @@ class _InputWithHeaders(Protocol):
     headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
-def set_header_from_context(
-    input: _InputWithHeaders
-) -> None:
+def set_header_from_context(input: _InputWithHeaders) -> None:
     """Inserts the OpenAI Agents trace/span data in the input header."""
     current = get_current_span()
     trace = get_trace_provider().get_current_trace()
@@ -45,12 +42,15 @@ def set_header_from_context(
                 "traceName": trace.name if trace else "Unknown Workflow",
                 "spanId": current.span_id if current else None,
                 "traceId": trace.trace_id if trace else None,
-                "otelTraceId": otel_span.get_span_context().trace_id if otel_span else None,
-                "otelSpanId": otel_span.get_span_context().span_id if otel_span else None,
+                "otelTraceId": otel_span.get_span_context().trace_id
+                if otel_span
+                else None,
+                "otelSpanId": otel_span.get_span_context().span_id
+                if otel_span
+                else None,
             }
         ),
     }
-
 
 
 @contextmanager
@@ -156,6 +156,7 @@ def _ensure_tracing_random() -> None:
             RunIdRandom(),
         )
 
+
 class OpenAIAgentsContextPropagationInterceptor(
     temporalio.client.Interceptor, temporalio.worker.Interceptor
 ):
@@ -183,7 +184,7 @@ class OpenAIAgentsContextPropagationInterceptor(
     def __init__(
         self,
         payload_converter: temporalio.converter.PayloadConverter = temporalio.converter.default().payload_converter,
-        add_temporal_spans=True,
+        add_temporal_spans: bool = True,
         start_traces: bool = False,
     ) -> None:
         """Initialize the interceptor with a payload converter.
@@ -223,7 +224,9 @@ class OpenAIAgentsContextPropagationInterceptor(
         Returns:
             An interceptor that propagates trace context for activity operations.
         """
-        return _ContextPropagationActivityInboundInterceptor(next, self._add_temporal_spans)
+        return _ContextPropagationActivityInboundInterceptor(
+            next, self._add_temporal_spans
+        )
 
     def workflow_interceptor_class(
         self, input: temporalio.worker.WorkflowInterceptorClassInput
@@ -236,33 +239,48 @@ class OpenAIAgentsContextPropagationInterceptor(
         Returns:
             The class of the workflow interceptor that propagates trace context.
         """
+
         class ModifiedInterceptor(_ContextPropagationWorkflowInboundInterceptor):
             start_trace = self._start_traces
             add_temporal_spans = self._add_temporal_spans
+
         return ModifiedInterceptor
 
+
 @contextmanager
-def maybe_span(add_temporal_spans: bool, span_name: str, data):
+def maybe_span(add_temporal_spans: bool, span_name: str, data: dict[str, Any] | None):
     if add_temporal_spans and get_trace_provider().get_current_trace() is not None:
         with custom_span(name=span_name, data=data):
             yield
     else:
         yield
 
+
 @contextmanager
-def maybe_trace_and_span(add_temporal_spans: bool, span_name: str, metadata, data, group_id:str):
+def maybe_trace_and_span(
+    add_temporal_spans: bool,
+    span_name: str,
+    metadata: dict[str, Any],
+    data: dict[str, Any] | None,
+    group_id: str,
+):
     if add_temporal_spans:
         if get_trace_provider().get_current_trace() is None:
-            with trace(
-                span_name, metadata=metadata, group_id=group_id
-            ):
-                with maybe_span(add_temporal_spans=add_temporal_spans, span_name=span_name, data=data):
+            with trace(span_name, metadata=metadata, group_id=group_id):
+                with maybe_span(
+                    add_temporal_spans=add_temporal_spans,
+                    span_name=span_name,
+                    data=data,
+                ):
                     yield
         else:
-            with maybe_span(add_temporal_spans=add_temporal_spans, span_name=span_name, data=data):
+            with maybe_span(
+                add_temporal_spans=add_temporal_spans, span_name=span_name, data=data
+            ):
                 yield
     else:
         yield
+
 
 class _ContextPropagationClientOutboundInterceptor(
     temporalio.client.OutboundInterceptor
@@ -284,7 +302,13 @@ class _ContextPropagationClientOutboundInterceptor(
         }
         data = {"workflowId": input.id} if input.id else None
         span_name = "temporal:startWorkflow"
-        with maybe_trace_and_span(self._add_temporal_spans, span_name + ":" + input.workflow, metadata=metadata, data=data, group_id=input.id):
+        with maybe_trace_and_span(
+            self._add_temporal_spans,
+            span_name + ":" + input.workflow,
+            metadata=metadata,
+            data=data,
+            group_id=input.id,
+        ):
             set_header_from_context(input)
             return await super().start_workflow(input)
 
@@ -295,7 +319,13 @@ class _ContextPropagationClientOutboundInterceptor(
         }
         data = {"workflowId": input.id, "query": input.query}
         span_name = "temporal:queryWorkflow"
-        with maybe_trace_and_span(self._add_temporal_spans, span_name, metadata=metadata, data=data, group_id=input.id):
+        with maybe_trace_and_span(
+            self._add_temporal_spans,
+            span_name,
+            metadata=metadata,
+            data=data,
+            group_id=input.id,
+        ):
             set_header_from_context(input)
             return await super().query_workflow(input)
 
@@ -308,7 +338,13 @@ class _ContextPropagationClientOutboundInterceptor(
         }
         data = {"workflowId": input.id, "signal": input.signal}
         span_name = "temporal:signalWorkflow"
-        with maybe_trace_and_span(self._add_temporal_spans, span_name, metadata=metadata, data=data, group_id=input.id):
+        with maybe_trace_and_span(
+            self._add_temporal_spans,
+            span_name,
+            metadata=metadata,
+            data=data,
+            group_id=input.id,
+        ):
             set_header_from_context(input)
             await super().signal_workflow(input)
 
@@ -324,7 +360,13 @@ class _ContextPropagationClientOutboundInterceptor(
             "update": input.update,
         }
         span_name = "temporal:updateWorkflow"
-        with maybe_trace_and_span(self._add_temporal_spans, span_name, metadata=metadata, data=data, group_id=input.id):
+        with maybe_trace_and_span(
+            self._add_temporal_spans,
+            span_name,
+            metadata=metadata,
+            data=data,
+            group_id=input.id,
+        ):
             set_header_from_context(input)
             return await self.next.start_workflow_update(input)
 
@@ -332,7 +374,11 @@ class _ContextPropagationClientOutboundInterceptor(
 class _ContextPropagationActivityInboundInterceptor(
     temporalio.worker.ActivityInboundInterceptor
 ):
-    def __init__(self, next: temporalio.worker.ActivityInboundInterceptor, add_temporal_spans: bool) -> None:
+    def __init__(
+        self,
+        next: temporalio.worker.ActivityInboundInterceptor,
+        add_temporal_spans: bool,
+    ) -> None:
         super().__init__(next)
         self._add_temporal_spans = add_temporal_spans
 
@@ -347,19 +393,22 @@ class _ContextPropagationActivityInboundInterceptor(
 class _ContextPropagationWorkflowInboundInterceptor(
     temporalio.worker.WorkflowInboundInterceptor
 ):
-    start_trace:bool = False
-    add_temporal_spans:bool = True
+    start_trace: bool = False
+    add_temporal_spans: bool = True
 
     def init(self, outbound: temporalio.worker.WorkflowOutboundInterceptor) -> None:
         class ModifiedInterceptor(_ContextPropagationWorkflowOutboundInterceptor):
             add_temporal_spans = self.add_temporal_spans
+
         self.next.init(ModifiedInterceptor(outbound))
 
     async def execute_workflow(
         self, input: temporalio.worker.ExecuteWorkflowInput
     ) -> Any:
         _ensure_tracing_random()
-        with context_from_header(input, temporalio.workflow.payload_converter(), start_trace=self.start_trace):
+        with context_from_header(
+            input, temporalio.workflow.payload_converter(), start_trace=self.start_trace
+        ):
             with temporal_span(self.add_temporal_spans, "temporal:executeWorkflow"):
                 return await self.next.execute_workflow(input)
 
@@ -399,17 +448,26 @@ class _ContextPropagationWorkflowOutboundInterceptor(
     temporalio.worker.WorkflowOutboundInterceptor
 ):
     add_temporal_spans: bool = True
+
     async def signal_child_workflow(
         self, input: temporalio.worker.SignalChildWorkflowInput
     ) -> None:
-        with maybe_span(self.add_temporal_spans, "temporal:signalChildWorkflow", data={"workflowId": input.child_workflow_id}):
+        with maybe_span(
+            self.add_temporal_spans,
+            "temporal:signalChildWorkflow",
+            data={"workflowId": input.child_workflow_id},
+        ):
             set_header_from_context(input)
             await self.next.signal_child_workflow(input)
 
     async def signal_external_workflow(
         self, input: temporalio.worker.SignalExternalWorkflowInput
     ) -> None:
-        with maybe_span(self.add_temporal_spans, "temporal:signalExternalWorkflow", data={"workflowId": input.workflow_id}):
+        with maybe_span(
+            self.add_temporal_spans,
+            "temporal:signalExternalWorkflow",
+            data={"workflowId": input.workflow_id},
+        ):
             set_header_from_context(input)
             await self.next.signal_external_workflow(input)
 
@@ -430,11 +488,9 @@ class _ContextPropagationWorkflowOutboundInterceptor(
             handle.add_done_callback(lambda _: span.finish())  # type: ignore
         return handle
 
-
     async def start_child_workflow(
         self, input: temporalio.worker.StartChildWorkflowInput
     ) -> temporalio.workflow.ChildWorkflowHandle:
-
         trace = get_trace_provider().get_current_trace()
         span: Span | None = None
         if trace and self.add_temporal_spans:

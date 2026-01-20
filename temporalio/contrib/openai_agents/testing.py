@@ -1,13 +1,8 @@
 """Testing utilities for OpenAI agents."""
 
+import typing
 from collections.abc import AsyncIterator, Callable, Sequence
 from typing import Any
-
-# Optional OTEL dependencies for type hints
-try:
-    from opentelemetry.sdk.trace.export import SpanExporter
-except ImportError:
-    SpanExporter = None
 
 from agents import (
     AgentOutputSchemaBase,
@@ -42,6 +37,9 @@ __all__ = [
     "TestModel",
     "TestModelProvider",
 ]
+
+if typing.TYPE_CHECKING:
+    from opentelemetry.sdk.trace.export import SpanExporter
 
 
 class ResponseBuilders:
@@ -233,7 +231,7 @@ class AgentEnvironment:
         ] = (),
         register_activities: bool = True,
         add_temporal_spans: bool = True,
-        otel_exporters: Sequence["SpanExporter"] | None = None,
+        otel_exporters: Sequence[SpanExporter] | None = None,
     ) -> None:
         """Initialize the AgentEnvironment.
 

@@ -1,4 +1,5 @@
 """Provides support for integration with OpenAI Agents SDK tracing across workflows"""
+
 import random
 import uuid
 from types import TracebackType
@@ -13,7 +14,7 @@ from agents.tracing.provider import (
     SynchronousMultiTracingProcessor,
 )
 from agents.tracing.spans import Span
-from opentelemetry.sdk.trace import IdGenerator
+from opentelemetry.sdk.trace.id_generator import IdGenerator
 from opentelemetry.trace import INVALID_SPAN_ID, INVALID_TRACE_ID
 
 from temporalio import workflow
@@ -80,7 +81,10 @@ def activity_span(
 
 class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
     def __init__(
-        self, impl: SynchronousMultiTracingProcessor, auto_close_in_workflows: bool, start_spans_in_replay: bool
+        self,
+        impl: SynchronousMultiTracingProcessor,
+        auto_close_in_workflows: bool,
+        start_spans_in_replay: bool,
     ):
         super().__init__()
         self._impl = impl
@@ -136,6 +140,7 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
     def force_flush(self) -> None:
         self._impl.force_flush()
 
+
 class RunIdRandom:
     """Random uuid generator seeded by the run id of the workflow.
     Doesn't currently support replay over reset correctly.
@@ -150,6 +155,7 @@ class RunIdRandom:
         return uuid.UUID(
             bytes=random.getrandbits(16 * 8).to_bytes(16, "big"), version=4
         ).hex[:24]
+
 
 def _workflow_uuid() -> str:
     random = cast(
@@ -168,6 +174,7 @@ class TemporalIdGenerator(IdGenerator):
             get_rand_bits = workflow.random().getrandbits
         else:
             import random
+
             get_rand_bits = random.getrandbits
 
         if len(self.spans) > 0:
@@ -183,6 +190,7 @@ class TemporalIdGenerator(IdGenerator):
             get_rand_bits = workflow.random().getrandbits
         else:
             import random
+
             get_rand_bits = random.getrandbits
         if len(self.traces) > 0:
             return self.traces.pop()
@@ -192,10 +200,13 @@ class TemporalIdGenerator(IdGenerator):
             trace_id = get_rand_bits(128)
         return trace_id
 
+
 class TemporalTraceProvider(DefaultTraceProvider):
     """A trace provider that integrates with Temporal workflows."""
 
-    def __init__(self, auto_close_in_workflows: bool = False, start_spans_in_replay: bool = False):
+    def __init__(
+        self, auto_close_in_workflows: bool = False, start_spans_in_replay: bool = False
+    ):
         """Initialize the TemporalTraceProvider."""
         super().__init__()
         self._original_provider = cast(DefaultTraceProvider, get_trace_provider())
@@ -253,4 +264,3 @@ class TemporalTraceProvider(DefaultTraceProvider):
     ):
         """Exit the context of the Temporal trace provider."""
         self._multi_processor.shutdown()
-

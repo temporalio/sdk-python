@@ -1,29 +1,22 @@
-import traceback
 import uuid
-from contextlib import contextmanager
 from datetime import timedelta
 from typing import Any
 
-import opentelemetry.trace
-from agents import Span, Trace, TracingProcessor, trace, custom_span
+from agents import Span, Trace, TracingProcessor, custom_span, trace
 from agents.tracing import get_trace_provider
-from opentelemetry.sdk.trace import SpanProcessor, ReadableSpan
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.sdk.trace.id_generator import IdGenerator
-from opentelemetry.trace import INVALID_TRACE_ID, INVALID_SPAN_ID, get_current_span
 
-import temporalio.contrib.opentelemetryv2
-from temporalio import workflow, activity
+from temporalio import activity, workflow
 from temporalio.client import Client
 from temporalio.contrib.openai_agents.testing import (
     AgentEnvironment,
 )
-from temporalio.contrib.openai_agents._temporal_trace_provider import TemporalIdGenerator
 from tests.contrib.openai_agents.test_openai import (
     ResearchWorkflow,
     research_mock_model,
 )
-from tests.helpers import new_worker, assert_eq_eventually
+from tests.helpers import assert_eq_eventually, new_worker
+
 
 class MemoryTracingProcessor(TracingProcessor):
     # True for start events, false for end
@@ -47,7 +40,6 @@ class MemoryTracingProcessor(TracingProcessor):
 
     def force_flush(self) -> None:
         pass
-
 
 
 async def test_tracing(client: Client):
@@ -85,30 +77,38 @@ async def test_tracing(client: Client):
             assert a[1]
             assert not b[1]
 
-        print("\n".join([str(event.span_data.export()) for event, _ in processor.span_events]))
+        print(
+            "\n".join(
+                [str(event.span_data.export()) for event, _ in processor.span_events]
+            )
+        )
 
         # Workflow start spans
         paired_span(processor.span_events[0], processor.span_events[1])
         assert (
-            processor.span_events[0][0].span_data.export().get("name") == "temporal:startWorkflow:ResearchWorkflow"
+            processor.span_events[0][0].span_data.export().get("name")
+            == "temporal:startWorkflow:ResearchWorkflow"
         )
 
         # Workflow execute spans
         paired_span(processor.span_events[2], processor.span_events[-1])
         assert (
-            processor.span_events[2][0].span_data.export().get("name") == "temporal:executeWorkflow"
+            processor.span_events[2][0].span_data.export().get("name")
+            == "temporal:executeWorkflow"
         )
 
         # Workflow execute spans
         paired_span(processor.span_events[2], processor.span_events[-1])
         assert (
-            processor.span_events[2][0].span_data.export().get("name") == "temporal:executeWorkflow"
+            processor.span_events[2][0].span_data.export().get("name")
+            == "temporal:executeWorkflow"
         )
 
         # Overarching research span
         paired_span(processor.span_events[3], processor.span_events[-2])
         assert (
-            processor.span_events[3][0].span_data.export().get("name") == "Research manager"
+            processor.span_events[3][0].span_data.export().get("name")
+            == "Research manager"
         )
 
         # Initial planner spans - There are only 3 because we don't make an actual model call
@@ -178,17 +178,17 @@ async def test_tracing(client: Client):
             == "temporal:executeActivity"
         )
 
+
 @activity.defn
 async def simple_no_context_activity() -> str:
     return "success"
 
 
-
 @workflow.defn
 class TraceWorkflow:
     def __init__(self) -> None:
-        self.proceed = False
-        self.ready = False
+        self._proceed = False
+        self._ready = False
 
     @workflow.run
     async def run(self):
@@ -198,23 +198,24 @@ class TraceWorkflow:
                 simple_no_context_activity,
                 start_to_close_timeout=timedelta(seconds=10),
             )
-            self.ready = True
-            await workflow.wait_condition(lambda: self.proceed)
+            self._ready = True
+            await workflow.wait_condition(lambda: self._proceed)
         return "done"
-    
+
     @workflow.query
     def ready(self) -> bool:
-        return self.ready
+        return self._ready
 
     @workflow.signal
     def proceed(self) -> None:
-        self.proceed = True
+        self._proceed = True
 
-@workflow.defn 
+
+@workflow.defn
 class SelfTracingWorkflow:
     def __init__(self) -> None:
-        self.proceed = False
-        self.ready = False
+        self._proceed = False
+        self._ready = False
 
     @workflow.run
     async def run(self):
@@ -225,29 +226,28 @@ class SelfTracingWorkflow:
                     simple_no_context_activity,
                     start_to_close_timeout=timedelta(seconds=10),
                 )
-                self.ready = True
-                await workflow.wait_condition(lambda: self.proceed)
+                self._ready = True
+                await workflow.wait_condition(lambda: self._proceed)
         return "done"
-    
+
     @workflow.query
     def ready(self) -> bool:
-        return self.ready
+        return self._ready
 
     @workflow.signal
     def proceed(self) -> None:
-        self.proceed = True
+        self._proceed = True
+
 
 async def test_external_trace_to_workflow_spans(client: Client):
     """Test: External trace → workflow spans (with worker restart)."""
     exporter = InMemorySpanExporter()
     workflow_id = None
     task_queue = str(uuid.uuid4())
-    
+
     # First worker: Start workflow with external trace context
     async with AgentEnvironment(
-        model=research_mock_model(), 
-        add_temporal_spans=False, 
-        otel_exporters=[exporter]
+        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
     ) as env:
         new_client = env.applied_on_client(client)
 
@@ -267,18 +267,16 @@ async def test_external_trace_to_workflow_spans(client: Client):
                     execution_timeout=timedelta(seconds=120),
                 )
                 workflow_id = workflow_handle.id
-                
+
                 # Wait for workflow to be ready
                 async def ready() -> bool:
                     return await workflow_handle.query(TraceWorkflow.ready)
-                
+
                 await assert_eq_eventually(True, ready)
 
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(
-        model=research_mock_model(), 
-        add_temporal_spans=False, 
-        otel_exporters=[exporter]
+        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
     ) as env:
         new_client = env.applied_on_client(client)
 
@@ -296,40 +294,56 @@ async def test_external_trace_to_workflow_spans(client: Client):
 
     spans = exporter.get_finished_spans()
     print("External trace → workflow spans:")
-    print("\n".join([
-        str({"Name": span.name, "Id": span.context.span_id, "Parent": span.parent.span_id if span.parent else None})
-        for span in spans
-    ]))
-    
+    print(
+        "\n".join(
+            [
+                str(
+                    {
+                        "Name": span.name,
+                        "Id": span.context.span_id if span.context else None,
+                        "Parent": span.parent.span_id if span.parent else None,
+                    }
+                )
+                for span in spans
+            ]
+        )
+    )
+
     assert len(spans) >= 2  # External trace + workflow span
-    
+
     # Find the spans
     external_span = next((s for s in spans if s.name == "External trace"), None)
     workflow_span = next((s for s in spans if s.name == "Workflow span"), None)
-    
+
     assert external_span is not None, "External trace span should exist"
-    assert workflow_span is not None, "Workflow span should exist" 
-    
+    assert workflow_span is not None, "Workflow span should exist"
+
     # Verify parenting: External trace should be root, workflow span should be child of external trace
-    assert external_span.parent is None, "External trace should have no parent (be root)"
+    assert (
+        external_span.parent is None
+    ), "External trace should have no parent (be root)"
     assert workflow_span.parent is not None, "Workflow span should have a parent"
-    assert workflow_span.parent.span_id == external_span.context.span_id, "Workflow span should be child of external trace"
-    
+    assert external_span.context is not None, "External span should have context"
+    assert (
+        workflow_span.parent.span_id == external_span.context.span_id
+    ), "Workflow span should be child of external trace"
+
     # Verify all spans have unique IDs
-    span_ids = [span.context.span_id for span in spans]
-    assert len(span_ids) == len(set(span_ids)), f"All spans should have unique IDs, got: {span_ids}"
+    span_ids = [span.context.span_id for span in spans if span.context]
+    assert len(span_ids) == len(
+        set(span_ids)
+    ), f"All spans should have unique IDs, got: {span_ids}"
+
 
 async def test_external_trace_and_span_to_workflow_spans(client: Client):
     """Test: External trace + span → workflow spans (with worker restart)."""
     exporter = InMemorySpanExporter()
     workflow_id = None
     task_queue = str(uuid.uuid4())
-    
+
     # First worker: Start workflow with external trace + span context
     async with AgentEnvironment(
-        model=research_mock_model(), 
-        add_temporal_spans=False, 
-        otel_exporters=[exporter]
+        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
     ) as env:
         new_client = env.applied_on_client(client)
 
@@ -350,18 +364,16 @@ async def test_external_trace_and_span_to_workflow_spans(client: Client):
                         execution_timeout=timedelta(seconds=120),
                     )
                     workflow_id = workflow_handle.id
-                    
+
                     # Wait for workflow to be ready
                     async def ready() -> bool:
                         return await workflow_handle.query(TraceWorkflow.ready)
-                    
+
                     await assert_eq_eventually(True, ready)
 
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(
-        model=research_mock_model(), 
-        add_temporal_spans=False, 
-        otel_exporters=[exporter]
+        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
     ) as env:
         new_client = env.applied_on_client(client)
 
@@ -379,44 +391,65 @@ async def test_external_trace_and_span_to_workflow_spans(client: Client):
 
     spans = exporter.get_finished_spans()
     print("External trace + span → workflow spans:")
-    print("\n".join([
-        str({"Name": span.name, "Id": span.context.span_id, "Parent": span.parent.span_id if span.parent else None})
-        for span in spans
-    ]))
-    
+    print(
+        "\n".join(
+            [
+                str(
+                    {
+                        "Name": span.name,
+                        "Id": span.context.span_id if span.context else None,
+                        "Parent": span.parent.span_id if span.parent else None,
+                    }
+                )
+                for span in spans
+            ]
+        )
+    )
+
     assert len(spans) >= 3  # External trace + external span + workflow span
-    
+
     # Find the spans
-    external_trace_span = next((s for s in spans if s.name == "External trace"), None) 
+    external_trace_span = next((s for s in spans if s.name == "External trace"), None)
     external_span = next((s for s in spans if s.name == "External span"), None)
     workflow_span = next((s for s in spans if s.name == "Workflow span"), None)
-    
+
     assert external_trace_span is not None, "External trace span should exist"
     assert external_span is not None, "External span should exist"
     assert workflow_span is not None, "Workflow span should exist"
-    
+
     # Verify parenting: External span should be child of trace, workflow span should be child of external span
-    assert external_trace_span.parent is None, "External trace should have no parent (be root)"
+    assert (
+        external_trace_span.parent is None
+    ), "External trace should have no parent (be root)"
     assert external_span.parent is not None, "External span should have a parent"
-    assert external_span.parent.span_id == external_trace_span.context.span_id, "External span should be child of external trace"
+    assert (
+        external_trace_span.context is not None
+    ), "External trace span should have context"
+    assert (
+        external_span.parent.span_id == external_trace_span.context.span_id
+    ), "External span should be child of external trace"
     assert workflow_span.parent is not None, "Workflow span should have a parent"
-    assert workflow_span.parent.span_id == external_span.context.span_id, "Workflow span should be child of external span"
-    
+    assert external_span.context is not None, "External span should have context"
+    assert (
+        workflow_span.parent.span_id == external_span.context.span_id
+    ), "Workflow span should be child of external span"
+
     # Verify all spans have unique IDs
-    span_ids = [span.context.span_id for span in spans]
-    assert len(span_ids) == len(set(span_ids)), f"All spans should have unique IDs, got: {span_ids}"
+    span_ids = [span.context.span_id for span in spans if span.context]
+    assert len(span_ids) == len(
+        set(span_ids)
+    ), f"All spans should have unique IDs, got: {span_ids}"
+
 
 async def test_workflow_only_trace_to_spans(client: Client):
     """Test: Workflow-only trace → spans (with worker restart)."""
     exporter = InMemorySpanExporter()
     workflow_id = None
     task_queue = str(uuid.uuid4())
-    
+
     # First worker: Start workflow (no external trace context)
     async with AgentEnvironment(
-        model=research_mock_model(), 
-        add_temporal_spans=False, 
-        otel_exporters=[exporter]
+        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
     ) as env:
         new_client = env.applied_on_client(client)
 
@@ -435,18 +468,16 @@ async def test_workflow_only_trace_to_spans(client: Client):
                 execution_timeout=timedelta(seconds=120),
             )
             workflow_id = workflow_handle.id
-            
+
             # Wait for workflow to be ready
             async def ready() -> bool:
                 return await workflow_handle.query(SelfTracingWorkflow.ready)
-            
+
             await assert_eq_eventually(True, ready)
 
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(
-        model=research_mock_model(), 
-        add_temporal_spans=False, 
-        otel_exporters=[exporter]
+        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
     ) as env:
         new_client = env.applied_on_client(client)
 
@@ -465,38 +496,53 @@ async def test_workflow_only_trace_to_spans(client: Client):
     spans = exporter.get_finished_spans()
     print("Workflow-only trace → spans:")
     print(f"Total spans: {len(spans)}")
-    print("\n".join([
-        str({"Name": span.name, "Id": span.context.span_id, "Parent": span.parent.span_id if span.parent else None})
-        for span in spans
-    ]))
-    
+    print(
+        "\n".join(
+            [
+                str(
+                    {
+                        "Name": span.name,
+                        "Id": span.context.span_id if span.context else None,
+                        "Parent": span.parent.span_id if span.parent else None,
+                    }
+                )
+                for span in spans
+            ]
+        )
+    )
+
     # Debug: print all span names
     print("Span names:", [span.name for span in spans])
-    
+
     assert len(spans) >= 2  # Workflow trace + workflow span
-    
+
     # Find the spans
     workflow_trace_span = next((s for s in spans if s.name == "Workflow trace"), None)
     workflow_span = next((s for s in spans if s.name == "Workflow span"), None)
-    
+
     assert workflow_trace_span is not None, "Workflow trace span should exist"
     assert workflow_span is not None, "Workflow span should exist"
-    
+
     # Verify parenting: Workflow trace should be root, workflow span should be child of workflow trace
-    assert workflow_trace_span.parent is None, "Workflow trace should have no parent (be root)"
+    assert (
+        workflow_trace_span.parent is None
+    ), "Workflow trace should have no parent (be root)"
     assert workflow_span.parent is not None, "Workflow span should have a parent"
-    assert workflow_span.parent.span_id == workflow_trace_span.context.span_id, "Workflow span should be child of workflow trace"
+    assert (
+        workflow_trace_span.context is not None
+    ), "Workflow trace span should have context"
+    assert (
+        workflow_span.parent.span_id == workflow_trace_span.context.span_id
+    ), "Workflow span should be child of workflow trace"
 
 
 async def test_otel_tracing_in_runner(client: Client):
     """Test the ergonomic AgentEnvironment OTEL integration."""
     exporter = InMemorySpanExporter()
-    
+
     # Test the new ergonomic API - just pass exporters to AgentEnvironment
     async with AgentEnvironment(
-        model=research_mock_model(), 
-        add_temporal_spans=False, 
-        otel_exporters=[exporter]
+        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
     ) as env:
         client = env.applied_on_client(client)
 
@@ -513,44 +559,33 @@ async def test_otel_tracing_in_runner(client: Client):
                 execution_timeout=timedelta(seconds=120),
             )
             await workflow_handle.result()
-                
+
     spans = exporter.get_finished_spans()
     print("OTEL tracing in runner spans:")
-    print("\n".join([str({"Name": span.name, "Id": span.context.span_id, "Parent": span.parent.span_id if span.parent else None}) for span in spans]))
-    
+    print(
+        "\n".join(
+            [
+                str(
+                    {
+                        "Name": span.name,
+                        "Id": span.context.span_id if span.context else None,
+                        "Parent": span.parent.span_id if span.parent else None,
+                    }
+                )
+                for span in spans
+            ]
+        )
+    )
+
     # Update assertion - the exact count and parent relationships may have changed with the new approach
     assert len(spans) > 0, "Should have at least some spans"
     print(f"Total spans: {len(spans)}")
-    
+
     # Verify spans have proper hierarchy
-    span_ids = {span.context.span_id for span in spans}
+    span_ids = {span.context.span_id for span in spans if span.context}
     parent_ids = {span.parent.span_id for span in spans if span.parent}
     print(f"Unique span IDs: {len(span_ids)}")
     print(f"Parent references: {len(parent_ids)}")
-    
+
     # All spans should have unique IDs
     assert len(span_ids) == len(spans), "All spans should have unique IDs"
-
-
-@workflow.defn
-class BasicerTraceWorkflow:
-    @workflow.run
-    async def run(self):
-        print("Outside span")
-        with temporalio.contrib.opentelemetryv2.workflow.start_as_current_span("Hello World") as span:
-            print(span)
-            print("Inside span")
-            await workflow.execute_activity(
-                simple_no_context_activity,
-                start_to_close_timeout=timedelta(seconds=10),
-            )
-            await workflow.execute_activity(
-                simple_no_context_activity,
-                start_to_close_timeout=timedelta(seconds=10),
-            )
-            with temporalio.contrib.opentelemetryv2.workflow.start_as_current_span("Inner") as span:
-                await workflow.execute_activity(
-                    simple_no_context_activity,
-                    start_to_close_timeout=timedelta(seconds=10),
-                )
-        return
