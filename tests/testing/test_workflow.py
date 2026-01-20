@@ -3,7 +3,7 @@ import platform
 import uuid
 from datetime import datetime, timedelta, timezone
 from time import monotonic
-from typing import Any, List, Optional, Union
+from typing import Any
 
 import pytest
 
@@ -12,7 +12,6 @@ from temporalio.client import (
     Client,
     Interceptor,
     OutboundInterceptor,
-    RPCError,
     StartWorkflowInput,
     WorkflowFailureError,
     WorkflowHandle,
@@ -29,7 +28,9 @@ from temporalio.exceptions import (
     TimeoutError,
     TimeoutType,
 )
+from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
+from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import new_worker
 
 
@@ -189,8 +190,8 @@ class AssertFailWorkflow:
 
 
 class SimpleClientInterceptor(Interceptor):
-    def __init__(self) -> None:
-        self.events: List[str] = []
+    def __init__(self) -> None:  # type: ignore[reportMissingSuperCall]
+        self.events: list[str] = []
 
     def intercept_client(self, next: OutboundInterceptor) -> OutboundInterceptor:
         return SimpleClientOutboundInterceptor(self, super().intercept_client(next))
@@ -218,7 +219,7 @@ async def test_workflow_env_assert(client: Client):
     client_config["interceptors"] = [interceptor]
     client = Client(**client_config)
 
-    def assert_proper_error(err: Optional[BaseException]) -> None:
+    def assert_proper_error(err: BaseException | None) -> None:
         assert isinstance(err, ApplicationError)
         # In unsandboxed workflows, this message has extra diff info appended
         # due to pytest's custom loader that does special assert tricks. But in
@@ -303,7 +304,8 @@ async def test_search_attributes_on_dev_server(
             float_attr,
             bool_attr,
             datetime_attr,
-        ]
+        ],
+        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
     ) as env:
         handle = await env.client.start_workflow(
             "some-workflow",
@@ -316,7 +318,7 @@ async def test_search_attributes_on_dev_server(
 
 
 def assert_timestamp_from_now(
-    ts: Union[datetime, float], expected_from_now: float, max_delta: float = 30
+    ts: datetime | float, expected_from_now: float, max_delta: float = 30
 ) -> None:
     if isinstance(ts, datetime):
         ts = ts.timestamp()

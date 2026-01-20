@@ -90,6 +90,11 @@ class CloudServiceStub:
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse,
     ]
     """Add a new region to a namespace"""
+    DeleteNamespaceRegion: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse,
+    ]
+    """Delete a region from a namespace"""
     GetRegions: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetRegionsResponse,
@@ -180,6 +185,20 @@ class CloudServiceStub:
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessResponse,
     ]
     """Set a user group's access to a namespace"""
+    AddUserGroupMember: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberResponse,
+    ]
+    """Add a member to the group, can only be used with Cloud group types."""
+    RemoveUserGroupMember: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberResponse,
+    ]
+    """Remove a member from the group, can only be used with Cloud group types."""
+    GetUserGroupMembers: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersResponse,
+    ]
     CreateServiceAccount: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountResponse,
@@ -200,6 +219,11 @@ class CloudServiceStub:
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountResponse,
     ]
     """Update a service account."""
+    SetServiceAccountNamespaceAccess: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessResponse,
+    ]
+    """Set a service account's access to a namespace."""
     DeleteServiceAccount: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteServiceAccountResponse,
@@ -253,6 +277,38 @@ class CloudServiceStub:
     ]
     """Validates an export sink configuration by delivering an empty test file to the specified sink.
     This operation verifies that the sink is correctly configured, accessible, and ready for data export.
+    """
+    UpdateNamespaceTags: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse,
+    ]
+    """Update the tags for a namespace"""
+    CreateConnectivityRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleResponse,
+    ]
+    """Creates a connectivity rule"""
+    GetConnectivityRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleResponse,
+    ]
+    """Gets a connectivity rule by id"""
+    GetConnectivityRules: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesResponse,
+    ]
+    """Lists connectivity rules by account"""
+    DeleteConnectivityRule: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse,
+    ]
+    """Deletes a connectivity rule by id"""
+    ValidateAccountAuditLogSink: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkResponse,
+    ]
+    """Validate customer audit log sink is accessible from Temporal's workflow by delivering an empty file to the specified sink.
+    The operation verifies that the sink is correctly configured, accessible and ready to receive audit logs.
     """
 
 class CloudServiceServicer(metaclass=abc.ABCMeta):
@@ -367,6 +423,13 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddNamespaceRegionResponse:
         """Add a new region to a namespace"""
+    @abc.abstractmethod
+    def DeleteNamespaceRegion(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteNamespaceRegionResponse:
+        """Delete a region from a namespace"""
     @abc.abstractmethod
     def GetRegions(
         self,
@@ -496,6 +559,26 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupNamespaceAccessResponse:
         """Set a user group's access to a namespace"""
     @abc.abstractmethod
+    def AddUserGroupMember(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.AddUserGroupMemberResponse:
+        """Add a member to the group, can only be used with Cloud group types."""
+    @abc.abstractmethod
+    def RemoveUserGroupMember(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.RemoveUserGroupMemberResponse:
+        """Remove a member from the group, can only be used with Cloud group types."""
+    @abc.abstractmethod
+    def GetUserGroupMembers(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupMembersResponse: ...
+    @abc.abstractmethod
     def CreateServiceAccount(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateServiceAccountRequest,
@@ -523,6 +606,13 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateServiceAccountResponse:
         """Update a service account."""
+    @abc.abstractmethod
+    def SetServiceAccountNamespaceAccess(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountNamespaceAccessResponse:
+        """Set a service account's access to a namespace."""
     @abc.abstractmethod
     def DeleteServiceAccount(
         self,
@@ -598,6 +688,50 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateNamespaceExportSinkResponse:
         """Validates an export sink configuration by delivering an empty test file to the specified sink.
         This operation verifies that the sink is correctly configured, accessible, and ready for data export.
+        """
+    @abc.abstractmethod
+    def UpdateNamespaceTags(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse:
+        """Update the tags for a namespace"""
+    @abc.abstractmethod
+    def CreateConnectivityRule(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateConnectivityRuleResponse:
+        """Creates a connectivity rule"""
+    @abc.abstractmethod
+    def GetConnectivityRule(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRuleResponse:
+        """Gets a connectivity rule by id"""
+    @abc.abstractmethod
+    def GetConnectivityRules(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetConnectivityRulesResponse:
+        """Lists connectivity rules by account"""
+    @abc.abstractmethod
+    def DeleteConnectivityRule(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteConnectivityRuleResponse:
+        """Deletes a connectivity rule by id"""
+    @abc.abstractmethod
+    def ValidateAccountAuditLogSink(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.cloud.cloudservice.v1.request_response_pb2.ValidateAccountAuditLogSinkResponse:
+        """Validate customer audit log sink is accessible from Temporal's workflow by delivering an empty file to the specified sink.
+        The operation verifies that the sink is correctly configured, accessible and ready to receive audit logs.
         """
 
 def add_CloudServiceServicer_to_server(

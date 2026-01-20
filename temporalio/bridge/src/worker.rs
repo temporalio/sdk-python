@@ -1,29 +1,31 @@
 #![allow(non_local_definitions)] // pymethods annotations causing issues with this lint
 
 use anyhow::Context;
-use log::error;
 use prost::Message;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
-use temporal_sdk_core::api::errors::PollError;
-use temporal_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
-use temporal_sdk_core_api::errors::WorkflowErrorType;
-use temporal_sdk_core_api::worker::{
+use temporalio_common::errors::PollError;
+use temporalio_common::errors::WorkflowErrorType;
+use temporalio_common::protos::coresdk::workflow_completion::WorkflowActivationCompletion;
+use temporalio_common::protos::coresdk::{
+    nexus::NexusTaskCompletion, ActivityHeartbeat, ActivityTaskCompletion,
+};
+use temporalio_common::protos::temporal::api::history::v1::History;
+use temporalio_common::protos::temporal::api::worker::v1::PluginInfo;
+use temporalio_common::worker::{
     SlotInfo, SlotInfoTrait, SlotKind, SlotKindType, SlotMarkUsedContext, SlotReleaseContext,
     SlotReservationContext, SlotSupplier as SlotSupplierTrait, SlotSupplierPermit,
 };
-use temporal_sdk_core_api::Worker;
-use temporal_sdk_core_protos::coresdk::workflow_completion::WorkflowActivationCompletion;
-use temporal_sdk_core_protos::coresdk::{ActivityHeartbeat, ActivityTaskCompletion};
-use temporal_sdk_core_protos::temporal::api::history::v1::History;
+use temporalio_common::Worker;
+use temporalio_sdk_core::replay::{HistoryForReplay, ReplayWorkerInput};
 use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
+use tracing::error;
 
 use crate::client;
 use crate::runtime;
@@ -32,11 +34,11 @@ pyo3::create_exception!(temporal_sdk_bridge, PollShutdownError, PyException);
 
 #[pyclass]
 pub struct WorkerRef {
-    worker: Option<Arc<temporal_sdk_core::Worker>>,
+    worker: Option<Arc<temporalio_sdk_core::Worker>>,
     /// Set upon the call to `validate`, with the task locals for the event loop at that time, which
     /// is whatever event loop the user is running their worker in. This loop might be needed by
     /// other rust-created threads that want to run async python code.
-    event_loop_task_locals: Arc<OnceLock<pyo3_asyncio::TaskLocals>>,
+    event_loop_task_locals: Arc<OnceLock<pyo3_async_runtimes::TaskLocals>>,
     runtime: runtime::Runtime,
 }
 
@@ -44,23 +46,103 @@ pub struct WorkerRef {
 pub struct WorkerConfig {
     namespace: String,
     task_queue: String,
-    build_id: String,
+    versioning_strategy: WorkerVersioningStrategy,
     identity_override: Option<String>,
     max_cached_workflows: usize,
     tuner: TunerHolder,
-    max_concurrent_workflow_task_polls: usize,
+    workflow_task_poller_behavior: PollerBehavior,
     nonsticky_to_sticky_poll_ratio: f32,
-    max_concurrent_activity_task_polls: usize,
-    no_remote_activities: bool,
+    activity_task_poller_behavior: PollerBehavior,
+    task_types: WorkerTaskTypes,
     sticky_queue_schedule_to_start_timeout_millis: u64,
     max_heartbeat_throttle_interval_millis: u64,
     default_heartbeat_throttle_interval_millis: u64,
     max_activities_per_second: Option<f64>,
     max_task_queue_activities_per_second: Option<f64>,
     graceful_shutdown_period_millis: u64,
-    use_worker_versioning: bool,
     nondeterminism_as_workflow_fail: bool,
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
+    nexus_task_poller_behavior: PollerBehavior,
+    plugins: Vec<String>,
+}
+
+#[derive(FromPyObject)]
+pub struct PollerBehaviorSimpleMaximum {
+    pub simple_maximum: usize,
+}
+
+#[derive(FromPyObject)]
+pub struct PollerBehaviorAutoscaling {
+    pub minimum: usize,
+    pub maximum: usize,
+    pub initial: usize,
+}
+
+/// Recreates [temporalio_common::worker::PollerBehavior]
+#[derive(FromPyObject)]
+pub enum PollerBehavior {
+    SimpleMaximum(PollerBehaviorSimpleMaximum),
+    Autoscaling(PollerBehaviorAutoscaling),
+}
+
+impl From<PollerBehavior> for temporalio_common::worker::PollerBehavior {
+    fn from(value: PollerBehavior) -> Self {
+        match value {
+            PollerBehavior::SimpleMaximum(simple) => {
+                temporalio_common::worker::PollerBehavior::SimpleMaximum(simple.simple_maximum)
+            }
+            PollerBehavior::Autoscaling(auto) => {
+                temporalio_common::worker::PollerBehavior::Autoscaling {
+                    minimum: auto.minimum,
+                    maximum: auto.maximum,
+                    initial: auto.initial,
+                }
+            }
+        }
+    }
+}
+
+/// Recreates [temporalio_common::worker::WorkerVersioningStrategy]
+#[derive(FromPyObject)]
+pub enum WorkerVersioningStrategy {
+    None(WorkerVersioningNone),
+    DeploymentBased(WorkerDeploymentOptions),
+    LegacyBuildIdBased(LegacyBuildIdBased),
+}
+
+#[derive(FromPyObject)]
+pub struct WorkerVersioningNone {
+    pub build_id_no_versioning: String,
+}
+
+/// Recreates [temporalio_common::worker::WorkerDeploymentOptions]
+#[derive(FromPyObject)]
+pub struct WorkerDeploymentOptions {
+    pub version: WorkerDeploymentVersion,
+    pub use_worker_versioning: bool,
+    /// This is a [enums::v1::VersioningBehavior] represented as i32
+    pub default_versioning_behavior: i32,
+}
+
+#[derive(FromPyObject)]
+pub struct LegacyBuildIdBased {
+    pub build_id_with_versioning: String,
+}
+
+/// Recreates [temporalio_common::worker::WorkerDeploymentVersion]
+#[derive(FromPyObject, IntoPyObject, Clone)]
+pub struct WorkerDeploymentVersion {
+    pub deployment_name: String,
+    pub build_id: String,
+}
+
+impl From<temporalio_common::worker::WorkerDeploymentVersion> for WorkerDeploymentVersion {
+    fn from(version: temporalio_common::worker::WorkerDeploymentVersion) -> Self {
+        WorkerDeploymentVersion {
+            deployment_name: version.deployment_name,
+            build_id: version.build_id,
+        }
+    }
 }
 
 #[derive(FromPyObject)]
@@ -68,6 +150,7 @@ pub struct TunerHolder {
     workflow_slot_supplier: SlotSupplier,
     activity_slot_supplier: SlotSupplier,
     local_activity_slot_supplier: SlotSupplier,
+    nexus_slot_supplier: SlotSupplier,
 }
 
 #[derive(FromPyObject)]
@@ -91,6 +174,25 @@ pub struct ResourceBasedSlotSupplier {
     tuner_config: ResourceBasedTunerConfig,
 }
 
+#[derive(FromPyObject)]
+pub struct WorkerTaskTypes {
+    enable_workflows: bool,
+    enable_local_activities: bool,
+    enable_remote_activities: bool,
+    enable_nexus: bool,
+}
+
+impl From<WorkerTaskTypes> for temporalio_common::worker::WorkerTaskTypes {
+    fn from(t: WorkerTaskTypes) -> Self {
+        Self {
+            enable_workflows: t.enable_workflows,
+            enable_local_activities: t.enable_local_activities,
+            enable_remote_activities: t.enable_remote_activities,
+            enable_nexus: t.enable_nexus,
+        }
+    }
+}
+
 #[pyclass]
 pub struct SlotReserveCtx {
     #[pyo3(get)]
@@ -101,6 +203,8 @@ pub struct SlotReserveCtx {
     pub worker_identity: String,
     #[pyo3(get)]
     pub worker_build_id: String,
+    #[pyo3(get)]
+    pub worker_deployment_version: Option<WorkerDeploymentVersion>,
     #[pyo3(get)]
     pub is_sticky: bool,
 }
@@ -116,7 +220,12 @@ impl SlotReserveCtx {
             },
             task_queue: ctx.task_queue().to_string(),
             worker_identity: ctx.worker_identity().to_string(),
-            worker_build_id: ctx.worker_build_id().to_string(),
+            worker_build_id: ctx
+                .worker_deployment_version()
+                .clone()
+                .map(|v| v.build_id)
+                .unwrap_or_default(),
+            worker_deployment_version: ctx.worker_deployment_version().clone().map(Into::into),
             is_sticky: ctx.is_sticky(),
         }
     }
@@ -167,38 +276,42 @@ pub struct SlotReleaseCtx {
     permit: PyObject,
 }
 
-fn slot_info_to_py_obj(py: Python<'_>, info: SlotInfo) -> PyObject {
-    match info {
+fn slot_info_to_py_obj<'py>(py: Python<'py>, info: SlotInfo) -> PyResult<Bound<'py, PyAny>> {
+    Ok(match info {
         SlotInfo::Workflow(w) => WorkflowSlotInfo {
             workflow_type: w.workflow_type.clone(),
             is_sticky: w.is_sticky,
         }
-        .into_py(py),
+        .into_pyobject(py)?
+        .into_any(),
         SlotInfo::Activity(a) => ActivitySlotInfo {
             activity_type: a.activity_type.clone(),
         }
-        .into_py(py),
+        .into_pyobject(py)?
+        .into_any(),
         SlotInfo::LocalActivity(a) => LocalActivitySlotInfo {
             activity_type: a.activity_type.clone(),
         }
-        .into_py(py),
+        .into_pyobject(py)?
+        .into_any(),
         SlotInfo::Nexus(n) => NexusSlotInfo {
             service: n.service.clone(),
             operation: n.operation.clone(),
         }
-        .into_py(py),
-    }
+        .into_pyobject(py)?
+        .into_any(),
+    })
 }
 
 #[pyclass]
 #[derive(Clone)]
 pub struct CustomSlotSupplier {
-    inner: PyObject,
+    inner: Arc<PyObject>,
 }
 
 struct CustomSlotSupplierOfType<SK: SlotKind> {
-    inner: PyObject,
-    event_loop_task_locals: Arc<OnceLock<pyo3_asyncio::TaskLocals>>,
+    inner: Arc<PyObject>,
+    event_loop_task_locals: Arc<OnceLock<pyo3_async_runtimes::TaskLocals>>,
     _phantom: PhantomData<SK>,
 }
 
@@ -206,7 +319,9 @@ struct CustomSlotSupplierOfType<SK: SlotKind> {
 impl CustomSlotSupplier {
     #[new]
     fn new(inner: PyObject) -> Self {
-        CustomSlotSupplier { inner }
+        CustomSlotSupplier {
+            inner: Arc::new(inner),
+        }
     }
 }
 
@@ -258,7 +373,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
             let stored_task = Arc::new(OnceLock::new());
             let _task_canceller = TaskCanceller::new(stored_task.clone());
             let pypermit = match Python::with_gil(|py| {
-                let py_obj = self.inner.as_ref(py);
+                let py_obj = self.inner.bind(py);
                 let called = py_obj.call_method1(
                     "reserve_slot",
                     (
@@ -270,14 +385,11 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
                     .event_loop_task_locals
                     .get()
                     .expect("task locals must be set");
-                pyo3_asyncio::into_future_with_locals(tl, called)
+                pyo3_async_runtimes::into_future_with_locals(tl, called)
             }) {
                 Ok(f) => f,
                 Err(e) => {
-                    error!(
-                        "Unexpected error in custom slot supplier `reserve_slot`: {}",
-                        e
-                    );
+                    error!("Unexpected error in custom slot supplier `reserve_slot`: {e}");
                     continue;
                 }
             }
@@ -296,7 +408,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
 
     fn try_reserve_slot(&self, ctx: &dyn SlotReservationContext) -> Option<SlotSupplierPermit> {
         Python::with_gil(|py| {
-            let py_obj = self.inner.as_ref(py);
+            let py_obj = self.inner.bind(py);
             let pa = py_obj.call_method1(
                 "try_reserve_slot",
                 (SlotReserveCtx::from_ctx(SK::kind(), ctx),),
@@ -305,13 +417,12 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
             if pa.is_none() {
                 return Ok(None);
             }
-            PyResult::Ok(Some(SlotSupplierPermit::with_user_data(pa.into_py(py))))
+            PyResult::Ok(Some(SlotSupplierPermit::with_user_data(
+                pa.into_pyobject(py)?.unbind(),
+            )))
         })
         .unwrap_or_else(|e| {
-            error!(
-                "Uncaught error in custom slot supplier `try_reserve_slot`: {}",
-                e
-            );
+            error!("Uncaught error in custom slot supplier `try_reserve_slot`: {e}");
             None
         })
     }
@@ -321,22 +432,19 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
             let permit = ctx
                 .permit()
                 .user_data::<PyObject>()
-                .cloned()
+                .map(|o| o.clone_ref(py))
                 .unwrap_or_else(|| py.None());
-            let py_obj = self.inner.as_ref(py);
+            let py_obj = self.inner.bind(py);
             py_obj.call_method1(
                 "mark_slot_used",
                 (SlotMarkUsedCtx {
-                    slot_info: slot_info_to_py_obj(py, ctx.info().downcast()),
+                    slot_info: slot_info_to_py_obj(py, ctx.info().downcast())?.unbind(),
                     permit,
                 },),
             )?;
             PyResult::Ok(())
         }) {
-            error!(
-                "Uncaught error in custom slot supplier `mark_slot_used`: {}",
-                e
-            );
+            error!("Uncaught error in custom slot supplier `mark_slot_used`: {e}");
         }
     }
 
@@ -345,22 +453,18 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
             let permit = ctx
                 .permit()
                 .user_data::<PyObject>()
-                .cloned()
+                .map(|o| o.clone_ref(py))
                 .unwrap_or_else(|| py.None());
-            let py_obj = self.inner.as_ref(py);
-            py_obj.call_method1(
-                "release_slot",
-                (SlotReleaseCtx {
-                    slot_info: ctx.info().map(|i| slot_info_to_py_obj(py, i.downcast())),
-                    permit,
-                },),
-            )?;
+            let py_obj = self.inner.bind(py);
+            let slot_info = if let Some(info) = ctx.info() {
+                Some(slot_info_to_py_obj(py, info.downcast())?.unbind())
+            } else {
+                None
+            };
+            py_obj.call_method1("release_slot", (SlotReleaseCtx { slot_info, permit },))?;
             PyResult::Ok(())
         }) {
-            error!(
-                "Uncaught error in custom slot supplier `release_slot`: {}",
-                e
-            );
+            error!("Uncaught error in custom slot supplier `release_slot`: {e}");
         }
     }
 
@@ -378,7 +482,7 @@ pub struct ResourceBasedTunerConfig {
 macro_rules! enter_sync {
     ($runtime:expr) => {
         if let Some(subscriber) = $runtime.core.telemetry().trace_subscriber() {
-            temporal_sdk_core::telemetry::set_trace_subscriber_for_current_thread(subscriber);
+            temporalio_sdk_core::telemetry::set_trace_subscriber_for_current_thread(subscriber);
         }
         let _guard = $runtime.core.tokio_handle().enter();
     };
@@ -390,9 +494,10 @@ pub fn new_worker(
     config: WorkerConfig,
 ) -> PyResult<WorkerRef> {
     enter_sync!(runtime_ref.runtime);
+    runtime_ref.runtime.assert_same_process("create worker")?;
     let event_loop_task_locals = Arc::new(OnceLock::new());
     let config = convert_worker_config(config, event_loop_task_locals.clone())?;
-    let worker = temporal_sdk_core::init_worker(
+    let worker = temporalio_sdk_core::init_worker(
         &runtime_ref.runtime.core,
         config,
         client.retry_client.clone().into_inner(),
@@ -409,33 +514,42 @@ pub fn new_replay_worker<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
     config: WorkerConfig,
-) -> PyResult<&'a PyTuple> {
+) -> PyResult<Bound<'a, PyTuple>> {
     enter_sync!(runtime_ref.runtime);
+    runtime_ref
+        .runtime
+        .assert_same_process("create replay worker")?;
     let event_loop_task_locals = Arc::new(OnceLock::new());
     let config = convert_worker_config(config, event_loop_task_locals.clone())?;
     let (history_pusher, stream) = HistoryPusher::new(runtime_ref.runtime.clone());
     let worker = WorkerRef {
         worker: Some(Arc::new(
-            temporal_sdk_core::init_replay_worker(ReplayWorkerInput::new(config, stream)).map_err(
-                |err| PyValueError::new_err(format!("Failed creating replay worker: {}", err)),
-            )?,
+            temporalio_sdk_core::init_replay_worker(ReplayWorkerInput::new(config, stream))
+                .map_err(|err| {
+                    PyValueError::new_err(format!("Failed creating replay worker: {err}"))
+                })?,
         )),
         event_loop_task_locals: Default::default(),
         runtime: runtime_ref.runtime.clone(),
     };
-    Ok(PyTuple::new(
+    PyTuple::new(
         py,
-        [worker.into_py(py), history_pusher.into_py(py)],
-    ))
+        [
+            worker.into_pyobject(py)?.into_any(),
+            history_pusher.into_pyobject(py)?.into_any(),
+        ],
+    )
 }
 
 #[pymethods]
 impl WorkerRef {
-    fn validate<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
+    fn validate<'p>(&self, py: Python<'p>) -> PyResult<Bound<PyAny, 'p>> {
+        self.runtime.assert_same_process("use worker")?;
         let worker = self.worker.as_ref().unwrap().clone();
         // Set custom slot supplier task locals so they can run futures.
         // Event loop is assumed to be running at this point.
-        let task_locals = pyo3_asyncio::TaskLocals::with_running_loop(py)?.copy_context(py)?;
+        let task_locals =
+            pyo3_async_runtimes::TaskLocals::with_running_loop(py)?.copy_context(py)?;
         self.event_loop_task_locals
             .set(task_locals)
             .expect("must only be set once");
@@ -449,40 +563,53 @@ impl WorkerRef {
         })
     }
 
-    fn poll_workflow_activation<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
+    fn poll_workflow_activation<'p>(&self, py: Python<'p>) -> PyResult<Bound<'p, PyAny>> {
+        self.runtime.assert_same_process("use worker")?;
         let worker = self.worker.as_ref().unwrap().clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match worker.poll_workflow_activation().await {
                 Ok(act) => act.encode_to_vec(),
                 Err(PollError::ShutDown) => return Err(PollShutdownError::new_err(())),
-                Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {}", err))),
+                Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {err}"))),
             };
-            let bytes: &[u8] = &bytes;
-            Ok(Python::with_gil(|py| bytes.into_py(py)))
+            Ok(bytes)
         })
     }
 
-    fn poll_activity_task<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
+    fn poll_activity_task<'p>(&self, py: Python<'p>) -> PyResult<Bound<'p, PyAny>> {
+        self.runtime.assert_same_process("use worker")?;
         let worker = self.worker.as_ref().unwrap().clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match worker.poll_activity_task().await {
                 Ok(task) => task.encode_to_vec(),
                 Err(PollError::ShutDown) => return Err(PollShutdownError::new_err(())),
-                Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {}", err))),
+                Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {err}"))),
             };
-            let bytes: &[u8] = &bytes;
-            Ok(Python::with_gil(|py| bytes.into_py(py)))
+            Ok(bytes)
+        })
+    }
+
+    fn poll_nexus_task<'p>(&self, py: Python<'p>) -> PyResult<Bound<'p, PyAny>> {
+        self.runtime.assert_same_process("use worker")?;
+        let worker = self.worker.as_ref().unwrap().clone();
+        self.runtime.future_into_py(py, async move {
+            let bytes = match worker.poll_nexus_task().await {
+                Ok(task) => task.encode_to_vec(),
+                Err(PollError::ShutDown) => return Err(PollShutdownError::new_err(())),
+                Err(err) => return Err(PyRuntimeError::new_err(format!("Poll failure: {err}"))),
+            };
+            Ok(bytes)
         })
     }
 
     fn complete_workflow_activation<'p>(
         &self,
         py: Python<'p>,
-        proto: &PyBytes,
-    ) -> PyResult<&'p PyAny> {
+        proto: &Bound<'_, PyBytes>,
+    ) -> PyResult<Bound<'p, PyAny>> {
         let worker = self.worker.as_ref().unwrap().clone();
         let completion = WorkflowActivationCompletion::decode(proto.as_bytes())
-            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
+            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
         self.runtime.future_into_py(py, async move {
             worker
                 .complete_workflow_activation(completion)
@@ -492,10 +619,14 @@ impl WorkerRef {
         })
     }
 
-    fn complete_activity_task<'p>(&self, py: Python<'p>, proto: &PyBytes) -> PyResult<&'p PyAny> {
+    fn complete_activity_task<'p>(
+        &self,
+        py: Python<'p>,
+        proto: &Bound<'_, PyBytes>,
+    ) -> PyResult<Bound<'p, PyAny>> {
         let worker = self.worker.as_ref().unwrap().clone();
         let completion = ActivityTaskCompletion::decode(proto.as_bytes())
-            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
+            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
         self.runtime.future_into_py(py, async move {
             worker
                 .complete_activity_task(completion)
@@ -505,10 +636,27 @@ impl WorkerRef {
         })
     }
 
-    fn record_activity_heartbeat(&self, proto: &PyBytes) -> PyResult<()> {
+    fn complete_nexus_task<'p>(
+        &self,
+        py: Python<'p>,
+        proto: &Bound<'_, PyBytes>,
+    ) -> PyResult<Bound<'p, PyAny>> {
+        let worker = self.worker.as_ref().unwrap().clone();
+        let completion = NexusTaskCompletion::decode(proto.as_bytes())
+            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
+        self.runtime.future_into_py(py, async move {
+            worker
+                .complete_nexus_task(completion)
+                .await
+                .context("Completion failure")
+                .map_err(Into::into)
+        })
+    }
+
+    fn record_activity_heartbeat(&self, proto: &Bound<'_, PyBytes>) -> PyResult<()> {
         enter_sync!(self.runtime);
         let heartbeat = ActivityHeartbeat::decode(proto.as_bytes())
-            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
+            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
         self.worker
             .as_ref()
             .unwrap()
@@ -525,11 +673,13 @@ impl WorkerRef {
         Ok(())
     }
 
-    fn replace_client(&self, client: &client::ClientRef) {
+    fn replace_client(&self, client: &client::ClientRef) -> PyResult<()> {
+        enter_sync!(self.runtime);
         self.worker
             .as_ref()
             .expect("missing worker")
-            .replace_client(client.retry_client.clone().into_inner());
+            .replace_client(client.retry_client.clone().into_inner())
+            .map_err(|err| PyValueError::new_err(format!("Failed replacing client: {err}")))
     }
 
     fn initiate_shutdown(&self) -> PyResult<()> {
@@ -538,7 +688,7 @@ impl WorkerRef {
         Ok(())
     }
 
-    fn finalize_shutdown<'p>(&mut self, py: Python<'p>) -> PyResult<&'p PyAny> {
+    fn finalize_shutdown<'p>(&mut self, py: Python<'p>) -> PyResult<Bound<'p, PyAny>> {
         // Take the worker out of the option and leave None. This should be the
         // only reference remaining to the worker so try_unwrap will work.
         let worker = Arc::try_unwrap(self.worker.take().unwrap()).map_err(|arc| {
@@ -556,20 +706,21 @@ impl WorkerRef {
 
 fn convert_worker_config(
     conf: WorkerConfig,
-    task_locals: Arc<OnceLock<pyo3_asyncio::TaskLocals>>,
-) -> PyResult<temporal_sdk_core::WorkerConfig> {
+    task_locals: Arc<OnceLock<pyo3_async_runtimes::TaskLocals>>,
+) -> PyResult<temporalio_sdk_core::WorkerConfig> {
     let converted_tuner = convert_tuner_holder(conf.tuner, task_locals)?;
-    temporal_sdk_core::WorkerConfigBuilder::default()
+    let converted_versioning_strategy = convert_versioning_strategy(conf.versioning_strategy);
+    temporalio_sdk_core::WorkerConfig::builder()
         .namespace(conf.namespace)
         .task_queue(conf.task_queue)
-        .worker_build_id(conf.build_id)
-        .client_identity_override(conf.identity_override)
+        .versioning_strategy(converted_versioning_strategy)
+        .maybe_client_identity_override(conf.identity_override)
         .max_cached_workflows(conf.max_cached_workflows)
-        .max_concurrent_wft_polls(conf.max_concurrent_workflow_task_polls)
+        .workflow_task_poller_behavior(conf.workflow_task_poller_behavior.into())
         .tuner(Arc::new(converted_tuner))
         .nonsticky_to_sticky_poll_ratio(conf.nonsticky_to_sticky_poll_ratio)
-        .max_concurrent_at_polls(conf.max_concurrent_activity_task_polls)
-        .no_remote_activities(conf.no_remote_activities)
+        .activity_task_poller_behavior(conf.activity_task_poller_behavior.into())
+        .task_types(conf.task_types.into())
         .sticky_queue_schedule_to_start_timeout(Duration::from_millis(
             conf.sticky_queue_schedule_to_start_timeout_millis,
         ))
@@ -579,13 +730,12 @@ fn convert_worker_config(
         .default_heartbeat_throttle_interval(Duration::from_millis(
             conf.default_heartbeat_throttle_interval_millis,
         ))
-        .max_worker_activities_per_second(conf.max_activities_per_second)
-        .max_task_queue_activities_per_second(conf.max_task_queue_activities_per_second)
+        .maybe_max_worker_activities_per_second(conf.max_activities_per_second)
+        .maybe_max_task_queue_activities_per_second(conf.max_task_queue_activities_per_second)
         // Even though grace period is optional, if it is not set then the
         // auto-cancel-activity behavior of shutdown will not occur, so we
         // always set it even if 0.
         .graceful_shutdown_period(Duration::from_millis(conf.graceful_shutdown_period_millis))
-        .use_worker_versioning(conf.use_worker_versioning)
         .workflow_failure_errors(if conf.nondeterminism_as_workflow_fail {
             HashSet::from([WorkflowErrorType::Nondeterminism])
         } else {
@@ -600,16 +750,26 @@ fn convert_worker_config(
                         HashSet::from([WorkflowErrorType::Nondeterminism]),
                     )
                 })
-                .collect::<HashMap<String, HashSet<WorkflowErrorType>>>(),
+                .collect(),
+        )
+        .nexus_task_poller_behavior(conf.nexus_task_poller_behavior.into())
+        .plugins(
+            conf.plugins
+                .into_iter()
+                .map(|name| PluginInfo {
+                    name,
+                    version: String::new(),
+                })
+                .collect(),
         )
         .build()
-        .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {}", err)))
+        .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {err}")))
 }
 
 fn convert_tuner_holder(
     holder: TunerHolder,
-    task_locals: Arc<OnceLock<pyo3_asyncio::TaskLocals>>,
-) -> PyResult<temporal_sdk_core::TunerHolder> {
+    task_locals: Arc<OnceLock<pyo3_async_runtimes::TaskLocals>>,
+) -> PyResult<temporalio_sdk_core::TunerHolder> {
     // Verify all resource-based options are the same if any are set
     let maybe_wf_resource_opts =
         if let SlotSupplier::ResourceBased(ref ss) = holder.workflow_slot_supplier {
@@ -629,10 +789,17 @@ fn convert_tuner_holder(
         } else {
             None
         };
+    let maybe_nexus_resource_opts =
+        if let SlotSupplier::ResourceBased(ref ss) = holder.nexus_slot_supplier {
+            Some(&ss.tuner_config)
+        } else {
+            None
+        };
     let all_resource_opts = [
         maybe_wf_resource_opts,
         maybe_act_resource_opts,
         maybe_local_act_resource_opts,
+        maybe_nexus_resource_opts,
     ];
     let mut set_resource_opts = all_resource_opts.iter().flatten();
     let first = set_resource_opts.next();
@@ -647,17 +814,13 @@ fn convert_tuner_holder(
         ));
     }
 
-    let mut options = temporal_sdk_core::TunerHolderOptionsBuilder::default();
-    if let Some(first) = first {
-        options.resource_based_options(
-            temporal_sdk_core::ResourceBasedSlotsOptionsBuilder::default()
+    Ok(temporalio_sdk_core::TunerHolderOptions::builder()
+        .maybe_resource_based_options(first.map(|first| {
+            temporalio_sdk_core::ResourceBasedSlotsOptions::builder()
                 .target_mem_usage(first.target_memory_usage)
                 .target_cpu_usage(first.target_cpu_usage)
                 .build()
-                .expect("Building ResourceBasedSlotsOptions is infallible"),
-        );
-    };
-    options
+        }))
         .workflow_slot_options(convert_slot_supplier(
             holder.workflow_slot_supplier,
             task_locals.clone(),
@@ -668,38 +831,77 @@ fn convert_tuner_holder(
         )?)
         .local_activity_slot_options(convert_slot_supplier(
             holder.local_activity_slot_supplier,
+            task_locals.clone(),
+        )?)
+        .nexus_slot_options(convert_slot_supplier(
+            holder.nexus_slot_supplier,
             task_locals,
-        )?);
-    Ok(options
+        )?)
         .build()
-        .map_err(|e| PyValueError::new_err(format!("Invalid tuner holder options: {}", e)))?
+        .map_err(|e| PyValueError::new_err(format!("Invalid tuner holder options: {e}")))?
         .build_tuner_holder()
         .context("Failed building tuner holder")?)
 }
 
 fn convert_slot_supplier<SK: SlotKind + Send + Sync + 'static>(
     supplier: SlotSupplier,
-    task_locals: Arc<OnceLock<pyo3_asyncio::TaskLocals>>,
-) -> PyResult<temporal_sdk_core::SlotSupplierOptions<SK>> {
+    task_locals: Arc<OnceLock<pyo3_async_runtimes::TaskLocals>>,
+) -> PyResult<temporalio_sdk_core::SlotSupplierOptions<SK>> {
     Ok(match supplier {
-        SlotSupplier::FixedSize(fs) => temporal_sdk_core::SlotSupplierOptions::FixedSize {
+        SlotSupplier::FixedSize(fs) => temporalio_sdk_core::SlotSupplierOptions::FixedSize {
             slots: fs.num_slots,
         },
-        SlotSupplier::ResourceBased(ss) => temporal_sdk_core::SlotSupplierOptions::ResourceBased(
-            temporal_sdk_core::ResourceSlotOptions::new(
+        SlotSupplier::ResourceBased(ss) => temporalio_sdk_core::SlotSupplierOptions::ResourceBased(
+            temporalio_sdk_core::ResourceSlotOptions::new(
                 ss.minimum_slots,
                 ss.maximum_slots,
                 Duration::from_millis(ss.ramp_throttle_ms),
             ),
         ),
-        SlotSupplier::Custom(cs) => temporal_sdk_core::SlotSupplierOptions::Custom(Arc::new(
-            CustomSlotSupplierOfType::<SK> {
+        SlotSupplier::Custom(cs) => {
+            temporalio_sdk_core::SlotSupplierOptions::Custom(Arc::new(CustomSlotSupplierOfType::<
+                SK,
+            > {
                 inner: cs.inner,
                 event_loop_task_locals: task_locals,
                 _phantom: PhantomData,
-            },
-        )),
+            }))
+        }
     })
+}
+
+fn convert_versioning_strategy(
+    strategy: WorkerVersioningStrategy,
+) -> temporalio_common::worker::WorkerVersioningStrategy {
+    match strategy {
+        WorkerVersioningStrategy::None(vn) => {
+            temporalio_common::worker::WorkerVersioningStrategy::None {
+                build_id: vn.build_id_no_versioning,
+            }
+        }
+        WorkerVersioningStrategy::DeploymentBased(options) => {
+            temporalio_common::worker::WorkerVersioningStrategy::WorkerDeploymentBased(
+                temporalio_common::worker::WorkerDeploymentOptions {
+                    version: temporalio_common::worker::WorkerDeploymentVersion {
+                        deployment_name: options.version.deployment_name,
+                        build_id: options.version.build_id,
+                    },
+                    use_worker_versioning: options.use_worker_versioning,
+                    default_versioning_behavior: Some(
+                        options
+                            .default_versioning_behavior
+                            .try_into()
+                            .unwrap_or_default(),
+                    ),
+                },
+            )
+        }
+        WorkerVersioningStrategy::LegacyBuildIdBased(lb) => {
+            temporalio_common::worker::WorkerVersioningStrategy::LegacyBuildIdBased {
+                build_id: lb.build_id_with_versioning,
+            }
+        }
+    }
 }
 
 /// For feeding histories into core during replay
@@ -728,10 +930,10 @@ impl HistoryPusher {
         &self,
         py: Python<'p>,
         workflow_id: &str,
-        history_proto: &PyBytes,
-    ) -> PyResult<&'p PyAny> {
+        history_proto: &Bound<'_, PyBytes>,
+    ) -> PyResult<Bound<'p, PyAny>> {
         let history = History::decode(history_proto.as_bytes())
-            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {}", err)))?;
+            .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
         let wfid = workflow_id.to_string();
         let tx = if let Some(tx) = self.tx.as_ref() {
             tx.clone()

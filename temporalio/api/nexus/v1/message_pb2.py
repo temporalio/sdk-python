@@ -19,9 +19,12 @@ from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__
 from temporalio.api.common.v1 import (
     message_pb2 as temporal_dot_api_dot_common_dot_v1_dot_message__pb2,
 )
+from temporalio.api.enums.v1 import (
+    nexus_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_nexus__pb2,
+)
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n#temporal/api/nexus/v1/message.proto\x12\x15temporal.api.nexus.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto"\x9c\x01\n\x07\x46\x61ilure\x12\x0f\n\x07message\x18\x01 \x01(\t\x12>\n\x08metadata\x18\x02 \x03(\x0b\x32,.temporal.api.nexus.v1.Failure.MetadataEntry\x12\x0f\n\x07\x64\x65tails\x18\x03 \x01(\x0c\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"S\n\x0cHandlerError\x12\x12\n\nerror_type\x18\x01 \x01(\t\x12/\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32\x1e.temporal.api.nexus.v1.Failure"f\n\x1aUnsuccessfulOperationError\x12\x17\n\x0foperation_state\x18\x01 \x01(\t\x12/\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32\x1e.temporal.api.nexus.v1.Failure"!\n\x04Link\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0c\n\x04type\x18\x02 \x01(\t"\xd1\x02\n\x15StartOperationRequest\x12\x0f\n\x07service\x18\x01 \x01(\t\x12\x11\n\toperation\x18\x02 \x01(\t\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x12\x10\n\x08\x63\x61llback\x18\x04 \x01(\t\x12\x30\n\x07payload\x18\x05 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12Y\n\x0f\x63\x61llback_header\x18\x06 \x03(\x0b\x32@.temporal.api.nexus.v1.StartOperationRequest.CallbackHeaderEntry\x12*\n\x05links\x18\x07 \x03(\x0b\x32\x1b.temporal.api.nexus.v1.Link\x1a\x35\n\x13\x43\x61llbackHeaderEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"R\n\x16\x43\x61ncelOperationRequest\x12\x0f\n\x07service\x18\x01 \x01(\t\x12\x11\n\toperation\x18\x02 \x01(\t\x12\x14\n\x0coperation_id\x18\x03 \x01(\t"\xc7\x02\n\x07Request\x12:\n\x06header\x18\x01 \x03(\x0b\x32*.temporal.api.nexus.v1.Request.HeaderEntry\x12\x32\n\x0escheduled_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12G\n\x0fstart_operation\x18\x03 \x01(\x0b\x32,.temporal.api.nexus.v1.StartOperationRequestH\x00\x12I\n\x10\x63\x61ncel_operation\x18\x04 \x01(\x0b\x32-.temporal.api.nexus.v1.CancelOperationRequestH\x00\x1a-\n\x0bHeaderEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\t\n\x07variant"\x90\x03\n\x16StartOperationResponse\x12J\n\x0csync_success\x18\x01 \x01(\x0b\x32\x32.temporal.api.nexus.v1.StartOperationResponse.SyncH\x00\x12L\n\rasync_success\x18\x02 \x01(\x0b\x32\x33.temporal.api.nexus.v1.StartOperationResponse.AsyncH\x00\x12L\n\x0foperation_error\x18\x03 \x01(\x0b\x32\x31.temporal.api.nexus.v1.UnsuccessfulOperationErrorH\x00\x1a\x38\n\x04Sync\x12\x30\n\x07payload\x18\x01 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x1aI\n\x05\x41sync\x12\x14\n\x0coperation_id\x18\x01 \x01(\t\x12*\n\x05links\x18\x02 \x03(\x0b\x32\x1b.temporal.api.nexus.v1.LinkB\t\n\x07variant"\x19\n\x17\x43\x61ncelOperationResponse"\xab\x01\n\x08Response\x12H\n\x0fstart_operation\x18\x01 \x01(\x0b\x32-.temporal.api.nexus.v1.StartOperationResponseH\x00\x12J\n\x10\x63\x61ncel_operation\x18\x02 \x01(\x0b\x32..temporal.api.nexus.v1.CancelOperationResponseH\x00\x42\t\n\x07variant"\xd8\x01\n\x08\x45ndpoint\x12\x0f\n\x07version\x18\x01 \x01(\x03\x12\n\n\x02id\x18\x02 \x01(\t\x12\x31\n\x04spec\x18\x03 \x01(\x0b\x32#.temporal.api.nexus.v1.EndpointSpec\x12\x30\n\x0c\x63reated_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12last_modified_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x12\n\nurl_prefix\x18\x06 \x01(\t"\x89\x01\n\x0c\x45ndpointSpec\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x34\n\x0b\x64\x65scription\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12\x35\n\x06target\x18\x03 \x01(\x0b\x32%.temporal.api.nexus.v1.EndpointTarget"\xe9\x01\n\x0e\x45ndpointTarget\x12>\n\x06worker\x18\x01 \x01(\x0b\x32,.temporal.api.nexus.v1.EndpointTarget.WorkerH\x00\x12\x42\n\x08\x65xternal\x18\x02 \x01(\x0b\x32..temporal.api.nexus.v1.EndpointTarget.ExternalH\x00\x1a/\n\x06Worker\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x12\n\ntask_queue\x18\x02 \x01(\t\x1a\x17\n\x08\x45xternal\x12\x0b\n\x03url\x18\x01 \x01(\tB\t\n\x07variantB\x84\x01\n\x18io.temporal.api.nexus.v1B\x0cMessageProtoP\x01Z!go.temporal.io/api/nexus/v1;nexus\xaa\x02\x17Temporalio.Api.Nexus.V1\xea\x02\x1aTemporalio::Api::Nexus::V1b\x06proto3'
+    b'\n#temporal/api/nexus/v1/message.proto\x12\x15temporal.api.nexus.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a!temporal/api/enums/v1/nexus.proto"\x9c\x01\n\x07\x46\x61ilure\x12\x0f\n\x07message\x18\x01 \x01(\t\x12>\n\x08metadata\x18\x02 \x03(\x0b\x32,.temporal.api.nexus.v1.Failure.MetadataEntry\x12\x0f\n\x07\x64\x65tails\x18\x03 \x01(\x0c\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"\xa2\x01\n\x0cHandlerError\x12\x12\n\nerror_type\x18\x01 \x01(\t\x12/\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32\x1e.temporal.api.nexus.v1.Failure\x12M\n\x0eretry_behavior\x18\x03 \x01(\x0e\x32\x35.temporal.api.enums.v1.NexusHandlerErrorRetryBehavior"f\n\x1aUnsuccessfulOperationError\x12\x17\n\x0foperation_state\x18\x01 \x01(\t\x12/\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32\x1e.temporal.api.nexus.v1.Failure"!\n\x04Link\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x0c\n\x04type\x18\x02 \x01(\t"\xd1\x02\n\x15StartOperationRequest\x12\x0f\n\x07service\x18\x01 \x01(\t\x12\x11\n\toperation\x18\x02 \x01(\t\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x12\x10\n\x08\x63\x61llback\x18\x04 \x01(\t\x12\x30\n\x07payload\x18\x05 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12Y\n\x0f\x63\x61llback_header\x18\x06 \x03(\x0b\x32@.temporal.api.nexus.v1.StartOperationRequest.CallbackHeaderEntry\x12*\n\x05links\x18\x07 \x03(\x0b\x32\x1b.temporal.api.nexus.v1.Link\x1a\x35\n\x13\x43\x61llbackHeaderEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"o\n\x16\x43\x61ncelOperationRequest\x12\x0f\n\x07service\x18\x01 \x01(\t\x12\x11\n\toperation\x18\x02 \x01(\t\x12\x18\n\x0coperation_id\x18\x03 \x01(\tB\x02\x18\x01\x12\x17\n\x0foperation_token\x18\x04 \x01(\t"\xd9\x02\n\x07Request\x12:\n\x06header\x18\x01 \x03(\x0b\x32*.temporal.api.nexus.v1.Request.HeaderEntry\x12\x32\n\x0escheduled_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12G\n\x0fstart_operation\x18\x03 \x01(\x0b\x32,.temporal.api.nexus.v1.StartOperationRequestH\x00\x12I\n\x10\x63\x61ncel_operation\x18\x04 \x01(\x0b\x32-.temporal.api.nexus.v1.CancelOperationRequestH\x00\x12\x10\n\x08\x65ndpoint\x18\n \x01(\t\x1a-\n\x0bHeaderEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\t\n\x07variant"\xd9\x03\n\x16StartOperationResponse\x12J\n\x0csync_success\x18\x01 \x01(\x0b\x32\x32.temporal.api.nexus.v1.StartOperationResponse.SyncH\x00\x12L\n\rasync_success\x18\x02 \x01(\x0b\x32\x33.temporal.api.nexus.v1.StartOperationResponse.AsyncH\x00\x12L\n\x0foperation_error\x18\x03 \x01(\x0b\x32\x31.temporal.api.nexus.v1.UnsuccessfulOperationErrorH\x00\x1a\x64\n\x04Sync\x12\x30\n\x07payload\x18\x01 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12*\n\x05links\x18\x02 \x03(\x0b\x32\x1b.temporal.api.nexus.v1.Link\x1a\x66\n\x05\x41sync\x12\x18\n\x0coperation_id\x18\x01 \x01(\tB\x02\x18\x01\x12*\n\x05links\x18\x02 \x03(\x0b\x32\x1b.temporal.api.nexus.v1.Link\x12\x17\n\x0foperation_token\x18\x03 \x01(\tB\t\n\x07variant"\x19\n\x17\x43\x61ncelOperationResponse"\xab\x01\n\x08Response\x12H\n\x0fstart_operation\x18\x01 \x01(\x0b\x32-.temporal.api.nexus.v1.StartOperationResponseH\x00\x12J\n\x10\x63\x61ncel_operation\x18\x02 \x01(\x0b\x32..temporal.api.nexus.v1.CancelOperationResponseH\x00\x42\t\n\x07variant"\xd8\x01\n\x08\x45ndpoint\x12\x0f\n\x07version\x18\x01 \x01(\x03\x12\n\n\x02id\x18\x02 \x01(\t\x12\x31\n\x04spec\x18\x03 \x01(\x0b\x32#.temporal.api.nexus.v1.EndpointSpec\x12\x30\n\x0c\x63reated_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x36\n\x12last_modified_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x12\n\nurl_prefix\x18\x06 \x01(\t"\x89\x01\n\x0c\x45ndpointSpec\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x34\n\x0b\x64\x65scription\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12\x35\n\x06target\x18\x03 \x01(\x0b\x32%.temporal.api.nexus.v1.EndpointTarget"\xe9\x01\n\x0e\x45ndpointTarget\x12>\n\x06worker\x18\x01 \x01(\x0b\x32,.temporal.api.nexus.v1.EndpointTarget.WorkerH\x00\x12\x42\n\x08\x65xternal\x18\x02 \x01(\x0b\x32..temporal.api.nexus.v1.EndpointTarget.ExternalH\x00\x1a/\n\x06Worker\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x12\n\ntask_queue\x18\x02 \x01(\t\x1a\x17\n\x08\x45xternal\x12\x0b\n\x03url\x18\x01 \x01(\tB\t\n\x07variantB\x84\x01\n\x18io.temporal.api.nexus.v1B\x0cMessageProtoP\x01Z!go.temporal.io/api/nexus/v1;nexus\xaa\x02\x17Temporalio.Api.Nexus.V1\xea\x02\x1aTemporalio::Api::Nexus::V1b\x06proto3'
 )
 
 
@@ -58,12 +61,12 @@ Failure = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _FAILURE_METADATAENTRY,
-                "__module__": "temporal.api.nexus.v1.message_pb2",
+                "__module__": "temporalio.api.nexus.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.Failure.MetadataEntry)
             },
         ),
         "DESCRIPTOR": _FAILURE,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.Failure)
     },
 )
@@ -75,7 +78,7 @@ HandlerError = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _HANDLERERROR,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.HandlerError)
     },
 )
@@ -86,7 +89,7 @@ UnsuccessfulOperationError = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _UNSUCCESSFULOPERATIONERROR,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.UnsuccessfulOperationError)
     },
 )
@@ -97,7 +100,7 @@ Link = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _LINK,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.Link)
     },
 )
@@ -112,12 +115,12 @@ StartOperationRequest = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _STARTOPERATIONREQUEST_CALLBACKHEADERENTRY,
-                "__module__": "temporal.api.nexus.v1.message_pb2",
+                "__module__": "temporalio.api.nexus.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.StartOperationRequest.CallbackHeaderEntry)
             },
         ),
         "DESCRIPTOR": _STARTOPERATIONREQUEST,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.StartOperationRequest)
     },
 )
@@ -129,7 +132,7 @@ CancelOperationRequest = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CANCELOPERATIONREQUEST,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.CancelOperationRequest)
     },
 )
@@ -144,12 +147,12 @@ Request = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _REQUEST_HEADERENTRY,
-                "__module__": "temporal.api.nexus.v1.message_pb2",
+                "__module__": "temporalio.api.nexus.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.Request.HeaderEntry)
             },
         ),
         "DESCRIPTOR": _REQUEST,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.Request)
     },
 )
@@ -165,7 +168,7 @@ StartOperationResponse = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _STARTOPERATIONRESPONSE_SYNC,
-                "__module__": "temporal.api.nexus.v1.message_pb2",
+                "__module__": "temporalio.api.nexus.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.StartOperationResponse.Sync)
             },
         ),
@@ -174,12 +177,12 @@ StartOperationResponse = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _STARTOPERATIONRESPONSE_ASYNC,
-                "__module__": "temporal.api.nexus.v1.message_pb2",
+                "__module__": "temporalio.api.nexus.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.StartOperationResponse.Async)
             },
         ),
         "DESCRIPTOR": _STARTOPERATIONRESPONSE,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.StartOperationResponse)
     },
 )
@@ -192,7 +195,7 @@ CancelOperationResponse = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CANCELOPERATIONRESPONSE,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.CancelOperationResponse)
     },
 )
@@ -203,7 +206,7 @@ Response = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESPONSE,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.Response)
     },
 )
@@ -214,7 +217,7 @@ Endpoint = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ENDPOINT,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.Endpoint)
     },
 )
@@ -225,7 +228,7 @@ EndpointSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _ENDPOINTSPEC,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.EndpointSpec)
     },
 )
@@ -240,7 +243,7 @@ EndpointTarget = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _ENDPOINTTARGET_WORKER,
-                "__module__": "temporal.api.nexus.v1.message_pb2",
+                "__module__": "temporalio.api.nexus.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.EndpointTarget.Worker)
             },
         ),
@@ -249,12 +252,12 @@ EndpointTarget = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _ENDPOINTTARGET_EXTERNAL,
-                "__module__": "temporal.api.nexus.v1.message_pb2",
+                "__module__": "temporalio.api.nexus.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.EndpointTarget.External)
             },
         ),
         "DESCRIPTOR": _ENDPOINTTARGET,
-        "__module__": "temporal.api.nexus.v1.message_pb2",
+        "__module__": "temporalio.api.nexus.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.nexus.v1.EndpointTarget)
     },
 )
@@ -269,46 +272,54 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _FAILURE_METADATAENTRY._serialized_options = b"8\001"
     _STARTOPERATIONREQUEST_CALLBACKHEADERENTRY._options = None
     _STARTOPERATIONREQUEST_CALLBACKHEADERENTRY._serialized_options = b"8\001"
+    _CANCELOPERATIONREQUEST.fields_by_name["operation_id"]._options = None
+    _CANCELOPERATIONREQUEST.fields_by_name[
+        "operation_id"
+    ]._serialized_options = b"\030\001"
     _REQUEST_HEADERENTRY._options = None
     _REQUEST_HEADERENTRY._serialized_options = b"8\001"
-    _FAILURE._serialized_start = 134
-    _FAILURE._serialized_end = 290
-    _FAILURE_METADATAENTRY._serialized_start = 243
-    _FAILURE_METADATAENTRY._serialized_end = 290
-    _HANDLERERROR._serialized_start = 292
-    _HANDLERERROR._serialized_end = 375
-    _UNSUCCESSFULOPERATIONERROR._serialized_start = 377
-    _UNSUCCESSFULOPERATIONERROR._serialized_end = 479
-    _LINK._serialized_start = 481
-    _LINK._serialized_end = 514
-    _STARTOPERATIONREQUEST._serialized_start = 517
-    _STARTOPERATIONREQUEST._serialized_end = 854
-    _STARTOPERATIONREQUEST_CALLBACKHEADERENTRY._serialized_start = 801
-    _STARTOPERATIONREQUEST_CALLBACKHEADERENTRY._serialized_end = 854
-    _CANCELOPERATIONREQUEST._serialized_start = 856
-    _CANCELOPERATIONREQUEST._serialized_end = 938
-    _REQUEST._serialized_start = 941
-    _REQUEST._serialized_end = 1268
-    _REQUEST_HEADERENTRY._serialized_start = 1212
-    _REQUEST_HEADERENTRY._serialized_end = 1257
-    _STARTOPERATIONRESPONSE._serialized_start = 1271
-    _STARTOPERATIONRESPONSE._serialized_end = 1671
-    _STARTOPERATIONRESPONSE_SYNC._serialized_start = 1529
-    _STARTOPERATIONRESPONSE_SYNC._serialized_end = 1585
-    _STARTOPERATIONRESPONSE_ASYNC._serialized_start = 1587
-    _STARTOPERATIONRESPONSE_ASYNC._serialized_end = 1660
-    _CANCELOPERATIONRESPONSE._serialized_start = 1673
-    _CANCELOPERATIONRESPONSE._serialized_end = 1698
-    _RESPONSE._serialized_start = 1701
-    _RESPONSE._serialized_end = 1872
-    _ENDPOINT._serialized_start = 1875
-    _ENDPOINT._serialized_end = 2091
-    _ENDPOINTSPEC._serialized_start = 2094
-    _ENDPOINTSPEC._serialized_end = 2231
-    _ENDPOINTTARGET._serialized_start = 2234
-    _ENDPOINTTARGET._serialized_end = 2467
-    _ENDPOINTTARGET_WORKER._serialized_start = 2384
-    _ENDPOINTTARGET_WORKER._serialized_end = 2431
-    _ENDPOINTTARGET_EXTERNAL._serialized_start = 2433
-    _ENDPOINTTARGET_EXTERNAL._serialized_end = 2456
+    _STARTOPERATIONRESPONSE_ASYNC.fields_by_name["operation_id"]._options = None
+    _STARTOPERATIONRESPONSE_ASYNC.fields_by_name[
+        "operation_id"
+    ]._serialized_options = b"\030\001"
+    _FAILURE._serialized_start = 169
+    _FAILURE._serialized_end = 325
+    _FAILURE_METADATAENTRY._serialized_start = 278
+    _FAILURE_METADATAENTRY._serialized_end = 325
+    _HANDLERERROR._serialized_start = 328
+    _HANDLERERROR._serialized_end = 490
+    _UNSUCCESSFULOPERATIONERROR._serialized_start = 492
+    _UNSUCCESSFULOPERATIONERROR._serialized_end = 594
+    _LINK._serialized_start = 596
+    _LINK._serialized_end = 629
+    _STARTOPERATIONREQUEST._serialized_start = 632
+    _STARTOPERATIONREQUEST._serialized_end = 969
+    _STARTOPERATIONREQUEST_CALLBACKHEADERENTRY._serialized_start = 916
+    _STARTOPERATIONREQUEST_CALLBACKHEADERENTRY._serialized_end = 969
+    _CANCELOPERATIONREQUEST._serialized_start = 971
+    _CANCELOPERATIONREQUEST._serialized_end = 1082
+    _REQUEST._serialized_start = 1085
+    _REQUEST._serialized_end = 1430
+    _REQUEST_HEADERENTRY._serialized_start = 1374
+    _REQUEST_HEADERENTRY._serialized_end = 1419
+    _STARTOPERATIONRESPONSE._serialized_start = 1433
+    _STARTOPERATIONRESPONSE._serialized_end = 1906
+    _STARTOPERATIONRESPONSE_SYNC._serialized_start = 1691
+    _STARTOPERATIONRESPONSE_SYNC._serialized_end = 1791
+    _STARTOPERATIONRESPONSE_ASYNC._serialized_start = 1793
+    _STARTOPERATIONRESPONSE_ASYNC._serialized_end = 1895
+    _CANCELOPERATIONRESPONSE._serialized_start = 1908
+    _CANCELOPERATIONRESPONSE._serialized_end = 1933
+    _RESPONSE._serialized_start = 1936
+    _RESPONSE._serialized_end = 2107
+    _ENDPOINT._serialized_start = 2110
+    _ENDPOINT._serialized_end = 2326
+    _ENDPOINTSPEC._serialized_start = 2329
+    _ENDPOINTSPEC._serialized_end = 2466
+    _ENDPOINTTARGET._serialized_start = 2469
+    _ENDPOINTTARGET._serialized_end = 2702
+    _ENDPOINTTARGET_WORKER._serialized_start = 2619
+    _ENDPOINTTARGET_WORKER._serialized_end = 2666
+    _ENDPOINTTARGET_EXTERNAL._serialized_start = 2668
+    _ENDPOINTTARGET_EXTERNAL._serialized_end = 2691
 # @@protoc_insertion_point(module_scope)

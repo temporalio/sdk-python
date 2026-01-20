@@ -4,18 +4,15 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
 from typing import (
     ClassVar,
     Generic,
-    Mapping,
     NewType,
-    Optional,
-    Sequence,
     TypeVar,
-    Union,
 )
 
 from typing_extensions import Protocol, Self
@@ -24,22 +21,60 @@ import temporalio.bridge.metric
 import temporalio.bridge.runtime
 import temporalio.common
 
-_default_runtime: Optional[Runtime] = None
+
+class _RuntimeRef:
+    def __init__(
+        self,
+    ) -> None:
+        self._default_runtime: Runtime | None = None
+        self._prevent_default = False
+
+    def default(self) -> Runtime:
+        if not self._default_runtime:
+            if self._prevent_default:
+                raise RuntimeError(
+                    "Cannot create default Runtime after Runtime.prevent_default has been called"
+                )
+            self._default_runtime = Runtime(telemetry=TelemetryConfig())
+        return self._default_runtime
+
+    def prevent_default(self):
+        if self._default_runtime:
+            raise RuntimeError(
+                "Runtime.prevent_default called after default runtime has been created or set"
+            )
+        self._prevent_default = True
+
+    def set_default(
+        self, runtime: Runtime, *, error_if_already_set: bool = True
+    ) -> None:
+        if self._default_runtime and error_if_already_set:
+            raise RuntimeError("Runtime default already set")
+
+        self._default_runtime = runtime
+
+
+_runtime_ref: _RuntimeRef = _RuntimeRef()
 
 
 class Runtime:
     """Runtime for Temporal Python SDK.
 
-    Users are encouraged to use :py:meth:`default`. It can be set with
+    Most users are encouraged to use :py:meth:`default`. It can be set with
     :py:meth:`set_default`. Every time a new runtime is created, a new internal
     thread pool is created.
 
-    Runtimes do not work across forks.
+    Runtimes do not work across forks. Advanced users should consider using
+    :py:meth:`prevent_default` and :py:meth:`set_default` to ensure each
+    fork creates it's own runtime.
+
     """
 
-    @staticmethod
-    def default() -> Runtime:
-        """Get the default runtime, creating if not already created.
+    @classmethod
+    def default(cls) -> Runtime:
+        """Get the default runtime, creating if not already created. If :py:meth:`prevent_default`
+        is called before this method it will raise a RuntimeError instead of creating a default
+        runtime.
 
         If the default runtime needs to be different, it should be done with
         :py:meth:`set_default` before this is called or ever used.
@@ -47,10 +82,20 @@ class Runtime:
         Returns:
             The default runtime.
         """
-        global _default_runtime
-        if not _default_runtime:
-            _default_runtime = Runtime(telemetry=TelemetryConfig())
-        return _default_runtime
+        global _runtime_ref
+        return _runtime_ref.default()
+
+    @classmethod
+    def prevent_default(cls):
+        """Prevent :py:meth:`default` from lazily creating a :py:class:`Runtime`.
+
+        Raises a RuntimeError if a default :py:class:`Runtime` has already been created.
+
+        Explicitly setting a default runtime with :py:meth:`set_default` bypasses this setting and
+        future calls to :py:meth:`default` will return the provided runtime.
+        """
+        global _runtime_ref
+        _runtime_ref.prevent_default()
 
     @staticmethod
     def set_default(runtime: Runtime, *, error_if_already_set: bool = True) -> None:
@@ -65,19 +110,41 @@ class Runtime:
             error_if_already_set: If True and default is already set, this will
                 raise a RuntimeError.
         """
-        global _default_runtime
-        if _default_runtime and error_if_already_set:
-            raise RuntimeError("Runtime default already set")
-        _default_runtime = runtime
+        global _runtime_ref
+        _runtime_ref.set_default(runtime, error_if_already_set=error_if_already_set)
 
-    def __init__(self, *, telemetry: TelemetryConfig) -> None:
-        """Create a default runtime with the given telemetry config.
+    def __init__(
+        self,
+        *,
+        telemetry: TelemetryConfig,
+        worker_heartbeat_interval: timedelta | None = timedelta(seconds=60),
+    ) -> None:
+        """Create a runtime with the provided configuration.
 
         Each new runtime creates a new internal thread pool, so use sparingly.
+
+        Args:
+            telemetry: Telemetry configuration when not supplying
+                ``runtime_options``.
+            worker_heartbeat_interval: Interval for worker heartbeats. ``None``
+                disables heartbeating. Interval must be between 1s and 60s.
+
+        Raises:
+            ValueError: If both ```runtime_options`` is a negative value.
         """
-        self._core_runtime = temporalio.bridge.runtime.Runtime(
-            telemetry=telemetry._to_bridge_config()
+        if worker_heartbeat_interval is None:
+            heartbeat_millis = None
+        else:
+            if worker_heartbeat_interval <= timedelta(0):
+                raise ValueError("worker_heartbeat_interval must be positive")
+            heartbeat_millis = int(worker_heartbeat_interval.total_seconds() * 1000)
+
+        runtime_options = temporalio.bridge.runtime.RuntimeOptions(
+            telemetry=telemetry._to_bridge_config(),
+            worker_heartbeat_interval_millis=heartbeat_millis,
         )
+
+        self._core_runtime = temporalio.bridge.runtime.Runtime(options=runtime_options)
         if isinstance(telemetry.metrics, MetricBuffer):
             telemetry.metrics._runtime = self
         core_meter = temporalio.bridge.metric.MetricMeter.create(self._core_runtime)
@@ -112,17 +179,25 @@ class TelemetryFilter:
         """Return a formatted form of this filter."""
         # We intentionally aren't using __str__ or __format__ so they can keep
         # their original dataclass impls
-        return f"{self.other_level},temporal_sdk_core={self.core_level},temporal_client={self.core_level},temporal_sdk={self.core_level}"
+        targets = [
+            "temporalio_sdk_core",
+            "temporalio_client",
+            "temporalio_sdk",
+            "temporal_sdk_bridge",
+        ]
+        parts = [self.other_level]
+        parts.extend(f"{target}={self.core_level}" for target in targets)
+        return ",".join(parts)
 
 
 @dataclass(frozen=True)
 class LoggingConfig:
     """Configuration for runtime logging."""
 
-    filter: Union[TelemetryFilter, str]
+    filter: TelemetryFilter | str
     """Filter for logging. Can use :py:class:`TelemetryFilter` or raw string."""
 
-    forwarding: Optional[LogForwardingConfig] = None
+    forwarding: LogForwardingConfig | None = None
     """If present, Core logger messages will be forwarded to a Python logger.
     See the :py:class:`LogForwardingConfig` docs for more info.
     """
@@ -227,7 +302,7 @@ class LogForwardingConfig:
                 # We can't access logging module's start time and it's not worth
                 # doing difference math to get relative time right here, so
                 # we'll make time relative to _our_ module's start time
-                self.relativeCreated = (record.created - _module_start_time) * 1000
+                self.relativeCreated = (record.created - _module_start_time) * 1000  # type: ignore[reportUninitializedInstanceVariable]
             # Log the record
             self.logger.handle(record)
 
@@ -244,8 +319,8 @@ class OpenTelemetryConfig:
     """Configuration for OpenTelemetry collector."""
 
     url: str
-    headers: Optional[Mapping[str, str]] = None
-    metric_periodicity: Optional[timedelta] = None
+    headers: Mapping[str, str] | None = None
+    metric_periodicity: timedelta | None = None
     metric_temporality: OpenTelemetryMetricTemporality = (
         OpenTelemetryMetricTemporality.CUMULATIVE
     )
@@ -277,6 +352,7 @@ class PrometheusConfig:
     counters_total_suffix: bool = False
     unit_suffix: bool = False
     durations_as_seconds: bool = False
+    histogram_bucket_overrides: Mapping[str, Sequence[float]] | None = None
 
     def _to_bridge_config(self) -> temporalio.bridge.runtime.PrometheusConfig:
         return temporalio.bridge.runtime.PrometheusConfig(
@@ -284,6 +360,7 @@ class PrometheusConfig:
             counters_total_suffix=self.counters_total_suffix,
             unit_suffix=self.unit_suffix,
             durations_as_seconds=self.durations_as_seconds,
+            histogram_bucket_overrides=self.histogram_bucket_overrides,
         )
 
 
@@ -325,7 +402,7 @@ class MetricBuffer:
             duration_format: Which duration format to use.
         """
         self._buffer_size = buffer_size
-        self._runtime: Optional[Runtime] = None
+        self._runtime: Runtime | None = None
         self._durations_as_seconds = (
             duration_format == MetricBufferDurationFormat.SECONDS
         )
@@ -351,10 +428,10 @@ class MetricBuffer:
 class TelemetryConfig:
     """Configuration for Core telemetry."""
 
-    logging: Optional[LoggingConfig] = LoggingConfig.default
+    logging: LoggingConfig | None = LoggingConfig.default
     """Logging configuration."""
 
-    metrics: Optional[Union[OpenTelemetryConfig, PrometheusConfig, MetricBuffer]] = None
+    metrics: OpenTelemetryConfig | PrometheusConfig | MetricBuffer | None = None
     """Metrics configuration or buffer."""
 
     global_tags: Mapping[str, str] = field(default_factory=dict)
@@ -363,7 +440,7 @@ class TelemetryConfig:
     attach_service_name: bool = True
     """Whether to put the service_name on every metric."""
 
-    metric_prefix: Optional[str] = None
+    metric_prefix: str | None = None
     """Prefix to put on every Temporal metric. If unset, defaults to
     ``temporal_``."""
 
@@ -417,12 +494,12 @@ class BufferedMetric(Protocol):
         ...
 
     @property
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         """Get the description of the metric if any."""
         ...
 
     @property
-    def unit(self) -> Optional[str]:
+    def unit(self) -> str | None:
         """Get the unit of the metric if any."""
         ...
 
@@ -452,7 +529,7 @@ class BufferedMetricUpdate(Protocol):
         ...
 
     @property
-    def value(self) -> Union[int, float]:
+    def value(self) -> int | float:
         """Value for the update.
 
         For counters this is a delta, for gauges and histograms this is just the
@@ -485,7 +562,7 @@ class _MetricMeter(temporalio.common.MetricMeter):
         self._core_attrs = core_attrs
 
     def create_counter(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> temporalio.common.MetricCounter:
         return _MetricCounter(
             name,
@@ -498,7 +575,7 @@ class _MetricMeter(temporalio.common.MetricMeter):
         )
 
     def create_histogram(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> temporalio.common.MetricHistogram:
         return _MetricHistogram(
             name,
@@ -511,7 +588,7 @@ class _MetricMeter(temporalio.common.MetricMeter):
         )
 
     def create_histogram_float(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> temporalio.common.MetricHistogramFloat:
         return _MetricHistogramFloat(
             name,
@@ -524,7 +601,7 @@ class _MetricMeter(temporalio.common.MetricMeter):
         )
 
     def create_histogram_timedelta(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> temporalio.common.MetricHistogramTimedelta:
         return _MetricHistogramTimedelta(
             name,
@@ -537,7 +614,7 @@ class _MetricMeter(temporalio.common.MetricMeter):
         )
 
     def create_gauge(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> temporalio.common.MetricGauge:
         return _MetricGauge(
             name,
@@ -550,7 +627,7 @@ class _MetricMeter(temporalio.common.MetricMeter):
         )
 
     def create_gauge_float(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> temporalio.common.MetricGaugeFloat:
         return _MetricGaugeFloat(
             name,
@@ -578,8 +655,8 @@ class _MetricCommon(temporalio.common.MetricCommon, Generic[_CoreMetricType]):
     def __init__(
         self,
         name: str,
-        description: Optional[str],
-        unit: Optional[str],
+        description: str | None,
+        unit: str | None,
         core_metric: _CoreMetricType,
         core_attrs: temporalio.bridge.metric.MetricAttributes,
     ) -> None:
@@ -594,11 +671,11 @@ class _MetricCommon(temporalio.common.MetricCommon, Generic[_CoreMetricType]):
         return self._name
 
     @property
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         return self._description
 
     @property
-    def unit(self) -> Optional[str]:
+    def unit(self) -> str | None:
         return self._unit
 
     def with_additional_attributes(
@@ -620,7 +697,7 @@ class _MetricCounter(
     def add(
         self,
         value: int,
-        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+        additional_attributes: temporalio.common.MetricAttributes | None = None,
     ) -> None:
         if value < 0:
             raise ValueError("Metric value cannot be negative")
@@ -637,7 +714,7 @@ class _MetricHistogram(
     def record(
         self,
         value: int,
-        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+        additional_attributes: temporalio.common.MetricAttributes | None = None,
     ) -> None:
         if value < 0:
             raise ValueError("Metric value cannot be negative")
@@ -654,7 +731,7 @@ class _MetricHistogramFloat(
     def record(
         self,
         value: float,
-        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+        additional_attributes: temporalio.common.MetricAttributes | None = None,
     ) -> None:
         if value < 0:
             raise ValueError("Metric value cannot be negative")
@@ -671,7 +748,7 @@ class _MetricHistogramTimedelta(
     def record(
         self,
         value: timedelta,
-        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+        additional_attributes: temporalio.common.MetricAttributes | None = None,
     ) -> None:
         if value.days < 0:
             raise ValueError("Metric value cannot be negative")
@@ -692,7 +769,7 @@ class _MetricGauge(
     def set(
         self,
         value: int,
-        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+        additional_attributes: temporalio.common.MetricAttributes | None = None,
     ) -> None:
         if value < 0:
             raise ValueError("Metric value cannot be negative")
@@ -709,7 +786,7 @@ class _MetricGaugeFloat(
     def set(
         self,
         value: float,
-        additional_attributes: Optional[temporalio.common.MetricAttributes] = None,
+        additional_attributes: temporalio.common.MetricAttributes | None = None,
     ) -> None:
         if value < 0:
             raise ValueError("Metric value cannot be negative")

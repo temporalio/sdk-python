@@ -36,7 +36,7 @@ from temporalio.api.taskqueue.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n%temporal/api/command/v1/message.proto\x12\x17temporal.api.command.v1\x1a\x1egoogle/protobuf/duration.proto\x1a$temporal/api/enums/v1/workflow.proto\x1a(temporal/api/enums/v1/command_type.proto\x1a$temporal/api/common/v1/message.proto\x1a%temporal/api/failure/v1/message.proto\x1a\'temporal/api/taskqueue/v1/message.proto\x1a\'temporal/api/sdk/v1/user_metadata.proto"\x82\x05\n%ScheduleActivityTaskCommandAttributes\x12\x13\n\x0b\x61\x63tivity_id\x18\x01 \x01(\t\x12;\n\ractivity_type\x18\x02 \x01(\x0b\x32$.temporal.api.common.v1.ActivityType\x12\x38\n\ntask_queue\x18\x04 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12.\n\x06header\x18\x05 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12/\n\x05input\x18\x06 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12<\n\x19schedule_to_close_timeout\x18\x07 \x01(\x0b\x32\x19.google.protobuf.Duration\x12<\n\x19schedule_to_start_timeout\x18\x08 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x16start_to_close_timeout\x18\t \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x34\n\x11heartbeat_timeout\x18\n \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x0cretry_policy\x18\x0b \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy\x12\x1f\n\x17request_eager_execution\x18\x0c \x01(\x08\x12\x1d\n\x15use_workflow_build_id\x18\r \x01(\x08J\x04\x08\x03\x10\x04"H\n*RequestCancelActivityTaskCommandAttributes\x12\x1a\n\x12scheduled_event_id\x18\x01 \x01(\x03"i\n\x1bStartTimerCommandAttributes\x12\x10\n\x08timer_id\x18\x01 \x01(\t\x12\x38\n\x15start_to_fire_timeout\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration"^\n*CompleteWorkflowExecutionCommandAttributes\x12\x30\n\x06result\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"[\n&FailWorkflowExecutionCommandAttributes\x12\x31\n\x07\x66\x61ilure\x18\x01 \x01(\x0b\x32 .temporal.api.failure.v1.Failure"0\n\x1c\x43\x61ncelTimerCommandAttributes\x12\x10\n\x08timer_id\x18\x01 \x01(\t"]\n(CancelWorkflowExecutionCommandAttributes\x12\x31\n\x07\x64\x65tails\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"\xaf\x01\n7RequestCancelExternalWorkflowExecutionCommandAttributes\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t\x12\x0f\n\x07\x63ontrol\x18\x04 \x01(\t\x12\x1b\n\x13\x63hild_workflow_only\x18\x05 \x01(\x08\x12\x0e\n\x06reason\x18\x06 \x01(\t"\xa7\x02\n0SignalExternalWorkflowExecutionCommandAttributes\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x13\n\x0bsignal_name\x18\x03 \x01(\t\x12/\n\x05input\x18\x04 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x0f\n\x07\x63ontrol\x18\x05 \x01(\t\x12\x1b\n\x13\x63hild_workflow_only\x18\x06 \x01(\x08\x12.\n\x06header\x18\x07 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header"v\n/UpsertWorkflowSearchAttributesCommandAttributes\x12\x43\n\x11search_attributes\x18\x01 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes"`\n)ModifyWorkflowPropertiesCommandAttributes\x12\x33\n\rupserted_memo\x18\x01 \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo"\xbf\x02\n\x1dRecordMarkerCommandAttributes\x12\x13\n\x0bmarker_name\x18\x01 \x01(\t\x12T\n\x07\x64\x65tails\x18\x02 \x03(\x0b\x32\x43.temporal.api.command.v1.RecordMarkerCommandAttributes.DetailsEntry\x12.\n\x06header\x18\x03 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x31\n\x07\x66\x61ilure\x18\x04 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x1aP\n\x0c\x44\x65tailsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12/\n\x05value\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads:\x02\x38\x01"\xcb\x06\n/ContinueAsNewWorkflowExecutionCommandAttributes\x12;\n\rworkflow_type\x18\x01 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12\x38\n\ntask_queue\x18\x02 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12/\n\x05input\x18\x03 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x37\n\x14workflow_run_timeout\x18\x04 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x38\n\x15workflow_task_timeout\x18\x05 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x16\x62\x61\x63koff_start_interval\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x0cretry_policy\x18\x07 \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy\x12@\n\tinitiator\x18\x08 \x01(\x0e\x32-.temporal.api.enums.v1.ContinueAsNewInitiator\x12\x31\n\x07\x66\x61ilure\x18\t \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12@\n\x16last_completion_result\x18\n \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x15\n\rcron_schedule\x18\x0b \x01(\t\x12.\n\x06header\x18\x0c \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12*\n\x04memo\x18\r \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x0e \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12\x18\n\x10inherit_build_id\x18\x0f \x01(\x08"\xe5\x06\n,StartChildWorkflowExecutionCommandAttributes\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12\x38\n\ntask_queue\x18\x04 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12/\n\x05input\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12=\n\x1aworkflow_execution_timeout\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x37\n\x14workflow_run_timeout\x18\x07 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x38\n\x15workflow_task_timeout\x18\x08 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x45\n\x13parent_close_policy\x18\t \x01(\x0e\x32(.temporal.api.enums.v1.ParentClosePolicy\x12\x0f\n\x07\x63ontrol\x18\n \x01(\t\x12N\n\x18workflow_id_reuse_policy\x18\x0b \x01(\x0e\x32,.temporal.api.enums.v1.WorkflowIdReusePolicy\x12\x39\n\x0cretry_policy\x18\x0c \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy\x12\x15\n\rcron_schedule\x18\r \x01(\t\x12.\n\x06header\x18\x0e \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12*\n\x04memo\x18\x0f \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x10 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12\x18\n\x10inherit_build_id\x18\x11 \x01(\x08"6\n ProtocolMessageCommandAttributes\x12\x12\n\nmessage_id\x18\x01 \x01(\t"\xea\x02\n\'ScheduleNexusOperationCommandAttributes\x12\x10\n\x08\x65ndpoint\x18\x01 \x01(\t\x12\x0f\n\x07service\x18\x02 \x01(\t\x12\x11\n\toperation\x18\x03 \x01(\t\x12.\n\x05input\x18\x04 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12<\n\x19schedule_to_close_timeout\x18\x05 \x01(\x0b\x32\x19.google.protobuf.Duration\x12g\n\x0cnexus_header\x18\x06 \x03(\x0b\x32Q.temporal.api.command.v1.ScheduleNexusOperationCommandAttributes.NexusHeaderEntry\x1a\x32\n\x10NexusHeaderEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"J\n,RequestCancelNexusOperationCommandAttributes\x12\x1a\n\x12scheduled_event_id\x18\x01 \x01(\x03"\xc2\x11\n\x07\x43ommand\x12\x38\n\x0c\x63ommand_type\x18\x01 \x01(\x0e\x32".temporal.api.enums.v1.CommandType\x12\x39\n\ruser_metadata\x18\xad\x02 \x01(\x0b\x32!.temporal.api.sdk.v1.UserMetadata\x12s\n)schedule_activity_task_command_attributes\x18\x02 \x01(\x0b\x32>.temporal.api.command.v1.ScheduleActivityTaskCommandAttributesH\x00\x12^\n\x1estart_timer_command_attributes\x18\x03 \x01(\x0b\x32\x34.temporal.api.command.v1.StartTimerCommandAttributesH\x00\x12}\n.complete_workflow_execution_command_attributes\x18\x04 \x01(\x0b\x32\x43.temporal.api.command.v1.CompleteWorkflowExecutionCommandAttributesH\x00\x12u\n*fail_workflow_execution_command_attributes\x18\x05 \x01(\x0b\x32?.temporal.api.command.v1.FailWorkflowExecutionCommandAttributesH\x00\x12~\n/request_cancel_activity_task_command_attributes\x18\x06 \x01(\x0b\x32\x43.temporal.api.command.v1.RequestCancelActivityTaskCommandAttributesH\x00\x12`\n\x1f\x63\x61ncel_timer_command_attributes\x18\x07 \x01(\x0b\x32\x35.temporal.api.command.v1.CancelTimerCommandAttributesH\x00\x12y\n,cancel_workflow_execution_command_attributes\x18\x08 \x01(\x0b\x32\x41.temporal.api.command.v1.CancelWorkflowExecutionCommandAttributesH\x00\x12\x99\x01\n=request_cancel_external_workflow_execution_command_attributes\x18\t \x01(\x0b\x32P.temporal.api.command.v1.RequestCancelExternalWorkflowExecutionCommandAttributesH\x00\x12\x62\n record_marker_command_attributes\x18\n \x01(\x0b\x32\x36.temporal.api.command.v1.RecordMarkerCommandAttributesH\x00\x12\x89\x01\n5continue_as_new_workflow_execution_command_attributes\x18\x0b \x01(\x0b\x32H.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributesH\x00\x12\x82\x01\n1start_child_workflow_execution_command_attributes\x18\x0c \x01(\x0b\x32\x45.temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributesH\x00\x12\x8a\x01\n5signal_external_workflow_execution_command_attributes\x18\r \x01(\x0b\x32I.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributesH\x00\x12\x88\x01\n4upsert_workflow_search_attributes_command_attributes\x18\x0e \x01(\x0b\x32H.temporal.api.command.v1.UpsertWorkflowSearchAttributesCommandAttributesH\x00\x12h\n#protocol_message_command_attributes\x18\x0f \x01(\x0b\x32\x39.temporal.api.command.v1.ProtocolMessageCommandAttributesH\x00\x12{\n-modify_workflow_properties_command_attributes\x18\x11 \x01(\x0b\x32\x42.temporal.api.command.v1.ModifyWorkflowPropertiesCommandAttributesH\x00\x12w\n+schedule_nexus_operation_command_attributes\x18\x12 \x01(\x0b\x32@.temporal.api.command.v1.ScheduleNexusOperationCommandAttributesH\x00\x12\x82\x01\n1request_cancel_nexus_operation_command_attributes\x18\x13 \x01(\x0b\x32\x45.temporal.api.command.v1.RequestCancelNexusOperationCommandAttributesH\x00\x42\x0c\n\nattributesB\x8e\x01\n\x1aio.temporal.api.command.v1B\x0cMessageProtoP\x01Z%go.temporal.io/api/command/v1;command\xaa\x02\x19Temporalio.Api.Command.V1\xea\x02\x1cTemporalio::Api::Command::V1b\x06proto3'
+    b'\n%temporal/api/command/v1/message.proto\x12\x17temporal.api.command.v1\x1a\x1egoogle/protobuf/duration.proto\x1a$temporal/api/enums/v1/workflow.proto\x1a(temporal/api/enums/v1/command_type.proto\x1a$temporal/api/common/v1/message.proto\x1a%temporal/api/failure/v1/message.proto\x1a\'temporal/api/taskqueue/v1/message.proto\x1a\'temporal/api/sdk/v1/user_metadata.proto"\xb6\x05\n%ScheduleActivityTaskCommandAttributes\x12\x13\n\x0b\x61\x63tivity_id\x18\x01 \x01(\t\x12;\n\ractivity_type\x18\x02 \x01(\x0b\x32$.temporal.api.common.v1.ActivityType\x12\x38\n\ntask_queue\x18\x04 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12.\n\x06header\x18\x05 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12/\n\x05input\x18\x06 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12<\n\x19schedule_to_close_timeout\x18\x07 \x01(\x0b\x32\x19.google.protobuf.Duration\x12<\n\x19schedule_to_start_timeout\x18\x08 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x16start_to_close_timeout\x18\t \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x34\n\x11heartbeat_timeout\x18\n \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x0cretry_policy\x18\x0b \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy\x12\x1f\n\x17request_eager_execution\x18\x0c \x01(\x08\x12\x1d\n\x15use_workflow_build_id\x18\r \x01(\x08\x12\x32\n\x08priority\x18\x0e \x01(\x0b\x32 .temporal.api.common.v1.PriorityJ\x04\x08\x03\x10\x04"H\n*RequestCancelActivityTaskCommandAttributes\x12\x1a\n\x12scheduled_event_id\x18\x01 \x01(\x03"i\n\x1bStartTimerCommandAttributes\x12\x10\n\x08timer_id\x18\x01 \x01(\t\x12\x38\n\x15start_to_fire_timeout\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration"^\n*CompleteWorkflowExecutionCommandAttributes\x12\x30\n\x06result\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"[\n&FailWorkflowExecutionCommandAttributes\x12\x31\n\x07\x66\x61ilure\x18\x01 \x01(\x0b\x32 .temporal.api.failure.v1.Failure"0\n\x1c\x43\x61ncelTimerCommandAttributes\x12\x10\n\x08timer_id\x18\x01 \x01(\t"]\n(CancelWorkflowExecutionCommandAttributes\x12\x31\n\x07\x64\x65tails\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"\xb3\x01\n7RequestCancelExternalWorkflowExecutionCommandAttributes\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t\x12\x13\n\x07\x63ontrol\x18\x04 \x01(\tB\x02\x18\x01\x12\x1b\n\x13\x63hild_workflow_only\x18\x05 \x01(\x08\x12\x0e\n\x06reason\x18\x06 \x01(\t"\xab\x02\n0SignalExternalWorkflowExecutionCommandAttributes\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12<\n\texecution\x18\x02 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x13\n\x0bsignal_name\x18\x03 \x01(\t\x12/\n\x05input\x18\x04 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x13\n\x07\x63ontrol\x18\x05 \x01(\tB\x02\x18\x01\x12\x1b\n\x13\x63hild_workflow_only\x18\x06 \x01(\x08\x12.\n\x06header\x18\x07 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header"v\n/UpsertWorkflowSearchAttributesCommandAttributes\x12\x43\n\x11search_attributes\x18\x01 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes"`\n)ModifyWorkflowPropertiesCommandAttributes\x12\x33\n\rupserted_memo\x18\x01 \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo"\xbf\x02\n\x1dRecordMarkerCommandAttributes\x12\x13\n\x0bmarker_name\x18\x01 \x01(\t\x12T\n\x07\x64\x65tails\x18\x02 \x03(\x0b\x32\x43.temporal.api.command.v1.RecordMarkerCommandAttributes.DetailsEntry\x12.\n\x06header\x18\x03 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x31\n\x07\x66\x61ilure\x18\x04 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x1aP\n\x0c\x44\x65tailsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12/\n\x05value\x18\x02 \x01(\x0b\x32 .temporal.api.common.v1.Payloads:\x02\x38\x01"\xac\x07\n/ContinueAsNewWorkflowExecutionCommandAttributes\x12;\n\rworkflow_type\x18\x01 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12\x38\n\ntask_queue\x18\x02 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12/\n\x05input\x18\x03 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x37\n\x14workflow_run_timeout\x18\x04 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x38\n\x15workflow_task_timeout\x18\x05 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x16\x62\x61\x63koff_start_interval\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x39\n\x0cretry_policy\x18\x07 \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy\x12@\n\tinitiator\x18\x08 \x01(\x0e\x32-.temporal.api.enums.v1.ContinueAsNewInitiator\x12\x31\n\x07\x66\x61ilure\x18\t \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12@\n\x16last_completion_result\x18\n \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12\x15\n\rcron_schedule\x18\x0b \x01(\t\x12.\n\x06header\x18\x0c \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12*\n\x04memo\x18\r \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x0e \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12\x1c\n\x10inherit_build_id\x18\x0f \x01(\x08\x42\x02\x18\x01\x12[\n\x1binitial_versioning_behavior\x18\x10 \x01(\x0e\x32\x36.temporal.api.enums.v1.ContinueAsNewVersioningBehavior"\x9d\x07\n,StartChildWorkflowExecutionCommandAttributes\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12;\n\rworkflow_type\x18\x03 \x01(\x0b\x32$.temporal.api.common.v1.WorkflowType\x12\x38\n\ntask_queue\x18\x04 \x01(\x0b\x32$.temporal.api.taskqueue.v1.TaskQueue\x12/\n\x05input\x18\x05 \x01(\x0b\x32 .temporal.api.common.v1.Payloads\x12=\n\x1aworkflow_execution_timeout\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x37\n\x14workflow_run_timeout\x18\x07 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x38\n\x15workflow_task_timeout\x18\x08 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x45\n\x13parent_close_policy\x18\t \x01(\x0e\x32(.temporal.api.enums.v1.ParentClosePolicy\x12\x0f\n\x07\x63ontrol\x18\n \x01(\t\x12N\n\x18workflow_id_reuse_policy\x18\x0b \x01(\x0e\x32,.temporal.api.enums.v1.WorkflowIdReusePolicy\x12\x39\n\x0cretry_policy\x18\x0c \x01(\x0b\x32#.temporal.api.common.v1.RetryPolicy\x12\x15\n\rcron_schedule\x18\r \x01(\t\x12.\n\x06header\x18\x0e \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12*\n\x04memo\x18\x0f \x01(\x0b\x32\x1c.temporal.api.common.v1.Memo\x12\x43\n\x11search_attributes\x18\x10 \x01(\x0b\x32(.temporal.api.common.v1.SearchAttributes\x12\x1c\n\x10inherit_build_id\x18\x11 \x01(\x08\x42\x02\x18\x01\x12\x32\n\x08priority\x18\x12 \x01(\x0b\x32 .temporal.api.common.v1.Priority"6\n ProtocolMessageCommandAttributes\x12\x12\n\nmessage_id\x18\x01 \x01(\t"\xea\x02\n\'ScheduleNexusOperationCommandAttributes\x12\x10\n\x08\x65ndpoint\x18\x01 \x01(\t\x12\x0f\n\x07service\x18\x02 \x01(\t\x12\x11\n\toperation\x18\x03 \x01(\t\x12.\n\x05input\x18\x04 \x01(\x0b\x32\x1f.temporal.api.common.v1.Payload\x12<\n\x19schedule_to_close_timeout\x18\x05 \x01(\x0b\x32\x19.google.protobuf.Duration\x12g\n\x0cnexus_header\x18\x06 \x03(\x0b\x32Q.temporal.api.command.v1.ScheduleNexusOperationCommandAttributes.NexusHeaderEntry\x1a\x32\n\x10NexusHeaderEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"J\n,RequestCancelNexusOperationCommandAttributes\x12\x1a\n\x12scheduled_event_id\x18\x01 \x01(\x03"\xc2\x11\n\x07\x43ommand\x12\x38\n\x0c\x63ommand_type\x18\x01 \x01(\x0e\x32".temporal.api.enums.v1.CommandType\x12\x39\n\ruser_metadata\x18\xad\x02 \x01(\x0b\x32!.temporal.api.sdk.v1.UserMetadata\x12s\n)schedule_activity_task_command_attributes\x18\x02 \x01(\x0b\x32>.temporal.api.command.v1.ScheduleActivityTaskCommandAttributesH\x00\x12^\n\x1estart_timer_command_attributes\x18\x03 \x01(\x0b\x32\x34.temporal.api.command.v1.StartTimerCommandAttributesH\x00\x12}\n.complete_workflow_execution_command_attributes\x18\x04 \x01(\x0b\x32\x43.temporal.api.command.v1.CompleteWorkflowExecutionCommandAttributesH\x00\x12u\n*fail_workflow_execution_command_attributes\x18\x05 \x01(\x0b\x32?.temporal.api.command.v1.FailWorkflowExecutionCommandAttributesH\x00\x12~\n/request_cancel_activity_task_command_attributes\x18\x06 \x01(\x0b\x32\x43.temporal.api.command.v1.RequestCancelActivityTaskCommandAttributesH\x00\x12`\n\x1f\x63\x61ncel_timer_command_attributes\x18\x07 \x01(\x0b\x32\x35.temporal.api.command.v1.CancelTimerCommandAttributesH\x00\x12y\n,cancel_workflow_execution_command_attributes\x18\x08 \x01(\x0b\x32\x41.temporal.api.command.v1.CancelWorkflowExecutionCommandAttributesH\x00\x12\x99\x01\n=request_cancel_external_workflow_execution_command_attributes\x18\t \x01(\x0b\x32P.temporal.api.command.v1.RequestCancelExternalWorkflowExecutionCommandAttributesH\x00\x12\x62\n record_marker_command_attributes\x18\n \x01(\x0b\x32\x36.temporal.api.command.v1.RecordMarkerCommandAttributesH\x00\x12\x89\x01\n5continue_as_new_workflow_execution_command_attributes\x18\x0b \x01(\x0b\x32H.temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributesH\x00\x12\x82\x01\n1start_child_workflow_execution_command_attributes\x18\x0c \x01(\x0b\x32\x45.temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributesH\x00\x12\x8a\x01\n5signal_external_workflow_execution_command_attributes\x18\r \x01(\x0b\x32I.temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributesH\x00\x12\x88\x01\n4upsert_workflow_search_attributes_command_attributes\x18\x0e \x01(\x0b\x32H.temporal.api.command.v1.UpsertWorkflowSearchAttributesCommandAttributesH\x00\x12h\n#protocol_message_command_attributes\x18\x0f \x01(\x0b\x32\x39.temporal.api.command.v1.ProtocolMessageCommandAttributesH\x00\x12{\n-modify_workflow_properties_command_attributes\x18\x11 \x01(\x0b\x32\x42.temporal.api.command.v1.ModifyWorkflowPropertiesCommandAttributesH\x00\x12w\n+schedule_nexus_operation_command_attributes\x18\x12 \x01(\x0b\x32@.temporal.api.command.v1.ScheduleNexusOperationCommandAttributesH\x00\x12\x82\x01\n1request_cancel_nexus_operation_command_attributes\x18\x13 \x01(\x0b\x32\x45.temporal.api.command.v1.RequestCancelNexusOperationCommandAttributesH\x00\x42\x0c\n\nattributesB\x8e\x01\n\x1aio.temporal.api.command.v1B\x0cMessageProtoP\x01Z%go.temporal.io/api/command/v1;command\xaa\x02\x19Temporalio.Api.Command.V1\xea\x02\x1cTemporalio::Api::Command::V1b\x06proto3'
 )
 
 
@@ -105,7 +105,7 @@ ScheduleActivityTaskCommandAttributes = _reflection.GeneratedProtocolMessageType
     (_message.Message,),
     {
         "DESCRIPTOR": _SCHEDULEACTIVITYTASKCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.ScheduleActivityTaskCommandAttributes)
     },
 )
@@ -116,7 +116,7 @@ RequestCancelActivityTaskCommandAttributes = _reflection.GeneratedProtocolMessag
     (_message.Message,),
     {
         "DESCRIPTOR": _REQUESTCANCELACTIVITYTASKCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.RequestCancelActivityTaskCommandAttributes)
     },
 )
@@ -127,7 +127,7 @@ StartTimerCommandAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _STARTTIMERCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.StartTimerCommandAttributes)
     },
 )
@@ -138,7 +138,7 @@ CompleteWorkflowExecutionCommandAttributes = _reflection.GeneratedProtocolMessag
     (_message.Message,),
     {
         "DESCRIPTOR": _COMPLETEWORKFLOWEXECUTIONCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.CompleteWorkflowExecutionCommandAttributes)
     },
 )
@@ -149,7 +149,7 @@ FailWorkflowExecutionCommandAttributes = _reflection.GeneratedProtocolMessageTyp
     (_message.Message,),
     {
         "DESCRIPTOR": _FAILWORKFLOWEXECUTIONCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.FailWorkflowExecutionCommandAttributes)
     },
 )
@@ -160,7 +160,7 @@ CancelTimerCommandAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CANCELTIMERCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.CancelTimerCommandAttributes)
     },
 )
@@ -171,7 +171,7 @@ CancelWorkflowExecutionCommandAttributes = _reflection.GeneratedProtocolMessageT
     (_message.Message,),
     {
         "DESCRIPTOR": _CANCELWORKFLOWEXECUTIONCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.CancelWorkflowExecutionCommandAttributes)
     },
 )
@@ -183,7 +183,7 @@ RequestCancelExternalWorkflowExecutionCommandAttributes = (
         (_message.Message,),
         {
             "DESCRIPTOR": _REQUESTCANCELEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES,
-            "__module__": "temporal.api.command.v1.message_pb2",
+            "__module__": "temporalio.api.command.v1.message_pb2",
             # @@protoc_insertion_point(class_scope:temporal.api.command.v1.RequestCancelExternalWorkflowExecutionCommandAttributes)
         },
     )
@@ -196,7 +196,7 @@ SignalExternalWorkflowExecutionCommandAttributes = (
         (_message.Message,),
         {
             "DESCRIPTOR": _SIGNALEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES,
-            "__module__": "temporal.api.command.v1.message_pb2",
+            "__module__": "temporalio.api.command.v1.message_pb2",
             # @@protoc_insertion_point(class_scope:temporal.api.command.v1.SignalExternalWorkflowExecutionCommandAttributes)
         },
     )
@@ -209,7 +209,7 @@ UpsertWorkflowSearchAttributesCommandAttributes = (
         (_message.Message,),
         {
             "DESCRIPTOR": _UPSERTWORKFLOWSEARCHATTRIBUTESCOMMANDATTRIBUTES,
-            "__module__": "temporal.api.command.v1.message_pb2",
+            "__module__": "temporalio.api.command.v1.message_pb2",
             # @@protoc_insertion_point(class_scope:temporal.api.command.v1.UpsertWorkflowSearchAttributesCommandAttributes)
         },
     )
@@ -221,7 +221,7 @@ ModifyWorkflowPropertiesCommandAttributes = _reflection.GeneratedProtocolMessage
     (_message.Message,),
     {
         "DESCRIPTOR": _MODIFYWORKFLOWPROPERTIESCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.ModifyWorkflowPropertiesCommandAttributes)
     },
 )
@@ -236,12 +236,12 @@ RecordMarkerCommandAttributes = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _RECORDMARKERCOMMANDATTRIBUTES_DETAILSENTRY,
-                "__module__": "temporal.api.command.v1.message_pb2",
+                "__module__": "temporalio.api.command.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.command.v1.RecordMarkerCommandAttributes.DetailsEntry)
             },
         ),
         "DESCRIPTOR": _RECORDMARKERCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.RecordMarkerCommandAttributes)
     },
 )
@@ -254,7 +254,7 @@ ContinueAsNewWorkflowExecutionCommandAttributes = (
         (_message.Message,),
         {
             "DESCRIPTOR": _CONTINUEASNEWWORKFLOWEXECUTIONCOMMANDATTRIBUTES,
-            "__module__": "temporal.api.command.v1.message_pb2",
+            "__module__": "temporalio.api.command.v1.message_pb2",
             # @@protoc_insertion_point(class_scope:temporal.api.command.v1.ContinueAsNewWorkflowExecutionCommandAttributes)
         },
     )
@@ -266,7 +266,7 @@ StartChildWorkflowExecutionCommandAttributes = _reflection.GeneratedProtocolMess
     (_message.Message,),
     {
         "DESCRIPTOR": _STARTCHILDWORKFLOWEXECUTIONCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.StartChildWorkflowExecutionCommandAttributes)
     },
 )
@@ -277,7 +277,7 @@ ProtocolMessageCommandAttributes = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PROTOCOLMESSAGECOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.ProtocolMessageCommandAttributes)
     },
 )
@@ -292,12 +292,12 @@ ScheduleNexusOperationCommandAttributes = _reflection.GeneratedProtocolMessageTy
             (_message.Message,),
             {
                 "DESCRIPTOR": _SCHEDULENEXUSOPERATIONCOMMANDATTRIBUTES_NEXUSHEADERENTRY,
-                "__module__": "temporal.api.command.v1.message_pb2",
+                "__module__": "temporalio.api.command.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.command.v1.ScheduleNexusOperationCommandAttributes.NexusHeaderEntry)
             },
         ),
         "DESCRIPTOR": _SCHEDULENEXUSOPERATIONCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.ScheduleNexusOperationCommandAttributes)
     },
 )
@@ -309,7 +309,7 @@ RequestCancelNexusOperationCommandAttributes = _reflection.GeneratedProtocolMess
     (_message.Message,),
     {
         "DESCRIPTOR": _REQUESTCANCELNEXUSOPERATIONCOMMANDATTRIBUTES,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.RequestCancelNexusOperationCommandAttributes)
     },
 )
@@ -320,7 +320,7 @@ Command = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _COMMAND,
-        "__module__": "temporal.api.command.v1.message_pb2",
+        "__module__": "temporalio.api.command.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.command.v1.Command)
     },
 )
@@ -329,50 +329,74 @@ _sym_db.RegisterMessage(Command)
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\032io.temporal.api.command.v1B\014MessageProtoP\001Z%go.temporal.io/api/command/v1;command\252\002\031Temporalio.Api.Command.V1\352\002\034Temporalio::Api::Command::V1"
+    _REQUESTCANCELEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES.fields_by_name[
+        "control"
+    ]._options = None
+    _REQUESTCANCELEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES.fields_by_name[
+        "control"
+    ]._serialized_options = b"\030\001"
+    _SIGNALEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES.fields_by_name[
+        "control"
+    ]._options = None
+    _SIGNALEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES.fields_by_name[
+        "control"
+    ]._serialized_options = b"\030\001"
     _RECORDMARKERCOMMANDATTRIBUTES_DETAILSENTRY._options = None
     _RECORDMARKERCOMMANDATTRIBUTES_DETAILSENTRY._serialized_options = b"8\001"
+    _CONTINUEASNEWWORKFLOWEXECUTIONCOMMANDATTRIBUTES.fields_by_name[
+        "inherit_build_id"
+    ]._options = None
+    _CONTINUEASNEWWORKFLOWEXECUTIONCOMMANDATTRIBUTES.fields_by_name[
+        "inherit_build_id"
+    ]._serialized_options = b"\030\001"
+    _STARTCHILDWORKFLOWEXECUTIONCOMMANDATTRIBUTES.fields_by_name[
+        "inherit_build_id"
+    ]._options = None
+    _STARTCHILDWORKFLOWEXECUTIONCOMMANDATTRIBUTES.fields_by_name[
+        "inherit_build_id"
+    ]._serialized_options = b"\030\001"
     _SCHEDULENEXUSOPERATIONCOMMANDATTRIBUTES_NEXUSHEADERENTRY._options = None
     _SCHEDULENEXUSOPERATIONCOMMANDATTRIBUTES_NEXUSHEADERENTRY._serialized_options = (
         b"8\001"
     )
     _SCHEDULEACTIVITYTASKCOMMANDATTRIBUTES._serialized_start = 338
-    _SCHEDULEACTIVITYTASKCOMMANDATTRIBUTES._serialized_end = 980
-    _REQUESTCANCELACTIVITYTASKCOMMANDATTRIBUTES._serialized_start = 982
-    _REQUESTCANCELACTIVITYTASKCOMMANDATTRIBUTES._serialized_end = 1054
-    _STARTTIMERCOMMANDATTRIBUTES._serialized_start = 1056
-    _STARTTIMERCOMMANDATTRIBUTES._serialized_end = 1161
-    _COMPLETEWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_start = 1163
-    _COMPLETEWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_end = 1257
-    _FAILWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_start = 1259
-    _FAILWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_end = 1350
-    _CANCELTIMERCOMMANDATTRIBUTES._serialized_start = 1352
-    _CANCELTIMERCOMMANDATTRIBUTES._serialized_end = 1400
-    _CANCELWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_start = 1402
-    _CANCELWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_end = 1495
-    _REQUESTCANCELEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_start = 1498
-    _REQUESTCANCELEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_end = 1673
-    _SIGNALEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_start = 1676
-    _SIGNALEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_end = 1971
-    _UPSERTWORKFLOWSEARCHATTRIBUTESCOMMANDATTRIBUTES._serialized_start = 1973
-    _UPSERTWORKFLOWSEARCHATTRIBUTESCOMMANDATTRIBUTES._serialized_end = 2091
-    _MODIFYWORKFLOWPROPERTIESCOMMANDATTRIBUTES._serialized_start = 2093
-    _MODIFYWORKFLOWPROPERTIESCOMMANDATTRIBUTES._serialized_end = 2189
-    _RECORDMARKERCOMMANDATTRIBUTES._serialized_start = 2192
-    _RECORDMARKERCOMMANDATTRIBUTES._serialized_end = 2511
-    _RECORDMARKERCOMMANDATTRIBUTES_DETAILSENTRY._serialized_start = 2431
-    _RECORDMARKERCOMMANDATTRIBUTES_DETAILSENTRY._serialized_end = 2511
-    _CONTINUEASNEWWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_start = 2514
-    _CONTINUEASNEWWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_end = 3357
-    _STARTCHILDWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_start = 3360
-    _STARTCHILDWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_end = 4229
-    _PROTOCOLMESSAGECOMMANDATTRIBUTES._serialized_start = 4231
-    _PROTOCOLMESSAGECOMMANDATTRIBUTES._serialized_end = 4285
-    _SCHEDULENEXUSOPERATIONCOMMANDATTRIBUTES._serialized_start = 4288
-    _SCHEDULENEXUSOPERATIONCOMMANDATTRIBUTES._serialized_end = 4650
-    _SCHEDULENEXUSOPERATIONCOMMANDATTRIBUTES_NEXUSHEADERENTRY._serialized_start = 4600
-    _SCHEDULENEXUSOPERATIONCOMMANDATTRIBUTES_NEXUSHEADERENTRY._serialized_end = 4650
-    _REQUESTCANCELNEXUSOPERATIONCOMMANDATTRIBUTES._serialized_start = 4652
-    _REQUESTCANCELNEXUSOPERATIONCOMMANDATTRIBUTES._serialized_end = 4726
-    _COMMAND._serialized_start = 4729
-    _COMMAND._serialized_end = 6971
+    _SCHEDULEACTIVITYTASKCOMMANDATTRIBUTES._serialized_end = 1032
+    _REQUESTCANCELACTIVITYTASKCOMMANDATTRIBUTES._serialized_start = 1034
+    _REQUESTCANCELACTIVITYTASKCOMMANDATTRIBUTES._serialized_end = 1106
+    _STARTTIMERCOMMANDATTRIBUTES._serialized_start = 1108
+    _STARTTIMERCOMMANDATTRIBUTES._serialized_end = 1213
+    _COMPLETEWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_start = 1215
+    _COMPLETEWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_end = 1309
+    _FAILWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_start = 1311
+    _FAILWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_end = 1402
+    _CANCELTIMERCOMMANDATTRIBUTES._serialized_start = 1404
+    _CANCELTIMERCOMMANDATTRIBUTES._serialized_end = 1452
+    _CANCELWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_start = 1454
+    _CANCELWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_end = 1547
+    _REQUESTCANCELEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_start = 1550
+    _REQUESTCANCELEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_end = 1729
+    _SIGNALEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_start = 1732
+    _SIGNALEXTERNALWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_end = 2031
+    _UPSERTWORKFLOWSEARCHATTRIBUTESCOMMANDATTRIBUTES._serialized_start = 2033
+    _UPSERTWORKFLOWSEARCHATTRIBUTESCOMMANDATTRIBUTES._serialized_end = 2151
+    _MODIFYWORKFLOWPROPERTIESCOMMANDATTRIBUTES._serialized_start = 2153
+    _MODIFYWORKFLOWPROPERTIESCOMMANDATTRIBUTES._serialized_end = 2249
+    _RECORDMARKERCOMMANDATTRIBUTES._serialized_start = 2252
+    _RECORDMARKERCOMMANDATTRIBUTES._serialized_end = 2571
+    _RECORDMARKERCOMMANDATTRIBUTES_DETAILSENTRY._serialized_start = 2491
+    _RECORDMARKERCOMMANDATTRIBUTES_DETAILSENTRY._serialized_end = 2571
+    _CONTINUEASNEWWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_start = 2574
+    _CONTINUEASNEWWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_end = 3514
+    _STARTCHILDWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_start = 3517
+    _STARTCHILDWORKFLOWEXECUTIONCOMMANDATTRIBUTES._serialized_end = 4442
+    _PROTOCOLMESSAGECOMMANDATTRIBUTES._serialized_start = 4444
+    _PROTOCOLMESSAGECOMMANDATTRIBUTES._serialized_end = 4498
+    _SCHEDULENEXUSOPERATIONCOMMANDATTRIBUTES._serialized_start = 4501
+    _SCHEDULENEXUSOPERATIONCOMMANDATTRIBUTES._serialized_end = 4863
+    _SCHEDULENEXUSOPERATIONCOMMANDATTRIBUTES_NEXUSHEADERENTRY._serialized_start = 4813
+    _SCHEDULENEXUSOPERATIONCOMMANDATTRIBUTES_NEXUSHEADERENTRY._serialized_end = 4863
+    _REQUESTCANCELNEXUSOPERATIONCOMMANDATTRIBUTES._serialized_start = 4865
+    _REQUESTCANCELNEXUSOPERATIONCOMMANDATTRIBUTES._serialized_end = 4939
+    _COMMAND._serialized_start = 4942
+    _COMMAND._serialized_end = 7184
 # @@protoc_insertion_point(module_scope)

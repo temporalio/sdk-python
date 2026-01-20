@@ -1,11 +1,11 @@
 """Common Temporal exceptions."""
 
 import asyncio
+from collections.abc import Sequence
 from datetime import timedelta
 from enum import IntEnum
-from typing import Any, Optional, Sequence, Tuple
+from typing import Any
 
-import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.failure.v1
 
@@ -14,7 +14,7 @@ class TemporalError(Exception):
     """Base for all Temporal exceptions."""
 
     @property
-    def cause(self) -> Optional[BaseException]:
+    def cause(self) -> BaseException | None:
         """Cause of the exception.
 
         This is the same as ``Exception.__cause__``.
@@ -29,8 +29,8 @@ class FailureError(TemporalError):
         self,
         message: str,
         *,
-        failure: Optional[temporalio.api.failure.v1.Failure] = None,
-        exc_args: Optional[Tuple] = None,
+        failure: temporalio.api.failure.v1.Failure | None = None,
+        exc_args: tuple | None = None,
     ) -> None:
         """Initialize a failure error."""
         if exc_args is None:
@@ -45,7 +45,7 @@ class FailureError(TemporalError):
         return self._message
 
     @property
-    def failure(self) -> Optional[temporalio.api.failure.v1.Failure]:
+    def failure(self) -> temporalio.api.failure.v1.Failure | None:
         """Underlying protobuf failure object."""
         return self._failure
 
@@ -61,13 +61,26 @@ class WorkflowAlreadyStartedError(FailureError):
     """
 
     def __init__(
-        self, workflow_id: str, workflow_type: str, *, run_id: Optional[str] = None
+        self, workflow_id: str, workflow_type: str, *, run_id: str | None = None
     ) -> None:
         """Initialize a workflow already started error."""
         super().__init__("Workflow execution already started")
         self.workflow_id = workflow_id
         self.workflow_type = workflow_type
         self.run_id = run_id
+
+
+class ApplicationErrorCategory(IntEnum):
+    """Severity category for your application error. Maps to corresponding client-side logging/metrics behaviors"""
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.ApplicationErrorCategory.APPLICATION_ERROR_CATEGORY_UNSPECIFIED
+    )
+
+    BENIGN = int(
+        temporalio.api.enums.v1.ApplicationErrorCategory.APPLICATION_ERROR_CATEGORY_BENIGN
+    )
+    """BENIGN category errors emit DEBUG level logs and do not record metrics"""
 
 
 class ApplicationError(FailureError):
@@ -77,9 +90,10 @@ class ApplicationError(FailureError):
         self,
         message: str,
         *details: Any,
-        type: Optional[str] = None,
+        type: str | None = None,
         non_retryable: bool = False,
-        next_retry_delay: Optional[timedelta] = None,
+        next_retry_delay: timedelta | None = None,
+        category: ApplicationErrorCategory = ApplicationErrorCategory.UNSPECIFIED,
     ) -> None:
         """Initialize an application error."""
         super().__init__(
@@ -91,6 +105,7 @@ class ApplicationError(FailureError):
         self._type = type
         self._non_retryable = non_retryable
         self._next_retry_delay = next_retry_delay
+        self._category = category
 
     @property
     def details(self) -> Sequence[Any]:
@@ -98,7 +113,7 @@ class ApplicationError(FailureError):
         return self._details
 
     @property
-    def type(self) -> Optional[str]:
+    def type(self) -> str | None:
         """General error type."""
         return self._type
 
@@ -113,13 +128,18 @@ class ApplicationError(FailureError):
         return self._non_retryable
 
     @property
-    def next_retry_delay(self) -> Optional[timedelta]:
+    def next_retry_delay(self) -> timedelta | None:
         """Delay before the next activity retry attempt.
 
         User activity code may set this when raising ApplicationError to specify
         a delay before the next activity retry.
         """
         return self._next_retry_delay
+
+    @property
+    def category(self) -> ApplicationErrorCategory:
+        """Severity category of the application error"""
+        return self._category
 
 
 class CancelledError(FailureError):
@@ -172,7 +192,7 @@ class TimeoutError(FailureError):
         self,
         message: str,
         *,
-        type: Optional[TimeoutType],
+        type: TimeoutType | None,
         last_heartbeat_details: Sequence[Any],
     ) -> None:
         """Initialize a timeout error."""
@@ -181,7 +201,7 @@ class TimeoutError(FailureError):
         self._last_heartbeat_details = last_heartbeat_details
 
     @property
-    def type(self) -> Optional[TimeoutType]:
+    def type(self) -> TimeoutType | None:
         """Type of timeout error."""
         return self._type
 
@@ -239,7 +259,7 @@ class ActivityError(FailureError):
         identity: str,
         activity_type: str,
         activity_id: str,
-        retry_state: Optional[RetryState],
+        retry_state: RetryState | None,
     ) -> None:
         """Initialize an activity error."""
         super().__init__(message)
@@ -276,7 +296,7 @@ class ActivityError(FailureError):
         return self._activity_id
 
     @property
-    def retry_state(self) -> Optional[RetryState]:
+    def retry_state(self) -> RetryState | None:
         """Retry state for this error."""
         return self._retry_state
 
@@ -294,7 +314,7 @@ class ChildWorkflowError(FailureError):
         workflow_type: str,
         initiated_event_id: int,
         started_event_id: int,
-        retry_state: Optional[RetryState],
+        retry_state: RetryState | None,
     ) -> None:
         """Initialize a child workflow error."""
         super().__init__(message)
@@ -337,9 +357,65 @@ class ChildWorkflowError(FailureError):
         return self._started_event_id
 
     @property
-    def retry_state(self) -> Optional[RetryState]:
+    def retry_state(self) -> RetryState | None:
         """Retry state for this error."""
         return self._retry_state
+
+
+class NexusOperationError(FailureError):
+    """Error raised on Nexus operation failure inside a Workflow."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        scheduled_event_id: int,
+        endpoint: str,
+        service: str,
+        operation: str,
+        operation_token: str,
+    ):
+        """Initialize a Nexus operation error.
+
+        Args:
+            message: The error message.
+            scheduled_event_id: The NexusOperationScheduled event ID for the failed operation.
+            endpoint: The endpoint name for the failed operation.
+            service: The service name for the failed operation.
+            operation: The name of the failed operation.
+            operation_token: The operation token returned by the failed operation.
+        """
+        super().__init__(message)
+        self._scheduled_event_id = scheduled_event_id
+        self._endpoint = endpoint
+        self._service = service
+        self._operation = operation
+        self._operation_token = operation_token
+
+    @property
+    def scheduled_event_id(self) -> int:
+        """The NexusOperationScheduled event ID for the failed operation."""
+        return self._scheduled_event_id
+
+    @property
+    def endpoint(self) -> str:
+        """The endpoint name for the failed operation."""
+        return self._endpoint
+
+    @property
+    def service(self) -> str:
+        """The service name for the failed operation."""
+        return self._service
+
+    @property
+    def operation(self) -> str:
+        """The name of the failed operation."""
+        return self._operation
+
+    @property
+    def operation_token(self) -> str:
+        """The operation token returned by the failed operation."""
+        return self._operation_token
 
 
 def is_cancelled_exception(exception: BaseException) -> bool:
@@ -365,6 +441,7 @@ def is_cancelled_exception(exception: BaseException) -> bool:
             (
                 isinstance(exception, ActivityError)
                 or isinstance(exception, ChildWorkflowError)
+                or isinstance(exception, NexusOperationError)
             )
             and isinstance(exception.cause, CancelledError)
         )

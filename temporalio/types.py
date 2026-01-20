@@ -1,11 +1,12 @@
 """Advanced types."""
 
-from typing import Any, Awaitable, Callable, Type, TypeVar, Union
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar
 
 from typing_extensions import ParamSpec, Protocol
 
 AnyType = TypeVar("AnyType")
-ClassType = TypeVar("ClassType", bound=Type)
+ClassType = TypeVar("ClassType", bound=type)
 SelfType = TypeVar("SelfType")
 ParamType = TypeVar("ParamType")
 ReturnType = TypeVar("ReturnType", covariant=True)
@@ -14,11 +15,11 @@ CallableType = TypeVar("CallableType", bound=Callable[..., Any])
 CallableAsyncType = TypeVar("CallableAsyncType", bound=Callable[..., Awaitable[Any]])
 CallableSyncOrAsyncType = TypeVar(
     "CallableSyncOrAsyncType",
-    bound=Callable[..., Union[Any, Awaitable[Any]]],
+    bound=Callable[..., Any | Awaitable[Any]],
 )
 CallableSyncOrAsyncReturnNoneType = TypeVar(
     "CallableSyncOrAsyncReturnNoneType",
-    bound=Callable[..., Union[None, Awaitable[None]]],
+    bound=Callable[..., None | Awaitable[None]],
 )
 MultiParamSpec = ParamSpec("MultiParamSpec")
 
@@ -105,7 +106,7 @@ class MethodSyncOrAsyncNoParam(Protocol[ProtocolSelfType, ProtocolReturnType]):
 
     def __call__(
         self, __self: ProtocolSelfType
-    ) -> Union[ProtocolReturnType, Awaitable[ProtocolReturnType]]:
+    ) -> ProtocolReturnType | Awaitable[ProtocolReturnType]:
         """Generic callable type callback."""
         ...
 
@@ -117,7 +118,7 @@ class MethodSyncOrAsyncSingleParam(
 
     def __call__(
         self, __self: ProtocolSelfType, __param: ProtocolParamType, /
-    ) -> Union[ProtocolReturnType, Awaitable[ProtocolReturnType]]:
+    ) -> ProtocolReturnType | Awaitable[ProtocolReturnType]:
         """Generic callable type callback."""
         ...
 

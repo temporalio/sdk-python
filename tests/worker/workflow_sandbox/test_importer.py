@@ -1,3 +1,4 @@
+import dataclasses
 import sys
 
 import pytest
@@ -19,7 +20,7 @@ from .testmodules import restrictions
 def test_workflow_sandbox_importer_invalid_module():
     with pytest.raises(RestrictedWorkflowAccessError) as err:
         with Importer(restrictions, RestrictionContext()).applied():
-            import tests.worker.workflow_sandbox.testmodules.invalid_module
+            import tests.worker.workflow_sandbox.testmodules.invalid_module  # type:ignore[reportUnusedImport]
     assert (
         err.value.qualified_name
         == "tests.worker.workflow_sandbox.testmodules.invalid_module"
@@ -113,9 +114,34 @@ def test_workflow_sandbox_importer_invalid_module_members():
     )
 
 
+def test_workflow_sandbox_importer_sys_module():
+    # Import outside to make sure this is in sys.modules
+    import tests.worker.workflow_sandbox.testmodules.passthrough_module  # type:ignore[reportUnusedImport]
+    import tests.worker.workflow_sandbox.testmodules.stateful_module  # type:ignore[reportUnusedImport]
+
+    with Importer(restrictions, RestrictionContext()).applied():
+        # Passthrough should be there but not non-passthrough
+        assert sys.modules.get(
+            "tests.worker.workflow_sandbox.testmodules.passthrough_module", None
+        )
+        assert not sys.modules.get(
+            "tests.worker.workflow_sandbox.testmodules.stateful_module", None
+        )
+
+    disabled_restrictions = dataclasses.replace(
+        restrictions, disable_lazy_sys_module_passthrough=True
+    )
+    with Importer(disabled_restrictions, RestrictionContext()).applied():
+        # Neither should be there because lazy sys mod is disabled
+        assert not sys.modules.get(
+            "tests.worker.workflow_sandbox.testmodules.passthrough_module", None
+        )
+        assert not sys.modules.get(
+            "tests.worker.workflow_sandbox.testmodules.stateful_module", None
+        )
+
+
 def test_thread_local_sys_module_attrs():
-    if sys.version_info < (3, 9):
-        pytest.skip("Dict or methods only in >= 3.9")
     # Python chose not to put everything in MutableMapping they do in dict, see
     # https://bugs.python.org/issue22101. Therefore we manually confirm that
     # every attribute of sys modules is also in thread local sys modules to
@@ -126,7 +152,7 @@ def test_thread_local_sys_module_attrs():
     # Let's also test "or" and "copy"
     norm = {"foo": 123}
     thread_local = _ThreadLocalSysModules({"foo": 123})  # type: ignore[dict-item]
-    assert (norm | {"bar": 456}) == (thread_local | {"bar": 456})
+    assert (norm | {"bar": 456}) == (thread_local | {"bar": 456})  # type: ignore
     norm |= {"baz": 789}
     thread_local |= {"baz": 789}  # type: ignore
     assert norm.copy() == thread_local.copy()

@@ -14,21 +14,15 @@ import logging
 import math
 import operator
 import random
+import sys
 import types
 import warnings
+from collections.abc import Callable, Mapping, Sequence
 from copy import copy, deepcopy
 from dataclasses import dataclass
 from typing import (
     Any,
-    Callable,
     ClassVar,
-    Dict,
-    Mapping,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Type,
     TypeVar,
     cast,
 )
@@ -39,8 +33,9 @@ try:
 
     HAVE_PYDANTIC = True
 except ImportError:
-    HAVE_PYDANTIC = False
+    HAVE_PYDANTIC = False  # type: ignore[reportConstantRedefinition]
 
+import temporalio.exceptions
 import temporalio.workflow
 
 logger = logging.getLogger(__name__)
@@ -61,7 +56,7 @@ class RestrictedWorkflowAccessError(temporalio.workflow.NondeterminismError):
     """
 
     def __init__(
-        self, qualified_name: str, *, override_message: Optional[str] = None
+        self, qualified_name: str, *, override_message: str | None = None
     ) -> None:
         """Create restricted workflow access error."""
         super().__init__(
@@ -81,11 +76,26 @@ class RestrictedWorkflowAccessError(temporalio.workflow.NondeterminismError):
         )
 
 
+class UnintentionalPassthroughError(temporalio.exceptions.TemporalError):
+    """Error that occurs when a workflow unintentionally passes an import to the sandbox when
+    the import notification policy includes :py:attr:`temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_UNINTENTIONAL_PASSTHROUGH`.
+
+    Attributes:
+        qualified_name: Fully qualified name of what was passed through to the sandbox.
+    """
+
+    def __init__(self, qualified_name: str) -> None:
+        """Create an unintentional passthrough error."""
+        super().__init__(
+            f"Module {qualified_name} was not intentionally passed through to the sandbox."
+        )
+
+
 @dataclass(frozen=True)
 class SandboxRestrictions:
     """Set of restrictions that can be applied to a sandbox."""
 
-    passthrough_modules: Set[str]
+    passthrough_modules: set[str]
     """
     Modules which pass through because we know they are side-effect free (or the
     side-effecting pieces are restricted). These modules will not be reloaded,
@@ -109,6 +119,13 @@ class SandboxRestrictions:
     fully qualified path to the item.
     """
 
+    import_notification_policy: temporalio.workflow.SandboxImportNotificationPolicy = (
+        temporalio.workflow.SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT
+    )
+    """
+    The import notification policy to use when an import is triggered during workflow loading or execution. See :py:class:`temporalio.workflow.SandboxImportNotificationPolicy` for options.
+    """
+
     passthrough_all_modules: bool = False
     """
     Pass through all modules, do not sandbox any modules. This is the equivalent
@@ -120,19 +137,28 @@ class SandboxRestrictions:
     on invalid calls are not still applied.
     """
 
-    passthrough_modules_minimum: ClassVar[Set[str]]
+    disable_lazy_sys_module_passthrough: bool = False
+    """
+    By default when __contains__ or __getitem__ is called on sys.modules in the
+    sandbox, if it is not present in the sandbox but is outside the sandbox and
+    it is marked passthrough, it is lazily added to the sandboxed sys.modules
+    and returned. This option disables that feature and forces all passthroughs
+    to have been explicitly imported.
+    """
+
+    passthrough_modules_minimum: ClassVar[set[str]]
     """Set of modules that must be passed through at the minimum."""
 
-    passthrough_modules_with_temporal: ClassVar[Set[str]]
+    passthrough_modules_with_temporal: ClassVar[set[str]]
     """Minimum modules that must be passed through and the Temporal modules."""
 
-    passthrough_modules_maximum: ClassVar[Set[str]]
+    passthrough_modules_maximum: ClassVar[set[str]]
     """
     All modules that can be passed through. This includes all standard library
     modules.
     """
 
-    passthrough_modules_default: ClassVar[Set[str]]
+    passthrough_modules_default: ClassVar[set[str]]
     """Same as :py:attr:`passthrough_modules_maximum`."""
 
     invalid_module_members_default: ClassVar[SandboxMatcher]
@@ -160,6 +186,12 @@ class SandboxRestrictions:
         """
         return dataclasses.replace(self, passthrough_all_modules=True)
 
+    def with_import_notification_policy(
+        self, policy: temporalio.workflow.SandboxImportNotificationPolicy
+    ) -> SandboxRestrictions:
+        """Create a new restriction set with the given import notification policy as the :py:attr:`import_notification_policy`."""
+        return dataclasses.replace(self, import_notification_policy=policy)
+
 
 # We intentionally use specific fields instead of generic "matcher" callbacks
 # for optimization reasons.
@@ -172,8 +204,8 @@ class SandboxMatcher:
     instances.
     """
 
-    @staticmethod
-    def nested_child(path: Sequence[str], child: SandboxMatcher) -> SandboxMatcher:
+    @classmethod
+    def nested_child(cls, path: Sequence[str], child: SandboxMatcher) -> SandboxMatcher:
         """Create a matcher where the given child is put at the given path.
 
         Args:
@@ -185,12 +217,12 @@ class SandboxMatcher:
         """
         ret = child
         for key in reversed(path):
-            ret = SandboxMatcher(children={key: ret})
+            ret = cls(children={key: ret})
         return ret
 
-    access: Set[str] = frozenset()  # type: ignore
+    access: set[str] = frozenset()  # type: ignore
     """Immutable set of names to match access.
-    
+
     This is often only used for pass through checks and not member restrictions.
     If this is used for member restrictions, even importing/accessing the value
     will fail as opposed to :py:attr:`use` which is for when it is used.
@@ -198,9 +230,9 @@ class SandboxMatcher:
     An string containing a single asterisk can be used to match all.
     """
 
-    use: Set[str] = frozenset()  # type: ignore
+    use: set[str] = frozenset()  # type: ignore
     """Immutable set of names to match use.
-    
+
     This is best used for member restrictions on functions/classes because the
     restriction will not apply to referencing/importing the item, just when it
     is used.
@@ -220,23 +252,23 @@ class SandboxMatcher:
     time.
     """
 
-    leaf_message: Optional[str] = None
+    leaf_message: str | None = None
     """
     Override message to use in error/warning. Defaults to a common message.
     This is only applicable to leafs, so this must only be set when
     ``match_self`` is ``True`` and this matcher is on ``children`` of a parent.
     """
 
-    leaf_warning: Optional[Type[Warning]] = None
+    leaf_warning: type[Warning] | None = None
     """
     If set, issues a warning instead of raising an error. This is only
     applicable to leafs, so this must only be set when ``match_self`` is
     ``True`` and this matcher is on ``children`` of a parent.
     """
 
-    exclude: Set[str] = frozenset()  # type: ignore
+    exclude: set[str] = frozenset()  # type: ignore
     """Immutable set of names to exclude.
-    
+
     These override anything that may have been matched elsewhere.
     """
 
@@ -264,7 +296,7 @@ class SandboxMatcher:
 
     def access_matcher(
         self, context: RestrictionContext, *child_path: str, include_use: bool = False
-    ) -> Optional[SandboxMatcher]:
+    ) -> SandboxMatcher | None:
         """Perform a match check and return matcher.
 
         Args:
@@ -295,10 +327,12 @@ class SandboxMatcher:
             if not child_matcher:
                 return None
             matcher = child_matcher
+
         if not context.is_runtime and matcher.only_runtime:
             return None
         if not matcher.match_self:
             return None
+
         return matcher
 
     def match_access(
@@ -319,7 +353,7 @@ class SandboxMatcher:
             is not None
         )
 
-    def child_matcher(self, *child_path: str) -> Optional[SandboxMatcher]:
+    def child_matcher(self, *child_path: str) -> SandboxMatcher | None:
         """Return a child matcher for the given path.
 
         Unlike :py:meth:`match_access`, this will match if in py:attr:`use` in
@@ -332,7 +366,7 @@ class SandboxMatcher:
             Matcher that can be used to check children.
         """
         # We prefer to avoid recursion
-        matcher: Optional[SandboxMatcher] = self
+        matcher: SandboxMatcher | None = self
         only_runtime = self.only_runtime
         for v in child_path:
             # Use all if it matches self, access, _or_ use. Use doesn't match
@@ -400,7 +434,7 @@ class SandboxMatcher:
         assert child_path
         # If there's only one item in path, make sure not in access, use, or
         # children. Otherwise, just remove from child.
-        to_replace: Dict[str, Any] = {}
+        to_replace: dict[str, Any] = {}
         if len(child_path) == 1:
             if child_path[0] in self.access:
                 to_replace["access"] = set(self.access)
@@ -471,6 +505,7 @@ SandboxRestrictions.passthrough_modules_with_temporal = (
         # https://wrapt.readthedocs.io/en/latest/issues.html#using-issubclass-on-abstract-classes
         "asyncio",
         "abc",
+        "nexusrpc",
         "temporalio",
         # Due to pkg_resources use of base classes caused by the ABC issue
         # above, and Otel's use of pkg_resources, we pass it through
@@ -478,45 +513,11 @@ SandboxRestrictions.passthrough_modules_with_temporal = (
         # Due to how Pydantic is importing lazily inside of some classes, we choose
         # to always pass it through
         "pydantic",
+        # OpenAI and OpenAI agent modules in workflows we always want to pass
+        # through and reference the out-of-sandbox forms
+        "openai",
+        "agents",
     }
-)
-
-# sys.stdlib_module_names is only available on 3.10+, so we hardcode here. A
-# test will fail if this list doesn't match the latest Python version it was
-# generated against, spitting out the expected list. This is a string instead
-# of a list of strings due to black wanting to format this to one item each
-# line in a list.
-_stdlib_module_names = (
-    "__future__,_abc,_aix_support,_ast,_asyncio,_bisect,_blake2,_bootsubprocess,_bz2,_codecs,"
-    "_codecs_cn,_codecs_hk,_codecs_iso2022,_codecs_jp,_codecs_kr,_codecs_tw,_collections,"
-    "_collections_abc,_compat_pickle,_compression,_contextvars,_crypt,_csv,_ctypes,_curses,"
-    "_curses_panel,_datetime,_dbm,_decimal,_elementtree,_frozen_importlib,_frozen_importlib_external,"
-    "_functools,_gdbm,_hashlib,_heapq,_imp,_io,_json,_locale,_lsprof,_lzma,_markupbase,"
-    "_md5,_msi,_multibytecodec,_multiprocessing,_opcode,_operator,_osx_support,_overlapped,"
-    "_pickle,_posixshmem,_posixsubprocess,_py_abc,_pydecimal,_pyio,_queue,_random,_scproxy,"
-    "_sha1,_sha256,_sha3,_sha512,_signal,_sitebuiltins,_socket,_sqlite3,_sre,_ssl,_stat,"
-    "_statistics,_string,_strptime,_struct,_symtable,_thread,_threading_local,_tkinter,"
-    "_tokenize,_tracemalloc,_typing,_uuid,_warnings,_weakref,_weakrefset,_winapi,_zoneinfo,"
-    "abc,aifc,antigravity,argparse,array,ast,asynchat,asyncio,asyncore,atexit,audioop,"
-    "base64,bdb,binascii,bisect,builtins,bz2,cProfile,calendar,cgi,cgitb,chunk,cmath,cmd,"
-    "code,codecs,codeop,collections,colorsys,compileall,concurrent,configparser,contextlib,"
-    "contextvars,copy,copyreg,crypt,csv,ctypes,curses,dataclasses,datetime,dbm,decimal,"
-    "difflib,dis,distutils,doctest,email,encodings,ensurepip,enum,errno,faulthandler,fcntl,"
-    "filecmp,fileinput,fnmatch,fractions,ftplib,functools,gc,genericpath,getopt,getpass,"
-    "gettext,glob,graphlib,grp,gzip,hashlib,heapq,hmac,html,http,idlelib,imaplib,imghdr,"
-    "imp,importlib,inspect,io,ipaddress,itertools,json,keyword,lib2to3,linecache,locale,"
-    "logging,lzma,mailbox,mailcap,marshal,math,mimetypes,mmap,modulefinder,msilib,msvcrt,"
-    "multiprocessing,netrc,nis,nntplib,nt,ntpath,nturl2path,numbers,opcode,operator,optparse,"
-    "os,ossaudiodev,pathlib,pdb,pickle,pickletools,pipes,pkgutil,platform,plistlib,poplib,"
-    "posix,posixpath,pprint,profile,pstats,pty,pwd,py_compile,pyclbr,pydoc,pydoc_data,"
-    "pyexpat,queue,quopri,random,re,readline,reprlib,resource,rlcompleter,runpy,sched,"
-    "secrets,select,selectors,shelve,shlex,shutil,signal,site,smtpd,smtplib,sndhdr,socket,"
-    "socketserver,spwd,sqlite3,sre_compile,sre_constants,sre_parse,ssl,stat,statistics,"
-    "string,stringprep,struct,subprocess,sunau,symtable,sys,sysconfig,syslog,tabnanny,"
-    "tarfile,telnetlib,tempfile,termios,textwrap,this,threading,time,timeit,tkinter,token,"
-    "tokenize,tomllib,trace,traceback,tracemalloc,tty,turtle,turtledemo,types,typing,unicodedata,"
-    "unittest,urllib,uu,uuid,venv,warnings,wave,weakref,webbrowser,winreg,winsound,wsgiref,"
-    "xdrlib,xml,xmlrpc,zipapp,zipfile,zipimport,zlib,zoneinfo"
 )
 
 SandboxRestrictions.passthrough_modules_maximum = (
@@ -527,7 +528,7 @@ SandboxRestrictions.passthrough_modules_maximum = (
         # manually setting sys.modules["os.path"]) they have certain child
         # expectations.
         v
-        for v in _stdlib_module_names.split(",")
+        for v in sys.stdlib_module_names
         if v != "sys"
     }
 )
@@ -537,8 +538,8 @@ SandboxRestrictions.passthrough_modules_default = (
 )
 
 
-def _public_callables(parent: Any, *, exclude: Set[str] = set()) -> Set[str]:
-    ret: Set[str] = set()
+def _public_callables(parent: Any, *, exclude: set[str] = set()) -> set[str]:
+    ret: set[str] = set()
     for name, member in inspect.getmembers(parent):
         # Name must be public and callable and not in exclude and not a class
         if (
@@ -632,11 +633,18 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
         # "linecache": SandboxMatcher.all_uses,
         # Restrict almost everything in OS at runtime
         "os": SandboxMatcher(
+            # As of https://github.com/python/cpython/pull/132662 in python 3.14 we have to allow os.path calls
+            # which may occur during exception tracing. See https://github.com/python/cpython/issues/140228.
+            children={
+                "path": SandboxMatcher.none
+                if sys.version_info >= (3, 14)
+                else SandboxMatcher.all
+            },
             access={"name"},
             use={"*"},
             # As of https://github.com/python/cpython/pull/112097, os.stat
             # calls are now made when displaying errors
-            exclude={"stat"},
+            exclude={"stat", "path"} if sys.version_info >= (3, 14) else {"stat"},
             # Only restricted at runtime
             only_runtime=True,
         ),
@@ -730,7 +738,8 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
                 "monotonic",
                 "monotonic_ns",
                 "perf_counter",
-                "perf_counter_ns" "process_time",
+                "perf_counter_ns",
+                "process_time",
                 "process_time_ns",
                 "sleep",
                 "time",
@@ -797,6 +806,7 @@ class RestrictionContext:
     def __init__(self) -> None:
         """Create a restriction context."""
         self.is_runtime = False
+        self.in_activation = False
 
 
 @dataclass
@@ -848,24 +858,28 @@ class _RestrictionState:
 class _RestrictedProxyLookup:
     def __init__(
         self,
-        access_func: Optional[Callable] = None,
+        access_func: Callable | None = None,
         *,
-        fallback_func: Optional[Callable] = None,
-        class_value: Optional[Any] = None,
+        fallback_func: Callable | None = None,
+        class_value: Any | None = None,
         is_attr: bool = False,
     ) -> None:
-        bind_func: Optional[Callable[[_RestrictedProxy, Any], Callable]]
+        bind_func: Callable[[_RestrictedProxy, Any], Callable] | None
         if hasattr(access_func, "__get__"):
             # A Python function, can be turned into a bound method.
 
-            def bind_func(instance: _RestrictedProxy, obj: Any) -> Callable:
+            def _bind_func(_instance: _RestrictedProxy, obj: Any) -> Callable:
                 return access_func.__get__(obj, type(obj))  # type: ignore
+
+            bind_func = _bind_func
 
         elif access_func is not None:
             # A C function, use partial to bind the first argument.
 
-            def bind_func(instance: _RestrictedProxy, obj: Any) -> Callable:
+            def _bind_func(_instance: _RestrictedProxy, obj: Any) -> Callable:
                 return functools.partial(access_func, obj)  # type: ignore
+
+            bind_func = _bind_func
 
         else:
             # Use getattr, which will produce a bound method.
@@ -877,12 +891,12 @@ class _RestrictedProxyLookup:
         self.is_attr = is_attr
 
     def __set_name__(self, owner: _RestrictedProxy, name: str) -> None:
-        self.name = name
+        self.name = name  # type: ignore[reportUninitializedInstanceVariable]
 
-    def __get__(self, instance: _RestrictedProxy, owner: Optional[Type] = None) -> Any:
-        if instance is None:
-            if self.class_value is not None:
-                return self.class_value
+    def __get__(self, instance: _RestrictedProxy, owner: type | None = None) -> Any:
+        if instance is None:  # type: ignore[reportUninitializedInstanceVariable]
+            if self.class_value is not None:  # type: ignore[reportUnreachable]
+                return self.class_value  # type: ignore[reportUnreachable]
 
             return self
 
@@ -925,9 +939,9 @@ class _RestrictedProxyIOp(_RestrictedProxyLookup):
 
     def __init__(
         self,
-        access_func: Optional[Callable] = None,
+        access_func: Callable | None = None,
         *,
-        fallback_func: Optional[Callable] = None,
+        fallback_func: Callable | None = None,
     ) -> None:
         super().__init__(access_func, fallback_func=fallback_func)
 
@@ -953,7 +967,7 @@ def _l_to_r_op(op: _OpF) -> _OpF:
     return cast(_OpF, r_op)
 
 
-_do_not_restrict: Tuple[Type, ...] = (bool, int, float, complex, str, bytes, bytearray)
+_do_not_restrict: tuple[type, ...] = (bool, int, float, complex, str, bytes, bytearray)
 if HAVE_PYDANTIC:
     # The datetime validator in pydantic_core
     # https://github.com/pydantic/pydantic-core/blob/741961c05847d9e9ee517cd783e24c2b58e5596b/src/input/input_python.rs#L548-L582
@@ -970,7 +984,7 @@ def _is_restrictable(v: Any) -> bool:
 
 
 class _RestrictedProxy:
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         # When we instantiate this class, we have the signature of:
         #   __init__(
         #       self,
@@ -1018,7 +1032,7 @@ class _RestrictedProxy:
         state.assert_child_not_restricted(__name)
         setattr(state.obj, __name, __value)
 
-    def __call__(self, *args, **kwargs) -> _RestrictedProxy:
+    def __call__(self, *args: Any, **kwargs: Any) -> _RestrictedProxy:
         state = _RestrictionState.from_proxy(self)
         _trace("__call__ on %s", state.name)
         state.assert_child_not_restricted("__call__")

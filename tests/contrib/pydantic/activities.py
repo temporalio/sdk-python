@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import List
 from uuid import UUID
 
 from temporalio import activity
@@ -8,8 +7,8 @@ from tests.contrib.pydantic.models import PydanticModels
 
 @activity.defn
 async def pydantic_objects_activity(
-    models: List[PydanticModels],
-) -> List[PydanticModels]:
+    models: list[PydanticModels],
+) -> list[PydanticModels]:
     return models
 
 

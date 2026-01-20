@@ -45,6 +45,10 @@ class _ActivityCancelReasonEnumTypeWrapper(
     """Activity timed out"""
     WORKER_SHUTDOWN: _ActivityCancelReason.ValueType  # 3
     """Core is shutting down and the graceful timeout has elapsed"""
+    PAUSED: _ActivityCancelReason.ValueType  # 4
+    """Activity was paused"""
+    RESET: _ActivityCancelReason.ValueType  # 5
+    """Activity was reset"""
 
 class ActivityCancelReason(
     _ActivityCancelReason, metaclass=_ActivityCancelReasonEnumTypeWrapper
@@ -58,6 +62,10 @@ TIMED_OUT: ActivityCancelReason.ValueType  # 2
 """Activity timed out"""
 WORKER_SHUTDOWN: ActivityCancelReason.ValueType  # 3
 """Core is shutting down and the graceful timeout has elapsed"""
+PAUSED: ActivityCancelReason.ValueType  # 4
+"""Activity was paused"""
+RESET: ActivityCancelReason.ValueType  # 5
+"""Activity was reset"""
 global___ActivityCancelReason = ActivityCancelReason
 
 class ActivityTask(google.protobuf.message.Message):
@@ -149,6 +157,7 @@ class Start(google.protobuf.message.Message):
     START_TO_CLOSE_TIMEOUT_FIELD_NUMBER: builtins.int
     HEARTBEAT_TIMEOUT_FIELD_NUMBER: builtins.int
     RETRY_POLICY_FIELD_NUMBER: builtins.int
+    PRIORITY_FIELD_NUMBER: builtins.int
     IS_LOCAL_FIELD_NUMBER: builtins.int
     workflow_namespace: builtins.str
     """The namespace the workflow lives in"""
@@ -208,6 +217,9 @@ class Start(google.protobuf.message.Message):
         (or not) during activity scheduling as the service can override the provided one in case its
         values are not specified or exceed configured system limits.
         """
+    @property
+    def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
+        """Priority of this activity. Local activities will always have this field set to the default."""
     is_local: builtins.bool
     """Set to true if this is a local activity. Note that heartbeating does not apply to local
     activities.
@@ -240,6 +252,7 @@ class Start(google.protobuf.message.Message):
         start_to_close_timeout: google.protobuf.duration_pb2.Duration | None = ...,
         heartbeat_timeout: google.protobuf.duration_pb2.Duration | None = ...,
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
+        priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
         is_local: builtins.bool = ...,
     ) -> None: ...
     def HasField(
@@ -249,6 +262,8 @@ class Start(google.protobuf.message.Message):
             b"current_attempt_scheduled_time",
             "heartbeat_timeout",
             b"heartbeat_timeout",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "schedule_to_close_timeout",
@@ -284,6 +299,8 @@ class Start(google.protobuf.message.Message):
             b"input",
             "is_local",
             b"is_local",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
             "schedule_to_close_timeout",
@@ -311,14 +328,71 @@ class Cancel(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     REASON_FIELD_NUMBER: builtins.int
+    DETAILS_FIELD_NUMBER: builtins.int
     reason: global___ActivityCancelReason.ValueType
+    """Primary cancellation reason"""
+    @property
+    def details(self) -> global___ActivityCancellationDetails:
+        """Activity cancellation details, surfaces all cancellation reasons."""
     def __init__(
         self,
         *,
         reason: global___ActivityCancelReason.ValueType = ...,
+        details: global___ActivityCancellationDetails | None = ...,
     ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["details", b"details"]
+    ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["reason", b"reason"]
+        self,
+        field_name: typing_extensions.Literal[
+            "details", b"details", "reason", b"reason"
+        ],
     ) -> None: ...
 
 global___Cancel = Cancel
+
+class ActivityCancellationDetails(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IS_NOT_FOUND_FIELD_NUMBER: builtins.int
+    IS_CANCELLED_FIELD_NUMBER: builtins.int
+    IS_PAUSED_FIELD_NUMBER: builtins.int
+    IS_TIMED_OUT_FIELD_NUMBER: builtins.int
+    IS_WORKER_SHUTDOWN_FIELD_NUMBER: builtins.int
+    IS_RESET_FIELD_NUMBER: builtins.int
+    is_not_found: builtins.bool
+    is_cancelled: builtins.bool
+    is_paused: builtins.bool
+    is_timed_out: builtins.bool
+    is_worker_shutdown: builtins.bool
+    is_reset: builtins.bool
+    def __init__(
+        self,
+        *,
+        is_not_found: builtins.bool = ...,
+        is_cancelled: builtins.bool = ...,
+        is_paused: builtins.bool = ...,
+        is_timed_out: builtins.bool = ...,
+        is_worker_shutdown: builtins.bool = ...,
+        is_reset: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "is_cancelled",
+            b"is_cancelled",
+            "is_not_found",
+            b"is_not_found",
+            "is_paused",
+            b"is_paused",
+            "is_reset",
+            b"is_reset",
+            "is_timed_out",
+            b"is_timed_out",
+            "is_worker_shutdown",
+            b"is_worker_shutdown",
+        ],
+    ) -> None: ...
+
+global___ActivityCancellationDetails = ActivityCancellationDetails

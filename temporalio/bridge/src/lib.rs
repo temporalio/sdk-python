@@ -2,13 +2,15 @@ use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 
 mod client;
+mod client_rpc_generated;
+mod envconfig;
 mod metric;
 mod runtime;
 mod testing;
 mod worker;
 
 #[pymodule]
-fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
+fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Client stuff
     m.add("RPCError", py.get_type::<client::RPCError>())?;
     m.add_class::<client::ClientRef>()?;
@@ -54,6 +56,14 @@ fn temporal_sdk_bridge(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<worker::LocalActivitySlotInfo>()?;
     m.add_function(wrap_pyfunction!(new_worker, m)?)?;
     m.add_function(wrap_pyfunction!(new_replay_worker, m)?)?;
+
+    // envconfig
+    let envconfig_module = PyModule::new(py, "envconfig")?;
+    envconfig_module.add("ConfigError", py.get_type::<envconfig::ConfigError>())?;
+    envconfig_module.add_function(wrap_pyfunction!(envconfig::load_client_config, m)?)?;
+    envconfig_module.add_function(wrap_pyfunction!(envconfig::load_client_connect_config, m)?)?;
+    m.add_submodule(&envconfig_module)?;
+
     Ok(())
 }
 
@@ -62,7 +72,7 @@ fn connect_client<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
     config: client::ClientConfig,
-) -> PyResult<&'a PyAny> {
+) -> PyResult<Bound<'a, PyAny>> {
     client::connect_client(py, runtime_ref, config)
 }
 
@@ -72,12 +82,12 @@ fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<metric::MetricM
 }
 
 #[pyfunction]
-fn init_runtime(telemetry_config: runtime::TelemetryConfig) -> PyResult<runtime::RuntimeRef> {
-    runtime::init_runtime(telemetry_config)
+fn init_runtime(options: runtime::RuntimeOptions) -> PyResult<runtime::RuntimeRef> {
+    runtime::init_runtime(options)
 }
 
 #[pyfunction]
-fn raise_in_thread(py: Python, thread_id: std::os::raw::c_long, exc: &PyAny) -> bool {
+fn raise_in_thread(py: Python, thread_id: std::os::raw::c_long, exc: &Bound<'_, PyAny>) -> bool {
     runtime::raise_in_thread(py, thread_id, exc)
 }
 
@@ -86,7 +96,7 @@ fn start_dev_server<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
     config: testing::DevServerConfig,
-) -> PyResult<&'a PyAny> {
+) -> PyResult<Bound<'a, PyAny>> {
     testing::start_dev_server(py, runtime_ref, config)
 }
 
@@ -95,7 +105,7 @@ fn start_test_server<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
     config: testing::TestServerConfig,
-) -> PyResult<&'a PyAny> {
+) -> PyResult<Bound<'a, PyAny>> {
     testing::start_test_server(py, runtime_ref, config)
 }
 
@@ -113,6 +123,6 @@ fn new_replay_worker<'a>(
     py: Python<'a>,
     runtime_ref: &runtime::RuntimeRef,
     config: worker::WorkerConfig,
-) -> PyResult<&'a PyTuple> {
+) -> PyResult<Bound<'a, PyTuple>> {
     worker::new_replay_worker(py, runtime_ref, config)
 }

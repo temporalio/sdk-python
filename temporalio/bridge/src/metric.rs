@@ -4,7 +4,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use pyo3::prelude::*;
 use pyo3::{exceptions::PyTypeError, types::PyDict};
-use temporal_sdk_core_api::telemetry::metrics::{
+use temporalio_common::telemetry::metrics::{
     self, BufferInstrumentRef, CustomMetricAttributes, MetricEvent, NewAttributes,
 };
 
@@ -25,32 +25,32 @@ pub struct MetricAttributesRef {
 
 #[pyclass]
 pub struct MetricCounterRef {
-    counter: Arc<dyn metrics::Counter>,
+    counter: metrics::Counter,
 }
 
 #[pyclass]
 pub struct MetricHistogramRef {
-    histogram: Arc<dyn metrics::Histogram>,
+    histogram: metrics::Histogram,
 }
 
 #[pyclass]
 pub struct MetricHistogramFloatRef {
-    histogram: Arc<dyn metrics::HistogramF64>,
+    histogram: metrics::HistogramF64,
 }
 
 #[pyclass]
 pub struct MetricHistogramDurationRef {
-    histogram: Arc<dyn metrics::HistogramDuration>,
+    histogram: metrics::HistogramDuration,
 }
 
 #[pyclass]
 pub struct MetricGaugeRef {
-    gauge: Arc<dyn metrics::Gauge>,
+    gauge: metrics::Gauge,
 }
 
 #[pyclass]
 pub struct MetricGaugeFloatRef {
-    gauge: Arc<dyn metrics::GaugeF64>,
+    gauge: metrics::GaugeF64,
 }
 
 pub fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<MetricMeterRef> {
@@ -207,16 +207,11 @@ fn build_metric_parameters(
     description: Option<String>,
     unit: Option<String>,
 ) -> metrics::MetricParameters {
-    let mut build = metrics::MetricParametersBuilder::default();
-    build.name(name);
-    if let Some(description) = description {
-        build.description(description);
-    }
-    if let Some(unit) = unit {
-        build.unit(unit);
-    }
-    // Should be nothing that would fail validation here
-    build.build().unwrap()
+    metrics::MetricParameters::builder()
+        .name(name)
+        .maybe_description(description)
+        .maybe_unit(unit)
+        .build()
 }
 
 #[pymethods]
@@ -255,8 +250,7 @@ fn metric_key_value_from_py(
         metrics::MetricValue::Float(v)
     } else {
         return Err(PyTypeError::new_err(format!(
-            "Invalid value type for key {}, must be str, int, float, or bool",
-            k
+            "Invalid value type for key {k}, must be str, int, float, or bool"
         )));
     };
     Ok(metrics::MetricKeyValue::new(k, val))
@@ -273,21 +267,11 @@ pub struct BufferedMetricUpdate {
     pub attributes: Py<PyDict>,
 }
 
-#[derive(Clone)]
+#[derive(IntoPyObject, Clone)]
 pub enum BufferedMetricUpdateValue {
     U64(u64),
     U128(u128),
     F64(f64),
-}
-
-impl IntoPy<PyObject> for BufferedMetricUpdateValue {
-    fn into_py(self, py: Python) -> PyObject {
-        match self {
-            BufferedMetricUpdateValue::U64(v) => v.into_py(py),
-            BufferedMetricUpdateValue::U128(v) => v.into_py(py),
-            BufferedMetricUpdateValue::F64(v) => v.into_py(py),
-        }
-    }
 }
 
 // WARNING: This must match temporalio.runtime.BufferedMetric protocol
@@ -304,10 +288,10 @@ pub struct BufferedMetric {
 }
 
 #[derive(Debug)]
-struct BufferedMetricAttributes(Py<PyDict>);
+struct BufferedMetricAttributes(Arc<Py<PyDict>>);
 
 #[derive(Clone, Debug)]
-pub struct BufferedMetricRef(Py<BufferedMetric>);
+pub struct BufferedMetricRef(Arc<Py<BufferedMetric>>);
 
 impl BufferInstrumentRef for BufferedMetricRef {}
 
@@ -340,7 +324,7 @@ fn convert_metric_event(
             populate_into,
             kind,
         } => {
-            let buffered_ref = BufferedMetricRef(
+            let buffered_ref = BufferedMetricRef(Arc::new(
                 Py::new(
                     py,
                     BufferedMetric {
@@ -371,7 +355,7 @@ fn convert_metric_event(
                     },
                 )
                 .expect("Unable to create buffered metric"),
-            );
+            ));
             populate_into.set(Arc::new(buffered_ref)).unwrap();
             None
         }
@@ -390,14 +374,14 @@ fn convert_metric_event(
                     .downcast::<BufferedMetricAttributes>()
                     .expect("Unable to downcast to expected buffered metric attributes")
                     .0
-                    .as_ref(py)
+                    .bind(py)
                     .copy()
                     .expect("Failed to copy metric attribute dictionary")
                     .into(),
                 None => PyDict::new(py).into(),
             };
             // Add attributes
-            let new_attrs = new_attrs_ref.as_ref(py);
+            let new_attrs = new_attrs_ref.bind(py);
             for kv in attributes.into_iter() {
                 match kv.value {
                     metrics::MetricValue::String(v) => new_attrs.set_item(kv.key, v),
@@ -409,7 +393,7 @@ fn convert_metric_event(
             }
             // Put on lazy ref
             populate_into
-                .set(Arc::new(BufferedMetricAttributes(new_attrs_ref)))
+                .set(Arc::new(BufferedMetricAttributes(Arc::new(new_attrs_ref))))
                 .expect("Unable to set buffered metric attributes on reference");
             None
         }
@@ -419,7 +403,7 @@ fn convert_metric_event(
             attributes,
             update,
         } => Some(BufferedMetricUpdate {
-            metric: instrument.get().clone().0.clone(),
+            metric: instrument.get().clone().0.clone_ref(py),
             value: match update {
                 metrics::MetricUpdateVal::Duration(v) if durations_as_seconds => {
                     BufferedMetricUpdateValue::F64(v.as_secs_f64())
@@ -439,7 +423,7 @@ fn convert_metric_event(
                 .downcast::<BufferedMetricAttributes>()
                 .expect("Unable to downcast to expected buffered metric attributes")
                 .0
-                .clone(),
+                .clone_ref(py),
         }),
     }
 }

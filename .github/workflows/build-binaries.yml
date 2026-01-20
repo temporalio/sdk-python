@@ -4,6 +4,10 @@ on:
     branches:
       - main
       - "releases/*"
+      - build-binaries-install-whl
+
+permissions:
+  contents: read
 
 jobs:
   # Compile the binaries and upload artifacts
@@ -19,7 +23,7 @@ jobs:
             runsOn: ubuntu-24.04-arm64-2-core
           - os: macos-intel
             package-suffix: macos-amd64
-            runsOn: macos-13
+            runsOn: macos-15-intel
           - os: macos-arm
             package-suffix: macos-aarch64
             runsOn: macos-14
@@ -32,7 +36,7 @@ jobs:
           submodules: recursive
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.14"
 
       # Install Rust locally for non-Linux (Linux uses an internal docker
       # command to build with cibuildwheel which uses rustup install defined
@@ -65,8 +69,8 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then
             bindir=Scripts
           fi
-          ./.venv/$bindir/pip install 'protobuf>=3.20' 'types-protobuf>=3.20' 'typing-extensions<5,>=4.2.0' pytest pytest_asyncio grpcio pydantic opentelemetry-api opentelemetry-sdk python-dateutil
-          ./.venv/$bindir/pip install --no-index --find-links=../dist temporalio
+          ./.venv/$bindir/pip install pytest pytest_asyncio grpcio pydantic opentelemetry-api opentelemetry-sdk python-dateutil 'openai-agents>=0.2.3,<=0.2.9' 'googleapis-common-protos==1.70.0'
+          ./.venv/$bindir/pip install --prefer-binary ../dist/*.whl
           ./.venv/$bindir/python -m pytest -s -k test_workflow_hello
 
       # Upload dist

@@ -1,16 +1,18 @@
 import inspect
 import itertools
-from typing import Sequence
+import typing
+from collections.abc import Callable, Sequence
+from typing import Any, get_type_hints
 
 import pytest
 
 from temporalio import workflow
-from temporalio.common import RawValue
+from temporalio.common import RawValue, VersioningBehavior
 
 
 class GoodDefnBase:
     @workflow.run
-    async def run(self, name: str) -> str:
+    async def run(self, _name: str) -> str:
         raise NotImplementedError
 
     @workflow.signal
@@ -29,7 +31,7 @@ class GoodDefnBase:
 @workflow.defn(name="workflow-custom")
 class GoodDefn(GoodDefnBase):
     @workflow.run
-    async def run(self, name: str) -> str:
+    async def run(self, _name: str) -> str:
         raise NotImplementedError
 
     @workflow.signal
@@ -41,7 +43,7 @@ class GoodDefn(GoodDefnBase):
         pass
 
     @workflow.signal(dynamic=True, description="boo")
-    def signal3(self, name: str, args: Sequence[RawValue]):
+    def signal3(self, _name: str, _args: Sequence[RawValue]):
         pass
 
     @workflow.query
@@ -53,7 +55,7 @@ class GoodDefn(GoodDefnBase):
         pass
 
     @workflow.query(dynamic=True, description="dqd")
-    def query3(self, name: str, args: Sequence[RawValue]):
+    def query3(self, _name: str, _args: Sequence[RawValue]):
         pass
 
     @workflow.update
@@ -65,7 +67,28 @@ class GoodDefn(GoodDefnBase):
         pass
 
     @workflow.update(dynamic=True, description="dud")
-    def update3(self, name: str, args: Sequence[RawValue]):
+    def update3(self, _name: str, _args: Sequence[RawValue]):
+        pass
+
+
+@workflow.defn()
+class GoodDefnDeprecatedTypes(GoodDefnBase):
+    # Just having the definition here is enough to confirm the signatures
+    # do not trigger a RuntimeError
+    @workflow.run
+    async def run(self, _name: str) -> str:
+        raise NotImplementedError
+
+    @workflow.signal(dynamic=True)
+    def signal(self, _name: str, _args: typing.Sequence[RawValue]):  # type: ignore[reportDeprecated]
+        pass
+
+    @workflow.query(dynamic=True)
+    def query(self, _name: str, _args: typing.Sequence[RawValue]):  # type: ignore[reportDeprecated]
+        pass
+
+    @workflow.update(dynamic=True)
+    def update(self, _name: str, _args: typing.Sequence[RawValue]):  # type: ignore[reportDeprecated]
         pass
 
 
@@ -130,6 +153,29 @@ def test_workflow_defn_good():
         },
         sandboxed=True,
         failure_exception_types=[],
+        versioning_behavior=VersioningBehavior.UNSPECIFIED,
+    )
+
+
+@workflow.defn(versioning_behavior=VersioningBehavior.PINNED)
+class VersioningBehaviorDefn:
+    @workflow.run
+    async def run(self, _name: str) -> str:
+        raise NotImplementedError
+
+
+def test_workflow_definition_with_versioning_behavior():
+    defn = workflow._Definition.from_class(VersioningBehaviorDefn)
+    assert defn == workflow._Definition(
+        name="VersioningBehaviorDefn",
+        cls=VersioningBehaviorDefn,
+        run_fn=VersioningBehaviorDefn.run,
+        signals={},
+        queries={},
+        updates={},
+        sandboxed=True,
+        failure_exception_types=[],
+        versioning_behavior=VersioningBehavior.PINNED,
     )
 
 
@@ -159,11 +205,11 @@ class BadDefn(BadDefnBase):
         pass
 
     @workflow.signal(dynamic=True)
-    def signal3(self, name: str, args: Sequence[RawValue]):
+    def signal3(self, _name: str, _args: Sequence[RawValue]):
         pass
 
     @workflow.signal(dynamic=True)
-    def signal4(self, name: str, args: Sequence[RawValue]):
+    def signal4(self, _name: str, _args: Sequence[RawValue]):
         pass
 
     # Intentionally missing decorator
@@ -179,11 +225,11 @@ class BadDefn(BadDefnBase):
         pass
 
     @workflow.query(dynamic=True)
-    def query3(self, name: str, args: Sequence[RawValue]):
+    def query3(self, _name: str, _args: Sequence[RawValue]):
         pass
 
     @workflow.query(dynamic=True)
-    def query4(self, name: str, args: Sequence[RawValue]):
+    def query4(self, _name: str, _args: Sequence[RawValue]):
         pass
 
     # Intentionally missing decorator
@@ -191,15 +237,15 @@ class BadDefn(BadDefnBase):
         pass
 
     @workflow.update
-    def update1(self, arg1: str):
+    def update1(self, _arg1: str):
         pass
 
     @workflow.update(name="update1")
-    def update2(self, arg1: str):
+    def update2(self, _arg1: str):
         pass
 
     # Intentionally missing decorator
-    def base_update(self):
+    def base_update(self):  # type: ignore[override]
         pass
 
 
@@ -247,7 +293,7 @@ def test_workflow_defn_local_class():
     with pytest.raises(ValueError) as err:
 
         @workflow.defn
-        class LocalClass:
+        class LocalClass:  # type:ignore[reportUnusedClass]
             @workflow.run
             async def run(self):
                 pass
@@ -262,7 +308,8 @@ class NonAsyncRun:
 
 def test_workflow_defn_non_async_run():
     with pytest.raises(ValueError) as err:
-        workflow.run(NonAsyncRun.run)
+        # assert-type-error-pyright: 'Argument .+ cannot be assigned to parameter "fn"'
+        workflow.run(NonAsyncRun.run)  # type: ignore
     assert "must be an async function" in str(err.value)
 
 
@@ -323,10 +370,10 @@ class BadDynamic:
     def some_dynamic1(self):
         pass
 
-    def some_dynamic2(self, no_vararg):
+    def some_dynamic2(self, no_vararg):  # type: ignore[reportMissingParameterType]
         pass
 
-    def old_dynamic(self, name, *args):
+    def old_dynamic(self, name, *args):  # type: ignore[reportMissingParameterType]
         pass
 
 
@@ -356,37 +403,37 @@ def test_workflow_defn_dynamic_handler_warnings():
 
 
 class _TestParametersIdenticalUpToNaming:
-    def a1(self, a):
+    def a1(self, a):  # type: ignore[reportMissingParameterType]
         pass
 
-    def a2(self, b):
+    def a2(self, b):  # type: ignore[reportMissingParameterType]
         pass
 
-    def b1(self, a: int):
+    def b1(self, _a: int):
         pass
 
-    def b2(self, b: int) -> str:
+    def b2(self, _b: int) -> str:
         return ""
 
-    def c1(self, a1: int, a2: str) -> str:
+    def c1(self, _a1: int, _a2: str) -> str:
         return ""
 
-    def c2(self, b1: int, b2: str) -> int:
+    def c2(self, _b1: int, _b2: str) -> int:
         return 0
 
-    def d1(self, a1, a2: str) -> None:
+    def d1(self, _a1, _a2: str) -> None:  # type: ignore[reportMissingParameterType]
         pass
 
-    def d2(self, b1, b2: str) -> str:
+    def d2(self, _b1, _b2: str) -> str:  # type: ignore[reportMissingParameterType]
         return ""
 
-    def e1(self, a1, a2: str = "") -> None:
+    def e1(self, _a1, _a2: str = "") -> None:  # type: ignore[reportMissingParameterType]
         return None
 
-    def e2(self, b1, b2: str = "") -> str:
+    def e2(self, _b1, _b2: str = "") -> str:  # type: ignore[reportMissingParameterType]
         return ""
 
-    def f1(self, a1, a2: str = "a") -> None:
+    def f1(self, _a1, _a2: str = "a") -> None:  # type: ignore[reportMissingParameterType]
         return None
 
 
@@ -422,11 +469,12 @@ def test_workflow_init_not__init__():
 
 class BadUpdateValidator:
     @workflow.update
-    def my_update(self, a: str):
+    def my_update(self, _a: str):
         pass
 
+    # assert-type-error-pyright: "Argument of type .+ cannot be assigned to parameter"
     @my_update.validator  # type: ignore
-    def my_validator(self, a: int):
+    def my_validator(self, _a: int):
         pass
 
     @workflow.run
@@ -441,3 +489,102 @@ def test_workflow_update_validator_not_update():
         "Update validator method my_validator parameters do not match update method my_update parameters"
         in str(err.value)
     )
+
+
+def _assert_config_function_parity(
+    function_obj: Callable[..., Any],
+    config_class: type[Any],
+    excluded_params: set[str],
+) -> None:
+    config_name = config_class.__name__
+
+    # Get the signature and type hints
+    function_sig = inspect.signature(function_obj)
+    config_hints = get_type_hints(config_class)
+
+    # Get parameter names from function (excluding excluded ones and applying mappings)
+    expected_config_params = {
+        name for name in function_sig.parameters.keys() if name not in excluded_params
+    }
+
+    # Get parameter names from config
+    actual_config_params = {
+        name for name in config_hints.keys() if name not in excluded_params
+    }
+
+    # Check for missing and extra parameters
+    missing_in_config = expected_config_params - actual_config_params
+    extra_in_config = actual_config_params - expected_config_params
+
+    # Build detailed error message if there are mismatches
+    if missing_in_config or extra_in_config:
+        error_parts = []
+        if missing_in_config:
+            error_parts.append(
+                f"{config_name} is missing parameters: {sorted(missing_in_config)}"
+            )
+        if extra_in_config:
+            error_parts.append(
+                f"{config_name} has extra parameters: {sorted(extra_in_config)}"
+            )
+
+        error_message = "; ".join(error_parts)
+        error_message += f"\nExpected: {sorted(expected_config_params)}\nActual: {sorted(actual_config_params)}"
+        assert False, error_message
+
+
+async def test_activity_config_parity_with_execute_activity():
+    """Test that ActivityConfig has all the same parameters as execute_activity."""
+    _assert_config_function_parity(
+        workflow.execute_activity,
+        workflow.ActivityConfig,
+        excluded_params={"activity", "arg", "args", "result_type"},
+    )
+
+    with pytest.raises(workflow._NotInWorkflowEventLoopError):
+        await workflow.execute_activity("activity", **workflow.ActivityConfig())
+
+
+def test_activity_config_parity_with_start_activity():
+    """Test that ActivityConfig has all the same parameters as start_activity."""
+    _assert_config_function_parity(
+        workflow.start_activity,
+        workflow.ActivityConfig,
+        excluded_params={"activity", "arg", "args", "result_type"},
+    )
+
+    with pytest.raises(workflow._NotInWorkflowEventLoopError):
+        workflow.start_activity("workflow", **workflow.ActivityConfig())
+
+
+async def test_child_workflow_config_parity_with_execute_child_workflow():
+    """Test that ChildWorkflowConfig has all the same parameters as execute_child_workflow."""
+    _assert_config_function_parity(
+        workflow.execute_child_workflow,
+        workflow.ChildWorkflowConfig,
+        excluded_params={"workflow", "arg", "args", "result_type"},
+    )
+
+    with pytest.raises(workflow._NotInWorkflowEventLoopError):
+        await workflow.execute_child_workflow(
+            "workflow", **workflow.ChildWorkflowConfig()
+        )
+
+
+async def test_child_workflow_config_parity_with_start_child_workflow():
+    """Test that ChildWorkflowConfig has all the same parameters as start_child_workflow."""
+    _assert_config_function_parity(
+        workflow.start_child_workflow,
+        workflow.ChildWorkflowConfig,
+        excluded_params={
+            "workflow",
+            "arg",
+            "args",
+            "result_type",
+        },
+    )
+
+    with pytest.raises(workflow._NotInWorkflowEventLoopError):
+        await workflow.start_child_workflow(
+            "workflow", **workflow.ChildWorkflowConfig()
+        )

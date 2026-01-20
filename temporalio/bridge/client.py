@@ -5,25 +5,28 @@ Nothing in this module should be considered stable. The API may change.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Mapping, Optional, Tuple, Type, TypeVar
+from typing import TypeVar
 
 import google.protobuf.message
 
 import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
-from temporalio.bridge.temporal_sdk_bridge import RPCError
+from temporalio.bridge.temporal_sdk_bridge import (
+    RPCError,  # type:ignore[reportUnusedImport]
+)
 
 
 @dataclass
 class ClientTlsConfig:
     """Python representation of the Rust struct for configuring TLS."""
 
-    server_root_ca_cert: Optional[bytes]
-    domain: Optional[str]
-    client_cert: Optional[bytes]
-    client_private_key: Optional[bytes]
+    server_root_ca_cert: bytes | None
+    domain: str | None
+    client_cert: bytes | None
+    client_private_key: bytes | None
 
 
 @dataclass
@@ -34,7 +37,7 @@ class ClientRetryConfig:
     randomization_factor: float
     multiplier: float
     max_interval_millis: int
-    max_elapsed_time_millis: Optional[int]
+    max_elapsed_time_millis: int | None
     max_retries: int
 
 
@@ -51,7 +54,7 @@ class ClientHttpConnectProxyConfig:
     """Python representation of the Rust struct for configuring HTTP proxy."""
 
     target_host: str
-    basic_auth: Optional[Tuple[str, str]]
+    basic_auth: tuple[str, str] | None
 
 
 @dataclass
@@ -59,15 +62,15 @@ class ClientConfig:
     """Python representation of the Rust struct for configuring the client."""
 
     target_url: str
-    metadata: Mapping[str, str]
-    api_key: Optional[str]
+    metadata: Mapping[str, str | bytes]
+    api_key: str | None
     identity: str
-    tls_config: Optional[ClientTlsConfig]
-    retry_config: Optional[ClientRetryConfig]
-    keep_alive_config: Optional[ClientKeepAliveConfig]
+    tls_config: ClientTlsConfig | None
+    retry_config: ClientRetryConfig | None
+    keep_alive_config: ClientKeepAliveConfig | None
     client_name: str
     client_version: str
-    http_connect_proxy_config: Optional[ClientHttpConnectProxyConfig]
+    http_connect_proxy_config: ClientHttpConnectProxyConfig | None
 
 
 @dataclass
@@ -77,8 +80,8 @@ class RpcCall:
     rpc: str
     req: bytes
     retry: bool
-    metadata: Mapping[str, str]
-    timeout_millis: Optional[int]
+    metadata: Mapping[str, str | bytes]
+    timeout_millis: int | None
 
 
 ProtoMessage = TypeVar("ProtoMessage", bound=google.protobuf.message.Message)
@@ -108,11 +111,11 @@ class Client:
         self._runtime = runtime
         self._ref = ref
 
-    def update_metadata(self, metadata: Mapping[str, str]) -> None:
+    def update_metadata(self, metadata: Mapping[str, str | bytes]) -> None:
         """Update underlying metadata on Core client."""
         self._ref.update_metadata(metadata)
 
-    def update_api_key(self, api_key: Optional[str]) -> None:
+    def update_api_key(self, api_key: str | None) -> None:
         """Update underlying API key on Core client."""
         self._ref.update_api_key(api_key)
 
@@ -122,10 +125,10 @@ class Client:
         service: str,
         rpc: str,
         req: google.protobuf.message.Message,
-        resp_type: Type[ProtoMessage],
+        resp_type: type[ProtoMessage],
         retry: bool,
-        metadata: Mapping[str, str],
-        timeout: Optional[timedelta],
+        metadata: Mapping[str, str | bytes],
+        timeout: timedelta | None,
     ) -> ProtoMessage:
         """Make RPC call using SDK Core."""
         # Prepare call

@@ -5,8 +5,9 @@ Nothing in this module should be considered stable. The API may change.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Type
+from typing import Any
 
 from typing_extensions import Protocol
 
@@ -17,15 +18,15 @@ class Runtime:
     """Runtime for SDK Core."""
 
     @staticmethod
-    def _raise_in_thread(thread_id: int, exc_type: Type[BaseException]) -> bool:
+    def _raise_in_thread(thread_id: int, exc_type: type[BaseException]) -> bool:
         """Internal helper for raising an exception in thread."""
         return temporalio.bridge.temporal_sdk_bridge.raise_in_thread(
             thread_id, exc_type
         )
 
-    def __init__(self, *, telemetry: TelemetryConfig) -> None:
+    def __init__(self, *, options: RuntimeOptions) -> None:
         """Create SDK Core runtime."""
-        self._ref = temporalio.bridge.temporal_sdk_bridge.init_runtime(telemetry)
+        self._ref = temporalio.bridge.temporal_sdk_bridge.init_runtime(options)
 
     def retrieve_buffered_metrics(self, durations_as_seconds: bool) -> Sequence[Any]:
         """Get buffered metrics."""
@@ -45,19 +46,19 @@ class LoggingConfig:
     """Python representation of the Rust struct for logging config."""
 
     filter: str
-    forward_to: Optional[Callable[[Sequence[BufferedLogEntry]], None]]
+    forward_to: Callable[[Sequence[BufferedLogEntry]], None] | None
 
 
 @dataclass(frozen=True)
 class MetricsConfig:
     """Python representation of the Rust struct for metrics config."""
 
-    opentelemetry: Optional[OpenTelemetryConfig]
-    prometheus: Optional[PrometheusConfig]
+    opentelemetry: OpenTelemetryConfig | None
+    prometheus: PrometheusConfig | None
     buffered_with_size: int
     attach_service_name: bool
-    global_tags: Optional[Mapping[str, str]]
-    metric_prefix: Optional[str]
+    global_tags: Mapping[str, str] | None
+    metric_prefix: str | None
 
 
 @dataclass(frozen=True)
@@ -66,7 +67,7 @@ class OpenTelemetryConfig:
 
     url: str
     headers: Mapping[str, str]
-    metric_periodicity_millis: Optional[int]
+    metric_periodicity_millis: int | None
     metric_temporality_delta: bool
     durations_as_seconds: bool
     http: bool
@@ -80,14 +81,23 @@ class PrometheusConfig:
     counters_total_suffix: bool
     unit_suffix: bool
     durations_as_seconds: bool
+    histogram_bucket_overrides: Mapping[str, Sequence[float]] | None = None
 
 
 @dataclass(frozen=True)
 class TelemetryConfig:
     """Python representation of the Rust struct for telemetry config."""
 
-    logging: Optional[LoggingConfig]
-    metrics: Optional[MetricsConfig]
+    logging: LoggingConfig | None
+    metrics: MetricsConfig | None
+
+
+@dataclass(frozen=True)
+class RuntimeOptions:
+    """Python representation of the Rust struct for runtime options."""
+
+    telemetry: TelemetryConfig
+    worker_heartbeat_interval_millis: int | None = 60_000  # 60s
 
 
 # WARNING: This must match Rust runtime::BufferedLogEntry
@@ -115,7 +125,7 @@ class BufferedLogEntry(Protocol):
         ...
 
     @property
-    def fields(self) -> Dict[str, Any]:
+    def fields(self) -> dict[str, Any]:
         """Additional log entry fields.
         Requesting this property performs a conversion from the internal
         representation to the Python representation on every request. Therefore

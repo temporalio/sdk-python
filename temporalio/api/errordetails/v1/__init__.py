@@ -1,4 +1,5 @@
 from .message_pb2 import (
+    ActivityExecutionAlreadyStartedFailure,
     CancellationAlreadyRequestedFailure,
     ClientVersionNotSupportedFailure,
     MultiOperationExecutionFailure,
@@ -6,6 +7,7 @@ from .message_pb2 import (
     NamespaceInvalidStateFailure,
     NamespaceNotActiveFailure,
     NamespaceNotFoundFailure,
+    NamespaceUnavailableFailure,
     NewerBuildExistsFailure,
     NotFoundFailure,
     PermissionDeniedFailure,
@@ -18,6 +20,7 @@ from .message_pb2 import (
 )
 
 __all__ = [
+    "ActivityExecutionAlreadyStartedFailure",
     "CancellationAlreadyRequestedFailure",
     "ClientVersionNotSupportedFailure",
     "MultiOperationExecutionFailure",
@@ -25,6 +28,7 @@ __all__ = [
     "NamespaceInvalidStateFailure",
     "NamespaceNotActiveFailure",
     "NamespaceNotFoundFailure",
+    "NamespaceUnavailableFailure",
     "NewerBuildExistsFailure",
     "NotFoundFailure",
     "PermissionDeniedFailure",

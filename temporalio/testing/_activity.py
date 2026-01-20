@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import inspect
 import threading
+from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Optional, Set, TypeVar
+from typing import Any, TypeVar
 
 from typing_extensions import ParamSpec
 
@@ -16,6 +17,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.worker._activity
+from temporalio.client import Client
 
 _Params = ParamSpec("_Params")
 _Return = TypeVar("_Return")
@@ -39,6 +41,8 @@ _default_info = temporalio.activity.Info(
     workflow_namespace="default",
     workflow_run_id="test-run",
     workflow_type="test",
+    priority=temporalio.common.Priority.default,
+    retry_policy=None,
 )
 
 
@@ -62,7 +66,7 @@ class ActivityEnvironment:
             take effect. Default is noop.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, client: Client | None = None) -> None:
         """Create an ActivityEnvironment for running activity code."""
         self.info = _default_info
         self.on_heartbeat: Callable[..., None] = lambda *args: None
@@ -72,16 +76,31 @@ class ActivityEnvironment:
         self.metric_meter = temporalio.common.MetricMeter.noop
         self._cancelled = False
         self._worker_shutdown = False
-        self._activities: Set[_Activity] = set()
+        self._activities: set[_Activity] = set()
+        self._client = client
+        self._cancellation_details = (
+            temporalio.activity._ActivityCancellationDetailsHolder()
+        )
 
-    def cancel(self) -> None:
+    def cancel(
+        self,
+        cancellation_details: temporalio.activity.ActivityCancellationDetails = temporalio.activity.ActivityCancellationDetails(
+            cancel_requested=True
+        ),
+    ) -> None:
         """Cancel the activity.
+
+        Args:
+            cancellation_details: details about the cancellation. These will
+                be accessible through temporalio.activity.cancellation_details()
+                in the activity after cancellation.
 
         This only has an effect on the first call.
         """
         if self._cancelled:
             return
         self._cancelled = True
+        self._cancellation_details.details = cancellation_details
         for act in self._activities:
             act.cancel()
 
@@ -113,7 +132,7 @@ class ActivityEnvironment:
             The callable's result.
         """
         # Create an activity and run it
-        return _Activity(self, fn).run(*args, **kwargs)
+        return _Activity(self, fn, self._client).run(*args, **kwargs)
 
 
 class _Activity:
@@ -121,13 +140,16 @@ class _Activity:
         self,
         env: ActivityEnvironment,
         fn: Callable,
+        client: Client | None,
     ) -> None:
         self.env = env
         self.fn = fn
-        self.is_async = inspect.iscoroutinefunction(fn)
-        self.cancel_thread_raiser: Optional[
+        self.is_async = inspect.iscoroutinefunction(fn) or inspect.iscoroutinefunction(
+            fn.__call__  # type: ignore
+        )
+        self.cancel_thread_raiser: None | (
             temporalio.worker._activity._ThreadExceptionRaiser
-        ] = None
+        ) = None
         if not self.is_async:
             # If there is a definition and they disable thread raising, don't
             # set
@@ -148,15 +170,19 @@ class _Activity:
                 thread_event=threading.Event(),
                 async_event=asyncio.Event() if self.is_async else None,
             ),
-            shield_thread_cancel_exception=None
-            if not self.cancel_thread_raiser
-            else self.cancel_thread_raiser.shielded,
+            shield_thread_cancel_exception=(
+                None
+                if not self.cancel_thread_raiser
+                else self.cancel_thread_raiser.shielded
+            ),
             payload_converter_class_or_instance=env.payload_converter,
             runtime_metric_meter=env.metric_meter,
+            client=client if self.is_async else None,
+            cancellation_details=env._cancellation_details,
         )
-        self.task: Optional[asyncio.Task] = None
+        self.task: asyncio.Task | None = None
 
-    def run(self, *args, **kwargs) -> Any:
+    def run(self, *args: Any, **kwargs: Any) -> Any:
         if self.cancel_thread_raiser:
             thread_id = threading.current_thread().ident
             if thread_id is not None:

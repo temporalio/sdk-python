@@ -25,9 +25,12 @@ from temporalio.api.enums.v1 import (
 from temporalio.api.enums.v1 import (
     namespace_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_namespace__pb2,
 )
+from temporalio.api.failure.v1 import (
+    message_pb2 as temporal_dot_api_dot_failure_dot_v1_dot_message__pb2,
+)
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n*temporal/api/errordetails/v1/message.proto\x12\x1ctemporal.api.errordetails.v1\x1a\x19google/protobuf/any.proto\x1a$temporal/api/common/v1/message.proto\x1a(temporal/api/enums/v1/failed_cause.proto\x1a%temporal/api/enums/v1/namespace.proto"B\n\x0fNotFoundFailure\x12\x17\n\x0f\x63urrent_cluster\x18\x01 \x01(\t\x12\x16\n\x0e\x61\x63tive_cluster\x18\x02 \x01(\t"R\n&WorkflowExecutionAlreadyStartedFailure\x12\x18\n\x10start_request_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\t"_\n\x19NamespaceNotActiveFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0f\x63urrent_cluster\x18\x02 \x01(\t\x12\x16\n\x0e\x61\x63tive_cluster\x18\x03 \x01(\t"\xa6\x01\n\x1cNamespaceInvalidStateFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x34\n\x05state\x18\x02 \x01(\x0e\x32%.temporal.api.enums.v1.NamespaceState\x12=\n\x0e\x61llowed_states\x18\x03 \x03(\x0e\x32%.temporal.api.enums.v1.NamespaceState"-\n\x18NamespaceNotFoundFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t"\x1f\n\x1dNamespaceAlreadyExistsFailure"k\n ClientVersionNotSupportedFailure\x12\x16\n\x0e\x63lient_version\x18\x01 \x01(\t\x12\x13\n\x0b\x63lient_name\x18\x02 \x01(\t\x12\x1a\n\x12supported_versions\x18\x03 \x01(\t"d\n ServerVersionNotSupportedFailure\x12\x16\n\x0eserver_version\x18\x01 \x01(\t\x12(\n client_supported_server_versions\x18\x02 \x01(\t"%\n#CancellationAlreadyRequestedFailure"\x14\n\x12QueryFailedFailure")\n\x17PermissionDeniedFailure\x12\x0e\n\x06reason\x18\x01 \x01(\t"\x96\x01\n\x18ResourceExhaustedFailure\x12<\n\x05\x63\x61use\x18\x01 \x01(\x0e\x32-.temporal.api.enums.v1.ResourceExhaustedCause\x12<\n\x05scope\x18\x02 \x01(\x0e\x32-.temporal.api.enums.v1.ResourceExhaustedScope"v\n\x15SystemWorkflowFailure\x12\x45\n\x12workflow_execution\x18\x01 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x16\n\x0eworkflow_error\x18\x02 \x01(\t"\x19\n\x17WorkflowNotReadyFailure"3\n\x17NewerBuildExistsFailure\x12\x18\n\x10\x64\x65\x66\x61ult_build_id\x18\x01 \x01(\t"\xd9\x01\n\x1eMultiOperationExecutionFailure\x12^\n\x08statuses\x18\x01 \x03(\x0b\x32L.temporal.api.errordetails.v1.MultiOperationExecutionFailure.OperationStatus\x1aW\n\x0fOperationStatus\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07message\x18\x02 \x01(\t\x12%\n\x07\x64\x65tails\x18\x03 \x03(\x0b\x32\x14.google.protobuf.AnyB\xa7\x01\n\x1fio.temporal.api.errordetails.v1B\x0cMessageProtoP\x01Z/go.temporal.io/api/errordetails/v1;errordetails\xaa\x02\x1eTemporalio.Api.ErrorDetails.V1\xea\x02!Temporalio::Api::ErrorDetails::V1b\x06proto3'
+    b'\n*temporal/api/errordetails/v1/message.proto\x12\x1ctemporal.api.errordetails.v1\x1a\x19google/protobuf/any.proto\x1a$temporal/api/common/v1/message.proto\x1a(temporal/api/enums/v1/failed_cause.proto\x1a%temporal/api/enums/v1/namespace.proto\x1a%temporal/api/failure/v1/message.proto"B\n\x0fNotFoundFailure\x12\x17\n\x0f\x63urrent_cluster\x18\x01 \x01(\t\x12\x16\n\x0e\x61\x63tive_cluster\x18\x02 \x01(\t"R\n&WorkflowExecutionAlreadyStartedFailure\x12\x18\n\x10start_request_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\t"_\n\x19NamespaceNotActiveFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x17\n\x0f\x63urrent_cluster\x18\x02 \x01(\t\x12\x16\n\x0e\x61\x63tive_cluster\x18\x03 \x01(\t"0\n\x1bNamespaceUnavailableFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t"\xa6\x01\n\x1cNamespaceInvalidStateFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x34\n\x05state\x18\x02 \x01(\x0e\x32%.temporal.api.enums.v1.NamespaceState\x12=\n\x0e\x61llowed_states\x18\x03 \x03(\x0e\x32%.temporal.api.enums.v1.NamespaceState"-\n\x18NamespaceNotFoundFailure\x12\x11\n\tnamespace\x18\x01 \x01(\t"\x1f\n\x1dNamespaceAlreadyExistsFailure"k\n ClientVersionNotSupportedFailure\x12\x16\n\x0e\x63lient_version\x18\x01 \x01(\t\x12\x13\n\x0b\x63lient_name\x18\x02 \x01(\t\x12\x1a\n\x12supported_versions\x18\x03 \x01(\t"d\n ServerVersionNotSupportedFailure\x12\x16\n\x0eserver_version\x18\x01 \x01(\t\x12(\n client_supported_server_versions\x18\x02 \x01(\t"%\n#CancellationAlreadyRequestedFailure"G\n\x12QueryFailedFailure\x12\x31\n\x07\x66\x61ilure\x18\x01 \x01(\x0b\x32 .temporal.api.failure.v1.Failure")\n\x17PermissionDeniedFailure\x12\x0e\n\x06reason\x18\x01 \x01(\t"\x96\x01\n\x18ResourceExhaustedFailure\x12<\n\x05\x63\x61use\x18\x01 \x01(\x0e\x32-.temporal.api.enums.v1.ResourceExhaustedCause\x12<\n\x05scope\x18\x02 \x01(\x0e\x32-.temporal.api.enums.v1.ResourceExhaustedScope"v\n\x15SystemWorkflowFailure\x12\x45\n\x12workflow_execution\x18\x01 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x16\n\x0eworkflow_error\x18\x02 \x01(\t"\x19\n\x17WorkflowNotReadyFailure"3\n\x17NewerBuildExistsFailure\x12\x18\n\x10\x64\x65\x66\x61ult_build_id\x18\x01 \x01(\t"\xd9\x01\n\x1eMultiOperationExecutionFailure\x12^\n\x08statuses\x18\x01 \x03(\x0b\x32L.temporal.api.errordetails.v1.MultiOperationExecutionFailure.OperationStatus\x1aW\n\x0fOperationStatus\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07message\x18\x02 \x01(\t\x12%\n\x07\x64\x65tails\x18\x03 \x03(\x0b\x32\x14.google.protobuf.Any"R\n&ActivityExecutionAlreadyStartedFailure\x12\x18\n\x10start_request_id\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\tB\xa7\x01\n\x1fio.temporal.api.errordetails.v1B\x0cMessageProtoP\x01Z/go.temporal.io/api/errordetails/v1;errordetails\xaa\x02\x1eTemporalio.Api.ErrorDetails.V1\xea\x02!Temporalio::Api::ErrorDetails::V1b\x06proto3'
 )
 
 
@@ -37,6 +40,9 @@ _WORKFLOWEXECUTIONALREADYSTARTEDFAILURE = DESCRIPTOR.message_types_by_name[
 ]
 _NAMESPACENOTACTIVEFAILURE = DESCRIPTOR.message_types_by_name[
     "NamespaceNotActiveFailure"
+]
+_NAMESPACEUNAVAILABLEFAILURE = DESCRIPTOR.message_types_by_name[
+    "NamespaceUnavailableFailure"
 ]
 _NAMESPACEINVALIDSTATEFAILURE = DESCRIPTOR.message_types_by_name[
     "NamespaceInvalidStateFailure"
@@ -66,12 +72,15 @@ _MULTIOPERATIONEXECUTIONFAILURE = DESCRIPTOR.message_types_by_name[
 _MULTIOPERATIONEXECUTIONFAILURE_OPERATIONSTATUS = (
     _MULTIOPERATIONEXECUTIONFAILURE.nested_types_by_name["OperationStatus"]
 )
+_ACTIVITYEXECUTIONALREADYSTARTEDFAILURE = DESCRIPTOR.message_types_by_name[
+    "ActivityExecutionAlreadyStartedFailure"
+]
 NotFoundFailure = _reflection.GeneratedProtocolMessageType(
     "NotFoundFailure",
     (_message.Message,),
     {
         "DESCRIPTOR": _NOTFOUNDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.NotFoundFailure)
     },
 )
@@ -82,7 +91,7 @@ WorkflowExecutionAlreadyStartedFailure = _reflection.GeneratedProtocolMessageTyp
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWEXECUTIONALREADYSTARTEDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.WorkflowExecutionAlreadyStartedFailure)
     },
 )
@@ -93,18 +102,29 @@ NamespaceNotActiveFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NAMESPACENOTACTIVEFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.NamespaceNotActiveFailure)
     },
 )
 _sym_db.RegisterMessage(NamespaceNotActiveFailure)
+
+NamespaceUnavailableFailure = _reflection.GeneratedProtocolMessageType(
+    "NamespaceUnavailableFailure",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _NAMESPACEUNAVAILABLEFAILURE,
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.NamespaceUnavailableFailure)
+    },
+)
+_sym_db.RegisterMessage(NamespaceUnavailableFailure)
 
 NamespaceInvalidStateFailure = _reflection.GeneratedProtocolMessageType(
     "NamespaceInvalidStateFailure",
     (_message.Message,),
     {
         "DESCRIPTOR": _NAMESPACEINVALIDSTATEFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.NamespaceInvalidStateFailure)
     },
 )
@@ -115,7 +135,7 @@ NamespaceNotFoundFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NAMESPACENOTFOUNDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.NamespaceNotFoundFailure)
     },
 )
@@ -126,7 +146,7 @@ NamespaceAlreadyExistsFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NAMESPACEALREADYEXISTSFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.NamespaceAlreadyExistsFailure)
     },
 )
@@ -137,7 +157,7 @@ ClientVersionNotSupportedFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CLIENTVERSIONNOTSUPPORTEDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.ClientVersionNotSupportedFailure)
     },
 )
@@ -148,7 +168,7 @@ ServerVersionNotSupportedFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SERVERVERSIONNOTSUPPORTEDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.ServerVersionNotSupportedFailure)
     },
 )
@@ -159,7 +179,7 @@ CancellationAlreadyRequestedFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _CANCELLATIONALREADYREQUESTEDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.CancellationAlreadyRequestedFailure)
     },
 )
@@ -170,7 +190,7 @@ QueryFailedFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _QUERYFAILEDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.QueryFailedFailure)
     },
 )
@@ -181,7 +201,7 @@ PermissionDeniedFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _PERMISSIONDENIEDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.PermissionDeniedFailure)
     },
 )
@@ -192,7 +212,7 @@ ResourceExhaustedFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _RESOURCEEXHAUSTEDFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.ResourceExhaustedFailure)
     },
 )
@@ -203,7 +223,7 @@ SystemWorkflowFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _SYSTEMWORKFLOWFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.SystemWorkflowFailure)
     },
 )
@@ -214,7 +234,7 @@ WorkflowNotReadyFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _WORKFLOWNOTREADYFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.WorkflowNotReadyFailure)
     },
 )
@@ -225,7 +245,7 @@ NewerBuildExistsFailure = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _NEWERBUILDEXISTSFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.NewerBuildExistsFailure)
     },
 )
@@ -240,53 +260,68 @@ MultiOperationExecutionFailure = _reflection.GeneratedProtocolMessageType(
             (_message.Message,),
             {
                 "DESCRIPTOR": _MULTIOPERATIONEXECUTIONFAILURE_OPERATIONSTATUS,
-                "__module__": "temporal.api.errordetails.v1.message_pb2",
+                "__module__": "temporalio.api.errordetails.v1.message_pb2",
                 # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.MultiOperationExecutionFailure.OperationStatus)
             },
         ),
         "DESCRIPTOR": _MULTIOPERATIONEXECUTIONFAILURE,
-        "__module__": "temporal.api.errordetails.v1.message_pb2",
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.MultiOperationExecutionFailure)
     },
 )
 _sym_db.RegisterMessage(MultiOperationExecutionFailure)
 _sym_db.RegisterMessage(MultiOperationExecutionFailure.OperationStatus)
 
+ActivityExecutionAlreadyStartedFailure = _reflection.GeneratedProtocolMessageType(
+    "ActivityExecutionAlreadyStartedFailure",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _ACTIVITYEXECUTIONALREADYSTARTEDFAILURE,
+        "__module__": "temporalio.api.errordetails.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.errordetails.v1.ActivityExecutionAlreadyStartedFailure)
+    },
+)
+_sym_db.RegisterMessage(ActivityExecutionAlreadyStartedFailure)
+
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\037io.temporal.api.errordetails.v1B\014MessageProtoP\001Z/go.temporal.io/api/errordetails/v1;errordetails\252\002\036Temporalio.Api.ErrorDetails.V1\352\002!Temporalio::Api::ErrorDetails::V1"
-    _NOTFOUNDFAILURE._serialized_start = 222
-    _NOTFOUNDFAILURE._serialized_end = 288
-    _WORKFLOWEXECUTIONALREADYSTARTEDFAILURE._serialized_start = 290
-    _WORKFLOWEXECUTIONALREADYSTARTEDFAILURE._serialized_end = 372
-    _NAMESPACENOTACTIVEFAILURE._serialized_start = 374
-    _NAMESPACENOTACTIVEFAILURE._serialized_end = 469
-    _NAMESPACEINVALIDSTATEFAILURE._serialized_start = 472
-    _NAMESPACEINVALIDSTATEFAILURE._serialized_end = 638
-    _NAMESPACENOTFOUNDFAILURE._serialized_start = 640
-    _NAMESPACENOTFOUNDFAILURE._serialized_end = 685
-    _NAMESPACEALREADYEXISTSFAILURE._serialized_start = 687
-    _NAMESPACEALREADYEXISTSFAILURE._serialized_end = 718
-    _CLIENTVERSIONNOTSUPPORTEDFAILURE._serialized_start = 720
-    _CLIENTVERSIONNOTSUPPORTEDFAILURE._serialized_end = 827
-    _SERVERVERSIONNOTSUPPORTEDFAILURE._serialized_start = 829
-    _SERVERVERSIONNOTSUPPORTEDFAILURE._serialized_end = 929
-    _CANCELLATIONALREADYREQUESTEDFAILURE._serialized_start = 931
-    _CANCELLATIONALREADYREQUESTEDFAILURE._serialized_end = 968
-    _QUERYFAILEDFAILURE._serialized_start = 970
-    _QUERYFAILEDFAILURE._serialized_end = 990
-    _PERMISSIONDENIEDFAILURE._serialized_start = 992
-    _PERMISSIONDENIEDFAILURE._serialized_end = 1033
-    _RESOURCEEXHAUSTEDFAILURE._serialized_start = 1036
-    _RESOURCEEXHAUSTEDFAILURE._serialized_end = 1186
-    _SYSTEMWORKFLOWFAILURE._serialized_start = 1188
-    _SYSTEMWORKFLOWFAILURE._serialized_end = 1306
-    _WORKFLOWNOTREADYFAILURE._serialized_start = 1308
-    _WORKFLOWNOTREADYFAILURE._serialized_end = 1333
-    _NEWERBUILDEXISTSFAILURE._serialized_start = 1335
-    _NEWERBUILDEXISTSFAILURE._serialized_end = 1386
-    _MULTIOPERATIONEXECUTIONFAILURE._serialized_start = 1389
-    _MULTIOPERATIONEXECUTIONFAILURE._serialized_end = 1606
-    _MULTIOPERATIONEXECUTIONFAILURE_OPERATIONSTATUS._serialized_start = 1519
-    _MULTIOPERATIONEXECUTIONFAILURE_OPERATIONSTATUS._serialized_end = 1606
+    _NOTFOUNDFAILURE._serialized_start = 261
+    _NOTFOUNDFAILURE._serialized_end = 327
+    _WORKFLOWEXECUTIONALREADYSTARTEDFAILURE._serialized_start = 329
+    _WORKFLOWEXECUTIONALREADYSTARTEDFAILURE._serialized_end = 411
+    _NAMESPACENOTACTIVEFAILURE._serialized_start = 413
+    _NAMESPACENOTACTIVEFAILURE._serialized_end = 508
+    _NAMESPACEUNAVAILABLEFAILURE._serialized_start = 510
+    _NAMESPACEUNAVAILABLEFAILURE._serialized_end = 558
+    _NAMESPACEINVALIDSTATEFAILURE._serialized_start = 561
+    _NAMESPACEINVALIDSTATEFAILURE._serialized_end = 727
+    _NAMESPACENOTFOUNDFAILURE._serialized_start = 729
+    _NAMESPACENOTFOUNDFAILURE._serialized_end = 774
+    _NAMESPACEALREADYEXISTSFAILURE._serialized_start = 776
+    _NAMESPACEALREADYEXISTSFAILURE._serialized_end = 807
+    _CLIENTVERSIONNOTSUPPORTEDFAILURE._serialized_start = 809
+    _CLIENTVERSIONNOTSUPPORTEDFAILURE._serialized_end = 916
+    _SERVERVERSIONNOTSUPPORTEDFAILURE._serialized_start = 918
+    _SERVERVERSIONNOTSUPPORTEDFAILURE._serialized_end = 1018
+    _CANCELLATIONALREADYREQUESTEDFAILURE._serialized_start = 1020
+    _CANCELLATIONALREADYREQUESTEDFAILURE._serialized_end = 1057
+    _QUERYFAILEDFAILURE._serialized_start = 1059
+    _QUERYFAILEDFAILURE._serialized_end = 1130
+    _PERMISSIONDENIEDFAILURE._serialized_start = 1132
+    _PERMISSIONDENIEDFAILURE._serialized_end = 1173
+    _RESOURCEEXHAUSTEDFAILURE._serialized_start = 1176
+    _RESOURCEEXHAUSTEDFAILURE._serialized_end = 1326
+    _SYSTEMWORKFLOWFAILURE._serialized_start = 1328
+    _SYSTEMWORKFLOWFAILURE._serialized_end = 1446
+    _WORKFLOWNOTREADYFAILURE._serialized_start = 1448
+    _WORKFLOWNOTREADYFAILURE._serialized_end = 1473
+    _NEWERBUILDEXISTSFAILURE._serialized_start = 1475
+    _NEWERBUILDEXISTSFAILURE._serialized_end = 1526
+    _MULTIOPERATIONEXECUTIONFAILURE._serialized_start = 1529
+    _MULTIOPERATIONEXECUTIONFAILURE._serialized_end = 1746
+    _MULTIOPERATIONEXECUTIONFAILURE_OPERATIONSTATUS._serialized_start = 1659
+    _MULTIOPERATIONEXECUTIONFAILURE_OPERATIONSTATUS._serialized_end = 1746
+    _ACTIVITYEXECUTIONALREADYSTARTEDFAILURE._serialized_start = 1748
+    _ACTIVITYEXECUTIONALREADYSTARTEDFAILURE._serialized_end = 1830
 # @@protoc_insertion_point(module_scope)

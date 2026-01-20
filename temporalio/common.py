@@ -6,34 +6,28 @@ import inspect
 import types
 import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import IntEnum
 from typing import (
     Any,
-    Callable,
     ClassVar,
-    Collection,
     Generic,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Text,
-    Tuple,
-    Type,
+    TypeAlias,
     TypeVar,
-    Union,
+    get_origin,
     get_type_hints,
     overload,
 )
 
 import google.protobuf.internal.containers
-from typing_extensions import ClassVar, NamedTuple, Self, TypeAlias, get_origin
+from typing_extensions import NamedTuple, Self
 
 import temporalio.api.common.v1
+import temporalio.api.deployment.v1
 import temporalio.api.enums.v1
+import temporalio.api.workflow.v1
 import temporalio.types
 
 
@@ -49,18 +43,18 @@ class RetryPolicy:
     interval. Default 2.0.
     """
 
-    maximum_interval: Optional[timedelta] = None
+    maximum_interval: timedelta | None = None
     """Maximum backoff interval between retries. Default 100x
     :py:attr:`initial_interval`.
     """
 
     maximum_attempts: int = 0
     """Maximum number of attempts.
-    
+
     If 0, the default, there is no maximum.
     """
 
-    non_retryable_error_types: Optional[Sequence[str]] = None
+    non_retryable_error_types: Sequence[str] | None = None
     """List of error types that are not retryable."""
 
     @staticmethod
@@ -198,13 +192,13 @@ class RawValue:
 # We choose to make this a list instead of an sequence so we can catch if people
 # are not sending lists each time but maybe accidentally sending a string (which
 # is a sequence)
-SearchAttributeValues: TypeAlias = Union[
-    List[str], List[int], List[float], List[bool], List[datetime]
-]
+SearchAttributeValues: TypeAlias = (
+    list[str] | list[int] | list[float] | list[bool] | list[datetime]
+)
 
 SearchAttributes: TypeAlias = Mapping[str, SearchAttributeValues]
 
-SearchAttributeValue: TypeAlias = Union[str, int, float, bool, datetime, Sequence[str]]
+SearchAttributeValue: TypeAlias = str | int | float | bool | datetime | Sequence[str]
 
 SearchAttributeValueType = TypeVar(
     "SearchAttributeValueType", str, int, float, bool, datetime, Sequence[str]
@@ -245,7 +239,7 @@ class SearchAttributeKey(ABC, Generic[SearchAttributeValueType]):
 
     @property
     @abstractmethod
-    def value_type(self) -> Type[SearchAttributeValueType]:
+    def value_type(self) -> type[SearchAttributeValueType]:
         """Get the Python type of value for the key.
 
         This may contain generics which cannot be used in ``isinstance``.
@@ -254,7 +248,7 @@ class SearchAttributeKey(ABC, Generic[SearchAttributeValueType]):
         ...
 
     @property
-    def origin_value_type(self) -> Type:
+    def origin_value_type(self) -> type:
         """Get the Python type of value for the key without generics."""
         return get_origin(self.value_type) or self.value_type
 
@@ -338,9 +332,7 @@ class SearchAttributeKey(ABC, Generic[SearchAttributeValueType]):
         )
 
     @staticmethod
-    def _from_metadata_type(
-        name: str, metadata_type: str
-    ) -> Optional[SearchAttributeKey]:
+    def _from_metadata_type(name: str, metadata_type: str) -> SearchAttributeKey | None:
         if metadata_type == "Text":
             return SearchAttributeKey.for_text(name)
         elif metadata_type == "Keyword":
@@ -360,7 +352,7 @@ class SearchAttributeKey(ABC, Generic[SearchAttributeValueType]):
     @staticmethod
     def _guess_from_untyped_values(
         name: str, vals: SearchAttributeValues
-    ) -> Optional[SearchAttributeKey]:
+    ) -> SearchAttributeKey | None:
         if not vals:
             return None
         elif len(vals) > 1:
@@ -384,7 +376,7 @@ class _SearchAttributeKey(SearchAttributeKey[SearchAttributeValueType]):
     _name: str
     _indexed_value_type: SearchAttributeIndexedValueType
     # No supported way in Python to derive this, so we're setting manually
-    _value_type: Type[SearchAttributeValueType]
+    _value_type: type[SearchAttributeValueType]
 
     @property
     def name(self) -> str:
@@ -395,7 +387,7 @@ class _SearchAttributeKey(SearchAttributeKey[SearchAttributeValueType]):
         return self._indexed_value_type
 
     @property
-    def value_type(self) -> Type[SearchAttributeValueType]:
+    def value_type(self) -> type[SearchAttributeValueType]:
         return self._value_type
 
 
@@ -417,7 +409,7 @@ class SearchAttributeUpdate(ABC, Generic[SearchAttributeValueType]):
 
     @property
     @abstractmethod
-    def value(self) -> Optional[SearchAttributeValueType]:
+    def value(self) -> SearchAttributeValueType | None:
         """Value that is being set or ``None`` if being unset."""
         ...
 
@@ -425,14 +417,14 @@ class SearchAttributeUpdate(ABC, Generic[SearchAttributeValueType]):
 @dataclass(frozen=True)
 class _SearchAttributeUpdate(SearchAttributeUpdate[SearchAttributeValueType]):
     _key: SearchAttributeKey[SearchAttributeValueType]
-    _value: Optional[SearchAttributeValueType]
+    _value: SearchAttributeValueType | None
 
     @property
     def key(self) -> SearchAttributeKey[SearchAttributeValueType]:
         return self._key
 
     @property
-    def value(self) -> Optional[SearchAttributeValueType]:
+    def value(self) -> SearchAttributeValueType | None:
         return self._value
 
 
@@ -494,24 +486,24 @@ class TypedSearchAttributes(Collection[SearchAttributePair]):
 
         This uses key equality so the key must be the same name and type.
         """
-        return any(v for k, v in self if k == key)
+        return any(k == key for k, _v in self)
 
     @overload
     def get(
         self, key: SearchAttributeKey[SearchAttributeValueType]
-    ) -> Optional[SearchAttributeValueType]: ...
+    ) -> SearchAttributeValueType | None: ...
 
     @overload
     def get(
         self,
         key: SearchAttributeKey[SearchAttributeValueType],
         default: temporalio.types.AnyType,
-    ) -> Union[SearchAttributeValueType, temporalio.types.AnyType]: ...
+    ) -> SearchAttributeValueType | temporalio.types.AnyType: ...
 
     def get(
         self,
         key: SearchAttributeKey[SearchAttributeValueType],
-        default: Optional[Any] = None,
+        default: Any | None = None,
     ) -> Any:
         """Get an attribute value for a key (or default). This is similar to
         dict.get.
@@ -546,8 +538,8 @@ class TypedSearchAttributes(Collection[SearchAttributePair]):
 TypedSearchAttributes.empty = TypedSearchAttributes(search_attributes=[])
 
 
-def _warn_on_deprecated_search_attributes(
-    attributes: Optional[Union[SearchAttributes, Any]],
+def _warn_on_deprecated_search_attributes(  # type:ignore[reportUnusedFunction]
+    attributes: SearchAttributes | Any | None,
     stack_level: int = 2,
 ) -> None:
     if attributes and isinstance(attributes, Mapping):
@@ -558,7 +550,7 @@ def _warn_on_deprecated_search_attributes(
         )
 
 
-MetricAttributes: TypeAlias = Mapping[str, Union[str, int, float, bool]]
+MetricAttributes: TypeAlias = Mapping[str, str | int | float | bool]
 
 
 class MetricMeter(ABC):
@@ -569,7 +561,7 @@ class MetricMeter(ABC):
 
     @abstractmethod
     def create_counter(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricCounter:
         """Create a counter metric for adding values.
 
@@ -585,7 +577,7 @@ class MetricMeter(ABC):
 
     @abstractmethod
     def create_histogram(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricHistogram:
         """Create a histogram metric for recording values.
 
@@ -601,7 +593,7 @@ class MetricMeter(ABC):
 
     @abstractmethod
     def create_histogram_float(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricHistogramFloat:
         """Create a histogram metric for recording values.
 
@@ -617,7 +609,7 @@ class MetricMeter(ABC):
 
     @abstractmethod
     def create_histogram_timedelta(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricHistogramTimedelta:
         """Create a histogram metric for recording values.
 
@@ -636,7 +628,7 @@ class MetricMeter(ABC):
 
     @abstractmethod
     def create_gauge(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricGauge:
         """Create a gauge metric for setting values.
 
@@ -652,7 +644,7 @@ class MetricMeter(ABC):
 
     @abstractmethod
     def create_gauge_float(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricGaugeFloat:
         """Create a gauge metric for setting values.
 
@@ -697,13 +689,13 @@ class MetricCommon(ABC):
 
     @property
     @abstractmethod
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         """Description for the metric if any."""
         ...
 
     @property
     @abstractmethod
-    def unit(self) -> Optional[str]:
+    def unit(self) -> str | None:
         """Unit for the metric if any."""
         ...
 
@@ -732,7 +724,7 @@ class MetricCounter(MetricCommon):
 
     @abstractmethod
     def add(
-        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+        self, value: int, additional_attributes: MetricAttributes | None = None
     ) -> None:
         """Add a value to the counter.
 
@@ -753,7 +745,7 @@ class MetricHistogram(MetricCommon):
 
     @abstractmethod
     def record(
-        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+        self, value: int, additional_attributes: MetricAttributes | None = None
     ) -> None:
         """Record a value on the histogram.
 
@@ -774,7 +766,7 @@ class MetricHistogramFloat(MetricCommon):
 
     @abstractmethod
     def record(
-        self, value: float, additional_attributes: Optional[MetricAttributes] = None
+        self, value: float, additional_attributes: MetricAttributes | None = None
     ) -> None:
         """Record a value on the histogram.
 
@@ -795,7 +787,7 @@ class MetricHistogramTimedelta(MetricCommon):
 
     @abstractmethod
     def record(
-        self, value: timedelta, additional_attributes: Optional[MetricAttributes] = None
+        self, value: timedelta, additional_attributes: MetricAttributes | None = None
     ) -> None:
         """Record a value on the histogram.
 
@@ -818,7 +810,7 @@ class MetricGauge(MetricCommon):
 
     @abstractmethod
     def set(
-        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+        self, value: int, additional_attributes: MetricAttributes | None = None
     ) -> None:
         """Set a value on the gauge.
 
@@ -839,7 +831,7 @@ class MetricGaugeFloat(MetricCommon):
 
     @abstractmethod
     def set(
-        self, value: float, additional_attributes: Optional[MetricAttributes] = None
+        self, value: float, additional_attributes: MetricAttributes | None = None
     ) -> None:
         """Set a value on the gauge.
 
@@ -857,32 +849,32 @@ class MetricGaugeFloat(MetricCommon):
 
 class _NoopMetricMeter(MetricMeter):
     def create_counter(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricCounter:
         return _NoopMetricCounter(name, description, unit)
 
     def create_histogram(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricHistogram:
         return _NoopMetricHistogram(name, description, unit)
 
     def create_histogram_float(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricHistogramFloat:
         return _NoopMetricHistogramFloat(name, description, unit)
 
     def create_histogram_timedelta(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricHistogramTimedelta:
         return _NoopMetricHistogramTimedelta(name, description, unit)
 
     def create_gauge(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricGauge:
         return _NoopMetricGauge(name, description, unit)
 
     def create_gauge_float(
-        self, name: str, description: Optional[str] = None, unit: Optional[str] = None
+        self, name: str, description: str | None = None, unit: str | None = None
     ) -> MetricGaugeFloat:
         return _NoopMetricGaugeFloat(name, description, unit)
 
@@ -893,9 +885,7 @@ class _NoopMetricMeter(MetricMeter):
 
 
 class _NoopMetric(MetricCommon):
-    def __init__(
-        self, name: str, description: Optional[str], unit: Optional[str]
-    ) -> None:
+    def __init__(self, name: str, description: str | None, unit: str | None) -> None:
         self._name = name
         self._description = description
         self._unit = unit
@@ -905,11 +895,11 @@ class _NoopMetric(MetricCommon):
         return self._name
 
     @property
-    def description(self) -> Optional[str]:
+    def description(self) -> str | None:
         return self._description
 
     @property
-    def unit(self) -> Optional[str]:
+    def unit(self) -> str | None:
         return self._unit
 
     def with_additional_attributes(
@@ -920,54 +910,248 @@ class _NoopMetric(MetricCommon):
 
 class _NoopMetricCounter(MetricCounter, _NoopMetric):
     def add(
-        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+        self, value: int, additional_attributes: MetricAttributes | None = None
     ) -> None:
         pass
 
 
 class _NoopMetricHistogram(MetricHistogram, _NoopMetric):
     def record(
-        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+        self, value: int, additional_attributes: MetricAttributes | None = None
     ) -> None:
         pass
 
 
 class _NoopMetricHistogramFloat(MetricHistogramFloat, _NoopMetric):
     def record(
-        self, value: float, additional_attributes: Optional[MetricAttributes] = None
+        self, value: float, additional_attributes: MetricAttributes | None = None
     ) -> None:
         pass
 
 
 class _NoopMetricHistogramTimedelta(MetricHistogramTimedelta, _NoopMetric):
     def record(
-        self, value: timedelta, additional_attributes: Optional[MetricAttributes] = None
+        self, value: timedelta, additional_attributes: MetricAttributes | None = None
     ) -> None:
         pass
 
 
 class _NoopMetricGauge(MetricGauge, _NoopMetric):
     def set(
-        self, value: int, additional_attributes: Optional[MetricAttributes] = None
+        self, value: int, additional_attributes: MetricAttributes | None = None
     ) -> None:
         pass
 
 
 class _NoopMetricGaugeFloat(MetricGaugeFloat, _NoopMetric):
     def set(
-        self, value: float, additional_attributes: Optional[MetricAttributes] = None
+        self, value: float, additional_attributes: MetricAttributes | None = None
     ) -> None:
         pass
 
 
 MetricMeter.noop = _NoopMetricMeter()
 
+
+@dataclass(frozen=True)
+class Priority:
+    """Priority contains metadata that controls relative ordering of task processing when tasks are
+    backlogged in a queue. Initially, Priority will be used in activity and workflow task queues,
+    which are typically where backlogs exist.
+
+    Priority is (for now) attached to workflows and activities. Activities and child workflows
+    inherit Priority from the workflow that created them, but may override fields when they are
+    started or modified. For each field of a Priority on an activity/workflow, not present or equal
+    to zero/empty string means to inherit the value from the calling workflow, or if there is no
+    calling workflow, then use the default (documented on the field).
+
+    The overall semantics of Priority are:
+    1. First, consider "priority_key": lower number goes first.
+    2. Then consider "fairness_key" and "fairness_weight" for fairness balancing.
+    """
+
+    priority_key: int | None = None
+    """Priority key is a positive integer from 1 to n, where smaller integers correspond to higher
+    priorities (tasks run sooner). In general, tasks in a queue should be processed in close to
+    priority order, although small deviations are possible.
+
+    The maximum priority value (minimum priority) is determined by server configuration, and
+    defaults to 5.
+
+    The default priority is (min+max)/2. With the default max of 5 and min of 1, that comes out to
+    3.
+    """
+
+    fairness_key: str | None = None
+    """A short string (max 64 bytes) that is used as a key for a fairness balancing mechanism.
+    This can correspond to a tenant id or even fixed strings like "high", "low", etc.
+
+    The fairness mechanism attempts to dispatch tasks for a given key in proportion to its weight.
+    For example, using a thousand distinct tenant ids, each with a weight of 1.0 will result in
+    each tenant getting a roughly equal share of task dispatch throughput.
+
+    Default is an empty string.
+    """
+
+    fairness_weight: float | None = None
+    """A float that represents the weight for task dispatch for the associated fairness key.
+    Tasks for a fairness key are dispatched in proportion to their weight.
+
+    Server will clamp the values between 0.001 and 1000. Default weight is 1.0.
+
+    The effective weight of a task is determined by the following precedence (highest to lowest):
+    1. Weights overridden in task queue configuration
+    2. Weights attached to workflow/activity
+    3. Default weight of 1.0
+    """
+
+    default: ClassVar[Priority]
+    """Singleton default priority instance."""
+
+    @staticmethod
+    def _from_proto(proto: temporalio.api.common.v1.Priority) -> Priority:
+        """Create a Priority instance from the proto object."""
+        return Priority(
+            priority_key=proto.priority_key if proto.priority_key else None,
+            fairness_key=proto.fairness_key if proto.fairness_key else None,
+            fairness_weight=proto.fairness_weight if proto.fairness_weight else None,
+        )
+
+    def _to_proto(self) -> temporalio.api.common.v1.Priority:
+        proto = temporalio.api.common.v1.Priority(
+            priority_key=self.priority_key or 0,
+        )
+        if self.fairness_key is not None:
+            proto.fairness_key = self.fairness_key
+        if self.fairness_weight is not None:
+            proto.fairness_weight = self.fairness_weight
+        return proto
+
+    def __post_init__(self):
+        """Validates priority settings."""
+        if self.priority_key is not None:
+            if not isinstance(self.priority_key, int):
+                raise TypeError("priority_key must be an integer")
+            if self.priority_key < 1:
+                raise ValueError("priority_key must be a positive integer")
+
+
+Priority.default = Priority(priority_key=None, fairness_key=None, fairness_weight=None)
+
+
+class VersioningBehavior(IntEnum):
+    """Specifies when a workflow might move from a worker of one Build Id to another.
+
+    WARNING: Experimental API.
+    """
+
+    UNSPECIFIED = (
+        temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_UNSPECIFIED
+    )
+    """ An unspecified versioning behavior. By default, workers opting into worker versioning will
+    be required to specify a behavior. See :py:class:`temporalio.worker.WorkerDeploymentOptions`."""
+    PINNED = temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED
+    """The workflow will be pinned to the current Build ID unless manually moved."""
+    AUTO_UPGRADE = (
+        temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_AUTO_UPGRADE
+    )
+    """The workflow will automatically move to the latest version (default Build ID of the task
+    queue) when the next task is dispatched."""
+
+
+@dataclass(frozen=True)
+class WorkerDeploymentVersion:
+    """Represents the version of a specific worker deployment.
+
+    WARNING: Experimental API.
+    """
+
+    deployment_name: str
+    build_id: str
+
+    def to_canonical_string(self) -> str:
+        """Returns the canonical string representation of the version."""
+        return f"{self.deployment_name}.{self.build_id}"
+
+    @staticmethod
+    def from_canonical_string(canonical: str) -> WorkerDeploymentVersion:
+        """Parse a version from a canonical string, which must be in the format
+        `<deployment_name>.<build_id>`. Deployment name must not have a ``.`` in it.
+        """
+        parts = canonical.split(".", maxsplit=1)
+        if len(parts) != 2:
+            raise ValueError(
+                f"Cannot parse version string: {canonical}, must be in format <deployment_name>.<build_id>"
+            )
+        return WorkerDeploymentVersion(parts[0], parts[1])
+
+    def _to_proto(self) -> temporalio.api.deployment.v1.WorkerDeploymentVersion:
+        """Convert to proto representation."""
+        return temporalio.api.deployment.v1.WorkerDeploymentVersion(
+            build_id=self.build_id,
+            deployment_name=self.deployment_name,
+        )
+
+
+class VersioningOverride(ABC):
+    """Represents the override of a worker's versioning behavior for a workflow execution.
+
+    .. warning::
+        Experimental API.
+    """
+
+    @abstractmethod
+    def _to_proto(self) -> temporalio.api.workflow.v1.VersioningOverride:
+        """Convert to proto representation."""
+        pass
+
+
+@dataclass(frozen=True)
+class PinnedVersioningOverride(VersioningOverride):
+    """Workflow will be pinned to a specific deployment version.
+
+    .. warning::
+        Experimental API.
+    """
+
+    version: WorkerDeploymentVersion
+
+    def _to_proto(self) -> temporalio.api.workflow.v1.VersioningOverride:
+        """Convert to proto representation."""
+        # Include deprecated fields for backward compatibility
+        return temporalio.api.workflow.v1.VersioningOverride(
+            behavior=temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_PINNED,
+            pinned_version=self.version.to_canonical_string(),
+            pinned=temporalio.api.workflow.v1.VersioningOverride.PinnedOverride(
+                version=self.version._to_proto(),
+                behavior=temporalio.api.workflow.v1.VersioningOverride.PinnedOverrideBehavior.PINNED_OVERRIDE_BEHAVIOR_PINNED,
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class AutoUpgradeVersioningOverride(VersioningOverride):
+    """The workflow will auto-upgrade to the current deployment version on the next workflow task.
+
+    .. warning::
+        Experimental API.
+    """
+
+    def _to_proto(self) -> temporalio.api.workflow.v1.VersioningOverride:
+        """Convert to proto representation."""
+        # Include deprecated fields for backward compatibility
+        return temporalio.api.workflow.v1.VersioningOverride(
+            behavior=temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_AUTO_UPGRADE,
+            auto_upgrade=True,
+        )
+
+
 # Should be set as the "arg" argument for _arg_or_args checks where the argument
 # is unset. This is different than None which is a legitimate argument.
 _arg_unset = object()
 
 
-def _arg_or_args(arg: Any, args: Sequence[Any]) -> Sequence[Any]:
+def _arg_or_args(arg: Any, args: Sequence[Any]) -> Sequence[Any]:  # type:ignore[reportUnusedFunction]
     if arg is not _arg_unset:
         if args:
             raise ValueError("Cannot have arg and args")
@@ -975,10 +1159,10 @@ def _arg_or_args(arg: Any, args: Sequence[Any]) -> Sequence[Any]:
     return args
 
 
-def _apply_headers(
-    source: Optional[Mapping[str, temporalio.api.common.v1.Payload]],
+def _apply_headers(  # type:ignore[reportUnusedFunction]
+    source: Mapping[str, temporalio.api.common.v1.Payload] | None,
     dest: google.protobuf.internal.containers.MessageMap[
-        Text, temporalio.api.common.v1.Payload
+        str, temporalio.api.common.v1.Payload
     ],
 ) -> None:
     if source is None:
@@ -1002,9 +1186,9 @@ _non_user_defined_callables = (
 )
 
 
-def _type_hints_from_func(
+def _type_hints_from_func(  # type:ignore[reportUnusedFunction]
     func: Callable,
-) -> Tuple[Optional[List[Type]], Optional[Type]]:
+) -> tuple[list[type] | None, type | None]:
     """Extracts the type hints from the function.
 
     Args:
@@ -1040,7 +1224,7 @@ def _type_hints_from_func(
     hints = get_type_hints(func)
     ret_hint = hints.get("return")
     ret = ret_hint if ret_hint is not inspect.Signature.empty else None
-    args: List[Type] = []
+    args: list[type] = []
     for index, value in enumerate(sig.parameters.values()):
         # Ignore self on methods
         if (
@@ -1066,3 +1250,14 @@ def _type_hints_from_func(
         # necessarily
         args.append(arg_hint)  # type: ignore
     return args, ret
+
+
+class HeaderCodecBehavior(IntEnum):
+    """Different ways to handle header encoding"""
+
+    NO_CODEC = 1
+    """Don't encode or decode any headers automatically"""
+    CODEC = 2
+    """Encode and decode all headers automatically"""
+    WORKFLOW_ONLY_CODEC = 3
+    """Only automatically encode and decode headers in workflow activation encoding and decoding."""

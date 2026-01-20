@@ -4,22 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
-    AsyncIterator,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Type,
-    Union,
     cast,
 )
 
 import google.protobuf.empty_pb2
+from typing_extensions import Self
 
 import temporalio.api.testservice.v1
 import temporalio.bridge.testing
@@ -29,7 +23,6 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.runtime
 import temporalio.service
-import temporalio.types
 import temporalio.worker
 
 logger = logging.getLogger(__name__)
@@ -54,8 +47,8 @@ class WorkflowEnvironment:
     to have ``assert`` failures fail the workflow with the assertion error.
     """
 
-    @staticmethod
-    def from_client(client: temporalio.client.Client) -> WorkflowEnvironment:
+    @classmethod
+    def from_client(cls, client: temporalio.client.Client) -> Self:
         """Create a workflow environment from the given client.
 
         :py:attr:`supports_time_skipping` will always return ``False`` for this
@@ -69,35 +62,35 @@ class WorkflowEnvironment:
             The workflow environment that runs against the given client.
         """
         # Add the assertion interceptor
-        return WorkflowEnvironment(
-            _client_with_interceptors(client, _AssertionErrorInterceptor())
-        )
+        return cls(_client_with_interceptors(client, _AssertionErrorInterceptor()))
 
-    @staticmethod
+    @classmethod
     async def start_local(
+        cls,
         *,
         namespace: str = "default",
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[temporalio.client.Interceptor] = [],
-        default_workflow_query_reject_condition: Optional[
-            temporalio.common.QueryRejectCondition
-        ] = None,
-        retry_config: Optional[temporalio.client.RetryConfig] = None,
-        rpc_metadata: Mapping[str, str] = {},
-        identity: Optional[str] = None,
-        tls: bool | temporalio.client.TLSConfig = False,
+        plugins: Sequence[temporalio.client.Plugin] = [],
+        default_workflow_query_reject_condition: None
+        | (temporalio.common.QueryRejectCondition) = None,
+        retry_config: temporalio.service.RetryConfig | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        identity: str | None = None,
+        tls: bool | temporalio.service.TLSConfig = False,
         ip: str = "127.0.0.1",
-        port: Optional[int] = None,
-        download_dest_dir: Optional[str] = None,
+        port: int | None = None,
+        download_dest_dir: str | None = None,
         ui: bool = False,
-        runtime: Optional[temporalio.runtime.Runtime] = None,
+        runtime: temporalio.runtime.Runtime | None = None,
         search_attributes: Sequence[temporalio.common.SearchAttributeKey] = (),
-        dev_server_existing_path: Optional[str] = None,
-        dev_server_database_filename: Optional[str] = None,
+        dev_server_existing_path: str | None = None,
+        dev_server_database_filename: str | None = None,
         dev_server_log_format: str = "pretty",
-        dev_server_log_level: Optional[str] = "warn",
+        dev_server_log_level: str | None = "warn",
         dev_server_download_version: str = "default",
         dev_server_extra_args: Sequence[str] = [],
+        dev_server_download_ttl: timedelta | None = None,
     ) -> WorkflowEnvironment:
         """Start a full Temporal server locally, downloading if necessary.
 
@@ -154,6 +147,8 @@ class WorkflowEnvironment:
                 Defaults to ``default`` which downloads the version known to
                 work best with this SDK.
             dev_server_extra_args: Extra arguments for the CLI binary.
+            dev_server_download_ttl: TTL for the downloaded CLI binary. If unset, it will be
+                cached indefinitely.
 
         Returns:
             The started CLI dev server workflow environment.
@@ -180,6 +175,9 @@ class WorkflowEnvironment:
             dev_server_extra_args = new_args
         # Start CLI dev server
         runtime = runtime or temporalio.runtime.Runtime.default()
+        download_ttl_ms = None
+        if dev_server_download_ttl is not None:
+            download_ttl_ms = int(dev_server_download_ttl.total_seconds() * 1000)
         server = await temporalio.bridge.testing.EphemeralServer.start_dev_server(
             runtime._core_runtime,
             temporalio.bridge.testing.DevServerConfig(
@@ -196,6 +194,7 @@ class WorkflowEnvironment:
                 log_format=dev_server_log_format,
                 log_level=dev_server_log_level,
                 extra_args=dev_server_extra_args,
+                download_ttl_ms=download_ttl_ms,
             ),
         )
         # If we can't connect to the server, we should shut it down
@@ -206,6 +205,7 @@ class WorkflowEnvironment:
                     namespace=namespace,
                     data_converter=data_converter,
                     interceptors=interceptors,
+                    plugins=plugins,
                     default_workflow_query_reject_condition=default_workflow_query_reject_condition,
                     tls=tls,
                     retry_config=retry_config,
@@ -219,29 +219,31 @@ class WorkflowEnvironment:
             try:
                 await server.shutdown()
             except:
-                logger.warn(
+                logger.warning(
                     "Failed stopping local server on client connection failure",
                     exc_info=True,
                 )
             raise
 
-    @staticmethod
+    @classmethod
     async def start_time_skipping(
+        cls,
         *,
         data_converter: temporalio.converter.DataConverter = temporalio.converter.DataConverter.default,
         interceptors: Sequence[temporalio.client.Interceptor] = [],
-        default_workflow_query_reject_condition: Optional[
-            temporalio.common.QueryRejectCondition
-        ] = None,
-        retry_config: Optional[temporalio.client.RetryConfig] = None,
-        rpc_metadata: Mapping[str, str] = {},
-        identity: Optional[str] = None,
-        port: Optional[int] = None,
-        download_dest_dir: Optional[str] = None,
-        runtime: Optional[temporalio.runtime.Runtime] = None,
-        test_server_existing_path: Optional[str] = None,
+        plugins: Sequence[temporalio.client.Plugin] = [],
+        default_workflow_query_reject_condition: None
+        | (temporalio.common.QueryRejectCondition) = None,
+        retry_config: temporalio.service.RetryConfig | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        identity: str | None = None,
+        port: int | None = None,
+        download_dest_dir: str | None = None,
+        runtime: temporalio.runtime.Runtime | None = None,
+        test_server_existing_path: str | None = None,
         test_server_download_version: str = "default",
         test_server_extra_args: Sequence[str] = [],
+        test_server_download_ttl: timedelta | None = None,
     ) -> WorkflowEnvironment:
         """Start a time skipping workflow environment.
 
@@ -293,12 +295,17 @@ class WorkflowEnvironment:
                 download. Defaults to ``default`` which downloads the version
                 known to work best with this SDK.
             test_server_extra_args: Extra arguments for the test server binary.
+            test_server_download_ttl: TTL for the downloaded test server binary. If unset, it
+                will be cached indefinitely.
 
         Returns:
             The started workflow environment with time skipping.
         """
         # Start test server
         runtime = runtime or temporalio.runtime.Runtime.default()
+        download_ttl_ms = None
+        if test_server_download_ttl:
+            download_ttl_ms = int(test_server_download_ttl.total_seconds() * 1000)
         server = await temporalio.bridge.testing.EphemeralServer.start_test_server(
             runtime._core_runtime,
             temporalio.bridge.testing.TestServerConfig(
@@ -307,6 +314,7 @@ class WorkflowEnvironment:
                 sdk_version=temporalio.service.__version__,
                 download_version=test_server_download_version,
                 download_dest_dir=download_dest_dir,
+                download_ttl_ms=download_ttl_ms,
                 port=port,
                 extra_args=test_server_extra_args,
             ),
@@ -318,6 +326,7 @@ class WorkflowEnvironment:
                     server.target,
                     data_converter=data_converter,
                     interceptors=interceptors,
+                    plugins=plugins,
                     default_workflow_query_reject_condition=default_workflow_query_reject_condition,
                     retry_config=retry_config,
                     rpc_metadata=rpc_metadata,
@@ -330,7 +339,7 @@ class WorkflowEnvironment:
             try:
                 await server.shutdown()
             except:
-                logger.warn(
+                logger.warning(
                     "Failed stopping test server on client connection failure",
                     exc_info=True,
                 )
@@ -339,7 +348,8 @@ class WorkflowEnvironment:
     def __init__(self, client: temporalio.client.Client) -> None:
         """Create a workflow environment from a client.
 
-        Most users would use a static method instead.
+        Most users would use a factory methods instead.
+
         """
         self._client = client
 
@@ -347,7 +357,7 @@ class WorkflowEnvironment:
         """Noop for ``async with`` support."""
         return self
 
-    async def __aexit__(self, *args) -> None:
+    async def __aexit__(self, *args: Any) -> None:
         """For ``async with`` support to just call :py:meth:`shutdown`."""
         await self.shutdown()
 
@@ -360,7 +370,7 @@ class WorkflowEnvironment:
         """Shut down this environment."""
         pass
 
-    async def sleep(self, duration: Union[timedelta, float]) -> None:
+    async def sleep(self, duration: timedelta | float) -> None:
         """Sleep in this environment.
 
         This awaits a regular :py:func:`asyncio.sleep` in regular environments,
@@ -412,7 +422,7 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
         # Add assertion interceptor to client and if time skipping is supported,
         # add time skipping interceptor
         self._supports_time_skipping = server.has_test_service
-        interceptors: List[temporalio.client.Interceptor] = [
+        interceptors: list[temporalio.client.Interceptor] = [
             _AssertionErrorInterceptor()
         ]
         if self._supports_time_skipping:
@@ -424,7 +434,7 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
     async def shutdown(self) -> None:
         await self._server.shutdown()
 
-    async def sleep(self, duration: Union[timedelta, float]) -> None:
+    async def sleep(self, duration: timedelta | float) -> None:
         # Use regular sleep if no time skipping
         if not self._supports_time_skipping:
             return await super().sleep(duration)
@@ -490,7 +500,7 @@ class _AssertionErrorInterceptor(
 ):
     def workflow_interceptor_class(
         self, input: temporalio.worker.WorkflowInterceptorClassInput
-    ) -> Optional[Type[temporalio.worker.WorkflowInboundInterceptor]]:
+    ) -> type[temporalio.worker.WorkflowInboundInterceptor] | None:
         return _AssertionErrorWorkflowInboundInterceptor
 
 
@@ -520,7 +530,7 @@ class _AssertionErrorWorkflowInboundInterceptor(
 
 
 class _TimeSkippingClientInterceptor(temporalio.client.Interceptor):
-    def __init__(self, env: _EphemeralServerWorkflowEnvironment) -> None:
+    def __init__(self, env: _EphemeralServerWorkflowEnvironment) -> None:  # type: ignore[reportMissingSuperCall]
         self.env = env
 
     def intercept_client(
@@ -549,14 +559,14 @@ class _TimeSkippingClientOutboundInterceptor(temporalio.client.OutboundIntercept
 
 
 class _TimeSkippingWorkflowHandle(temporalio.client.WorkflowHandle):
-    env: _EphemeralServerWorkflowEnvironment
+    env: _EphemeralServerWorkflowEnvironment  # type: ignore[reportUninitializedInstanceAttribute]
 
     async def result(
         self,
         *,
         follow_runs: bool = True,
-        rpc_metadata: Mapping[str, str] = {},
-        rpc_timeout: Optional[timedelta] = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
     ) -> Any:
         async with self.env.time_skipping_unlocked():
             return await super().result(

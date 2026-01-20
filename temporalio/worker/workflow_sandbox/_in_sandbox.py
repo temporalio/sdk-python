@@ -6,12 +6,14 @@
 
 import dataclasses
 import logging
-from typing import Any, Type
+from typing import Any
 
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
+import temporalio.converter
 import temporalio.worker._workflow_instance
 import temporalio.workflow
+from temporalio.worker import _command_aware_visitor
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +32,8 @@ class InSandbox:
     def __init__(
         self,
         instance_details: temporalio.worker._workflow_instance.WorkflowInstanceDetails,
-        runner_class: Type[temporalio.worker._workflow_instance.WorkflowRunner],
-        workflow_class: Type,
+        runner_class: type[temporalio.worker._workflow_instance.WorkflowRunner],
+        workflow_class: type,
     ) -> None:
         """Create in-sandbox instance."""
         _trace("Initializing workflow %s in sandbox", workflow_class)
@@ -79,3 +81,10 @@ class InSandbox:
     ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
         """Send activation to this instance."""
         return self.instance.activate(act)
+
+    def get_serialization_context(
+        self,
+        command_info: _command_aware_visitor.CommandInfo | None,
+    ) -> temporalio.converter.SerializationContext | None:
+        """Get serialization context."""
+        return self.instance.get_serialization_context(command_info)

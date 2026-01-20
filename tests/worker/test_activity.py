@@ -2,21 +2,26 @@ import asyncio
 import concurrent.futures
 import logging
 import logging.handlers
-import multiprocessing
 import os
 import queue
 import signal
 import threading
 import time
 import uuid
+from collections.abc import Callable, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, List, NoReturn, Optional, Sequence, Type
+from time import sleep
+from typing import Any, NoReturn
 
 import pytest
 
+import temporalio.api.common.v1
+import temporalio.api.workflowservice.v1
+import temporalio.exceptions
 from temporalio import activity, workflow
 from temporalio.client import (
     AsyncActivityHandle,
@@ -46,38 +51,57 @@ from tests.helpers.worker import (
     KSAction,
     KSExecuteActivityAction,
     KSWorkflowParams,
-)
-
-_default_shared_state_manager = SharedStateManager.create_from_multiprocessing(
-    multiprocessing.Manager()
+    kitchen_sink_retry_policy,
 )
 
 default_max_concurrent_activities = 50
 
 
-async def test_activity_hello(client: Client, worker: ExternalWorker):
+async def test_activity_hello(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     @activity.defn
     async def say_hello(name: str) -> str:
         return f"Hello, {name}!"
 
     result = await _execute_workflow_with_activity(
-        client, worker, say_hello, "Temporal"
+        client,
+        worker,
+        say_hello,
+        "Temporal",
+        shared_state_manager=shared_state_manager,
     )
     assert result.result == "Hello, Temporal!"
 
 
-async def test_activity_without_decorator(client: Client, worker: ExternalWorker):
+async def test_activity_without_decorator(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     async def say_hello(name: str) -> str:
         return f"Hello, {name}!"
 
     with pytest.raises(TypeError) as err:
-        await _execute_workflow_with_activity(client, worker, say_hello, "Temporal")
+        await _execute_workflow_with_activity(
+            client,
+            worker,
+            say_hello,
+            "Temporal",
+            shared_state_manager=shared_state_manager,
+        )
     assert "Activity say_hello missing attributes" in str(err.value)
 
 
-async def test_activity_custom_name(client: Client, worker: ExternalWorker):
+async def test_activity_custom_name(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     @activity.defn(name="my custom activity name!")
-    async def get_name(name: str) -> str:
+    async def get_name(_name: str) -> str:
         return f"Name: {activity.info().activity_type}"
 
     result = await _execute_workflow_with_activity(
@@ -86,12 +110,69 @@ async def test_activity_custom_name(client: Client, worker: ExternalWorker):
         get_name,
         "Temporal",
         activity_name_override="my custom activity name!",
+        shared_state_manager=shared_state_manager,
     )
     assert result.result == "Name: my custom activity name!"
 
 
+async def test_client_available_in_async_activities(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
+    with pytest.raises(RuntimeError, match="Not in activity context"):
+        activity.client()
+
+    captured_client: Client | None = None
+
+    @activity.defn
+    async def capture_client() -> None:
+        nonlocal captured_client
+        captured_client = activity.client()
+
+    await _execute_workflow_with_activity(
+        client,
+        worker,
+        capture_client,
+        shared_state_manager=shared_state_manager,
+    )
+    assert captured_client is client
+
+
+async def test_client_not_available_in_sync_activities(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
+    saw_error = False
+
+    @activity.defn
+    def some_activity() -> None:
+        with pytest.raises(
+            RuntimeError, match="The client is only available in `async def`"
+        ):
+            activity.client()
+        nonlocal saw_error
+        saw_error = True
+
+    await _execute_workflow_with_activity(
+        client,
+        worker,
+        some_activity,
+        worker_config={
+            "activity_executor": concurrent.futures.ThreadPoolExecutor(1),
+            "max_concurrent_activities": 1,
+        },
+        shared_state_manager=shared_state_manager,
+    )
+    assert saw_error
+
+
 async def test_activity_info(
-    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+    client: Client,
+    worker: ExternalWorker,
+    env: WorkflowEnvironment,
+    shared_state_manager: SharedStateManager,
 ):
     # TODO(cretz): Fix
     if env.supports_time_skipping:
@@ -105,7 +186,7 @@ async def test_activity_info(
     assert str(err.value) == "Not in activity context"
 
     # Capture the info from the activity
-    info: Optional[activity.Info] = None
+    info: activity.Info | None = None
 
     @activity.defn
     async def capture_info() -> None:
@@ -113,11 +194,15 @@ async def test_activity_info(
         info = activity.info()
 
     result = await _execute_workflow_with_activity(
-        client, worker, capture_info, start_to_close_timeout_ms=4000
+        client,
+        worker,
+        capture_info,
+        start_to_close_timeout_ms=4000,
+        shared_state_manager=shared_state_manager,
     )
 
     assert info
-    assert info.activity_id
+    assert info.activity_id  # type:ignore[reportUnreachable]
     assert info.activity_type == "capture_info"
     assert info.attempt == 1
     assert abs(
@@ -136,9 +221,14 @@ async def test_activity_info(
     assert info.workflow_namespace == client.namespace
     assert info.workflow_run_id == result.handle.first_execution_run_id
     assert info.workflow_type == "kitchen_sink"
+    assert info.retry_policy == kitchen_sink_retry_policy()
 
 
-async def test_sync_activity_thread(client: Client, worker: ExternalWorker):
+async def test_sync_activity_thread(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     @activity.defn
     def some_activity() -> str:
         return f"activity name: {activity.info().activity_type}"
@@ -155,6 +245,7 @@ async def test_sync_activity_thread(client: Client, worker: ExternalWorker):
                 worker,
                 some_activity,
                 worker_config={"activity_executor": executor},
+                shared_state_manager=shared_state_manager,
             )
     assert result.result == "activity name: some_activity"
 
@@ -164,7 +255,11 @@ def picklable_activity() -> str:
     return f"activity name: {activity.info().activity_type}"
 
 
-async def test_sync_activity_process(client: Client, worker: ExternalWorker):
+async def test_sync_activity_process(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     # We intentionally leave max_workers by default in the process pool executor
     # to confirm that the warning is triggered
     with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -177,12 +272,15 @@ async def test_sync_activity_process(client: Client, worker: ExternalWorker):
                 worker,
                 picklable_activity,
                 worker_config={"activity_executor": executor},
+                shared_state_manager=shared_state_manager,
             )
     assert result.result == "activity name: picklable_activity"
 
 
 async def test_sync_activity_process_non_picklable(
-    client: Client, worker: ExternalWorker
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
 ):
     @activity.defn
     def some_activity() -> str:
@@ -195,17 +293,27 @@ async def test_sync_activity_process_non_picklable(
                 worker,
                 some_activity,
                 worker_config={"activity_executor": executor},
+                shared_state_manager=shared_state_manager,
             )
     assert "must be picklable when using a process executor" in str(err.value)
 
 
-async def test_activity_failure(client: Client, worker: ExternalWorker):
+async def test_activity_failure(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     @activity.defn
     async def raise_error():
         raise RuntimeError("oh no!")
 
     with pytest.raises(WorkflowFailureError) as err:
-        await _execute_workflow_with_activity(client, worker, raise_error)
+        await _execute_workflow_with_activity(
+            client,
+            worker,
+            raise_error,
+            shared_state_manager=shared_state_manager,
+        )
     assert str(assert_activity_application_error(err.value)) == "RuntimeError: oh no!"
 
 
@@ -214,7 +322,11 @@ def picklable_activity_failure():
     raise RuntimeError("oh no!")
 
 
-async def test_sync_activity_process_failure(client: Client, worker: ExternalWorker):
+async def test_sync_activity_process_failure(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     with pytest.raises(WorkflowFailureError) as err:
         with concurrent.futures.ProcessPoolExecutor() as executor:
             await _execute_workflow_with_activity(
@@ -222,17 +334,27 @@ async def test_sync_activity_process_failure(client: Client, worker: ExternalWor
                 worker,
                 picklable_activity_failure,
                 worker_config={"activity_executor": executor},
+                shared_state_manager=shared_state_manager,
             )
     assert str(assert_activity_application_error(err.value)) == "RuntimeError: oh no!"
 
 
-async def test_activity_bad_params(client: Client, worker: ExternalWorker):
+async def test_activity_bad_params(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     @activity.defn
     async def say_hello(name: str) -> str:
         return f"Hello, {name}!"
 
     with pytest.raises(WorkflowFailureError) as err:
-        await _execute_workflow_with_activity(client, worker, say_hello)
+        await _execute_workflow_with_activity(
+            client,
+            worker,
+            say_hello,
+            shared_state_manager=shared_state_manager,
+        )
     assert str(assert_activity_application_error(err.value)).endswith(
         "missing 1 required positional argument: 'name'"
     )
@@ -242,13 +364,17 @@ async def test_activity_kwonly_params():
     with pytest.raises(TypeError) as err:
 
         @activity.defn
-        async def say_hello(*, name: str) -> str:
+        async def say_hello(*, name: str) -> str:  # type:ignore[reportUnusedFunction]
             return f"Hello, {name}!"
 
     assert str(err.value).endswith("cannot have keyword-only arguments")
 
 
-async def test_activity_cancel_catch(client: Client, worker: ExternalWorker):
+async def test_activity_cancel_catch(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     @activity.defn
     async def wait_cancel() -> str:
         try:
@@ -265,11 +391,16 @@ async def test_activity_cancel_catch(client: Client, worker: ExternalWorker):
         cancel_after_ms=100,
         wait_for_cancellation=True,
         heartbeat_timeout_ms=2000,
+        shared_state_manager=shared_state_manager,
     )
     assert result.result == "Got cancelled error, cancelled? True"
 
 
-async def test_activity_cancel_throw(client: Client, worker: ExternalWorker):
+async def test_activity_cancel_throw(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     @activity.defn
     async def wait_cancel() -> str:
         while True:
@@ -284,13 +415,16 @@ async def test_activity_cancel_throw(client: Client, worker: ExternalWorker):
             cancel_after_ms=100,
             wait_for_cancellation=True,
             heartbeat_timeout_ms=1000,
+            shared_state_manager=shared_state_manager,
         )
     assert isinstance(err.value.cause, ActivityError)
     assert isinstance(err.value.cause.cause, CancelledError)
 
 
 async def test_sync_activity_thread_cancel_caught(
-    client: Client, worker: ExternalWorker
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
 ):
     @activity.defn
     def wait_cancel() -> str:
@@ -313,12 +447,15 @@ async def test_sync_activity_thread_cancel_caught(
             wait_for_cancellation=True,
             heartbeat_timeout_ms=3000,
             worker_config={"activity_executor": executor},
+            shared_state_manager=shared_state_manager,
         )
     assert result.result == "Cancelled"
 
 
 async def test_sync_activity_thread_cancel_uncaught(
-    client: Client, worker: ExternalWorker
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
 ):
     @activity.defn
     def wait_cancel() -> NoReturn:
@@ -338,13 +475,16 @@ async def test_sync_activity_thread_cancel_uncaught(
                 wait_for_cancellation=True,
                 heartbeat_timeout_ms=3000,
                 worker_config={"activity_executor": executor},
+                shared_state_manager=shared_state_manager,
             )
     assert isinstance(err.value.cause, ActivityError)
     assert isinstance(err.value.cause.cause, CancelledError)
 
 
 async def test_sync_activity_thread_cancel_exception_disabled(
-    client: Client, worker: ExternalWorker
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
 ):
     @activity.defn(no_thread_cancel_exception=True)
     def wait_cancel() -> str:
@@ -368,14 +508,17 @@ async def test_sync_activity_thread_cancel_exception_disabled(
             wait_for_cancellation=True,
             heartbeat_timeout_ms=3000,
             worker_config={"activity_executor": executor},
+            shared_state_manager=shared_state_manager,
         )
     assert result.result == "Cancelled"
 
 
 async def test_sync_activity_thread_cancel_exception_shielded(
-    client: Client, worker: ExternalWorker
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
 ):
-    events: List[str] = []
+    events: list[str] = []
 
     @activity.defn
     def wait_cancel() -> None:
@@ -403,6 +546,7 @@ async def test_sync_activity_thread_cancel_exception_shielded(
                 wait_for_cancellation=True,
                 heartbeat_timeout_ms=3000,
                 worker_config={"activity_executor": executor},
+                shared_state_manager=shared_state_manager,
             )
     assert isinstance(err.value.cause, ActivityError)
     assert isinstance(err.value.cause.cause, CancelledError)
@@ -482,7 +626,11 @@ def picklable_activity_wait_cancel() -> str:
     return "Cancelled"
 
 
-async def test_sync_activity_process_cancel(client: Client, worker: ExternalWorker):
+async def test_sync_activity_process_cancel(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     with concurrent.futures.ProcessPoolExecutor() as executor:
         result = await _execute_workflow_with_activity(
             client,
@@ -492,6 +640,7 @@ async def test_sync_activity_process_cancel(client: Client, worker: ExternalWork
             wait_for_cancellation=True,
             heartbeat_timeout_ms=3000,
             worker_config={"activity_executor": executor},
+            shared_state_manager=shared_state_manager,
         )
     assert result.result == "Cancelled"
 
@@ -505,7 +654,9 @@ def picklable_activity_raise_cancel() -> str:
 
 
 async def test_sync_activity_process_cancel_uncaught(
-    client: Client, worker: ExternalWorker
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
 ):
     with pytest.raises(WorkflowFailureError) as err:
         with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -517,6 +668,7 @@ async def test_sync_activity_process_cancel_uncaught(
                 wait_for_cancellation=True,
                 heartbeat_timeout_ms=5000,
                 worker_config={"activity_executor": executor},
+                shared_state_manager=shared_state_manager,
             )
     assert isinstance(err.value.cause, ActivityError)
     assert isinstance(err.value.cause.cause, CancelledError)
@@ -547,8 +699,12 @@ async def test_activity_does_not_exist(client: Client, worker: ExternalWorker):
     assert "is not registered" in str(assert_activity_application_error(err.value))
 
 
-async def test_max_concurrent_activities(client: Client, worker: ExternalWorker):
-    seen_indexes: List[int] = []
+async def test_max_concurrent_activities(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
+    seen_indexes: list[int] = []
     complete_activities_event = asyncio.Event()
 
     @activity.defn
@@ -571,6 +727,7 @@ async def test_max_concurrent_activities(client: Client, worker: ExternalWorker)
             schedule_to_start_timeout_ms=1000,
             worker_config={"max_concurrent_activities": 42},
             on_complete=complete_activities_event.set,
+            shared_state_manager=shared_state_manager,
         )
     timeout = assert_activity_error(err.value)
     assert isinstance(timeout, TimeoutError)
@@ -585,10 +742,14 @@ class SomeClass1:
 @dataclass
 class SomeClass2:
     foo: str
-    bar: Optional[SomeClass1] = None
+    bar: SomeClass1 | None = None
 
 
-async def test_activity_type_hints(client: Client, worker: ExternalWorker):
+async def test_activity_type_hints(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     activity_param1: SomeClass2
 
     @activity.defn
@@ -603,15 +764,24 @@ async def test_activity_type_hints(client: Client, worker: ExternalWorker):
         some_activity,
         SomeClass2(foo="str1", bar=SomeClass1(foo=123)),
         "123",
+        shared_state_manager=shared_state_manager,
     )
     assert (
         result.result
         == "param1: <class 'tests.worker.test_activity.SomeClass2'>, param2: <class 'str'>"
     )
-    assert activity_param1 == SomeClass2(foo="str1", bar=SomeClass1(foo=123))
+    assert activity_param1 == SomeClass2(foo="str1", bar=SomeClass1(foo=123))  # type: ignore[reportUnboundVariable] # noqa
 
 
-async def test_activity_heartbeat_details(client: Client, worker: ExternalWorker):
+async def test_activity_heartbeat_details(
+    client: Client,
+    worker: ExternalWorker,
+    env: WorkflowEnvironment,
+    shared_state_manager: SharedStateManager,
+):
+    if env.supports_time_skipping:
+        pytest.skip("https://github.com/temporalio/sdk-java/issues/2459")
+
     @activity.defn
     async def some_activity() -> str:
         info = activity.info()
@@ -628,6 +798,7 @@ async def test_activity_heartbeat_details(client: Client, worker: ExternalWorker
         worker,
         some_activity,
         retry_max_attempts=4,
+        shared_state_manager=shared_state_manager,
     )
     assert result.result == "final count: 36"
 
@@ -637,7 +808,9 @@ class NotSerializableValue:
 
 
 async def test_activity_heartbeat_details_converter_fail(
-    client: Client, worker: ExternalWorker
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
 ):
     @activity.defn
     async def some_activity() -> str:
@@ -649,14 +822,22 @@ async def test_activity_heartbeat_details_converter_fail(
         return "Should not get here"
 
     with pytest.raises(WorkflowFailureError) as err:
-        await _execute_workflow_with_activity(client, worker, some_activity)
+        await _execute_workflow_with_activity(
+            client,
+            worker,
+            some_activity,
+            shared_state_manager=shared_state_manager,
+        )
     assert str(assert_activity_application_error(err.value)).endswith(
         "is not JSON serializable"
     )
 
 
 async def test_activity_heartbeat_details_timeout(
-    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+    client: Client,
+    worker: ExternalWorker,
+    env: WorkflowEnvironment,
+    shared_state_manager: SharedStateManager,
 ):
     # TODO(cretz): Fix
     if env.supports_time_skipping:
@@ -674,7 +855,11 @@ async def test_activity_heartbeat_details_timeout(
     # then check the timeout's details
     with pytest.raises(WorkflowFailureError) as err:
         await _execute_workflow_with_activity(
-            client, worker, some_activity, heartbeat_timeout_ms=1000
+            client,
+            worker,
+            some_activity,
+            heartbeat_timeout_ms=1000,
+            shared_state_manager=shared_state_manager,
         )
     timeout = assert_activity_error(err.value)
     assert isinstance(timeout, TimeoutError)
@@ -686,7 +871,7 @@ async def test_activity_heartbeat_details_timeout(
 @activity.defn
 def picklable_heartbeat_details_activity() -> str:
     info = activity.info()
-    some_list: List[str] = (
+    some_list: list[str] = (
         next(iter(info.heartbeat_details)) if info.heartbeat_details else []
     )
     some_list.append(f"attempt: {info.attempt}")
@@ -698,8 +883,14 @@ def picklable_heartbeat_details_activity() -> str:
 
 
 async def test_sync_activity_thread_heartbeat_details(
-    client: Client, worker: ExternalWorker
+    client: Client,
+    worker: ExternalWorker,
+    env: WorkflowEnvironment,
+    shared_state_manager: SharedStateManager,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("https://github.com/temporalio/sdk-java/issues/2459")
+
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=default_max_concurrent_activities
     ) as executor:
@@ -709,13 +900,20 @@ async def test_sync_activity_thread_heartbeat_details(
             picklable_heartbeat_details_activity,
             retry_max_attempts=2,
             worker_config={"activity_executor": executor},
+            shared_state_manager=shared_state_manager,
         )
     assert result.result == "attempt: 1, attempt: 2"
 
 
 async def test_sync_activity_process_heartbeat_details(
-    client: Client, worker: ExternalWorker
+    client: Client,
+    worker: ExternalWorker,
+    env: WorkflowEnvironment,
+    shared_state_manager: SharedStateManager,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("https://github.com/temporalio/sdk-java/issues/2459")
+
     with concurrent.futures.ProcessPoolExecutor() as executor:
         result = await _execute_workflow_with_activity(
             client,
@@ -723,6 +921,7 @@ async def test_sync_activity_process_heartbeat_details(
             picklable_heartbeat_details_activity,
             retry_max_attempts=2,
             worker_config={"activity_executor": executor},
+            shared_state_manager=shared_state_manager,
         )
     assert result.result == "attempt: 1, attempt: 2"
 
@@ -734,7 +933,9 @@ def picklable_activity_non_pickable_heartbeat_details() -> str:
 
 
 async def test_sync_activity_process_non_picklable_heartbeat_details(
-    client: Client, worker: ExternalWorker
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
 ):
     with pytest.raises(WorkflowFailureError) as err:
         with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -743,6 +944,7 @@ async def test_sync_activity_process_non_picklable_heartbeat_details(
                 worker,
                 picklable_activity_non_pickable_heartbeat_details,
                 worker_config={"activity_executor": executor},
+                shared_state_manager=shared_state_manager,
             )
     msg = str(assert_activity_application_error(err.value))
     # TODO: different messages can apparently be produced across runs/platforms
@@ -754,7 +956,11 @@ async def test_sync_activity_process_non_picklable_heartbeat_details(
     )
 
 
-async def test_activity_error_non_retryable(client: Client, worker: ExternalWorker):
+async def test_activity_error_non_retryable(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     @activity.defn
     async def some_activity():
         if activity.info().attempt < 2:
@@ -768,6 +974,7 @@ async def test_activity_error_non_retryable(client: Client, worker: ExternalWork
             worker,
             some_activity,
             retry_max_attempts=100,
+            shared_state_manager=shared_state_manager,
         )
     app_err = assert_activity_application_error(err.value)
     assert str(app_err) == "Do not retry me"
@@ -775,7 +982,9 @@ async def test_activity_error_non_retryable(client: Client, worker: ExternalWork
 
 
 async def test_activity_error_non_retryable_type(
-    client: Client, worker: ExternalWorker
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
 ):
     @activity.defn
     async def some_activity():
@@ -790,6 +999,7 @@ async def test_activity_error_non_retryable_type(
             some_activity,
             retry_max_attempts=100,
             non_retryable_error_types=["Cannot retry me"],
+            shared_state_manager=shared_state_manager,
         )
     assert (
         str(assert_activity_application_error(err.value))
@@ -797,7 +1007,11 @@ async def test_activity_error_non_retryable_type(
     )
 
 
-async def test_activity_logging(client: Client, worker: ExternalWorker):
+async def test_activity_logging(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     @activity.defn
     async def say_hello(name: str) -> str:
         activity.logger.info(f"Called with arg: {name}")
@@ -810,13 +1024,17 @@ async def test_activity_logging(client: Client, worker: ExternalWorker):
     activity.logger.base_logger.setLevel(logging.INFO)
     try:
         result = await _execute_workflow_with_activity(
-            client, worker, say_hello, "Temporal"
+            client,
+            worker,
+            say_hello,
+            "Temporal",
+            shared_state_manager=shared_state_manager,
         )
     finally:
         activity.logger.base_logger.removeHandler(handler)
         activity.logger.base_logger.setLevel(prev_level)
     assert result.result == "Hello, Temporal!"
-    records: List[logging.LogRecord] = list(handler.queue.queue)  # type: ignore
+    records: list[logging.LogRecord] = list(handler.queue.queue)  # type: ignore
     assert len(records) > 0
     assert records[-1].message.startswith(
         "Called with arg: Temporal ({'activity_id': '"
@@ -824,7 +1042,10 @@ async def test_activity_logging(client: Client, worker: ExternalWorker):
     assert records[-1].__dict__["temporal_activity"]["activity_type"] == "say_hello"
 
 
-async def test_activity_worker_shutdown(client: Client, worker: ExternalWorker):
+async def test_activity_worker_shutdown(
+    client: Client,
+    worker: ExternalWorker,
+):
     activity_started = asyncio.Event()
 
     @activity.defn
@@ -912,7 +1133,9 @@ def picklable_wait_on_event() -> str:
 
 
 async def test_sync_activity_process_worker_shutdown_graceful(
-    client: Client, worker: ExternalWorker
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
 ):
     act_task_queue = str(uuid.uuid4())
     with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -923,7 +1146,7 @@ async def test_sync_activity_process_worker_shutdown_graceful(
             activity_executor=executor,
             max_concurrent_activities=default_max_concurrent_activities,
             graceful_shutdown_timeout=timedelta(seconds=2),
-            shared_state_manager=_default_shared_state_manager,
+            shared_state_manager=shared_state_manager,
         )
         asyncio.create_task(act_worker.run())
 
@@ -969,7 +1192,9 @@ def kill_my_process() -> str:
 
 
 async def test_sync_activity_process_executor_crash(
-    client: Client, worker: ExternalWorker
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
 ):
     act_task_queue = str(uuid.uuid4())
     with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -980,7 +1205,7 @@ async def test_sync_activity_process_executor_crash(
             activity_executor=executor,
             max_concurrent_activities=default_max_concurrent_activities,
             graceful_shutdown_timeout=timedelta(seconds=2),
-            shared_state_manager=_default_shared_state_manager,
+            shared_state_manager=shared_state_manager,
         )
         act_worker_task = asyncio.create_task(act_worker.run())
 
@@ -1015,11 +1240,11 @@ async def test_sync_activity_process_executor_crash(
 
 class AsyncActivityWrapper:
     def __init__(self) -> None:
-        self._info: Optional[activity.Info] = None
+        self._info: activity.Info | None = None
         self._info_set = asyncio.Event()
 
     @activity.defn
-    async def run(self) -> Optional[str]:
+    async def run(self) -> str | None:
         self._info = activity.info()
         self._info_set.set()
         activity.raise_complete_async()
@@ -1043,12 +1268,20 @@ class AsyncActivityWrapper:
 
 @pytest.mark.parametrize("use_task_token", [True, False])
 async def test_activity_async_success(
-    client: Client, worker: ExternalWorker, use_task_token: bool
+    client: Client,
+    worker: ExternalWorker,
+    use_task_token: bool,
+    shared_state_manager: SharedStateManager,
 ):
     # Start task, wait for info, complete with value, wait on workflow
     wrapper = AsyncActivityWrapper()
     task = asyncio.create_task(
-        _execute_workflow_with_activity(client, worker, wrapper.run)
+        _execute_workflow_with_activity(
+            client,
+            worker,
+            wrapper.run,
+            shared_state_manager=shared_state_manager,
+        )
     )
     await wrapper.wait_info()
     await wrapper.async_handle(client, use_task_token).complete("some value")
@@ -1057,7 +1290,12 @@ async def test_activity_async_success(
     # Do again with a None value
     wrapper = AsyncActivityWrapper()
     task = asyncio.create_task(
-        _execute_workflow_with_activity(client, worker, wrapper.run)
+        _execute_workflow_with_activity(
+            client,
+            worker,
+            wrapper.run,
+            shared_state_manager=shared_state_manager,
+        )
     )
     await wrapper.wait_info()
     await wrapper.async_handle(client, use_task_token).complete(None)
@@ -1066,13 +1304,24 @@ async def test_activity_async_success(
 
 @pytest.mark.parametrize("use_task_token", [True, False])
 async def test_activity_async_heartbeat_and_fail(
-    client: Client, worker: ExternalWorker, use_task_token: bool
+    client: Client,
+    worker: ExternalWorker,
+    env: WorkflowEnvironment,
+    use_task_token: bool,
+    shared_state_manager: SharedStateManager,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("https://github.com/temporalio/sdk-java/issues/2459")
+
     wrapper = AsyncActivityWrapper()
     # Start task w/ max attempts 2, wait for info, send heartbeat, fail
     task = asyncio.create_task(
         _execute_workflow_with_activity(
-            client, worker, wrapper.run, retry_max_attempts=2
+            client,
+            worker,
+            wrapper.run,
+            retry_max_attempts=2,
+            shared_state_manager=shared_state_manager,
         )
     )
     info = await wrapper.wait_info()
@@ -1100,13 +1349,21 @@ async def test_activity_async_heartbeat_and_fail(
 
 @pytest.mark.parametrize("use_task_token", [True, False])
 async def test_activity_async_cancel(
-    client: Client, worker: ExternalWorker, use_task_token: bool
+    client: Client,
+    worker: ExternalWorker,
+    use_task_token: bool,
+    shared_state_manager: SharedStateManager,
 ):
     wrapper = AsyncActivityWrapper()
     # Start task, wait for info, cancel, wait on workflow
     task = asyncio.create_task(
         _execute_workflow_with_activity(
-            client, worker, wrapper.run, cancel_after_ms=50, wait_for_cancellation=True
+            client,
+            worker,
+            wrapper.run,
+            cancel_after_ms=50,
+            wait_for_cancellation=True,
+            shared_state_manager=shared_state_manager,
         )
     )
     await wrapper.wait_info()
@@ -1138,7 +1395,11 @@ class ContextVarActivityInboundInterceptor(ActivityInboundInterceptor):
         return await super().execute_activity(input)
 
 
-async def test_sync_activity_contextvars(client: Client, worker: ExternalWorker):
+async def test_sync_activity_contextvars(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     @activity.defn
     def some_activity() -> str:
         return f"context var: {some_context_var.get()}"
@@ -1154,6 +1415,7 @@ async def test_sync_activity_contextvars(client: Client, worker: ExternalWorker)
                 "activity_executor": executor,
                 "interceptors": [ContextVarInterceptor()],
             },
+            shared_state_manager=shared_state_manager,
         )
     assert result.result == "context var: some value!"
 
@@ -1208,7 +1470,11 @@ def sync_dyn_activity(args: Sequence[RawValue]) -> DynActivityValue:
     )
 
 
-async def test_activity_dynamic(client: Client, worker: ExternalWorker):
+async def test_activity_dynamic(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     @activity.defn(dynamic=True)
     async def async_dyn_activity(args: Sequence[RawValue]) -> DynActivityValue:
         return sync_dyn_activity(args)
@@ -1221,11 +1487,16 @@ async def test_activity_dynamic(client: Client, worker: ExternalWorker):
         DynActivityValue("val2"),
         activity_name_override="some-activity-name",
         result_type_override=DynActivityValue,
+        shared_state_manager=shared_state_manager,
     )
     assert result.result == DynActivityValue("some-activity-name - val1 - val2")
 
 
-async def test_sync_activity_dynamic_thread(client: Client, worker: ExternalWorker):
+async def test_sync_activity_dynamic_thread(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=default_max_concurrent_activities
     ) as executor:
@@ -1238,11 +1509,16 @@ async def test_sync_activity_dynamic_thread(client: Client, worker: ExternalWork
             worker_config={"activity_executor": executor},
             activity_name_override="some-activity-name",
             result_type_override=DynActivityValue,
+            shared_state_manager=shared_state_manager,
         )
         assert result.result == DynActivityValue("some-activity-name - val1 - val2")
 
 
-async def test_sync_activity_dynamic_process(client: Client, worker: ExternalWorker):
+async def test_sync_activity_dynamic_process(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     with concurrent.futures.ProcessPoolExecutor() as executor:
         result = await _execute_workflow_with_activity(
             client,
@@ -1253,22 +1529,31 @@ async def test_sync_activity_dynamic_process(client: Client, worker: ExternalWor
             worker_config={"activity_executor": executor},
             activity_name_override="some-activity-name",
             result_type_override=DynActivityValue,
+            shared_state_manager=shared_state_manager,
         )
         assert result.result == DynActivityValue("some-activity-name - val1 - val2")
 
 
-async def test_activity_dynamic_duplicate(client: Client, worker: ExternalWorker):
+async def test_activity_dynamic_duplicate(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
     @activity.defn(dynamic=True)
-    async def dyn_activity_1(args: Sequence[RawValue]) -> None:
+    async def dyn_activity_1(_args: Sequence[RawValue]) -> None:
         pass
 
     @activity.defn(dynamic=True)
-    async def dyn_activity_2(args: Sequence[RawValue]) -> None:
+    async def dyn_activity_2(_args: Sequence[RawValue]) -> None:
         pass
 
     with pytest.raises(TypeError) as err:
         await _execute_workflow_with_activity(
-            client, worker, dyn_activity_1, additional_activities=[dyn_activity_2]
+            client,
+            worker,
+            dyn_activity_1,
+            additional_activities=[dyn_activity_2],
+            shared_state_manager=shared_state_manager,
         )
     assert "More than one dynamic activity" in str(err.value)
 
@@ -1285,26 +1570,27 @@ async def _execute_workflow_with_activity(
     worker: ExternalWorker,
     fn: Callable,
     *args: Any,
-    count: Optional[int] = None,
-    index_as_arg: Optional[bool] = None,
-    schedule_to_close_timeout_ms: Optional[int] = None,
-    start_to_close_timeout_ms: Optional[int] = None,
-    schedule_to_start_timeout_ms: Optional[int] = None,
-    cancel_after_ms: Optional[int] = None,
-    wait_for_cancellation: Optional[bool] = None,
-    heartbeat_timeout_ms: Optional[int] = None,
-    retry_max_attempts: Optional[int] = None,
-    non_retryable_error_types: Optional[Sequence[str]] = None,
+    shared_state_manager: SharedStateManager,
+    count: int | None = None,
+    index_as_arg: bool | None = None,
+    schedule_to_close_timeout_ms: int | None = None,
+    start_to_close_timeout_ms: int | None = None,
+    schedule_to_start_timeout_ms: int | None = None,
+    cancel_after_ms: int | None = None,
+    wait_for_cancellation: bool | None = None,
+    heartbeat_timeout_ms: int | None = None,
+    retry_max_attempts: int | None = None,
+    non_retryable_error_types: Sequence[str] | None = None,
     worker_config: WorkerConfig = {},
-    on_complete: Optional[Callable[[], None]] = None,
-    activity_name_override: Optional[str] = None,
-    result_type_override: Optional[Type] = None,
-    additional_activities: List[Callable] = [],
+    on_complete: Callable[[], None] | None = None,
+    activity_name_override: str | None = None,
+    result_type_override: type | None = None,
+    additional_activities: list[Callable] = [],
 ) -> _ActivityResult:
     worker_config["client"] = client
     worker_config["task_queue"] = str(uuid.uuid4())
     worker_config["activities"] = [fn] + additional_activities
-    worker_config["shared_state_manager"] = _default_shared_state_manager
+    worker_config["shared_state_manager"] = shared_state_manager
     if not worker_config.get("max_concurrent_activities"):
         worker_config["max_concurrent_activities"] = default_max_concurrent_activities
     async with Worker(**worker_config):
@@ -1358,3 +1644,230 @@ def assert_activity_application_error(
     ret = assert_activity_error(err)
     assert isinstance(ret, ApplicationError)
     return ret
+
+
+class CustomLogHandler(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self._trace_identifiers = 0
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if (
+            hasattr(record, "__temporal_error_identifier")
+            and getattr(record, "__temporal_error_identifier") == "ActivityFailure"
+        ):
+            assert record.msg.startswith("Completing activity as failed")
+            self._trace_identifiers += 1
+        return None
+
+
+async def test_activity_failure_trace_identifier(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
+    @activity.defn
+    async def raise_error():
+        raise RuntimeError("oh no!")
+
+    handler = CustomLogHandler()
+    activity.logger.base_logger.addHandler(handler)
+
+    try:
+        with pytest.raises(WorkflowFailureError) as err:
+            await _execute_workflow_with_activity(
+                client,
+                worker,
+                raise_error,
+                shared_state_manager=shared_state_manager,
+            )
+        assert (
+            str(assert_activity_application_error(err.value)) == "RuntimeError: oh no!"
+        )
+        assert handler._trace_identifiers == 1
+
+    finally:
+        activity.logger.base_logger.removeHandler(CustomLogHandler())
+
+
+async def test_activity_heartbeat_context(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
+    @activity.defn
+    async def heartbeat():
+        if activity.info().attempt == 1:
+            context: activity._Context = activity._Context.current()
+
+            def heartbeat_task():
+                async def h():
+                    if context.heartbeat is not None:
+                        context.heartbeat("Some detail")
+
+                asyncio.run(h())
+
+            thread = threading.Thread(target=heartbeat_task)
+            thread.start()
+            thread.join()
+            raise RuntimeError("oh no!")
+        else:
+            assert len(activity.info().heartbeat_details) == 1
+            return "details: " + activity.info().heartbeat_details[0]
+
+    result = await _execute_workflow_with_activity(
+        client,
+        worker,
+        heartbeat,
+        retry_max_attempts=2,
+        shared_state_manager=shared_state_manager,
+    )
+    assert result.result == "details: Some detail"
+
+
+async def test_activity_reset_catch(
+    client: Client,
+    worker: ExternalWorker,
+    env: WorkflowEnvironment,
+    shared_state_manager: SharedStateManager,
+):
+    if env.supports_time_skipping:
+        pytest.skip("Time skipping server doesn't support activity reset")
+
+    @activity.defn
+    async def wait_cancel() -> str:
+        req = temporalio.api.workflowservice.v1.ResetActivityRequest(
+            namespace=client.namespace,
+            execution=temporalio.api.common.v1.WorkflowExecution(
+                workflow_id=activity.info().workflow_id,
+                run_id=activity.info().workflow_run_id,
+            ),
+            id=activity.info().activity_id,
+        )
+        await client.workflow_service.reset_activity(req)
+        try:
+            while True:
+                await asyncio.sleep(0.3)
+                activity.heartbeat()
+        except asyncio.CancelledError:
+            details = activity.cancellation_details()
+            assert details is not None
+            return "Got cancelled error, reset? " + str(details.reset)
+
+    @activity.defn
+    def sync_wait_cancel() -> str:
+        req = temporalio.api.workflowservice.v1.ResetActivityRequest(
+            namespace=client.namespace,
+            execution=temporalio.api.common.v1.WorkflowExecution(
+                workflow_id=activity.info().workflow_id,
+                run_id=activity.info().workflow_run_id,
+            ),
+            id=activity.info().activity_id,
+        )
+        asyncio.run(client.workflow_service.reset_activity(req))
+        try:
+            while True:
+                sleep(0.3)
+                activity.heartbeat()
+        except temporalio.exceptions.CancelledError:
+            details = activity.cancellation_details()
+            assert details is not None
+            return "Got cancelled error, reset? " + str(details.reset)
+        except Exception as e:
+            return str(type(e)) + str(e)
+
+    result = await _execute_workflow_with_activity(
+        client,
+        worker,
+        wait_cancel,
+        shared_state_manager=shared_state_manager,
+    )
+    assert result.result == "Got cancelled error, reset? True"
+
+    config = WorkerConfig(
+        activity_executor=ThreadPoolExecutor(max_workers=1),
+    )
+    result = await _execute_workflow_with_activity(
+        client,
+        worker,
+        sync_wait_cancel,
+        worker_config=config,
+        shared_state_manager=shared_state_manager,
+    )
+    assert result.result == "Got cancelled error, reset? True"
+
+
+async def test_activity_reset_history(
+    client: Client,
+    worker: ExternalWorker,
+    env: WorkflowEnvironment,
+    shared_state_manager: SharedStateManager,
+):
+    if env.supports_time_skipping:
+        pytest.skip("Time skipping server doesn't support activity reset")
+
+    @activity.defn
+    async def wait_cancel() -> str:
+        req = temporalio.api.workflowservice.v1.ResetActivityRequest(
+            namespace=client.namespace,
+            execution=temporalio.api.common.v1.WorkflowExecution(
+                workflow_id=activity.info().workflow_id,
+                run_id=activity.info().workflow_run_id,
+            ),
+            id=activity.info().activity_id,
+        )
+        await client.workflow_service.reset_activity(req)
+        while True:
+            await asyncio.sleep(0.3)
+            activity.heartbeat()
+
+    with pytest.raises(WorkflowFailureError) as e:
+        await _execute_workflow_with_activity(
+            client,
+            worker,
+            wait_cancel,
+            shared_state_manager=shared_state_manager,
+        )
+    assert isinstance(e.value.cause, ActivityError)
+    assert isinstance(e.value.cause.cause, ApplicationError)
+    assert (
+        e.value.cause.cause.message
+        == "Unhandled activity cancel error produced by activity reset"
+    )
+
+
+@activity.defn
+async def local_activity_for_no_remote_test(name: str) -> str:
+    assert activity.info().is_local
+    return f"Hello from local activity, {name}!"
+
+
+@workflow.defn(sandboxed=False)
+class LocalActivityWithNoRemoteActivitiesWorkflow:
+    @workflow.run
+    async def run(self, name: str) -> str:
+        return await workflow.execute_local_activity(
+            local_activity_for_no_remote_test,
+            name,
+            schedule_to_close_timeout=timedelta(seconds=5),
+        )
+
+
+async def test_local_activities_with_no_remote_activities_option(client: Client):
+    task_queue = f"tq-{uuid.uuid4()}"
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        activities=[local_activity_for_no_remote_test],
+        workflows=[LocalActivityWithNoRemoteActivitiesWorkflow],
+        no_remote_activities=True,
+    ):
+        result = await client.execute_workflow(
+            LocalActivityWithNoRemoteActivitiesWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+
+        assert result == "Hello from local activity, Temporal!"

@@ -4,13 +4,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Mapping
 from functools import partial
 from pathlib import Path
-from typing import List, Mapping, Optional
 
 base_dir = Path(__file__).parent.parent
 proto_dir = (
-    base_dir / "temporalio" / "bridge" / "sdk-core" / "sdk-core-protos" / "protos"
+    base_dir / "temporalio" / "bridge" / "sdk-core" / "crates" / "common" / "protos"
 )
 api_proto_dir = proto_dir / "api_upstream"
 api_cloud_proto_dir = proto_dir / "api_cloud_upstream"
@@ -42,6 +42,10 @@ py_fixes = [
     partial(
         re.compile(r"from temporal\.sdk\.core\.").sub, r"from temporalio.bridge.proto."
     ),
+    partial(
+        re.compile(r"'__module__' : 'temporal\.api\.").sub,
+        r"'__module__' : 'temporalio.api.",
+    ),
 ]
 
 pyi_fixes = [
@@ -60,8 +64,7 @@ def fix_generated_output(base_path: Path):
     - protoc doesn't generate the correct import paths
         (https://github.com/protocolbuffers/protobuf/issues/1491)
     """
-
-    imports: Mapping[str, List[str]] = collections.defaultdict(list)
+    imports: Mapping[str, list[str]] = collections.defaultdict(list)
     for p in base_path.iterdir():
         if p.is_dir():
             fix_generated_output(p)

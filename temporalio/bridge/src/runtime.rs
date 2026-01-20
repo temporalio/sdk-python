@@ -1,5 +1,5 @@
 use futures::channel::mpsc::Receiver;
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::{PyAssertionError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pythonize::pythonize;
 use std::collections::HashMap;
@@ -9,16 +9,16 @@ use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
-use temporal_sdk_core::telemetry::{
+use temporalio_common::telemetry::metrics::{CoreMeter, MetricCallBufferer};
+use temporalio_common::telemetry::{
+    CoreLog, Logger, MetricTemporality, OtelCollectorOptions, OtlpProtocol,
+    PrometheusExporterOptions, TelemetryOptions,
+};
+use temporalio_sdk_core::telemetry::{
     build_otlp_metric_exporter, start_prometheus_metric_exporter, CoreLogStreamConsumer,
     MetricsCallBuffer,
 };
-use temporal_sdk_core::{CoreRuntime, TokioRuntimeBuilder};
-use temporal_sdk_core_api::telemetry::metrics::{CoreMeter, MetricCallBufferer};
-use temporal_sdk_core_api::telemetry::{
-    CoreLog, Logger, MetricTemporality, OtelCollectorOptionsBuilder,
-    PrometheusExporterOptionsBuilder, TelemetryOptionsBuilder, OtlpProtocol
-};
+use temporalio_sdk_core::{CoreRuntime, TokioRuntimeBuilder};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tracing::Level;
@@ -33,6 +33,7 @@ pub struct RuntimeRef {
 
 #[derive(Clone)]
 pub(crate) struct Runtime {
+    pub(crate) pid: u32,
     pub(crate) core: Arc<CoreRuntime>,
     metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>>,
     log_forwarder_handle: Option<Arc<JoinHandle<()>>>,
@@ -83,19 +84,31 @@ pub struct PrometheusConfig {
     counters_total_suffix: bool,
     unit_suffix: bool,
     durations_as_seconds: bool,
+    histogram_bucket_overrides: Option<HashMap<String, Vec<f64>>>,
+}
+
+#[derive(FromPyObject)]
+pub struct RuntimeOptions {
+    telemetry: TelemetryConfig,
+    worker_heartbeat_interval_millis: Option<u64>,
 }
 
 const FORWARD_LOG_BUFFER_SIZE: usize = 2048;
 const FORWARD_LOG_MAX_FREQ_MS: u64 = 10;
 
-pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
+pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
+    let RuntimeOptions {
+        telemetry: TelemetryConfig { logging, metrics },
+        worker_heartbeat_interval_millis,
+    } = options;
+
     // Have to build/start telemetry config pieces
-    let mut telemetry_build = TelemetryOptionsBuilder::default();
+    let telemetry_build = TelemetryOptions::builder();
 
     // Build logging config, capturing forwarding info to start later
     let mut log_forwarding: Option<(Receiver<CoreLog>, PyObject)> = None;
-    if let Some(logging_conf) = telemetry_config.logging {
-        telemetry_build.logging(if let Some(forward_to) = logging_conf.forward_to {
+    let maybe_logging = if let Some(logging_conf) = logging {
+        Some(if let Some(forward_to) = logging_conf.forward_to {
             // Note, actual log forwarding is started later
             let (consumer, stream) = CoreLogStreamConsumer::new(FORWARD_LOG_BUFFER_SIZE);
             log_forwarding = Some((stream, forward_to));
@@ -107,31 +120,31 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
             Logger::Console {
                 filter: logging_conf.filter.to_string(),
             }
-        });
-    }
+        })
+    } else {
+        None
+    };
 
-    // Build metric config, but actual metrics instance is late-bound after
-    // CoreRuntime is created since it needs Tokio runtime
-    if let Some(metrics_conf) = telemetry_config.metrics.as_ref() {
-        telemetry_build.attach_service_name(metrics_conf.attach_service_name);
-        if let Some(prefix) = &metrics_conf.metric_prefix {
-            telemetry_build.metric_prefix(prefix.to_string());
-        }
-    }
+    let runtime_options = temporalio_sdk_core::RuntimeOptions::builder()
+        .telemetry_options(
+            telemetry_build
+                .maybe_logging(maybe_logging)
+                .maybe_attach_service_name(metrics.as_ref().map(|c| c.attach_service_name))
+                .maybe_metric_prefix(metrics.as_ref().and_then(|c| c.metric_prefix.clone()))
+                .build(),
+        )
+        .heartbeat_interval(worker_heartbeat_interval_millis.map(Duration::from_millis))
+        .build()
+        .map_err(|err| PyValueError::new_err(format!("Invalid runtime options: {err}")))?;
 
     // Create core runtime which starts tokio multi-thread runtime
-    let mut core = CoreRuntime::new(
-        telemetry_build
-            .build()
-            .map_err(|err| PyValueError::new_err(format!("Invalid telemetry config: {}", err)))?,
-        TokioRuntimeBuilder::default(),
-    )
-    .map_err(|err| PyRuntimeError::new_err(format!("Failed initializing telemetry: {}", err)))?;
+    let mut core = CoreRuntime::new(runtime_options, TokioRuntimeBuilder::default())
+        .map_err(|err| PyRuntimeError::new_err(format!("Failed initializing runtime: {err}")))?;
 
     // We late-bind the metrics after core runtime is created since it needs
     // the Tokio handle
     let mut metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>> = None;
-    if let Some(metrics_conf) = telemetry_config.metrics {
+    if let Some(metrics_conf) = metrics {
         let _guard = core.tokio_handle().enter();
         // If they want buffered, cannot have Prom/OTel and we make buffered
         if metrics_conf.buffered_with_size > 0 {
@@ -172,6 +185,7 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
 
     Ok(RuntimeRef {
         runtime: Runtime {
+            pid: std::process::id(),
             core: Arc::new(core),
             metrics_call_buffer,
             log_forwarder_handle,
@@ -179,18 +193,34 @@ pub fn init_runtime(telemetry_config: TelemetryConfig) -> PyResult<RuntimeRef> {
     })
 }
 
-pub fn raise_in_thread(_py: Python, thread_id: std::os::raw::c_long, exc: &PyAny) -> bool {
+pub fn raise_in_thread(
+    _py: Python,
+    thread_id: std::os::raw::c_long,
+    exc: &Bound<'_, PyAny>,
+) -> bool {
     unsafe { pyo3::ffi::PyThreadState_SetAsyncExc(thread_id, exc.as_ptr()) == 1 }
 }
 
 impl Runtime {
-    pub fn future_into_py<'a, F, T>(&self, py: Python<'a>, fut: F) -> PyResult<&'a PyAny>
+    pub fn future_into_py<'a, F, T>(&self, py: Python<'a>, fut: F) -> PyResult<Bound<'a, PyAny>>
     where
         F: Future<Output = PyResult<T>> + Send + 'static,
-        T: IntoPy<PyObject>,
+        T: for<'py> IntoPyObject<'py>,
     {
         let _guard = self.core.tokio_handle().enter();
-        pyo3_asyncio::generic::future_into_py::<TokioRuntime, _, T>(py, fut)
+        pyo3_async_runtimes::generic::future_into_py::<TokioRuntime, _, T>(py, fut)
+    }
+
+    pub(crate) fn assert_same_process(&self, action: &'static str) -> PyResult<()> {
+        let current_pid = std::process::id();
+        if self.pid != current_pid {
+            Err(PyAssertionError::new_err(format!(
+                "Cannot {} across forks (original runtime PID is {}, current is {})",
+                action, self.pid, current_pid,
+            )))
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -286,7 +316,7 @@ impl BufferedLogEntry {
             .fields
             .iter()
             .map(|(key, value)| match pythonize(py, value) {
-                Ok(value) => Ok((key.as_str(), value)),
+                Ok(value) => Ok((key.as_str(), value.unbind())),
                 Err(err) => Err(err.into()),
             })
             .collect()
@@ -305,54 +335,54 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
             }
 
             // Build OTel exporter
-            let mut build = OtelCollectorOptionsBuilder::default();
-            build
+            let otel_options = OtelCollectorOptions::builder()
                 .url(
-                    Url::parse(&otel_conf.url).map_err(|err| {
-                        PyValueError::new_err(format!("Invalid OTel URL: {}", err))
-                    })?,
+                    Url::parse(&otel_conf.url)
+                        .map_err(|err| PyValueError::new_err(format!("Invalid OTel URL: {err}")))?,
                 )
                 .headers(otel_conf.headers)
-                .use_seconds_for_durations(otel_conf.durations_as_seconds);
-            if let Some(period) = otel_conf.metric_periodicity_millis {
-                build.metric_periodicity(Duration::from_millis(period));
-            }
-            if otel_conf.metric_temporality_delta {
-                build.metric_temporality(MetricTemporality::Delta);
-            }
-            if let Some(global_tags) = conf.global_tags {
-                build.global_tags(global_tags);
-            }
-            if otel_conf.http {
-                build.protocol(OtlpProtocol::Http);
-            }
-            let otel_options = build
-                .build()
-                .map_err(|err| PyValueError::new_err(format!("Invalid OTel config: {}", err)))?;
+                .use_seconds_for_durations(otel_conf.durations_as_seconds)
+                .maybe_metric_periodicity(
+                    otel_conf
+                        .metric_periodicity_millis
+                        .map(Duration::from_millis),
+                )
+                .maybe_metric_temporality(if otel_conf.metric_temporality_delta {
+                    Some(MetricTemporality::Delta)
+                } else {
+                    None
+                })
+                .maybe_global_tags(conf.global_tags)
+                .maybe_protocol(if otel_conf.http {
+                    Some(OtlpProtocol::Http)
+                } else {
+                    None
+                })
+                .build();
             Ok(Arc::new(build_otlp_metric_exporter(otel_options).map_err(
-                |err| PyValueError::new_err(format!("Failed building OTel exporter: {}", err)),
+                |err| PyValueError::new_err(format!("Failed building OTel exporter: {err}")),
             )?))
         } else if let Some(prom_conf) = conf.prometheus {
             // Start prom exporter
-            let mut build = PrometheusExporterOptionsBuilder::default();
-            build
+            let prom_options = PrometheusExporterOptions::builder()
                 .socket_addr(
                     SocketAddr::from_str(&prom_conf.bind_address).map_err(|err| {
-                        PyValueError::new_err(format!("Invalid Prometheus address: {}", err))
+                        PyValueError::new_err(format!("Invalid Prometheus address: {err}"))
                     })?,
                 )
                 .counters_total_suffix(prom_conf.counters_total_suffix)
                 .unit_suffix(prom_conf.unit_suffix)
-                .use_seconds_for_durations(prom_conf.durations_as_seconds);
-            if let Some(global_tags) = conf.global_tags {
-                build.global_tags(global_tags);
-            }
-            let prom_options = build.build().map_err(|err| {
-                PyValueError::new_err(format!("Invalid Prometheus config: {}", err))
-            })?;
+                .use_seconds_for_durations(prom_conf.durations_as_seconds)
+                .maybe_global_tags(conf.global_tags)
+                .maybe_histogram_bucket_overrides(prom_conf.histogram_bucket_overrides.map(
+                    |overrides| temporalio_common::telemetry::HistogramBucketOverrides {
+                        overrides,
+                    },
+                ))
+                .build();
             Ok(start_prometheus_metric_exporter(prom_options)
                 .map_err(|err| {
-                    PyValueError::new_err(format!("Failed starting Prometheus exporter: {}", err))
+                    PyValueError::new_err(format!("Failed starting Prometheus exporter: {err}"))
                 })?
                 .meter)
         } else {
@@ -371,10 +401,10 @@ impl TryFrom<MetricsConfig> for Arc<dyn CoreMeter> {
 pub(crate) struct TokioRuntime;
 
 tokio::task_local! {
-    static TASK_LOCALS: std::cell::OnceCell<pyo3_asyncio::TaskLocals>;
+    static TASK_LOCALS: std::cell::OnceCell<pyo3_async_runtimes::TaskLocals>;
 }
 
-impl pyo3_asyncio::generic::Runtime for TokioRuntime {
+impl pyo3_async_runtimes::generic::Runtime for TokioRuntime {
     type JoinError = tokio::task::JoinError;
     type JoinHandle = tokio::task::JoinHandle<()>;
 
@@ -386,9 +416,9 @@ impl pyo3_asyncio::generic::Runtime for TokioRuntime {
     }
 }
 
-impl pyo3_asyncio::generic::ContextExt for TokioRuntime {
+impl pyo3_async_runtimes::generic::ContextExt for TokioRuntime {
     fn scope<F, R>(
-        locals: pyo3_asyncio::TaskLocals,
+        locals: pyo3_async_runtimes::TaskLocals,
         fut: F,
     ) -> Pin<Box<dyn Future<Output = R> + Send>>
     where
@@ -400,9 +430,12 @@ impl pyo3_asyncio::generic::ContextExt for TokioRuntime {
         Box::pin(TASK_LOCALS.scope(cell, fut))
     }
 
-    fn get_task_locals() -> Option<pyo3_asyncio::TaskLocals> {
+    fn get_task_locals() -> Option<pyo3_async_runtimes::TaskLocals> {
         TASK_LOCALS
-            .try_with(|c| c.get().cloned())
+            .try_with(|c| {
+                c.get()
+                    .map(|locals| Python::with_gil(|py| locals.clone_ref(py)))
+            })
             .unwrap_or_default()
     }
 }

@@ -4,6 +4,8 @@
 [![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![MIT](https://img.shields.io/pypi/l/temporalio.svg?style=for-the-badge)](LICENSE)
 
+**📣 News: Integration between OpenAI Agents SDK and Temporal is now in public preview. [Learn more](temporalio/contrib/openai_agents/README.md).**
+
 [Temporal](https://temporal.io/) is a distributed, scalable, durable, and highly available orchestration engine used to
 execute asynchronous, long-running business logic in a scalable and resilient way.
 
@@ -25,9 +27,7 @@ starting a workflow with an `int` parameter when it accepts a `str` parameter wo
 
 **Different Activity Types**
 
-The activity worker has been developed to work with `async def`, threaded, and multiprocess activities. While
-`async def` activities are the easiest and recommended, care has been taken to make heartbeating and cancellation also
-work across threads/processes.
+The activity worker has been developed to work with `async def`, threaded, and multiprocess activities. Threaded activities are the initial recommendation, and further guidance can be found in [the docs](https://docs.temporal.io/develop/python/python-sdk-sync-vs-async).
 
 **Custom `asyncio` Event Loop**
 
@@ -96,8 +96,18 @@ informal introduction to the features and their implementation.
         - [Heartbeating and Cancellation](#heartbeating-and-cancellation)
         - [Worker Shutdown](#worker-shutdown)
       - [Testing](#testing-1)
+    - [Interceptors](#interceptors)
+    - [Nexus](#nexus)
+    - [Plugins](#plugins)
+      - [Usage](#usage-1)
+      - [Plugin Implementations](#plugin-implementations)
+      - [Advanced Plugin Implementations](#advanced-plugin-implementations)
+        - [Client Plugins](#client-plugins)
+        - [Worker Plugins](#worker-plugins)
     - [Workflow Replay](#workflow-replay)
-    - [OpenTelemetry Support](#opentelemetry-support)
+    - [Observability](#observability)
+      - [Metrics](#metrics)
+      - [OpenTelemetry Tracing](#opentelemetry-tracing)
     - [Protobuf 3.x vs 4.x](#protobuf-3x-vs-4x)
     - [Known Compatibility Issues](#known-compatibility-issues)
       - [gevent Patching](#gevent-patching)
@@ -314,10 +324,11 @@ The default data converter supports converting multiple types including:
   * Iterables including ones JSON dump may not support by default, e.g. `set`
   * [IntEnum, StrEnum](https://docs.python.org/3/library/enum.html) based enumerates
   * [UUID](https://docs.python.org/3/library/uuid.html)
+  * `datetime.datetime`
 
 To use pydantic model instances, see [Pydantic Support](#pydantic-support).
 
-`datetime.date`, `datetime.time`, and `datetime.datetime` can only be used with the Pydantic data converter.
+`datetime.date` and `datetime.time` can only be used with the Pydantic data converter.
 
 Although workflows, updates, signals, and queries can all be defined with multiple input parameters, users are strongly
 encouraged to use a single `dataclass` or Pydantic model parameter, so that fields with defaults can be easily added
@@ -508,7 +519,7 @@ class GreetingWorkflow:
                 start_to_close_timeout=timedelta(seconds=5),
             )
             workflow.logger.debug("Greeting set to %s", self._current_greeting)
-            
+
             # Wait for salutation update or complete signal (this can be
             # cancelled)
             await asyncio.wait(
@@ -534,7 +545,7 @@ class GreetingWorkflow:
     @workflow.query
     def current_greeting(self) -> str:
         return self._current_greeting
-    
+
     @workflow.update
     def set_and_get_greeting(self, greeting: str) -> str:
       old = self._current_greeting
@@ -620,7 +631,7 @@ Here are the decorators that can be applied:
   * May mutate workflow state, and make calls to other workflow APIs like starting activities, etc.
   * Also accepts the `name` and `dynamic` parameters like signal, with the same semantics.
   * Update handlers may optionally define a validator method by decorating it with `@update_handler_method.validator`.
-    To reject an update before any events are written to history, throw an exception in a validator. Validators cannot 
+    To reject an update before any events are written to history, throw an exception in a validator. Validators cannot
     be `async`, cannot mutate workflow state, and return nothing.
   * See [Signal and update handlers](#signal-and-update-handlers) below
 * `@workflow.query` - Defines a method as a query
@@ -945,19 +956,12 @@ workflow will not progress until fixed.
 The sandbox is not foolproof and non-determinism can still occur. It is simply a best-effort way to catch bad code
 early. Users are encouraged to define their workflows in files with no other side effects.
 
-The sandbox offers a mechanism to pass through modules from outside the sandbox. By default this already includes all
+The sandbox offers a mechanism to "pass through" modules from outside the sandbox. By default this already includes all
 standard library modules and Temporal modules. **For performance and behavior reasons, users are encouraged to pass
-through all third party modules whose calls will be deterministic.** This includes modules containing the activities to
-be referenced in workflows. See "Passthrough Modules" below on how to do this.
+through all modules whose calls will be deterministic.** In particular, this advice extends to modules containing the
+activities to be referenced in workflows, and modules containing dataclasses and Pydantic models, which can be
+particularly expensive to import. See "Passthrough Modules" below on how to do this.
 
-If you are getting an error like:
-
-> temporalio.worker.workflow_sandbox._restrictions.RestrictedWorkflowAccessError: Cannot access
-> http.client.IncompleteRead.\_\_mro_entries\_\_ from inside a workflow. If this is code from a module not used in a
-> workflow or known to only be used deterministically from a workflow, mark the import as pass through.
-
-Then you are either using an invalid construct from the workflow, this is a known limitation of the sandbox, or most
-commonly this is from a module that is safe to pass through (see "Passthrough Modules" section below).
 
 ##### How the Sandbox Works
 
@@ -966,12 +970,13 @@ The sandbox is made up of two components that work closely together:
 * Global state isolation
 * Restrictions preventing known non-deterministic library calls
 
-Global state isolation is performed by using `exec`. Upon workflow start, the file that the workflow is defined in is
-imported into a new sandbox created for that workflow run. In order to keep the sandbox performant a known set of
-"passthrough modules" are passed through from outside of the sandbox when they are imported. These are expected to be
-side-effect free on import and have their non-deterministic aspects restricted. By default the entire Python standard
-library, `temporalio`, and a couple of other modules are passed through from outside of the sandbox. To update this
-list, see "Customizing the Sandbox".
+Global state isolation is performed by using `exec`. Upon workflow start, and every time that the workflow is replayed,
+the file that the workflow is defined in is re-imported into a new sandbox created for that workflow run. In order to
+keep the sandbox performant, not all modules are re-imported in this way: instead, a known set of "passthrough modules"
+are obtained as references to the already-imported module _outside_ the sandbox. These modules should be side-effect
+free on import and, if they make any non-deterministic calls, then these should be restricted by sandbox restriction
+rules. By default the entire Python standard library, `temporalio`, and a couple of other modules are "passed through"
+in this way from outside of the sandbox. To update this list, see "Customizing the Sandbox".
 
 Restrictions preventing known non-deterministic library calls are achieved using proxy objects on modules wrapped around
 the custom importer set in the sandbox. Many restrictions apply at workflow import time and workflow run time, while
@@ -983,16 +988,16 @@ and isn't restricted, see "Customizing the Sandbox".
 ##### Avoiding the Sandbox
 
 There are three increasingly-scoped ways to avoid the sandbox. Users are discouraged from avoiding the sandbox if
-possible.
+possible, except for passing through safe modules, which is recommended.
 
 To remove restrictions around a particular block of code, use `with temporalio.workflow.unsafe.sandbox_unrestricted():`.
 The workflow will still be running in the sandbox, but no restrictions for invalid library calls will be applied.
 
 To run an entire workflow outside of a sandbox, set `sandboxed=False` on the `@workflow.defn` decorator when defining
-it. This will run the entire workflow outside of the workflow which means it can share global state and other bad
+it. This will run the entire workflow outside of the sandbox which means it can share global state and other bad
 things.
 
-To disable the sandbox entirely for a worker, set the `Worker` init's `workflow_runner` keyword argument to 
+To disable the sandbox entirely for a worker, set the `Worker` init's `workflow_runner` keyword argument to
 `temporalio.worker.UnsandboxedWorkflowRunner()`. This value is defaulted to
 `temporalio.worker.workflow_sandbox.SandboxedWorkflowRunner()` so by changing it to the unsandboxed runner, the sandbox
 will not be used at all.
@@ -1010,11 +1015,12 @@ is immutable and contains three fields that can be customized, but only two have
 ###### Passthrough Modules
 
 By default the sandbox completely reloads non-standard-library and non-Temporal modules for every workflow run. To make
-the sandbox quicker and use less memory when importing known-side-effect-free third party modules, they can be marked
+the sandbox quicker and use less memory when importing known-side-effect-free modules, they can be marked
 as passthrough modules.
 
 **For performance and behavior reasons, users are encouraged to pass through all third party modules whose calls will be
-deterministic.**
+deterministic.** In particular, this advice extends to modules containing the activities to be referenced in workflows,
+and modules containing dataclasses and Pydantic models, which can be particularly expensive to import.
 
 One way to pass through a module is at import time in the workflow file using the `imports_passed_through` context
 manager like so:
@@ -1259,6 +1265,7 @@ calls in the `temporalio.activity` package make use of it. Specifically:
 
 * `in_activity()` - Whether an activity context is present
 * `info()` - Returns the immutable info of the currently running activity
+* `client()` - Returns the Temporal client used by this worker. Only available in `async def` activities.
 * `heartbeat(*details)` - Record a heartbeat
 * `is_cancelled()` - Whether a cancellation has been requested on this activity
 * `wait_for_cancelled()` - `async` call to wait for cancellation request
@@ -1312,11 +1319,398 @@ affect calls activity code might make to functions on the `temporalio.activity` 
 * `cancel()` can be invoked to simulate a cancellation of the activity
 * `worker_shutdown()` can be invoked to simulate a worker shutdown during execution of the activity
 
+
+### Interceptors
+
+The behavior of the SDK can be customized in many useful ways by modifying inbound and outbound calls using
+interceptors. This is similar to the use of middleware in other frameworks.
+
+There are five categories of inbound and outbound calls that you can modify in this way:
+
+1. Outbound client calls, such as `start_workflow()`, `signal_workflow()`, `list_workflows()`, `update_schedule()`, etc.
+
+2. Inbound workflow calls: `execute_workflow()`, `handle_signal()`, `handle_update_handler()`, etc
+
+3. Outbound workflow calls: `start_activity()`, `start_child_workflow()`, `start_nexus_operation()`, etc
+
+4. Inbound call to execute an activity: `execute_activity()`
+
+5. Outbound activity calls: `info()` and `heartbeat()`
+
+
+To modify outbound client calls, define a class inheriting from
+[`client.Interceptor`](https://python.temporal.io/temporalio.client.Interceptor.html), and implement the method
+`intercept_client()` to return an instance of
+[`OutboundInterceptor`](https://python.temporal.io/temporalio.client.OutboundInterceptor.html) that implements the
+subset of outbound client calls that you wish to modify.
+
+Then, pass a list containing an instance of your `client.Interceptor` class as the
+`interceptors` argument of [`Client.connect()`](https://python.temporal.io/temporalio.client.Client.html#connect).
+
+The purpose of the interceptor framework is that the methods you implement on your interceptor classes can perform
+arbitrary side effects and/or arbitrary modifications to the data, before it is received by the SDK's "real"
+implementation. The `interceptors` list can contain multiple interceptors. In this case they form a chain: a method
+implemented on an interceptor instance in the list can perform side effects, and modify the data, before passing it on
+to the corresponding method on the next interceptor in the list. Your interceptor classes need not implement every
+method; the default implementation is always to pass the data on to the next method in the interceptor chain.
+
+The remaining four categories are worker calls. To modify these, define a class inheriting from
+[`worker.Interceptor`](https://python.temporal.io/temporalio.worker.Interceptor.html) and implement methods on that
+class to define the
+[`ActivityInboundInterceptor`](https://python.temporal.io/temporalio.worker.ActivityInboundInterceptor.html),
+[`ActivityOutboundInterceptor`](https://python.temporal.io/temporalio.worker.ActivityOutboundInterceptor.html),
+[`WorkflowInboundInterceptor`](https://python.temporal.io/temporalio.worker.WorkflowInboundInterceptor.html), and
+[`WorkflowOutboundInterceptor`](https://python.temporal.io/temporalio.worker.WorkflowOutboundInterceptor.html) classes
+that you wish to use to effect your modifications. Then, pass a list containing an instance of your `worker.Interceptor`
+class as the `interceptors` argument of the [`Worker()`](https://python.temporal.io/temporalio.worker.Worker.html)
+constructor.
+
+It often happens that your worker and client interceptors will share code because they implement closely related logic.
+For convenience, you can create an interceptor class that inherits from _both_ `client.Interceptor` and
+`worker.Interceptor` (their method sets do not overlap). You can then pass this in the `interceptors` argument of
+`Client.connect()` when starting your worker _as well as_ in your client/starter code. If you do this, your worker will
+automatically pick up the interceptors from its underlying client (and you should not pass them directly to the
+`Worker()` constructor).
+
+This is best explained by example. The [Context Propagation Interceptor
+Sample](https://github.com/temporalio/samples-python/tree/main/context_propagation) is a good starting point. In
+[context_propagation/interceptor.py](https://github.com/temporalio/samples-python/blob/main/context_propagation/interceptor.py)
+a class is defined that inherits from both `client.Interceptor` and `worker.Interceptor`. It implements the various
+methods such that the outbound client and workflow calls set a certain key in the outbound `headers` field, and the
+inbound workflow and activity calls retrieve the header value from the inbound workflow/activity input data. An instance
+of this interceptor class is passed to `Client.connect()` when [starting the
+worker](https://github.com/temporalio/samples-python/blob/main/context_propagation/worker.py) and when connecting the
+client in the [workflow starter
+code](https://github.com/temporalio/samples-python/blob/main/context_propagation/starter.py).
+
+
+### Nexus
+
+⚠️  **Nexus support is currently at an experimental release stage. Backwards-incompatible changes are anticipated until a stable release is announced.** ⚠️
+
+[Nexus](https://github.com/nexus-rpc/) is a synchronous RPC protocol. Arbitrary duration operations that can respond
+asynchronously are modeled on top of a set of pre-defined synchronous RPCs.
+
+Temporal supports calling Nexus operations **from a workflow**. See https://docs.temporal.io/nexus. There is no support
+currently for calling a Nexus operation from non-workflow code.
+
+To get started quickly using Nexus with Temporal, see the Python Nexus sample:
+https://github.com/temporalio/samples-python/tree/nexus/hello_nexus.
+
+
+Two types of Nexus operation are supported, each using a decorator:
+
+- `@temporalio.nexus.workflow_run_operation`: a Nexus operation that is backed by a Temporal workflow. The operation
+  handler you write will start the handler workflow and then respond with a token indicating that the handler workflow
+  is in progress. When the handler workflow completes, Temporal server will automatically deliver the result (success or
+  failure) to the caller workflow.
+- `@nexusrpc.handler.sync_operation`: an operation that responds synchronously. It may be `def` or `async def` and it
+may do network I/O, but it must respond within 10 seconds.
+
+The following steps are an overview of the [Python Nexus sample](
+https://github.com/temporalio/samples-python/tree/nexus/hello_nexus).
+
+1. Create the caller and handler namespaces, and the Nexus endpoint. For example,
+    ```
+    temporal operator namespace create --namespace my-handler-namespace
+    temporal operator namespace create --namespace my-caller-namespace
+
+    temporal operator nexus endpoint create \
+      --name my-nexus-endpoint \
+      --target-namespace my-handler-namespace \
+      --target-task-queue my-handler-task-queue
+    ```
+
+2. Define your service contract. This specifies the names and input/output types of your operations. You will use this
+   to refer to the operations when calling them from a workflow.
+    ```python
+    @nexusrpc.service
+    class MyNexusService:
+        my_sync_operation: nexusrpc.Operation[MyInput, MyOutput]
+        my_workflow_run_operation: nexusrpc.Operation[MyInput, MyOutput]
+    ```
+
+3. Implement your operation handlers in a service handler:
+    ```python
+    @service_handler(service=MyNexusService)
+    class MyNexusServiceHandler:
+        @sync_operation
+        async def my_sync_operation(
+            self, ctx: StartOperationContext, input: MyInput
+        ) -> MyOutput:
+            return MyOutput(message=f"Hello {input.name} from sync operation!")
+
+        @workflow_run_operation
+        async def my_workflow_run_operation(
+            self, ctx: WorkflowRunOperationContext, input: MyInput
+        ) -> nexus.WorkflowHandle[MyOutput]:
+            return await ctx.start_workflow(
+                WorkflowStartedByNexusOperation.run,
+                input,
+                id=str(uuid.uuid4()),
+            )
+    ```
+
+4. Register your service handler with a Temporal worker.
+    ```python
+    client = await Client.connect("localhost:7233", namespace="my-handler-namespace")
+    worker = Worker(
+        client,
+        task_queue="my-handler-task-queue",
+        workflows=[WorkflowStartedByNexusOperation],
+        nexus_service_handlers=[MyNexusServiceHandler()],
+    )
+    await worker.run()
+    ```
+
+5. Call your Nexus operations from your caller workflow.
+    ```python
+    @workflow.defn
+    class CallerWorkflow:
+        def __init__(self):
+            self.nexus_client = workflow.create_nexus_client(
+                service=MyNexusService, endpoint="my-nexus-endpoint"
+            )
+
+        @workflow.run
+        async def run(self, name: str) -> tuple[MyOutput, MyOutput]:
+            # Start the Nexus operation and wait for the result in one go, using execute_operation.
+            wf_result = await self.nexus_client.execute_operation(
+                MyNexusService.my_workflow_run_operation,
+                MyInput(name),
+            )
+            # Or alternatively, obtain the operation handle using start_operation,
+            # and then use it to get the result:
+            sync_operation_handle = await self.nexus_client.start_operation(
+                MyNexusService.my_sync_operation,
+                MyInput(name),
+            )
+            sync_result = await sync_operation_handle
+            return sync_result, wf_result
+    ```
+
+
+### Plugins
+
+Plugins provide a way to extend and customize the behavior of Temporal clients and workers through a chain of
+responsibility pattern. They allow you to intercept and modify client creation, service connections, worker
+configuration, and worker execution. Common customizations may include but are not limited to:
+
+1. DataConverter
+2. Activities
+3. Workflows
+4. Interceptors
+
+**Important Notes:**
+
+- Client plugins that also implement worker plugin interfaces are automatically propagated to workers
+- Avoid providing the same plugin to both client and worker to prevent double execution
+- Each plugin's `name()` method returns a unique identifier for debugging purposes
+
+#### Usage
+
+Plugins can be provided to both `Client` and `Worker`. 
+
+```python
+# Use the plugin when connecting
+client = await Client.connect(
+    "my-server.com:7233",
+    plugins=[SomePlugin()]
+)
+```
+```python
+# Use the plugin when creating a worker
+worker = Worker(
+    client,
+    plugins=[SomePlugin()]
+)
+```
+In the case of `Client`, any plugins will also be provided to any workers created with that client.
+```python
+# Create client with the unified plugin
+client = await Client.connect(
+    "localhost:7233",
+    plugins=[SomePlugin()]
+)
+
+# Worker will automatically inherit the plugin from the client
+worker = Worker(
+    client,
+    task_queue="my-task-queue",
+    workflows=[MyWorkflow],
+    activities=[my_activity]
+)
+```
+#### Plugin Implementations
+
+The easiest way to create your own plugin is to use `SimplePlugin`. This takes a number of possible configurations to produce
+a relatively straightforward plugin. 
+
+```python
+plugin = SimplePlugin(
+    "MyPlugin",
+    data_converter=converter,
+)
+```
+
+It is also possible to subclass `SimplePlugin` for some additional controls. This is what we do for `OpenAIAgentsPlugin`.
+
+```python
+class MediumPlugin(SimplePlugin):
+    def __init__(self):
+        super().__init__("MediumPlugin", data_converter=pydantic_data_converter)
+
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+        config = super().configure_worker(config)
+        config["task_queue"] = "override"
+        return config
+```
+
+#### Advanced Plugin Implementations
+
+`SimplePlugin` doesn't cover all possible uses of plugins. For more unusual use cases, an implementor can implement
+the underlying plugin interfaces directly.
+
+A single plugin class can implement both client and worker plugin interfaces to share common logic between both
+contexts. When used with a client, it will automatically be propagated to any workers created with that client.
+
+##### Client Plugins
+
+Client plugins can intercept and modify client configuration and service connections. They are useful for adding
+authentication, modifying connection parameters, or adding custom behavior during client creation.
+
+Here's an example of a client plugin that adds custom authentication:
+
+```python
+from temporalio.client import Plugin, ClientConfig
+import temporalio.service
+
+class AuthenticationPlugin(Plugin):
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
+        # Modify client configuration
+        config["namespace"] = "my-secure-namespace"
+        return config
+
+    async def connect_service_client(
+        self, 
+        config: temporalio.service.ConnectConfig,
+        next: Callable[[ConnectConfig], Awaitable[ServiceClient]]
+    ) -> temporalio.service.ServiceClient:
+        config.api_key = self.api_key
+        return await next(config)
+```
+
+##### Worker Plugins
+
+Worker plugins can modify worker configuration and intercept worker execution. They are useful for adding monitoring,
+custom lifecycle management, or modifying worker settings. Worker plugins can also configure replay.
+They should do this in the case that they modified the worker in a way which would also need to be present
+for replay to function. For instance, changing the data converter or adding workflows.
+
+Here's an example of a worker plugin that adds custom monitoring:
+
+```python
+import temporalio
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+from temporalio.worker import Plugin, WorkerConfig, ReplayerConfig, Worker, Replayer, WorkflowReplayResult
+import logging
+
+class MonitoringPlugin(Plugin):
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+        # Modify worker configuration
+        original_task_queue = config["task_queue"]
+        config["task_queue"] = f"monitored-{original_task_queue}"
+        self.logger.info(f"Worker created for task queue: {config['task_queue']}")
+        return config
+
+    async def run_worker(self, worker: Worker, next: Callable[[Worker], Awaitable[None]]) -> None:
+        self.logger.info("Starting worker execution")
+        try:
+            await next(worker)
+        finally:
+            self.logger.info("Worker execution completed")
+
+    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
+        return config
+
+    @asynccontextmanager
+    async def run_replayer(
+        self,
+        replayer: Replayer,
+        histories: AsyncIterator[temporalio.client.WorkflowHistory],
+        next: Callable[
+            [Replayer, AsyncIterator[WorkflowHistory]],
+            AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]],
+        ]
+    ) -> AsyncIterator[AsyncIterator[WorkflowReplayResult]]:
+          self.logger.info("Starting replay execution")
+          try:
+              async with self.next_worker_plugin.run_replayer(replayer, histories) as results:
+                  yield results
+          finally:
+              self.logger.info("Replay execution completed")
+```
+
+For plugins that need to work with both clients and workers, you can implement both interfaces in a single class:
+
+```python
+import temporalio
+from contextlib import AbstractAsyncContextManager
+from typing import AsyncIterator
+from temporalio.client import Plugin as ClientPlugin, ClientConfig
+from temporalio.worker import Plugin as WorkerPlugin, WorkerConfig, ReplayerConfig, Worker, Replayer, WorkflowReplayResult
+
+
+class UnifiedPlugin(ClientPlugin, WorkerPlugin):
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
+        # Client-side customization
+        config["data_converter"] = pydantic_data_converter
+        return config
+
+    async def connect_service_client(
+        self, 
+        config: temporalio.service.ConnectConfig,
+        next: Callable[[ConnectConfig], Awaitable[ServiceClient]]
+    ) -> temporalio.service.ServiceClient:
+        config.api_key = self.api_key
+        return await next(config)
+
+    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
+        # Worker-side customization
+        return config
+
+    async def run_worker(self, worker: Worker, next: Callable[[Worker], Awaitable[None]]) -> None:
+        print("Starting unified worker")
+        await next(worker)
+
+    def configure_replayer(self, config: ReplayerConfig) -> ReplayerConfig:
+        config["data_converter"] = pydantic_data_converter
+        return config
+
+    async def run_replayer(
+        self,
+        replayer: Replayer,
+        histories: AsyncIterator[temporalio.client.WorkflowHistory],
+        next: Callable[
+            [Replayer, AsyncIterator[WorkflowHistory]],
+            AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]],
+        ]
+    ) -> AbstractAsyncContextManager[AsyncIterator[WorkflowReplayResult]]:
+        return next(replayer, histories)
+```
+
 ### Workflow Replay
 
 Given a workflow's history, it can be replayed locally to check for things like non-determinism errors. For example,
-assuming `history_str` is populated with a JSON string history either exported from the web UI or from `tctl`, the
-following function will replay it:
+assuming `history_str` is populated with a JSON string history either exported from the web UI or from the 
+`Temporal CLI`, the following function will replay it:
 
 ```python
 from temporalio.client import WorkflowHistory
@@ -1344,10 +1738,30 @@ async def check_past_histories(my_client: Client):
   )
 ```
 
-### OpenTelemetry Support
+### Observability
 
-OpenTelemetry support requires the optional `opentelemetry` dependencies which are part of the `opentelemetry` extra.
-When using `pip`, running
+See https://github.com/temporalio/samples-python/tree/main/open_telemetry for a sample demonstrating collection of
+metrics and tracing data emitted by the SDK.
+
+#### Metrics
+
+The SDK emits various metrics by default: see https://docs.temporal.io/references/sdk-metrics. To configure additional
+attributes to be emitted with all metrics, pass
+[global_tags](https://python.temporal.io/temporalio.runtime.TelemetryConfig.html#global_tags) when creating the
+[TelemetryConfig](https://python.temporal.io/temporalio.runtime.TelemetryConfig.html).
+
+For emitting custom metrics, the SDK makes a metric meter available:
+- In Workflow code, use https://python.temporal.io/temporalio.workflow.html#metric_meter
+- In Activity code, use https://python.temporal.io/temporalio.activity.html#metric_meter
+- In normal application code, use https://python.temporal.io/temporalio.runtime.Runtime.html#metric_meter
+
+The attributes emitted by these default to `namespace`, `task_queue`, and `workflow_type`/`activity_type`; use
+`with_additional_attributes` to create a meter emitting additional attributes.
+
+#### OpenTelemetry Tracing
+
+Tracing support requires the optional `opentelemetry` dependencies which are part of the `opentelemetry` extra. When
+using `pip`, running
 
     pip install 'temporalio[opentelemetry]'
 
@@ -1521,20 +1935,18 @@ poe test -s --log-cli-level=DEBUG -k test_sync_activity_thread_cancel_caught
 
 #### Proto Generation and Testing
 
-To allow for backwards compatibility, protobuf code is generated on the 3.x series of the protobuf library. To generate
-protobuf code, you must be on Python <= 3.10, and then run `uv add "protobuf<4"` + `uv sync --all-extras`. Then the
-protobuf files can be generated via `poe gen-protos`. Tests can be run for protobuf version 3 by setting the
-`TEMPORAL_TEST_PROTO3` env var to `1` prior to running tests.
+If you have docker available, run
 
-Do not commit `uv.lock` or `pyproject.toml` changes. To go back from this downgrade, restore both of those files and run
-`uv sync --all-extras`. Make sure you `poe format` the results.
-
-For a less system-intrusive approach, you can:
-```shell
-docker build -f scripts/_proto/Dockerfile .
-docker run --rm -v "${PWD}/temporalio/api:/api_new" -v "${PWD}/temporalio/bridge/proto:/bridge_new" <just built image sha>
-poe format
 ```
+poe gen-protos-docker
+```
+
+Alternatively: to generate protobuf code, you must be on Python <= 3.10, and then run `uv add
+"protobuf<4"` + `uv sync --all-extras`. Then the protobuf files can be generated via `poe
+gen-protos` followed by `poe format`. Do not commit `uv.lock` or `pyproject.toml` changes. To go
+back from this downgrade, restore both of those files and run `uv sync --all-extras`. Tests can be
+run for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var to `1` prior to running
+tests.
 
 ### Style
 

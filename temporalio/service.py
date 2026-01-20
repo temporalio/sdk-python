@@ -8,25 +8,23 @@ import os
 import socket
 import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import IntEnum
-from typing import ClassVar, Generic, Mapping, Optional, Tuple, Type, TypeVar, Union
+from typing import ClassVar, TypeVar
 
-import google.protobuf.empty_pb2
 import google.protobuf.message
 
-import temporalio.api.cloud.cloudservice.v1
 import temporalio.api.common.v1
-import temporalio.api.operatorservice.v1
-import temporalio.api.testservice.v1
-import temporalio.api.workflowservice.v1
 import temporalio.bridge.client
 import temporalio.bridge.proto.health.v1
+import temporalio.bridge.services_generated
 import temporalio.exceptions
 import temporalio.runtime
+from temporalio.bridge.client import RPCError as BridgeRPCError
 
-__version__ = "1.10.0"
+__version__ = "1.21.1"
 
 ServiceRequest = TypeVar("ServiceRequest", bound=google.protobuf.message.Message)
 ServiceResponse = TypeVar("ServiceResponse", bound=google.protobuf.message.Message)
@@ -41,20 +39,20 @@ LOG_PROTOS = False
 class TLSConfig:
     """TLS configuration for connecting to Temporal server."""
 
-    server_root_ca_cert: Optional[bytes] = None
+    server_root_ca_cert: bytes | None = None
     """Root CA to validate the server certificate against."""
 
-    domain: Optional[str] = None
+    domain: str | None = None
     """TLS domain."""
 
-    client_cert: Optional[bytes] = None
+    client_cert: bytes | None = None
     """Client certificate for mTLS.
-    
+
     This must be combined with :py:attr:`client_private_key`."""
 
-    client_private_key: Optional[bytes] = None
+    client_private_key: bytes | None = None
     """Client private key for mTLS.
-    
+
     This must be combined with :py:attr:`client_cert`."""
 
     def _to_bridge_config(self) -> temporalio.bridge.client.ClientTlsConfig:
@@ -78,7 +76,7 @@ class RetryConfig:
     """Backoff multiplier."""
     max_interval_millis: int = 5000
     """Maximum backoff interval."""
-    max_elapsed_time_millis: Optional[int] = 10000
+    max_elapsed_time_millis: int | None = 10000
     """Maximum total time."""
     max_retries: int = 10
     """Maximum number of retries."""
@@ -122,7 +120,7 @@ class HttpConnectProxyConfig:
 
     target_host: str
     """Target host:port for the HTTP CONNECT proxy."""
-    basic_auth: Optional[Tuple[str, str]] = None
+    basic_auth: tuple[str, str] | None = None
     """Basic auth for the HTTP CONNECT proxy if any as a user/pass tuple."""
 
     def _to_bridge_config(
@@ -139,15 +137,15 @@ class ConnectConfig:
     """Config for connecting to the server."""
 
     target_host: str
-    api_key: Optional[str] = None
-    tls: Union[bool, TLSConfig] = False
-    retry_config: Optional[RetryConfig] = None
-    keep_alive_config: Optional[KeepAliveConfig] = KeepAliveConfig.default
-    rpc_metadata: Mapping[str, str] = field(default_factory=dict)
+    api_key: str | None = None
+    tls: bool | TLSConfig | None = None
+    retry_config: RetryConfig | None = None
+    keep_alive_config: KeepAliveConfig | None = KeepAliveConfig.default
+    rpc_metadata: Mapping[str, str | bytes] = field(default_factory=dict)
     identity: str = ""
     lazy: bool = False
-    runtime: Optional[temporalio.runtime.Runtime] = None
-    http_connect_proxy_config: Optional[HttpConnectProxyConfig] = None
+    runtime: temporalio.runtime.Runtime | None = None
+    http_connect_proxy_config: HttpConnectProxyConfig | None = None
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
@@ -159,7 +157,7 @@ class ConnectConfig:
         # past so we'll leave it for only one more version with a warning.
         # Otherwise we'll prepend the scheme.
         target_url: str
-        tls_config: Optional[temporalio.bridge.client.ClientTlsConfig]
+        tls_config: temporalio.bridge.client.ClientTlsConfig | None
         if "://" in self.target_host:
             warnings.warn(
                 "Target host as URL with scheme no longer supported. This will be an error in future versions."
@@ -176,6 +174,10 @@ class ConnectConfig:
         elif self.tls:
             target_url = f"https://{self.target_host}"
             tls_config = TLSConfig()._to_bridge_config()
+        # Enable TLS by default when API key is provided and tls not explicitly set
+        elif self.tls is None and self.api_key is not None:
+            target_url = f"https://{self.target_host}"
+            tls_config = TLSConfig()._to_bridge_config()
         else:
             target_url = f"http://{self.target_host}"
             tls_config = None
@@ -184,19 +186,23 @@ class ConnectConfig:
             target_url=target_url,
             api_key=self.api_key,
             tls_config=tls_config,
-            retry_config=self.retry_config._to_bridge_config()
-            if self.retry_config
-            else None,
-            keep_alive_config=self.keep_alive_config._to_bridge_config()
-            if self.keep_alive_config
-            else None,
+            retry_config=(
+                self.retry_config._to_bridge_config() if self.retry_config else None
+            ),
+            keep_alive_config=(
+                self.keep_alive_config._to_bridge_config()
+                if self.keep_alive_config
+                else None
+            ),
             metadata=self.rpc_metadata,
             identity=self.identity,
             client_name="temporal-python",
             client_version=__version__,
-            http_connect_proxy_config=self.http_connect_proxy_config._to_bridge_config()
-            if self.http_connect_proxy_config
-            else None,
+            http_connect_proxy_config=(
+                self.http_connect_proxy_config._to_bridge_config()
+                if self.http_connect_proxy_config
+                else None
+            ),
         )
 
 
@@ -216,38 +222,31 @@ class ServiceClient(ABC):
         self.operator_service = OperatorService(self)
         self.cloud_service = CloudService(self)
         self.test_service = TestService(self)
-        self._check_health_call = self._new_call(
-            "check",
-            temporalio.bridge.proto.health.v1.HealthCheckRequest,
-            temporalio.bridge.proto.health.v1.HealthCheckResponse,
-            service="health",
-        )
+        self.health_service = HealthService(self)
 
     async def check_health(
         self,
         *,
         service: str = "temporal.api.workflowservice.v1.WorkflowService",
         retry: bool = False,
-        metadata: Mapping[str, str] = {},
-        timeout: Optional[timedelta] = None,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
     ) -> bool:
-        """Check whether the WorkflowService is up.
-
-        In addition to accepting which service to check health on, this accepts
-        some of the same parameters as other RPC calls. See
-        :py:meth:`ServiceCall.__call__`.
+        """Check whether the provided service is up. If no service is specified,
+         the WorkflowService is used.
 
         Returns:
             True when available, false if the server is running but the service
             is unavailable (rare), or raises an error if server/service cannot
             be reached.
         """
-        resp = await self._check_health_call(
+        resp = await self.health_service.check(
             temporalio.bridge.proto.health.v1.HealthCheckRequest(service=service),
             retry=retry,
             metadata=metadata,
             timeout=timeout,
         )
+
         return (
             resp.status
             == temporalio.bridge.proto.health.v1.HealthCheckResponse.ServingStatus.SERVING
@@ -260,12 +259,12 @@ class ServiceClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def update_rpc_metadata(self, metadata: Mapping[str, str]) -> None:
+    def update_rpc_metadata(self, metadata: Mapping[str, str | bytes]) -> None:
         """Update service client's RPC metadata."""
         raise NotImplementedError
 
     @abstractmethod
-    def update_api_key(self, api_key: Optional[str]) -> None:
+    def update_api_key(self, api_key: str | None) -> None:
         """Update service client's API key."""
         raise NotImplementedError
 
@@ -274,838 +273,34 @@ class ServiceClient(ABC):
         self,
         rpc: str,
         req: google.protobuf.message.Message,
-        resp_type: Type[ServiceResponse],
+        resp_type: type[ServiceResponse],
         *,
         service: str,
         retry: bool,
-        metadata: Mapping[str, str],
-        timeout: Optional[timedelta],
+        metadata: Mapping[str, str | bytes],
+        timeout: timedelta | None,
     ) -> ServiceResponse:
         raise NotImplementedError
 
-    def _new_call(
-        self,
-        name: str,
-        req_type: Type[ServiceRequest],
-        resp_type: Type[ServiceResponse],
-        *,
-        service: str = "workflow",
-    ) -> ServiceCall[ServiceRequest, ServiceResponse]:
-        return ServiceCall(self, name, req_type, resp_type, service)
 
-
-class WorkflowService:
+class WorkflowService(temporalio.bridge.services_generated.WorkflowService):
     """Client to the Temporal server's workflow service."""
 
-    def __init__(self, client: ServiceClient) -> None:
-        """Initialize the workflow service."""
-        wsv1 = temporalio.api.workflowservice.v1
-        self.count_workflow_executions = client._new_call(
-            "count_workflow_executions",
-            wsv1.CountWorkflowExecutionsRequest,
-            wsv1.CountWorkflowExecutionsResponse,
-        )
-        self.create_schedule = client._new_call(
-            "create_schedule",
-            wsv1.CreateScheduleRequest,
-            wsv1.CreateScheduleResponse,
-        )
-        self.delete_schedule = client._new_call(
-            "delete_schedule",
-            wsv1.DeleteScheduleRequest,
-            wsv1.DeleteScheduleResponse,
-        )
-        self.delete_workflow_execution = client._new_call(
-            "delete_workflow_execution",
-            wsv1.DeleteWorkflowExecutionRequest,
-            wsv1.DeleteWorkflowExecutionResponse,
-        )
-        self.describe_batch_operation = client._new_call(
-            "describe_batch_operation",
-            wsv1.DescribeBatchOperationRequest,
-            wsv1.DescribeBatchOperationResponse,
-        )
-        self.deprecate_namespace = client._new_call(
-            "deprecate_namespace",
-            wsv1.DeprecateNamespaceRequest,
-            wsv1.DeprecateNamespaceResponse,
-        )
-        self.describe_namespace = client._new_call(
-            "describe_namespace",
-            wsv1.DescribeNamespaceRequest,
-            wsv1.DescribeNamespaceResponse,
-        )
-        self.describe_schedule = client._new_call(
-            "describe_schedule",
-            wsv1.DescribeScheduleRequest,
-            wsv1.DescribeScheduleResponse,
-        )
-        self.describe_task_queue = client._new_call(
-            "describe_task_queue",
-            wsv1.DescribeTaskQueueRequest,
-            wsv1.DescribeTaskQueueResponse,
-        )
-        self.describe_workflow_execution = client._new_call(
-            "describe_workflow_execution",
-            wsv1.DescribeWorkflowExecutionRequest,
-            wsv1.DescribeWorkflowExecutionResponse,
-        )
-        self.execute_multi_operation = client._new_call(
-            "execute_multi_operation",
-            wsv1.ExecuteMultiOperationRequest,
-            wsv1.ExecuteMultiOperationResponse,
-        )
-        self.get_cluster_info = client._new_call(
-            "get_cluster_info",
-            wsv1.GetClusterInfoRequest,
-            wsv1.GetClusterInfoResponse,
-        )
-        self.get_search_attributes = client._new_call(
-            "get_search_attributes",
-            wsv1.GetSearchAttributesRequest,
-            wsv1.GetSearchAttributesResponse,
-        )
-        self.get_system_info = client._new_call(
-            "get_system_info",
-            wsv1.GetSystemInfoRequest,
-            wsv1.GetSystemInfoResponse,
-        )
-        self.get_worker_build_id_compatibility = client._new_call(
-            "get_worker_build_id_compatibility",
-            wsv1.GetWorkerBuildIdCompatibilityRequest,
-            wsv1.GetWorkerBuildIdCompatibilityResponse,
-        )
-        self.get_worker_task_reachability = client._new_call(
-            "get_worker_task_reachability",
-            wsv1.GetWorkerTaskReachabilityRequest,
-            wsv1.GetWorkerTaskReachabilityResponse,
-        )
-        self.get_worker_versioning_rules = client._new_call(
-            "get_worker_versioning_rules",
-            wsv1.GetWorkerVersioningRulesRequest,
-            wsv1.GetWorkerVersioningRulesResponse,
-        )
-        self.get_workflow_execution_history = client._new_call(
-            "get_workflow_execution_history",
-            wsv1.GetWorkflowExecutionHistoryRequest,
-            wsv1.GetWorkflowExecutionHistoryResponse,
-        )
-        self.get_workflow_execution_history_reverse = client._new_call(
-            "get_workflow_execution_history_reverse",
-            wsv1.GetWorkflowExecutionHistoryReverseRequest,
-            wsv1.GetWorkflowExecutionHistoryReverseResponse,
-        )
-        self.list_archived_workflow_executions = client._new_call(
-            "list_archived_workflow_executions",
-            wsv1.ListArchivedWorkflowExecutionsRequest,
-            wsv1.ListArchivedWorkflowExecutionsResponse,
-        )
-        self.list_batch_operations = client._new_call(
-            "list_batch_operations",
-            wsv1.ListBatchOperationsRequest,
-            wsv1.ListBatchOperationsResponse,
-        )
-        self.list_closed_workflow_executions = client._new_call(
-            "list_closed_workflow_executions",
-            wsv1.ListClosedWorkflowExecutionsRequest,
-            wsv1.ListClosedWorkflowExecutionsResponse,
-        )
-        self.list_namespaces = client._new_call(
-            "list_namespaces",
-            wsv1.ListNamespacesRequest,
-            wsv1.ListNamespacesResponse,
-        )
-        self.list_open_workflow_executions = client._new_call(
-            "list_open_workflow_executions",
-            wsv1.ListOpenWorkflowExecutionsRequest,
-            wsv1.ListOpenWorkflowExecutionsResponse,
-        )
-        self.list_schedule_matching_times = client._new_call(
-            "list_schedule_matching_times",
-            wsv1.ListScheduleMatchingTimesRequest,
-            wsv1.ListScheduleMatchingTimesResponse,
-        )
-        self.list_schedules = client._new_call(
-            "list_schedules",
-            wsv1.ListSchedulesRequest,
-            wsv1.ListSchedulesResponse,
-        )
-        self.list_task_queue_partitions = client._new_call(
-            "list_task_queue_partitions",
-            wsv1.ListTaskQueuePartitionsRequest,
-            wsv1.ListTaskQueuePartitionsResponse,
-        )
-        self.list_workflow_executions = client._new_call(
-            "list_workflow_executions",
-            wsv1.ListWorkflowExecutionsRequest,
-            wsv1.ListWorkflowExecutionsResponse,
-        )
-        self.patch_schedule = client._new_call(
-            "patch_schedule",
-            wsv1.PatchScheduleRequest,
-            wsv1.PatchScheduleResponse,
-        )
-        self.poll_activity_task_queue = client._new_call(
-            "poll_activity_task_queue",
-            wsv1.PollActivityTaskQueueRequest,
-            wsv1.PollActivityTaskQueueResponse,
-        )
-        self.poll_nexus_task_queue = client._new_call(
-            "poll_nexus_task_queue",
-            wsv1.PollNexusTaskQueueRequest,
-            wsv1.PollNexusTaskQueueResponse,
-        )
-        self.poll_workflow_execution_update = client._new_call(
-            "poll_workflow_execution_update",
-            wsv1.PollWorkflowExecutionUpdateRequest,
-            wsv1.PollWorkflowExecutionUpdateResponse,
-        )
-        self.poll_workflow_task_queue = client._new_call(
-            "poll_workflow_task_queue",
-            wsv1.PollWorkflowTaskQueueRequest,
-            wsv1.PollWorkflowTaskQueueResponse,
-        )
-        self.query_workflow = client._new_call(
-            "query_workflow",
-            wsv1.QueryWorkflowRequest,
-            wsv1.QueryWorkflowResponse,
-        )
-        self.record_activity_task_heartbeat = client._new_call(
-            "record_activity_task_heartbeat",
-            wsv1.RecordActivityTaskHeartbeatRequest,
-            wsv1.RecordActivityTaskHeartbeatResponse,
-        )
-        self.record_activity_task_heartbeat_by_id = client._new_call(
-            "record_activity_task_heartbeat_by_id",
-            wsv1.RecordActivityTaskHeartbeatByIdRequest,
-            wsv1.RecordActivityTaskHeartbeatByIdResponse,
-        )
-        self.register_namespace = client._new_call(
-            "register_namespace",
-            wsv1.RegisterNamespaceRequest,
-            wsv1.RegisterNamespaceResponse,
-        )
-        self.request_cancel_workflow_execution = client._new_call(
-            "request_cancel_workflow_execution",
-            wsv1.RequestCancelWorkflowExecutionRequest,
-            wsv1.RequestCancelWorkflowExecutionResponse,
-        )
-        self.reset_sticky_task_queue = client._new_call(
-            "reset_sticky_task_queue",
-            wsv1.ResetStickyTaskQueueRequest,
-            wsv1.ResetStickyTaskQueueResponse,
-        )
-        self.reset_workflow_execution = client._new_call(
-            "reset_workflow_execution",
-            wsv1.ResetWorkflowExecutionRequest,
-            wsv1.ResetWorkflowExecutionResponse,
-        )
-        self.respond_activity_task_canceled = client._new_call(
-            "respond_activity_task_canceled",
-            wsv1.RespondActivityTaskCanceledRequest,
-            wsv1.RespondActivityTaskCanceledResponse,
-        )
-        self.respond_activity_task_canceled_by_id = client._new_call(
-            "respond_activity_task_canceled_by_id",
-            wsv1.RespondActivityTaskCanceledByIdRequest,
-            wsv1.RespondActivityTaskCanceledByIdResponse,
-        )
-        self.respond_activity_task_completed = client._new_call(
-            "respond_activity_task_completed",
-            wsv1.RespondActivityTaskCompletedRequest,
-            wsv1.RespondActivityTaskCompletedResponse,
-        )
-        self.respond_activity_task_completed_by_id = client._new_call(
-            "respond_activity_task_completed_by_id",
-            wsv1.RespondActivityTaskCompletedByIdRequest,
-            wsv1.RespondActivityTaskCompletedByIdResponse,
-        )
-        self.respond_activity_task_failed = client._new_call(
-            "respond_activity_task_failed",
-            wsv1.RespondActivityTaskFailedRequest,
-            wsv1.RespondActivityTaskFailedResponse,
-        )
-        self.respond_activity_task_failed_by_id = client._new_call(
-            "respond_activity_task_failed_by_id",
-            wsv1.RespondActivityTaskFailedByIdRequest,
-            wsv1.RespondActivityTaskFailedByIdResponse,
-        )
-        self.respond_nexus_task_completed = client._new_call(
-            "respond_nexus_task_completed",
-            wsv1.RespondNexusTaskCompletedRequest,
-            wsv1.RespondNexusTaskCompletedResponse,
-        )
-        self.respond_nexus_task_failed = client._new_call(
-            "respond_nexus_task_failed",
-            wsv1.RespondNexusTaskFailedRequest,
-            wsv1.RespondNexusTaskFailedResponse,
-        )
-        self.respond_query_task_completed = client._new_call(
-            "respond_query_task_completed",
-            wsv1.RespondQueryTaskCompletedRequest,
-            wsv1.RespondQueryTaskCompletedResponse,
-        )
-        self.respond_workflow_task_completed = client._new_call(
-            "respond_workflow_task_completed",
-            wsv1.RespondWorkflowTaskCompletedRequest,
-            wsv1.RespondWorkflowTaskCompletedResponse,
-        )
-        self.respond_workflow_task_failed = client._new_call(
-            "respond_workflow_task_failed",
-            wsv1.RespondWorkflowTaskFailedRequest,
-            wsv1.RespondWorkflowTaskFailedResponse,
-        )
-        self.scan_workflow_executions = client._new_call(
-            "scan_workflow_executions",
-            wsv1.ScanWorkflowExecutionsRequest,
-            wsv1.ScanWorkflowExecutionsResponse,
-        )
-        self.signal_with_start_workflow_execution = client._new_call(
-            "signal_with_start_workflow_execution",
-            wsv1.SignalWithStartWorkflowExecutionRequest,
-            wsv1.SignalWithStartWorkflowExecutionResponse,
-        )
-        self.signal_workflow_execution = client._new_call(
-            "signal_workflow_execution",
-            wsv1.SignalWorkflowExecutionRequest,
-            wsv1.SignalWorkflowExecutionResponse,
-        )
-        self.start_batch_operation = client._new_call(
-            "start_batch_operation",
-            wsv1.StartBatchOperationRequest,
-            wsv1.StartBatchOperationResponse,
-        )
-        self.start_workflow_execution = client._new_call(
-            "start_workflow_execution",
-            wsv1.StartWorkflowExecutionRequest,
-            wsv1.StartWorkflowExecutionResponse,
-        )
-        self.stop_batch_operation = client._new_call(
-            "stop_batch_operation",
-            wsv1.StopBatchOperationRequest,
-            wsv1.StopBatchOperationResponse,
-        )
-        self.terminate_workflow_execution = client._new_call(
-            "terminate_workflow_execution",
-            wsv1.TerminateWorkflowExecutionRequest,
-            wsv1.TerminateWorkflowExecutionResponse,
-        )
-        self.update_namespace = client._new_call(
-            "update_namespace",
-            wsv1.UpdateNamespaceRequest,
-            wsv1.UpdateNamespaceResponse,
-        )
-        self.update_schedule = client._new_call(
-            "update_schedule",
-            wsv1.UpdateScheduleRequest,
-            wsv1.UpdateScheduleResponse,
-        )
-        self.update_workflow_execution = client._new_call(
-            "update_workflow_execution",
-            wsv1.UpdateWorkflowExecutionRequest,
-            wsv1.UpdateWorkflowExecutionResponse,
-        )
-        self.update_worker_build_id_compatibility = client._new_call(
-            "update_worker_build_id_compatibility",
-            wsv1.UpdateWorkerBuildIdCompatibilityRequest,
-            wsv1.UpdateWorkerBuildIdCompatibilityResponse,
-        )
-        self.update_worker_versioning_rules = client._new_call(
-            "update_worker_versioning_rules",
-            wsv1.UpdateWorkerVersioningRulesRequest,
-            wsv1.UpdateWorkerVersioningRulesResponse,
-        )
-        self.pause_activity_by_id = client._new_call(
-            "pause_activity_by_id",
-            wsv1.PauseActivityByIdRequest,
-            wsv1.PauseActivityByIdResponse,
-        )
-        self.unpause_activity_by_id = client._new_call(
-            "unpause_activity_by_id",
-            wsv1.UnpauseActivityByIdRequest,
-            wsv1.UnpauseActivityByIdResponse,
-        )
-        self.reset_activity_by_id = client._new_call(
-            "reset_activity_by_id",
-            wsv1.ResetActivityByIdRequest,
-            wsv1.ResetActivityByIdResponse,
-        )
-        self.update_activity_options_by_id = client._new_call(
-            "update_activity_options_by_id",
-            wsv1.UpdateActivityOptionsByIdRequest,
-            wsv1.UpdateActivityOptionsByIdResponse,
-        )
-        self.shutdown_worker = client._new_call(
-            "shutdown_worker",
-            wsv1.ShutdownWorkerRequest,
-            wsv1.ShutdownWorkerResponse,
-        )
 
-
-class OperatorService:
+class OperatorService(temporalio.bridge.services_generated.OperatorService):
     """Client to the Temporal server's operator service."""
 
-    def __init__(self, client: ServiceClient) -> None:
-        """Initialize the operator service."""
-        osv1 = temporalio.api.operatorservice.v1
-        self.add_or_update_remote_cluster = client._new_call(
-            "add_or_update_remote_cluster",
-            osv1.AddOrUpdateRemoteClusterRequest,
-            osv1.AddOrUpdateRemoteClusterResponse,
-            service="operator",
-        )
-        self.add_search_attributes = client._new_call(
-            "add_search_attributes",
-            osv1.AddSearchAttributesRequest,
-            osv1.AddSearchAttributesResponse,
-            service="operator",
-        )
-        self.create_nexus_endpoint = client._new_call(
-            "create_nexus_endpoint",
-            osv1.CreateNexusEndpointRequest,
-            osv1.CreateNexusEndpointResponse,
-            service="operator",
-        )
-        self.delete_nexus_endpoint = client._new_call(
-            "delete_nexus_endpoint",
-            osv1.DeleteNexusEndpointRequest,
-            osv1.DeleteNexusEndpointResponse,
-            service="operator",
-        )
-        self.delete_namespace = client._new_call(
-            "delete_namespace",
-            osv1.DeleteNamespaceRequest,
-            osv1.DeleteNamespaceResponse,
-            service="operator",
-        )
-        self.get_nexus_endpoint = client._new_call(
-            "get_nexus_endpoint",
-            osv1.GetNexusEndpointRequest,
-            osv1.GetNexusEndpointResponse,
-            service="operator",
-        )
-        self.list_clusters = client._new_call(
-            "list_clusters",
-            osv1.ListClustersRequest,
-            osv1.ListClustersResponse,
-            service="operator",
-        )
-        self.list_nexus_endpoints = client._new_call(
-            "list_nexus_endpoints",
-            osv1.ListNexusEndpointsRequest,
-            osv1.ListNexusEndpointsResponse,
-            service="operator",
-        )
-        self.list_search_attributes = client._new_call(
-            "list_search_attributes",
-            osv1.ListSearchAttributesRequest,
-            osv1.ListSearchAttributesResponse,
-            service="operator",
-        )
-        self.remove_remote_cluster = client._new_call(
-            "remove_remote_cluster",
-            osv1.RemoveRemoteClusterRequest,
-            osv1.RemoveRemoteClusterResponse,
-            service="operator",
-        )
-        self.remove_search_attributes = client._new_call(
-            "remove_search_attributes",
-            osv1.RemoveSearchAttributesRequest,
-            osv1.RemoveSearchAttributesResponse,
-            service="operator",
-        )
-        self.update_nexus_endpoint = client._new_call(
-            "update_nexus_endpoint",
-            osv1.UpdateNexusEndpointRequest,
-            osv1.UpdateNexusEndpointResponse,
-            service="operator",
-        )
 
-
-class CloudService:
+class CloudService(temporalio.bridge.services_generated.CloudService):
     """Client to the Temporal server's cloud service."""
 
-    def __init__(self, client: ServiceClient) -> None:
-        """Initialize the cloud service."""
-        clv1 = temporalio.api.cloud.cloudservice.v1
-        self.add_namespace_region = client._new_call(
-            "add_namespace_region",
-            clv1.AddNamespaceRegionRequest,
-            clv1.AddNamespaceRegionResponse,
-            service="cloud",
-        )
-        self.create_api_key = client._new_call(
-            "create_api_key",
-            clv1.CreateApiKeyRequest,
-            clv1.CreateApiKeyResponse,
-            service="cloud",
-        )
-        self.create_namespace = client._new_call(
-            "create_namespace",
-            clv1.CreateNamespaceRequest,
-            clv1.CreateNamespaceResponse,
-            service="cloud",
-        )
-        self.create_namespace_export_sink = client._new_call(
-            "create_namespace_export_sink",
-            clv1.CreateNamespaceExportSinkRequest,
-            clv1.CreateNamespaceExportSinkResponse,
-            service="cloud",
-        )
-        self.create_nexus_endpoint = client._new_call(
-            "create_nexus_endpoint",
-            clv1.CreateNexusEndpointRequest,
-            clv1.CreateNexusEndpointResponse,
-            service="cloud",
-        )
-        self.create_service_account = client._new_call(
-            "create_service_account",
-            clv1.CreateServiceAccountRequest,
-            clv1.CreateServiceAccountResponse,
-            service="cloud",
-        )
-        self.create_user_group = client._new_call(
-            "create_user_group",
-            clv1.CreateUserGroupRequest,
-            clv1.CreateUserGroupResponse,
-            service="cloud",
-        )
-        self.create_user = client._new_call(
-            "create_user",
-            clv1.CreateUserRequest,
-            clv1.CreateUserResponse,
-            service="cloud",
-        )
-        self.delete_api_key = client._new_call(
-            "delete_api_key",
-            clv1.DeleteApiKeyRequest,
-            clv1.DeleteApiKeyResponse,
-            service="cloud",
-        )
-        self.delete_namespace = client._new_call(
-            "delete_namespace",
-            clv1.DeleteNamespaceRequest,
-            clv1.DeleteNamespaceResponse,
-            service="cloud",
-        )
-        self.delete_namespace_export_sink = client._new_call(
-            "delete_namespace_export_sink",
-            clv1.DeleteNamespaceExportSinkRequest,
-            clv1.DeleteNamespaceExportSinkResponse,
-            service="cloud",
-        )
-        self.delete_nexus_endpoint = client._new_call(
-            "delete_nexus_endpoint",
-            clv1.DeleteNexusEndpointRequest,
-            clv1.DeleteNexusEndpointResponse,
-            service="cloud",
-        )
-        self.delete_service_account = client._new_call(
-            "delete_service_account",
-            clv1.DeleteServiceAccountRequest,
-            clv1.DeleteServiceAccountResponse,
-            service="cloud",
-        )
-        self.delete_user_group = client._new_call(
-            "delete_user_group",
-            clv1.DeleteUserGroupRequest,
-            clv1.DeleteUserGroupResponse,
-            service="cloud",
-        )
-        self.delete_user = client._new_call(
-            "delete_user",
-            clv1.DeleteUserRequest,
-            clv1.DeleteUserResponse,
-            service="cloud",
-        )
-        self.failover_namespace_region = client._new_call(
-            "failover_namespace_region",
-            clv1.FailoverNamespaceRegionRequest,
-            clv1.FailoverNamespaceRegionResponse,
-            service="cloud",
-        )
-        self.get_account = client._new_call(
-            "get_account",
-            clv1.GetAccountRequest,
-            clv1.GetAccountResponse,
-            service="cloud",
-        )
-        self.get_api_key = client._new_call(
-            "get_api_key",
-            clv1.GetApiKeyRequest,
-            clv1.GetApiKeyResponse,
-            service="cloud",
-        )
-        self.get_api_keys = client._new_call(
-            "get_api_keys",
-            clv1.GetApiKeysRequest,
-            clv1.GetApiKeysResponse,
-            service="cloud",
-        )
-        self.get_async_operation = client._new_call(
-            "get_async_operation",
-            clv1.GetAsyncOperationRequest,
-            clv1.GetAsyncOperationResponse,
-            service="cloud",
-        )
-        self.get_namespace = client._new_call(
-            "get_namespace",
-            clv1.GetNamespaceRequest,
-            clv1.GetNamespaceResponse,
-            service="cloud",
-        )
-        self.get_namespaces = client._new_call(
-            "get_namespaces",
-            clv1.GetNamespacesRequest,
-            clv1.GetNamespacesResponse,
-            service="cloud",
-        )
-        self.get_namespace_export_sink = client._new_call(
-            "get_namespace_export_sink",
-            clv1.GetNamespaceExportSinkRequest,
-            clv1.GetNamespaceExportSinkResponse,
-            service="cloud",
-        )
-        self.get_namespace_export_sinks = client._new_call(
-            "get_namespace_export_sinks",
-            clv1.GetNamespaceExportSinksRequest,
-            clv1.GetNamespaceExportSinksResponse,
-            service="cloud",
-        )
-        self.get_nexus_endpoint = client._new_call(
-            "get_nexus_endpoint",
-            clv1.GetNexusEndpointRequest,
-            clv1.GetNexusEndpointResponse,
-            service="cloud",
-        )
-        self.get_nexus_endpoints = client._new_call(
-            "get_nexus_endpoints",
-            clv1.GetNexusEndpointsRequest,
-            clv1.GetNexusEndpointsResponse,
-            service="cloud",
-        )
-        self.get_region = client._new_call(
-            "get_region",
-            clv1.GetRegionRequest,
-            clv1.GetRegionResponse,
-            service="cloud",
-        )
-        self.get_regions = client._new_call(
-            "get_regions",
-            clv1.GetRegionsRequest,
-            clv1.GetRegionsResponse,
-            service="cloud",
-        )
-        self.get_service_account = client._new_call(
-            "get_service_account",
-            clv1.GetServiceAccountRequest,
-            clv1.GetServiceAccountResponse,
-            service="cloud",
-        )
-        self.get_service_accounts = client._new_call(
-            "get_service_accounts",
-            clv1.GetServiceAccountsRequest,
-            clv1.GetServiceAccountsResponse,
-            service="cloud",
-        )
-        self.get_usage = client._new_call(
-            "get_usage",
-            clv1.GetUsageRequest,
-            clv1.GetUsageResponse,
-            service="cloud",
-        )
-        self.get_user_group = client._new_call(
-            "get_user_group",
-            clv1.GetUserGroupRequest,
-            clv1.GetUserGroupResponse,
-            service="cloud",
-        )
-        self.get_user_groups = client._new_call(
-            "get_user_groups",
-            clv1.GetUserGroupsRequest,
-            clv1.GetUserGroupsResponse,
-            service="cloud",
-        )
-        self.get_user = client._new_call(
-            "get_user",
-            clv1.GetUserRequest,
-            clv1.GetUserResponse,
-            service="cloud",
-        )
-        self.get_users = client._new_call(
-            "get_users",
-            clv1.GetUsersRequest,
-            clv1.GetUsersResponse,
-            service="cloud",
-        )
-        self.rename_custom_search_attribute = client._new_call(
-            "rename_custom_search_attribute",
-            clv1.RenameCustomSearchAttributeRequest,
-            clv1.RenameCustomSearchAttributeResponse,
-            service="cloud",
-        )
-        self.set_user_group_namespace_access = client._new_call(
-            "set_user_group_namespace_access",
-            clv1.SetUserGroupNamespaceAccessRequest,
-            clv1.SetUserGroupNamespaceAccessResponse,
-            service="cloud",
-        )
-        self.set_user_namespace_access = client._new_call(
-            "set_user_namespace_access",
-            clv1.SetUserNamespaceAccessRequest,
-            clv1.SetUserNamespaceAccessResponse,
-            service="cloud",
-        )
-        self.update_account = client._new_call(
-            "update_account",
-            clv1.UpdateAccountRequest,
-            clv1.UpdateAccountResponse,
-            service="cloud",
-        )
-        self.update_api_key = client._new_call(
-            "update_api_key",
-            clv1.UpdateApiKeyRequest,
-            clv1.UpdateApiKeyResponse,
-            service="cloud",
-        )
-        self.update_namespace = client._new_call(
-            "update_namespace",
-            clv1.UpdateNamespaceRequest,
-            clv1.UpdateNamespaceResponse,
-            service="cloud",
-        )
-        self.update_namespace_export_sink = client._new_call(
-            "update_namespace_export_sink",
-            clv1.UpdateNamespaceExportSinkRequest,
-            clv1.UpdateNamespaceExportSinkResponse,
-            service="cloud",
-        )
-        self.update_nexus_endpoint = client._new_call(
-            "update_nexus_endpoint",
-            clv1.UpdateNexusEndpointRequest,
-            clv1.UpdateNexusEndpointResponse,
-            service="cloud",
-        )
-        self.update_service_account = client._new_call(
-            "update_service_account",
-            clv1.UpdateServiceAccountRequest,
-            clv1.UpdateServiceAccountResponse,
-            service="cloud",
-        )
-        self.update_user_group = client._new_call(
-            "update_user_group",
-            clv1.UpdateUserGroupRequest,
-            clv1.UpdateUserGroupResponse,
-            service="cloud",
-        )
-        self.update_user = client._new_call(
-            "update_user",
-            clv1.UpdateUserRequest,
-            clv1.UpdateUserResponse,
-            service="cloud",
-        )
-        self.validate_namespace_export_sink = client._new_call(
-            "validate_namespace_export_sink",
-            clv1.ValidateNamespaceExportSinkRequest,
-            clv1.ValidateNamespaceExportSinkResponse,
-            service="cloud",
-        )
 
-
-class TestService:
+class TestService(temporalio.bridge.services_generated.TestService):
     """Client to the Temporal test server's test service."""
 
-    def __init__(self, client: ServiceClient) -> None:
-        """Initialize the test service."""
-        tsv1 = temporalio.api.testservice.v1
-        self.get_current_time = client._new_call(
-            "get_current_time",
-            google.protobuf.empty_pb2.Empty,
-            tsv1.GetCurrentTimeResponse,
-            service="test",
-        )
-        self.lock_time_skipping = client._new_call(
-            "lock_time_skipping",
-            tsv1.LockTimeSkippingRequest,
-            tsv1.LockTimeSkippingResponse,
-            service="test",
-        )
-        self.sleep_until = client._new_call(
-            "sleep_until",
-            tsv1.SleepUntilRequest,
-            tsv1.SleepResponse,
-            service="test",
-        )
-        self.sleep = client._new_call(
-            "sleep",
-            tsv1.SleepRequest,
-            tsv1.SleepResponse,
-            service="test",
-        )
-        self.unlock_time_skipping_with_sleep = client._new_call(
-            "unlock_time_skipping_with_sleep",
-            tsv1.SleepRequest,
-            tsv1.SleepResponse,
-            service="test",
-        )
-        self.unlock_time_skipping = client._new_call(
-            "unlock_time_skipping",
-            tsv1.UnlockTimeSkippingRequest,
-            tsv1.UnlockTimeSkippingResponse,
-            service="test",
-        )
 
-
-class ServiceCall(Generic[ServiceRequest, ServiceResponse]):
-    """Callable RPC method for services."""
-
-    def __init__(
-        self,
-        service_client: ServiceClient,
-        name: str,
-        req_type: Type[ServiceRequest],
-        resp_type: Type[ServiceResponse],
-        service: str,
-    ) -> None:
-        """Initialize the service call."""
-        self.service_client = service_client
-        self.name = name
-        self.req_type = req_type
-        self.resp_type = resp_type
-        self.service = service
-
-    async def __call__(
-        self,
-        req: ServiceRequest,
-        *,
-        retry: bool = False,
-        metadata: Mapping[str, str] = {},
-        timeout: Optional[timedelta] = None,
-    ) -> ServiceResponse:
-        """Invoke underlying client with the given request.
-
-        Args:
-            req: Request for the call.
-            retry: If true, will use retry config to retry failed calls.
-            metadata: Headers used on the RPC call. Keys here override
-                client-level RPC metadata keys.
-            timeout: Optional RPC deadline to set for the RPC call.
-
-        Returns:
-            RPC response.
-
-        Raises:
-            RPCError: Any RPC error that occurs during the call.
-        """
-        return await self.service_client._rpc_call(
-            self.name,
-            req,
-            self.resp_type,
-            service=self.service,
-            retry=retry,
-            metadata=metadata,
-            timeout=timeout,
-        )
+class HealthService(temporalio.bridge.services_generated.HealthService):
+    """Client to the Temporal server's health service."""
 
 
 class _BridgeServiceClient(ServiceClient):
@@ -1120,7 +315,7 @@ class _BridgeServiceClient(ServiceClient):
     def __init__(self, config: ConnectConfig) -> None:
         super().__init__(config)
         self._bridge_config = config._to_bridge_config()
-        self._bridge_client: Optional[temporalio.bridge.client.Client] = None
+        self._bridge_client: temporalio.bridge.client.Client | None = None
         self._bridge_client_connect_lock = asyncio.Lock()
 
     async def _connected_client(self) -> temporalio.bridge.client.Client:
@@ -1138,7 +333,7 @@ class _BridgeServiceClient(ServiceClient):
         """Underlying service client."""
         return self
 
-    def update_rpc_metadata(self, metadata: Mapping[str, str]) -> None:
+    def update_rpc_metadata(self, metadata: Mapping[str, str | bytes]) -> None:
         """Update Core client metadata."""
         # Mutate the bridge config and then only mutate the running client
         # metadata if already connected
@@ -1146,7 +341,7 @@ class _BridgeServiceClient(ServiceClient):
         if self._bridge_client:
             self._bridge_client.update_metadata(metadata)
 
-    def update_api_key(self, api_key: Optional[str]) -> None:
+    def update_api_key(self, api_key: str | None) -> None:
         """Update Core client API key."""
         # Mutate the bridge config and then only mutate the running client
         # metadata if already connected
@@ -1158,12 +353,12 @@ class _BridgeServiceClient(ServiceClient):
         self,
         rpc: str,
         req: google.protobuf.message.Message,
-        resp_type: Type[ServiceResponse],
+        resp_type: type[ServiceResponse],
         *,
         service: str,
         retry: bool,
-        metadata: Mapping[str, str],
-        timeout: Optional[timedelta],
+        metadata: Mapping[str, str | bytes],
+        timeout: timedelta | None,
     ) -> ServiceResponse:
         global LOG_PROTOS
         if LOG_PROTOS:
@@ -1182,7 +377,7 @@ class _BridgeServiceClient(ServiceClient):
             if LOG_PROTOS:
                 logger.debug("Service %s response from %s: %s", service, rpc, resp)
             return resp
-        except temporalio.bridge.client.RPCError as err:
+        except BridgeRPCError as err:
             # Intentionally swallowing the cause instead of using "from"
             status, message, details = err.args
             raise RPCError(message, RPCStatusCode(status), details)
@@ -1221,7 +416,7 @@ class RPCError(temporalio.exceptions.TemporalError):
         self._message = message
         self._status = status
         self._raw_grpc_status = raw_grpc_status
-        self._grpc_status: Optional[temporalio.api.common.v1.GrpcStatus] = None
+        self._grpc_status: temporalio.api.common.v1.GrpcStatus | None = None
 
     @property
     def message(self) -> str:

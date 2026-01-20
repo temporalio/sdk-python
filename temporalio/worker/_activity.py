@@ -14,32 +14,19 @@ import queue
 import threading
 import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
-    Callable,
-    Dict,
-    Iterator,
     NoReturn,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    Union,
 )
 
 import google.protobuf.duration_pb2
 import google.protobuf.timestamp_pb2
 
 import temporalio.activity
-import temporalio.api.common.v1
-import temporalio.bridge.client
-import temporalio.bridge.proto
-import temporalio.bridge.proto.activity_result
-import temporalio.bridge.proto.activity_task
-import temporalio.bridge.proto.common
 import temporalio.bridge.runtime
 import temporalio.bridge.worker
 import temporalio.client
@@ -64,30 +51,32 @@ class _ActivityWorker:
         bridge_worker: Callable[[], temporalio.bridge.worker.Worker],
         task_queue: str,
         activities: Sequence[Callable],
-        activity_executor: Optional[concurrent.futures.Executor],
-        shared_state_manager: Optional[SharedStateManager],
+        activity_executor: concurrent.futures.Executor | None,
+        shared_state_manager: SharedStateManager | None,
         data_converter: temporalio.converter.DataConverter,
         interceptors: Sequence[Interceptor],
         metric_meter: temporalio.common.MetricMeter,
+        client: temporalio.client.Client,
+        encode_headers: bool,
     ) -> None:
         self._bridge_worker = bridge_worker
         self._task_queue = task_queue
         self._activity_executor = activity_executor
         self._shared_state_manager = shared_state_manager
-        self._running_activities: Dict[bytes, _RunningActivity] = {}
+        self._running_activities: dict[bytes, _RunningActivity] = {}
         self._data_converter = data_converter
         self._interceptors = interceptors
         self._metric_meter = metric_meter
+        self._encode_headers = encode_headers
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
         # Lazily created on first activity
-        self._worker_shutdown_event: Optional[temporalio.activity._CompositeEvent] = (
-            None
-        )
+        self._worker_shutdown_event: temporalio.activity._CompositeEvent | None = None
         self._seen_sync_activity = False
+        self._client = client
 
         # Validate and build activity dict
-        self._activities: Dict[str, temporalio.activity._Definition] = {}
-        self._dynamic_activity: Optional[temporalio.activity._Definition] = None
+        self._activities: dict[str, temporalio.activity._Definition] = {}
+        self._dynamic_activity: temporalio.activity._Definition | None = None
         for activity in activities:
             # Get definition
             defn = temporalio.activity._Definition.must_from_callable(activity)
@@ -138,24 +127,21 @@ class _ActivityWorker:
                 self._dynamic_activity = defn
 
     async def run(self) -> None:
-        # Create a task that fails when we get a failure on the queue
-        async def raise_from_queue() -> NoReturn:
+        """Continually poll for activity tasks and dispatch to handlers."""
+
+        async def raise_from_exception_queue() -> NoReturn:
             raise await self._fail_worker_exception_queue.get()
 
-        exception_task = asyncio.create_task(raise_from_queue())
+        exception_task = asyncio.create_task(raise_from_exception_queue())
 
-        # Continually poll for activity work
         while True:
             try:
-                # Poll for a task
                 poll_task = asyncio.create_task(
                     self._bridge_worker().poll_activity_task()
                 )
                 await asyncio.wait(
                     [poll_task, exception_task], return_when=asyncio.FIRST_COMPLETED
-                )  # type: ignore
-                # If exception for failing the worker happened, raise it.
-                # Otherwise, the poll succeeded.
+                )
                 if exception_task.done():
                     poll_task.cancel()
                     await exception_task
@@ -167,14 +153,16 @@ class _ActivityWorker:
                     # size of 1000 should be plenty for the heartbeat queue.
                     activity = _RunningActivity(pending_heartbeats=asyncio.Queue(1000))
                     activity.task = asyncio.create_task(
-                        self._run_activity(task.task_token, task.start, activity)
+                        self._handle_start_activity_task(
+                            task.task_token, task.start, activity
+                        )
                     )
                     self._running_activities[task.task_token] = activity
                 elif task.HasField("cancel"):
-                    self._cancel(task.task_token, task.cancel)
+                    self._handle_cancel_activity_task(task.task_token, task.cancel)
                 else:
                     raise RuntimeError(f"Unrecognized activity task: {task}")
-            except temporalio.bridge.worker.PollShutdownError:
+            except temporalio.bridge.worker.PollShutdownError:  # type: ignore[reportPrivateLocalImportUsage]
                 exception_task.cancel()
                 return
             except Exception as err:
@@ -191,12 +179,12 @@ class _ActivityWorker:
             try:
                 # Just take all tasks and say we can't handle them
                 task = await self._bridge_worker().poll_activity_task()
-                completion = temporalio.bridge.proto.ActivityTaskCompletion(
+                completion = temporalio.bridge.proto.ActivityTaskCompletion(  # type: ignore[reportAttributeAccessIssue]
                     task_token=task.task_token
                 )
                 completion.result.failed.failure.message = "Worker shutting down"
                 await self._bridge_worker().complete_activity_task(completion)
-            except temporalio.bridge.worker.PollShutdownError:
+            except temporalio.bridge.worker.PollShutdownError:  # type: ignore[reportPrivateLocalImportUsage]
                 return
 
     # Only call this after run()/drain_poll_queue() have returned. This will not
@@ -206,15 +194,24 @@ class _ActivityWorker:
         if running_tasks:
             await asyncio.gather(*running_tasks, return_exceptions=False)
 
-    def _cancel(
-        self, task_token: bytes, cancel: temporalio.bridge.proto.activity_task.Cancel
+    def _handle_cancel_activity_task(
+        self,
+        task_token: bytes,
+        cancel: temporalio.bridge.proto.activity_task.Cancel,  # type: ignore[reportAttributeAccessIssue]
     ) -> None:
+        """Request cancellation of a running activity task."""
         activity = self._running_activities.get(task_token)
         if not activity:
             warnings.warn(f"Cannot find activity to cancel for token {task_token!r}")
             return
         logger.debug("Cancelling activity %s, reason: %s", task_token, cancel.reason)
-        activity.cancel(cancelled_by_request=True)
+        activity.cancellation_details.details = (
+            temporalio.activity.ActivityCancellationDetails._from_proto(cancel.details)
+        )
+        activity.cancel(
+            cancelled_by_request=cancel.details.is_cancelled
+            or cancel.details.is_worker_shutdown
+        )
 
     def _heartbeat(self, task_token: bytes, *details: Any) -> None:
         # We intentionally make heartbeating non-async, but since the data
@@ -240,18 +237,32 @@ class _ActivityWorker:
         task_token: bytes,
     ) -> None:
         # Drain the queue, only taking the last value to actually heartbeat
-        details: Optional[Sequence[Any]] = None
+        details: Sequence[Any] | None = None
         while not activity.pending_heartbeats.empty():
             details = activity.pending_heartbeats.get_nowait()
         if details is None:
             return
 
+        data_converter = self._data_converter
+        if activity.info:
+            context = temporalio.converter.ActivitySerializationContext(
+                namespace=activity.info.workflow_namespace,
+                workflow_id=activity.info.workflow_id,
+                workflow_type=activity.info.workflow_type,
+                activity_type=activity.info.activity_type,
+                activity_task_queue=self._task_queue,
+                is_local=activity.info.is_local,
+            )
+            data_converter = data_converter.with_context(context)
+
         # Perform the heartbeat
         try:
-            heartbeat = temporalio.bridge.proto.ActivityHeartbeat(task_token=task_token)
+            heartbeat = temporalio.bridge.proto.ActivityHeartbeat(  # type: ignore[reportAttributeAccessIssue]
+                task_token=task_token
+            )
             if details:
                 # Convert to core payloads
-                heartbeat.details.extend(await self._data_converter.encode(details))
+                heartbeat.details.extend(await data_converter.encode(details))
             logger.debug("Recording heartbeat with details %s", details)
             self._bridge_worker().record_activity_heartbeat(heartbeat)
         except Exception as err:
@@ -267,196 +278,40 @@ class _ActivityWorker:
                 )
                 activity.cancel(cancelled_due_to_heartbeat_error=err)
 
-    async def _run_activity(
+    async def _handle_start_activity_task(
         self,
         task_token: bytes,
-        start: temporalio.bridge.proto.activity_task.Start,
+        start: temporalio.bridge.proto.activity_task.Start,  # type: ignore[reportAttributeAccessIssue]
         running_activity: _RunningActivity,
     ) -> None:
+        """Handle a start activity task.
+
+        Attempt to execute the user activity function and invoke the data converter on
+        the result. Handle errors and send the task completion.
+        """
         logger.debug("Running activity %s (token %s)", start.activity_type, task_token)
         # We choose to surround interceptor creation and activity invocation in
         # a try block so we can mark the workflow as failed on any error instead
         # of having error handling in the interceptor
-        completion = temporalio.bridge.proto.ActivityTaskCompletion(
+        completion = temporalio.bridge.proto.ActivityTaskCompletion(  # type: ignore[reportAttributeAccessIssue]
             task_token=task_token
         )
+        # Create serialization context for the activity
+        context = temporalio.converter.ActivitySerializationContext(
+            namespace=start.workflow_namespace,
+            workflow_id=start.workflow_execution.workflow_id,
+            workflow_type=start.workflow_type,
+            activity_type=start.activity_type,
+            activity_task_queue=self._task_queue,
+            is_local=start.is_local,
+        )
+        data_converter = self._data_converter.with_context(context)
         try:
-            # Find activity or fail
-            activity_def = self._activities.get(
-                start.activity_type, self._dynamic_activity
+            result = await self._execute_activity(
+                start, running_activity, task_token, data_converter
             )
-            if not activity_def:
-                activity_names = ", ".join(sorted(self._activities.keys()))
-                raise temporalio.exceptions.ApplicationError(
-                    f"Activity function {start.activity_type} for workflow {start.workflow_execution.workflow_id} "
-                    f"is not registered on this worker, available activities: {activity_names}",
-                    type="NotFoundError",
-                )
-
-            # Create the worker shutdown event if not created
-            if not self._worker_shutdown_event:
-                self._worker_shutdown_event = temporalio.activity._CompositeEvent(
-                    thread_event=threading.Event(), async_event=asyncio.Event()
-                )
-
-            # Setup events
-            sync_non_threaded = False
-            if not activity_def.is_async:
-                running_activity.sync = True
-                # If we're in a thread-pool executor we can use threading events
-                # otherwise we must use manager events
-                if isinstance(
-                    self._activity_executor, concurrent.futures.ThreadPoolExecutor
-                ):
-                    running_activity.cancelled_event = (
-                        temporalio.activity._CompositeEvent(
-                            thread_event=threading.Event(),
-                            # No async event
-                            async_event=None,
-                        )
-                    )
-                    if not activity_def.no_thread_cancel_exception:
-                        running_activity.cancel_thread_raiser = _ThreadExceptionRaiser()
-                else:
-                    sync_non_threaded = True
-                    manager = self._shared_state_manager
-                    # Pre-checked on worker init
-                    assert manager
-                    running_activity.cancelled_event = (
-                        temporalio.activity._CompositeEvent(
-                            thread_event=manager.new_event(),
-                            # No async event
-                            async_event=None,
-                        )
-                    )
-                    # We also must set the worker shutdown thread event to a
-                    # manager event if this is the first sync event. We don't
-                    # want to create if there never is a sync event.
-                    if not self._seen_sync_activity:
-                        self._worker_shutdown_event.thread_event = manager.new_event()
-                # Say we've seen a sync activity
-                self._seen_sync_activity = True
-            else:
-                # We have to set the async form of events
-                running_activity.cancelled_event = temporalio.activity._CompositeEvent(
-                    thread_event=threading.Event(),
-                    async_event=asyncio.Event(),
-                )
-
-            # Convert arguments. We use raw value for dynamic. Otherwise, we
-            # only use arg type hints if they match the input count.
-            arg_types = activity_def.arg_types
-            if not activity_def.name:
-                # Dynamic is just the raw value for each input value
-                arg_types = [temporalio.common.RawValue] * len(start.input)
-            elif arg_types is not None and len(arg_types) != len(start.input):
-                arg_types = None
-            try:
-                args = (
-                    []
-                    if not start.input
-                    else await self._data_converter.decode(
-                        start.input, type_hints=arg_types
-                    )
-                )
-            except Exception as err:
-                raise temporalio.exceptions.ApplicationError(
-                    "Failed decoding arguments"
-                ) from err
-            # Put the args inside a list if dynamic
-            if not activity_def.name:
-                args = [args]
-
-            # Convert heartbeat details
-            # TODO(cretz): Allow some way to configure heartbeat type hinting?
-            try:
-                heartbeat_details = (
-                    []
-                    if not start.heartbeat_details
-                    else await self._data_converter.decode(start.heartbeat_details)
-                )
-            except Exception as err:
-                raise temporalio.exceptions.ApplicationError(
-                    "Failed decoding heartbeat details", non_retryable=True
-                ) from err
-
-            # Build info
-            info = temporalio.activity.Info(
-                activity_id=start.activity_id,
-                activity_type=start.activity_type,
-                attempt=start.attempt,
-                current_attempt_scheduled_time=_proto_to_datetime(
-                    start.current_attempt_scheduled_time
-                ),
-                heartbeat_details=heartbeat_details,
-                heartbeat_timeout=_proto_to_non_zero_timedelta(start.heartbeat_timeout)
-                if start.HasField("heartbeat_timeout")
-                else None,
-                is_local=start.is_local,
-                schedule_to_close_timeout=_proto_to_non_zero_timedelta(
-                    start.schedule_to_close_timeout
-                )
-                if start.HasField("schedule_to_close_timeout")
-                else None,
-                scheduled_time=_proto_to_datetime(start.scheduled_time),
-                start_to_close_timeout=_proto_to_non_zero_timedelta(
-                    start.start_to_close_timeout
-                )
-                if start.HasField("start_to_close_timeout")
-                else None,
-                started_time=_proto_to_datetime(start.started_time),
-                task_queue=self._task_queue,
-                task_token=task_token,
-                workflow_id=start.workflow_execution.workflow_id,
-                workflow_namespace=start.workflow_namespace,
-                workflow_run_id=start.workflow_execution.run_id,
-                workflow_type=start.workflow_type,
-            )
-            running_activity.info = info
-            input = ExecuteActivityInput(
-                fn=activity_def.fn,
-                args=args,
-                executor=None if not running_activity.sync else self._activity_executor,
-                headers=start.header_fields,
-            )
-
-            # Set the context early so the logging adapter works and
-            # interceptors have it
-            temporalio.activity._Context.set(
-                temporalio.activity._Context(
-                    info=lambda: info,
-                    heartbeat=None,
-                    cancelled_event=running_activity.cancelled_event,
-                    worker_shutdown_event=self._worker_shutdown_event,
-                    shield_thread_cancel_exception=None
-                    if not running_activity.cancel_thread_raiser
-                    else running_activity.cancel_thread_raiser.shielded,
-                    payload_converter_class_or_instance=self._data_converter.payload_converter,
-                    runtime_metric_meter=None
-                    if sync_non_threaded
-                    else self._metric_meter,
-                )
-            )
-            temporalio.activity.logger.debug("Starting activity")
-
-            # Build the interceptors chaining in reverse. We build a context right
-            # now even though the info() can't be intercepted and heartbeat() will
-            # fail. The interceptors may want to use the info() during init.
-            impl: ActivityInboundInterceptor = _ActivityInboundImpl(
-                self, running_activity
-            )
-            for interceptor in reversed(list(self._interceptors)):
-                impl = interceptor.intercept_activity(impl)
-            # Init
-            impl.init(_ActivityOutboundImpl(self, running_activity.info))
-            # Exec
-            result = await impl.execute_activity(input)
-            # Convert result even if none. Since Python essentially only
-            # supports single result types (even if they are tuples), we will do
-            # the same.
-            completion.result.completed.result.CopyFrom(
-                (await self._data_converter.encode([result]))[0]
-            )
+            [payload] = await data_converter.encode([result])
+            completion.result.completed.result.CopyFrom(payload)
         except BaseException as err:
             try:
                 if isinstance(err, temporalio.activity._CompleteAsyncError):
@@ -473,8 +328,44 @@ class _ActivityWorker:
                     temporalio.activity.logger.warning(
                         f"Completing as failure during heartbeat with error of type {type(err)}: {err}",
                     )
-                    await self._data_converter.encode_failure(
+                    await data_converter.encode_failure(
                         err, completion.result.failed.failure
+                    )
+                elif (
+                    isinstance(
+                        err,
+                        (asyncio.CancelledError, temporalio.exceptions.CancelledError),
+                    )
+                    and running_activity.cancellation_details.details
+                    and running_activity.cancellation_details.details.paused
+                ):
+                    temporalio.activity.logger.warning(
+                        "Completing as failure due to unhandled cancel error produced by activity pause",
+                    )
+                    await data_converter.encode_failure(
+                        temporalio.exceptions.ApplicationError(
+                            type="ActivityPause",
+                            message="Unhandled activity cancel error produced by activity pause",
+                        ),
+                        completion.result.failed.failure,
+                    )
+                elif (
+                    isinstance(
+                        err,
+                        (asyncio.CancelledError, temporalio.exceptions.CancelledError),
+                    )
+                    and running_activity.cancellation_details.details
+                    and running_activity.cancellation_details.details.reset
+                ):
+                    temporalio.activity.logger.warning(
+                        "Completing as failure due to unhandled cancel error produced by activity reset",
+                    )
+                    await data_converter.encode_failure(
+                        temporalio.exceptions.ApplicationError(
+                            type="ActivityReset",
+                            message="Unhandled activity cancel error produced by activity reset",
+                        ),
+                        completion.result.failed.failure,
                     )
                 elif (
                     isinstance(
@@ -484,19 +375,35 @@ class _ActivityWorker:
                     and running_activity.cancelled_by_request
                 ):
                     temporalio.activity.logger.debug("Completing as cancelled")
-                    await self._data_converter.encode_failure(
+                    await data_converter.encode_failure(
                         # TODO(cretz): Should use some other message?
                         temporalio.exceptions.CancelledError("Cancelled"),
                         completion.result.cancelled.failure,
                     )
                 else:
-                    temporalio.activity.logger.warning(
-                        "Completing activity as failed", exc_info=True
-                    )
-                    await self._data_converter.encode_failure(
+                    if (
+                        isinstance(
+                            err,
+                            temporalio.exceptions.ApplicationError,
+                        )
+                        and err.category
+                        == temporalio.exceptions.ApplicationErrorCategory.BENIGN
+                    ):
+                        # Downgrade log level to DEBUG for BENIGN application errors.
+                        temporalio.activity.logger.debug(
+                            "Completing activity as failed",
+                            exc_info=True,
+                            extra={"__temporal_error_identifier": "ActivityFailure"},
+                        )
+                    else:
+                        temporalio.activity.logger.warning(
+                            "Completing activity as failed",
+                            exc_info=True,
+                            extra={"__temporal_error_identifier": "ActivityFailure"},
+                        )
+                    await data_converter.encode_failure(
                         err, completion.result.failed.failure
                     )
-
                     # For broken executors, we have to fail the entire worker
                     if isinstance(err, concurrent.futures.BrokenExecutor):
                         self._fail_worker_exception_queue.put_nowait(err)
@@ -531,26 +438,223 @@ class _ActivityWorker:
         except Exception:
             temporalio.activity.logger.exception("Failed completing activity task")
 
+    async def _execute_activity(
+        self,
+        start: temporalio.bridge.proto.activity_task.Start,  # type: ignore[reportAttributeAccessIssue]
+        running_activity: _RunningActivity,
+        task_token: bytes,
+        data_converter: temporalio.converter.DataConverter,
+    ) -> Any:
+        """Invoke the user's activity function.
+
+        Exceptions are handled by a caller of this function.
+        """
+        # Find activity or fail
+        activity_def = self._activities.get(start.activity_type, self._dynamic_activity)
+        if not activity_def:
+            activity_names = ", ".join(sorted(self._activities.keys()))
+            raise temporalio.exceptions.ApplicationError(
+                f"Activity function {start.activity_type} for workflow {start.workflow_execution.workflow_id} "
+                f"is not registered on this worker, available activities: {activity_names}",
+                type="NotFoundError",
+            )
+
+        # Create the worker shutdown event if not created
+        if not self._worker_shutdown_event:
+            self._worker_shutdown_event = temporalio.activity._CompositeEvent(
+                thread_event=threading.Event(), async_event=asyncio.Event()
+            )
+
+        # Setup events
+        sync_non_threaded = False
+        if not activity_def.is_async:
+            running_activity.sync = True
+            # If we're in a thread-pool executor we can use threading events
+            # otherwise we must use manager events
+            if isinstance(
+                self._activity_executor, concurrent.futures.ThreadPoolExecutor
+            ):
+                running_activity.cancelled_event = temporalio.activity._CompositeEvent(
+                    thread_event=threading.Event(),
+                    # No async event
+                    async_event=None,
+                )
+                if not activity_def.no_thread_cancel_exception:
+                    running_activity.cancel_thread_raiser = _ThreadExceptionRaiser()
+            else:
+                sync_non_threaded = True
+                manager = self._shared_state_manager
+                # Pre-checked on worker init
+                assert manager
+                running_activity.cancelled_event = temporalio.activity._CompositeEvent(
+                    thread_event=manager.new_event(),
+                    # No async event
+                    async_event=None,
+                )
+                # We also must set the worker shutdown thread event to a
+                # manager event if this is the first sync event. We don't
+                # want to create if there never is a sync event.
+                if not self._seen_sync_activity:
+                    self._worker_shutdown_event.thread_event = manager.new_event()
+            # Say we've seen a sync activity
+            self._seen_sync_activity = True
+        else:
+            # We have to set the async form of events
+            running_activity.cancelled_event = temporalio.activity._CompositeEvent(
+                thread_event=threading.Event(),
+                async_event=asyncio.Event(),
+            )
+
+        # Convert arguments. We use raw value for dynamic. Otherwise, we
+        # only use arg type hints if they match the input count.
+        arg_types = activity_def.arg_types
+        if not activity_def.name:
+            # Dynamic is just the raw value for each input value
+            arg_types = [temporalio.common.RawValue] * len(start.input)
+        elif arg_types is not None and len(arg_types) != len(start.input):
+            arg_types = None
+        try:
+            args = (
+                []
+                if not start.input
+                else await data_converter.decode(start.input, type_hints=arg_types)
+            )
+        except Exception as err:
+            raise temporalio.exceptions.ApplicationError(
+                "Failed decoding arguments"
+            ) from err
+        # Put the args inside a list if dynamic
+        if not activity_def.name:
+            args = [args]
+
+        # Convert heartbeat details
+        # TODO(cretz): Allow some way to configure heartbeat type hinting?
+        try:
+            heartbeat_details = (
+                []
+                if not start.heartbeat_details
+                else await data_converter.decode(start.heartbeat_details)
+            )
+        except Exception as err:
+            raise temporalio.exceptions.ApplicationError(
+                "Failed decoding heartbeat details", non_retryable=True
+            ) from err
+
+        # Build info
+        info = temporalio.activity.Info(
+            activity_id=start.activity_id,
+            activity_type=start.activity_type,
+            attempt=start.attempt,
+            current_attempt_scheduled_time=_proto_to_datetime(
+                start.current_attempt_scheduled_time
+            ),
+            heartbeat_details=heartbeat_details,
+            heartbeat_timeout=_proto_to_non_zero_timedelta(start.heartbeat_timeout)
+            if start.HasField("heartbeat_timeout")
+            else None,
+            is_local=start.is_local,
+            schedule_to_close_timeout=_proto_to_non_zero_timedelta(
+                start.schedule_to_close_timeout
+            )
+            if start.HasField("schedule_to_close_timeout")
+            else None,
+            scheduled_time=_proto_to_datetime(start.scheduled_time),
+            start_to_close_timeout=_proto_to_non_zero_timedelta(
+                start.start_to_close_timeout
+            )
+            if start.HasField("start_to_close_timeout")
+            else None,
+            started_time=_proto_to_datetime(start.started_time),
+            task_queue=self._task_queue,
+            task_token=task_token,
+            workflow_id=start.workflow_execution.workflow_id,
+            workflow_namespace=start.workflow_namespace,
+            workflow_run_id=start.workflow_execution.run_id,
+            workflow_type=start.workflow_type,
+            priority=temporalio.common.Priority._from_proto(start.priority),
+            retry_policy=temporalio.common.RetryPolicy.from_proto(start.retry_policy)
+            if start.HasField("retry_policy")
+            else None,
+        )
+
+        if self._encode_headers and data_converter.payload_codec is not None:
+            for payload in start.header_fields.values():
+                new_payload = (await data_converter.payload_codec.decode([payload]))[0]
+                payload.CopyFrom(new_payload)
+
+        running_activity.info = info
+        input = ExecuteActivityInput(
+            fn=activity_def.fn,
+            args=args,
+            executor=None if not running_activity.sync else self._activity_executor,
+            headers=start.header_fields,
+        )
+
+        # Set the context early so the logging adapter works and
+        # interceptors have it
+        temporalio.activity._Context.set(
+            temporalio.activity._Context(
+                info=lambda: info,
+                heartbeat=None,
+                cancelled_event=running_activity.cancelled_event,
+                worker_shutdown_event=self._worker_shutdown_event,
+                shield_thread_cancel_exception=(
+                    None
+                    if not running_activity.cancel_thread_raiser
+                    else running_activity.cancel_thread_raiser.shielded
+                ),
+                payload_converter_class_or_instance=data_converter.payload_converter,
+                runtime_metric_meter=None if sync_non_threaded else self._metric_meter,
+                client=self._client if not running_activity.sync else None,
+                cancellation_details=running_activity.cancellation_details,
+            )
+        )
+        temporalio.activity.logger.debug("Starting activity")
+
+        # Build the interceptors chaining in reverse. We build a context right
+        # now even though the info() can't be intercepted and heartbeat() will
+        # fail. The interceptors may want to use the info() during init.
+        impl: ActivityInboundInterceptor = _ActivityInboundImpl(self, running_activity)
+        for interceptor in reversed(list(self._interceptors)):
+            impl = interceptor.intercept_activity(impl)
+
+        impl.init(_ActivityOutboundImpl(self, running_activity.info))
+        return await impl.execute_activity(input)
+
+    def assert_activity_valid(self, activity: str) -> None:
+        if self._dynamic_activity:
+            return
+        activity_def = self._activities.get(activity)
+        if not activity_def:
+            activity_names = ", ".join(sorted(self._activities.keys()))
+            raise ValueError(
+                f"Activity function {activity} "
+                f"is not registered on this worker, available activities: {activity_names}",
+            )
+
 
 @dataclass
 class _RunningActivity:
     pending_heartbeats: asyncio.Queue[Sequence[Any]]
     # Most of these optional values are set before use
-    info: Optional[temporalio.activity.Info] = None
-    task: Optional[asyncio.Task] = None
-    cancelled_event: Optional[temporalio.activity._CompositeEvent] = None
-    last_heartbeat_task: Optional[asyncio.Task] = None
-    cancel_thread_raiser: Optional[_ThreadExceptionRaiser] = None
+    info: temporalio.activity.Info | None = None
+    task: asyncio.Task | None = None
+    cancelled_event: temporalio.activity._CompositeEvent | None = None
+    last_heartbeat_task: asyncio.Task | None = None
+    cancel_thread_raiser: _ThreadExceptionRaiser | None = None
     sync: bool = False
     done: bool = False
     cancelled_by_request: bool = False
-    cancelled_due_to_heartbeat_error: Optional[Exception] = None
+    cancelled_due_to_heartbeat_error: Exception | None = None
+    cancellation_details: temporalio.activity._ActivityCancellationDetailsHolder = (
+        field(default_factory=temporalio.activity._ActivityCancellationDetailsHolder)
+    )
 
     def cancel(
         self,
         *,
         cancelled_by_request: bool = False,
-        cancelled_due_to_heartbeat_error: Optional[Exception] = None,
+        cancelled_due_to_heartbeat_error: Exception | None = None,
     ) -> None:
         self.cancelled_by_request = cancelled_by_request
         self.cancelled_due_to_heartbeat_error = cancelled_due_to_heartbeat_error
@@ -571,15 +675,15 @@ class _RunningActivity:
 class _ThreadExceptionRaiser:
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._thread_id: Optional[int] = None
-        self._pending_exception: Optional[Type[Exception]] = None
+        self._thread_id: int | None = None
+        self._pending_exception: type[Exception] | None = None
         self._shield_depth = 0
 
     def set_thread_id(self, thread_id: int) -> None:
         with self._lock:
             self._thread_id = thread_id
 
-    def raise_in_thread(self, exc_type: Type[Exception]) -> None:
+    def raise_in_thread(self, exc_type: type[Exception]) -> None:
         with self._lock:
             self._pending_exception = exc_type
             self._raise_in_thread_if_pending_unlocked()
@@ -607,7 +711,7 @@ class _ThreadExceptionRaiser:
 
 
 class _ActivityInboundImpl(ActivityInboundInterceptor):
-    def __init__(
+    def __init__(  # type: ignore[reportMissingSuperCall]
         self, worker: _ActivityWorker, running_activity: _RunningActivity
     ) -> None:
         # We are intentionally not calling the base class's __init__ here
@@ -634,6 +738,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
             # can set the initializer on the executor).
             ctx = temporalio.activity._Context.current()
             info = ctx.info()
+            cancellation_details = ctx.cancellation_details
 
             # Heartbeat calls internally use a data converter which is async so
             # they need to be called on the event loop
@@ -657,8 +762,8 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
 
             # For heartbeats, we use the existing heartbeat callable for thread
             # pool executors or a multiprocessing queue for others
-            heartbeat: Union[Callable[..., None], SharedHeartbeatSender] = ctx.heartbeat
-            shared_manager: Optional[SharedStateManager] = None
+            heartbeat: Callable[..., None] | SharedHeartbeatSender = ctx.heartbeat
+            shared_manager: SharedStateManager | None = None
             if not isinstance(input.executor, concurrent.futures.ThreadPoolExecutor):
                 # Should always be present in worker, pre-checked on init
                 shared_manager = self._worker._shared_state_manager
@@ -692,6 +797,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
                     worker_shutdown_event.thread_event,
                     payload_converter_class_or_instance,
                     ctx.runtime_metric_meter,
+                    cancellation_details,
                     input.fn,
                     *input.args,
                 ]
@@ -707,13 +813,12 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
             finally:
                 if shared_manager:
                     await shared_manager.unregister_heartbeater(info.task_token)
-
         # Otherwise for async activity, just run
         return await input.fn(*input.args)
 
 
 class _ActivityOutboundImpl(ActivityOutboundInterceptor):
-    def __init__(self, worker: _ActivityWorker, info: temporalio.activity.Info) -> None:
+    def __init__(self, worker: _ActivityWorker, info: temporalio.activity.Info) -> None:  # type: ignore[reportMissingSuperCall]
         # We are intentionally not calling the base class's __init__ here
         self._worker = worker
         self._info = info
@@ -722,23 +827,23 @@ class _ActivityOutboundImpl(ActivityOutboundInterceptor):
         return self._info
 
     def heartbeat(self, *details: Any) -> None:
-        info = temporalio.activity.info()
-        self._worker._heartbeat(info.task_token, *details)
+        self._worker._heartbeat(self._info.task_token, *details)
 
 
 # This has to be defined at the top-level to be picklable for process executors
 def _execute_sync_activity(
     info: temporalio.activity.Info,
-    heartbeat: Union[Callable[..., None], SharedHeartbeatSender],
+    heartbeat: Callable[..., None] | SharedHeartbeatSender,
     # This is only set for threaded activities
-    cancel_thread_raiser: Optional[_ThreadExceptionRaiser],
+    cancel_thread_raiser: _ThreadExceptionRaiser | None,
     cancelled_event: threading.Event,
     worker_shutdown_event: threading.Event,
-    payload_converter_class_or_instance: Union[
-        Type[temporalio.converter.PayloadConverter],
-        temporalio.converter.PayloadConverter,
-    ],
-    runtime_metric_meter: Optional[temporalio.common.MetricMeter],
+    payload_converter_class_or_instance: (
+        type[temporalio.converter.PayloadConverter]
+        | temporalio.converter.PayloadConverter
+    ),
+    runtime_metric_meter: temporalio.common.MetricMeter | None,
+    cancellation_details: temporalio.activity._ActivityCancellationDetailsHolder,
     fn: Callable[..., Any],
     *args: Any,
 ) -> Any:
@@ -746,13 +851,10 @@ def _execute_sync_activity(
         thread_id = threading.current_thread().ident
         if thread_id is not None:
             cancel_thread_raiser.set_thread_id(thread_id)
-    heartbeat_fn: Callable[..., None]
     if isinstance(heartbeat, SharedHeartbeatSender):
-        # To make mypy happy
-        heartbeat_sender = heartbeat
-        heartbeat_fn = lambda *details: heartbeat_sender.send_heartbeat(
-            info.task_token, *details
-        )
+
+        def heartbeat_fn(*details: Any) -> None:
+            heartbeat.send_heartbeat(info.task_token, *details)
     else:
         heartbeat_fn = heartbeat
     temporalio.activity._Context.set(
@@ -765,11 +867,13 @@ def _execute_sync_activity(
             worker_shutdown_event=temporalio.activity._CompositeEvent(
                 thread_event=worker_shutdown_event, async_event=None
             ),
-            shield_thread_cancel_exception=None
-            if not cancel_thread_raiser
-            else cancel_thread_raiser.shielded,
+            shield_thread_cancel_exception=(
+                None if not cancel_thread_raiser else cancel_thread_raiser.shielded
+            ),
             payload_converter_class_or_instance=payload_converter_class_or_instance,
             runtime_metric_meter=runtime_metric_meter,
+            client=None,
+            cancellation_details=cancellation_details,
         )
     )
     return fn(*args)
@@ -787,7 +891,7 @@ class SharedStateManager(ABC):
     @staticmethod
     def create_from_multiprocessing(
         mgr: multiprocessing.managers.SyncManager,
-        queue_poller_executor: Optional[concurrent.futures.Executor] = None,
+        queue_poller_executor: concurrent.futures.Executor | None = None,
     ) -> SharedStateManager:
         """Create a shared state manager from a multiprocessing manager.
 
@@ -860,11 +964,11 @@ class _MultiprocessingSharedStateManager(SharedStateManager):
         self._mgr = mgr
         self._queue_poller_executor = queue_poller_executor
         # 1000 in-flight heartbeats should be plenty
-        self._heartbeat_queue: queue.Queue[Tuple[bytes, Sequence[Any]]] = mgr.Queue(
+        self._heartbeat_queue: queue.Queue[tuple[bytes, Sequence[Any]]] = mgr.Queue(
             1000
         )
-        self._heartbeats: Dict[bytes, Callable[..., None]] = {}
-        self._heartbeat_completions: Dict[bytes, Callable] = {}
+        self._heartbeats: dict[bytes, Callable[..., None]] = {}
+        self._heartbeat_completions: dict[bytes, Callable] = {}
 
     def new_event(self) -> threading.Event:
         return self._mgr.Event()
@@ -922,7 +1026,7 @@ class _MultiprocessingSharedStateManager(SharedStateManager):
 
 class _MultiprocessingSharedHeartbeatSender(SharedHeartbeatSender):
     def __init__(
-        self, heartbeat_queue: queue.Queue[Tuple[bytes, Sequence[Any]]]
+        self, heartbeat_queue: queue.Queue[tuple[bytes, Sequence[Any]]]
     ) -> None:
         super().__init__()
         self._heartbeat_queue = heartbeat_queue
@@ -943,7 +1047,7 @@ def _proto_to_datetime(
 
 def _proto_to_non_zero_timedelta(
     dur: google.protobuf.duration_pb2.Duration,
-) -> Optional[timedelta]:
+) -> timedelta | None:
     if dur.nanos == 0 and dur.seconds == 0:
         return None
     return dur.ToTimedelta()

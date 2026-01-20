@@ -5,25 +5,34 @@ import dataclasses
 import functools
 import inspect
 import os
+import sys
 import time
 import uuid
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import IntEnum
-from typing import Callable, Dict, List, Optional, Sequence, Set, Type
+from typing import Any
 
 import pytest
 
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
 from temporalio.exceptions import ApplicationError
-from temporalio.worker import Worker
+from temporalio.worker import Worker, WorkflowInboundInterceptor
+from temporalio.worker._interceptor import (
+    ExecuteWorkflowInput,
+    Interceptor,
+    WorkflowInterceptorClassInput,
+)
 from temporalio.worker.workflow_sandbox import (
     RestrictedWorkflowAccessError,
     SandboxedWorkflowRunner,
     SandboxMatcher,
     SandboxRestrictions,
+    UnintentionalPassthroughError,
 )
+from temporalio.workflow import SandboxImportNotificationPolicy
 from tests.helpers import assert_eq_eventually
 from tests.worker.workflow_sandbox.testmodules import stateful_module
 from tests.worker.workflow_sandbox.testmodules.proto import SomeMessage
@@ -34,7 +43,7 @@ global_state = ["global orig"]
 _ = os.name
 
 # This used to fail because our __init__ couldn't handle metaclass init
-import zipfile
+import zipfile  # noqa: E402
 
 
 class MyZipFile(zipfile.ZipFile):
@@ -60,7 +69,7 @@ class GlobalStateWorkflow:
         self.append("inited")
 
     @workflow.run
-    async def run(self, params: GlobalStateWorkflowParams) -> Dict[str, List[str]]:
+    async def run(self, params: GlobalStateWorkflowParams) -> dict[str, list[str]]:
         self.append("started")
         if params.fail_on_first_attempt:
             raise ApplicationError("Failing first attempt")
@@ -74,7 +83,7 @@ class GlobalStateWorkflow:
         stateful_module.module_state.append(str)
 
     @workflow.query
-    def state(self) -> Dict[str, List[str]]:
+    def state(self) -> dict[str, list[str]]:
         return {"global": global_state, "module": stateful_module.module_state}
 
 
@@ -89,7 +98,7 @@ class GlobalStateWorkflow:
 )
 async def test_workflow_sandbox_global_state(
     client: Client,
-    sandboxed_passthrough_modules: Set[str],
+    sandboxed_passthrough_modules: set[str],
 ):
     global global_state
     async with new_worker(
@@ -99,7 +108,7 @@ async def test_workflow_sandbox_global_state(
     ) as worker:
         # Start several workflows in the sandbox and make sure none of it
         # clashes
-        handles: List[WorkflowHandle] = []
+        handles: list[WorkflowHandle] = []
         for _ in range(10):
             handles.append(
                 await client.start_workflow(
@@ -172,7 +181,6 @@ async def test_workflow_sandbox_restrictions(client: Client):
             "import datetime\ndatetime.datetime.now()",
             "import os\ngetattr(os.environ, 'foo')",
             "import os\nos.getenv('foo')",
-            "import os.path\nos.path.abspath('foo')",
             "import random\nrandom.choice(['foo', 'bar'])",
             "import secrets\nsecrets.choice(['foo', 'bar'])",
             "import threading\nthreading.current_thread()",
@@ -182,6 +190,12 @@ async def test_workflow_sandbox_restrictions(client: Client):
             "import http.client\nhttp.client.HTTPConnection('example.com')",
             "import uuid\nuuid.uuid4()",
         ]
+
+        # We can only validate this restriction prior to 3.14 because we had to exempt it due to
+        # https://github.com/python/cpython/issues/140228
+        if sys.version_info < (3, 14):
+            invalid_code_to_check.append("import os.path\nos.path.abspath('foo')")  # type: ignore[reportUnreachable]
+
         for code in invalid_code_to_check:
             with pytest.raises(WorkflowFailureError) as err:
                 await client.execute_workflow(
@@ -416,7 +430,7 @@ async def test_workflow_sandbox_known_issues(client: Client):
 @workflow.defn
 class BadAsyncioWorkflow:
     @workflow.run
-    async def run(self) -> List[str]:
+    async def run(self) -> list[str]:
         # Two known bad asyncio task calls, as_completed and wait
         async def return_value(value: str) -> str:
             return value
@@ -455,11 +469,11 @@ async def test_workflow_sandbox_bad_asyncio(client: Client):
 
 def new_worker(
     client: Client,
-    *workflows: Type,
+    *workflows: type,
     activities: Sequence[Callable] = [],
-    task_queue: Optional[str] = None,
-    sandboxed_passthrough_modules: Set[str] = set(),
-    sandboxed_invalid_module_members: Optional[SandboxMatcher] = None,
+    task_queue: str | None = None,
+    sandboxed_passthrough_modules: set[str] = set(),
+    sandboxed_invalid_module_members: SandboxMatcher | None = None,
 ) -> Worker:
     restrictions = SandboxRestrictions.default
     if sandboxed_passthrough_modules:
@@ -477,3 +491,171 @@ def new_worker(
         activities=activities,
         workflow_runner=SandboxedWorkflowRunner(restrictions=restrictions),
     )
+
+
+class _TestWorkflowInboundInterceptor(WorkflowInboundInterceptor):
+    async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
+        # import in the interceptor to show it will be captured
+        # applying this policy should squelch the "after initial workload" warning
+        with workflow.unsafe.sandbox_import_notification_policy(
+            workflow.SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH
+        ):
+            import tests.worker.workflow_sandbox.testmodules.lazy_module_interceptor  #  type:ignore[reportUnusedImport] # noqa: F401
+
+        return await super().execute_workflow(input)
+
+
+class _TestInterceptor(Interceptor):
+    def workflow_interceptor_class(
+        self, input: WorkflowInterceptorClassInput
+    ) -> type[_TestWorkflowInboundInterceptor]:
+        return _TestWorkflowInboundInterceptor
+
+
+@workflow.defn
+class LazyImportWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        try:
+            import tests.worker.workflow_sandbox.testmodules.lazy_module  #  type:ignore[reportUnusedImport] # noqa: F401
+        except UnintentionalPassthroughError as err:
+            raise ApplicationError(
+                str(err), type="UnintentionalPassthroughError"
+            ) from err
+
+
+async def test_workflow_sandbox_import_default_warnings(client: Client):
+    restrictions = dataclasses.replace(
+        SandboxRestrictions.default,
+        # passthrough this test module to avoid a ton of noisy warnings
+        passthrough_modules=SandboxRestrictions.passthrough_modules_default
+        | {"tests.worker.workflow_sandbox.test_runner"},
+    )
+
+    async with Worker(
+        client,
+        task_queue=str(uuid.uuid4()),
+        workflows=[LazyImportWorkflow],
+        workflow_runner=SandboxedWorkflowRunner(restrictions),
+    ) as worker:
+        with pytest.warns() as recorder:
+            await client.execute_workflow(
+                LazyImportWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+            _assert_expected_warnings(
+                recorder,
+                {
+                    "Module tests.worker.workflow_sandbox.testmodules.lazy_module was imported after initial workflow load.",
+                },
+            )
+
+
+async def test_workflow_sandbox_import_all_warnings(client: Client):
+    restrictions = dataclasses.replace(
+        SandboxRestrictions.default,
+        import_notification_policy=SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT
+        | SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH,
+        # passthrough this test module to avoid a ton of noisy warnings
+        passthrough_modules=SandboxRestrictions.passthrough_modules_default
+        | {"tests.worker.workflow_sandbox.test_runner"},
+    )
+
+    async with Worker(
+        client,
+        task_queue=str(uuid.uuid4()),
+        workflows=[LazyImportWorkflow],
+        interceptors=[_TestInterceptor()],
+        workflow_runner=SandboxedWorkflowRunner(restrictions),
+    ) as worker:
+        with pytest.warns() as recorder:
+            await client.execute_workflow(
+                LazyImportWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+            _assert_expected_warnings(
+                recorder,
+                {
+                    "Module tests.worker.workflow_sandbox.testmodules.lazy_module_interceptor was not intentionally passed through to the sandbox.",
+                    "Module tests.worker.workflow_sandbox.testmodules.lazy_module was imported after initial workflow load.",
+                    "Module tests.worker.workflow_sandbox.testmodules.lazy_module was not intentionally passed through to the sandbox.",
+                },
+            )
+
+
+async def test_workflow_sandbox_import_errors(client: Client):
+    restrictions = dataclasses.replace(
+        SandboxRestrictions.default,
+        import_notification_policy=SandboxImportNotificationPolicy.WARN_ON_DYNAMIC_IMPORT
+        | SandboxImportNotificationPolicy.RAISE_ON_UNINTENTIONAL_PASSTHROUGH,
+        # passthrough this test module to avoid a ton of noisy warnings
+        passthrough_modules=SandboxRestrictions.passthrough_modules_default
+        | {"tests.worker.workflow_sandbox.test_runner"},
+    )
+
+    async with Worker(
+        client,
+        task_queue=str(uuid.uuid4()),
+        workflows=[LazyImportWorkflow],
+        workflow_runner=SandboxedWorkflowRunner(restrictions),
+    ) as worker:
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                LazyImportWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+        assert isinstance(err.value.cause, ApplicationError)
+        assert err.value.cause.type == "UnintentionalPassthroughError"
+        assert (
+            "Module tests.worker.workflow_sandbox.testmodules.lazy_module was not intentionally passed through to the sandbox."
+            == err.value.cause.message
+        )
+
+
+@workflow.defn
+class SupressWarningsLazyImportWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        with workflow.unsafe.sandbox_import_notification_policy(
+            SandboxImportNotificationPolicy.SILENT
+        ):
+            try:
+                import tests.worker.workflow_sandbox.testmodules.lazy_module  #  type:ignore[reportUnusedImport] # noqa: F401
+            except UserWarning:
+                raise ApplicationError("No warnings were expected")
+
+
+async def test_workflow_sandbox_import_suppress_warnings(client: Client):
+    restrictions = dataclasses.replace(
+        SandboxRestrictions.default,
+        # passthrough this test module to avoid a ton of noisy warnings
+        passthrough_modules=SandboxRestrictions.passthrough_modules_default
+        | {"tests.worker.workflow_sandbox.test_runner"},
+    )
+
+    async with Worker(
+        client,
+        task_queue=str(uuid.uuid4()),
+        workflows=[SupressWarningsLazyImportWorkflow],
+        workflow_runner=SandboxedWorkflowRunner(restrictions),
+    ) as worker:
+        with pytest.warns(None) as recorder:  # type:ignore
+            await client.execute_workflow(
+                SupressWarningsLazyImportWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            assert len(recorder) == 0, "Expected no warnings to be issued"
+
+
+def _assert_expected_warnings(
+    recorder: pytest.WarningsRecorder, expected_warnings: set[str]
+):
+    actual_warnings = {str(w.message) for w in recorder}
+    assert expected_warnings <= actual_warnings

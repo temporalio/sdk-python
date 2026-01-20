@@ -1,19 +1,19 @@
 import dataclasses
 import json
+import multiprocessing
+import multiprocessing.context
 import os
 import uuid
+from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Mapping, Optional, Tuple, cast
+from typing import Any, cast
 from unittest import mock
 
 import google.protobuf.any_pb2
-import google.protobuf.message
 import pytest
 from google.protobuf import json_format
 
 import temporalio.api.common.v1
-import temporalio.api.enums.v1
-import temporalio.api.errordetails.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
@@ -46,8 +46,6 @@ from temporalio.client import (
     Interceptor,
     OutboundInterceptor,
     QueryWorkflowInput,
-    RPCError,
-    RPCStatusCode,
     Schedule,
     ScheduleActionExecutionStartWorkflow,
     ScheduleActionStartWorkflow,
@@ -86,7 +84,10 @@ from temporalio.common import (
 )
 from temporalio.converter import DataConverter
 from temporalio.exceptions import WorkflowAlreadyStartedError
-from temporalio.service import ServiceCall
+from temporalio.service import (
+    RPCError,
+    RPCStatusCode,
+)
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     assert_eq_eventually,
@@ -94,6 +95,7 @@ from tests.helpers import (
     new_worker,
     worker_versioning_enabled,
 )
+from tests.helpers.fork import _ForkTestResult, _TestFork
 from tests.helpers.worker import (
     ExternalWorker,
     KSAction,
@@ -291,12 +293,7 @@ async def test_terminate(client: Client, worker: ExternalWorker):
 
 
 async def test_rpc_already_exists_error_is_raised(client: Client):
-    class start_workflow_execution(
-        ServiceCall[
-            temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
-            temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse,
-        ]
-    ):
+    class start_workflow_execution:
         already_exists_err = RPCError(
             "fake already exists error", RPCStatusCode.ALREADY_EXISTS, b""
         )
@@ -308,7 +305,7 @@ async def test_rpc_already_exists_error_is_raised(client: Client):
             ],
         )
 
-        def __init__(self) -> None:
+        def __init__(self) -> None:  # type: ignore[reportMissingSuperCall]
             pass
 
         async def __call__(
@@ -316,8 +313,8 @@ async def test_rpc_already_exists_error_is_raised(client: Client):
             req: temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
             *,
             retry: bool = False,
-            metadata: Mapping[str, str] = {},
-            timeout: Optional[timedelta] = None,
+            metadata: Mapping[str, str | bytes] = {},
+            timeout: timedelta | None = None,
         ) -> temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse:
             raise self.already_exists_err
 
@@ -367,6 +364,8 @@ async def test_describe(
     assert desc.status == WorkflowExecutionStatus.COMPLETED
     assert desc.task_queue == worker.task_queue
     assert desc.workflow_type == "kitchen_sink"
+    assert desc.root_id == desc.id
+    assert desc.root_run_id == desc.run_id
 
 
 async def test_query(client: Client, worker: ExternalWorker):
@@ -381,7 +380,7 @@ async def test_query(client: Client, worker: ExternalWorker):
     await handle.result()
     assert "some query arg" == await handle.query("some query", "some query arg")
     # Try a query not on the workflow
-    with pytest.raises(WorkflowQueryFailedError) as err:
+    with pytest.raises(WorkflowQueryFailedError):
         await handle.query("does not exist")
 
 
@@ -475,7 +474,7 @@ async def test_single_client_config_change(client: Client, worker: ExternalWorke
 
 class TracingClientInterceptor(Interceptor):
     def intercept_client(self, next: OutboundInterceptor) -> OutboundInterceptor:
-        self.traces: List[Tuple[str, Any]] = []
+        self.traces: list[tuple[str, Any]] = []  # type: ignore[reportUninitializedInstanceVariable]
         return TracingClientOutboundInterceptor(self, next)
 
 
@@ -665,7 +664,7 @@ async def test_count_workflows(client: Client, env: WorkflowEnvironment):
         resp = await client.count_workflows(
             f"TaskQueue = '{worker.task_queue}' GROUP BY ExecutionStatus"
         )
-        cast(List[WorkflowExecutionCountAggregationGroup], resp.groups).sort(
+        cast(list[WorkflowExecutionCountAggregationGroup], resp.groups).sort(
             key=lambda g: g.count
         )
         return resp
@@ -902,7 +901,7 @@ async def test_schedule_basics(
     # Update but error
     with pytest.raises(RuntimeError) as err:
 
-        def update_fail(input: ScheduleUpdateInput) -> ScheduleUpdate:
+        def update_fail(_input: ScheduleUpdateInput) -> ScheduleUpdate:
             raise RuntimeError("Oh no")
 
         await handle.update(update_fail)
@@ -922,7 +921,7 @@ async def test_schedule_basics(
     )
     assert isinstance(new_schedule.action, ScheduleActionStartWorkflow)
 
-    async def update_schedule_basic(input: ScheduleUpdateInput) -> ScheduleUpdate:
+    async def update_schedule_basic(_input: ScheduleUpdateInput) -> ScheduleUpdate:
         return ScheduleUpdate(new_schedule)
 
     await handle.update(update_schedule_basic)
@@ -996,7 +995,7 @@ async def test_schedule_basics(
         )
         expected_ids.append(new_handle.id)
 
-    async def list_ids() -> List[str]:
+    async def list_ids() -> list[str]:
         return sorted(
             [
                 list_desc.id
@@ -1166,7 +1165,7 @@ async def test_schedule_backfill(
 
 
 async def test_schedule_create_limited_actions_validation(
-    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+    client: Client, worker: ExternalWorker
 ):
     sched = Schedule(
         action=ScheduleActionStartWorkflow(
@@ -1226,7 +1225,7 @@ async def test_schedule_workflow_search_attribute_update(
     # Do update of typed attrs
     def update_schedule_typed_attrs(
         input: ScheduleUpdateInput,
-    ) -> Optional[ScheduleUpdate]:
+    ) -> ScheduleUpdate | None:
         assert isinstance(
             input.description.schedule.action, ScheduleActionStartWorkflow
         )
@@ -1333,7 +1332,7 @@ async def test_schedule_search_attribute_update(
 
     def update_search_attributes(
         input: ScheduleUpdateInput,
-    ) -> Optional[ScheduleUpdate]:
+    ) -> ScheduleUpdate | None:
         # Make sure the initial search attributes are present
         assert input.description.search_attributes[key_1.name] == [val_1]
         assert input.description.search_attributes[key_2.name] == [val_2]
@@ -1493,3 +1492,94 @@ async def test_cloud_client_simple():
         GetNamespaceRequest(namespace=os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"])
     )
     assert os.environ["TEMPORAL_CLIENT_CLOUD_NAMESPACE"] == result.namespace.namespace
+
+
+@workflow.defn
+class LastCompletionResultWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        last_result = workflow.get_last_completion_result(type_hint=str)
+        if last_result is not None:
+            return "From last completion: " + last_result
+        else:
+            return "My First Result"
+
+
+async def test_schedule_last_completion_result(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server doesn't support schedules")
+
+    async with new_worker(client, LastCompletionResultWorkflow) as worker:
+        handle = await client.create_schedule(
+            f"schedule-{uuid.uuid4()}",
+            Schedule(
+                action=ScheduleActionStartWorkflow(
+                    "LastCompletionResultWorkflow",
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                ),
+                spec=ScheduleSpec(),
+            ),
+        )
+        await handle.trigger()
+
+        async def get_schedule_result() -> tuple[int, str | None]:
+            desc = await handle.describe()
+            length = len(desc.info.recent_actions)
+            if length == 0:
+                return length, None
+            else:
+                workflow_id = cast(
+                    ScheduleActionExecutionStartWorkflow,
+                    desc.info.recent_actions[-1].action,
+                ).workflow_id
+                workflow_handle = client.get_workflow_handle(workflow_id)
+                result = await workflow_handle.result()
+                return length, result
+
+        assert await get_schedule_result() == (1, "My First Result")
+        await handle.trigger()
+        assert await get_schedule_result() == (
+            2,
+            "From last completion: My First Result",
+        )
+
+        await handle.delete()
+
+
+class TestForkCreateClient(_TestFork):
+    async def coro(self):
+        await Client.connect(
+            self._env.client.config()["service_client"].config.target_host
+        )
+
+    def test_fork_create_client(
+        self,
+        env: WorkflowEnvironment,
+        mp_fork_ctx: multiprocessing.context.BaseContext | None,
+    ):
+        self._expected = _ForkTestResult.assertion_error(
+            "Cannot create client across forks"
+        )
+        self._env = env  # type:ignore[reportUninitializedInstanceVariable]
+        self.run(mp_fork_ctx)
+
+
+class TestForkUseClient(_TestFork):
+    async def coro(self):
+        await self._client.start_workflow(
+            "some-workflow",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=f"tq-{uuid.uuid4()}",
+        )
+
+    def test_fork_use_client(
+        self, client: Client, mp_fork_ctx: multiprocessing.context.BaseContext | None
+    ):
+        self._expected = _ForkTestResult.assertion_error(
+            "Cannot use client across forks"
+        )
+        self._client = client  # type:ignore[reportUninitializedInstanceVariable]
+        self.run(mp_fork_ctx)

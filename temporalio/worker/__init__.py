@@ -1,25 +1,31 @@
 """Worker for processing Temporal workflows and/or activities."""
 
+from ..common import WorkerDeploymentVersion
 from ._activity import SharedHeartbeatSender, SharedStateManager
 from ._interceptor import (
     ActivityInboundInterceptor,
     ActivityOutboundInterceptor,
     ContinueAsNewInput,
     ExecuteActivityInput,
+    ExecuteNexusOperationCancelInput,
+    ExecuteNexusOperationStartInput,
     ExecuteWorkflowInput,
     HandleQueryInput,
     HandleSignalInput,
     HandleUpdateInput,
     Interceptor,
+    NexusOperationInboundInterceptor,
     SignalChildWorkflowInput,
     SignalExternalWorkflowInput,
     StartActivityInput,
     StartChildWorkflowInput,
     StartLocalActivityInput,
+    StartNexusOperationInput,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
+from ._plugin import Plugin
 from ._replayer import (
     Replayer,
     ReplayerConfig,
@@ -31,6 +37,7 @@ from ._tuning import (
     CustomSlotSupplier,
     FixedSizeSlotSupplier,
     LocalActivitySlotInfo,
+    NexusSlotInfo,
     ResourceBasedSlotConfig,
     ResourceBasedSlotSupplier,
     ResourceBasedTunerConfig,
@@ -42,7 +49,14 @@ from ._tuning import (
     WorkerTuner,
     WorkflowSlotInfo,
 )
-from ._worker import Worker, WorkerConfig
+from ._worker import (
+    PollerBehavior,
+    PollerBehaviorAutoscaling,
+    PollerBehaviorSimpleMaximum,
+    Worker,
+    WorkerConfig,
+    WorkerDeploymentConfig,
+)
 from ._workflow_instance import (
     UnsandboxedWorkflowRunner,
     WorkflowInstance,
@@ -54,16 +68,23 @@ __all__ = [
     # Primary types
     "Worker",
     "WorkerConfig",
+    "WorkerDeploymentConfig",
+    "WorkerDeploymentVersion",
     "Replayer",
     "ReplayerConfig",
     "WorkflowReplayResult",
     "WorkflowReplayResults",
+    "PollerBehavior",
+    "PollerBehaviorSimpleMaximum",
+    "PollerBehaviorAutoscaling",
     # Interceptor base classes
     "Interceptor",
     "ActivityInboundInterceptor",
     "ActivityOutboundInterceptor",
     "WorkflowInboundInterceptor",
     "WorkflowOutboundInterceptor",
+    "NexusOperationInboundInterceptor",
+    "Plugin",
     # Interceptor input
     "ContinueAsNewInput",
     "ExecuteActivityInput",
@@ -76,7 +97,10 @@ __all__ = [
     "StartActivityInput",
     "StartChildWorkflowInput",
     "StartLocalActivityInput",
+    "StartNexusOperationInput",
     "WorkflowInterceptorClassInput",
+    "ExecuteNexusOperationStartInput",
+    "ExecuteNexusOperationCancelInput",
     # Advanced activity classes
     "SharedStateManager",
     "SharedHeartbeatSender",
@@ -100,4 +124,5 @@ __all__ = [
     "SlotReleaseContext",
     "SlotReserveContext",
     "WorkflowSlotInfo",
+    "NexusSlotInfo",
 ]

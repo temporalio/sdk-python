@@ -15,18 +15,20 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n(temporal/api/cloud/sink/v1/message.proto\x12\x1atemporal.api.cloud.sink.v1"i\n\x06S3Spec\x12\x11\n\trole_name\x18\x01 \x01(\t\x12\x13\n\x0b\x62ucket_name\x18\x02 \x01(\t\x12\x0e\n\x06region\x18\x03 \x01(\t\x12\x0f\n\x07kms_arn\x18\x04 \x01(\t\x12\x16\n\x0e\x61ws_account_id\x18\x05 \x01(\t"U\n\x07GCSSpec\x12\r\n\x05sa_id\x18\x01 \x01(\t\x12\x13\n\x0b\x62ucket_name\x18\x02 \x01(\t\x12\x16\n\x0egcp_project_id\x18\x03 \x01(\t\x12\x0e\n\x06region\x18\x04 \x01(\tB\x98\x01\n\x1dio.temporal.api.cloud.sink.v1B\x0cMessageProtoP\x01Z%go.temporal.io/api/cloud/sink/v1;sink\xaa\x02\x1cTemporalio.Api.Cloud.Sink.V1\xea\x02 Temporalio::Api::Cloud::Sink::V1b\x06proto3'
+    b'\n(temporal/api/cloud/sink/v1/message.proto\x12\x1atemporal.api.cloud.sink.v1"i\n\x06S3Spec\x12\x11\n\trole_name\x18\x01 \x01(\t\x12\x13\n\x0b\x62ucket_name\x18\x02 \x01(\t\x12\x0e\n\x06region\x18\x03 \x01(\t\x12\x0f\n\x07kms_arn\x18\x04 \x01(\t\x12\x16\n\x0e\x61ws_account_id\x18\x05 \x01(\t"U\n\x07GCSSpec\x12\r\n\x05sa_id\x18\x01 \x01(\t\x12\x13\n\x0b\x62ucket_name\x18\x02 \x01(\t\x12\x16\n\x0egcp_project_id\x18\x03 \x01(\t\x12\x0e\n\x06region\x18\x04 \x01(\t"I\n\x0bKinesisSpec\x12\x11\n\trole_name\x18\x01 \x01(\t\x12\x17\n\x0f\x64\x65stination_uri\x18\x02 \x01(\t\x12\x0e\n\x06region\x18\x03 \x01(\t"T\n\nPubSubSpec\x12\x1a\n\x12service_account_id\x18\x01 \x01(\t\x12\x12\n\ntopic_name\x18\x02 \x01(\t\x12\x16\n\x0egcp_project_id\x18\x03 \x01(\tB\x98\x01\n\x1dio.temporal.api.cloud.sink.v1B\x0cMessageProtoP\x01Z%go.temporal.io/api/cloud/sink/v1;sink\xaa\x02\x1cTemporalio.Api.Cloud.Sink.V1\xea\x02 Temporalio::Api::Cloud::Sink::V1b\x06proto3'
 )
 
 
 _S3SPEC = DESCRIPTOR.message_types_by_name["S3Spec"]
 _GCSSPEC = DESCRIPTOR.message_types_by_name["GCSSpec"]
+_KINESISSPEC = DESCRIPTOR.message_types_by_name["KinesisSpec"]
+_PUBSUBSPEC = DESCRIPTOR.message_types_by_name["PubSubSpec"]
 S3Spec = _reflection.GeneratedProtocolMessageType(
     "S3Spec",
     (_message.Message,),
     {
         "DESCRIPTOR": _S3SPEC,
-        "__module__": "temporal.api.cloud.sink.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.sink.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.sink.v1.S3Spec)
     },
 )
@@ -37,11 +39,33 @@ GCSSpec = _reflection.GeneratedProtocolMessageType(
     (_message.Message,),
     {
         "DESCRIPTOR": _GCSSPEC,
-        "__module__": "temporal.api.cloud.sink.v1.message_pb2",
+        "__module__": "temporalio.api.cloud.sink.v1.message_pb2",
         # @@protoc_insertion_point(class_scope:temporal.api.cloud.sink.v1.GCSSpec)
     },
 )
 _sym_db.RegisterMessage(GCSSpec)
+
+KinesisSpec = _reflection.GeneratedProtocolMessageType(
+    "KinesisSpec",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _KINESISSPEC,
+        "__module__": "temporalio.api.cloud.sink.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.sink.v1.KinesisSpec)
+    },
+)
+_sym_db.RegisterMessage(KinesisSpec)
+
+PubSubSpec = _reflection.GeneratedProtocolMessageType(
+    "PubSubSpec",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _PUBSUBSPEC,
+        "__module__": "temporalio.api.cloud.sink.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.cloud.sink.v1.PubSubSpec)
+    },
+)
+_sym_db.RegisterMessage(PubSubSpec)
 
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
@@ -50,4 +74,8 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _S3SPEC._serialized_end = 177
     _GCSSPEC._serialized_start = 179
     _GCSSPEC._serialized_end = 264
+    _KINESISSPEC._serialized_start = 266
+    _KINESISSPEC._serialized_end = 339
+    _PUBSUBSPEC._serialized_start = 341
+    _PUBSUBSPEC._serialized_end = 425
 # @@protoc_insertion_point(module_scope)

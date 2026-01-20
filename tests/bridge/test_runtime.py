@@ -1,6 +1,5 @@
 from threading import Event, Thread
 from time import sleep
-from typing import Optional
 
 from temporalio.bridge.runtime import Runtime
 
@@ -11,7 +10,7 @@ class SomeException(Exception):
 
 def test_bridge_runtime_raise_in_thread():
     waiting = Event()
-    exc_in_thread: Optional[BaseException] = None
+    exc_in_thread: BaseException | None = None
 
     def wait_forever():
         try:

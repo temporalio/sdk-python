@@ -53,15 +53,15 @@ class WorkflowActivation(google.protobuf.message.Message):
     This is because:
     * Patches are expected to apply to the entire activation
     * Signal and update handlers should be invoked before workflow routines are iterated. That is to
-      say before the users' main workflow function and anything spawned by it is allowed to continue.
+     say before the users' main workflow function and anything spawned by it is allowed to continue.
     * Local activities resolutions go after other normal jobs because while *not* replaying, they
-      will always take longer than anything else that produces an immediate job (which is
-      effectively instant). When *replaying* we need to scan ahead for LA markers so that we can
-      resolve them in the same activation that they completed in when not replaying. However, doing
-      so would, by default, put those resolutions *before* any other immediate jobs that happened
-      in that same activation (prime example: cancelling not-wait-for-cancel activities). So, we do
-      this to ensure the LA resolution happens after that cancel (or whatever else it may be) as it
-      normally would have when executing.
+     will always take longer than anything else that produces an immediate job (which is
+     effectively instant). When *replaying* we need to scan ahead for LA markers so that we can
+     resolve them in the same activation that they completed in when not replaying. However, doing
+     so would, by default, put those resolutions *before* any other immediate jobs that happened
+     in that same activation (prime example: cancelling not-wait-for-cancel activities). So, we do
+     this to ensure the LA resolution happens after that cancel (or whatever else it may be) as it
+     normally would have when executing.
     * Queries always go last (and, in fact, always come in their own activation)
     * Evictions also always come in their own activation
 
@@ -91,7 +91,8 @@ class WorkflowActivation(google.protobuf.message.Message):
     AVAILABLE_INTERNAL_FLAGS_FIELD_NUMBER: builtins.int
     HISTORY_SIZE_BYTES_FIELD_NUMBER: builtins.int
     CONTINUE_AS_NEW_SUGGESTED_FIELD_NUMBER: builtins.int
-    BUILD_ID_FOR_CURRENT_TASK_FIELD_NUMBER: builtins.int
+    DEPLOYMENT_VERSION_FOR_CURRENT_TASK_FIELD_NUMBER: builtins.int
+    LAST_SDK_VERSION_FIELD_NUMBER: builtins.int
     run_id: builtins.str
     """The id of the currently active run of the workflow. Also used as a cache key. There may
     only ever be one active workflow task (and hence activation) of a run at one time.
@@ -124,11 +125,20 @@ class WorkflowActivation(google.protobuf.message.Message):
     """The history size in bytes as of the last WFT started event"""
     continue_as_new_suggested: builtins.bool
     """Set true if the most recent WFT started event had this suggestion"""
-    build_id_for_current_task: builtins.str
-    """Set to the Build ID of the worker that processed this task, which may be empty. During replay
-    this id may not equal the id of the replaying worker. If not replaying and this worker has
-    a defined Build ID, it will equal that ID. It will also be empty for evict-only activations.
-    """
+    @property
+    def deployment_version_for_current_task(
+        self,
+    ) -> temporalio.bridge.proto.common.common_pb2.WorkerDeploymentVersion:
+        """Set to the deployment version of the worker that processed this task,
+        which may be empty. During replay this version may not equal the version
+        of the replaying worker. If not replaying and this worker has a defined
+        Deployment Version, it will equal that. It will also be empty for
+        evict-only activations. The deployment name may be empty, but not the
+        build id, if this worker was using the deprecated Build ID-only
+        feature(s).
+        """
+    last_sdk_version: builtins.str
+    """The last seen SDK version from the most recent WFT completed event"""
     def __init__(
         self,
         *,
@@ -140,20 +150,28 @@ class WorkflowActivation(google.protobuf.message.Message):
         available_internal_flags: collections.abc.Iterable[builtins.int] | None = ...,
         history_size_bytes: builtins.int = ...,
         continue_as_new_suggested: builtins.bool = ...,
-        build_id_for_current_task: builtins.str = ...,
+        deployment_version_for_current_task: temporalio.bridge.proto.common.common_pb2.WorkerDeploymentVersion
+        | None = ...,
+        last_sdk_version: builtins.str = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["timestamp", b"timestamp"]
+        self,
+        field_name: typing_extensions.Literal[
+            "deployment_version_for_current_task",
+            b"deployment_version_for_current_task",
+            "timestamp",
+            b"timestamp",
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
             "available_internal_flags",
             b"available_internal_flags",
-            "build_id_for_current_task",
-            b"build_id_for_current_task",
             "continue_as_new_suggested",
             b"continue_as_new_suggested",
+            "deployment_version_for_current_task",
+            b"deployment_version_for_current_task",
             "history_length",
             b"history_length",
             "history_size_bytes",
@@ -162,6 +180,8 @@ class WorkflowActivation(google.protobuf.message.Message):
             b"is_replaying",
             "jobs",
             b"jobs",
+            "last_sdk_version",
+            b"last_sdk_version",
             "run_id",
             b"run_id",
             "timestamp",
@@ -432,6 +452,8 @@ class InitializeWorkflow(google.protobuf.message.Message):
     MEMO_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     START_TIME_FIELD_NUMBER: builtins.int
+    ROOT_WORKFLOW_FIELD_NUMBER: builtins.int
+    PRIORITY_FIELD_NUMBER: builtins.int
     workflow_type: builtins.str
     """The identifier the lang-specific sdk uses to execute workflow code"""
     workflow_id: builtins.str
@@ -518,6 +540,22 @@ class InitializeWorkflow(google.protobuf.message.Message):
     @property
     def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """When the workflow execution started event was first written"""
+    @property
+    def root_workflow(self) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
+        """Contains information about the root workflow execution. It is possible for the namespace to
+        be different than this workflow if using OSS and cross-namespace children, but this
+        information is not retained. Users should take care to track it by other means in such
+        situations.
+
+        The root workflow execution is defined as follows:
+          1. A workflow without parent workflow is its own root workflow.
+          2. A workflow that has a parent workflow has the same root workflow as its parent workflow.
+
+        See field in WorkflowExecutionStarted for more detail.
+        """
+    @property
+    def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
+        """Priority of this workflow execution"""
     def __init__(
         self,
         *,
@@ -555,6 +593,9 @@ class InitializeWorkflow(google.protobuf.message.Message):
         search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
         | None = ...,
         start_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        root_workflow: temporalio.api.common.v1.message_pb2.WorkflowExecution
+        | None = ...,
+        priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -569,8 +610,12 @@ class InitializeWorkflow(google.protobuf.message.Message):
             b"memo",
             "parent_workflow_info",
             b"parent_workflow_info",
+            "priority",
+            b"priority",
             "retry_policy",
             b"retry_policy",
+            "root_workflow",
+            b"root_workflow",
             "search_attributes",
             b"search_attributes",
             "start_time",
@@ -614,10 +659,14 @@ class InitializeWorkflow(google.protobuf.message.Message):
             b"memo",
             "parent_workflow_info",
             b"parent_workflow_info",
+            "priority",
+            b"priority",
             "randomness_seed",
             b"randomness_seed",
             "retry_policy",
             b"retry_policy",
+            "root_workflow",
+            b"root_workflow",
             "search_attributes",
             b"search_attributes",
             "start_time",
@@ -978,22 +1027,16 @@ class CancelWorkflow(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    DETAILS_FIELD_NUMBER: builtins.int
-    @property
-    def details(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        temporalio.api.common.v1.message_pb2.Payload
-    ]:
-        """Information from the cancellation request"""
+    REASON_FIELD_NUMBER: builtins.int
+    reason: builtins.str
+    """User-specified reason the cancel request was issued"""
     def __init__(
         self,
         *,
-        details: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload]
-        | None = ...,
+        reason: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["details", b"details"]
+        self, field_name: typing_extensions.Literal["reason", b"reason"]
     ) -> None: ...
 
 global___CancelWorkflow = CancelWorkflow
@@ -1265,13 +1308,13 @@ class ResolveNexusOperationStart(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     SEQ_FIELD_NUMBER: builtins.int
-    OPERATION_ID_FIELD_NUMBER: builtins.int
+    OPERATION_TOKEN_FIELD_NUMBER: builtins.int
     STARTED_SYNC_FIELD_NUMBER: builtins.int
-    CANCELLED_BEFORE_START_FIELD_NUMBER: builtins.int
+    FAILED_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Sequence number as provided by lang in the corresponding ScheduleNexusOperation command"""
-    operation_id: builtins.str
-    """The operation started asynchronously. Contains an ID that can be used to perform
+    operation_token: builtins.str
+    """The operation started asynchronously. Contains a token that can be used to perform
     operations on the started operation by, ex, clients. A `ResolveNexusOperation` job will
     follow at some point.
     """
@@ -1280,27 +1323,26 @@ class ResolveNexusOperationStart(google.protobuf.message.Message):
     `ResolveNexusOperation` job will be in the same activation.
     """
     @property
-    def cancelled_before_start(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """The operation was cancelled before it was ever sent to server (same WFT).
-        Note that core will still send a `ResolveNexusOperation` job in the same activation, so
-        there does not need to be an exceptional case for this in lang.
+    def failed(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """The operation either failed to start, was cancelled before it started, timed out, or
+        failed synchronously. Details are included inside the message. In this case, the
+        subsequent ResolveNexusOperation will never be sent.
         """
     def __init__(
         self,
         *,
         seq: builtins.int = ...,
-        operation_id: builtins.str = ...,
+        operation_token: builtins.str = ...,
         started_sync: builtins.bool = ...,
-        cancelled_before_start: temporalio.api.failure.v1.message_pb2.Failure
-        | None = ...,
+        failed: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "cancelled_before_start",
-            b"cancelled_before_start",
-            "operation_id",
-            b"operation_id",
+            "failed",
+            b"failed",
+            "operation_token",
+            b"operation_token",
             "started_sync",
             b"started_sync",
             "status",
@@ -1310,10 +1352,10 @@ class ResolveNexusOperationStart(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "cancelled_before_start",
-            b"cancelled_before_start",
-            "operation_id",
-            b"operation_id",
+            "failed",
+            b"failed",
+            "operation_token",
+            b"operation_token",
             "seq",
             b"seq",
             "started_sync",
@@ -1325,10 +1367,7 @@ class ResolveNexusOperationStart(google.protobuf.message.Message):
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["status", b"status"]
     ) -> (
-        typing_extensions.Literal[
-            "operation_id", "started_sync", "cancelled_before_start"
-        ]
-        | None
+        typing_extensions.Literal["operation_token", "started_sync", "failed"] | None
     ): ...
 
 global___ResolveNexusOperationStart = ResolveNexusOperationStart
