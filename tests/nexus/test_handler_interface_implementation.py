@@ -44,11 +44,29 @@ class ValidWorkflowRunImpl(_InterfaceImplementationTestCase):
     error_message = None
 
 
+class MissingWorkflowRunDecorator(_InterfaceImplementationTestCase):
+    """Missing @workflow_run_operation decorator raises appropriate error."""
+
+    @nexusrpc.service
+    class Interface:
+        my_workflow_op: nexusrpc.Operation[str, int]
+
+    class Impl:
+        # Method exists but MISSING @workflow_run_operation decorator
+        async def my_workflow_op(
+            self, ctx: WorkflowRunOperationContext, input: str
+        ) -> nexus.WorkflowHandle[int]:
+            raise NotImplementedError
+
+    error_message = "does not implement an operation with method name 'my_workflow_op'"
+
+
 @pytest.mark.parametrize(
     "test_case",
     [
         ValidImpl,
         ValidWorkflowRunImpl,
+        MissingWorkflowRunDecorator,
     ],
 )
 def test_service_decorator_enforces_interface_conformance(
@@ -56,7 +74,7 @@ def test_service_decorator_enforces_interface_conformance(
 ):
     if test_case.error_message:
         with pytest.raises(Exception) as ei:
-            nexusrpc.handler.service_handler(test_case.Interface)(test_case.Impl)
+            nexusrpc.handler.service_handler(service=test_case.Interface)(test_case.Impl)
         err = ei.value
         assert test_case.error_message in str(err)
     else:
