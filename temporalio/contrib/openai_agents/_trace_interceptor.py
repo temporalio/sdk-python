@@ -62,7 +62,6 @@ def context_from_header(
     """Extracts and initializes trace information the input header."""
     payload = input.headers.get(HEADER_KEY)
     span_info = payload_converter.from_payload(payload) if payload else None
-    print("Context:", span_info)
     if span_info is None:
         yield
     else:
@@ -89,10 +88,8 @@ def context_from_header(
             )
 
             if start_trace:
-                print("Setting current trace and starting: ", current_trace.trace_id)
                 current_trace.start(mark_as_current=True)
             else:
-                print("Setting current trace: ", current_trace.trace_id)
                 Scope.set_current_trace(current_trace)
 
         current_span = get_trace_provider().get_current_span()
@@ -104,7 +101,6 @@ def context_from_header(
                 current_span.start(mark_as_current=True)
             else:
                 Scope.set_current_span(current_span)
-            print("Setting current span: ", current_span.span_id)
 
         yield
 
@@ -363,12 +359,8 @@ class _ContextPropagationWorkflowInboundInterceptor(
         self, input: temporalio.worker.ExecuteWorkflowInput
     ) -> Any:
         _ensure_tracing_random()
-        print("\nExecuting workflow\n")
         with context_from_header(input, temporalio.workflow.payload_converter(), start_trace=self.start_trace):
             with temporal_span(self.add_temporal_spans, "temporal:executeWorkflow"):
-
-                print("Executing workflow with context")
-
                 return await self.next.execute_workflow(input)
 
     async def handle_signal(self, input: temporalio.worker.HandleSignalInput) -> None:

@@ -1,6 +1,5 @@
 """Provides support for integration with OpenAI Agents SDK tracing across workflows"""
 import random
-import traceback
 import uuid
 from types import TracebackType
 from typing import Any, cast
@@ -95,16 +94,11 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
         self._impl.set_processors(processors)
 
     def on_trace_start(self, trace: Trace) -> None:
-        print("on_trace_start 1:", self._start_spans_in_replay, workflow.in_workflow())
         if not self._start_spans_in_replay:
-            print("on_trace_start 2:", self._start_spans_in_replay, workflow.in_workflow(), workflow.unsafe.is_replaying())
             if workflow.in_workflow() and workflow.unsafe.is_replaying():
-                print("on_trace_start 3:", self._start_spans_in_replay, workflow.in_workflow(), workflow.unsafe.is_replaying())
                 # In replay mode, don't report
                 return
 
-        print("on_trace_start", trace)
-        traceback.print_stack()
         self._impl.on_trace_start(trace)
         if self._auto_close_in_workflows and workflow.in_workflow():
             self._impl.on_trace_end(trace)
@@ -123,7 +117,6 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
             if workflow.in_workflow() and workflow.unsafe.is_replaying():
                 # In replay mode, don't report
                 return
-        print("on_span_start", span.export())
         self._impl.on_span_start(span)
         if self._auto_close_in_workflows and workflow.in_workflow():
             self._impl.on_span_end(span)
@@ -178,7 +171,6 @@ class TemporalIdGenerator(IdGenerator):
             get_rand_bits = random.getrandbits
 
         if len(self.spans) > 0:
-            print("Generating span id from cache:", self.spans)
             return self.spans.pop()
 
         span_id = get_rand_bits(64)
@@ -193,7 +185,6 @@ class TemporalIdGenerator(IdGenerator):
             import random
             get_rand_bits = random.getrandbits
         if len(self.traces) > 0:
-            print("Generating trace id from cache:", self.traces)
             return self.traces.pop()
 
         trace_id = get_rand_bits(128)
