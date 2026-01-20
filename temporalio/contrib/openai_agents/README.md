@@ -536,6 +536,109 @@ SQLite storage is not suited to a distributed environment.
 | :--------------- | :-------: |
 | OpenAI platform  |    Yes    |
 
+## OpenTelemetry Integration
+
+This integration provides seamless export of OpenAI agent telemetry to OpenTelemetry (OTEL) endpoints for observability and monitoring. The integration automatically handles workflow replay semantics, ensuring spans are only exported when workflows actually complete.
+
+### Quick Start
+
+To enable OTEL telemetry export, simply provide exporters to the `OpenAIAgentsPlugin` or `AgentEnvironment`:
+
+```python
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
+# Your OTEL endpoint configuration
+exporters = [
+    OTLPSpanExporter(endpoint="http://localhost:4317"),
+    # Add multiple exporters for different endpoints as needed
+]
+
+# For production applications
+client = await Client.connect(
+    "localhost:7233",
+    plugins=[
+        OpenAIAgentsPlugin(
+            otel_exporters=exporters,  # Enable OTEL integration
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            )
+        ),
+    ],
+)
+
+# For testing
+from temporalio.contrib.openai_agents.testing import AgentEnvironment
+
+async with AgentEnvironment(
+    model=my_test_model,
+    otel_exporters=exporters  # Enable OTEL integration for tests
+) as env:
+    client = env.applied_on_client(base_client)
+```
+
+### Features
+
+- **Multiple Exporters**: Send telemetry to multiple OTEL endpoints simultaneously
+- **Replay-Safe**: Spans are only exported when workflows actually complete, not during replays
+- **Deterministic IDs**: Consistent span IDs across workflow replays for reliable correlation
+- **Automatic Setup**: No manual instrumentation required - just provide exporters
+- **Graceful Degradation**: Works seamlessly whether OTEL dependencies are installed or not
+
+### Dependencies
+
+OTEL integration requires additional dependencies:
+
+```bash
+pip install openinference-instrumentation-openai-agents opentelemetry-sdk
+```
+
+Choose the appropriate OTEL exporter for your monitoring system:
+
+```bash
+# For OTLP (works with most OTEL collectors and monitoring systems)
+pip install opentelemetry-exporter-otlp
+
+# For Console output (development/debugging)
+pip install opentelemetry-exporter-console
+
+# Other exporters available for specific systems
+pip install opentelemetry-exporter-<your-system>
+```
+
+### Example: Multiple Exporters
+
+```python
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.console import ConsoleSpanExporter
+
+exporters = [
+    # Production monitoring system
+    OTLPSpanExporter(
+        endpoint="https://your-monitoring-system:4317",
+        headers={"api-key": "your-api-key"}
+    ),
+    
+    # Secondary monitoring endpoint
+    OTLPSpanExporter(endpoint="https://backup-collector:4317"),
+    
+    # Development debugging
+    ConsoleSpanExporter(),
+]
+
+plugin = OpenAIAgentsPlugin(otel_exporters=exporters)
+```
+
+### Error Handling
+
+If you provide OTEL exporters but the required dependencies are not installed, you'll receive a clear error message:
+
+```
+ImportError: OTEL dependencies not available. Install with: pip install openinference-instrumentation-openai-agents opentelemetry-sdk
+```
+
+If no OTEL exporters are provided, the integration works normally without any OTEL setup.
+
 ### Voice
 
 | Mode                     | Supported |

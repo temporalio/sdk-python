@@ -56,12 +56,6 @@ class BasicTraceWorkflow:
                 )
         return
 
-class TemporalSpanProcessor(SimpleSpanProcessor):
-    def on_end(self, span: ReadableSpan) -> None:
-        if workflow.in_workflow() and workflow.unsafe.is_replaying():
-            print("Skipping span:", span.get_span_context().span_id, span.start_time)
-            return
-        super().on_end(span)
 
 async def test_otel_tracing_parent_trace(client: Client):
     exporter = InMemorySpanExporter()
