@@ -165,11 +165,27 @@ def _workflow_uuid() -> str:
 
 
 class TemporalIdGenerator(IdGenerator):
+    """OpenTelemetry ID generator that provides deterministic IDs for Temporal workflows.
+
+    This generator ensures that span and trace IDs are deterministic when running
+    within Temporal workflows by using the workflow's deterministic random source.
+    This is crucial for maintaining consistency across workflow replays.
+    """
+
     def __init__(self):
+        """Initialize the ID generator with empty trace and span pools."""
         self.traces = []
         self.spans = []
 
     def generate_span_id(self) -> int:
+        """Generate a deterministic span ID.
+
+        Uses the workflow's deterministic random source when in a workflow context,
+        otherwise falls back to system random.
+
+        Returns:
+            A 64-bit span ID that is guaranteed not to be INVALID_SPAN_ID.
+        """
         if workflow.in_workflow():
             get_rand_bits = workflow.random().getrandbits
         else:
@@ -186,6 +202,14 @@ class TemporalIdGenerator(IdGenerator):
         return span_id
 
     def generate_trace_id(self) -> int:
+        """Generate a deterministic trace ID.
+
+        Uses the workflow's deterministic random source when in a workflow context,
+        otherwise falls back to system random.
+
+        Returns:
+            A 128-bit trace ID that is guaranteed not to be INVALID_TRACE_ID.
+        """
         if workflow.in_workflow():
             get_rand_bits = workflow.random().getrandbits
         else:
