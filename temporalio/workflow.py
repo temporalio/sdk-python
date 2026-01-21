@@ -741,6 +741,9 @@ class _Runtime(ABC):
     def workflow_is_replaying(self) -> bool: ...
 
     @abstractmethod
+    def workflow_is_replaying_history_events(self) -> bool: ...
+
+    @abstractmethod
     def workflow_memo(self) -> Mapping[str, Any]: ...
 
     @abstractmethod
@@ -1444,10 +1447,23 @@ class unsafe:
     def is_replaying() -> bool:
         """Whether the workflow is currently replaying.
 
+        This includes queries and update validators that occur during replay.
+
         Returns:
             True if the workflow is currently replaying
         """
         return _Runtime.current().workflow_is_replaying()
+
+    @staticmethod
+    def is_replaying_history_events() -> bool:
+        """Whether the workflow is replaying history events.
+
+        This excludes queries and update validators, which are live operations.
+
+        Returns:
+            True if replaying history events, False otherwise.
+        """
+        return _Runtime.current().workflow_is_replaying_history_events()
 
     @staticmethod
     def is_sandbox_unrestricted() -> bool:
@@ -1602,7 +1618,7 @@ class LoggerAdapter(logging.LoggerAdapter):
 
     def isEnabledFor(self, level: int) -> bool:
         """Override to ignore replay logs."""
-        if not self.log_during_replay and unsafe.is_replaying():
+        if not self.log_during_replay and unsafe.is_replaying_history_events():
             return False
         return super().isEnabledFor(level)
 
@@ -5475,9 +5491,6 @@ class NexusClient(ABC, Generic[ServiceT]):
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
     ) -> OutputT: ...
-
-    # TODO(nexus-preview): in practice, both these overloads match an async def sync
-    # operation (i.e. either can be deleted without causing a type error).
 
     # Overload for sync_operation methods (async def)
     @overload

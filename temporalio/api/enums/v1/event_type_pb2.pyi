@@ -210,6 +210,10 @@ class _EventTypeEnumTypeWrapper(
     """A cancellation request for a Nexus operation was successfully delivered to the Nexus handler."""
     EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_FAILED: _EventType.ValueType  # 57
     """A cancellation request for a Nexus operation resulted in an error."""
+    EVENT_TYPE_WORKFLOW_EXECUTION_PAUSED: _EventType.ValueType  # 58
+    """An event that indicates that the workflow execution has been paused."""
+    EVENT_TYPE_WORKFLOW_EXECUTION_UNPAUSED: _EventType.ValueType  # 59
+    """An event that indicates that the previously paused workflow execution has been unpaused."""
 
 class EventType(_EventType, metaclass=_EventTypeEnumTypeWrapper):
     """Whenever this list of events is changed do change the function shouldBufferEvent in mutableStateBuilder.go to make sure to do the correct event ordering"""
@@ -396,4 +400,8 @@ EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_COMPLETED: EventType.ValueType  # 56
 """A cancellation request for a Nexus operation was successfully delivered to the Nexus handler."""
 EVENT_TYPE_NEXUS_OPERATION_CANCEL_REQUEST_FAILED: EventType.ValueType  # 57
 """A cancellation request for a Nexus operation resulted in an error."""
+EVENT_TYPE_WORKFLOW_EXECUTION_PAUSED: EventType.ValueType  # 58
+"""An event that indicates that the workflow execution has been paused."""
+EVENT_TYPE_WORKFLOW_EXECUTION_UNPAUSED: EventType.ValueType  # 59
+"""An event that indicates that the previously paused workflow execution has been unpaused."""
 global___EventType = EventType

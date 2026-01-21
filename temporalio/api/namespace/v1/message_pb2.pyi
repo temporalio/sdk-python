@@ -53,6 +53,7 @@ class NamespaceInfo(google.protobuf.message.Message):
         ASYNC_UPDATE_FIELD_NUMBER: builtins.int
         WORKER_HEARTBEATS_FIELD_NUMBER: builtins.int
         REPORTED_PROBLEMS_SEARCH_ATTRIBUTE_FIELD_NUMBER: builtins.int
+        WORKFLOW_PAUSE_FIELD_NUMBER: builtins.int
         eager_workflow_start: builtins.bool
         """True if the namespace supports eager workflow start."""
         sync_update: builtins.bool
@@ -63,6 +64,8 @@ class NamespaceInfo(google.protobuf.message.Message):
         """True if the namespace supports worker heartbeats"""
         reported_problems_search_attribute: builtins.bool
         """True if the namespace supports reported problems search attribute"""
+        workflow_pause: builtins.bool
+        """True if the namespace supports pausing workflows"""
         def __init__(
             self,
             *,
@@ -71,6 +74,7 @@ class NamespaceInfo(google.protobuf.message.Message):
             async_update: builtins.bool = ...,
             worker_heartbeats: builtins.bool = ...,
             reported_problems_search_attribute: builtins.bool = ...,
+            workflow_pause: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -85,6 +89,36 @@ class NamespaceInfo(google.protobuf.message.Message):
                 b"sync_update",
                 "worker_heartbeats",
                 b"worker_heartbeats",
+                "workflow_pause",
+                b"workflow_pause",
+            ],
+        ) -> None: ...
+
+    class Limits(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        BLOB_SIZE_LIMIT_ERROR_FIELD_NUMBER: builtins.int
+        MEMO_SIZE_LIMIT_ERROR_FIELD_NUMBER: builtins.int
+        blob_size_limit_error: builtins.int
+        """Maximum size in bytes for payload fields in workflow history events
+        (e.g., workflow/activity inputs and results, failure details, signal payloads).
+        When exceeded, the server will reject the operation with an error.
+        """
+        memo_size_limit_error: builtins.int
+        """Maximum total memo size in bytes per workflow execution."""
+        def __init__(
+            self,
+            *,
+            blob_size_limit_error: builtins.int = ...,
+            memo_size_limit_error: builtins.int = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "blob_size_limit_error",
+                b"blob_size_limit_error",
+                "memo_size_limit_error",
+                b"memo_size_limit_error",
             ],
         ) -> None: ...
 
@@ -95,6 +129,7 @@ class NamespaceInfo(google.protobuf.message.Message):
     DATA_FIELD_NUMBER: builtins.int
     ID_FIELD_NUMBER: builtins.int
     CAPABILITIES_FIELD_NUMBER: builtins.int
+    LIMITS_FIELD_NUMBER: builtins.int
     SUPPORTS_SCHEDULES_FIELD_NUMBER: builtins.int
     name: builtins.str
     state: temporalio.api.enums.v1.namespace_pb2.NamespaceState.ValueType
@@ -109,6 +144,9 @@ class NamespaceInfo(google.protobuf.message.Message):
     @property
     def capabilities(self) -> global___NamespaceInfo.Capabilities:
         """All capabilities the namespace supports."""
+    @property
+    def limits(self) -> global___NamespaceInfo.Limits:
+        """Namespace configured limits"""
     supports_schedules: builtins.bool
     """Whether scheduled workflows are supported on this namespace. This is only needed
     temporarily while the feature is experimental, so we can give it a high tag.
@@ -123,10 +161,14 @@ class NamespaceInfo(google.protobuf.message.Message):
         data: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         id: builtins.str = ...,
         capabilities: global___NamespaceInfo.Capabilities | None = ...,
+        limits: global___NamespaceInfo.Limits | None = ...,
         supports_schedules: builtins.bool = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["capabilities", b"capabilities"]
+        self,
+        field_name: typing_extensions.Literal[
+            "capabilities", b"capabilities", "limits", b"limits"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
@@ -139,6 +181,8 @@ class NamespaceInfo(google.protobuf.message.Message):
             b"description",
             "id",
             b"id",
+            "limits",
+            b"limits",
             "name",
             b"name",
             "owner_email",
