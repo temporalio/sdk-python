@@ -1986,6 +1986,7 @@ class LoggingWorkflow:
 
     @workflow.query
     def last_signal(self) -> str:
+        workflow.logger.info("Query called")
         return self._last_signal
 
 
@@ -2021,6 +2022,7 @@ async def test_workflow_logging(client: Client):
         assert capturer.find_log("Signal: signal 2")
         assert capturer.find_log("Update: update 1")
         assert capturer.find_log("Update: update 2")
+        assert capturer.find_log("Query called")
         assert not capturer.find_log("Signal: signal 3")
         # Also make sure it has some workflow info and correct funcName
         record = capturer.find_log("Signal: signal 1")

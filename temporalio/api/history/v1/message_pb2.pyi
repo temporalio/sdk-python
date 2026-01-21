@@ -74,6 +74,7 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     PARENT_PINNED_WORKER_DEPLOYMENT_VERSION_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
     INHERITED_PINNED_VERSION_FIELD_NUMBER: builtins.int
+    INHERITED_AUTO_UPGRADE_INFO_FIELD_NUMBER: builtins.int
     EAGER_EXECUTION_ACCEPTED_FIELD_NUMBER: builtins.int
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
@@ -239,17 +240,46 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
         """If present, the new workflow should start on this version with pinned base behavior.
         Child of pinned parent will inherit the parent's version if the Child's Task Queue belongs to that version.
 
-        New run initiated by workflow ContinueAsNew of pinned run, will inherit the previous run's version if the
+        A new run initiated by workflow ContinueAsNew of pinned run, will inherit the previous run's version if the
         new run's Task Queue belongs to that version.
 
-        New run initiated by workflow Cron will never inherit.
+        A new run initiated by workflow Cron will never inherit.
 
-        New run initiated by workflow Retry will only inherit if the retried run is effectively pinned at the time
+        A new run initiated by workflow Retry will only inherit if the retried run is effectively pinned at the time
         of retry, and the retried run inherited a pinned version when it started (ie. it is a child of a pinned
         parent, or a CaN of a pinned run, and is running on a Task Queue in the inherited version).
 
         Pinned override is inherited if Task Queue of new run is compatible with the override version.
         Override is inherited separately and takes precedence over inherited base version.
+
+        Note: This field is mutually exclusive with inherited_auto_upgrade_info.
+        Additionaly, versioning_override, if present, overrides this field during routing decisions.
+        """
+    @property
+    def inherited_auto_upgrade_info(
+        self,
+    ) -> temporalio.api.deployment.v1.message_pb2.InheritedAutoUpgradeInfo:
+        """If present, the new workflow begins with AutoUpgrade behavior. Before dispatching the
+        first workflow task, this field is set to the deployment version on which the parent/
+        previous run was operating. This inheritance only happens when the task queues belong to
+        the same deployment version. The first workflow task will then be dispatched to either
+        this inherited deployment version, or the current deployment version of the task queue's
+        Deployment. After the first workflow task, the effective behavior depends on worker-sent
+        values in subsequent workflow tasks.
+
+        Inheritance rules:
+          - ContinueAsNew and child workflows: inherit AutoUpgrade behavior and deployment version
+          - Cron: never inherits
+          - Retry: inherits only if the retried run is effectively AutoUpgrade at the time of
+            retry, and inherited AutoUpgrade behavior when it started (i.e. it is a child of an
+            AutoUpgrade parent or ContinueAsNew of an AutoUpgrade run, running on the same
+            deployment as the parent/previous run)
+
+        Additional notes:
+        - This field is mutually exclusive with `inherited_pinned_version`.
+        - `versioning_override`, if present, overrides this field during routing decisions.
+        - SDK implementations do not interact with this field and is only used internally by
+          the server to ensure task routing correctness.
         """
     eager_execution_accepted: builtins.bool
     """A boolean indicating whether the SDK has asked to eagerly execute the first workflow task for this workflow and
@@ -307,6 +337,8 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
         inherited_pinned_version: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion
         | None = ...,
+        inherited_auto_upgrade_info: temporalio.api.deployment.v1.message_pb2.InheritedAutoUpgradeInfo
+        | None = ...,
         eager_execution_accepted: builtins.bool = ...,
     ) -> None: ...
     def HasField(
@@ -318,6 +350,8 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             b"first_workflow_task_backoff",
             "header",
             b"header",
+            "inherited_auto_upgrade_info",
+            b"inherited_auto_upgrade_info",
             "inherited_pinned_version",
             b"inherited_pinned_version",
             "input",
@@ -379,6 +413,8 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             b"header",
             "identity",
             b"identity",
+            "inherited_auto_upgrade_info",
+            b"inherited_auto_upgrade_info",
             "inherited_build_id",
             b"inherited_build_id",
             "inherited_pinned_version",
@@ -567,6 +603,7 @@ class WorkflowExecutionContinuedAsNewEventAttributes(google.protobuf.message.Mes
     MEMO_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     INHERIT_BUILD_ID_FIELD_NUMBER: builtins.int
+    INITIAL_VERSIONING_BEHAVIOR_FIELD_NUMBER: builtins.int
     new_execution_run_id: builtins.str
     """The run ID of the new workflow started by this continue-as-new"""
     @property
@@ -585,18 +622,22 @@ class WorkflowExecutionContinuedAsNewEventAttributes(google.protobuf.message.Mes
     """The `WORKFLOW_TASK_COMPLETED` event which this command was reported with"""
     @property
     def backoff_start_interval(self) -> google.protobuf.duration_pb2.Duration:
-        """TODO: How and is this used?"""
+        """How long the server will wait before scheduling the first workflow task for the new run.
+        Used for cron, retry, and other continue-as-new cases that server may enforce some minimal
+        delay between new runs for system protection purpose.
+        """
     initiator: temporalio.api.enums.v1.workflow_pb2.ContinueAsNewInitiator.ValueType
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """TODO: David are these right?
-        Deprecated. If a workflow's retry policy would cause a new run to start when the current one
+        """Deprecated. If a workflow's retry policy would cause a new run to start when the current one
         has failed, this field would be populated with that failure. Now (when supported by server
         and sdk) the final event will be `WORKFLOW_EXECUTION_FAILED` with `new_execution_run_id` set.
         """
     @property
     def last_completion_result(self) -> temporalio.api.common.v1.message_pb2.Payloads:
-        """TODO: Is this the result of *this* workflow as it continued-as-new?"""
+        """The result from the most recent completed run of this workflow. The SDK surfaces this to the
+        new run via APIs such as `GetLastCompletionResult`.
+        """
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header: ...
     @property
@@ -609,6 +650,13 @@ class WorkflowExecutionContinuedAsNewEventAttributes(google.protobuf.message.Mes
     """If this is set, the new execution inherits the Build ID of the current execution. Otherwise,
     the assignment rules will be used to independently assign a Build ID to the new execution.
     Deprecated. Only considered for versioning v0.2.
+    """
+    initial_versioning_behavior: (
+        temporalio.api.enums.v1.workflow_pb2.ContinueAsNewVersioningBehavior.ValueType
+    )
+    """Experimental. Optionally decide the versioning behavior that the first task of the new run should use.
+    For example, choose to AutoUpgrade on continue-as-new instead of inheriting the pinned version
+    of the previous run.
     """
     def __init__(
         self,
@@ -630,6 +678,7 @@ class WorkflowExecutionContinuedAsNewEventAttributes(google.protobuf.message.Mes
         search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
         | None = ...,
         inherit_build_id: builtins.bool = ...,
+        initial_versioning_behavior: temporalio.api.enums.v1.workflow_pb2.ContinueAsNewVersioningBehavior.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -669,6 +718,8 @@ class WorkflowExecutionContinuedAsNewEventAttributes(google.protobuf.message.Mes
             b"header",
             "inherit_build_id",
             b"inherit_build_id",
+            "initial_versioning_behavior",
+            b"initial_versioning_behavior",
             "initiator",
             b"initiator",
             "input",
@@ -753,6 +804,7 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
     IDENTITY_FIELD_NUMBER: builtins.int
     REQUEST_ID_FIELD_NUMBER: builtins.int
     SUGGEST_CONTINUE_AS_NEW_FIELD_NUMBER: builtins.int
+    SUGGEST_CONTINUE_AS_NEW_REASONS_FIELD_NUMBER: builtins.int
     HISTORY_SIZE_BYTES_FIELD_NUMBER: builtins.int
     WORKER_VERSION_FIELD_NUMBER: builtins.int
     BUILD_ID_REDIRECT_COUNTER_FIELD_NUMBER: builtins.int
@@ -761,11 +813,24 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
     identity: builtins.str
     """Identity of the worker who picked up this task"""
     request_id: builtins.str
-    """TODO: ? Appears unused?"""
-    suggest_continue_as_new: builtins.bool
-    """True if this workflow should continue-as-new soon because its history size (in
-    either event count or bytes) is getting large.
+    """This field is populated from the RecordWorkflowTaskStartedRequest. Matching service would
+    set the request_id on the RecordWorkflowTaskStartedRequest to a new UUID. This is useful
+    in case a RecordWorkflowTaskStarted call succeed but matching doesn't get that response,
+    so matching could retry and history service would return success if the request_id matches.
+    In that case, matching will continue to deliver the task to worker. Without this field, history
+    service would return AlreadyStarted error, and matching would drop the task.
     """
+    suggest_continue_as_new: builtins.bool
+    """True if this workflow should continue-as-new soon. See `suggest_continue_as_new_reasons` for why."""
+    @property
+    def suggest_continue_as_new_reasons(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        temporalio.api.enums.v1.workflow_pb2.SuggestContinueAsNewReason.ValueType
+    ]:
+        """The reason(s) that suggest_continue_as_new is true, if it is.
+        Unset if suggest_continue_as_new is false.
+        """
     history_size_bytes: builtins.int
     """Total history size in bytes, which the workflow might use to decide when to
     continue-as-new regardless of the suggestion. Note that history event count is
@@ -788,6 +853,10 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
         identity: builtins.str = ...,
         request_id: builtins.str = ...,
         suggest_continue_as_new: builtins.bool = ...,
+        suggest_continue_as_new_reasons: collections.abc.Iterable[
+            temporalio.api.enums.v1.workflow_pb2.SuggestContinueAsNewReason.ValueType
+        ]
+        | None = ...,
         history_size_bytes: builtins.int = ...,
         worker_version: temporalio.api.common.v1.message_pb2.WorkerVersionStamp
         | None = ...,
@@ -811,6 +880,8 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
             b"scheduled_event_id",
             "suggest_continue_as_new",
             b"suggest_continue_as_new",
+            "suggest_continue_as_new_reasons",
+            b"suggest_continue_as_new_reasons",
             "worker_version",
             b"worker_version",
         ],
@@ -1016,13 +1087,17 @@ class WorkflowTaskFailedEventAttributes(google.protobuf.message.Message):
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
         """The failure details"""
     identity: builtins.str
-    """If a worker explicitly failed this task, it's identity. TODO: What is this set to if server fails the task?"""
+    """If a worker explicitly failed this task, this field contains the worker's identity.
+    When the server generates the failure internally this field is set as 'history-service'.
+    """
     base_run_id: builtins.str
     """The original run id of the workflow. For reset workflow."""
     new_run_id: builtins.str
     """If the workflow is being reset, the new run id."""
     fork_event_version: builtins.int
-    """TODO: ?"""
+    """Version of the event where the history branch was forked. Used by multi-cluster replication
+    during resets to identify the correct history branch.
+    """
     binary_checksum: builtins.str
     """Deprecated. This field should be cleaned up when versioning-2 API is removed. [cleanup-experimental-wv]
     If a worker explicitly failed this task, its binary id
@@ -1248,7 +1323,13 @@ class ActivityTaskStartedEventAttributes(google.protobuf.message.Message):
     identity: builtins.str
     """id of the worker that picked up this task"""
     request_id: builtins.str
-    """TODO ??"""
+    """This field is populated from the RecordActivityTaskStartedRequest. Matching service would
+    set the request_id on the RecordActivityTaskStartedRequest to a new UUID. This is useful
+    in case a RecordActivityTaskStarted call succeed but matching doesn't get that response,
+    so matching could retry and history service would return success if the request_id matches.
+    In that case, matching will continue to deliver the task to worker. Without this field, history
+    service would return AlreadyStarted error, and matching would drop the task.
+    """
     attempt: builtins.int
     """Starting at 1, the number of times this task has been attempted"""
     @property
@@ -1675,11 +1756,11 @@ class WorkflowExecutionCancelRequestedEventAttributes(google.protobuf.message.Me
     EXTERNAL_WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
     cause: builtins.str
-    """User provided reason for requesting cancellation
-    TODO: shall we create a new field with name "reason" and deprecate this one?
-    """
+    """User provided reason for requesting cancellation"""
     external_initiated_event_id: builtins.int
-    """TODO: Is this the ID of the event in the workflow which initiated this cancel, if there was one?"""
+    """The ID of the `REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED` event in the external
+    workflow history when the cancellation was requested by another workflow.
+    """
     @property
     def external_workflow_execution(
         self,
@@ -3115,6 +3196,8 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
     UNSET_VERSIONING_OVERRIDE_FIELD_NUMBER: builtins.int
     ATTACHED_REQUEST_ID_FIELD_NUMBER: builtins.int
     ATTACHED_COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    PRIORITY_FIELD_NUMBER: builtins.int
     @property
     def versioning_override(
         self,
@@ -3125,7 +3208,7 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
     unset_versioning_override: builtins.bool
     """Versioning override removed in this event."""
     attached_request_id: builtins.str
-    """Request ID attachedto the running workflow execution so that subsequent requests with same
+    """Request ID attached to the running workflow execution so that subsequent requests with same
     request ID will be deduped.
     """
     @property
@@ -3135,6 +3218,13 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
         temporalio.api.common.v1.message_pb2.Callback
     ]:
         """Completion callbacks attached to the running workflow execution."""
+    identity: builtins.str
+    """Optional. The identity of the client who initiated the request that created this event."""
+    @property
+    def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
+        """Priority override upserted in this event. Represents the full priority; not just partial fields.
+        Ignored if nil.
+        """
     def __init__(
         self,
         *,
@@ -3146,11 +3236,13 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
             temporalio.api.common.v1.message_pb2.Callback
         ]
         | None = ...,
+        identity: builtins.str = ...,
+        priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "versioning_override", b"versioning_override"
+            "priority", b"priority", "versioning_override", b"versioning_override"
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -3160,6 +3252,10 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
             b"attached_completion_callbacks",
             "attached_request_id",
             b"attached_request_id",
+            "identity",
+            b"identity",
+            "priority",
+            b"priority",
             "unset_versioning_override",
             b"unset_versioning_override",
             "versioning_override",
@@ -3458,6 +3554,68 @@ class WorkflowExecutionUpdateAdmittedEventAttributes(google.protobuf.message.Mes
 
 global___WorkflowExecutionUpdateAdmittedEventAttributes = (
     WorkflowExecutionUpdateAdmittedEventAttributes
+)
+
+class WorkflowExecutionPausedEventAttributes(google.protobuf.message.Message):
+    """Attributes for an event marking that a workflow execution was paused."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    identity: builtins.str
+    """The identity of the client who paused the workflow execution."""
+    reason: builtins.str
+    """The reason for pausing the workflow execution."""
+    request_id: builtins.str
+    """The request ID of the request that paused the workflow execution."""
+    def __init__(
+        self,
+        *,
+        identity: builtins.str = ...,
+        reason: builtins.str = ...,
+        request_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity", b"identity", "reason", b"reason", "request_id", b"request_id"
+        ],
+    ) -> None: ...
+
+global___WorkflowExecutionPausedEventAttributes = WorkflowExecutionPausedEventAttributes
+
+class WorkflowExecutionUnpausedEventAttributes(google.protobuf.message.Message):
+    """Attributes for an event marking that a workflow execution was unpaused."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REASON_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    identity: builtins.str
+    """The identity of the client who unpaused the workflow execution."""
+    reason: builtins.str
+    """The reason for unpausing the workflow execution."""
+    request_id: builtins.str
+    """The request ID of the request that unpaused the workflow execution."""
+    def __init__(
+        self,
+        *,
+        identity: builtins.str = ...,
+        reason: builtins.str = ...,
+        request_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity", b"identity", "reason", b"reason", "request_id", b"request_id"
+        ],
+    ) -> None: ...
+
+global___WorkflowExecutionUnpausedEventAttributes = (
+    WorkflowExecutionUnpausedEventAttributes
 )
 
 class NexusOperationScheduledEventAttributes(google.protobuf.message.Message):
@@ -3982,15 +4140,21 @@ class HistoryEvent(google.protobuf.message.Message):
     WORKFLOW_EXECUTION_OPTIONS_UPDATED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     NEXUS_OPERATION_CANCEL_REQUEST_COMPLETED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     NEXUS_OPERATION_CANCEL_REQUEST_FAILED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    WORKFLOW_EXECUTION_PAUSED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    WORKFLOW_EXECUTION_UNPAUSED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     event_id: builtins.int
     """Monotonically increasing event number, starts at 1."""
     @property
     def event_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     event_type: temporalio.api.enums.v1.event_type_pb2.EventType.ValueType
     version: builtins.int
-    """TODO: What is this? Appears unused by SDKs"""
+    """Failover version of the event, used by the server for multi-cluster replication and history
+    versioning. SDKs generally ignore this field.
+    """
     task_id: builtins.int
-    """TODO: What is this? Appears unused by SDKs"""
+    """Identifier used by the service to order replication and transfer tasks associated with this
+    event. SDKs generally ignore this field.
+    """
     worker_may_ignore: builtins.bool
     """Set to true when the SDK may ignore the event as it does not impact workflow state or
     information in any way that the SDK need be concerned with. If an SDK encounters an event
@@ -4241,6 +4405,14 @@ class HistoryEvent(google.protobuf.message.Message):
     def nexus_operation_cancel_request_failed_event_attributes(
         self,
     ) -> global___NexusOperationCancelRequestFailedEventAttributes: ...
+    @property
+    def workflow_execution_paused_event_attributes(
+        self,
+    ) -> global___WorkflowExecutionPausedEventAttributes: ...
+    @property
+    def workflow_execution_unpaused_event_attributes(
+        self,
+    ) -> global___WorkflowExecutionUnpausedEventAttributes: ...
     def __init__(
         self,
         *,
@@ -4367,6 +4539,10 @@ class HistoryEvent(google.protobuf.message.Message):
         | None = ...,
         nexus_operation_cancel_request_failed_event_attributes: global___NexusOperationCancelRequestFailedEventAttributes
         | None = ...,
+        workflow_execution_paused_event_attributes: global___WorkflowExecutionPausedEventAttributes
+        | None = ...,
+        workflow_execution_unpaused_event_attributes: global___WorkflowExecutionUnpausedEventAttributes
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -4461,6 +4637,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_execution_failed_event_attributes",
             "workflow_execution_options_updated_event_attributes",
             b"workflow_execution_options_updated_event_attributes",
+            "workflow_execution_paused_event_attributes",
+            b"workflow_execution_paused_event_attributes",
             "workflow_execution_signaled_event_attributes",
             b"workflow_execution_signaled_event_attributes",
             "workflow_execution_started_event_attributes",
@@ -4469,6 +4647,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_execution_terminated_event_attributes",
             "workflow_execution_timed_out_event_attributes",
             b"workflow_execution_timed_out_event_attributes",
+            "workflow_execution_unpaused_event_attributes",
+            b"workflow_execution_unpaused_event_attributes",
             "workflow_execution_update_accepted_event_attributes",
             b"workflow_execution_update_accepted_event_attributes",
             "workflow_execution_update_admitted_event_attributes",
@@ -4598,6 +4778,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_execution_failed_event_attributes",
             "workflow_execution_options_updated_event_attributes",
             b"workflow_execution_options_updated_event_attributes",
+            "workflow_execution_paused_event_attributes",
+            b"workflow_execution_paused_event_attributes",
             "workflow_execution_signaled_event_attributes",
             b"workflow_execution_signaled_event_attributes",
             "workflow_execution_started_event_attributes",
@@ -4606,6 +4788,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_execution_terminated_event_attributes",
             "workflow_execution_timed_out_event_attributes",
             b"workflow_execution_timed_out_event_attributes",
+            "workflow_execution_unpaused_event_attributes",
+            b"workflow_execution_unpaused_event_attributes",
             "workflow_execution_update_accepted_event_attributes",
             b"workflow_execution_update_accepted_event_attributes",
             "workflow_execution_update_admitted_event_attributes",
@@ -4691,6 +4875,8 @@ class HistoryEvent(google.protobuf.message.Message):
             "workflow_execution_options_updated_event_attributes",
             "nexus_operation_cancel_request_completed_event_attributes",
             "nexus_operation_cancel_request_failed_event_attributes",
+            "workflow_execution_paused_event_attributes",
+            "workflow_execution_unpaused_event_attributes",
         ]
         | None
     ): ...
