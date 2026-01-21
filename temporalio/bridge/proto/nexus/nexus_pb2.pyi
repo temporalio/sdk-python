@@ -10,6 +10,7 @@ import typing
 import google.protobuf.descriptor
 import google.protobuf.internal.enum_type_wrapper
 import google.protobuf.message
+import google.protobuf.timestamp_pb2
 
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.failure.v1.message_pb2
@@ -227,6 +228,7 @@ class NexusTask(google.protobuf.message.Message):
 
     TASK_FIELD_NUMBER: builtins.int
     CANCEL_TASK_FIELD_NUMBER: builtins.int
+    REQUEST_DEADLINE_FIELD_NUMBER: builtins.int
     @property
     def task(
         self,
@@ -246,23 +248,44 @@ class NexusTask(google.protobuf.message.Message):
         EX: Core knows the nexus operation has timed out, and it does not make sense for the
         user's operation handler to continue doing work.
         """
+    @property
+    def request_deadline(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The deadline for this request, parsed from the "Request-Timeout" header.
+        Only set when variant is `task` and the header was present with a valid value.
+        Represented as an absolute timestamp.
+        """
     def __init__(
         self,
         *,
         task: temporalio.api.workflowservice.v1.request_response_pb2.PollNexusTaskQueueResponse
         | None = ...,
         cancel_task: global___CancelNexusTask | None = ...,
+        request_deadline: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "cancel_task", b"cancel_task", "task", b"task", "variant", b"variant"
+            "cancel_task",
+            b"cancel_task",
+            "request_deadline",
+            b"request_deadline",
+            "task",
+            b"task",
+            "variant",
+            b"variant",
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "cancel_task", b"cancel_task", "task", b"task", "variant", b"variant"
+            "cancel_task",
+            b"cancel_task",
+            "request_deadline",
+            b"request_deadline",
+            "task",
+            b"task",
+            "variant",
+            b"variant",
         ],
     ) -> None: ...
     def WhichOneof(
