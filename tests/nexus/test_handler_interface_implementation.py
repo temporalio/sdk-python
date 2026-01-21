@@ -54,7 +54,7 @@ class MissingWorkflowRunDecorator(_InterfaceImplementationTestCase):
     class Impl:
         # Method exists but MISSING @workflow_run_operation decorator
         async def my_workflow_op(
-            self, ctx: WorkflowRunOperationContext, input: str
+            self, _ctx: WorkflowRunOperationContext, _input: str
         ) -> nexus.WorkflowHandle[int]:
             raise NotImplementedError
 
@@ -74,7 +74,9 @@ def test_service_decorator_enforces_interface_conformance(
 ):
     if test_case.error_message:
         with pytest.raises(Exception) as ei:
-            nexusrpc.handler.service_handler(service=test_case.Interface)(test_case.Impl)
+            nexusrpc.handler.service_handler(service=test_case.Interface)(
+                test_case.Impl
+            )
         err = ei.value
         assert test_case.error_message in str(err)
     else:
