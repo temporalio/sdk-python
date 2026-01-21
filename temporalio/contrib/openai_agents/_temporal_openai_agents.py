@@ -183,11 +183,11 @@ class OpenAIAgentsPlugin(SimplePlugin):
         model_params: ModelActivityParameters | None = None,
         model_provider: ModelProvider | None = None,
         mcp_server_providers: Sequence[
-            StatelessMCPServerProvider | StatefulMCPServerProvider
+            "StatelessMCPServerProvider | StatefulMCPServerProvider"
         ] = (),
         register_activities: bool = True,
         add_temporal_spans: bool = True,
-        otel_exporters: Sequence[SpanExporter] | None = None,
+        otel_exporters: Sequence["SpanExporter"] | None = None,
     ) -> None:
         """Initialize the OpenAI agents plugin.
 

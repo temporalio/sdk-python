@@ -231,7 +231,7 @@ class AgentEnvironment:
         ] = (),
         register_activities: bool = True,
         add_temporal_spans: bool = True,
-        otel_exporters: Sequence[SpanExporter] | None = None,
+        otel_exporters: Sequence["SpanExporter"] | None = None,
     ) -> None:
         """Initialize the AgentEnvironment.
 

@@ -34,7 +34,6 @@ def set_header_from_context(input: _InputWithHeaders) -> None:
     """Inserts the OpenAI Agents trace/span data in the input header."""
     current = get_current_span()
     trace = get_trace_provider().get_current_trace()
-    otel_span = getattr(trace, "__otel_span", None)
     input.headers = {
         **input.headers,
         HEADER_KEY: temporalio.converter.PayloadConverter.default.to_payload(
@@ -42,12 +41,6 @@ def set_header_from_context(input: _InputWithHeaders) -> None:
                 "traceName": trace.name if trace else "Unknown Workflow",
                 "spanId": current.span_id if current else None,
                 "traceId": trace.trace_id if trace else None,
-                "otelTraceId": otel_span.get_span_context().trace_id
-                if otel_span
-                else None,
-                "otelSpanId": otel_span.get_span_context().span_id
-                if otel_span
-                else None,
             }
         ),
     }
@@ -65,26 +58,11 @@ def context_from_header(
     if span_info is None:
         yield
     else:
-        workflow_type = (
-            activity.info().workflow_type
-            if activity.in_activity()
-            else workflow.info().workflow_type
-        )
         current_trace = get_trace_provider().get_current_trace()
         if current_trace is None and span_info["traceId"] is not None:
-            metadata = {
-                "temporal:workflowId": activity.info().workflow_id
-                if activity.in_activity()
-                else workflow.info().workflow_id,
-                "temporal:runId": activity.info().workflow_run_id
-                if activity.in_activity()
-                else workflow.info().run_id,
-                "temporal:workflowType": workflow_type,
-            }
             current_trace = trace(
                 span_info["traceName"],
                 trace_id=span_info["traceId"],
-                metadata=metadata,
             )
 
             if start_trace:
