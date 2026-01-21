@@ -345,6 +345,7 @@ class _ContextPropagationWorkflowInboundInterceptor(
     async def execute_workflow(
         self, input: temporalio.worker.ExecuteWorkflowInput
     ) -> Any:
+        print("Executing workflow")
         _ensure_tracing_random()
         with context_from_header(
             input, temporalio.workflow.payload_converter(), start_trace=self.start_trace

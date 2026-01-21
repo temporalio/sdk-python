@@ -296,15 +296,16 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 if otel_instrumentor is not None:
                     otel_instrumentor.uninstrument()
 
+        interceptor = OpenAIAgentsContextPropagationInterceptor(
+            add_temporal_spans=add_temporal_spans,
+            start_traces=self._otel_exporters is not None,
+        )
+
         super().__init__(
             name="OpenAIAgentsPlugin",
             data_converter=_data_converter,
-            client_interceptors=[
-                OpenAIAgentsContextPropagationInterceptor(
-                    add_temporal_spans=add_temporal_spans,
-                    start_traces=self._otel_exporters is not None,
-                )
-            ],
+            client_interceptors=[interceptor],
+            worker_interceptors=[interceptor],
             activities=add_activities,
             workflow_runner=workflow_runner,
             workflow_failure_exception_types=[AgentsWorkflowError],
