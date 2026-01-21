@@ -268,32 +268,6 @@ def _maybe_span(add_temporal_spans: bool, span_name: str, data: dict[str, Any] |
         yield
 
 
-@contextmanager
-def _maybe_trace_and_span(
-    add_temporal_spans: bool,
-    span_name: str,
-    metadata: dict[str, Any],
-    data: dict[str, Any] | None,
-    group_id: str,
-):
-    if add_temporal_spans:
-        if get_trace_provider().get_current_trace() is None:
-            with trace(span_name, metadata=metadata, group_id=group_id):
-                with _maybe_span(
-                    add_temporal_spans=add_temporal_spans,
-                    span_name=span_name,
-                    data=data,
-                ):
-                    yield
-        else:
-            with _maybe_span(
-                add_temporal_spans=add_temporal_spans, span_name=span_name, data=data
-            ):
-                yield
-    else:
-        yield
-
-
 class _ContextPropagationClientOutboundInterceptor(
     temporalio.client.OutboundInterceptor
 ):
@@ -308,35 +282,23 @@ class _ContextPropagationClientOutboundInterceptor(
     async def start_workflow(
         self, input: temporalio.client.StartWorkflowInput
     ) -> temporalio.client.WorkflowHandle[Any, Any]:
-        metadata = {
-            "temporal:workflowType": input.workflow,
-            **({"temporal:workflowId": input.id} if input.id else {}),
-        }
         data = {"workflowId": input.id} if input.id else None
         span_name = "temporal:startWorkflow"
-        with _maybe_trace_and_span(
+        with _maybe_span(
             self._add_temporal_spans,
             span_name + ":" + input.workflow,
-            metadata=metadata,
             data=data,
-            group_id=input.id,
         ):
             set_header_from_context(input)
             return await super().start_workflow(input)
 
     async def query_workflow(self, input: temporalio.client.QueryWorkflowInput) -> Any:
-        metadata = {
-            "temporal:queryWorkflow": input.query,
-            **({"temporal:workflowId": input.id} if input.id else {}),
-        }
         data = {"workflowId": input.id, "query": input.query}
         span_name = "temporal:queryWorkflow"
-        with _maybe_trace_and_span(
+        with _maybe_span(
             self._add_temporal_spans,
             span_name,
-            metadata=metadata,
             data=data,
-            group_id=input.id,
         ):
             set_header_from_context(input)
             return await super().query_workflow(input)
@@ -344,18 +306,12 @@ class _ContextPropagationClientOutboundInterceptor(
     async def signal_workflow(
         self, input: temporalio.client.SignalWorkflowInput
     ) -> None:
-        metadata = {
-            "temporal:signalWorkflow": input.signal,
-            **({"temporal:workflowId": input.id} if input.id else {}),
-        }
         data = {"workflowId": input.id, "signal": input.signal}
         span_name = "temporal:signalWorkflow"
-        with _maybe_trace_and_span(
+        with _maybe_span(
             self._add_temporal_spans,
             span_name,
-            metadata=metadata,
             data=data,
-            group_id=input.id,
         ):
             set_header_from_context(input)
             await super().signal_workflow(input)
@@ -363,21 +319,15 @@ class _ContextPropagationClientOutboundInterceptor(
     async def start_workflow_update(
         self, input: temporalio.client.StartWorkflowUpdateInput
     ) -> temporalio.client.WorkflowUpdateHandle[Any]:
-        metadata = {
-            "temporal:updateWorkflow": input.update,
-            **({"temporal:workflowId": input.id} if input.id else {}),
-        }
         data = {
             **({"workflowId": input.id} if input.id else {}),
             "update": input.update,
         }
         span_name = "temporal:updateWorkflow"
-        with _maybe_trace_and_span(
+        with _maybe_span(
             self._add_temporal_spans,
             span_name,
-            metadata=metadata,
             data=data,
-            group_id=input.id,
         ):
             set_header_from_context(input)
             return await self.next.start_workflow_update(input)
