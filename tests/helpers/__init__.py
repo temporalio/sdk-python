@@ -5,13 +5,12 @@ import queue
 import socket
 import time
 import uuid
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Iterator, Sequence
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
-    Iterator,
     TypeVar,
     cast,
 )
