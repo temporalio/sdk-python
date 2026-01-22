@@ -26,8 +26,9 @@ import inspect
 import time
 import uuid
 from collections.abc import Sequence
+from contextlib import asynccontextmanager
 from datetime import timedelta
-from typing import Any, AsyncGenerator, Callable, List, Optional
+from typing import Any, AsyncGenerator, Callable, List, Optional, AsyncIterator
 
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.agents.invocation_context import InvocationContext
@@ -50,6 +51,7 @@ from temporalio.worker import (
     WorkflowInterceptorClassInput,
     WorkflowRunner,
 )
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 
 def setup_deterministic_runtime():
@@ -78,20 +80,6 @@ def setup_deterministic_runtime():
         pass
     except Exception as e:
         print(f"Warning: Failed to set deterministic runtime providers: {e}")
-
-
-class AdkWorkflowInboundInterceptor(WorkflowInboundInterceptor):
-    async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
-        # Global runtime setup before ANY user code runs
-        setup_deterministic_runtime()
-        return await super().execute_workflow(input)
-
-
-class AdkInterceptor(Interceptor):
-    def workflow_interceptor_class(
-        self, input: WorkflowInterceptorClassInput
-    ) -> type[WorkflowInboundInterceptor] | None:
-        return AdkWorkflowInboundInterceptor
 
 
 class AgentPlugin(BasePlugin):
@@ -144,30 +132,43 @@ class AgentPlugin(BasePlugin):
     async def before_model_callback(
         self, *, callback_context: CallbackContext, llm_request: LlmRequest
     ) -> LlmResponse | None:
-        # Construct dynamic activity name for visibility
-        agent_name = callback_context.agent_name
-        activity_name = f"{agent_name}.generate_content"
-
-        # Execute with dynamic name
-        response_dicts = await workflow.execute_activity(
-            activity_name, args=[llm_request], **self.activity_options
+        responses = await workflow.execute_activity(
+            invoke_model, args=[llm_request], summary=callback_context.agent_name, **self.activity_options
         )
 
-        # Rehydrate LlmResponse objects safely
-        responses = []
-        for d in response_dicts:
-            try:
-                responses.append(LlmResponse.model_validate(d))
-            except Exception as e:
-                raise RuntimeError(
-                    f"Failed to deserialized LlmResponse from activity result: {e}"
-                ) from e
+        # # Rehydrate LlmResponse objects safely
+        # responses = []
+        # for d in response_dicts:
+        #     try:
+        #         responses.append(LlmResponse.model_validate(d))
+        #     except Exception as e:
+        #         raise RuntimeError(
+        #             f"Failed to deserialized LlmResponse from activity result: {e}"
+        #         ) from e
 
         # Simple consolidation: return the last complete response
         return responses[-1] if responses else None
 
 
-class WorkerPlugin(SimplePlugin):
+@activity.defn
+async def invoke_model(llm_request: LlmRequest) -> list[LlmResponse]:
+
+    # 3. Model Initialization
+    llm = LLMRegistry.new_llm(llm_request.model)
+    if not llm:
+        raise ValueError(f"Failed to create LLM for model: {llm_request.model}")
+
+    # 4. Execution
+    responses = [
+        response
+        async for response in llm.generate_content_async(llm_request=llm_request)
+    ]
+
+    # 5. Serialization
+    # Return dicts to avoid Pydantic strictness issues on rehydration
+    return responses
+
+class GoogleAdkPlugin(SimplePlugin):
     """A Temporal Worker Plugin configured for ADK.
 
     This plugin configures:
@@ -176,68 +177,31 @@ class WorkerPlugin(SimplePlugin):
     """
 
     def __init__(self):
+
+        @asynccontextmanager
+        async def run_context() -> AsyncIterator[None]:
+            setup_deterministic_runtime()
+            yield
+
+        def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
+            if not runner:
+                raise ValueError("No WorkflowRunner provided to the OpenAI plugin.")
+
+            # If in sandbox, add additional passthrough
+            if isinstance(runner, SandboxedWorkflowRunner):
+                return dataclasses.replace(
+                    runner,
+                    restrictions=runner.restrictions.with_passthrough_modules("google.adk", "google.genai"),
+                )
+            return runner
+
         super().__init__(
-            name="adk_worker_plugin",
+            name="google_adk_plugin",
             data_converter=self._configure_data_converter,
-            workflow_runner=self._configure_workflow_runner,
-            activities=[self.dynamic_activity],
-            worker_interceptors=[AdkInterceptor()],
+            activities=[invoke_model],
+            run_context=lambda: run_context(),
+            workflow_runner=workflow_runner
         )
-
-    @staticmethod
-    @activity.defn(dynamic=True)
-    async def dynamic_activity(args: Sequence[RawValue]) -> Any:
-        """Handles dynamic ADK activities (e.g. 'AgentName.generate_content')."""
-        activity_type = activity.info().activity_type
-
-        # Check if this is a generate_content call
-        if (
-            activity_type.endswith(".generate_content")
-            or activity_type == "google.adk.generate_content"
-        ):
-            return await WorkerPlugin._handle_generate_content(args)
-
-        raise ValueError(f"Unknown dynamic activity: {activity_type}")
-
-    @staticmethod
-    async def _handle_generate_content(args: List[Any]) -> list[dict[str, Any]]:
-        """Implementation of content generation."""
-        # 1. Decode Arguments
-        # Dynamic activities receive RawValue wrappers (which host the Payload).
-        # We must manually decode them using the activity's configured data converter.
-        converter = activity.payload_converter()
-
-        # We expect a single argument: LlmRequest
-        if not args:
-            raise ValueError("Missing llm_request argument for generate_content")
-
-        # Extract payloads from RawValue wrappers
-        payloads = [arg.payload for arg in args]
-
-        # Decode
-        # from_payloads returns a list of decoded objects.
-        # We specify the types we expect for each argument.
-        try:
-            decoded_args = converter.from_payloads(payloads, [LlmRequest])
-            llm_request: LlmRequest = decoded_args[0]
-        except Exception as e:
-            activity.logger.error(f"Failed to decode arguments: {e}")
-            raise ValueError(f"Argument decoding failed: {e}") from e
-
-        # 3. Model Initialization
-        llm = LLMRegistry.new_llm(llm_request.model)
-        if not llm:
-            raise ValueError(f"Failed to create LLM for model: {llm_request.model}")
-
-        # 4. Execution
-        responses = [
-            response
-            async for response in llm.generate_content_async(llm_request=llm_request)
-        ]
-
-        # 5. Serialization
-        # Return dicts to avoid Pydantic strictness issues on rehydration
-        return [r.model_dump(mode="json", by_alias=True) for r in responses]
 
     def _configure_data_converter(
         self, converter: DataConverter | None
@@ -252,10 +216,3 @@ class WorkerPlugin(SimplePlugin):
             )
         return converter
 
-    def _configure_workflow_runner(
-        self, runner: WorkflowRunner | None
-    ) -> WorkflowRunner:
-        from temporalio.worker import UnsandboxedWorkflowRunner
-
-        # TODO: Not sure implications here. is this a good default an allow user override?
-        return UnsandboxedWorkflowRunner()

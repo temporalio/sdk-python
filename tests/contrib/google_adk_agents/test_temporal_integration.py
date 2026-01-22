@@ -16,35 +16,25 @@
 
 import dataclasses
 import logging
-import os
 import uuid
 from datetime import timedelta
-from typing import AsyncGenerator
 
 import pytest
-from google.adk import Agent, Runner, runtime
+from google.adk import Agent, Runner
 from google.adk.agents import LlmAgent
 from google.adk.events import Event
-from google.adk.models import LLMRegistry, LlmRequest, LlmResponse
 from google.adk.sessions import InMemorySessionService
-from google.adk.tools import AgentTool
 from google.adk.utils.context_utils import Aclosing
 from google.genai import types
 
 from temporalio import activity, workflow
 from temporalio.client import Client
-from temporalio.contrib.google_adk_agents import AgentPlugin, WorkerPlugin
+from temporalio.contrib.google_adk_agents import AgentPlugin, GoogleAdkPlugin
 from temporalio.contrib.pydantic import (
     PydanticPayloadConverter,
-    pydantic_data_converter,
 )
-from temporalio.converter import DataConverter, DefaultPayloadConverter
-from temporalio.plugin import SimplePlugin
-from temporalio.worker import Worker, WorkflowRunner
-from temporalio.worker.workflow_sandbox import (
-    SandboxedWorkflowRunner,
-    SandboxRestrictions,
-)
+from temporalio.converter import DataConverter
+from temporalio.worker import Worker
 
 # Required Environment Variables for this test:
 # in this folder update .env.example to be .env and have the following vars:
@@ -223,7 +213,7 @@ async def test_temporal_integration():
             get_weather,
         ],
         workflows=[WeatherAgent, MultiAgentWorkflow],
-        plugins=[WorkerPlugin()],
+        plugins=[GoogleAdkPlugin()],
     ):
         print("Worker started.")
         # Test Weather Agent
