@@ -22,6 +22,7 @@ from temporalio.runtime import (
 )
 from temporalio.worker import Worker
 from tests.helpers import (
+    LogHandler,
     assert_eq_eventually,
     assert_eventually,
     find_free_port,
@@ -96,8 +97,7 @@ async def test_runtime_log_forwarding():
         )
     )
 
-    logger.addHandler(handler)
-    try:
+    with LogHandler.apply(logger, handler):
         # Set capture only info logs
         logger.setLevel(logging.INFO)
         # Write some logs
@@ -141,8 +141,6 @@ async def test_runtime_log_forwarding():
         assert log_queue_list[2].message.startswith(
             "[sdk_core::temporal_sdk_bridge::runtime] info6"
         )
-    finally:
-        logger.removeHandler(handler)
 
 
 @workflow.defn
@@ -172,8 +170,7 @@ async def test_runtime_task_fail_log_forwarding(client: Client):
         ),
     )
 
-    logger.addHandler(handler)
-    try:
+    with LogHandler.apply(logger, handler):
         # Start workflow
         task_queue = f"task-queue-{uuid.uuid4()}"
         async with Worker(client, task_queue=task_queue, workflows=[TaskFailWorkflow]):
@@ -199,8 +196,6 @@ async def test_runtime_task_fail_log_forwarding(client: Client):
             == f"{logger.name}-sdk_core::temporalio_sdk_core::worker::workflow"
         )
         assert record.temporal_log.fields["run_id"] == handle.result_run_id  # type: ignore
-    finally:
-        logger.removeHandler(handler)
 
 
 async def test_prometheus_histogram_bucket_overrides(client: Client):

@@ -122,6 +122,7 @@ from temporalio.worker import (
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import (
     LogCapturer,
+    LogHandler,
     admitted_update_task,
     assert_eq_eventually,
     assert_eventually,
@@ -8453,8 +8454,7 @@ async def test_disable_logger_sandbox(
 ):
     logger = workflow.logger.logger
     handler = CustomLogHandler()
-    logger.addHandler(handler)
-    try:
+    with LogHandler.apply(logger, handler):
         async with new_worker(
             client,
             DisableLoggerSandbox,
@@ -8485,5 +8485,3 @@ async def test_disable_logger_sandbox(
                     run_timeout=timedelta(seconds=1),
                     retry_policy=RetryPolicy(maximum_attempts=1),
                 )
-    finally:
-        logger.removeHandler(handler)

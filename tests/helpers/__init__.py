@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import (
     Any,
+    Iterator,
     TypeVar,
     cast,
 )
@@ -440,3 +441,16 @@ class LogCapturer:
             if pred(record):
                 return record
         return None
+
+
+class LogHandler:
+    @staticmethod
+    @contextmanager
+    def apply(logger: logging.Logger, handler: logging.Handler) -> Iterator[None]:
+        level = logger.level
+        logger.addHandler(handler)
+        try:
+            yield
+        finally:
+            logger.removeHandler(handler)
+            logger.level = level
