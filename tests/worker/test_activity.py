@@ -1687,7 +1687,7 @@ async def test_activity_failure_trace_identifier(
         assert handler._trace_identifiers == 1
 
     finally:
-        activity.logger.base_logger.removeHandler(CustomLogHandler())
+        activity.logger.base_logger.removeHandler(handler)
 
 
 async def test_activity_heartbeat_context(

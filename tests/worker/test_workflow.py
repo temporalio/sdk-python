@@ -8445,20 +8445,30 @@ class DisableLoggerSandbox:
 
 class CustomLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
-        import httpx  # type: ignore[reportUnusedImport]
+        import httpx  # type: ignore[reportUnusedImport] # noqa
 
 
 async def test_disable_logger_sandbox(
     client: Client,
 ):
     logger = workflow.logger.logger
-    logger.addHandler(CustomLogHandler())
-    async with new_worker(
-        client,
-        DisableLoggerSandbox,
-        activities=[],
-    ) as worker:
-        with pytest.raises(WorkflowFailureError):
+    handler = CustomLogHandler()
+    logger.addHandler(handler)
+    try:
+        async with new_worker(
+            client,
+            DisableLoggerSandbox,
+            activities=[],
+        ) as worker:
+            with pytest.raises(WorkflowFailureError):
+                await client.execute_workflow(
+                    DisableLoggerSandbox.run,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    run_timeout=timedelta(seconds=1),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                )
+            workflow.logger.unsafe_disable_sandbox()
             await client.execute_workflow(
                 DisableLoggerSandbox.run,
                 id=f"workflow-{uuid.uuid4()}",
@@ -8466,20 +8476,14 @@ async def test_disable_logger_sandbox(
                 run_timeout=timedelta(seconds=1),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
-        workflow.logger.unsafe_disable_sandbox()
-        await client.execute_workflow(
-            DisableLoggerSandbox.run,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            run_timeout=timedelta(seconds=1),
-            retry_policy=RetryPolicy(maximum_attempts=1),
-        )
-        workflow.logger.unsafe_disable_sandbox(False)
-        with pytest.raises(WorkflowFailureError):
-            await client.execute_workflow(
-                DisableLoggerSandbox.run,
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                run_timeout=timedelta(seconds=1),
-                retry_policy=RetryPolicy(maximum_attempts=1),
-            )
+            workflow.logger.unsafe_disable_sandbox(False)
+            with pytest.raises(WorkflowFailureError):
+                await client.execute_workflow(
+                    DisableLoggerSandbox.run,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    run_timeout=timedelta(seconds=1),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                )
+    finally:
+        logger.removeHandler(handler)
