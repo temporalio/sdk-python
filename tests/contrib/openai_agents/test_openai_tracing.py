@@ -241,7 +241,7 @@ class SelfTracingWorkflow:
 
 
 async def test_external_trace_to_workflow_spans(client: Client):
-    """Test: External trace → workflow spans (with worker restart)."""
+    """Test: External trace -> workflow spans (with worker restart)."""
     exporter = InMemorySpanExporter()
     workflow_id = None
     task_queue = str(uuid.uuid4())
@@ -294,7 +294,7 @@ async def test_external_trace_to_workflow_spans(client: Client):
             assert result == "done"
 
     spans = exporter.get_finished_spans()
-    print("External trace → workflow spans:")
+    print("External trace -> workflow spans:")
     print(
         "\n".join(
             [
@@ -337,7 +337,7 @@ async def test_external_trace_to_workflow_spans(client: Client):
 
 
 async def test_external_trace_and_span_to_workflow_spans(client: Client):
-    """Test: External trace + span → workflow spans (with worker restart)."""
+    """Test: External trace + span -> workflow spans (with worker restart)."""
     exporter = InMemorySpanExporter()
     workflow_id = None
     task_queue = str(uuid.uuid4())
@@ -391,7 +391,7 @@ async def test_external_trace_and_span_to_workflow_spans(client: Client):
             assert result == "done"
 
     spans = exporter.get_finished_spans()
-    print("External trace + span → workflow spans:")
+    print("External trace + span -> workflow spans:")
     print(
         "\n".join(
             [
@@ -443,7 +443,7 @@ async def test_external_trace_and_span_to_workflow_spans(client: Client):
 
 
 async def test_workflow_only_trace_to_spans(client: Client):
-    """Test: Workflow-only trace → spans (with worker restart)."""
+    """Test: Workflow-only trace -> spans (with worker restart)."""
     exporter = InMemorySpanExporter()
     workflow_id = None
     task_queue = str(uuid.uuid4())
@@ -495,7 +495,7 @@ async def test_workflow_only_trace_to_spans(client: Client):
             assert result == "done"
 
     spans = exporter.get_finished_spans()
-    print("Workflow-only trace → spans:")
+    print("Workflow-only trace -> spans:")
     print(f"Total spans: {len(spans)}")
     print(
         "\n".join(
