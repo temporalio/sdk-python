@@ -1,9 +1,11 @@
 import uuid
 from datetime import timedelta
-from typing import Any
+from typing import Any, Tuple
 
+import opentelemetry.trace
 from agents import Span, Trace, TracingProcessor, custom_span, trace
 from agents.tracing import get_trace_provider
+from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from temporalio import activity, workflow
@@ -11,6 +13,7 @@ from temporalio.client import Client
 from temporalio.contrib.openai_agents.testing import (
     AgentEnvironment,
 )
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner, SandboxRestrictions
 from tests.contrib.openai_agents.test_openai import (
     ResearchWorkflow,
     research_mock_model,
@@ -239,6 +242,22 @@ class SelfTracingWorkflow:
     def proceed(self) -> None:
         self._proceed = True
 
+def print_otel_spans(spans: Tuple[ReadableSpan]):
+    print(
+        "\n".join(
+            [
+                str(
+                    {
+                        "Name": span.name,
+                        "Id": span.context.span_id if span.context else None,
+                        "Parent": span.parent.span_id if span.parent else None,
+                    }
+                )
+                for span in spans
+            ]
+        )
+    )
+
 
 async def test_external_trace_to_workflow_spans(client: Client):
     """Test: External trace -> workflow spans (with worker restart)."""
@@ -294,21 +313,8 @@ async def test_external_trace_to_workflow_spans(client: Client):
             assert result == "done"
 
     spans = exporter.get_finished_spans()
-    print("External trace -> workflow spans:")
-    print(
-        "\n".join(
-            [
-                str(
-                    {
-                        "Name": span.name,
-                        "Id": span.context.span_id if span.context else None,
-                        "Parent": span.parent.span_id if span.parent else None,
-                    }
-                )
-                for span in spans
-            ]
-        )
-    )
+    print("External trace to workflow spans:")
+    print_otel_spans(spans)
 
     assert len(spans) >= 2  # External trace + workflow span
 
@@ -391,21 +397,8 @@ async def test_external_trace_and_span_to_workflow_spans(client: Client):
             assert result == "done"
 
     spans = exporter.get_finished_spans()
-    print("External trace + span -> workflow spans:")
-    print(
-        "\n".join(
-            [
-                str(
-                    {
-                        "Name": span.name,
-                        "Id": span.context.span_id if span.context else None,
-                        "Parent": span.parent.span_id if span.parent else None,
-                    }
-                )
-                for span in spans
-            ]
-        )
-    )
+    print("External trace + span to workflow spans:")
+    print_otel_spans(spans)
 
     assert len(spans) >= 3  # External trace + external span + workflow span
 
@@ -495,22 +488,9 @@ async def test_workflow_only_trace_to_spans(client: Client):
             assert result == "done"
 
     spans = exporter.get_finished_spans()
-    print("Workflow-only trace -> spans:")
+    print("Workflow-only trace to spans:")
     print(f"Total spans: {len(spans)}")
-    print(
-        "\n".join(
-            [
-                str(
-                    {
-                        "Name": span.name,
-                        "Id": span.context.span_id if span.context else None,
-                        "Parent": span.parent.span_id if span.parent else None,
-                    }
-                )
-                for span in spans
-            ]
-        )
-    )
+    print_otel_spans(spans)
 
     # Debug: print all span names
     print("Span names:", [span.name for span in spans])
@@ -614,20 +594,7 @@ async def test_otel_tracing_in_runner(client: Client):
 
     spans = exporter.get_finished_spans()
     print("OTEL tracing in runner spans:")
-    print(
-        "\n".join(
-            [
-                str(
-                    {
-                        "Name": span.name,
-                        "Id": span.context.span_id if span.context else None,
-                        "Parent": span.parent.span_id if span.parent else None,
-                    }
-                )
-                for span in spans
-            ]
-        )
-    )
+    print_otel_spans(spans)
 
     # Verify basic span capture
     assert len(spans) > 0, "Should have captured some spans from the research workflow"
@@ -725,3 +692,133 @@ async def test_otel_tracing_in_runner(client: Client):
         assert (
             writer_span.parent.span_id == research_span.context.span_id
         ), "Expected 'WriterAgent' to be child of 'Research manager' span"
+
+
+@workflow.defn
+class OtelSpanWorkflow:
+    def __init__(self) -> None:
+        self._proceed = False
+        self._ready = False
+
+    @workflow.run
+    async def run(self):
+        # Start an SDK custom_span first to establish OTEL context
+        with custom_span("Workflow SDK span"):
+            # Workflow starts OTEL span directly using opentelemetry.trace
+            tracer = opentelemetry.trace.get_tracer(__name__)
+            with tracer.start_as_current_span("Direct OTEL span"):
+                await workflow.execute_activity(
+                    simple_no_context_activity,
+                    start_to_close_timeout=timedelta(seconds=10),
+                )
+                self._ready = True
+                await workflow.wait_condition(lambda: self._proceed)
+        return "done"
+
+    @workflow.query
+    def ready(self) -> bool:
+        return self._ready
+
+    @workflow.signal
+    def proceed(self) -> None:
+        self._proceed = True
+
+
+async def test_sdk_trace_to_otel_span_parenting(client: Client):
+    """Test that OTEL spans started in workflow are properly parented to client SDK trace."""
+    exporter = InMemorySpanExporter()
+    workflow_id = None
+    task_queue = str(uuid.uuid4())
+
+    # First worker: Start workflow with client SDK trace context
+    async with AgentEnvironment(
+        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
+    ) as env:
+        new_client = env.applied_on_client(client)
+
+        async with new_worker(
+            new_client,
+            OtelSpanWorkflow,
+            activities=[simple_no_context_activity],
+            max_cached_workflows=0,
+            task_queue=task_queue,
+        ) as worker:
+            # Start SDK trace in client, then start workflow within that trace
+            with trace("Client SDK trace"):
+                workflow_handle = await new_client.start_workflow(
+                    OtelSpanWorkflow.run,
+                    id=f"sdk-trace-otel-span-workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    execution_timeout=timedelta(seconds=120),
+                )
+                workflow_id = workflow_handle.id
+
+                # Wait for workflow to be ready
+                async def ready() -> bool:
+                    return await workflow_handle.query(OtelSpanWorkflow.ready)
+
+                await assert_eq_eventually(True, ready)
+
+    # Second worker: Complete the workflow with fresh objects (new instrumentation)
+    async with AgentEnvironment(
+        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
+    ) as env:
+        new_client = env.applied_on_client(client)
+
+        async with new_worker(
+            new_client,
+            OtelSpanWorkflow,
+            activities=[simple_no_context_activity],
+            max_cached_workflows=0,
+            task_queue=task_queue,
+            workflow_runner=SandboxedWorkflowRunner(SandboxRestrictions.default.with_passthrough_modules("opentelemetry"))
+        ) as worker:
+            workflow_handle = new_client.get_workflow_handle(workflow_id)
+            await workflow_handle.signal(OtelSpanWorkflow.proceed)
+            result = await workflow_handle.result()
+            assert result == "done"
+
+    spans = exporter.get_finished_spans()
+    print("SDK trace to OTEL span parenting:")
+    print_otel_spans(spans)
+
+    assert len(spans) >= 3  # Client SDK trace + Workflow SDK span + Direct OTEL span
+
+    # Find the spans
+    client_sdk_trace_span = next((s for s in spans if s.name == "Client SDK trace"), None)
+    workflow_sdk_span = next((s for s in spans if s.name == "Workflow SDK span"), None)
+    direct_otel_span = next((s for s in spans if s.name == "Direct OTEL span"), None)
+
+    assert client_sdk_trace_span is not None, "Client SDK trace span should exist"
+    assert workflow_sdk_span is not None, "Workflow SDK span should exist"
+    assert direct_otel_span is not None, "Direct OTEL span should exist"
+
+    # Verify parenting chain: Client SDK trace -> Workflow SDK span -> Direct OTEL span
+    assert (
+        client_sdk_trace_span.parent is None
+    ), "Client SDK trace should have no parent (be root)"
+    
+    assert workflow_sdk_span.parent is not None, "Workflow SDK span should have a parent"
+    assert client_sdk_trace_span.context is not None, "Client SDK trace span should have context"
+    assert (
+        workflow_sdk_span.parent.span_id == client_sdk_trace_span.context.span_id
+    ), "Workflow SDK span should be child of Client SDK trace"
+
+    assert direct_otel_span.parent is not None, "Direct OTEL span should have a parent"
+    assert workflow_sdk_span.context is not None, "Workflow SDK span should have context"
+    assert (
+        direct_otel_span.parent.span_id == workflow_sdk_span.context.span_id
+    ), "Direct OTEL span should be child of Workflow SDK span"
+
+    # Verify all spans belong to the same trace
+    assert workflow_sdk_span.context is not None, "Workflow SDK span should have context"
+    assert direct_otel_span.context is not None, "Direct OTEL span should have context"
+    assert (
+        client_sdk_trace_span.context.trace_id == workflow_sdk_span.context.trace_id == direct_otel_span.context.trace_id
+    ), "All spans should belong to the same trace"
+
+    # Verify all spans have unique IDs
+    span_ids = [span.context.span_id for span in spans if span.context]
+    assert len(span_ids) == len(
+        set(span_ids)
+    ), f"All spans should have unique IDs, got: {span_ids}"

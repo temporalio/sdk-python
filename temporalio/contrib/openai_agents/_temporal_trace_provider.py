@@ -14,8 +14,6 @@ from agents.tracing.provider import (
     SynchronousMultiTracingProcessor,
 )
 from agents.tracing.spans import Span
-from opentelemetry.sdk.trace.id_generator import IdGenerator
-from opentelemetry.trace import INVALID_SPAN_ID, INVALID_TRACE_ID
 
 from temporalio import workflow
 from temporalio.workflow import ReadOnlyContextError
@@ -83,13 +81,11 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
     def __init__(
         self,
         impl: SynchronousMultiTracingProcessor,
-        auto_close_in_workflows: bool,
         start_spans_in_replay: bool,
     ):
         super().__init__()
         self._impl = impl
-        self._auto_close_in_workflows = auto_close_in_workflows
-        self._start_spans_in_replay = start_spans_in_replay
+        self._emit_spans_in_replay = start_spans_in_replay
 
     def add_tracing_processor(self, tracing_processor: TracingProcessor):
         self._impl.add_tracing_processor(tracing_processor)
@@ -98,39 +94,33 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
         self._impl.set_processors(processors)
 
     def on_trace_start(self, trace: Trace) -> None:
-        if not self._start_spans_in_replay:
+        if not self._emit_spans_in_replay:
             if workflow.in_workflow() and workflow.unsafe.is_replaying():
                 # In replay mode, don't report
                 return
 
         self._impl.on_trace_start(trace)
-        if self._auto_close_in_workflows and workflow.in_workflow():
-            self._impl.on_trace_end(trace)
 
     def on_trace_end(self, trace: Trace) -> None:
-        if workflow.in_workflow() and workflow.unsafe.is_replaying():
-            # In replay mode, don't report
-            return
-        if self._auto_close_in_workflows and workflow.in_workflow():
-            return
+        if not self._emit_spans_in_replay:
+            if workflow.in_workflow() and workflow.unsafe.is_replaying():
+                # In replay mode, don't report
+                return
 
         self._impl.on_trace_end(trace)
 
     def on_span_start(self, span: Span[Any]) -> None:
-        if not self._start_spans_in_replay:
+        if not self._emit_spans_in_replay:
             if workflow.in_workflow() and workflow.unsafe.is_replaying():
                 # In replay mode, don't report
                 return
         self._impl.on_span_start(span)
-        if self._auto_close_in_workflows and workflow.in_workflow():
-            self._impl.on_span_end(span)
 
     def on_span_end(self, span: Span[Any]) -> None:
-        if workflow.in_workflow() and workflow.unsafe.is_replaying():
-            # In replay mode, don't report
-            return
-        if self._auto_close_in_workflows and workflow.in_workflow():
-            return
+        if not self._emit_spans_in_replay:
+            if workflow.in_workflow() and workflow.unsafe.is_replaying():
+                # In replay mode, don't report
+                return
 
         self._impl.on_span_end(span)
 
@@ -164,79 +154,17 @@ def _workflow_uuid() -> str:
     return random.uuid4()
 
 
-class TemporalIdGenerator(IdGenerator):
-    """OpenTelemetry ID generator that provides deterministic IDs for Temporal workflows.
-
-    This generator ensures that span and trace IDs are deterministic when running
-    within Temporal workflows by using the workflow's deterministic random source.
-    This is crucial for maintaining consistency across workflow replays.
-    """
-
-    def __init__(self):
-        """Initialize the ID generator with empty trace and span pools."""
-        self.traces = []
-        self.spans = []
-
-    def generate_span_id(self) -> int:
-        """Generate a deterministic span ID.
-
-        Uses the workflow's deterministic random source when in a workflow context,
-        otherwise falls back to system random.
-
-        Returns:
-            A 64-bit span ID that is guaranteed not to be INVALID_SPAN_ID.
-        """
-        if workflow.in_workflow():
-            get_rand_bits = workflow.random().getrandbits
-        else:
-            import random
-
-            get_rand_bits = random.getrandbits
-
-        if len(self.spans) > 0:
-            return self.spans.pop()
-
-        span_id = get_rand_bits(64)
-        while span_id == INVALID_SPAN_ID:
-            span_id = get_rand_bits(64)
-        return span_id
-
-    def generate_trace_id(self) -> int:
-        """Generate a deterministic trace ID.
-
-        Uses the workflow's deterministic random source when in a workflow context,
-        otherwise falls back to system random.
-
-        Returns:
-            A 128-bit trace ID that is guaranteed not to be INVALID_TRACE_ID.
-        """
-        if workflow.in_workflow():
-            get_rand_bits = workflow.random().getrandbits
-        else:
-            import random
-
-            get_rand_bits = random.getrandbits
-        if len(self.traces) > 0:
-            return self.traces.pop()
-
-        trace_id = get_rand_bits(128)
-        while trace_id == INVALID_TRACE_ID:
-            trace_id = get_rand_bits(128)
-        return trace_id
-
-
 class TemporalTraceProvider(DefaultTraceProvider):
     """A trace provider that integrates with Temporal workflows."""
 
     def __init__(
-        self, auto_close_in_workflows: bool = False, start_spans_in_replay: bool = False
+        self, start_spans_in_replay: bool = False
     ):
         """Initialize the TemporalTraceProvider."""
         super().__init__()
         self._original_provider = cast(DefaultTraceProvider, get_trace_provider())
         self._multi_processor = _TemporalTracingProcessor(
             self._original_provider._multi_processor,
-            auto_close_in_workflows,
             start_spans_in_replay,
         )
 

@@ -345,7 +345,6 @@ class _ContextPropagationWorkflowInboundInterceptor(
     async def execute_workflow(
         self, input: temporalio.worker.ExecuteWorkflowInput
     ) -> Any:
-        print("Executing workflow")
         _ensure_tracing_random()
         with context_from_header(
             input, temporalio.workflow.payload_converter(), start_trace=self.start_trace
@@ -361,7 +360,6 @@ class _ContextPropagationWorkflowInboundInterceptor(
 
     async def handle_query(self, input: temporalio.worker.HandleQueryInput) -> Any:
         _ensure_tracing_random()
-        # with context_from_header(input, temporalio.workflow.payload_converter()):
         with temporal_span(self.add_temporal_spans, "temporal:handleQuery"):
             return await self.next.handle_query(input)
 

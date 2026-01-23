@@ -47,7 +47,6 @@ if typing.TYPE_CHECKING:
 @contextmanager
 def set_open_ai_agent_temporal_overrides(
     model_params: ModelActivityParameters,
-    auto_close_tracing_in_workflows: bool = False,
     start_spans_in_replay: bool = False,
 ):
     """Configure Temporal-specific overrides for OpenAI agents.
@@ -68,7 +67,6 @@ def set_open_ai_agent_temporal_overrides(
 
     Args:
         model_params: Configuration parameters for Temporal activity execution of model calls.
-        auto_close_tracing_in_workflows: If set to true, close tracing spans immediately.
         start_spans_in_replay: If set to true, start spans even during replay. Primarily used for otel integration.
 
     Returns:
@@ -77,7 +75,6 @@ def set_open_ai_agent_temporal_overrides(
     previous_runner = get_default_agent_runner()
     previous_trace_provider = get_trace_provider()
     provider = TemporalTraceProvider(
-        auto_close_in_workflows=auto_close_tracing_in_workflows,
         start_spans_in_replay=start_spans_in_replay,
     )
 
@@ -255,7 +252,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
             if isinstance(runner, SandboxedWorkflowRunner):
                 return dataclasses.replace(
                     runner,
-                    restrictions=runner.restrictions.with_passthrough_modules("mcp"),
+                    restrictions=runner.restrictions.with_passthrough_modules("openai", "agents", "mcp"),
                 )
             return runner
 
@@ -263,19 +260,24 @@ class OpenAIAgentsPlugin(SimplePlugin):
         async def run_context() -> AsyncIterator[None]:
             # Set up OTEL instrumentation if exporters are provided
             otel_instrumentor = None
+            old_provider = None
             if self._otel_exporters is not None:
                 from openinference.instrumentation.openai_agents import (
                     OpenAIAgentsInstrumentor,
                 )
                 from opentelemetry.sdk import trace as trace_sdk
 
-                from temporalio.contrib.openai_agents._otel import TemporalSpanProcessor
-                from temporalio.contrib.openai_agents._temporal_trace_provider import (
+                from temporalio.contrib.openai_agents._otel import (
                     TemporalIdGenerator,
+                    TemporalSpanProcessor,
                 )
 
                 # Create trace provider with deterministic ID generation
                 provider = trace_sdk.TracerProvider(id_generator=TemporalIdGenerator())
+
+                # Switch the current tracer provider
+                old_provider = trace_sdk.trace_api.get_tracer_provider()
+                trace_sdk.trace_api.set_tracer_provider(provider)
 
                 # Add all exporters with TemporalSpanProcessor wrapper
                 for exporter in self._otel_exporters:
@@ -295,6 +297,9 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 # Clean up OTEL instrumentation
                 if otel_instrumentor is not None:
                     otel_instrumentor.uninstrument()
+                if old_provider is not None:
+                    from opentelemetry.sdk import trace as trace_sdk
+                    trace_sdk.trace_api.set_tracer_provider(old_provider)
 
         interceptor = OpenAIAgentsContextPropagationInterceptor(
             add_temporal_spans=add_temporal_spans,

@@ -637,6 +637,97 @@ If you provide OTEL exporters but the required dependencies are not installed, y
 ImportError: OTEL dependencies not available. Install with: pip install openinference-instrumentation-openai-agents opentelemetry-sdk
 ```
 
+### Direct OpenTelemetry API Calls in Workflows
+
+When using direct OpenTelemetry API calls within workflows (e.g., `opentelemetry.trace.get_tracer(__name__).start_as_current_span()`), you need to ensure proper context bridging and sandbox configuration.
+
+#### Sandbox Configuration
+
+Workflows run in a sandbox that restricts module access. To use direct OTEL API calls, you must explicitly allow OpenTelemetry passthrough:
+
+```python
+from temporalio.worker import Worker
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner, SandboxRestrictions
+
+# Configure worker with OpenTelemetry passthrough
+worker = Worker(
+    client,
+    task_queue="my-task-queue",
+    workflows=[MyWorkflow],
+    workflow_runner=SandboxedWorkflowRunner(
+        SandboxRestrictions.default.with_passthrough_modules("opentelemetry")
+    )
+)
+```
+
+#### Context Bridging Pattern
+
+Direct OTEL spans must be created within an active OpenAI Agents SDK span to ensure proper parenting:
+
+```python
+import opentelemetry.trace
+from agents import custom_span
+from temporalio import workflow
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        # Start an SDK span first to establish OTEL context bridge
+        with custom_span("Workflow coordination"):
+            # Now direct OTEL spans will be properly parented
+            tracer = opentelemetry.trace.get_tracer(__name__)
+            with tracer.start_as_current_span("Custom workflow span"):
+                # Your workflow logic here
+                result = await self.do_work()
+                return result
+```
+
+#### Why This Pattern is Required
+
+- **OpenInference instrumentation** bridges OpenAI Agents SDK spans to OpenTelemetry context
+- **Direct OTEL API calls** without an active SDK span become root spans with no parent
+- **SDK spans** (`custom_span()`) establish the context bridge that allows subsequent direct OTEL spans to inherit proper trace parenting
+
+#### Complete Example
+
+```python
+import opentelemetry.trace
+from agents import custom_span
+from temporalio import workflow
+from temporalio.worker import Worker
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner, SandboxRestrictions
+
+@workflow.defn
+class TracedWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        # Establish OTEL context with SDK span
+        with custom_span("Main workflow"):
+            # Create direct OTEL spans for fine-grained tracing
+            tracer = opentelemetry.trace.get_tracer(__name__)
+            
+            with tracer.start_as_current_span("Data processing"):
+                data = await self.process_data()
+                
+            with tracer.start_as_current_span("Business logic"):
+                result = await self.execute_business_logic(data)
+                
+            return result
+
+# Worker configuration
+worker = Worker(
+    client,
+    task_queue="traced-workflows",
+    workflows=[TracedWorkflow],
+    workflow_runner=SandboxedWorkflowRunner(
+        SandboxRestrictions.default.with_passthrough_modules("opentelemetry")
+    )
+)
+```
+
+This ensures your direct OTEL spans are properly parented within the trace hierarchy initiated by your client SDK traces.
+
 If no OTEL exporters are provided, the integration works normally without any OTEL setup.
 
 ### Voice
