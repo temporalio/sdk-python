@@ -13,6 +13,7 @@ from agents import (
     TContext,
     TResponseInputItem,
 )
+from agents.extensions.models.litellm_model import LitellmModel
 from agents.run import DEFAULT_AGENT_RUNNER, DEFAULT_MAX_TURNS, AgentRunner
 
 from temporalio import workflow
@@ -200,9 +201,13 @@ class TemporalOpenAIRunner(AgentRunner):
 
 
 def _model_name(agent: Agent[Any]) -> str | None:
-    name = agent.model
-    if name is not None and not isinstance(name, str):
-        raise ValueError(
-            "Temporal workflows require a model name to be a string in the agent."
-        )
-    return name
+    model = agent.model
+    if model is None or isinstance(model, str):
+        return model
+
+    if isinstance(model, LitellmModel):
+        return model.model
+
+    raise ValueError(
+        "Temporal workflows require a model name to be a string or a LitellmModel in the agent."
+    )
