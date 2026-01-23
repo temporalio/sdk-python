@@ -317,6 +317,16 @@ async def test_search_attributes_on_dev_server(
         assert attrs == desc.typed_search_attributes
 
 
+async def test_ui_port():
+    """Test that ui_port parameter works correctly."""
+    async with await WorkflowEnvironment.start_local(
+        ui=True,
+        ui_port=18080,
+    ) as env:
+        # Just verify it starts without error
+        assert env.client is not None
+
+
 def assert_timestamp_from_now(
     ts: datetime | float, expected_from_now: float, max_delta: float = 30
 ) -> None:
