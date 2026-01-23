@@ -1,6 +1,6 @@
 import uuid
 from datetime import timedelta
-from typing import Any, Tuple
+from typing import Any
 
 import opentelemetry.trace
 from agents import Span, Trace, TracingProcessor, custom_span, trace
@@ -13,7 +13,10 @@ from temporalio.client import Client
 from temporalio.contrib.openai_agents.testing import (
     AgentEnvironment,
 )
-from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner, SandboxRestrictions
+from temporalio.worker.workflow_sandbox import (
+    SandboxedWorkflowRunner,
+    SandboxRestrictions,
+)
 from tests.contrib.openai_agents.test_openai import (
     ResearchWorkflow,
     research_mock_model,
@@ -242,7 +245,8 @@ class SelfTracingWorkflow:
     def proceed(self) -> None:
         self._proceed = True
 
-def print_otel_spans(spans: Tuple[ReadableSpan]):
+
+def print_otel_spans(spans: tuple[ReadableSpan, ...]):
     print(
         "\n".join(
             [
@@ -771,7 +775,9 @@ async def test_sdk_trace_to_otel_span_parenting(client: Client):
             activities=[simple_no_context_activity],
             max_cached_workflows=0,
             task_queue=task_queue,
-            workflow_runner=SandboxedWorkflowRunner(SandboxRestrictions.default.with_passthrough_modules("opentelemetry"))
+            workflow_runner=SandboxedWorkflowRunner(
+                SandboxRestrictions.default.with_passthrough_modules("opentelemetry")
+            ),
         ) as worker:
             workflow_handle = new_client.get_workflow_handle(workflow_id)
             await workflow_handle.signal(OtelSpanWorkflow.proceed)
@@ -785,7 +791,9 @@ async def test_sdk_trace_to_otel_span_parenting(client: Client):
     assert len(spans) >= 3  # Client SDK trace + Workflow SDK span + Direct OTEL span
 
     # Find the spans
-    client_sdk_trace_span = next((s for s in spans if s.name == "Client SDK trace"), None)
+    client_sdk_trace_span = next(
+        (s for s in spans if s.name == "Client SDK trace"), None
+    )
     workflow_sdk_span = next((s for s in spans if s.name == "Workflow SDK span"), None)
     direct_otel_span = next((s for s in spans if s.name == "Direct OTEL span"), None)
 
@@ -797,24 +805,34 @@ async def test_sdk_trace_to_otel_span_parenting(client: Client):
     assert (
         client_sdk_trace_span.parent is None
     ), "Client SDK trace should have no parent (be root)"
-    
-    assert workflow_sdk_span.parent is not None, "Workflow SDK span should have a parent"
-    assert client_sdk_trace_span.context is not None, "Client SDK trace span should have context"
+
+    assert (
+        workflow_sdk_span.parent is not None
+    ), "Workflow SDK span should have a parent"
+    assert (
+        client_sdk_trace_span.context is not None
+    ), "Client SDK trace span should have context"
     assert (
         workflow_sdk_span.parent.span_id == client_sdk_trace_span.context.span_id
     ), "Workflow SDK span should be child of Client SDK trace"
 
     assert direct_otel_span.parent is not None, "Direct OTEL span should have a parent"
-    assert workflow_sdk_span.context is not None, "Workflow SDK span should have context"
+    assert (
+        workflow_sdk_span.context is not None
+    ), "Workflow SDK span should have context"
     assert (
         direct_otel_span.parent.span_id == workflow_sdk_span.context.span_id
     ), "Direct OTEL span should be child of Workflow SDK span"
 
     # Verify all spans belong to the same trace
-    assert workflow_sdk_span.context is not None, "Workflow SDK span should have context"
+    assert (
+        workflow_sdk_span.context is not None
+    ), "Workflow SDK span should have context"
     assert direct_otel_span.context is not None, "Direct OTEL span should have context"
     assert (
-        client_sdk_trace_span.context.trace_id == workflow_sdk_span.context.trace_id == direct_otel_span.context.trace_id
+        client_sdk_trace_span.context.trace_id
+        == workflow_sdk_span.context.trace_id
+        == direct_otel_span.context.trace_id
     ), "All spans should belong to the same trace"
 
     # Verify all spans have unique IDs

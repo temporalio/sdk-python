@@ -252,7 +252,9 @@ class OpenAIAgentsPlugin(SimplePlugin):
             if isinstance(runner, SandboxedWorkflowRunner):
                 return dataclasses.replace(
                     runner,
-                    restrictions=runner.restrictions.with_passthrough_modules("openai", "agents", "mcp"),
+                    restrictions=runner.restrictions.with_passthrough_modules(
+                        "openai", "agents", "mcp"
+                    ),
                 )
             return runner
 
@@ -265,6 +267,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 from openinference.instrumentation.openai_agents import (
                     OpenAIAgentsInstrumentor,
                 )
+                from opentelemetry import trace
                 from opentelemetry.sdk import trace as trace_sdk
 
                 from temporalio.contrib.openai_agents._otel import (
@@ -276,8 +279,8 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 provider = trace_sdk.TracerProvider(id_generator=TemporalIdGenerator())
 
                 # Switch the current tracer provider
-                old_provider = trace_sdk.trace_api.get_tracer_provider()
-                trace_sdk.trace_api.set_tracer_provider(provider)
+                old_provider = trace.get_tracer_provider()
+                trace.set_tracer_provider(provider)
 
                 # Add all exporters with TemporalSpanProcessor wrapper
                 for exporter in self._otel_exporters:
@@ -298,8 +301,9 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 if otel_instrumentor is not None:
                     otel_instrumentor.uninstrument()
                 if old_provider is not None:
-                    from opentelemetry.sdk import trace as trace_sdk
-                    trace_sdk.trace_api.set_tracer_provider(old_provider)
+                    from opentelemetry import trace
+
+                    trace.set_tracer_provider(old_provider)
 
         interceptor = OpenAIAgentsContextPropagationInterceptor(
             add_temporal_spans=add_temporal_spans,

@@ -5,8 +5,9 @@ to OpenTelemetry endpoints from within Temporal workflows, handling workflow
 replay semantics correctly.
 """
 
-from opentelemetry.sdk.trace import ReadableSpan, IdGenerator
+from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.id_generator import IdGenerator
 from opentelemetry.trace import INVALID_SPAN_ID, INVALID_TRACE_ID
 
 from temporalio import workflow

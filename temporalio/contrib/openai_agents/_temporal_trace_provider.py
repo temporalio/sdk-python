@@ -157,9 +157,7 @@ def _workflow_uuid() -> str:
 class TemporalTraceProvider(DefaultTraceProvider):
     """A trace provider that integrates with Temporal workflows."""
 
-    def __init__(
-        self, start_spans_in_replay: bool = False
-    ):
+    def __init__(self, start_spans_in_replay: bool = False):
         """Initialize the TemporalTraceProvider."""
         super().__init__()
         self._original_provider = cast(DefaultTraceProvider, get_trace_provider())
