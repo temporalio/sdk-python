@@ -730,6 +730,14 @@ class OtelSpanWorkflow:
 
 async def test_sdk_trace_to_otel_span_parenting(client: Client):
     """Test that OTEL spans started in workflow are properly parented to client SDK trace."""
+    # Reset OpenTelemetry global state to avoid conflicts with previous tests
+    import opentelemetry.trace
+    from opentelemetry.util._once import Once
+
+    # Clear the global TracerProvider state
+    opentelemetry.trace._TRACER_PROVIDER = None
+    opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
+
     exporter = InMemorySpanExporter()
     workflow_id = None
     task_queue = str(uuid.uuid4())
@@ -746,6 +754,9 @@ async def test_sdk_trace_to_otel_span_parenting(client: Client):
             activities=[simple_no_context_activity],
             max_cached_workflows=0,
             task_queue=task_queue,
+            workflow_runner=SandboxedWorkflowRunner(
+                SandboxRestrictions.default.with_passthrough_modules("opentelemetry")
+            ),
         ) as worker:
             # Start SDK trace in client, then start workflow within that trace
             with trace("Client SDK trace"):
