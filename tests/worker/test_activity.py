@@ -46,6 +46,7 @@ from temporalio.worker import (
     Worker,
     WorkerConfig,
 )
+from tests.helpers import LogHandler
 from tests.helpers.worker import (
     ExternalWorker,
     KSAction,
@@ -1019,10 +1020,8 @@ async def test_activity_logging(
 
     # Create a queue, add handler to logger, call normal activity, then check
     handler = logging.handlers.QueueHandler(queue.Queue())
-    activity.logger.base_logger.addHandler(handler)
-    prev_level = activity.logger.base_logger.level
-    activity.logger.base_logger.setLevel(logging.INFO)
-    try:
+    with LogHandler.apply(activity.logger.base_logger, handler):
+        activity.logger.base_logger.setLevel(logging.INFO)
         result = await _execute_workflow_with_activity(
             client,
             worker,
@@ -1030,9 +1029,6 @@ async def test_activity_logging(
             "Temporal",
             shared_state_manager=shared_state_manager,
         )
-    finally:
-        activity.logger.base_logger.removeHandler(handler)
-        activity.logger.base_logger.setLevel(prev_level)
     assert result.result == "Hello, Temporal!"
     records: list[logging.LogRecord] = list(handler.queue.queue)  # type: ignore
     assert len(records) > 0
@@ -1671,9 +1667,8 @@ async def test_activity_failure_trace_identifier(
         raise RuntimeError("oh no!")
 
     handler = CustomLogHandler()
-    activity.logger.base_logger.addHandler(handler)
 
-    try:
+    with LogHandler.apply(activity.logger.base_logger, handler):
         with pytest.raises(WorkflowFailureError) as err:
             await _execute_workflow_with_activity(
                 client,
@@ -1685,9 +1680,6 @@ async def test_activity_failure_trace_identifier(
             str(assert_activity_application_error(err.value)) == "RuntimeError: oh no!"
         )
         assert handler._trace_identifiers == 1
-
-    finally:
-        activity.logger.base_logger.removeHandler(CustomLogHandler())
 
 
 async def test_activity_heartbeat_context(

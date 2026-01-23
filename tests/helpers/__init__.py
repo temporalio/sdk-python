@@ -5,7 +5,7 @@ import queue
 import socket
 import time
 import uuid
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Iterator, Sequence
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -440,3 +440,16 @@ class LogCapturer:
             if pred(record):
                 return record
         return None
+
+
+class LogHandler:
+    @staticmethod
+    @contextmanager
+    def apply(logger: logging.Logger, handler: logging.Handler) -> Iterator[None]:
+        level = logger.level
+        logger.addHandler(handler)
+        try:
+            yield
+        finally:
+            logger.removeHandler(handler)
+            logger.level = level
