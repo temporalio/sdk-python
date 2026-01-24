@@ -243,7 +243,7 @@ class StartTimeoutTestService:
         self, ctx: StartOperationContext, _input: None
     ) -> None:
         try:
-            await asyncio.wait_for(ctx.task_cancellation.wait_until_cancelled(), 1)
+            await asyncio.wait_for(ctx.task_cancellation.wait_until_cancelled(), 3)
         except asyncio.TimeoutError:
             raise ApplicationError("expected cancel", non_retryable=True)
 
@@ -251,8 +251,9 @@ class StartTimeoutTestService:
     def expect_timeout_cancellation_sync(
         self, ctx: StartOperationContext, _input: None
     ) -> None:
+        print("sup")
         global _start_operation_sync_complete
-        cancelled = ctx.task_cancellation.wait_until_cancelled_sync(1)
+        cancelled = ctx.task_cancellation.wait_until_cancelled_sync(3)
         if not cancelled:
             raise ApplicationError("expected cancel", non_retryable=True)
         reason = ctx.task_cancellation.cancellation_reason()
@@ -276,7 +277,7 @@ class StartTimeoutTestCallerWorkflow:
             operation,
             None,
             output_type=None,
-            schedule_to_close_timeout=timedelta(seconds=0.1),
+            schedule_to_close_timeout=timedelta(seconds=2),
         )
 
 

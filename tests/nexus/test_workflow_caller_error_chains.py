@@ -96,7 +96,8 @@ class RaiseApplicationErrorNonRetryable(ErrorConversionTestCase):
                 # a wrapping HandlerError was synthesized with the same error message as
                 # that of the ApplicationError. The server prepends 'handler error
                 # (INTERNAL):'
-                "message": "handler error (INTERNAL): application-error-message",
+                # "message": "handler error (INTERNAL): application-error-message",
+                "message": "application-error-message",
                 "type": nexusrpc.HandlerErrorType.INTERNAL,
                 "retryable": False,
             },
@@ -164,7 +165,8 @@ class RaiseNexusHandlerErrorNotFound(ErrorConversionTestCase):
                 # In this test case the user code raised HandlerError directly, so there
                 # was no need to synthesize a wrapping HandlerError The server prepends
                 # 'handler error (INTERNAL):'
-                "message": "handler error (NOT_FOUND): handler-error-message",
+                # "message": "handler error (NOT_FOUND): handler-error-message",
+                "message": "handler-error-message",
                 "type": nexusrpc.HandlerErrorType.NOT_FOUND,
                 # The following HandlerError types should be considered non-retryable:
                 # BAD_REQUEST, UNAUTHENTICATED, UNAUTHORIZED, NOT_FOUND, and

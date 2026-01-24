@@ -298,7 +298,10 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                     completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
                         task_token=task_token,
                     )
-                    await self._data_converter.encode_failure(err, completion.failure)
+                    handler_error = _exception_to_handler_error(err)
+                    await self._data_converter.encode_failure(
+                        handler_error, completion.failure
+                    )
                 else:
                     handler_error = _exception_to_handler_error(err)
                     completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
