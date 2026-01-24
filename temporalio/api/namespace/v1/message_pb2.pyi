@@ -54,6 +54,7 @@ class NamespaceInfo(google.protobuf.message.Message):
         WORKER_HEARTBEATS_FIELD_NUMBER: builtins.int
         REPORTED_PROBLEMS_SEARCH_ATTRIBUTE_FIELD_NUMBER: builtins.int
         WORKFLOW_PAUSE_FIELD_NUMBER: builtins.int
+        STANDALONE_ACTIVITIES_FIELD_NUMBER: builtins.int
         eager_workflow_start: builtins.bool
         """True if the namespace supports eager workflow start."""
         sync_update: builtins.bool
@@ -66,6 +67,8 @@ class NamespaceInfo(google.protobuf.message.Message):
         """True if the namespace supports reported problems search attribute"""
         workflow_pause: builtins.bool
         """True if the namespace supports pausing workflows"""
+        standalone_activities: builtins.bool
+        """True if the namespace supports standalone activities"""
         def __init__(
             self,
             *,
@@ -75,6 +78,7 @@ class NamespaceInfo(google.protobuf.message.Message):
             worker_heartbeats: builtins.bool = ...,
             reported_problems_search_attribute: builtins.bool = ...,
             workflow_pause: builtins.bool = ...,
+            standalone_activities: builtins.bool = ...,
         ) -> None: ...
         def ClearField(
             self,
@@ -85,6 +89,8 @@ class NamespaceInfo(google.protobuf.message.Message):
                 b"eager_workflow_start",
                 "reported_problems_search_attribute",
                 b"reported_problems_search_attribute",
+                "standalone_activities",
+                b"standalone_activities",
                 "sync_update",
                 b"sync_update",
                 "worker_heartbeats",
