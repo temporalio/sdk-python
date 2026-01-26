@@ -319,7 +319,7 @@ class RaiseNexusOperationErrorFromApplicationErrorNonRetryableFromCustomError(
         (
             NexusOperationError,
             {
-                "message": "nexus operation completed unsuccessfully",
+                "message": "operation-error-message",
                 "service": "ErrorTestService",
             },
         ),
