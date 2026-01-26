@@ -527,19 +527,6 @@ class _ActivityWorker:
         if not activity_def.name:
             args = [args]
 
-        # Convert heartbeat details
-        # TODO(cretz): Allow some way to configure heartbeat type hinting?
-        try:
-            heartbeat_details = (
-                []
-                if not start.heartbeat_details
-                else await data_converter.decode(start.heartbeat_details)
-            )
-        except Exception as err:
-            raise temporalio.exceptions.ApplicationError(
-                "Failed decoding heartbeat details", non_retryable=True
-            ) from err
-
         # Build info
         info = temporalio.activity.Info(
             activity_id=start.activity_id,
@@ -548,7 +535,8 @@ class _ActivityWorker:
             current_attempt_scheduled_time=_proto_to_datetime(
                 start.current_attempt_scheduled_time
             ),
-            heartbeat_details=heartbeat_details,
+            _heartbeat_payloads=list(start.heartbeat_details),
+            _payload_converter=data_converter.payload_converter,
             heartbeat_timeout=_proto_to_non_zero_timedelta(start.heartbeat_timeout)
             if start.HasField("heartbeat_timeout")
             else None,

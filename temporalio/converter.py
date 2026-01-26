@@ -1133,14 +1133,15 @@ class DefaultFailureConverter(FailureConverter):
             )
         elif failure.HasField("timeout_failure_info"):
             timeout_info = failure.timeout_failure_info
-            err = temporalio.exceptions.TimeoutError(
+            err = temporalio.exceptions.TimeoutError._from_failure(
                 failure.message or "Timeout",
-                type=temporalio.exceptions.TimeoutType(int(timeout_info.timeout_type))
+                timeout_type=temporalio.exceptions.TimeoutType(
+                    int(timeout_info.timeout_type)
+                )
                 if timeout_info.timeout_type
                 else None,
-                last_heartbeat_details=payload_converter.from_payloads_wrapper(
-                    timeout_info.last_heartbeat_details
-                ),
+                heartbeat_payloads=timeout_info.last_heartbeat_details,
+                payload_converter=payload_converter,
             )
         elif failure.HasField("canceled_failure_info"):
             cancel_info = failure.canceled_failure_info

@@ -1,6 +1,7 @@
 """Common Temporal exceptions."""
 
 import asyncio
+import builtins
 import typing
 from collections.abc import Sequence
 from datetime import timedelta
@@ -144,19 +145,45 @@ class ApplicationError(FailureError):
     @property
     def details(self) -> Sequence[Any]:
         """User-defined details on the error."""
-        return self.details_with_type_hints()
-
-    def details_with_type_hints(
-        self, type_hints: list[type] | None = None
-    ) -> Sequence[Any]:
-        """User-defined details on the error with type hints for deserialization."""
         if self._payload_converter and self._payloads is not None:
             if not self._payloads or not self._payloads.payloads:
                 return []
-            return self._payload_converter.from_payloads(
-                self._payloads.payloads, type_hints
-            )
+            return self._payload_converter.from_payloads(self._payloads.payloads, None)
         return self._details
+
+    def get_detail(self, index: int, type_hint: type | None = None) -> Any:
+        """Get a detail by index with optional type hint.
+
+        Args:
+            index: Zero-based index of the detail to retrieve.
+            type_hint: Optional type hint for deserialization.
+
+        Returns:
+            The detail at the specified index.
+
+        Raises:
+            IndexError: If the index is out of range.
+        """
+        if (
+            self._payload_converter
+            and self._payloads is not None
+            and self._payloads.payloads
+        ):
+            if index < 0 or index >= len(self._payloads.payloads):
+                raise IndexError(
+                    f"Detail index {index} out of range (0-{len(self._payloads.payloads)-1})"
+                )
+            # Convert single payload at the specified index
+            payload = self._payloads.payloads[index]
+            type_hints = [type_hint] if type_hint is not None else None
+            converted = self._payload_converter.from_payloads([payload], type_hints)
+            return converted[0] if converted else None
+        else:
+            if index < 0 or index >= len(self._details):
+                raise IndexError(
+                    f"Detail index {index} out of range (0-{len(self._details)-1})"
+                )
+            return self._details[index]
 
     @property
     def type(self) -> str | None:
@@ -245,16 +272,81 @@ class TimeoutError(FailureError):
         super().__init__(message)
         self._type = type
         self._last_heartbeat_details = last_heartbeat_details
+        self._heartbeat_payloads: Payloads | None = None
+        self._payload_converter: "PayloadConverter | None" = None
 
     @property
     def type(self) -> TimeoutType | None:
         """Type of timeout error."""
         return self._type
 
+    @classmethod
+    def _from_failure(
+        cls,
+        message: str,
+        timeout_type: TimeoutType | None,
+        heartbeat_payloads: Payloads | None,
+        payload_converter: "PayloadConverter",
+    ) -> "TimeoutError":
+        """Create a TimeoutError from failure payloads (internal use only)."""
+        # Create instance using regular constructor first
+        instance = cls(
+            message,
+            type=timeout_type,
+            last_heartbeat_details=[],  # Will be overridden if payloads exist
+        )
+        # Override payloads and payload converter for lazy loading if payloads exist
+        if heartbeat_payloads is not None:
+            instance._heartbeat_payloads = heartbeat_payloads
+            instance._payload_converter = payload_converter
+        return instance
+
     @property
     def last_heartbeat_details(self) -> Sequence[Any]:
         """Last heartbeat details if this is for an activity heartbeat."""
+        if self._payload_converter and self._heartbeat_payloads is not None:
+            if not self._heartbeat_payloads.payloads:
+                return []
+            return self._payload_converter.from_payloads(
+                self._heartbeat_payloads.payloads, None
+            )
         return self._last_heartbeat_details
+
+    def get_heartbeat_detail(
+        self, index: int, type_hint: builtins.type | None = None
+    ) -> Any:
+        """Get a heartbeat detail by index with optional type hint.
+
+        Args:
+            index: Zero-based index of the heartbeat detail to retrieve.
+            type_hint: Optional type hint for deserialization.
+
+        Returns:
+            The heartbeat detail at the specified index.
+
+        Raises:
+            IndexError: If the index is out of range.
+        """
+        if (
+            self._payload_converter
+            and self._heartbeat_payloads is not None
+            and self._heartbeat_payloads.payloads
+        ):
+            if index < 0 or index >= len(self._heartbeat_payloads.payloads):
+                raise IndexError(
+                    f"Heartbeat detail index {index} out of range (0-{len(self._heartbeat_payloads.payloads)-1})"
+                )
+            # Convert single payload at the specified index
+            payload = self._heartbeat_payloads.payloads[index]
+            type_hints = [type_hint] if type_hint is not None else None
+            converted = self._payload_converter.from_payloads([payload], type_hints)
+            return converted[0] if converted else None
+        else:
+            if index < 0 or index >= len(self._last_heartbeat_details):
+                raise IndexError(
+                    f"Heartbeat detail index {index} out of range (0-{len(self._last_heartbeat_details)-1})"
+                )
+            return self._last_heartbeat_details[index]
 
 
 class ServerError(FailureError):

@@ -26,6 +26,7 @@ from typing import (
     overload,
 )
 
+import temporalio.api.common.v1
 import temporalio.bridge
 import temporalio.bridge.proto
 import temporalio.bridge.proto.activity_task
@@ -101,7 +102,8 @@ class Info:
     activity_type: str
     attempt: int
     current_attempt_scheduled_time: datetime
-    heartbeat_details: Sequence[Any]
+    _heartbeat_payloads: Sequence[temporalio.api.common.v1.Payload]
+    _payload_converter: temporalio.converter.PayloadConverter
     heartbeat_timeout: timedelta | None
     is_local: bool
     schedule_to_close_timeout: timedelta | None
@@ -123,6 +125,34 @@ class Info:
     version), but it may still be defined server-side."""
 
     # TODO(cretz): Consider putting identity on here for "worker_id" for logger?
+
+    @property
+    def heartbeat_details(self) -> Sequence[Any]:
+        """Heartbeat details for the activity."""
+        return self._payload_converter.from_payloads(self._heartbeat_payloads, None)
+
+    def get_heartbeat_detail(self, index: int, type_hint: type | None = None) -> Any:
+        """Get a heartbeat detail by index with optional type hint.
+
+        Args:
+            index: Zero-based index of the heartbeat detail to retrieve.
+            type_hint: Optional type hint for deserialization.
+
+        Returns:
+            The heartbeat detail at the specified index.
+
+        Raises:
+            IndexError: If the index is out of range.
+        """
+        if index < 0 or index >= len(self._heartbeat_payloads):
+            raise IndexError(
+                f"Heartbeat detail index {index} out of range (0-{len(self._heartbeat_payloads)-1})"
+            )
+        # Convert single payload at the specified index
+        payload = self._heartbeat_payloads[index]
+        type_hints = [type_hint] if type_hint is not None else None
+        converted = self._payload_converter.from_payloads([payload], type_hints)
+        return converted[0] if converted else None
 
     def _logger_details(self) -> Mapping[str, Any]:
         return {
