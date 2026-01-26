@@ -535,8 +535,8 @@ class _ActivityWorker:
             current_attempt_scheduled_time=_proto_to_datetime(
                 start.current_attempt_scheduled_time
             ),
-            _heartbeat_payloads=list(start.heartbeat_details),
-            _payload_converter=data_converter.payload_converter,
+            raw_heartbeat_payloads=list(start.heartbeat_details),
+            payload_converter=data_converter.payload_converter,
             heartbeat_timeout=_proto_to_non_zero_timedelta(start.heartbeat_timeout)
             if start.HasField("heartbeat_timeout")
             else None,

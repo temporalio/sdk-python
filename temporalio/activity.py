@@ -103,8 +103,8 @@ class Info:
     activity_type: str
     attempt: int
     current_attempt_scheduled_time: datetime
-    _heartbeat_payloads: Sequence[temporalio.api.common.v1.Payload]
-    _payload_converter: temporalio.converter.PayloadConverter
+    raw_heartbeat_payloads: Sequence[temporalio.api.common.v1.Payload]
+    payload_converter: temporalio.converter.PayloadConverter
     heartbeat_timeout: timedelta | None
     is_local: bool
     schedule_to_close_timeout: timedelta | None
@@ -139,7 +139,7 @@ class Info:
             DeprecationWarning,
             stacklevel=2,
         )
-        return self._payload_converter.from_payloads(self._heartbeat_payloads, None)
+        return self.payload_converter.from_payloads(self.raw_heartbeat_payloads, None)
 
     def heartbeat_detail(self, index: int = 0, type_hint: type | None = None) -> Any:
         """Get a heartbeat detail by index with optional type hint.
@@ -154,19 +154,19 @@ class Info:
         Raises:
             IndexError: If the index is out of range.
         """
-        if index < 0 or index >= len(self._heartbeat_payloads):
+        if index < 0 or index >= len(self.raw_heartbeat_payloads):
             raise IndexError(
-                f"Heartbeat detail index {index} out of range (0-{len(self._heartbeat_payloads)-1})"
+                f"Heartbeat detail index {index} out of range (0-{len(self.raw_heartbeat_payloads)-1})"
             )
         # Convert single payload at the specified index
-        payload = self._heartbeat_payloads[index]
+        payload = self.raw_heartbeat_payloads[index]
         type_hints = [type_hint] if type_hint is not None else None
-        converted = self._payload_converter.from_payloads([payload], type_hints)
+        converted = self.payload_converter.from_payloads([payload], type_hints)
         return converted[0] if converted else None
 
     def heartbeat_details_len(self) -> int:
         """Get the number heartbeat details."""
-        return len(self._heartbeat_payloads)
+        return len(self.raw_heartbeat_payloads)
 
     def _logger_details(self) -> Mapping[str, Any]:
         return {
