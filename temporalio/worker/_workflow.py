@@ -353,19 +353,18 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         # Encode completion
         if self._data_converter.payload_codec and workflow:
             assert data_converter.payload_codec
-            if workflow:
-                data_converter = dataclasses.replace(
-                    data_converter,
-                    payload_codec=_CommandAwarePayloadCodec(
-                        workflow.instance,
-                        context_free_payload_codec=self._data_converter.payload_codec,
-                        workflow_context_payload_codec=data_converter.payload_codec,
-                        workflow_context=temporalio.converter.WorkflowSerializationContext(
-                            namespace=self._namespace,
-                            workflow_id=workflow.workflow_id,
-                        ),
+            data_converter = dataclasses.replace(
+                data_converter,
+                payload_codec=_CommandAwarePayloadCodec(
+                    workflow.instance,
+                    context_free_payload_codec=self._data_converter.payload_codec,
+                    workflow_context_payload_codec=data_converter.payload_codec,
+                    workflow_context=temporalio.converter.WorkflowSerializationContext(
+                        namespace=self._namespace,
+                        workflow_id=workflow.workflow_id,
                     ),
-                )
+                ),
+            )
 
         try:
             await temporalio.bridge.worker.encode_completion(
