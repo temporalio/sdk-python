@@ -19,36 +19,26 @@ This module provides the necessary components to run ADK Agents within Temporal 
 
 from __future__ import annotations
 
-import asyncio
 import dataclasses
-import functools
 import inspect
 import time
 import uuid
-from collections.abc import Sequence
 from contextlib import asynccontextmanager
-from datetime import timedelta
-from typing import Any, AsyncGenerator, Callable, List, Optional, AsyncIterator
+from typing import Any, AsyncIterator, Callable, Optional
 
 from google.adk.agents.callback_context import CallbackContext
-from google.adk.agents.invocation_context import InvocationContext
-from google.adk.models import BaseLlm, LLMRegistry, LlmRequest, LlmResponse
+from google.adk.models import LLMRegistry
+from google.adk.models.llm_request import LlmRequest
+from google.adk.models.llm_response import LlmResponse
 from google.adk.plugins import BasePlugin
-from google.genai import types
 
 from temporalio import activity, workflow
-from temporalio.common import RawValue, RetryPolicy
 from temporalio.contrib.pydantic import (
     PydanticPayloadConverter as _DefaultPydanticPayloadConverter,
 )
 from temporalio.converter import DataConverter, DefaultPayloadConverter
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import (
-    ExecuteWorkflowInput,
-    Interceptor,
-    UnsandboxedWorkflowRunner,
-    WorkflowInboundInterceptor,
-    WorkflowInterceptorClassInput,
     WorkflowRunner,
 )
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
@@ -125,7 +115,7 @@ class AgentPlugin(BasePlugin):
         # Copy metadata
         wrapper.__name__ = activity_def.__name__
         wrapper.__doc__ = activity_def.__doc__
-        wrapper.__signature__ = inspect.signature(activity_def)
+        setattr(wrapper, "__signature__", inspect.signature(activity_def))
 
         return wrapper
 
@@ -133,18 +123,11 @@ class AgentPlugin(BasePlugin):
         self, *, callback_context: CallbackContext, llm_request: LlmRequest
     ) -> LlmResponse | None:
         responses = await workflow.execute_activity(
-            invoke_model, args=[llm_request], summary=callback_context.agent_name, **self.activity_options
+            invoke_model,
+            args=[llm_request],
+            summary=callback_context.agent_name,
+            **self.activity_options,
         )
-
-        # # Rehydrate LlmResponse objects safely
-        # responses = []
-        # for d in response_dicts:
-        #     try:
-        #         responses.append(LlmResponse.model_validate(d))
-        #     except Exception as e:
-        #         raise RuntimeError(
-        #             f"Failed to deserialized LlmResponse from activity result: {e}"
-        #         ) from e
 
         # Simple consolidation: return the last complete response
         return responses[-1] if responses else None
@@ -152,21 +135,18 @@ class AgentPlugin(BasePlugin):
 
 @activity.defn
 async def invoke_model(llm_request: LlmRequest) -> list[LlmResponse]:
+    if llm_request.model is None:
+        raise ValueError(f"No model name provided, could not create LLM.")
 
-    # 3. Model Initialization
     llm = LLMRegistry.new_llm(llm_request.model)
     if not llm:
         raise ValueError(f"Failed to create LLM for model: {llm_request.model}")
 
-    # 4. Execution
-    responses = [
+    return [
         response
         async for response in llm.generate_content_async(llm_request=llm_request)
     ]
 
-    # 5. Serialization
-    # Return dicts to avoid Pydantic strictness issues on rehydration
-    return responses
 
 class GoogleAdkPlugin(SimplePlugin):
     """A Temporal Worker Plugin configured for ADK.
@@ -177,7 +157,6 @@ class GoogleAdkPlugin(SimplePlugin):
     """
 
     def __init__(self):
-
         @asynccontextmanager
         async def run_context() -> AsyncIterator[None]:
             setup_deterministic_runtime()
@@ -191,7 +170,9 @@ class GoogleAdkPlugin(SimplePlugin):
             if isinstance(runner, SandboxedWorkflowRunner):
                 return dataclasses.replace(
                     runner,
-                    restrictions=runner.restrictions.with_passthrough_modules("google.adk", "google.genai"),
+                    restrictions=runner.restrictions.with_passthrough_modules(
+                        "google.adk", "google.genai"
+                    ),
                 )
             return runner
 
@@ -200,7 +181,7 @@ class GoogleAdkPlugin(SimplePlugin):
             data_converter=self._configure_data_converter,
             activities=[invoke_model],
             run_context=lambda: run_context(),
-            workflow_runner=workflow_runner
+            workflow_runner=workflow_runner,
         )
 
     def _configure_data_converter(
@@ -215,4 +196,3 @@ class GoogleAdkPlugin(SimplePlugin):
                 converter, payload_converter_class=_DefaultPydanticPayloadConverter
             )
         return converter
-

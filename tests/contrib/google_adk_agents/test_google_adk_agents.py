@@ -14,39 +14,29 @@
 
 """Integration tests for ADK Temporal support."""
 
-import dataclasses
 import logging
+import os
 import uuid
 from datetime import timedelta
+from pathlib import Path
+from typing import AsyncGenerator, Iterator
 
 import pytest
 from google.adk import Agent, Runner
 from google.adk.agents import LlmAgent
 from google.adk.events import Event
+from google.adk.models import BaseLlm, LLMRegistry
+from google.adk.models.llm_request import LlmRequest
+from google.adk.models.llm_response import LlmResponse
 from google.adk.sessions import InMemorySessionService
 from google.adk.utils.context_utils import Aclosing
 from google.genai import types
+from google.genai.types import Content, FunctionCall, Part
 
 from temporalio import activity, workflow
 from temporalio.client import Client
 from temporalio.contrib.google_adk_agents import AgentPlugin, GoogleAdkPlugin
-from temporalio.contrib.pydantic import (
-    PydanticPayloadConverter,
-)
-from temporalio.converter import DataConverter
 from temporalio.worker import Worker
-
-# Required Environment Variables for this test:
-# in this folder update .env.example to be .env and have the following vars:
-# GOOGLE_GENAI_USE_VERTEXAI=1
-# GOOGLE_CLOUD_PROJECT="<your-project>"
-# GOOGLE_CLOUD_LOCATION="<your-location>"
-# TEST_BACKEND=VERTEX_ONLY
-# then:
-# start temporal: temporal server start-dev
-# then:
-# uv run pytest tests/integration/manual_test_temporal_integration.py
-
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +50,7 @@ async def get_weather(city: str) -> str:
 @workflow.defn
 class WeatherAgent:
     @workflow.run
-    async def run(self, prompt: str) -> Event | None:
+    async def run(self, prompt: str, model_name: str) -> Event | None:
         logger.info("Workflow started.")
 
         # 1. Define Agent using Temporal Helpers
@@ -74,7 +64,7 @@ class WeatherAgent:
 
         agent = Agent(
             name="test_agent",
-            model="gemini-2.5-pro",  # Standard model string
+            model=model_name,
             tools=[weather_tool],
         )
 
@@ -118,7 +108,7 @@ class WeatherAgent:
 @workflow.defn
 class MultiAgentWorkflow:
     @workflow.run
-    async def run(self, topic: str) -> str:
+    async def run(self, topic: str, model_name: str) -> str | None:
         # Example of multi-turn/multi-agent orchestration
         # This is where Temporal shines - orchestrating complex agent flows
 
@@ -134,21 +124,21 @@ class MultiAgentWorkflow:
         # Sub-agent: Researcher
         researcher = LlmAgent(
             name="researcher",
-            model="gemini-2.5-pro",
+            model=model_name,
             instruction="You are a researcher. Find information about the topic.",
         )
 
         # Sub-agent: Writer
         writer = LlmAgent(
             name="writer",
-            model="gemini-2.5-pro",
+            model=model_name,
             instruction="You are a poet. Write a haiku based on the research.",
         )
 
         # Root Agent: Coordinator
         coordinator = LlmAgent(
             name="coordinator",
-            model="gemini-2.5-pro",
+            model=model_name,
             instruction="You are a coordinator. Delegate to researcher then writer.",
             sub_agents=[researcher, writer],
         )
@@ -186,24 +176,48 @@ class MultiAgentWorkflow:
         return final_content
 
 
+class WeatherModel(BaseLlm):
+    responses: list[LlmResponse] = [
+        LlmResponse(
+            content=Content(
+                role="model",
+                parts=[
+                    Part(
+                        function_call=FunctionCall(
+                            args={"city": "New York"}, name="get_weather"
+                        )
+                    )
+                ],
+            )
+        ),
+        LlmResponse(
+            content=Content(
+                role="model",
+                parts=[Part(text="warm and sunny")],
+            )
+        ),
+    ]
+    response_iter: Iterator[LlmResponse] = iter(responses)
+
+    @classmethod
+    def supported_models(cls) -> list[str]:
+        return ["weather_model"]
+
+    async def generate_content_async(
+        self, llm_request: LlmRequest, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        yield next(self.response_iter)
+
+
+@pytest.mark.parametrize("use_local_model", [True, False])
 @pytest.mark.asyncio
-async def test_temporal_integration():
-    """Manual integration test requiring a running Temporal server."""
+async def test_single_agent(client: Client, use_local_model: bool):
+    if not use_local_model and not os.environ.get("GOOGLE_API_KEY"):
+        pytest.skip("No google API key")
 
-    # 1. Start a Worker (in a real app, this would be a separate process)
-    # We run it here for the test.
-
-    try:
-        # Connect to Temporal Server
-        # We must configure the data converter to handle Pydantic models (like Event)
-        client = await Client.connect(
-            "localhost:7233",
-            data_converter=DataConverter(
-                payload_converter_class=PydanticPayloadConverter
-            ),
-        )
-    except RuntimeError:
-        pytest.skip("Could not connect to Temporal server. Is it running?")
+    new_config = client.config()
+    new_config["plugins"] = [GoogleAdkPlugin()]
+    client = Client(**new_config)
 
     # Run Worker with the ADK plugin
     async with Worker(
@@ -212,24 +226,112 @@ async def test_temporal_integration():
         activities=[
             get_weather,
         ],
-        workflows=[WeatherAgent, MultiAgentWorkflow],
-        plugins=[GoogleAdkPlugin()],
+        workflows=[WeatherAgent],
+        max_cached_workflows=0,
     ):
-        print("Worker started.")
+        if use_local_model:
+            LLMRegistry.register(WeatherModel)
+
         # Test Weather Agent
-        result = await client.execute_workflow(
+        handle = await client.start_workflow(
             WeatherAgent.run,
-            "What is the weather in New York?",
+            args=[
+                "What is the weather in New York?",
+                "weather_model" if use_local_model else "gemini-2.5-pro",
+            ],
             id=f"weather-agent-workflow-{uuid.uuid4()}",
             task_queue="adk-task-queue",
         )
+        result = await handle.result()
         print(f"Workflow result: {result}")
+        if use_local_model:
+            assert result is not None
+            assert result.content is not None
+            assert result.content.parts is not None
+            assert result.content.parts[0].text == "warm and sunny"
+
+        with (Path(__file__).with_name("histories") / "single_agent.json").open(
+            "w"
+        ) as f:
+            f.write((await handle.fetch_history()).to_json())
+
+
+class ResearchModel(BaseLlm):
+    responses: list[LlmResponse] = [
+        LlmResponse(
+            content=Content(
+                role="model",
+                parts=[
+                    Part(
+                        function_call=FunctionCall(
+                            args={"agent_name": "researcher"}, name="transfer_to_agent"
+                        )
+                    )
+                ],
+            )
+        ),
+        LlmResponse(
+            content=Content(
+                role="model",
+                parts=[
+                    Part(
+                        function_call=FunctionCall(
+                            args={"agent_name": "writer"}, name="transfer_to_agent"
+                        )
+                    )
+                ],
+            )
+        ),
+        LlmResponse(
+            content=Content(
+                role="model",
+                parts=[Part(text="haiku")],
+            )
+        ),
+    ]
+    response_iter: Iterator[LlmResponse] = iter(responses)
+
+    @classmethod
+    def supported_models(cls) -> list[str]:
+        return ["research_model"]
+
+    async def generate_content_async(
+        self, llm_request: LlmRequest, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        yield next(self.response_iter)
+
+
+@pytest.mark.parametrize("use_local_model", [True, False])
+@pytest.mark.asyncio
+async def test_multi_agent(client: Client, use_local_model: bool):
+    if not use_local_model and not os.environ.get("GOOGLE_API_KEY"):
+        pytest.skip("No google API key")
+
+    new_config = client.config()
+    new_config["plugins"] = [GoogleAdkPlugin()]
+    client = Client(**new_config)
+
+    # Run Worker with the ADK plugin
+    async with Worker(
+        client,
+        task_queue="adk-task-queue",
+        workflows=[MultiAgentWorkflow],
+        max_cached_workflows=0,
+    ):
+        if use_local_model:
+            LLMRegistry.register(ResearchModel)
 
         # Test Multi Agent
-        result_multi = await client.execute_workflow(
+        handle = await client.start_workflow(
             MultiAgentWorkflow.run,
-            "Run mult-agent flow",
+            args=[
+                "Run mult-agent flow",
+                "research_model" if use_local_model else "gemini-2.5-pro",
+            ],
             id=f"multi-agent-workflow-{uuid.uuid4()}",
             task_queue="adk-task-queue",
         )
-        print(f"Multi-Agent Workflow result: {result_multi}")
+        result = await handle.result()
+        print(f"Multi-Agent Workflow result: {result}")
+        if use_local_model:
+            assert result == "haiku"
