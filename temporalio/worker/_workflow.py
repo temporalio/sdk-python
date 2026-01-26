@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import dataclasses
 import logging
 import os
 import sys
@@ -270,20 +271,21 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             data_converter = self._data_converter.with_context(workflow_context)
             if self._data_converter.payload_codec:
                 assert data_converter.payload_codec
-                if not workflow:
-                    payload_codec = data_converter.payload_codec
-                else:
-                    payload_codec = _CommandAwarePayloadCodec(
-                        workflow.instance,
-                        context_free_payload_codec=self._data_converter.payload_codec,
-                        workflow_context_payload_codec=data_converter.payload_codec,
-                        workflow_context=workflow_context,
+                if workflow:
+                    data_converter = dataclasses.replace(
+                        data_converter,
+                        payload_codec=_CommandAwarePayloadCodec(
+                            workflow.instance,
+                            context_free_payload_codec=self._data_converter.payload_codec,
+                            workflow_context_payload_codec=data_converter.payload_codec,
+                            workflow_context=workflow_context,
+                        ),
                     )
-                await temporalio.bridge.worker.decode_activation(
-                    act,
-                    payload_codec,
-                    decode_headers=self._encode_headers,
-                )
+            await temporalio.bridge.worker.decode_activation(
+                act,
+                data_converter,
+                decode_headers=self._encode_headers,
+            )
             if not workflow:
                 assert init_job
                 workflow = _RunningWorkflow(
@@ -351,27 +353,32 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         # Encode completion
         if self._data_converter.payload_codec and workflow:
             assert data_converter.payload_codec
-            payload_codec = _CommandAwarePayloadCodec(
-                workflow.instance,
-                context_free_payload_codec=self._data_converter.payload_codec,
-                workflow_context_payload_codec=data_converter.payload_codec,
-                workflow_context=temporalio.converter.WorkflowSerializationContext(
-                    namespace=self._namespace,
-                    workflow_id=workflow.workflow_id,
-                ),
+            if workflow:
+                data_converter = dataclasses.replace(
+                    data_converter,
+                    payload_codec=_CommandAwarePayloadCodec(
+                        workflow.instance,
+                        context_free_payload_codec=self._data_converter.payload_codec,
+                        workflow_context_payload_codec=data_converter.payload_codec,
+                        workflow_context=temporalio.converter.WorkflowSerializationContext(
+                            namespace=self._namespace,
+                            workflow_id=workflow.workflow_id,
+                        ),
+                    ),
+                )
+
+        try:
+            await temporalio.bridge.worker.encode_completion(
+                completion,
+                data_converter,
+                encode_headers=self._encode_headers,
             )
-            try:
-                await temporalio.bridge.worker.encode_completion(
-                    completion,
-                    payload_codec,
-                    encode_headers=self._encode_headers,
-                )
-            except Exception as err:
-                logger.exception(
-                    "Failed encoding completion on workflow with run ID %s", act.run_id
-                )
-                completion.failed.Clear()
-                completion.failed.failure.message = f"Failed encoding completion: {err}"
+        except Exception as err:
+            logger.exception(
+                "Failed encoding completion on workflow with run ID %s", act.run_id
+            )
+            completion.failed.Clear()
+            completion.failed.failure.message = f"Failed encoding completion: {err}"
 
         # Send off completion
         if LOG_PROTOS:
