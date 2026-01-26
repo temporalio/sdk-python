@@ -208,7 +208,7 @@ async def test_activity_info(
     assert abs(
         info.current_attempt_scheduled_time - datetime.now(timezone.utc)
     ) < timedelta(seconds=5)
-    assert info.heartbeat_details == []
+    assert info.heartbeat_details_len() == 0
     assert info.heartbeat_timeout is None
     assert not info.is_local
     assert info.schedule_to_close_timeout is None
@@ -785,7 +785,7 @@ async def test_activity_heartbeat_details(
     @activity.defn
     async def some_activity() -> str:
         info = activity.info()
-        count = int(next(iter(info.heartbeat_details))) if info.heartbeat_details else 0
+        count = int(info.heartbeat_detail(0)) if info.heartbeat_details_len() > 0 else 0
         activity.logger.debug("Changing count from %s to %s", count, count + 9)
         count += 9
         activity.heartbeat(count)
@@ -872,7 +872,7 @@ async def test_activity_heartbeat_details_timeout(
 def picklable_heartbeat_details_activity() -> str:
     info = activity.info()
     some_list: list[str] = (
-        next(iter(info.heartbeat_details)) if info.heartbeat_details else []
+        info.heartbeat_detail(0) if info.heartbeat_details_len() > 0 else []
     )
     some_list.append(f"attempt: {info.attempt}")
     activity.logger.debug("Heartbeating with value: %s", some_list)
@@ -1334,7 +1334,10 @@ async def test_activity_async_heartbeat_and_fail(
     info = await wrapper.wait_info()
     # Confirm the heartbeat details and attempt
     assert info.attempt == 2
-    assert list(info.heartbeat_details) == ["heartbeat details"]
+    assert (
+        info.heartbeat_details_len() == 1
+        and info.heartbeat_detail(0) == "heartbeat details"
+    )
     # Fail again which won't retry
     await wrapper.async_handle(client, use_task_token).fail(
         ApplicationError("err message 2", "err details 2")
@@ -1712,8 +1715,8 @@ async def test_activity_heartbeat_context(
             thread.join()
             raise RuntimeError("oh no!")
         else:
-            assert len(activity.info().heartbeat_details) == 1
-            return "details: " + activity.info().heartbeat_details[0]
+            assert activity.info().heartbeat_details_len() == 1
+            return "details: " + activity.info().heartbeat_detail(0)
 
     result = await _execute_workflow_with_activity(
         client,

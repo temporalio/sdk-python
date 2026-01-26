@@ -311,7 +311,7 @@ async def activity_with_heartbeat_details() -> TraceData:
         activity.heartbeat(data)
         raise Exception("Intentional error to force retry")
     elif info.attempt == 2:
-        [heartbeat_data] = info.heartbeat_details
+        heartbeat_data = info.heartbeat_detail(0)
         assert isinstance(heartbeat_data, TraceData)
         return heartbeat_data
     else:

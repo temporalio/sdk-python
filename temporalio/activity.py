@@ -15,6 +15,7 @@ import dataclasses
 import inspect
 import logging
 import threading
+import warnings
 from collections.abc import Callable, Iterator, Mapping, MutableMapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
@@ -128,10 +129,19 @@ class Info:
 
     @property
     def heartbeat_details(self) -> Sequence[Any]:
-        """Heartbeat details for the activity."""
+        """Heartbeat details for the activity.
+
+        .. deprecated::
+           Use :py:meth:`heartbeat_detail` and :py:meth:`heartbeat_details_len` instead.
+        """
+        warnings.warn(
+            "heartbeat_details is deprecated. Use heartbeat_detail() and heartbeat_details_len() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self._payload_converter.from_payloads(self._heartbeat_payloads, None)
 
-    def get_heartbeat_detail(self, index: int, type_hint: type | None = None) -> Any:
+    def heartbeat_detail(self, index: int = 0, type_hint: type | None = None) -> Any:
         """Get a heartbeat detail by index with optional type hint.
 
         Args:
@@ -153,6 +163,10 @@ class Info:
         type_hints = [type_hint] if type_hint is not None else None
         converted = self._payload_converter.from_payloads([payload], type_hints)
         return converted[0] if converted else None
+
+    def heartbeat_details_len(self) -> int:
+        """Get the number heartbeat details."""
+        return len(self._heartbeat_payloads)
 
     def _logger_details(self) -> Mapping[str, Any]:
         return {

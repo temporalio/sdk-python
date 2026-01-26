@@ -7653,7 +7653,7 @@ async def heartbeat_activity(
         try:
             activity.heartbeat()
             # If we have heartbeat details, we are on the second attempt, we have retried due to pause/unpause.
-            if activity.info().heartbeat_details:
+            if activity.info().heartbeat_details_len() > 0:
                 return activity.cancellation_details()
             await asyncio.sleep(0.1)
         except (CancelledError, asyncio.CancelledError) as err:
@@ -7672,7 +7672,7 @@ def sync_heartbeat_activity(
         try:
             activity.heartbeat()
             # If we have heartbeat details, we are on the second attempt, we have retried due to pause/unpause.
-            if activity.info().heartbeat_details:
+            if activity.info().heartbeat_details_len() > 0:
                 return activity.cancellation_details()
             time.sleep(0.1)
         except (CancelledError, asyncio.CancelledError) as err:
