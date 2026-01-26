@@ -3,6 +3,7 @@ from .core_interface_pb2 import (
     ActivitySlotInfo,
     ActivityTaskCompletion,
     LocalActivitySlotInfo,
+    NamespaceInfo,
     NexusSlotInfo,
     WorkflowSlotInfo,
 )
@@ -12,6 +13,7 @@ __all__ = [
     "ActivitySlotInfo",
     "ActivityTaskCompletion",
     "LocalActivitySlotInfo",
+    "NamespaceInfo",
     "NexusSlotInfo",
     "WorkflowSlotInfo",
 ]
