@@ -303,9 +303,10 @@ async def decode_activation(
     decode_headers: bool,
 ) -> None:
     """Decode all payloads in the activation."""
-    await CommandAwarePayloadVisitor(
-        skip_search_attributes=True, skip_headers=not decode_headers
-    ).visit(_Visitor(data_converter._decode_payload_sequence), activation)
+    if data_converter._decode_payload_has_effect:
+        await CommandAwarePayloadVisitor(
+            skip_search_attributes=True, skip_headers=not decode_headers
+        ).visit(_Visitor(data_converter._decode_payload_sequence), activation)
 
 
 async def encode_completion(
@@ -314,6 +315,7 @@ async def encode_completion(
     encode_headers: bool,
 ) -> None:
     """Encode all payloads in the completion."""
-    await CommandAwarePayloadVisitor(
-        skip_search_attributes=True, skip_headers=not encode_headers
-    ).visit(_Visitor(data_converter._encode_payload_sequence), completion)
+    if data_converter._encode_payload_has_effect:
+        await CommandAwarePayloadVisitor(
+            skip_search_attributes=True, skip_headers=not encode_headers
+        ).visit(_Visitor(data_converter._encode_payload_sequence), completion)

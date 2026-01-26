@@ -1387,10 +1387,15 @@ class DataConverter(WithSerializationContext):
     async def _encode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
-        encoded_payloads = list(payloads)
-        if self.payload_codec:
-            encoded_payloads = await self.payload_codec.encode(encoded_payloads)
-        return encoded_payloads
+        if not self.payload_codec:
+            return list(payloads)
+        return await self.payload_codec.encode(payloads)
+
+    # Temporary shortcircuit detection while the _encode_* methods may no-op if
+    # a payload codec is not configured. Remove once those paths have more to them.
+    @property
+    def _encode_payload_has_effect(self) -> bool:
+        return self.payload_codec is not None
 
     async def _decode_payload(
         self, payload: temporalio.api.common.v1.Payload
@@ -1406,10 +1411,15 @@ class DataConverter(WithSerializationContext):
     async def _decode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
-        decoded_payloads = list(payloads)
-        if self.payload_codec:
-            decoded_payloads = await self.payload_codec.decode(decoded_payloads)
-        return decoded_payloads
+        if not self.payload_codec:
+            return list(payloads)
+        return await self.payload_codec.decode(payloads)
+
+    # Temporary shortcircuit detection while the _decode_* methods may no-op if
+    # a payload codec is not configured. Remove once those paths have more to them.
+    @property
+    def _decode_payload_has_effect(self) -> bool:
+        return self.payload_codec is not None
 
     @staticmethod
     async def _apply_to_failure_payloads(
