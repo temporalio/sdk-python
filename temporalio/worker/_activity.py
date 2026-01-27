@@ -577,10 +577,9 @@ class _ActivityWorker:
             else None,
         )
 
-        if self._encode_headers and data_converter.payload_codec is not None:
+        if self._encode_headers and data_converter._decode_payload_has_effect:
             for payload in start.header_fields.values():
-                new_payload = (await data_converter.payload_codec.decode([payload]))[0]
-                payload.CopyFrom(new_payload)
+                payload.CopyFrom(await data_converter._decode_payload(payload))
 
         running_activity.info = info
         input = ExecuteActivityInput(

@@ -122,6 +122,7 @@ from temporalio.worker import (
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import (
     LogCapturer,
+    LogHandler,
     admitted_update_task,
     assert_eq_eventually,
     assert_eventually,
@@ -8434,3 +8435,53 @@ async def test_activity_failure_with_encoded_payload_is_decoded_in_workflow(
             run_timeout=timedelta(seconds=5),
         )
         assert result == "Handled encrypted failure successfully"
+
+
+@workflow.defn
+class DisableLoggerSandbox:
+    @workflow.run
+    async def run(self):
+        workflow.logger.info("Running workflow")
+
+
+class CustomLogHandler(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        import httpx  # type: ignore[reportUnusedImport] # noqa
+
+
+async def test_disable_logger_sandbox(
+    client: Client,
+):
+    logger = workflow.logger.logger
+    handler = CustomLogHandler()
+    with LogHandler.apply(logger, handler):
+        async with new_worker(
+            client,
+            DisableLoggerSandbox,
+            activities=[],
+        ) as worker:
+            with pytest.raises(WorkflowFailureError):
+                await client.execute_workflow(
+                    DisableLoggerSandbox.run,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    run_timeout=timedelta(seconds=1),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                )
+            workflow.logger.unsafe_disable_sandbox()
+            await client.execute_workflow(
+                DisableLoggerSandbox.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                run_timeout=timedelta(seconds=1),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+            workflow.logger.unsafe_disable_sandbox(False)
+            with pytest.raises(WorkflowFailureError):
+                await client.execute_workflow(
+                    DisableLoggerSandbox.run,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    run_timeout=timedelta(seconds=1),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                )
