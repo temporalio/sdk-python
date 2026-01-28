@@ -504,8 +504,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         temporal_extra_mode: Controls how activity context is added to log
             ``extra``. Default is ``"dict"`` (current behavior). Set to
             ``"flatten"`` for OpenTelemetry compatibility (scalar attributes
-            with ``temporal.activity.`` prefix), or ``"json"`` for a single JSON
-            string value.
+            with ``temporal.activity.`` prefix).
     """
 
     def __init__(self, logger: logging.Logger, extra: Mapping[str, Any] | None) -> None:
@@ -535,7 +534,6 @@ class LoggerAdapter(logging.LoggerAdapter):
                     _apply_temporal_context_to_extra(
                         extra,
                         key="temporal_activity",
-                        prefix="temporal.activity",
                         ctx=context.logger_details,
                         mode=self.temporal_extra_mode,
                     )

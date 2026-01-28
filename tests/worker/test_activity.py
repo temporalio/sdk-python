@@ -1050,7 +1050,6 @@ async def test_activity_logging_flatten_mode(
         activity.logger.info(f"Called with arg: {name}")
         return f"Hello, {name}!"
 
-    # Save original mode and set to flatten
     original_mode = activity.logger.temporal_extra_mode
     activity.logger.temporal_extra_mode = "flatten"
 
@@ -1094,57 +1093,6 @@ async def test_activity_logging_flatten_mode(
             assert isinstance(
                 value, (str, int, float, bool, type(None))
             ), f"Key {key} has non-primitive value: {type(value)}"
-
-
-async def test_activity_logging_json_mode(
-    client: Client,
-    worker: ExternalWorker,
-    shared_state_manager: SharedStateManager,
-):
-    """Test that activity logger json mode produces a JSON string value."""
-    import json as json_module
-
-    @activity.defn
-    async def say_hello_json(name: str) -> str:
-        activity.logger.info(f"Called with arg: {name}")
-        return f"Hello, {name}!"
-
-    # Save original mode and set to json
-    original_mode = activity.logger.temporal_extra_mode
-    activity.logger.temporal_extra_mode = "json"
-
-    handler = logging.handlers.QueueHandler(queue.Queue())
-    activity.logger.base_logger.addHandler(handler)
-    prev_level = activity.logger.base_logger.level
-    activity.logger.base_logger.setLevel(logging.INFO)
-    try:
-        result = await _execute_workflow_with_activity(
-            client,
-            worker,
-            say_hello_json,
-            "Temporal",
-            shared_state_manager=shared_state_manager,
-        )
-    finally:
-        activity.logger.base_logger.removeHandler(handler)
-        activity.logger.base_logger.setLevel(prev_level)
-        activity.logger.temporal_extra_mode = original_mode
-
-    assert result.result == "Hello, Temporal!"
-    records: list[logging.LogRecord] = list(handler.queue.queue)  # type: ignore
-    assert len(records) > 0
-    record = records[-1]
-
-    # Should have temporal_activity as a JSON string
-    assert "temporal_activity" in record.__dict__
-    json_str = record.__dict__["temporal_activity"]
-    assert isinstance(json_str, str)
-
-    # Should be valid JSON
-    parsed = json_module.loads(json_str)
-    assert parsed["activity_type"] == "say_hello_json"
-    assert "activity_id" in parsed
-    assert "workflow_id" in parsed
 
 
 async def test_activity_worker_shutdown(

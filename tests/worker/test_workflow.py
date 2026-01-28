@@ -2119,44 +2119,6 @@ async def test_workflow_logging_flatten_mode(client: Client):
         workflow.logger.temporal_extra_mode = original_mode
 
 
-async def test_workflow_logging_json_mode(client: Client):
-    """Test that json mode produces a JSON string value."""
-    # Save original mode and set to json
-    original_mode = workflow.logger.temporal_extra_mode
-    workflow.logger.temporal_extra_mode = "json"
-
-    try:
-        with LogCapturer().logs_captured(workflow.logger.base_logger) as capturer:
-            async with new_worker(
-                client, LoggingWorkflow, max_cached_workflows=0
-            ) as worker:
-                handle = await client.start_workflow(
-                    LoggingWorkflow.run,
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                )
-                await handle.signal(LoggingWorkflow.my_signal, "signal 1")
-                await handle.signal(LoggingWorkflow.my_signal, "finish")
-                await handle.result()
-
-            # Check log record
-            record = capturer.find_log("Signal: signal 1")
-            assert record is not None
-
-            # Should have temporal_workflow as a JSON string
-            assert "temporal_workflow" in record.__dict__
-            json_str = record.__dict__["temporal_workflow"]
-            assert isinstance(json_str, str)
-
-            # Should be valid JSON
-            parsed = json.loads(json_str)
-            assert parsed["workflow_type"] == "LoggingWorkflow"
-            assert "workflow_id" in parsed
-            assert "run_id" in parsed
-    finally:
-        workflow.logger.temporal_extra_mode = original_mode
-
-
 @activity.defn
 async def task_fail_once_activity() -> None:
     if activity.info().attempt == 1:

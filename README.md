@@ -1018,20 +1018,9 @@ By default the sandbox completely reloads non-standard-library and non-Temporal 
 the sandbox quicker and use less memory when importing known-side-effect-free modules, they can be marked
 as passthrough modules.
 
-**Passthrough modules are about import-time behavior and determinism, not just about whether a module is third-party.**
-Any module that is side-effect-free on import and makes only deterministic calls can be passed through, including
-first-party application modules, third-party libraries, and non-workflow-specific code. The key criteria are:
-1. The module does not have import-time side effects (e.g., file I/O, network calls, random values)
-2. Calls made from the module are deterministic within workflow code
-
-**For performance and behavior reasons, users are encouraged to pass through all non-workflow imports whose calls will be
+**For performance and behavior reasons, users are encouraged to pass through all third party modules whose calls will be
 deterministic.** In particular, this advice extends to modules containing the activities to be referenced in workflows,
 and modules containing dataclasses and Pydantic models, which can be particularly expensive to import.
-
-**Note on datetime and similar stdlib modules:** If you need to use non-deterministic functions like `datetime.date.today()`,
-do **not** mark `datetime` as passthrough. Instead, use `with_child_unrestricted()` to allow specific invalid members
-(see [Invalid Module Members](#invalid-module-members) below). Passthrough affects import reloading, while
-`invalid_module_members` controls which calls are allowed at runtime.
 
 One way to pass through a module is at import time in the workflow file using the `imports_passed_through` context
 manager like so:
@@ -1082,7 +1071,7 @@ Note, some calls from the module may still be checked for invalid calls at runti
 
 `SandboxRestrictions.invalid_module_members` contains a root matcher that applies to all module members. This already
 has a default set which includes things like `datetime.date.today()` which should never be called from a workflow. To
-remove this restriction and allow a specific call like `datetime.date.today()`:
+remove this restriction:
 
 ```python
 my_restrictions = dataclasses.replace(
@@ -1093,12 +1082,6 @@ my_restrictions = dataclasses.replace(
 )
 my_worker = Worker(..., workflow_runner=SandboxedWorkflowRunner(restrictions=my_restrictions))
 ```
-
-**This is the correct approach for allowing non-deterministic stdlib calls.** Do not use passthrough modules for this
-purpose—passthrough controls import reloading, while `invalid_module_members` controls runtime call restrictions.
-
-For a complete example showing both passthrough modules and unrestricted invalid members, see the
-[pydantic_converter sample worker configuration](https://github.com/temporalio/samples-python/blob/4303a9b15f4ddc4cd770bc0ba33afef90a25d3ae/pydantic_converter/worker.py#L45-L65).
 
 Restrictions can also be added by `|`'ing together matchers, for example to restrict the `datetime.date` class from
 being used altogether:
@@ -1146,7 +1129,7 @@ To mitigate this, users should:
 
 * Define workflows in files that have as few non-standard-library imports as possible
 * Alter the max workflow cache and/or max concurrent workflows settings if memory grows too large
-* Set non-workflow imports as passthrough modules if they are known to be side-effect free on import and deterministic
+* Set third-party libraries as passthrough modules if they are known to be side-effect free
 
 ###### Extending Restricted Classes
 

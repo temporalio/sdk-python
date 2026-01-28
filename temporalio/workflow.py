@@ -1577,8 +1577,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         temporal_extra_mode: Controls how workflow context is added to log
             ``extra``. Default is ``"dict"`` (current behavior). Set to
             ``"flatten"`` for OpenTelemetry compatibility (scalar attributes
-            with ``temporal.workflow.`` prefix), or ``"json"`` for a single JSON
-            string value.
+            with ``temporal.workflow.`` prefix).
 
     Values added to ``extra`` are merged with the ``extra`` dictionary from a
     logging call, with values from the logging call taking precedence. I.e. the
@@ -1616,7 +1615,6 @@ class LoggerAdapter(logging.LoggerAdapter):
                     _apply_temporal_context_to_extra(
                         extra,
                         key="temporal_workflow",
-                        prefix="temporal.workflow",
                         ctx=workflow_details,
                         mode=self.temporal_extra_mode,
                     )
@@ -1631,7 +1629,6 @@ class LoggerAdapter(logging.LoggerAdapter):
                     _update_temporal_context_in_extra(
                         extra,
                         key="temporal_workflow",
-                        prefix="temporal.workflow",
                         update_ctx=update_details,
                         mode=self.temporal_extra_mode,
                     )
