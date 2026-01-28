@@ -327,7 +327,7 @@ class Replayer:
             bridge_worker_scope = bridge_worker
 
             # Start worker
-            workflow_worker_task = asyncio.create_task(workflow_worker.run())
+            workflow_worker_task = asyncio.create_task(workflow_worker.run(None))
 
             # Yield iterator
             async def replay_iterator() -> AsyncIterator[WorkflowReplayResult]:
