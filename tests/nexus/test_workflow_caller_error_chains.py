@@ -97,7 +97,7 @@ class RaiseApplicationErrorNonRetryable(ErrorConversionTestCase):
                 # that of the ApplicationError. The server prepends 'handler error
                 # (INTERNAL):'
                 "message": "handler error (INTERNAL): application-error-message",
-                "type": nexusrpc.HandlerErrorType.INTERNAL,
+                "error_type": nexusrpc.HandlerErrorType.INTERNAL,
                 "retryable": False,
             },
         ),
@@ -147,7 +147,7 @@ class RaiseNexusHandlerErrorNotFound(ErrorConversionTestCase):
         except RuntimeError as err:
             raise nexusrpc.HandlerError(
                 "handler-error-message",
-                type=nexusrpc.HandlerErrorType.NOT_FOUND,
+                error_type=nexusrpc.HandlerErrorType.NOT_FOUND,
             ) from err
 
     expected_exception_chain_in_workflow = [
@@ -165,7 +165,7 @@ class RaiseNexusHandlerErrorNotFound(ErrorConversionTestCase):
                 # was no need to synthesize a wrapping HandlerError The server prepends
                 # 'handler error (INTERNAL):'
                 "message": "handler error (NOT_FOUND): handler-error-message",
-                "type": nexusrpc.HandlerErrorType.NOT_FOUND,
+                "error_type": nexusrpc.HandlerErrorType.NOT_FOUND,
                 # The following HandlerError types should be considered non-retryable:
                 # BAD_REQUEST, UNAUTHENTICATED, UNAUTHORIZED, NOT_FOUND, and
                 # RESOURCE_EXHAUSTED. In this test case, the handler does not set the
@@ -200,7 +200,7 @@ class RaiseNexusHandlerErrorNotFoundFromCustomError(ErrorConversionTestCase):
         except CustomError as err:
             raise nexusrpc.HandlerError(
                 "handler-error-message",
-                type=nexusrpc.HandlerErrorType.NOT_FOUND,
+                error_type=nexusrpc.HandlerErrorType.NOT_FOUND,
             ) from err
 
     expected_exception_chain_in_workflow = (
@@ -228,12 +228,12 @@ class RaiseNexusHandlerErrorNotFoundFromHandlerErrorUnavailable(
         try:
             raise nexusrpc.HandlerError(
                 "handler-error-message-2",
-                type=nexusrpc.HandlerErrorType.UNAVAILABLE,
+                error_type=nexusrpc.HandlerErrorType.UNAVAILABLE,
             )
         except nexusrpc.HandlerError as err:
             raise nexusrpc.HandlerError(
                 "handler-error-message",
-                type=nexusrpc.HandlerErrorType.NOT_FOUND,
+                error_type=nexusrpc.HandlerErrorType.NOT_FOUND,
             ) from err
 
     expected_exception_chain_in_workflow = (
@@ -243,7 +243,7 @@ class RaiseNexusHandlerErrorNotFoundFromHandlerErrorUnavailable(
                 nexusrpc.HandlerError,
                 {
                     "message": "handler-error-message-2",
-                    "type": nexusrpc.HandlerErrorType.UNAVAILABLE,
+                    "error_type": nexusrpc.HandlerErrorType.UNAVAILABLE,
                     "retryable": True,
                 },
             )

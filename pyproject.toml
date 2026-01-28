@@ -97,7 +97,7 @@ lint-docs = "uv run pydocstyle --ignore-decorators=overload"
 lint-types = [
   { cmd = "uv run pyright" },
   { cmd = "uv run mypy --namespace-packages --check-untyped-defs ." },
-  { cmd = "uv run basedpyright" }
+  { cmd = "uv run basedpyright" },
 ]
 run-bench = "uv run python scripts/run_bench.py"
 test = "uv run pytest"
@@ -229,3 +229,6 @@ exclude = ["temporalio/bridge/target/**/*"]
 [tool.uv]
 # Prevent uv commands from building the package by default
 package = false
+
+[tool.uv.sources]
+nexus-rpc = { git = "https://github.com/nexus-rpc/sdk-python.git", branch = "preserve-raw-handler-error-type" }
