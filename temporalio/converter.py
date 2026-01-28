@@ -1209,16 +1209,39 @@ class DefaultFailureConverterWithEncodedAttributes(DefaultFailureConverter):
 
 @dataclass(frozen=True)
 class PayloadLimitsConfig:
-    """Configuration for when payload sizes exceed limits."""
+    """Configuration for when uploaded payload sizes exceed the Temporal server's limits."""
 
-    memo_upload_error_limit: int | None = None
-    """The limit at which a memo size error is created."""
+    memo_upload_error_disabled: bool = False
+    """Field indiciating that the memo size checks should be disabled in the SDK.
+
+    A value of False will cause the SDK to fail tasks that attempt to upload memos
+    with a size that is over the Temporal server memo limit. A value of True will
+    disable memo size checks in the SDK, allowing it to attempt to upload memos
+    even if their size is over the Temporal server limit.
+    
+    The default value is False."""
+
     memo_upload_warning_limit: int = 2 * 1024
-    """The limit at which a memo size warning is created."""
-    payload_upload_error_limit: int | None = None
-    """The limit at which a payloads size error is created."""
+    """The limit (in bytes) at which a memo size warning is logged."""
+
+    payload_upload_error_disabled: bool = False
+    """Field indiciating that the payload size checks should be disabled in the SDK.
+
+    A value of False will cause the SDK to fail tasks that attempt to upload payloads
+    with a size that is over the Temporal server payloads limit. A value of True will
+    disable payload size checks in the SDK, allowing it to attempt to upload payloads
+    even if their size is over the Temporal server limit.
+    
+    The default value is False."""
+
     payload_upload_warning_limit: int = 512 * 1024
-    """The limit at which a payloads size warning is created."""
+    """The limit (in bytes) at which a payload size warning is logged."""
+
+
+@dataclass
+class _PayloadErrorLimits:
+    memo_upload_error_limit: int
+    payload_upload_error_limit: int
 
 
 @dataclass(frozen=True)
@@ -1249,6 +1272,10 @@ class DataConverter(WithSerializationContext):
 
     default: ClassVar[DataConverter]
     """Singleton default data converter."""
+
+    _memo_upload_error_limit: int = 0
+
+    _payload_upload_error_limit: int = 0
 
     def __post_init__(self) -> None:  # noqa: D105
         object.__setattr__(self, "payload_converter", self.payload_converter_class())
@@ -1351,6 +1378,17 @@ class DataConverter(WithSerializationContext):
         object.__setattr__(cloned, "failure_converter", failure_converter)
         return cloned
 
+    def _with_payload_error_limits(self, options: _PayloadErrorLimits) -> DataConverter:
+        return dataclasses.replace(
+            self,
+            _memo_upload_error_limit=0
+            if self.payload_limits.memo_upload_error_disabled
+            else options.memo_upload_error_limit,
+            _payload_upload_error_limit=0
+            if self.payload_limits.payload_upload_error_disabled
+            else options.payload_upload_error_limit,
+        )
+
     async def _decode_memo(
         self,
         source: temporalio.api.common.v1.Memo,
@@ -1394,7 +1432,7 @@ class DataConverter(WithSerializationContext):
         # Memos have their field payloads validated all together in one unit
         self._validate_limits(
             payloads,
-            self.payload_limits.memo_upload_error_limit,
+            self._memo_upload_error_limit,
             self.payload_limits.memo_upload_warning_limit,
             "Memo size exceeded the warning limit.",
         )
@@ -1482,7 +1520,7 @@ class DataConverter(WithSerializationContext):
     ):
         self._validate_limits(
             payloads,
-            self.payload_limits.payload_upload_error_limit,
+            self._payload_upload_error_limit,
             self.payload_limits.payload_upload_warning_limit,
             "Payloads size exceeded the warning limit.",
         )
@@ -1490,19 +1528,19 @@ class DataConverter(WithSerializationContext):
     def _validate_limits(
         self,
         payloads: Sequence[temporalio.api.common.v1.Payload],
-        error_limit: int | None,
+        error_limit: int,
         warning_limit: int,
         warning_message: str,
     ):
         total_size = sum(payload.ByteSize() for payload in payloads)
 
-        if error_limit and error_limit > 0 and total_size > error_limit:
+        if error_limit > 0 and total_size > error_limit:
             raise temporalio.exceptions.PayloadSizeError(
                 size=total_size,
                 limit=error_limit,
             )
 
-        if warning_limit and warning_limit > 0 and total_size > warning_limit:
+        if warning_limit > 0 and total_size > warning_limit:
             # TODO: Use a context aware logger to log extra information about workflow/activity/etc
             warnings.warn(
                 f"{warning_message} Size: {total_size} bytes, Limit: {warning_limit} bytes"

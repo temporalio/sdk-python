@@ -90,6 +90,7 @@ from temporalio.converter import (
     PayloadCodec,
     PayloadConverter,
     PayloadLimitsConfig,
+    _PayloadErrorLimits,
 )
 from temporalio.exceptions import (
     ActivityError,
@@ -8543,11 +8544,13 @@ class LargePayloadWorkflow:
 async def test_large_payload_error_workflow_input(client: Client):
     config = client.config()
     error_limit = 5 * 1024
-    config["data_converter"] = dataclasses.replace(
-        temporalio.converter.default(),
-        payload_limits=PayloadLimitsConfig(
-            payload_upload_error_limit=error_limit, payload_upload_warning_limit=1024
-        ),
+    config["data_converter"] = (
+        temporalio.converter.default()._with_payload_error_limits(
+            _PayloadErrorLimits(
+                memo_upload_error_limit=0,
+                payload_upload_error_limit=error_limit,
+            )
+        )
     )
     client = Client(**config)
 
@@ -8570,9 +8573,13 @@ async def test_large_payload_error_workflow_input(client: Client):
 async def test_large_payload_error_workflow_memo(client: Client):
     config = client.config()
     error_limit = 128
-    config["data_converter"] = dataclasses.replace(
-        temporalio.converter.default(),
-        payload_limits=PayloadLimitsConfig(memo_upload_error_limit=error_limit),
+    config["data_converter"] = (
+        temporalio.converter.default()._with_payload_error_limits(
+            _PayloadErrorLimits(
+                memo_upload_error_limit=error_limit,
+                payload_upload_error_limit=0,
+            )
+        )
     )
     client = Client(**config)
 
@@ -8598,7 +8605,7 @@ async def test_large_payload_warning_workflow_input(client: Client):
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
         payload_limits=PayloadLimitsConfig(
-            payload_upload_error_limit=5 * 1024, payload_upload_warning_limit=1024
+            payload_upload_warning_limit=102,
         ),
     )
     client = Client(**config)
@@ -8672,12 +8679,11 @@ async def test_large_payload_error_workflow_result(client: Client):
         client.service_client.config.target_host,
         namespace=client.namespace,
         runtime=worker_runtime,
-        data_converter=dataclasses.replace(
-            temporalio.converter.default(),
-            payload_limits=PayloadLimitsConfig(
+        data_converter=temporalio.converter.default()._with_payload_error_limits(
+            _PayloadErrorLimits(
+                memo_upload_error_limit=0,
                 payload_upload_error_limit=error_limit,
-                payload_upload_warning_limit=1024,
-            ),
+            )
         ),
     )
 
@@ -8706,7 +8712,6 @@ async def test_large_payload_error_workflow_result(client: Client):
             assert err.value.cause.type == TimeoutType.START_TO_CLOSE
 
         def worker_logger_predicate(record: logging.LogRecord) -> bool:
-            print(f"Justin Record: {record}")
             return (
                 record.levelname == "WARNING"
                 and "Payloads size exceeded the error limit" in record.msg
@@ -8730,7 +8735,7 @@ async def test_large_payload_warning_workflow_result(client: Client):
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
         payload_limits=PayloadLimitsConfig(
-            payload_upload_error_limit=5 * 1024, payload_upload_warning_limit=1024
+            payload_upload_warning_limit=1024,
         ),
     )
     worker_client = Client(**config)
@@ -8775,12 +8780,11 @@ async def test_large_payload_error_activity_input(client: Client):
         client.service_client.config.target_host,
         namespace=client.namespace,
         runtime=worker_runtime,
-        data_converter=dataclasses.replace(
-            temporalio.converter.default(),
-            payload_limits=PayloadLimitsConfig(
+        data_converter=temporalio.converter.default()._with_payload_error_limits(
+            _PayloadErrorLimits(
+                memo_upload_error_limit=0,
                 payload_upload_error_limit=error_limit,
-                payload_upload_warning_limit=1024,
-            ),
+            )
         ),
     )
 
@@ -8831,7 +8835,7 @@ async def test_large_payload_warning_activity_input(client: Client):
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
         payload_limits=PayloadLimitsConfig(
-            payload_upload_error_limit=5 * 1024, payload_upload_warning_limit=1024
+            payload_upload_warning_limit=1024,
         ),
     )
     worker_client = Client(**config)
@@ -8875,12 +8879,11 @@ async def test_large_payload_error_activity_result(client: Client):
         client.service_client.config.target_host,
         namespace=client.namespace,
         runtime=worker_runtime,
-        data_converter=dataclasses.replace(
-            temporalio.converter.default(),
-            payload_limits=PayloadLimitsConfig(
+        data_converter=temporalio.converter.default()._with_payload_error_limits(
+            _PayloadErrorLimits(
+                memo_upload_error_limit=0,
                 payload_upload_error_limit=error_limit,
-                payload_upload_warning_limit=1024,
-            ),
+            )
         ),
     )
 
@@ -8934,7 +8937,7 @@ async def test_large_payload_warning_activity_result(client: Client):
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
         payload_limits=PayloadLimitsConfig(
-            payload_upload_error_limit=5 * 1024, payload_upload_warning_limit=1024
+            payload_upload_warning_limit=1024,
         ),
     )
     worker_client = Client(**config)
