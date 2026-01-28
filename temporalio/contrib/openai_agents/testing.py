@@ -1,5 +1,6 @@
 """Testing utilities for OpenAI agents."""
 
+import typing
 from collections.abc import AsyncIterator, Callable, Sequence
 from typing import Any
 
@@ -36,6 +37,9 @@ __all__ = [
     "TestModel",
     "TestModelProvider",
 ]
+
+if typing.TYPE_CHECKING:
+    from opentelemetry.sdk.trace.export import SpanExporter
 
 
 class ResponseBuilders:
@@ -226,6 +230,8 @@ class AgentEnvironment:
             StatelessMCPServerProvider | StatefulMCPServerProvider
         ] = (),
         register_activities: bool = True,
+        add_temporal_spans: bool = True,
+        otel_exporters: Sequence["SpanExporter"] | None = None,
     ) -> None:
         """Initialize the AgentEnvironment.
 
@@ -242,6 +248,10 @@ class AgentEnvironment:
                 If both are provided, model_provider will be used.
             mcp_server_providers: Sequence of MCP servers to automatically register with the worker.
             register_activities: Whether to register activities during worker execution.
+            add_temporal_spans: Whether to add temporal spans to traces
+            otel_exporters: Optional sequence of OpenTelemetry span exporters for telemetry export.
+                When provided, automatically sets up OpenAI agents instrumentation with proper
+                Temporal workflow replay semantics. If None, no OTEL instrumentation is configured.
 
         .. warning::
            This API is experimental and may change in the future.
@@ -255,6 +265,8 @@ class AgentEnvironment:
         self._mcp_server_providers = mcp_server_providers
         self._register_activities = register_activities
         self._plugin: OpenAIAgentsPlugin | None = None
+        self._add_temporal_spans = add_temporal_spans
+        self._otel_exporters = otel_exporters
 
     async def __aenter__(self) -> "AgentEnvironment":
         """Enter the async context manager."""
@@ -264,6 +276,8 @@ class AgentEnvironment:
             model_provider=self._model_provider,
             mcp_server_providers=self._mcp_server_providers,
             register_activities=self._register_activities,
+            add_temporal_spans=self._add_temporal_spans,
+            otel_exporters=self._otel_exporters,
         )
 
         return self
