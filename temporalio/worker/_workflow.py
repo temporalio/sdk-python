@@ -376,18 +376,17 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             )
 
         try:
-            await temporalio.bridge.worker.encode_completion(
-                completion,
-                data_converter,
-                encode_headers=self._encode_headers,
-            )
-        except temporalio.exceptions.PayloadSizeError as err:
-            logger.warning(err.message)
-            completion.failed.Clear()
-            await data_converter.encode_failure(err, completion.failed.failure)
-            completion.failed.force_cause = (
-                WorkflowTaskFailedCause.WORKFLOW_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE
-            )
+            try:
+                await temporalio.bridge.worker.encode_completion(
+                    completion,
+                    data_converter,
+                    encode_headers=self._encode_headers,
+                )
+            except temporalio.exceptions.PayloadSizeError as err:
+                logger.warning(err.message)
+                completion.failed.Clear()
+                await data_converter.encode_failure(err, completion.failed.failure)
+                completion.failed.force_cause = WorkflowTaskFailedCause.WORKFLOW_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE
         except Exception as err:
             logger.exception(
                 "Failed encoding completion on workflow with run ID %s", act.run_id
