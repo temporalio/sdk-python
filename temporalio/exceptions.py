@@ -70,6 +70,26 @@ class WorkflowAlreadyStartedError(FailureError):
         self.run_id = run_id
 
 
+class ActivityAlreadyStartedError(FailureError):
+    """Thrown by a client when an activity execution has already started.
+
+    Attributes:
+        activity_id: ID of the already-started activity.
+        activity_type: Activity type name of the already-started activity.
+        run_id: Run ID of the already-started activity if this was raised by the
+            client.
+    """
+
+    def __init__(
+        self, activity_id: str, activity_type: str, *, run_id: str | None = None
+    ) -> None:
+        """Initialize a workflow already started error."""
+        super().__init__("Workflow execution already started")
+        self.activity_id = activity_id
+        self.activity_type = activity_type
+        self.run_id = run_id
+
+
 class ApplicationErrorCategory(IntEnum):
     """Severity category for your application error. Maps to corresponding client-side logging/metrics behaviors"""
 
@@ -247,10 +267,6 @@ class RetryState(IntEnum):
     )
 
 
-# TODO: This error class has required history event fields. I propose we retain it as
-# workflow-specific and introduce client.ActivityFailedError for an error in an activity not
-# started by a workflow. We could deprecate this name and introduce WorkflowActivityError as a
-# preferred-going-forwards alias.
 class ActivityError(FailureError):
     """Error raised on activity failure."""
 
@@ -366,8 +382,6 @@ class ChildWorkflowError(FailureError):
         return self._retry_state
 
 
-# TODO: This error class has required history event fields. Would we retain it as workflow-specific
-# and introduce client.NexusOperationFailureError? See related note on ActivityError above.
 class NexusOperationError(FailureError):
     """Error raised on Nexus operation failure inside a Workflow."""
 

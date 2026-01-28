@@ -126,11 +126,21 @@ class ActivitySerializationContext(SerializationContext):
     activity_id: str | None
     """Activity ID. Optional if this is an activity started from a workflow."""
 
-    activity_type: str
-    """Activity type."""
+    activity_type: str | None
+    """Activity type.
+    
+    .. deprecated::
+        This value may not be set in some bidirectional situations, it should
+        not be relied on.
+    """
 
-    activity_task_queue: str
-    """Activity task queue."""
+    activity_task_queue: str | None
+    """Activity task queue.
+    
+    .. deprecated::
+        This value may not be set in some bidirectional situations, it should
+        not be relied on.
+    """
 
     workflow_id: str | None
     """Workflow ID if this is an activity started from a workflow."""

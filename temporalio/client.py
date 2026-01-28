@@ -1714,7 +1714,7 @@ class Client:
             The result of the activity.
 
         Raises:
-            ActivityFailedError: If the activity completed with a failure.
+            ActivityFailureError: If the activity completed with a failure.
         """
         handle: ActivityHandle[ReturnType] = await self.start_activity(
             cast(Any, activity),
@@ -2398,7 +2398,7 @@ class Client:
 
     def list_activities(
         self,
-        query: str | None = None,
+        query: str,
         *,
         limit: int | None = None,
         page_size: int = 1000,
@@ -2415,7 +2415,7 @@ class Client:
         Therefore any errors will not occur until then.
 
         Args:
-            query: A Temporal visibility list filter for activities.
+            query: A Temporal visibility list filter for activities. Required.
             limit: Maximum number of activities to return. If unset, all
                 activities are returned. Only applies if using the
                 returned :py:class:`ActivityExecutionAsyncIterator`
@@ -2474,7 +2474,7 @@ class Client:
         self,
         activity_id: str,
         *,
-        activity_run_id: str | None = None,
+        run_id: str | None = None,
     ) -> ActivityHandle[Any]: ...
 
     @overload
@@ -2482,16 +2482,16 @@ class Client:
         self,
         activity_id: str,
         *,
+        run_id: str | None = None,
         result_type: type[ReturnType],
-        activity_run_id: str | None = None,
     ) -> ActivityHandle[ReturnType]: ...
 
     def get_activity_handle(
         self,
         activity_id: str,
         *,
+        run_id: str | None = None,
         result_type: type | None = None,
-        activity_run_id: str | None = None,
     ) -> ActivityHandle[Any]:
         """Get a handle to an existing activity, as the caller of that activity.
 
@@ -2505,9 +2505,8 @@ class Client:
 
         Args:
             activity_id: The activity ID.
+            run_id: The activity run ID. If not provided, targets the latest run.
             result_type: The result type to deserialize into.
-            activity_run_id: The activity run ID. If not provided, targets the
-                         latest run.
 
         Returns:
             A handle to the activity.
@@ -2515,7 +2514,7 @@ class Client:
         return ActivityHandle(
             self,
             activity_id,
-            activity_run_id=activity_run_id,
+            run_id=run_id,
             result_type=result_type,
         )
 
@@ -2535,7 +2534,6 @@ class Client:
     def get_async_activity_handle(self, *, task_token: bytes) -> AsyncActivityHandle:
         pass
 
-    # TODO(dan): add typed API get_async_activity_handle_for?
     def get_async_activity_handle(
         self,
         *,
@@ -2544,28 +2542,32 @@ class Client:
         activity_id: str | None = None,
         task_token: bytes | None = None,
     ) -> AsyncActivityHandle:
-        """Get a handle to an activity execution that you control, for manual completion and heartbeating.
+        """Get a handle to an activity execution that you control, for manual
+        completion and heartbeating.
 
-        To get a handle to an activity execution as the caller of that activity, see
-        :py:meth:`Client.get_activity_handle`.
+        To get a handle to an activity execution as the caller of that activity,
+        see :py:meth:`Client.get_activity_handle`.
 
-        This function may be used to get a handle to an activity started by a client, or
-        an activity started by a workflow.
+        This function may be used to get a handle to an activity started by a
+        client, or an activity started by a workflow.
 
-        To get a handle to an activity started by a workflow, use one of the following two calls:
+        To get a handle to an activity started by a workflow, use one of the
+        following two calls:
         - Supply ``workflow_id``, ``run_id``, and ``activity_id``
         - Supply the activity ``task_token`` alone
 
-        To get a handle to an activity not started by a workflow, supply ``activity_id`` and
-        ``run_id``
-
+        To get a handle to an activity not started by a workflow, supply
+        ``activity_id`` and ``run_id``
 
         Args:
-            workflow_id: Workflow ID for the activity.
-            run_id: Run ID for the activity. Cannot be
-                    set if task_token is set.
-            activity_id: ID for the activity.
-            task_token: Task token for the activity.
+            workflow_id: Workflow ID for the activity, or None if not a workflow
+                activity. Cannot be set if task_token is set.
+            run_id: Run ID for the activity or workflow. Cannot be set if
+                task_token is set.
+            activity_id: ID for the activity. Cannot be set if task_token is
+                set.
+            task_token: Task token for the activity. Cannot be set with other
+                fields.
 
         Returns:
             A handle that can be used for completion or heartbeating.
@@ -4039,9 +4041,7 @@ class ActivityExecutionAsyncIterator:
         )
 
         self._current_page = [
-            ActivityExecution._from_raw_info(
-                v, self._client.namespace, self._client.data_converter
-            )
+            ActivityExecution._from_raw_info(v, self._client.namespace)
             for v in resp.executions
         ]
         self._current_page_index = 0
@@ -4113,9 +4113,6 @@ class ActivityExecution:
     scheduled_time: datetime
     """Time the activity was originally scheduled."""
 
-    search_attributes: temporalio.common.SearchAttributes
-    """Search attributes from the start request."""
-
     state_transition_count: int | None
     """Number of state transitions, if available."""
 
@@ -4125,12 +4122,12 @@ class ActivityExecution:
     task_queue: str
     """Task queue the activity was scheduled on."""
 
+    typed_search_attributes: temporalio.common.TypedSearchAttributes
+    """Current set of search attributes if any."""
+
     @classmethod
     def _from_raw_info(
-        cls,
-        info: temporalio.api.activity.v1.ActivityExecutionListInfo,
-        namespace: str,
-        _converter: temporalio.converter.DataConverter,
+        cls, info: temporalio.api.activity.v1.ActivityExecutionListInfo, namespace: str
     ) -> Self:
         """Create from raw proto activity list info."""
         return cls(
@@ -4156,9 +4153,6 @@ class ActivityExecution:
                 if info.HasField("schedule_time")
                 else datetime.min
             ),
-            search_attributes=temporalio.converter.decode_search_attributes(
-                info.search_attributes
-            ),
             state_transition_count=(
                 info.state_transition_count if info.state_transition_count else None
             ),
@@ -4168,71 +4162,10 @@ class ActivityExecution:
                 else temporalio.common.ActivityExecutionStatus.RUNNING
             ),
             task_queue=info.task_queue,
+            typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
+                info.search_attributes
+            ),
         )
-
-
-@dataclass(frozen=True)
-class ActivityExecutionCountAggregationGroup:
-    """A single aggregation group from a count activities call.
-
-    .. warning::
-       This API is experimental.
-    """
-
-    count: int
-    """Count for this group."""
-
-    group_values: Sequence[temporalio.common.SearchAttributeValue]
-    """Values that define this group."""
-
-
-@dataclass(frozen=True)
-class ActivityExecutionCount:
-    """Representation of a count from a count activities call.
-
-    .. warning::
-       This API is experimental.
-    """
-
-    count: int
-    """Total count matching the filter, if any."""
-
-    groups: Sequence[ActivityExecutionCountAggregationGroup]
-    """Aggregation groups if requested."""
-
-    @staticmethod
-    def _from_raw(
-        resp: temporalio.api.workflowservice.v1.CountActivityExecutionsResponse,
-    ) -> ActivityExecutionCount:
-        """Create from raw proto response."""
-        return ActivityExecutionCount(
-            count=resp.count,
-            groups=[
-                ActivityExecutionCountAggregationGroup(
-                    count=g.count,
-                    group_values=[
-                        temporalio.converter._decode_search_attribute_value(v)
-                        for v in g.group_values
-                    ],
-                )
-                for g in resp.groups
-            ],
-        )
-
-
-@dataclass(frozen=True)
-class ActivityExecutionOutcome:
-    """Outcome of a completed activity execution.
-
-    .. warning::
-       This API is experimental.
-    """
-
-    result: Sequence[Any] | None
-    """The decoded result if the activity completed successfully."""
-
-    failure: BaseException | None
-    """The failure if the activity completed unsuccessfully."""
 
 
 @dataclass(frozen=True)
@@ -4258,12 +4191,6 @@ class ActivityExecutionDescription(ActivityExecution):
     expiration_time: datetime
     """Scheduled time plus schedule_to_close_timeout."""
 
-    heartbeat_details: Sequence[Any]
-    """Details from the last heartbeat."""
-
-    input: Sequence[Any] | None
-    """Serialized activity input. None if include_input was False."""
-
     last_attempt_complete_time: datetime | None
     """Time when the last attempt completed."""
 
@@ -4285,14 +4212,14 @@ class ActivityExecutionDescription(ActivityExecution):
     paused: bool
     """Whether the activity is paused."""
 
+    raw_heartbeat_details: Sequence[temporalio.api.common.v1.Payload]
+    """Details from the last heartbeat."""
+
     retry_policy: temporalio.common.RetryPolicy | None
     """Retry policy for the activity."""
 
     run_state: temporalio.common.PendingActivityState | None
     """More detailed breakdown if status is RUNNING."""
-
-    outcome: ActivityExecutionOutcome | None
-    """Outcome of the activity if completed and include_outcome was True."""
 
     long_poll_token: bytes | None
     """Token for follow-on long-poll requests. None if the activity is complete."""
@@ -4301,26 +4228,19 @@ class ActivityExecutionDescription(ActivityExecution):
     async def _from_execution_info(
         cls,
         info: temporalio.api.activity.v1.ActivityExecutionInfo,
-        input: temporalio.api.common.v1.Payloads | None,
-        outcome: temporalio.api.activity.v1.ActivityExecutionOutcome | None,
         long_poll_token: bytes | None,
         namespace: str,
         data_converter: temporalio.converter.DataConverter,
     ) -> Self:
         """Create from raw proto activity execution info."""
-        # Decode outcome if present
-        decoded_outcome: ActivityExecutionOutcome | None = None
-        if outcome is not None:
-            if outcome.HasField("result"):
-                decoded_outcome = ActivityExecutionOutcome(
-                    result=await data_converter.decode(outcome.result.payloads),
-                    failure=None,
-                )
-            elif outcome.HasField("failure"):
-                decoded_outcome = ActivityExecutionOutcome(
-                    result=None,
-                    failure=await data_converter.decode_failure(outcome.failure),
-                )
+        # Decode heartbeat details if present
+        decoded_heartbeat_details: Sequence[temporalio.api.common.v1.Payload] = (
+            info.heartbeat_details.payloads
+        )
+        if decoded_heartbeat_details and data_converter.payload_codec:
+            decoded_heartbeat_details = await data_converter.payload_codec.decode(
+                decoded_heartbeat_details
+            )
 
         return cls(
             activity_id=info.activity_id,
@@ -4350,16 +4270,6 @@ class ActivityExecutionDescription(ActivityExecution):
                 info.expiration_time.ToDatetime(tzinfo=timezone.utc)
                 if info.HasField("expiration_time")
                 else datetime.min
-            ),
-            heartbeat_details=(
-                await data_converter.decode(info.heartbeat_details.payloads)
-                if info.HasField("heartbeat_details")
-                else []
-            ),
-            input=(
-                await data_converter.decode(input.payloads)
-                if input is not None
-                else None
             ),
             last_attempt_complete_time=(
                 info.last_attempt_complete_time.ToDatetime(tzinfo=timezone.utc)
@@ -4392,8 +4302,8 @@ class ActivityExecutionDescription(ActivityExecution):
                 if info.HasField("next_attempt_schedule_time")
                 else None
             ),
-            outcome=decoded_outcome,
             paused=getattr(info, "paused", False),
+            raw_heartbeat_details=decoded_heartbeat_details,
             raw_info=info,
             retry_policy=temporalio.common.RetryPolicy.from_proto(info.retry_policy)
             if info.HasField("retry_policy")
@@ -4404,9 +4314,6 @@ class ActivityExecutionDescription(ActivityExecution):
                 else None
             ),
             scheduled_time=(info.schedule_time.ToDatetime(tzinfo=timezone.utc)),
-            search_attributes=temporalio.converter.decode_search_attributes(
-                info.search_attributes
-            ),
             state_transition_count=(
                 info.state_transition_count if info.state_transition_count else None
             ),
@@ -4416,24 +4323,73 @@ class ActivityExecutionDescription(ActivityExecution):
                 else temporalio.common.ActivityExecutionStatus.RUNNING
             ),
             task_queue=info.task_queue,
+            typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
+                info.search_attributes
+            ),
         )
 
 
 @dataclass(frozen=True)
-class ActivityIDReference:
-    """Information identifying an activity execution.
+class ActivityExecutionCount:
+    """Representation of a count from a count activities call.
 
     .. warning::
        This API is experimental.
     """
 
+    count: int
+    """Total count matching the filter, if any."""
+
+    groups: Sequence[ActivityExecutionCountAggregationGroup]
+    """Aggregation groups if requested."""
+
+    @staticmethod
+    def _from_raw(
+        resp: temporalio.api.workflowservice.v1.CountActivityExecutionsResponse,
+    ) -> ActivityExecutionCount:
+        """Create from raw proto response."""
+        return ActivityExecutionCount(
+            count=resp.count,
+            groups=[
+                ActivityExecutionCountAggregationGroup._from_raw(g) for g in resp.groups
+            ],
+        )
+
+
+@dataclass(frozen=True)
+class ActivityExecutionCountAggregationGroup:
+    """A single aggregation group from a count activities call.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    count: int
+    """Count for this group."""
+
+    group_values: Sequence[temporalio.common.SearchAttributeValue]
+    """Values that define this group."""
+
+    @staticmethod
+    def _from_raw(
+        raw: temporalio.api.workflowservice.v1.CountActivityExecutionsResponse.AggregationGroup,
+    ) -> ActivityExecutionCountAggregationGroup:
+        return ActivityExecutionCountAggregationGroup(
+            count=raw.count,
+            group_values=[
+                temporalio.converter._decode_search_attribute_value(v)
+                for v in raw.group_values
+            ],
+        )
+
+
+@dataclass(frozen=True)
+class AsyncActivityIDReference:
+    """Reference to an async activity by its qualified ID."""
+
     workflow_id: str | None
     run_id: str | None
     activity_id: str
-
-
-# Deprecated alias
-AsyncActivityIDReference = ActivityIDReference
 
 
 class AsyncActivityHandle(WithSerializationContext):
@@ -4575,9 +4531,6 @@ class AsyncActivityHandle(WithSerializationContext):
         )
 
 
-# TODO: in the future when messages can be sent to activities, we will want the activity handle to
-# be generic in the activity type in addition to the return type (as WorkflowHandle), to support
-# static type inference for signal/query/update.
 class ActivityHandle(Generic[ReturnType]):
     """Handle representing an activity execution not started by a workflow.
 
@@ -4588,58 +4541,43 @@ class ActivityHandle(Generic[ReturnType]):
     def __init__(
         self,
         client: Client,
-        activity_id: str,
+        id: str,
         *,
-        activity_run_id: str | None = None,
+        run_id: str | None = None,
         result_type: type | None = None,
-        data_converter_override: DataConverter | None = None,
     ) -> None:
         """Create activity handle."""
         self._client = client
-        self._activity_id = activity_id
-        self._activity_run_id = activity_run_id
+        self._id = id
+        self._run_id = run_id
         self._result_type = result_type
-        self._data_converter_override = data_converter_override
         self._known_outcome: (
             temporalio.api.activity.v1.ActivityExecutionOutcome | None
         ) = None
-        self._cached_result: ReturnType | None = None
-        self._result_fetched: bool = False
 
-    @property
-    def activity_id(self) -> str:
-        """ID of the activity."""
-        return self._activity_id
-
-    @property
-    def activity_run_id(self) -> str | None:
-        """Run ID of the activity."""
-        return self._activity_run_id
-
-    def with_context(self, context: SerializationContext) -> Self:
-        """Create a new ActivityHandle with a different serialization context.
-
-        Payloads received by the activity will be decoded and deserialized using a data converter
-        with :py:class:`ActivitySerializationContext` set as context. If you are using a custom data
-        converter that makes use of this context then you can use this method to supply matching
-        context data to the data converter used to serialize and encode the outbound payloads.
-        """
-        data_converter = self._client.data_converter.with_context(context)
-        if data_converter is self._client.data_converter:
-            return self
-        cls = type(self)
-        if cls.__init__ is not ActivityHandle.__init__:
-            raise TypeError(
-                "If you have subclassed ActivityHandle and overridden the __init__ method "
-                "then you must override with_context to return an instance of your class."
+    @functools.cached_property
+    def _data_converter(self) -> temporalio.converter.DataConverter:
+        return self._client.data_converter.with_context(
+            ActivitySerializationContext(
+                namespace=self._client.namespace,
+                activity_id=self._id,
+                activity_type=None,
+                activity_task_queue=None,
+                is_local=False,
+                workflow_id=None,
+                workflow_type=None,
             )
-        return cls(
-            self._client,
-            activity_id=self._activity_id,
-            activity_run_id=self._activity_run_id,
-            result_type=self._result_type,
-            data_converter_override=data_converter,
         )
+
+    @property
+    def id(self) -> str:
+        """ID of the activity."""
+        return self._id
+
+    @property
+    def run_id(self) -> str | None:
+        """Run ID of the activity."""
+        return self._run_id
 
     async def result(
         self,
@@ -4668,24 +4606,32 @@ class ActivityHandle(Generic[ReturnType]):
             The result of the activity.
 
         Raises:
-            ActivityFailedError: If the activity completed with a failure.
+            ActivityFailureError: If the activity completed with a failure.
             RPCError: Activity result could not be fetched for some reason.
         """
-        if self._result_fetched:
-            return cast(ReturnType, self._cached_result)
-
-        result = await self._client._impl.get_activity_result(
-            GetActivityResultInput[ReturnType](
-                activity_id=self._activity_id,
-                activity_run_id=self._activity_run_id,
-                result_type=self._result_type,
-                rpc_metadata=rpc_metadata,
-                rpc_timeout=rpc_timeout,
-            )
+        await self._poll_until_outcome(
+            rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
         )
-        self._cached_result = result
-        self._result_fetched = True
-        return result
+
+        # Convert outcome to failure or value
+        assert self._known_outcome
+        if self._known_outcome.HasField("failure"):
+            raise ActivityFailureError(
+                cause=await self._data_converter.decode_failure(
+                    self._known_outcome.failure
+                ),
+            )
+        if not self._known_outcome.result.payloads:
+            return None  # type: ignore
+        type_hints = [self._result_type] if self._result_type else None
+        results = await self._data_converter.decode(
+            self._known_outcome.result.payloads, type_hints
+        )
+        if not results:
+            return None  # type: ignore
+        elif len(results) > 1:
+            warnings.warn(f"Expected single activity result, got {len(results)}")
+        return results[0]
 
     async def _poll_until_outcome(
         self,
@@ -4698,8 +4644,8 @@ class ActivityHandle(Generic[ReturnType]):
 
         req = temporalio.api.workflowservice.v1.PollActivityExecutionRequest(
             namespace=self._client.namespace,
-            activity_id=self._activity_id,
-            run_id=self._activity_run_id or "",
+            activity_id=self._id,
+            run_id=self._run_id or "",
         )
 
         # Continue polling as long as we have no outcome
@@ -4750,8 +4696,8 @@ class ActivityHandle(Generic[ReturnType]):
         """
         await self._client._impl.cancel_activity(
             CancelActivityInput(
-                activity_id=self._activity_id,
-                activity_run_id=self._activity_run_id,
+                activity_id=self._id,
+                activity_run_id=self._run_id,
                 reason=reason,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
@@ -4781,8 +4727,8 @@ class ActivityHandle(Generic[ReturnType]):
         """
         await self._client._impl.terminate_activity(
             TerminateActivityInput(
-                activity_id=self._activity_id,
-                activity_run_id=self._activity_run_id,
+                activity_id=self._id,
+                activity_run_id=self._run_id,
                 reason=reason,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
@@ -4792,8 +4738,6 @@ class ActivityHandle(Generic[ReturnType]):
     async def describe(
         self,
         *,
-        include_input: bool = True,
-        include_outcome: bool = False,
         long_poll_token: bytes | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
@@ -4804,9 +4748,6 @@ class ActivityHandle(Generic[ReturnType]):
            This API is experimental.
 
         Args:
-            include_input: If True, include the activity input in the response.
-            include_outcome: If True, include the outcome (result/failure) for
-                completed activities.
             long_poll_token: Token from a previous describe response. If provided,
                 the request will long-poll until the activity state changes.
             rpc_metadata: Headers used on the RPC call.
@@ -4817,10 +4758,8 @@ class ActivityHandle(Generic[ReturnType]):
         """
         return await self._client._impl.describe_activity(
             DescribeActivityInput(
-                activity_id=self._activity_id,
-                activity_run_id=self._activity_run_id,
-                include_input=include_input,
-                include_outcome=include_outcome,
+                activity_id=self._id,
+                activity_run_id=self._run_id,
                 long_poll_token=long_poll_token,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
@@ -7252,7 +7191,7 @@ class WorkflowUpdateRPCTimeoutOrCancelledError(RPCTimeoutOrCancelledError):
         super().__init__("Timeout or cancellation waiting for update")
 
 
-class ActivityFailedError(temporalio.exceptions.TemporalError):
+class ActivityFailureError(temporalio.exceptions.TemporalError):
     """Error that occurs when an activity is unsuccessful.
 
     .. warning::
@@ -7493,24 +7432,7 @@ class DescribeActivityInput:
 
     activity_id: str
     activity_run_id: str | None
-    include_input: bool
-    include_outcome: bool
     long_poll_token: bytes | None
-    rpc_metadata: Mapping[str, str | bytes]
-    rpc_timeout: timedelta | None
-
-
-@dataclass
-class GetActivityResultInput(Generic[ReturnType]):
-    """Input for :py:meth:`OutboundInterceptor.get_activity_result`.
-
-    .. warning::
-       This API is experimental.
-    """
-
-    activity_id: str
-    activity_run_id: str | None
-    result_type: type[ReturnType] | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
 
@@ -7625,7 +7547,7 @@ class StartWorkflowUpdateWithStartInput:
 class HeartbeatAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.heartbeat_async_activity`."""
 
-    id_or_token: ActivityIDReference | bytes
+    id_or_token: AsyncActivityIDReference | bytes
     details: Sequence[Any]
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
@@ -7636,7 +7558,7 @@ class HeartbeatAsyncActivityInput:
 class CompleteAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.complete_async_activity`."""
 
-    id_or_token: ActivityIDReference | bytes
+    id_or_token: AsyncActivityIDReference | bytes
     result: Any | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
@@ -7647,7 +7569,7 @@ class CompleteAsyncActivityInput:
 class FailAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.fail_async_activity`."""
 
-    id_or_token: ActivityIDReference | bytes
+    id_or_token: AsyncActivityIDReference | bytes
     error: Exception
     last_heartbeat_details: Sequence[Any]
     rpc_metadata: Mapping[str, str | bytes]
@@ -7659,7 +7581,7 @@ class FailAsyncActivityInput:
 class ReportCancellationAsyncActivityInput:
     """Input for :py:meth:`OutboundInterceptor.report_cancellation_async_activity`."""
 
-    id_or_token: ActivityIDReference | bytes
+    id_or_token: AsyncActivityIDReference | bytes
     details: Sequence[Any]
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
@@ -7913,16 +7835,6 @@ class OutboundInterceptor:
            This API is experimental.
         """
         return await self.next.describe_activity(input)
-
-    async def get_activity_result(
-        self, input: GetActivityResultInput[ReturnType]
-    ) -> ReturnType:
-        """Called for every :py:meth:`ActivityHandle.result` call.
-
-        .. warning::
-           This API is experimental.
-        """
-        return await self.next.get_activity_result(input)
 
     def list_activities(
         self, input: ListActivitiesInput
@@ -8403,19 +8315,28 @@ class _ClientImpl(OutboundInterceptor):
             )
         req = await self._build_start_activity_execution_request(input)
 
-        # TODO(dan): any counterpart of WorkflowExecutionAlreadyStartedFailure?
-        # If RPCError with err.status == RPCStatusCode.ALREADY_EXISTS
-
-        resp = await self._client.workflow_service.start_activity_execution(
-            req,
-            retry=True,
-            metadata=input.rpc_metadata,
-            timeout=input.rpc_timeout,
-        )
+        resp: temporalio.api.workflowservice.v1.StartActivityExecutionResponse
+        try:
+            resp = await self._client.workflow_service.start_activity_execution(
+                req,
+                retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
+            )
+        except RPCError as err:
+            # If the status is ALREADY_EXISTS and the details can be extracted
+            # as already started, use a different exception
+            if err.status == RPCStatusCode.ALREADY_EXISTS and err.grpc_status.details:
+                details = temporalio.api.errordetails.v1.ActivityExecutionAlreadyStartedFailure()
+                if err.grpc_status.details[0].Unpack(details):
+                    raise temporalio.exceptions.ActivityAlreadyStartedError(
+                        input.id, input.activity_type, run_id=details.run_id
+                    )
+            raise
         return ActivityHandle(
             self._client,
-            activity_id=input.id,
-            activity_run_id=resp.run_id,
+            input.id,
+            run_id=resp.run_id,
             result_type=input.result_type,
         )
 
@@ -8528,8 +8449,6 @@ class _ClientImpl(OutboundInterceptor):
                 namespace=self._client.namespace,
                 activity_id=input.activity_id,
                 run_id=input.activity_run_id or "",
-                include_input=input.include_input,
-                include_outcome=input.include_outcome,
                 long_poll_token=input.long_poll_token or b"",
             ),
             retry=True,
@@ -8538,8 +8457,6 @@ class _ClientImpl(OutboundInterceptor):
         )
         return await ActivityExecutionDescription._from_execution_info(
             info=resp.info,
-            input=resp.input if resp.HasField("input") else None,
-            outcome=resp.outcome if resp.HasField("outcome") else None,
             long_poll_token=resp.long_poll_token or None,
             namespace=self._client.namespace,
             data_converter=self._client.data_converter.with_context(
@@ -8549,55 +8466,6 @@ class _ClientImpl(OutboundInterceptor):
                 )
             ),
         )
-
-    async def get_activity_result(
-        self, input: GetActivityResultInput[ReturnType]
-    ) -> ReturnType:
-        """Get the result of an activity."""
-        req = temporalio.api.workflowservice.v1.PollActivityExecutionRequest(
-            namespace=self._client.namespace,
-            activity_id=input.activity_id,
-            run_id=input.activity_run_id or "",
-        )
-
-        # Poll until we have an outcome
-        outcome: temporalio.api.activity.v1.ActivityExecutionOutcome | None = None
-        while outcome is None:
-            try:
-                res = await self._client.workflow_service.poll_activity_execution(
-                    req,
-                    retry=True,
-                    metadata=input.rpc_metadata,
-                    timeout=input.rpc_timeout,
-                )
-                if res.HasField("outcome"):
-                    outcome = res.outcome
-            except RPCError as err:
-                if err.status == RPCStatusCode.DEADLINE_EXCEEDED:
-                    # Deadline exceeded is expected with long polling; retry
-                    continue
-                elif err.status == RPCStatusCode.CANCELLED:
-                    raise asyncio.CancelledError() from err
-                else:
-                    raise
-            except asyncio.CancelledError:
-                raise
-
-        # Decode the outcome
-        data_converter = self._client.data_converter
-        if outcome.HasField("failure"):
-            raise ActivityFailedError(
-                cause=await data_converter.decode_failure(outcome.failure),
-            )
-
-        # Decode result
-        type_hints: list[type] | None = (
-            [input.result_type] if input.result_type else None
-        )
-        results = await data_converter.decode(outcome.result.payloads, type_hints)
-        if not results:
-            return cast(ReturnType, None)
-        return cast(ReturnType, results[0])
 
     def list_activities(
         self, input: ListActivitiesInput

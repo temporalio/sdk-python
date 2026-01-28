@@ -121,11 +121,15 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "component.nexusoperations.recordCancelRequestCompletionEvents=true",
                 "--dynamic-config-value",
                 "activity.enableStandalone=true",
+                "--dynamic-config-value",
+                "history.enableChasm=true",
+                "--dynamic-config-value",
+                "history.enableTransitionHistory=true",
                 "--http-port",
                 str(http_port),
             ],
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
-            dev_server_existing_path="../next-server-cli/cli/temporal.exe"
+            dev_server_existing_path="../next-server-cli/cli/temporal.exe",
         )
         # TODO(nexus-preview): expose this in a more principled way
         env._http_port = http_port  # type: ignore

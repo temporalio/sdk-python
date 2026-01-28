@@ -10,13 +10,12 @@ from temporalio.client import (
     ActivityExecutionCount,
     ActivityExecutionCountAggregationGroup,
     ActivityExecutionDescription,
-    ActivityFailedError,
+    ActivityFailureError,
     ActivityHandle,
     CancelActivityInput,
     Client,
     CountActivitiesInput,
     DescribeActivityInput,
-    GetActivityResultInput,
     Interceptor,
     ListActivitiesInput,
     OutboundInterceptor,
@@ -93,15 +92,15 @@ class TestDescribe:
     async def test_describe(self, client: Client, activity_handle: ActivityHandle):
         desc = await activity_handle.describe()
         # From ActivityExecution (base class)
-        assert desc.activity_id == activity_handle.activity_id
-        assert desc.activity_run_id == activity_handle.activity_run_id
+        assert desc.activity_id == activity_handle.id
+        assert desc.activity_run_id == activity_handle.run_id
         assert desc.activity_type == "increment"
         assert desc.close_time is None  # not closed yet
         assert desc.execution_duration is None  # not closed yet
         assert desc.namespace == client.namespace
         assert desc.raw_info is not None
         assert desc.scheduled_time is not None
-        assert desc.search_attributes == {}
+        assert len(desc.typed_search_attributes) == 0
         assert desc.state_transition_count is not None
         assert desc.status == ActivityExecutionStatus.RUNNING
         assert desc.task_queue
@@ -111,9 +110,7 @@ class TestDescribe:
         assert desc.current_retry_interval is None
         assert desc.eager_execution_requested is False
         assert desc.expiration_time is not None
-        assert desc.heartbeat_details == []
-        assert desc.input == [42]
-        assert desc.outcome is None
+        assert desc.raw_heartbeat_details == []
         assert desc.run_state == PendingActivityState.SCHEDULED
         assert desc.last_attempt_complete_time is None
         assert desc.last_failure is None
@@ -124,23 +121,6 @@ class TestDescribe:
         assert desc.next_attempt_schedule_time is None
         assert desc.paused is False
         assert desc.retry_policy is not None
-
-        assert (await activity_handle.describe(include_input=False)).input is None
-
-    async def test_describe_include_outcome(self, activity_handle: ActivityHandle):
-        desc = await activity_handle.describe()
-        assert desc.outcome is None
-        assert (await activity_handle.describe(include_outcome=True)).outcome is None
-        async with Worker(
-            activity_handle._client,
-            task_queue=desc.task_queue,
-            activities=[increment],
-        ):
-            await activity_handle.result()
-            desc = await activity_handle.describe(include_outcome=True)
-            assert desc.status == ActivityExecutionStatus.COMPLETED
-            assert desc.run_state is None
-            assert desc.outcome and desc.outcome.result == [43]
 
     async def test_describe_long_poll(self, activity_handle: ActivityHandle):
         desc1 = await activity_handle.describe()
@@ -165,7 +145,6 @@ class ActivityTracingInterceptor(Interceptor):
     def __init__(self) -> None:
         super().__init__()
         self.start_activity_calls: list[StartActivityInput] = []
-        self.get_activity_result_calls: list[GetActivityResultInput] = []
         self.describe_activity_calls: list[DescribeActivityInput] = []
         self.cancel_activity_calls: list[CancelActivityInput] = []
         self.terminate_activity_calls: list[TerminateActivityInput] = []
@@ -189,11 +168,6 @@ class ActivityTracingOutboundInterceptor(OutboundInterceptor):
         assert isinstance(input, StartActivityInput)
         self._parent.start_activity_calls.append(input)
         return await super().start_activity(input)
-
-    async def get_activity_result(self, input: GetActivityResultInput):
-        assert isinstance(input, GetActivityResultInput)
-        self._parent.get_activity_result_calls.append(input)
-        return await super().get_activity_result(input)
 
     async def describe_activity(self, input: DescribeActivityInput):
         assert isinstance(input, DescribeActivityInput)
@@ -246,39 +220,6 @@ async def test_start_activity_calls_interceptor(client: Client):
     assert call.id == activity_id
     assert call.task_queue == task_queue
     assert call.activity_type == "increment"
-
-
-async def test_get_activity_result_calls_interceptor(client: Client):
-    """ActivityHandle.result() should call the get_activity_result interceptor."""
-    interceptor = ActivityTracingInterceptor()
-    intercepted_client = Client(
-        service_client=client.service_client,
-        namespace=client.namespace,
-        interceptors=[interceptor],
-    )
-
-    activity_id = str(uuid.uuid4())
-    task_queue = str(uuid.uuid4())
-
-    activity_handle = await intercepted_client.start_activity(
-        increment,
-        args=(1,),
-        id=activity_id,
-        task_queue=task_queue,
-        start_to_close_timeout=timedelta(seconds=5),
-    )
-
-    async with Worker(
-        intercepted_client,
-        task_queue=task_queue,
-        activities=[increment],
-    ):
-        result = await activity_handle.result()
-        assert result == 2
-
-    assert len(interceptor.get_activity_result_calls) == 1
-    call = interceptor.get_activity_result_calls[0]
-    assert call.activity_id == activity_id
 
 
 async def test_describe_activity_calls_interceptor(client: Client):
@@ -464,20 +405,20 @@ async def test_get_activity_handle(client: Client):
     )
 
     handle_by_id = client.get_activity_handle(activity_id)
-    assert handle_by_id.activity_id == activity_id
-    assert handle_by_id.activity_run_id is None
+    assert handle_by_id.id == activity_id
+    assert handle_by_id.run_id is None
 
     handle_by_id_and_run_id = client.get_activity_handle(
         activity_id,
-        activity_run_id=activity_handle.activity_run_id,
+        run_id=activity_handle.run_id,
     )
-    assert handle_by_id_and_run_id.activity_id == activity_id
-    assert handle_by_id_and_run_id.activity_run_id == activity_handle.activity_run_id
+    assert handle_by_id_and_run_id.id == activity_id
+    assert handle_by_id_and_run_id.run_id == activity_handle.run_id
 
     handle_with_result_type = client.get_activity_handle(
         activity_id,
+        run_id=activity_handle.run_id,
         result_type=int,
-        activity_run_id=activity_handle.activity_run_id,
     )
 
     async with Worker(
@@ -511,8 +452,7 @@ async def test_list_activities(client: Client):
     assert execution.activity_type == "increment"
     assert execution.task_queue == task_queue
     assert execution.status == ActivityExecutionStatus.RUNNING
-    # TODO: not being set by server?
-    # assert isinstance(execution.state_transition_count, int)
+    assert execution.state_transition_count is None  # Not set until activity completes
 
 
 async def test_count_activities(client: Client):
@@ -595,7 +535,7 @@ async def test_manual_completion(client: Client):
 
     activity_handle = await client.start_activity(
         async_activity,
-        args=(ActivityInput(event_workflow_id=event_workflow_id),),  # TODO: overloads
+        ActivityInput(event_workflow_id=event_workflow_id),
         id=activity_id,
         task_queue=task_queue,
         start_to_close_timeout=timedelta(seconds=5),
@@ -616,7 +556,7 @@ async def test_manual_completion(client: Client):
         # Complete activity manually
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
-            run_id=activity_handle.activity_run_id,
+            run_id=activity_handle.run_id,
         )
         await async_activity_handle.complete(7)
         assert await activity_handle.result() == 7
@@ -632,7 +572,7 @@ async def test_manual_cancellation(client: Client):
 
     activity_handle = await client.start_activity(
         async_activity,
-        args=(ActivityInput(event_workflow_id=event_workflow_id),),  # TODO: overloads
+        ActivityInput(event_workflow_id=event_workflow_id),
         id=activity_id,
         task_queue=task_queue,
         start_to_close_timeout=timedelta(seconds=5),
@@ -652,7 +592,7 @@ async def test_manual_cancellation(client: Client):
         )
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
-            run_id=activity_handle.activity_run_id,
+            run_id=activity_handle.run_id,
         )
 
         # report_cancellation fails if activity is not in CANCELLATION_REQUESTED state
@@ -667,7 +607,7 @@ async def test_manual_cancellation(client: Client):
         # Now report_cancellation succeeds
         await async_activity_handle.report_cancellation("Test cancellation")
 
-        with pytest.raises(ActivityFailedError) as exc_info:
+        with pytest.raises(ActivityFailureError) as exc_info:
             await activity_handle.result()
         assert isinstance(exc_info.value.cause, CancelledError)
         assert list(exc_info.value.cause.details) == ["Test cancellation"]
@@ -683,7 +623,7 @@ async def test_manual_failure(client: Client):
 
     activity_handle = await client.start_activity(
         async_activity,
-        args=(ActivityInput(event_workflow_id=event_workflow_id),),  # TODO: overloads
+        ActivityInput(event_workflow_id=event_workflow_id),
         id=activity_id,
         task_queue=task_queue,
         start_to_close_timeout=timedelta(seconds=5),
@@ -701,12 +641,12 @@ async def test_manual_failure(client: Client):
         )
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
-            run_id=activity_handle.activity_run_id,
+            run_id=activity_handle.run_id,
         )
         await async_activity_handle.fail(
             ApplicationError("Test failure", non_retryable=True)
         )
-        with pytest.raises(ActivityFailedError) as err:
+        with pytest.raises(ActivityFailureError) as err:
             await activity_handle.result()
         assert isinstance(err.value.cause, ApplicationError)
         assert str(err.value.cause) == "Test failure"
@@ -752,12 +692,10 @@ async def test_manual_heartbeat(client: Client):
 
     activity_handle = await client.start_activity(
         activity_for_testing_heartbeat,
-        args=(
-            ActivityInput(
-                event_workflow_id=event_workflow_id,
-                wait_for_activity_start_workflow_id=wait_for_activity_start_workflow_id,
-            ),
-        ),  # TODO: overloads
+        ActivityInput(
+            event_workflow_id=event_workflow_id,
+            wait_for_activity_start_workflow_id=wait_for_activity_start_workflow_id,
+        ),
         id=activity_id,
         task_queue=task_queue,
         start_to_close_timeout=timedelta(seconds=5),
@@ -775,7 +713,7 @@ async def test_manual_heartbeat(client: Client):
     ):
         async_activity_handle = client.get_async_activity_handle(
             activity_id=activity_id,
-            run_id=activity_handle.activity_run_id,
+            run_id=activity_handle.run_id,
         )
         await wait_for_activity_start_wf_handle.result()
         await async_activity_handle.heartbeat("Test heartbeat details")
@@ -789,6 +727,7 @@ async def test_id_conflict_policy_fail(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     from temporalio.common import ActivityIDConflictPolicy
+    from temporalio.exceptions import ActivityAlreadyStartedError
 
     await client.start_activity(
         increment,
@@ -799,7 +738,7 @@ async def test_id_conflict_policy_fail(client: Client):
         id_conflict_policy=ActivityIDConflictPolicy.FAIL,
     )
 
-    with pytest.raises(RPCError) as err:
+    with pytest.raises(ActivityAlreadyStartedError) as err:
         await client.start_activity(
             increment,
             1,
@@ -808,7 +747,7 @@ async def test_id_conflict_policy_fail(client: Client):
             schedule_to_close_timeout=timedelta(seconds=60),
             id_conflict_policy=ActivityIDConflictPolicy.FAIL,
         )
-    assert err.value.status == RPCStatusCode.ALREADY_EXISTS
+    assert err.value.activity_id == activity_id
 
 
 async def test_id_conflict_policy_use_existing(client: Client):
@@ -834,14 +773,15 @@ async def test_id_conflict_policy_use_existing(client: Client):
         id_conflict_policy=ActivityIDConflictPolicy.USE_EXISTING,
     )
 
-    assert handle1.activity_id == handle2.activity_id
-    assert handle1.activity_run_id == handle2.activity_run_id
+    assert handle1.id == handle2.id
+    assert handle1.run_id == handle2.run_id
 
 
 async def test_id_reuse_policy_reject_duplicate(client: Client):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     from temporalio.common import ActivityIDReusePolicy
+    from temporalio.exceptions import ActivityAlreadyStartedError
 
     handle = await client.start_activity(
         increment,
@@ -859,7 +799,7 @@ async def test_id_reuse_policy_reject_duplicate(client: Client):
     ):
         await handle.result()
 
-    with pytest.raises(RPCError) as err:
+    with pytest.raises(ActivityAlreadyStartedError) as err:
         await client.start_activity(
             increment,
             1,
@@ -868,7 +808,7 @@ async def test_id_reuse_policy_reject_duplicate(client: Client):
             start_to_close_timeout=timedelta(seconds=5),
             id_reuse_policy=ActivityIDReusePolicy.REJECT_DUPLICATE,
         )
-    assert err.value.status == RPCStatusCode.ALREADY_EXISTS
+    assert err.value.activity_id == activity_id
 
 
 async def test_id_reuse_policy_allow_duplicate(client: Client):
@@ -901,8 +841,8 @@ async def test_id_reuse_policy_allow_duplicate(client: Client):
         id_reuse_policy=ActivityIDReusePolicy.ALLOW_DUPLICATE,
     )
 
-    assert handle1.activity_id == handle2.activity_id
-    assert handle1.activity_run_id != handle2.activity_run_id
+    assert handle1.id == handle2.id
+    assert handle1.run_id != handle2.run_id
 
 
 async def test_search_attributes(client: Client):
@@ -930,8 +870,10 @@ async def test_search_attributes(client: Client):
     )
 
     desc = await handle.describe()
-    assert desc.search_attributes is not None
-    assert desc.search_attributes["TemporalChangeVersion"] == ["test-1", "test-2"]
+    assert desc.typed_search_attributes[temporal_change_version_key] == [
+        "test-1",
+        "test-2",
+    ]
 
 
 async def test_retry_policy(client: Client):
@@ -989,7 +931,7 @@ async def test_terminate(client: Client):
 
         await activity_handle.terminate(reason="Test termination")
 
-        with pytest.raises(ActivityFailedError):
+        with pytest.raises(ActivityFailureError):
             await activity_handle.result()
 
         desc = await activity_handle.describe()
