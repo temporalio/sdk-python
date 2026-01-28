@@ -392,9 +392,7 @@ class _ActivityWorker:
                     temporalio.exceptions.PayloadSizeError,
                 ):
                     temporalio.activity.logger.warning(
-                        "Activity task failed: payloads size exceeded the error limit. Size: %d bytes, Limit: %d bytes",
-                        err.payloads_size,
-                        err.payloads_limit,
+                        err.message,
                         extra={"__temporal_error_identifier": "ActivityFailure"},
                     )
                     await data_converter.encode_failure(

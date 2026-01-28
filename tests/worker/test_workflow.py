@@ -8568,14 +8568,17 @@ async def test_large_payload_warning_workflow_input(client: Client):
 
         assert len(w) == 1
         assert issubclass(w[-1].category, UserWarning)
-        assert "Payloads size exceeded the warning limit" in str(w[-1].message)
+        assert (
+            "PAYLOAD_LIMIT_WARNING: Payloads size exceeded the warning limit."
+            in str(w[-1].message)
+        )
 
 
 async def test_large_payload_warning_workflow_memo(client: Client):
     config = client.config()
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
-        payload_limits=PayloadLimitsConfig(payload_upload_warning_limit=128),
+        payload_limits=PayloadLimitsConfig(memo_upload_warning_limit=128),
     )
     client = Client(**config)
 
@@ -8593,12 +8596,18 @@ async def test_large_payload_warning_workflow_memo(client: Client):
                 ),
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                memo={"key1": [0] * 256},
+                memo={
+                    "key1": [0] * 64,
+                    "key2": [0] * 64,
+                    "key3": [0] * 64,
+                },
             )
 
         assert len(w) == 1
         assert issubclass(w[-1].category, UserWarning)
-        assert "Payloads size exceeded the warning limit" in str(w[-1].message)
+        assert "MEMO_LIMIT_WARNING: Memo size exceeded the warning limit." in str(
+            w[-1].message
+        )
 
 
 async def test_large_payload_error_workflow_result(client: Client):
@@ -8654,7 +8663,8 @@ async def test_large_payload_error_workflow_result(client: Client):
         def worker_logger_predicate(record: logging.LogRecord) -> bool:
             return (
                 record.levelname == "WARNING"
-                and "Payloads size exceeded the error limit" in record.msg
+                and "PAYLOAD_LIMIT_ERROR: Payloads size exceeded the error limit."
+                in record.msg
             )
 
         assert worker_logger_capturer.find(worker_logger_predicate)
@@ -8662,7 +8672,7 @@ async def test_large_payload_error_workflow_result(client: Client):
         def root_logger_predicate(record: logging.LogRecord) -> bool:
             return (
                 record.levelname == "WARNING"
-                and "Workflow task failed: payloads size exceeded the error limit."
+                and "PAYLOAD_LIMIT_ERROR: Payloads size exceeded the error limit."
                 in record.msg
                 and f"Limit: {error_limit} bytes" in record.msg
             )
@@ -8699,7 +8709,10 @@ async def test_large_payload_warning_workflow_result(client: Client):
 
         assert len(w) == 1
         assert issubclass(w[-1].category, UserWarning)
-        assert "Payloads size exceeded the warning limit" in str(w[-1].message)
+        assert (
+            "PAYLOAD_LIMIT_WARNING: Payloads size exceeded the warning limit."
+            in str(w[-1].message)
+        )
 
 
 async def test_large_payload_error_activity_input(client: Client):
@@ -8754,7 +8767,8 @@ async def test_large_payload_error_activity_input(client: Client):
         def worker_logger_predicate(record: logging.LogRecord) -> bool:
             return (
                 record.levelname == "WARNING"
-                and "Payloads size exceeded the error limit" in record.msg
+                and "PAYLOAD_LIMIT_ERROR: Payloads size exceeded the error limit."
+                in record.msg
             )
 
         assert worker_logger_capturer.find(worker_logger_predicate)
@@ -8762,7 +8776,7 @@ async def test_large_payload_error_activity_input(client: Client):
         def root_logger_predicate(record: logging.LogRecord) -> bool:
             return (
                 record.levelname == "WARNING"
-                and "Workflow task failed: payloads size exceeded the error limit."
+                and "PAYLOAD_LIMIT_ERROR: Payloads size exceeded the error limit."
                 in record.msg
                 and f"Limit: {error_limit} bytes" in record.msg
             )
@@ -8798,7 +8812,10 @@ async def test_large_payload_warning_activity_input(client: Client):
 
         assert len(w) == 1
         assert issubclass(w[-1].category, UserWarning)
-        assert "Payloads size exceeded the warning limit" in str(w[-1].message)
+        assert (
+            "PAYLOAD_LIMIT_WARNING: Payloads size exceeded the warning limit."
+            in str(w[-1].message)
+        )
 
 
 async def test_large_payload_error_activity_result(client: Client):
@@ -8857,7 +8874,7 @@ async def test_large_payload_error_activity_result(client: Client):
                 hasattr(record, "__temporal_error_identifier")
                 and getattr(record, "__temporal_error_identifier") == "ActivityFailure"
                 and record.levelname == "WARNING"
-                and "Activity task failed: payloads size exceeded the error limit."
+                and "PAYLOAD_LIMIT_ERROR: Payloads size exceeded the error limit."
                 in record.msg
                 and f"Limit: {error_limit} bytes" in record.msg
             )
@@ -8900,4 +8917,7 @@ async def test_large_payload_warning_activity_result(client: Client):
 
         assert len(w) == 1
         assert issubclass(w[-1].category, UserWarning)
-        assert "Payloads size exceeded the warning limit" in str(w[-1].message)
+        assert (
+            "PAYLOAD_LIMIT_WARNING: Payloads size exceeded the warning limit."
+            in str(w[-1].message)
+        )

@@ -382,15 +382,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 encode_headers=self._encode_headers,
             )
         except temporalio.exceptions.PayloadSizeError as err:
-            # TODO: Would like to use temporalio.workflow.logger here, but
-            # that requires being in the workflow event loop. Possibly refactor
-            # the logger core functionality into shareable class and update
-            # LoggerAdapter to be a decorator.
-            logger.warning(
-                "Workflow task failed: payloads size exceeded the error limit. Size: %d bytes, Limit: %d bytes",
-                err.payloads_size,
-                err.payloads_limit,
-            )
+            logger.warning(err.message)
             completion.failed.Clear()
             await data_converter.encode_failure(err, completion.failed.failure)
             completion.failed.force_cause = (

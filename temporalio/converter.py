@@ -1430,11 +1430,14 @@ class DataConverter(WithSerializationContext):
             memo.fields[k].CopyFrom(payload)
             payloads.append(payload)
         # Memos have their field payloads validated all together in one unit
+        # The MEMO_LIMIT_ERROR and MEMO_LIMIT_WARNING markers are added
+        # for improved searchability in unstructured logs.
         self._validate_limits(
             payloads,
             self._memo_upload_error_limit,
+            "MEMO_LIMIT_ERROR: Memo size exceeded the error limit.",
             self.payload_limits.memo_upload_warning_limit,
-            "Memo size exceeded the warning limit.",
+            "MEMO_LIMIT_WARNING: Memo size exceeded the warning limit.",
         )
 
     async def _encode_payload(
@@ -1518,17 +1521,21 @@ class DataConverter(WithSerializationContext):
         self,
         payloads: Sequence[temporalio.api.common.v1.Payload],
     ):
+        # The PAYLOAD_LIMIT_ERROR and PAYLOAD_LIMIT_WARNING markers are added
+        # for improved searchability in unstructured logs.
         self._validate_limits(
             payloads,
             self._payload_upload_error_limit,
+            "PAYLOAD_LIMIT_ERROR: Payloads size exceeded the error limit.",
             self.payload_limits.payload_upload_warning_limit,
-            "Payloads size exceeded the warning limit.",
+            "PAYLOAD_LIMIT_WARNING: Payloads size exceeded the warning limit.",
         )
 
     def _validate_limits(
         self,
         payloads: Sequence[temporalio.api.common.v1.Payload],
         error_limit: int,
+        error_message: str,
         warning_limit: int,
         warning_message: str,
     ):
@@ -1536,8 +1543,7 @@ class DataConverter(WithSerializationContext):
 
         if error_limit > 0 and total_size > error_limit:
             raise temporalio.exceptions.PayloadSizeError(
-                size=total_size,
-                limit=error_limit,
+                f"{error_message} Size: {total_size} bytes, Limit: {error_limit} bytes"
             )
 
         if warning_limit > 0 and total_size > warning_limit:
