@@ -8498,6 +8498,7 @@ async def test_disable_logger_sandbox(
 class LargePayloadWorkflowInput:
     activity_input_data_size: int
     activity_output_data_size: int
+    activity_exception_data_size: int
     workflow_output_data_size: int
     data: list[int]
 
@@ -8509,6 +8510,7 @@ class LargePayloadWorkflowOutput:
 
 @dataclass
 class LargePayloadActivityInput:
+    exception_data_size: int
     output_data_size: int
     data: list[int]
 
@@ -8522,6 +8524,10 @@ class LargePayloadActivityOutput:
 async def large_payload_activity(
     input: LargePayloadActivityInput,
 ) -> LargePayloadActivityOutput:
+    if input.exception_data_size > 0:
+        raise ApplicationError(
+            "Intentially failing activity", "a" * input.exception_data_size
+        )
     return LargePayloadActivityOutput(data=[0] * input.output_data_size)
 
 
@@ -8532,6 +8538,7 @@ class LargePayloadWorkflow:
         await workflow.execute_activity(
             large_payload_activity,
             LargePayloadActivityInput(
+                exception_data_size=input.activity_exception_data_size,
                 output_data_size=input.activity_output_data_size,
                 data=[0] * input.activity_input_data_size,
             ),
@@ -8540,7 +8547,7 @@ class LargePayloadWorkflow:
         return LargePayloadWorkflowOutput(data=[0] * input.workflow_output_data_size)
 
 
-async def test_large_payload_warning_workflow_input(client: Client):
+async def test_large_payload_workflow_input_warning(client: Client):
     config = client.config()
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
@@ -8559,6 +8566,7 @@ async def test_large_payload_warning_workflow_input(client: Client):
                 LargePayloadWorkflowInput(
                     activity_input_data_size=0,
                     activity_output_data_size=0,
+                    activity_exception_data_size=0,
                     workflow_output_data_size=0,
                     data=[0] * 2 * 1024,
                 ),
@@ -8574,7 +8582,7 @@ async def test_large_payload_warning_workflow_input(client: Client):
         )
 
 
-async def test_large_payload_warning_workflow_memo(client: Client):
+async def test_large_payload_workflow_memo_warning(client: Client):
     config = client.config()
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
@@ -8591,6 +8599,7 @@ async def test_large_payload_warning_workflow_memo(client: Client):
                 LargePayloadWorkflowInput(
                     activity_input_data_size=0,
                     activity_output_data_size=0,
+                    activity_exception_data_size=0,
                     workflow_output_data_size=0,
                     data=[],
                 ),
@@ -8610,7 +8619,7 @@ async def test_large_payload_warning_workflow_memo(client: Client):
         )
 
 
-async def test_large_payload_error_workflow_result(client: Client):
+async def test_large_payload_workflow_result_error(client: Client):
     # Create worker runtime with forwarded logger
     worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
     worker_runtime = Runtime(
@@ -8649,6 +8658,7 @@ async def test_large_payload_error_workflow_result(client: Client):
                     LargePayloadWorkflowInput(
                         activity_input_data_size=0,
                         activity_output_data_size=0,
+                        activity_exception_data_size=0,
                         workflow_output_data_size=6 * 1024,
                         data=[],
                     ),
@@ -8680,7 +8690,7 @@ async def test_large_payload_error_workflow_result(client: Client):
         assert root_logger_capturer.find(root_logger_predicate)
 
 
-async def test_large_payload_warning_workflow_result(client: Client):
+async def test_large_payload_workflow_result_warning(client: Client):
     config = client.config()
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
@@ -8699,6 +8709,7 @@ async def test_large_payload_warning_workflow_result(client: Client):
                 LargePayloadWorkflowInput(
                     activity_input_data_size=0,
                     activity_output_data_size=0,
+                    activity_exception_data_size=0,
                     workflow_output_data_size=2 * 1024,
                     data=[],
                 ),
@@ -8715,7 +8726,7 @@ async def test_large_payload_warning_workflow_result(client: Client):
         )
 
 
-async def test_large_payload_error_activity_input(client: Client):
+async def test_large_payload_activity_input_error(client: Client):
     # Create worker runtime with forwarded logger
     worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
     worker_runtime = Runtime(
@@ -8754,6 +8765,7 @@ async def test_large_payload_error_activity_input(client: Client):
                     LargePayloadWorkflowInput(
                         activity_input_data_size=6 * 1024,
                         activity_output_data_size=0,
+                        activity_exception_data_size=0,
                         workflow_output_data_size=0,
                         data=[],
                     ),
@@ -8784,7 +8796,7 @@ async def test_large_payload_error_activity_input(client: Client):
         assert root_logger_capturer.find(root_logger_predicate)
 
 
-async def test_large_payload_warning_activity_input(client: Client):
+async def test_large_payload_activity_input_warning(client: Client):
     config = client.config()
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
@@ -8803,6 +8815,7 @@ async def test_large_payload_warning_activity_input(client: Client):
                 LargePayloadWorkflowInput(
                     activity_input_data_size=2 * 1024,
                     activity_output_data_size=0,
+                    activity_exception_data_size=0,
                     workflow_output_data_size=0,
                     data=[],
                 ),
@@ -8818,7 +8831,76 @@ async def test_large_payload_warning_activity_input(client: Client):
         )
 
 
-async def test_large_payload_error_activity_result(client: Client):
+async def test_large_payload_activity_exception_error(client: Client):
+    # Create worker runtime with forwarded logger
+    worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
+    worker_runtime = Runtime(
+        telemetry=TelemetryConfig(
+            logging=LoggingConfig(
+                filter=TelemetryFilter(core_level="WARN", other_level="ERROR"),
+                forwarding=LogForwardingConfig(logger=worker_logger),
+            )
+        )
+    )
+
+    # Create client for worker with custom payload limits
+    error_limit = 5 * 1024
+    worker_client = await Client.connect(
+        client.service_client.config.target_host,
+        namespace=client.namespace,
+        runtime=worker_runtime,
+        data_converter=temporalio.converter.default()._with_payload_error_limits(
+            _PayloadErrorLimits(
+                memo_upload_error_limit=0,
+                payload_upload_error_limit=error_limit,
+            )
+        ),
+    )
+
+    with (
+        LogCapturer().logs_captured(
+            activity.logger.base_logger
+        ) as activity_logger_capturer,
+        # LogCapturer().logs_captured(worker_logger) as worker_logger_capturer,
+    ):
+        async with new_worker(
+            worker_client, LargePayloadWorkflow, activities=[large_payload_activity]
+        ) as worker:
+            with pytest.raises(WorkflowFailureError) as err:
+                await client.execute_workflow(
+                    LargePayloadWorkflow.run,
+                    LargePayloadWorkflowInput(
+                        activity_input_data_size=0,
+                        activity_output_data_size=0,
+                        activity_exception_data_size=6 * 1024,
+                        workflow_output_data_size=0,
+                        data=[],
+                    ),
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+
+            assert isinstance(err.value.cause, ActivityError)
+            assert isinstance(err.value.cause.cause, ApplicationError)
+
+        def activity_logger_predicate(record: logging.LogRecord) -> bool:
+            return (
+                record.levelname == "ERROR"
+                and "PAYLOAD_LIMIT_ERROR: Payloads size exceeded the error limit."
+                in record.msg
+            )
+
+        assert activity_logger_capturer.find(activity_logger_predicate)
+
+        # Worker logger is not emitting this follow message. Maybe activity completion failures
+        # are not routed through the log forwarder whereas workflow completion failures are?
+        # def worker_logger_predicate(record: logging.LogRecord) -> bool:
+        #     return "Payloads size exceeded the error limit" in record.msg
+
+        # assert worker_logger_capturer.find(worker_logger_predicate)
+
+
+async def test_large_payload_activity_result_error(client: Client):
     # Create worker runtime with forwarded logger
     worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
     worker_runtime = Runtime(
@@ -8859,6 +8941,7 @@ async def test_large_payload_error_activity_result(client: Client):
                     LargePayloadWorkflowInput(
                         activity_input_data_size=0,
                         activity_output_data_size=6 * 1024,
+                        activity_exception_data_size=0,
                         workflow_output_data_size=0,
                         data=[],
                     ),
@@ -8872,7 +8955,7 @@ async def test_large_payload_error_activity_result(client: Client):
         def activity_logger_predicate(record: logging.LogRecord) -> bool:
             return (
                 hasattr(record, "__temporal_error_identifier")
-                and getattr(record, "__temporal_error_identifier") == "ActivityFailure"
+                and getattr(record, "__temporal_error_identifier") == "PayloadSizeError"
                 and record.levelname == "WARNING"
                 and "PAYLOAD_LIMIT_ERROR: Payloads size exceeded the error limit."
                 in record.msg
@@ -8889,7 +8972,7 @@ async def test_large_payload_error_activity_result(client: Client):
         # assert worker_logger_capturer.find(worker_logger_predicate)
 
 
-async def test_large_payload_warning_activity_result(client: Client):
+async def test_large_payload_activity_result_warning(client: Client):
     config = client.config()
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
@@ -8908,6 +8991,7 @@ async def test_large_payload_warning_activity_result(client: Client):
                 LargePayloadWorkflowInput(
                     activity_input_data_size=0,
                     activity_output_data_size=2 * 1024,
+                    activity_exception_data_size=0,
                     workflow_output_data_size=0,
                     data=[],
                 ),
