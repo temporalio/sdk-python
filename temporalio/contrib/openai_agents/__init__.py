@@ -12,7 +12,11 @@ from temporalio.contrib.openai_agents._mcp import (
     StatefulMCPServerProvider,
     StatelessMCPServerProvider,
 )
-from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
+from temporalio.contrib.openai_agents._model_parameters import (
+    ModelActivityParameters,
+    ModelSummaryProvider,
+    StreamingOptions,
+)
 from temporalio.contrib.openai_agents._temporal_openai_agents import (
     OpenAIAgentsPlugin,
     OpenAIPayloadConverter,
@@ -24,10 +28,12 @@ from . import testing, workflow
 __all__ = [
     "AgentsWorkflowError",
     "ModelActivityParameters",
+    "ModelSummaryProvider",
     "OpenAIAgentsPlugin",
     "OpenAIPayloadConverter",
     "StatelessMCPServerProvider",
     "StatefulMCPServerProvider",
+    "StreamingOptions",
     "testing",
     "workflow",
 ]

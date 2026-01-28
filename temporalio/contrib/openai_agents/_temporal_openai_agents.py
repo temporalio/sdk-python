@@ -12,7 +12,10 @@ from agents.tracing import get_trace_provider
 from agents.tracing.provider import DefaultTraceProvider
 
 from temporalio.contrib.openai_agents._invoke_model_activity import ModelActivity
-from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
+from temporalio.contrib.openai_agents._model_parameters import (
+    ModelActivityParameters,
+    StreamingOptions,
+)
 from temporalio.contrib.openai_agents._openai_runner import (
     TemporalOpenAIRunner,
 )
@@ -46,6 +49,7 @@ if typing.TYPE_CHECKING:
 def set_open_ai_agent_temporal_overrides(
     model_params: ModelActivityParameters,
     auto_close_tracing_in_workflows: bool = False,
+    streaming_options: StreamingOptions = StreamingOptions(),
 ):
     """Configure Temporal-specific overrides for OpenAI agents.
 
@@ -66,6 +70,7 @@ def set_open_ai_agent_temporal_overrides(
     Args:
         model_params: Configuration parameters for Temporal activity execution of model calls.
         auto_close_tracing_in_workflows: If set to true, close tracing spans immediately.
+        streaming_options: Options applicable for use of run_streamed.
 
     Returns:
         A context manager that yields the configured TemporalTraceProvider.
@@ -77,7 +82,7 @@ def set_open_ai_agent_temporal_overrides(
     )
 
     try:
-        set_default_agent_runner(TemporalOpenAIRunner(model_params))
+        set_default_agent_runner(TemporalOpenAIRunner(model_params, streaming_options))
         set_trace_provider(provider)
         yield provider
     finally:
@@ -135,6 +140,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
             The plugin will wrap each server in a TemporalMCPServer if needed and
             manage their connection lifecycles tied to the worker lifetime. This is
             the recommended way to use MCP servers with Temporal workflows.
+        streaming_options: Options applicable for use of run_streamed.
 
     Example:
         >>> from temporalio.client import Client
@@ -181,6 +187,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
             "StatelessMCPServerProvider | StatefulMCPServerProvider"
         ] = (),
         register_activities: bool = True,
+        streaming_options: StreamingOptions = StreamingOptions(),
     ) -> None:
         """Initialize the OpenAI agents plugin.
 
@@ -196,6 +203,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
             register_activities: Whether to register activities during the worker execution.
                 This can be disabled on some workers to allow a separation of workflows and activities
                 but should not be disabled on all workers, or agents will not be able to progress.
+            streaming_options: Options applicable for use of run_streamed.
         """
         if model_params is None:
             model_params = ModelActivityParameters()
@@ -220,7 +228,12 @@ class OpenAIAgentsPlugin(SimplePlugin):
             if not register_activities:
                 return activities or []
 
-            new_activities = [ModelActivity(model_provider).invoke_model_activity]
+            model_activity = ModelActivity(model_provider, streaming_options)
+            new_activities = [
+                model_activity.invoke_model_activity,
+                model_activity.stream_model,
+                model_activity.batch_stream_model,
+            ]
 
             server_names = [server.name for server in mcp_server_providers]
             if len(server_names) != len(set(server_names)):
@@ -246,7 +259,9 @@ class OpenAIAgentsPlugin(SimplePlugin):
 
         @asynccontextmanager
         async def run_context() -> AsyncIterator[None]:
-            with set_open_ai_agent_temporal_overrides(model_params):
+            with set_open_ai_agent_temporal_overrides(
+                model_params, streaming_options=streaming_options
+            ):
                 yield
 
         super().__init__(

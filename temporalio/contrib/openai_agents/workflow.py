@@ -12,12 +12,14 @@ from typing import Any
 import nexusrpc
 from agents import (
     RunContextWrapper,
+    StreamEvent,
     Tool,
 )
 from agents.function_schema import function_schema
 from agents.tool import (
     FunctionTool,
 )
+from openai.types.responses import ResponseErrorEvent
 
 from temporalio import activity
 from temporalio import workflow as temporal_workflow
@@ -357,3 +359,14 @@ class AgentsWorkflowError(TemporalError):
         This exception is experimental and may change in future versions.
         Use with caution in production environments.
     """
+
+
+def is_activity_failure_event(event: StreamEvent):
+    """Determine if an activity event is an activity failure event. This can be used by the application to handle
+    stream consistency decisions when a streaming activity fails.
+    """
+    return (
+        event.type == "raw_response_event"
+        and isinstance(event.data, ResponseErrorEvent)
+        and event.data.message == "Activity Failed"
+    )
