@@ -547,6 +547,20 @@ class SimpleCodec(PayloadCodec):
         return list(wrapper.payloads)
 
 
+async def test_broken_exception_serialization():
+    conv = DataConverter(
+        payload_codec=SimpleCodec(),
+    )
+    try:
+        try:
+            raise ValueError("test")
+        except Exception as e:
+            raise e from e
+    except Exception as e:
+        failure = Failure()
+        conv.failure_converter.to_failure(e, conv.payload_converter, failure)
+
+
 async def test_failure_encoded_attributes():
     try:
         raise ApplicationError("some message", "some detail")
