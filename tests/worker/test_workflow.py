@@ -8861,7 +8861,6 @@ async def test_large_payload_activity_exception_error(client: Client):
         LogCapturer().logs_captured(
             activity.logger.base_logger
         ) as activity_logger_capturer,
-        # LogCapturer().logs_captured(worker_logger) as worker_logger_capturer,
     ):
         async with new_worker(
             worker_client, LargePayloadWorkflow, activities=[large_payload_activity]
@@ -8891,13 +8890,6 @@ async def test_large_payload_activity_exception_error(client: Client):
             )
 
         assert activity_logger_capturer.find(activity_logger_predicate)
-
-        # Worker logger is not emitting this follow message. Maybe activity completion failures
-        # are not routed through the log forwarder whereas workflow completion failures are?
-        # def worker_logger_predicate(record: logging.LogRecord) -> bool:
-        #     return "Payloads size exceeded the error limit" in record.msg
-
-        # assert worker_logger_capturer.find(worker_logger_predicate)
 
 
 async def test_large_payload_activity_result_error(client: Client):
@@ -8930,7 +8922,6 @@ async def test_large_payload_activity_result_error(client: Client):
         LogCapturer().logs_captured(
             activity.logger.base_logger
         ) as activity_logger_capturer,
-        # LogCapturer().logs_captured(worker_logger) as worker_logger_capturer,
     ):
         async with new_worker(
             worker_client, LargePayloadWorkflow, activities=[large_payload_activity]
@@ -8963,13 +8954,6 @@ async def test_large_payload_activity_result_error(client: Client):
             )
 
         assert activity_logger_capturer.find(activity_logger_predicate)
-
-        # Worker logger is not emitting this follow message. Maybe activity completion failures
-        # are not routed through the log forwarder whereas workflow completion failures are?
-        # def worker_logger_predicate(record: logging.LogRecord) -> bool:
-        #     return "Payloads size exceeded the error limit" in record.msg
-
-        # assert worker_logger_capturer.find(worker_logger_predicate)
 
 
 async def test_large_payload_activity_result_warning(client: Client):
