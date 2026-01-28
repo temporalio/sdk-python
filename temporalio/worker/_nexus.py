@@ -93,8 +93,16 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         self._running_tasks: dict[bytes, _RunningNexusTask] = {}
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
 
-    async def run(self) -> None:
+    async def run(
+        self,
+        payload_error_limits: temporalio.converter._PayloadErrorLimits | None,
+    ) -> None:
         """Continually poll for Nexus tasks and dispatch to handlers."""
+
+        if payload_error_limits:
+            self._data_converter = self._data_converter._with_payload_error_limits(
+                payload_error_limits
+            )
 
         async def raise_from_exception_queue() -> NoReturn:
             raise await self._fail_worker_exception_queue.get()

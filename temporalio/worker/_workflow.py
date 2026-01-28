@@ -164,7 +164,15 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             else:
                 self._dynamic_workflow = defn
 
-    async def run(self) -> None:
+    async def run(
+        self,
+        payload_error_limits: temporalio.converter._PayloadErrorLimits | None,
+    ) -> None:
+        if payload_error_limits:
+            self._data_converter = self._data_converter._with_payload_error_limits(
+                payload_error_limits
+            )
+
         # Continually poll for workflow work
         task_tag = object()
         try:
