@@ -751,9 +751,12 @@ protect tasks against cancellation.
 
 The following tasks, when cancelled, perform a Temporal cancellation:
 
-* Activities - when the task executing an activity is cancelled, a cancellation request is sent to the activity
-* Child workflows - when the task starting or executing a child workflow is cancelled, a cancellation request is sent to
-  cancel the child workflow
+* Activities - when the task executing an activity is cancelled, a cancellation request may be sent to the activity
+  depending on cancellation type
+* Child workflows - when the task starting or executing a child workflow is cancelled, a cancellation request may be
+  sent to cancel the child workflow depending on cancellation type
+* Nexus operations - when the task starting or executing a Nexus operation is cancelled, a cancellation request may be
+  sent to cancel the Nexus operation depending on cancellation type
 * Timers - when the task executing a timer is cancelled (whether started via sleep or timeout), the timer is cancelled
 
 When the workflow itself is requested to cancel, `Task.cancel` is called on the main workflow task. Therefore,
