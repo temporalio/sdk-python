@@ -8638,6 +8638,8 @@ async def test_large_payload_workflow_result_error(client: Client):
         client.service_client.config.target_host,
         namespace=client.namespace,
         runtime=worker_runtime,
+        # Mock server behavior since referenced server version doesn't report limits.
+        # Remove and configure error limits in server when limit reporting supported.
         data_converter=temporalio.converter.default()._with_payload_error_limits(
             _PayloadErrorLimits(
                 memo_upload_error_limit=0,
@@ -8745,6 +8747,8 @@ async def test_large_payload_activity_input_error(client: Client):
         client.service_client.config.target_host,
         namespace=client.namespace,
         runtime=worker_runtime,
+        # Mock server behavior since referenced server version doesn't report limits.
+        # Remove and configure error limits in server when limit reporting supported.
         data_converter=temporalio.converter.default()._with_payload_error_limits(
             _PayloadErrorLimits(
                 memo_upload_error_limit=0,
@@ -8850,6 +8854,8 @@ async def test_large_payload_activity_exception_error(client: Client):
         client.service_client.config.target_host,
         namespace=client.namespace,
         runtime=worker_runtime,
+        # Mock server behavior since referenced server version doesn't report limits.
+        # Remove and configure error limits in server when limit reporting supported.
         data_converter=temporalio.converter.default()._with_payload_error_limits(
             _PayloadErrorLimits(
                 memo_upload_error_limit=0,
@@ -8911,6 +8917,8 @@ async def test_large_payload_activity_result_error(client: Client):
         client.service_client.config.target_host,
         namespace=client.namespace,
         runtime=worker_runtime,
+        # Mock server behavior since referenced server version doesn't report limits.
+        # Remove and configure error limits in server when limit reporting supported.
         data_converter=temporalio.converter.default()._with_payload_error_limits(
             _PayloadErrorLimits(
                 memo_upload_error_limit=0,
