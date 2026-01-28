@@ -8577,7 +8577,7 @@ async def test_large_payload_workflow_input_warning(client: Client):
         assert len(w) == 1
         assert issubclass(w[-1].category, UserWarning)
         assert (
-            "PAYLOAD_LIMIT_WARNING: Payloads size exceeded the warning limit."
+            "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit."
             in str(w[-1].message)
         )
 
@@ -8614,8 +8614,9 @@ async def test_large_payload_workflow_memo_warning(client: Client):
 
         assert len(w) == 1
         assert issubclass(w[-1].category, UserWarning)
-        assert "MEMO_LIMIT_WARNING: Memo size exceeded the warning limit." in str(
-            w[-1].message
+        assert (
+            "[TMPRL1103] Attempted to upload memo with size that exceeded the warning limit."
+            in str(w[-1].message)
         )
 
 
@@ -8673,7 +8674,7 @@ async def test_large_payload_workflow_result_error(client: Client):
         def worker_logger_predicate(record: logging.LogRecord) -> bool:
             return (
                 record.levelname == "WARNING"
-                and "PAYLOAD_LIMIT_ERROR: Payloads size exceeded the error limit."
+                and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
                 in record.msg
             )
 
@@ -8682,7 +8683,7 @@ async def test_large_payload_workflow_result_error(client: Client):
         def root_logger_predicate(record: logging.LogRecord) -> bool:
             return (
                 record.levelname == "WARNING"
-                and "PAYLOAD_LIMIT_ERROR: Payloads size exceeded the error limit."
+                and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
                 in record.msg
                 and f"Limit: {error_limit} bytes" in record.msg
             )
@@ -8721,7 +8722,7 @@ async def test_large_payload_workflow_result_warning(client: Client):
         assert len(w) == 1
         assert issubclass(w[-1].category, UserWarning)
         assert (
-            "PAYLOAD_LIMIT_WARNING: Payloads size exceeded the warning limit."
+            "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit."
             in str(w[-1].message)
         )
 
@@ -8779,7 +8780,7 @@ async def test_large_payload_activity_input_error(client: Client):
         def worker_logger_predicate(record: logging.LogRecord) -> bool:
             return (
                 record.levelname == "WARNING"
-                and "PAYLOAD_LIMIT_ERROR: Payloads size exceeded the error limit."
+                and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
                 in record.msg
             )
 
@@ -8788,7 +8789,7 @@ async def test_large_payload_activity_input_error(client: Client):
         def root_logger_predicate(record: logging.LogRecord) -> bool:
             return (
                 record.levelname == "WARNING"
-                and "PAYLOAD_LIMIT_ERROR: Payloads size exceeded the error limit."
+                and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
                 in record.msg
                 and f"Limit: {error_limit} bytes" in record.msg
             )
@@ -8826,7 +8827,7 @@ async def test_large_payload_activity_input_warning(client: Client):
         assert len(w) == 1
         assert issubclass(w[-1].category, UserWarning)
         assert (
-            "PAYLOAD_LIMIT_WARNING: Payloads size exceeded the warning limit."
+            "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit."
             in str(w[-1].message)
         )
 
@@ -8885,7 +8886,7 @@ async def test_large_payload_activity_exception_error(client: Client):
         def activity_logger_predicate(record: logging.LogRecord) -> bool:
             return (
                 record.levelname == "ERROR"
-                and "PAYLOAD_LIMIT_ERROR: Payloads size exceeded the error limit."
+                and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
                 in record.msg
             )
 
@@ -8948,7 +8949,7 @@ async def test_large_payload_activity_result_error(client: Client):
                 hasattr(record, "__temporal_error_identifier")
                 and getattr(record, "__temporal_error_identifier") == "PayloadSizeError"
                 and record.levelname == "WARNING"
-                and "PAYLOAD_LIMIT_ERROR: Payloads size exceeded the error limit."
+                and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
                 in record.msg
                 and f"Limit: {error_limit} bytes" in record.msg
             )
@@ -8986,6 +8987,6 @@ async def test_large_payload_activity_result_warning(client: Client):
         assert len(w) == 1
         assert issubclass(w[-1].category, UserWarning)
         assert (
-            "PAYLOAD_LIMIT_WARNING: Payloads size exceeded the warning limit."
+            "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit."
             in str(w[-1].message)
         )

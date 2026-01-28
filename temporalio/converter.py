@@ -1430,14 +1430,12 @@ class DataConverter(WithSerializationContext):
             memo.fields[k].CopyFrom(payload)
             payloads.append(payload)
         # Memos have their field payloads validated all together in one unit
-        # The MEMO_LIMIT_ERROR and MEMO_LIMIT_WARNING markers are added
-        # for improved searchability in unstructured logs.
         self._validate_limits(
             payloads,
             self._memo_upload_error_limit,
-            "MEMO_LIMIT_ERROR: Memo size exceeded the error limit.",
+            "[TMPRL1103] Attempted to upload memo with size that exceeded the error limit.",
             self.payload_limits.memo_upload_warning_limit,
-            "MEMO_LIMIT_WARNING: Memo size exceeded the warning limit.",
+            "[TMPRL1103] Attempted to upload memo with size that exceeded the warning limit.",
         )
 
     async def _encode_payload(
@@ -1521,14 +1519,12 @@ class DataConverter(WithSerializationContext):
         self,
         payloads: Sequence[temporalio.api.common.v1.Payload],
     ):
-        # The PAYLOAD_LIMIT_ERROR and PAYLOAD_LIMIT_WARNING markers are added
-        # for improved searchability in unstructured logs.
         self._validate_limits(
             payloads,
             self._payload_upload_error_limit,
-            "PAYLOAD_LIMIT_ERROR: Payloads size exceeded the error limit.",
+            "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit.",
             self.payload_limits.payload_upload_warning_limit,
-            "PAYLOAD_LIMIT_WARNING: Payloads size exceeded the warning limit.",
+            "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit.",
         )
 
     def _validate_limits(
