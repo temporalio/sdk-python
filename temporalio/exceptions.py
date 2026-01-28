@@ -23,7 +23,19 @@ class TemporalError(Exception):
 
 
 class FailureError(TemporalError):
-    """Base for runtime failures during workflow/activity execution."""
+    """Base class for exceptions that cause a workflow execution failure.
+
+    Do not raise this directly: raise ``ApplicationError`` instead.
+
+    Workflow execution failure puts the workflow execution into "Failed" state,
+    and no further attempts will be made to progress the workflow execution.
+
+    By default, any exception that does not inherit from this class causes the
+    workflow task to be retried, rather than failing the workflow execution. The
+    default behavior can be changed by providing a list of exception types to
+    ``workflow_failure_exception_types`` when creating a worker or
+    ``failure_exception_types`` on the ``@workflow.defn`` decorator.
+    """
 
     def __init__(
         self,
@@ -84,7 +96,18 @@ class ApplicationErrorCategory(IntEnum):
 
 
 class ApplicationError(FailureError):
-    """Error raised during workflow/activity execution."""
+    """Raised in workflow/activity code to cause a workflow execution failure.
+
+    Workflow execution failure puts the workflow execution into "Failed" state,
+    and no further attempts will be made to progress the workflow execution.
+
+    .. code-block:: python
+
+        from temporalio.exceptions import ApplicationError
+        # ...
+        if is_delivery and distance.get_kilometers() > 25:
+            raise ApplicationError("Customer lives outside the service area")
+    """
 
     def __init__(
         self,
