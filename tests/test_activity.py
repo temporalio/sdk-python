@@ -10,6 +10,7 @@ from temporalio.client import (
     ActivityExecutionCount,
     ActivityExecutionCountAggregationGroup,
     ActivityExecutionDescription,
+    ActivityExecutionStatus,
     ActivityFailureError,
     ActivityHandle,
     CancelActivityInput,
@@ -19,10 +20,10 @@ from temporalio.client import (
     Interceptor,
     ListActivitiesInput,
     OutboundInterceptor,
+    PendingActivityState,
     StartActivityInput,
     TerminateActivityInput,
 )
-from temporalio.common import ActivityExecutionStatus, PendingActivityState
 from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import Worker

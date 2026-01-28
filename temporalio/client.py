@@ -4116,7 +4116,7 @@ class ActivityExecution:
     state_transition_count: int | None
     """Number of state transitions, if available."""
 
-    status: temporalio.common.ActivityExecutionStatus
+    status: ActivityExecutionStatus
     """Current status of the activity."""
 
     task_queue: str
@@ -4157,9 +4157,9 @@ class ActivityExecution:
                 info.state_transition_count if info.state_transition_count else None
             ),
             status=(
-                temporalio.common.ActivityExecutionStatus(info.status)
+                ActivityExecutionStatus(info.status)
                 if info.status
-                else temporalio.common.ActivityExecutionStatus.RUNNING
+                else ActivityExecutionStatus.UNSPECIFIED
             ),
             task_queue=info.task_queue,
             typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
@@ -4218,7 +4218,7 @@ class ActivityExecutionDescription(ActivityExecution):
     retry_policy: temporalio.common.RetryPolicy | None
     """Retry policy for the activity."""
 
-    run_state: temporalio.common.PendingActivityState | None
+    run_state: PendingActivityState | None
     """More detailed breakdown if status is RUNNING."""
 
     long_poll_token: bytes | None
@@ -4309,24 +4309,83 @@ class ActivityExecutionDescription(ActivityExecution):
             if info.HasField("retry_policy")
             else None,
             run_state=(
-                temporalio.common.PendingActivityState(info.run_state)
-                if info.run_state
-                else None
+                PendingActivityState(info.run_state) if info.run_state else None
             ),
             scheduled_time=(info.schedule_time.ToDatetime(tzinfo=timezone.utc)),
             state_transition_count=(
                 info.state_transition_count if info.state_transition_count else None
             ),
             status=(
-                temporalio.common.ActivityExecutionStatus(info.status)
+                ActivityExecutionStatus(info.status)
                 if info.status
-                else temporalio.common.ActivityExecutionStatus.RUNNING
+                else ActivityExecutionStatus.UNSPECIFIED
             ),
             task_queue=info.task_queue,
             typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
                 info.search_attributes
             ),
         )
+
+
+class ActivityExecutionStatus(IntEnum):
+    """Status of an activity execution.
+
+    .. warning::
+       This API is experimental.
+
+    See :py:class:`temporalio.api.enums.v1.ActivityExecutionStatus`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_UNSPECIFIED
+    )
+    RUNNING = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_RUNNING
+    )
+    COMPLETED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_COMPLETED
+    )
+    FAILED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_FAILED
+    )
+    CANCELED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_CANCELED
+    )
+    TERMINATED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_TERMINATED
+    )
+    TIMED_OUT = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_TIMED_OUT
+    )
+
+
+class PendingActivityState(IntEnum):
+    """Detailed state of an activity execution that is in ACTIVITY_EXECUTION_STATUS_RUNNING.
+
+    .. warning::
+       This API is experimental.
+
+    See :py:class:`temporalio.api.enums.v1.PendingActivityState`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_UNSPECIFIED
+    )
+    SCHEDULED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_SCHEDULED
+    )
+    STARTED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_STARTED
+    )
+    CANCEL_REQUESTED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_CANCEL_REQUESTED
+    )
+    PAUSED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_PAUSED
+    )
+    PAUSE_REQUESTED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_PAUSE_REQUESTED
+    )
 
 
 @dataclass(frozen=True)
