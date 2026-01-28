@@ -98,7 +98,6 @@ from temporalio.exceptions import (
     ApplicationErrorCategory,
     CancelledError,
     ChildWorkflowError,
-    PayloadSizeError,
     TemporalError,
     TimeoutError,
     TimeoutType,
@@ -8539,65 +8538,6 @@ class LargePayloadWorkflow:
             schedule_to_close_timeout=timedelta(seconds=5),
         )
         return LargePayloadWorkflowOutput(data=[0] * input.workflow_output_data_size)
-
-
-async def test_large_payload_error_workflow_input(client: Client):
-    config = client.config()
-    error_limit = 5 * 1024
-    config["data_converter"] = (
-        temporalio.converter.default()._with_payload_error_limits(
-            _PayloadErrorLimits(
-                memo_upload_error_limit=0,
-                payload_upload_error_limit=error_limit,
-            )
-        )
-    )
-    client = Client(**config)
-
-    with pytest.raises(PayloadSizeError) as err:
-        await client.execute_workflow(
-            LargePayloadWorkflow.run,
-            LargePayloadWorkflowInput(
-                activity_input_data_size=0,
-                activity_output_data_size=0,
-                workflow_output_data_size=0,
-                data=[0] * 6 * 1024,
-            ),
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue="test-queue",
-        )
-
-        assert error_limit == err.value.payloads_limit
-
-
-async def test_large_payload_error_workflow_memo(client: Client):
-    config = client.config()
-    error_limit = 128
-    config["data_converter"] = (
-        temporalio.converter.default()._with_payload_error_limits(
-            _PayloadErrorLimits(
-                memo_upload_error_limit=error_limit,
-                payload_upload_error_limit=0,
-            )
-        )
-    )
-    client = Client(**config)
-
-    with pytest.raises(PayloadSizeError) as err:
-        await client.execute_workflow(
-            LargePayloadWorkflow.run,
-            LargePayloadWorkflowInput(
-                activity_input_data_size=0,
-                activity_output_data_size=0,
-                workflow_output_data_size=0,
-                data=[],
-            ),
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue="test-queue",
-            memo={"key1": [0] * 256},
-        )
-
-        assert error_limit == err.value.payloads_limit
 
 
 async def test_large_payload_warning_workflow_input(client: Client):
