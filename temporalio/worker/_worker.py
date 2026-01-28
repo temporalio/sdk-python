@@ -29,6 +29,7 @@ from temporalio.common import (
     VersioningBehavior,
     WorkerDeploymentVersion,
 )
+from temporalio.converter import _PayloadErrorLimits
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
@@ -715,7 +716,15 @@ class Worker:
 
     async def _run(self):
         # Eagerly validate which will do a namespace check in Core
-        await self._bridge_worker.validate()
+        namespace_info = await self._bridge_worker.validate()
+        payload_error_limits = (
+            _PayloadErrorLimits(
+                memo_upload_error_limit=namespace_info.Limits.memo_size_limit_error,
+                payload_upload_error_limit=namespace_info.Limits.blob_size_limit_error,
+            )
+            if namespace_info.HasField("limits")
+            else None
+        )
 
         if self._started:
             raise RuntimeError("Already started")
@@ -735,14 +744,16 @@ class Worker:
         # Create tasks for workers
         if self._activity_worker:
             tasks[self._activity_worker] = asyncio.create_task(
-                self._activity_worker.run()
+                self._activity_worker.run(payload_error_limits)
             )
         if self._workflow_worker:
             tasks[self._workflow_worker] = asyncio.create_task(
-                self._workflow_worker.run()
+                self._workflow_worker.run(payload_error_limits)
             )
         if self._nexus_worker:
-            tasks[self._nexus_worker] = asyncio.create_task(self._nexus_worker.run())
+            tasks[self._nexus_worker] = asyncio.create_task(
+                self._nexus_worker.run(payload_error_limits)
+            )
 
         # Wait for either worker or shutdown requested
         wait_task = asyncio.wait(tasks.values(), return_when=asyncio.FIRST_EXCEPTION)
