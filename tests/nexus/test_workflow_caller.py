@@ -1301,9 +1301,6 @@ class ServiceInterfaceAndImplCallerWorkflow:
         return await nexus_client.execute_operation(service_cls.op, None)  # type: ignore
 
 
-# TODO(nexus-prerelease): check missing decorator behavior
-
-
 async def test_service_interface_and_implementation_names(
     client: Client, env: WorkflowEnvironment
 ):
