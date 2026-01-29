@@ -4,7 +4,7 @@ import pytest
 from google.adk.models import LLMRegistry
 
 from temporalio.client import WorkflowHistory
-from temporalio.contrib.google_adk_agents import GoogleAdkPlugin
+from temporalio.contrib.google_adk_agents import TemporalAdkPlugin
 from temporalio.worker import Replayer
 from tests.contrib.google_adk_agents.test_google_adk_agents import (
     MultiAgentWorkflow,
@@ -29,5 +29,5 @@ async def test_replay(file_name: str) -> None:
         LLMRegistry.register(WeatherModel)
         await Replayer(
             workflows=[MultiAgentWorkflow, WeatherAgent],
-            plugins=[GoogleAdkPlugin()],
+            plugins=[TemporalAdkPlugin()],
         ).replay_workflow(WorkflowHistory.from_json("fake", history_json))

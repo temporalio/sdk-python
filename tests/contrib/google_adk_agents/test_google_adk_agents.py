@@ -29,13 +29,21 @@ from google.adk.models import BaseLlm, LLMRegistry
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.adk.sessions import InMemorySessionService
+from google.adk.tools.mcp_tool import McpToolset
+from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
 from google.adk.utils.context_utils import Aclosing
 from google.genai import types
 from google.genai.types import Content, FunctionCall, Part
+from mcp import StdioServerParameters
 
 from temporalio import activity, workflow
 from temporalio.client import Client
-from temporalio.contrib.google_adk_agents import AgentPlugin, GoogleAdkPlugin
+from temporalio.contrib.google_adk_agents import (
+    AdkAgentPlugin,
+    TemporalAdkPlugin,
+    TemporalToolSet,
+    TemporalToolSetProvider,
+)
 from temporalio.worker import Worker
 
 logger = logging.getLogger(__name__)
@@ -58,7 +66,7 @@ class WeatherAgent:
         # and Model Activity interception. We use standard ADK models now.
 
         # Wraps 'get_weather' activity as a Tool
-        weather_tool = AgentPlugin.activity_tool(
+        weather_tool = AdkAgentPlugin.activity_tool(
             get_weather, start_to_close_timeout=timedelta(seconds=60)
         )
 
@@ -83,7 +91,7 @@ class WeatherAgent:
             app_name="test_app",
             session_service=session_service,
             plugins=[
-                AgentPlugin(
+                AdkAgentPlugin(
                     activity_options={"start_to_close_timeout": timedelta(minutes=2)}
                 )
             ],
@@ -149,7 +157,7 @@ class MultiAgentWorkflow:
             app_name="multi_agent_app",
             session_service=session_service,
             plugins=[
-                AgentPlugin(
+                AdkAgentPlugin(
                     activity_options={"start_to_close_timeout": timedelta(minutes=2)}
                 )
             ],
@@ -216,7 +224,7 @@ async def test_single_agent(client: Client, use_local_model: bool):
         pytest.skip("No google API key")
 
     new_config = client.config()
-    new_config["plugins"] = [GoogleAdkPlugin()]
+    new_config["plugins"] = [TemporalAdkPlugin()]
     client = Client(**new_config)
 
     # Run Worker with the ADK plugin
@@ -308,7 +316,7 @@ async def test_multi_agent(client: Client, use_local_model: bool):
         pytest.skip("No google API key")
 
     new_config = client.config()
-    new_config["plugins"] = [GoogleAdkPlugin()]
+    new_config["plugins"] = [TemporalAdkPlugin()]
     client = Client(**new_config)
 
     # Run Worker with the ADK plugin
@@ -333,5 +341,147 @@ async def test_multi_agent(client: Client, use_local_model: bool):
         )
         result = await handle.result()
         print(f"Multi-Agent Workflow result: {result}")
+        if use_local_model:
+            assert result == "haiku"
+
+
+@workflow.defn
+class McpAgent:
+    @workflow.run
+    async def run(self, prompt: str, model_name: str) -> Event | None:
+        logger.info("Workflow started.")
+
+        # 1. Define Agent using Temporal Helpers
+        # Note: AgentPlugin in the Runner automatically handles Runtime setup
+        # and Model Activity interception. We use standard ADK models now.
+        agent = Agent(
+            name="test_agent",
+            # instruction="Always use your tools to answer questions.",
+            model=model_name,
+            tools=[TemporalToolSet("test_set")],
+        )
+
+        # 2. Create Session (uses runtime.new_uuid() -> workflow.uuid4())
+        session_service = InMemorySessionService()
+        logger.info("Create session.")
+        session = await session_service.create_session(
+            app_name="test_app", user_id="test"
+        )
+
+        logger.info(f"Session created with ID: {session.id}")
+
+        # 3. Run Agent with AgentPlugin
+        runner = Runner(
+            agent=agent,
+            app_name="test_app",
+            session_service=session_service,
+            plugins=[
+                AdkAgentPlugin(
+                    activity_options={"start_to_close_timeout": timedelta(minutes=2)}
+                )
+            ],
+        )
+
+        last_event = None
+        async with Aclosing(
+            runner.run_async(
+                user_id="test",
+                session_id=session.id,
+                new_message=types.Content(role="user", parts=[types.Part(text=prompt)]),
+            )
+        ) as agen:
+            async for event in agen:
+                logger.info(f"Event: {event}")
+                last_event = event
+
+        return last_event
+
+
+class McpModel(BaseLlm):
+    responses: list[LlmResponse] = [
+        LlmResponse(
+            content=Content(
+                role="model",
+                parts=[
+                    Part(
+                        function_call=FunctionCall(
+                            args={"city": "New York"}, name="get_weather"
+                        )
+                    )
+                ],
+            )
+        ),
+        LlmResponse(
+            content=Content(
+                role="model",
+                parts=[Part(text="warm and sunny")],
+            )
+        ),
+    ]
+    response_iter: Iterator[LlmResponse] = iter(responses)
+
+    @classmethod
+    def supported_models(cls) -> list[str]:
+        return ["weather_model"]
+
+    async def generate_content_async(
+        self, llm_request: LlmRequest, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        yield next(self.response_iter)
+
+
+@pytest.mark.parametrize("use_local_model", [True, False])
+@pytest.mark.asyncio
+async def test_mcp_agent(client: Client, use_local_model: bool):
+    if not use_local_model and not os.environ.get("GOOGLE_API_KEY"):
+        pytest.skip("No google API key")
+
+    new_config = client.config()
+    new_config["plugins"] = [
+        TemporalAdkPlugin(
+            toolset_providers=[
+                TemporalToolSetProvider(
+                    "test_set",
+                    lambda _: McpToolset(
+                        connection_params=StdioConnectionParams(
+                            server_params=StdioServerParameters(
+                                command="npx",
+                                args=[
+                                    "-y",
+                                    "@modelcontextprotocol/server-filesystem",
+                                    os.path.dirname(os.path.abspath(__file__)),
+                                ],
+                            ),
+                        ),
+                        require_confirmation=True,
+                    ),
+                )
+            ]
+        )
+    ]
+    client = Client(**new_config)
+
+    # Run Worker with the ADK plugin
+    async with Worker(
+        client,
+        task_queue="adk-task-queue",
+        workflows=[McpAgent],
+        max_cached_workflows=0,
+    ):
+        if use_local_model:
+            LLMRegistry.register(ResearchModel)
+
+        # Test Multi Agent
+        handle = await client.start_workflow(
+            McpAgent.run,
+            args=[
+                "What files are in the current directory?",
+                "research_model" if use_local_model else "gemini-2.5-pro",
+            ],
+            id=f"mcp-agent-workflow-{uuid.uuid4()}",
+            task_queue="adk-task-queue",
+        )
+        result = await handle.result()
+        print(f"MCP-Agent Workflow result: {result}")
         if use_local_model:
             assert result == "haiku"
