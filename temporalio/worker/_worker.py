@@ -141,6 +141,7 @@ class Worker:
         nexus_task_poller_behavior: PollerBehavior = PollerBehaviorSimpleMaximum(
             maximum=5
         ),
+        disable_payload_error_limit: bool = False,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -314,6 +315,14 @@ class Worker:
                 Defaults to a 5-poller maximum.
             nexus_task_poller_behavior: Specify the behavior of Nexus task polling.
                 Defaults to a 5-poller maximum.
+            disable_payload_error_limit: If true, payload and memo error limit checks
+                are disabled in the worker, allowing payloads and memos that are above
+                the server error limit to be submitted to the Temporal server. If false,
+                the worker will validate the size before submitting to the Temporal server,
+                and cause a task failure if the size limit is exceeded. The default is False.
+                See https://docs.temporal.io/troubleshooting/blob-size-limit-error for more
+                details.
+
         """
         config = WorkerConfig(
             client=client,
@@ -357,6 +366,7 @@ class Worker:
             workflow_task_poller_behavior=workflow_task_poller_behavior,
             activity_task_poller_behavior=activity_task_poller_behavior,
             nexus_task_poller_behavior=nexus_task_poller_behavior,
+            disable_payload_error_limit=disable_payload_error_limit,
         )
 
         plugins_from_client = cast(
@@ -719,10 +729,11 @@ class Worker:
         namespace_info = await self._bridge_worker.validate()
         payload_error_limits = (
             _PayloadErrorLimits(
-                memo_upload_error_limit=namespace_info.Limits.memo_size_limit_error,
-                payload_upload_error_limit=namespace_info.Limits.blob_size_limit_error,
+                memo_size_error=namespace_info.Limits.memo_size_limit_error,
+                payload_size_error=namespace_info.Limits.blob_size_limit_error,
             )
             if namespace_info.HasField("limits")
+            and not self._config.get("disable_payload_error_limit", False)
             else None
         )
 
@@ -930,6 +941,7 @@ class WorkerConfig(TypedDict, total=False):
     workflow_task_poller_behavior: PollerBehavior
     activity_task_poller_behavior: PollerBehavior
     nexus_task_poller_behavior: PollerBehavior
+    disable_payload_error_limit: bool
 
 
 def _warn_if_activity_executor_max_workers_is_inconsistent(

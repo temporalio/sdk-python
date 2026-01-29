@@ -90,6 +90,7 @@ from temporalio.converter import (
     PayloadCodec,
     PayloadConverter,
     PayloadLimitsConfig,
+    PayloadSizeWarning,
     _PayloadErrorLimits,
 )
 from temporalio.exceptions import (
@@ -8552,7 +8553,7 @@ async def test_large_payload_workflow_input_warning(client: Client):
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
         payload_limits=PayloadLimitsConfig(
-            payload_upload_warning_limit=102,
+            payload_size_warning=102,
         ),
     )
     client = Client(**config)
@@ -8575,7 +8576,7 @@ async def test_large_payload_workflow_input_warning(client: Client):
             )
 
         assert len(w) == 1
-        assert issubclass(w[-1].category, UserWarning)
+        assert issubclass(w[-1].category, PayloadSizeWarning)
         assert (
             "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit."
             in str(w[-1].message)
@@ -8586,7 +8587,7 @@ async def test_large_payload_workflow_memo_warning(client: Client):
     config = client.config()
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
-        payload_limits=PayloadLimitsConfig(memo_upload_warning_limit=128),
+        payload_limits=PayloadLimitsConfig(memo_size_warning=128),
     )
     client = Client(**config)
 
@@ -8613,10 +8614,34 @@ async def test_large_payload_workflow_memo_warning(client: Client):
             )
 
         assert len(w) == 1
-        assert issubclass(w[-1].category, UserWarning)
+        assert issubclass(w[-1].category, PayloadSizeWarning)
         assert (
             "[TMPRL1103] Attempted to upload memo with size that exceeded the warning limit."
             in str(w[-1].message)
+        )
+
+
+async def test_large_payload_workflow_payload_error_disabled(client: Client):
+    async with new_worker(
+        client,
+        LargePayloadWorkflow,
+        activities=[large_payload_activity],
+        # Referenced server version doesn't report payload limits.
+        # Configure error limits in server when limit reporting supported.
+        disable_payload_error_limit=True,
+    ) as worker:
+        await client.execute_workflow(
+            LargePayloadWorkflow.run,
+            LargePayloadWorkflowInput(
+                activity_input_data_size=0,
+                activity_output_data_size=0,
+                activity_exception_data_size=0,
+                workflow_output_data_size=6 * 1024,
+                data=[],
+            ),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=3),
         )
 
 
@@ -8642,8 +8667,8 @@ async def test_large_payload_workflow_result_error(client: Client):
         # Remove and configure error limits in server when limit reporting supported.
         data_converter=temporalio.converter.default()._with_payload_error_limits(
             _PayloadErrorLimits(
-                memo_upload_error_limit=0,
-                payload_upload_error_limit=error_limit,
+                memo_size_error=0,
+                payload_size_error=error_limit,
             )
         ),
     )
@@ -8698,7 +8723,7 @@ async def test_large_payload_workflow_result_warning(client: Client):
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
         payload_limits=PayloadLimitsConfig(
-            payload_upload_warning_limit=1024,
+            payload_size_warning=1024,
         ),
     )
     worker_client = Client(**config)
@@ -8722,7 +8747,7 @@ async def test_large_payload_workflow_result_warning(client: Client):
             )
 
         assert len(w) == 1
-        assert issubclass(w[-1].category, UserWarning)
+        assert issubclass(w[-1].category, PayloadSizeWarning)
         assert (
             "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit."
             in str(w[-1].message)
@@ -8751,8 +8776,8 @@ async def test_large_payload_activity_input_error(client: Client):
         # Remove and configure error limits in server when limit reporting supported.
         data_converter=temporalio.converter.default()._with_payload_error_limits(
             _PayloadErrorLimits(
-                memo_upload_error_limit=0,
-                payload_upload_error_limit=error_limit,
+                memo_size_error=0,
+                payload_size_error=error_limit,
             )
         ),
     )
@@ -8806,7 +8831,7 @@ async def test_large_payload_activity_input_warning(client: Client):
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
         payload_limits=PayloadLimitsConfig(
-            payload_upload_warning_limit=1024,
+            payload_size_warning=1024,
         ),
     )
     worker_client = Client(**config)
@@ -8829,7 +8854,7 @@ async def test_large_payload_activity_input_warning(client: Client):
             )
 
         assert len(w) == 1
-        assert issubclass(w[-1].category, UserWarning)
+        assert issubclass(w[-1].category, PayloadSizeWarning)
         assert (
             "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit."
             in str(w[-1].message)
@@ -8858,8 +8883,8 @@ async def test_large_payload_activity_exception_error(client: Client):
         # Remove and configure error limits in server when limit reporting supported.
         data_converter=temporalio.converter.default()._with_payload_error_limits(
             _PayloadErrorLimits(
-                memo_upload_error_limit=0,
-                payload_upload_error_limit=error_limit,
+                memo_size_error=0,
+                payload_size_error=error_limit,
             )
         ),
     )
@@ -8921,8 +8946,8 @@ async def test_large_payload_activity_result_error(client: Client):
         # Remove and configure error limits in server when limit reporting supported.
         data_converter=temporalio.converter.default()._with_payload_error_limits(
             _PayloadErrorLimits(
-                memo_upload_error_limit=0,
-                payload_upload_error_limit=error_limit,
+                memo_size_error=0,
+                payload_size_error=error_limit,
             )
         ),
     )
@@ -8970,7 +8995,7 @@ async def test_large_payload_activity_result_warning(client: Client):
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
         payload_limits=PayloadLimitsConfig(
-            payload_upload_warning_limit=1024,
+            payload_size_warning=1024,
         ),
     )
     worker_client = Client(**config)
@@ -8993,7 +9018,7 @@ async def test_large_payload_activity_result_warning(client: Client):
             )
 
         assert len(w) == 1
-        assert issubclass(w[-1].category, UserWarning)
+        assert issubclass(w[-1].category, PayloadSizeWarning)
         assert (
             "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit."
             in str(w[-1].message)

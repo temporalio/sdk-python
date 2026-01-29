@@ -1209,43 +1209,23 @@ class DefaultFailureConverterWithEncodedAttributes(DefaultFailureConverter):
 
 @dataclass(frozen=True)
 class PayloadLimitsConfig:
-    """Configuration for when uploaded payload sizes exceed the Temporal server's limits."""
+    """Configuration for when payload sizes exceed limits."""
 
-    memo_upload_error_disabled: bool = False
-    """Field indiciating that the memo size checks should be disabled in the SDK.
-
-    A value of False will cause the SDK to fail tasks that attempt to upload memos
-    with a size that is over the Temporal server memo limit. A value of True will
-    disable memo size checks in the SDK, allowing it to attempt to upload memos
-    even if their size is over the Temporal server limit.
-    
-    The default value is False."""
-
-    memo_upload_warning_limit: int = 2 * 1024
+    memo_size_warning: int = 2 * 1024
     """The limit (in bytes) at which a memo size warning is logged."""
 
-    payload_upload_error_disabled: bool = False
-    """Field indiciating that the payload size checks should be disabled in the SDK.
-
-    A value of False will cause the SDK to fail tasks that attempt to upload payloads
-    with a size that is over the Temporal server payloads limit. A value of True will
-    disable payload size checks in the SDK, allowing it to attempt to upload payloads
-    even if their size is over the Temporal server limit.
-    
-    The default value is False."""
-
-    payload_upload_warning_limit: int = 512 * 1024
+    payload_size_warning: int = 512 * 1024
     """The limit (in bytes) at which a payload size warning is logged."""
 
 
 class PayloadSizeWarning(RuntimeWarning):
-    """The size of encoded payloads is above the warning limit."""
+    """The size of payloads is above the warning limit."""
 
 
 @dataclass
 class _PayloadErrorLimits:
-    memo_upload_error_limit: int
-    payload_upload_error_limit: int
+    memo_size_error: int
+    payload_size_error: int
 
 
 @dataclass(frozen=True)
@@ -1277,9 +1257,9 @@ class DataConverter(WithSerializationContext):
     default: ClassVar[DataConverter]
     """Singleton default data converter."""
 
-    _memo_upload_error_limit: int = 0
+    _memo_size_error_limit: int = 0
 
-    _payload_upload_error_limit: int = 0
+    _payload_size_error_limit: int = 0
 
     def __post_init__(self) -> None:  # noqa: D105
         object.__setattr__(self, "payload_converter", self.payload_converter_class())
@@ -1385,12 +1365,8 @@ class DataConverter(WithSerializationContext):
     def _with_payload_error_limits(self, options: _PayloadErrorLimits) -> DataConverter:
         return dataclasses.replace(
             self,
-            _memo_upload_error_limit=0
-            if self.payload_limits.memo_upload_error_disabled
-            else options.memo_upload_error_limit,
-            _payload_upload_error_limit=0
-            if self.payload_limits.payload_upload_error_disabled
-            else options.payload_upload_error_limit,
+            _memo_size_error_limit=options.memo_size_error,
+            _payload_size_error_limit=options.payload_size_error,
         )
 
     async def _decode_memo(
@@ -1436,9 +1412,9 @@ class DataConverter(WithSerializationContext):
         # Memos have their field payloads validated all together in one unit
         DataConverter._validate_limits(
             payloads,
-            self._memo_upload_error_limit,
+            self._memo_size_error_limit,
             "[TMPRL1103] Attempted to upload memo with size that exceeded the error limit.",
-            self.payload_limits.memo_upload_warning_limit,
+            self.payload_limits.memo_size_warning,
             "[TMPRL1103] Attempted to upload memo with size that exceeded the warning limit.",
         )
 
@@ -1525,9 +1501,9 @@ class DataConverter(WithSerializationContext):
     ):
         DataConverter._validate_limits(
             payloads,
-            self._payload_upload_error_limit,
+            self._payload_size_error_limit,
             "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit.",
-            self.payload_limits.payload_upload_warning_limit,
+            self.payload_limits.payload_size_warning,
             "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit.",
         )
 
