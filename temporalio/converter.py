@@ -1238,6 +1238,10 @@ class PayloadLimitsConfig:
     """The limit (in bytes) at which a payload size warning is logged."""
 
 
+class PayloadSizeWarning(RuntimeWarning):
+    """The size of encoded payloads is above the warning limit."""
+
+
 @dataclass
 class _PayloadErrorLimits:
     memo_upload_error_limit: int
@@ -1430,7 +1434,7 @@ class DataConverter(WithSerializationContext):
             memo.fields[k].CopyFrom(payload)
             payloads.append(payload)
         # Memos have their field payloads validated all together in one unit
-        self._validate_limits(
+        DataConverter._validate_limits(
             payloads,
             self._memo_upload_error_limit,
             "[TMPRL1103] Attempted to upload memo with size that exceeded the error limit.",
@@ -1519,7 +1523,7 @@ class DataConverter(WithSerializationContext):
         self,
         payloads: Sequence[temporalio.api.common.v1.Payload],
     ):
-        self._validate_limits(
+        DataConverter._validate_limits(
             payloads,
             self._payload_upload_error_limit,
             "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit.",
@@ -1527,8 +1531,8 @@ class DataConverter(WithSerializationContext):
             "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit.",
         )
 
+    @staticmethod
     def _validate_limits(
-        self,
         payloads: Sequence[temporalio.api.common.v1.Payload],
         error_limit: int,
         error_message: str,
@@ -1545,7 +1549,8 @@ class DataConverter(WithSerializationContext):
         if warning_limit > 0 and total_size > warning_limit:
             # TODO: Use a context aware logger to log extra information about workflow/activity/etc
             warnings.warn(
-                f"{warning_message} Size: {total_size} bytes, Limit: {warning_limit} bytes"
+                f"{warning_message} Size: {total_size} bytes, Limit: {warning_limit} bytes",
+                PayloadSizeWarning,
             )
 
 
