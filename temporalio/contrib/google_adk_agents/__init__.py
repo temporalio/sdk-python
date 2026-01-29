@@ -4,8 +4,8 @@ This module provides the necessary components to run ADK Agents within Temporal 
 """
 
 from temporalio.contrib.google_adk_agents._mcp import (
-    TemporalToolSet,
-    TemporalToolSetProvider,
+    TemporalMcpToolSet,
+    TemporalMcpToolSetProvider,
 )
 from temporalio.contrib.google_adk_agents._plugin import (
     AdkAgentPlugin,
@@ -15,6 +15,6 @@ from temporalio.contrib.google_adk_agents._plugin import (
 __all__ = [
     "AdkAgentPlugin",
     "TemporalAdkPlugin",
-    "TemporalToolSet",
-    "TemporalToolSetProvider",
+    "TemporalMcpToolSet",
+    "TemporalMcpToolSetProvider",
 ]

@@ -4,8 +4,9 @@ import dataclasses
 import inspect
 import time
 import uuid
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Callable, Optional
+from typing import Any, Callable
 
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models import LLMRegistry
@@ -14,7 +15,7 @@ from google.adk.models.llm_response import LlmResponse
 from google.adk.plugins import BasePlugin
 
 from temporalio import activity, workflow
-from temporalio.contrib.google_adk_agents._mcp import TemporalToolSetProvider
+from temporalio.contrib.google_adk_agents._mcp import TemporalMcpToolSetProvider
 from temporalio.contrib.pydantic import (
     PydanticPayloadConverter as _DefaultPydanticPayloadConverter,
 )
@@ -61,7 +62,7 @@ class AdkAgentPlugin(BasePlugin):
     inside a Temporal workflow, and intercepts model calls to execute them as Temporal Activities.
     """
 
-    def __init__(self, activity_options: Optional[dict[str, Any]] = None):
+    def __init__(self, activity_options: dict[str, Any] | None = None):
         """Initializes the Temporal Plugin.
 
         Args:
@@ -78,7 +79,7 @@ class AdkAgentPlugin(BasePlugin):
         while marking it as a tool that executes via 'workflow.execute_activity'.
         """
 
-        async def wrapper(*args, **kw):
+        async def wrapper(*args: Any, **kw: Any):
             # Inspect signature to bind arguments
             sig = inspect.signature(activity_def)
             bound = sig.bind(*args, **kw)
@@ -104,6 +105,15 @@ class AdkAgentPlugin(BasePlugin):
     async def before_model_callback(
         self, *, callback_context: CallbackContext, llm_request: LlmRequest
     ) -> LlmResponse | None:
+        """Intercepts model calls to execute them as Temporal Activities.
+
+        Args:
+            callback_context: The ADK callback context.
+            llm_request: The LLM request to process.
+
+        Returns:
+            The last complete LLM response or None if no responses.
+        """
         responses = await workflow.execute_activity(
             invoke_model,
             args=[llm_request],
@@ -117,6 +127,17 @@ class AdkAgentPlugin(BasePlugin):
 
 @activity.defn
 async def invoke_model(llm_request: LlmRequest) -> list[LlmResponse]:
+    """Activity that invokes an LLM model.
+
+    Args:
+        llm_request: The LLM request containing model name and parameters.
+
+    Returns:
+        List of LLM responses from the model.
+
+    Raises:
+        ValueError: If model name is not provided or LLM creation fails.
+    """
     if llm_request.model is None:
         raise ValueError(f"No model name provided, could not create LLM.")
 
@@ -138,7 +159,12 @@ class TemporalAdkPlugin(SimplePlugin):
     2. Sandbox Passthrough for `google.adk` and `google.genai`.
     """
 
-    def __init__(self, toolset_providers: list[TemporalToolSetProvider] = ()):
+    def __init__(self, toolset_providers: list[TemporalMcpToolSetProvider] | None = None):
+        """Initializes the Temporal ADK Plugin.
+
+        Args:
+            toolset_providers: Optional list of toolset providers for MCP integration.
+        """
         @asynccontextmanager
         async def run_context() -> AsyncIterator[None]:
             setup_deterministic_runtime()
@@ -159,8 +185,9 @@ class TemporalAdkPlugin(SimplePlugin):
             return runner
 
         new_activities = [invoke_model]
-        for toolset_provider in toolset_providers:
-            new_activities.extend(toolset_provider._get_activities())
+        if toolset_providers is not None:
+            for toolset_provider in toolset_providers:
+                new_activities.extend(toolset_provider._get_activities())
 
         super().__init__(
             name="google_adk_plugin",

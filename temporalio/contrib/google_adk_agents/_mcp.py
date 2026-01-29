@@ -5,10 +5,11 @@ from typing import Any, Callable
 
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.events import EventActions
-from google.adk.tools import ToolContext
 from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.base_toolset import BaseToolset
+from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.tool_confirmation import ToolConfirmation
+from google.adk.tools.tool_context import ToolContext
 from google.genai import types
 from google.genai.types import FunctionDeclaration
 
@@ -33,9 +34,13 @@ class _ToolResult:
 
 @dataclass
 class TemporalToolContext:
+    """Context for tools running within Temporal workflows.
+    
+    Provides access to tool confirmation and event actions for ADK integration.
+    """
     tool_confirmation: ToolConfirmation | None
     function_call_id: str | None
-    event_actions: EventActions | None
+    event_actions: EventActions
 
     def request_confirmation(
         self,
@@ -50,10 +55,10 @@ class TemporalToolContext:
           payload: The payload used to confirm the tool call.
         """
         if not self.function_call_id:
-            raise ValueError('function_call_id is not set.')
+            raise ValueError("function_call_id is not set.")
         self.event_actions.requested_tool_confirmations[self.function_call_id] = (
             ToolConfirmation(
-                hint=hint,
+                hint=hint or "",
                 payload=payload,
             )
         )
@@ -64,6 +69,7 @@ class _CallToolResult:
     result: Any
     tool_context: TemporalToolContext
 
+
 @dataclass
 class _CallToolArguments:
     factory_argument: Any | None
@@ -71,10 +77,20 @@ class _CallToolArguments:
     arguments: dict[str, Any]
     tool_context: TemporalToolContext
 
-class TemporalToolSetProvider:
-    def __init__(
-        self, name: str, toolset_factory: Callable[[Any | None], BaseToolset]
-    ):
+
+class TemporalMcpToolSetProvider:
+    """Provider for creating Temporal-aware MCP toolsets.
+    
+    Manages the creation of toolset activities and handles tool execution
+    within Temporal workflows.
+    """
+    def __init__(self, name: str, toolset_factory: Callable[[Any | None], McpToolset]):
+        """Initializes the toolset provider.
+
+        Args:
+            name: Name prefix for the generated activities.
+            toolset_factory: Factory function that creates McpToolset instances.
+        """
         super().__init__()
         self._name = name
         self._toolset_factory = toolset_factory
@@ -117,7 +133,7 @@ class TemporalToolSetProvider:
             # We cannot provide a full-fledged ToolContext so we need to provide only what is needed by the tool
             result = await tool.run_async(
                 args=args.arguments,
-                tool_context=args.tool_context, #  type:ignore
+                tool_context=args.tool_context,  #  type:ignore
             )
             return _CallToolResult(result=result, tool_context=args.tool_context)
 
@@ -177,13 +193,25 @@ class _TemporalTool(BaseTool):
         return result.result
 
 
-class TemporalToolSet(BaseToolset):
+class TemporalMcpToolSet(BaseToolset):
+    """Temporal-aware MCP toolset implementation.
+    
+    Executes MCP tools as Temporal activities, providing proper isolation
+    and execution guarantees within workflows.
+    """
     def __init__(
         self,
         name: str,
         config: ActivityConfig | None = None,
         factory_argument: Any | None = None,
     ):
+        """Initializes the Temporal MCP toolset.
+
+        Args:
+            name: Name of the toolset (used for activity naming).
+            config: Optional activity configuration.
+            factory_argument: Optional argument passed to toolset factory.
+        """
         super().__init__()
         self._name = name
         self._factory_argument = factory_argument
@@ -194,6 +222,14 @@ class TemporalToolSet(BaseToolset):
     async def get_tools(
         self, readonly_context: ReadonlyContext | None = None
     ) -> list[BaseTool]:
+        """Retrieves available tools from the MCP toolset.
+
+        Args:
+            readonly_context: Optional readonly context (unused in this implementation).
+
+        Returns:
+            List of available tools wrapped as Temporal activities.
+        """
         tool_results: list[_ToolResult] = await workflow.execute_activity(
             self._name + "-list-tools",
             _GetToolsArguments(self._factory_argument),

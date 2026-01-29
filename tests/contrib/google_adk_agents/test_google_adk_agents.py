@@ -17,9 +17,9 @@
 import logging
 import os
 import uuid
+from collections.abc import AsyncGenerator, Iterator
 from datetime import timedelta
 from pathlib import Path
-from typing import AsyncGenerator, Iterator
 
 import pytest
 from google.adk import Agent, Runner
@@ -41,8 +41,8 @@ from temporalio.client import Client
 from temporalio.contrib.google_adk_agents import (
     AdkAgentPlugin,
     TemporalAdkPlugin,
-    TemporalToolSet,
-    TemporalToolSetProvider,
+    TemporalMcpToolSet,
+    TemporalMcpToolSetProvider,
 )
 from temporalio.worker import Worker
 
@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
 
 
 @activity.defn
-async def get_weather(city: str) -> str:
+async def get_weather(city: str) -> str:  #  type: ignore[reportUnusedParameter]
     """Activity that gets weather for a given city."""
     return "Warm and sunny. 17 degrees."
 
@@ -117,11 +117,6 @@ class WeatherAgent:
 class MultiAgentWorkflow:
     @workflow.run
     async def run(self, topic: str, model_name: str) -> str | None:
-        # Example of multi-turn/multi-agent orchestration
-        # This is where Temporal shines - orchestrating complex agent flows
-
-        # 0. Deterministic Runtime is now auto-configured by AdkInterceptor!
-
         # 1. Setup Session Service
         session_service = InMemorySessionService()
         session = await session_service.create_session(
@@ -164,8 +159,6 @@ class MultiAgentWorkflow:
         )
 
         # 4. Run
-        # Note: In a real temporal app, we might signal the workflow or use queries.
-        # Here we just run a single turn for the test.
         final_content = ""
         user_msg = types.Content(
             role="user",
@@ -178,7 +171,11 @@ class MultiAgentWorkflow:
         async for event in runner.run_async(
             user_id="test_user", session_id=session.id, new_message=user_msg
         ):
-            if event.content and event.content.parts:
+            if (
+                event.content
+                and event.content.parts
+                and event.content.parts[0].text is not None
+            ):
                 final_content = event.content.parts[0].text
 
         return final_content
@@ -358,7 +355,7 @@ class McpAgent:
             name="test_agent",
             # instruction="Always use your tools to answer questions.",
             model=model_name,
-            tools=[TemporalToolSet("test_set")],
+            tools=[TemporalMcpToolSet("test_set")],
         )
 
         # 2. Create Session (uses runtime.new_uuid() -> workflow.uuid4())
@@ -440,7 +437,7 @@ async def test_mcp_agent(client: Client, use_local_model: bool):
     new_config["plugins"] = [
         TemporalAdkPlugin(
             toolset_providers=[
-                TemporalToolSetProvider(
+                TemporalMcpToolSetProvider(
                     "test_set",
                     lambda _: McpToolset(
                         connection_params=StdioConnectionParams(
