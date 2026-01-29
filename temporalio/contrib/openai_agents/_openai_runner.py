@@ -21,6 +21,25 @@ from temporalio.contrib.openai_agents._temporal_model_stub import _TemporalModel
 from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 
 
+def _make_on_invoke_wrapper(
+    original_invoke: Any,
+    model_params: ModelActivityParameters,
+    seen: dict[int, Agent] | None,
+) -> Any:
+    """Factory function to create handoff wrapper with proper closure capture.
+
+    This fixes the closure late-binding bug where all handoffs would route to the
+    last agent because `original_invoke` was captured by reference in the loop.
+    See: https://github.com/openai/openai-agents-python/issues/2216
+    """
+
+    async def on_invoke(context: RunContextWrapper[Any], args: str) -> Agent[Any]:
+        handoff_agent = await original_invoke(context, args)
+        return _convert_agent(model_params, handoff_agent, seen)
+
+    return on_invoke
+
+
 # Recursively replace models in all agents
 def _convert_agent(
     model_params: ModelActivityParameters,
@@ -49,12 +68,9 @@ def _convert_agent(
         if isinstance(handoff, Agent):
             new_handoffs.append(_convert_agent(model_params, handoff, seen))
         elif isinstance(handoff, Handoff):
-            original_invoke = handoff.on_invoke_handoff
-
-            async def on_invoke(context: RunContextWrapper[Any], args: str) -> Agent:
-                handoff_agent = await original_invoke(context, args)
-                return _convert_agent(model_params, handoff_agent, seen)
-
+            on_invoke = _make_on_invoke_wrapper(
+                handoff.on_invoke_handoff, model_params, seen
+            )
             new_handoffs.append(
                 dataclasses.replace(handoff, on_invoke_handoff=on_invoke)
             )
