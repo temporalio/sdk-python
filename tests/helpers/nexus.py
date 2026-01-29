@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
+import nexusrpc
+
 import temporalio.api.failure.v1
 import temporalio.api.nexus.v1
 import temporalio.api.operatorservice.v1
@@ -110,6 +112,8 @@ class Failure:
     message: str = ""
     metadata: dict[str, str] | None = None
     details: dict[str, Any] | None = None
+    cause: dict[str, Any] | None = None
+    stackTrace: str | None = None
 
     exception_from_details: BaseException | None = dataclasses.field(
         init=False, default=None
@@ -122,10 +126,35 @@ class Failure:
             )
 
     def _instantiate_exception(
-        self, error_type: str, _details: dict[str, Any] | None
+        self, error_type: str, details: dict[str, Any] | None
     ) -> BaseException:
-        proto = {
-            "temporal.api.failure.v1.Failure": temporalio.api.failure.v1.Failure,
-        }[error_type]()
-        json_format.ParseDict(self.details, proto, ignore_unknown_fields=True)
-        return FailureConverter.default.from_failure(proto, PayloadConverter.default)
+        if error_type == "temporal.api.failure.v1.Failure":
+            proto = temporalio.api.failure.v1.Failure()
+            json_format.ParseDict(self.details, proto, ignore_unknown_fields=True)
+            return FailureConverter.default.from_failure(
+                proto, PayloadConverter.default
+            )
+
+        elif error_type == "nexus.OperationError":
+            state_str = (details or {}).get("state", "failed")
+            try:
+                state = nexusrpc.OperationErrorState(state_str)
+            except ValueError:
+                state = nexusrpc.OperationErrorState.FAILED
+            return nexusrpc.OperationError(self.message, state=state)
+
+        elif error_type == "nexus.HandlerError":
+            type_str = (details or {}).get("type", "INTERNAL")
+            try:
+                handler_type = nexusrpc.HandlerErrorType[type_str]
+            except KeyError:
+                handler_type = nexusrpc.HandlerErrorType.INTERNAL
+            retryable_override = (details or {}).get("retryableOverride")
+            return nexusrpc.HandlerError(
+                self.message,
+                error_type=handler_type,
+                retryable_override=retryable_override,
+            )
+
+        else:
+            raise ValueError(f"Unknown Nexus error type: {error_type}")

@@ -84,7 +84,7 @@ class ErrorTestService:
         operation_invocation_counts[input.id] += 1
         raise nexusrpc.HandlerError(
             "handler-error-message",
-            type=nexusrpc.HandlerErrorType.RESOURCE_EXHAUSTED,
+            error_type=nexusrpc.HandlerErrorType.RESOURCE_EXHAUSTED,
         )
 
     @nexusrpc.handler.sync_operation
@@ -94,7 +94,7 @@ class ErrorTestService:
         operation_invocation_counts[input.id] += 1
         raise nexusrpc.HandlerError(
             "handler-error-message",
-            type=nexusrpc.HandlerErrorType.INTERNAL,
+            error_type=nexusrpc.HandlerErrorType.INTERNAL,
         )
 
     @nexusrpc.handler.sync_operation
@@ -226,7 +226,7 @@ async def test_nexus_operation_fails_without_retry_as_handler_error(
             handler_error = err.__cause__.__cause__
             assert isinstance(handler_error, nexusrpc.HandlerError)
             assert not handler_error.retryable
-            assert handler_error.type == handler_error_type
+            assert handler_error.error_type == handler_error_type
             assert handler_error_message in str(handler_error)
         else:
             pytest.fail("Unreachable")

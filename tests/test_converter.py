@@ -19,6 +19,7 @@ from typing import (
 )
 from uuid import UUID, uuid4
 
+import nexusrpc
 import pydantic
 import pytest
 import typing_extensions
@@ -27,6 +28,7 @@ from typing_extensions import TypedDict
 import temporalio.api.common.v1
 import temporalio.common
 from temporalio.api.common.v1 import Payload, Payloads
+from temporalio.api.enums.v1 import NexusHandlerErrorRetryBehavior
 from temporalio.api.failure.v1 import Failure
 from temporalio.common import RawValue
 from temporalio.converter import (
@@ -44,8 +46,6 @@ from temporalio.converter import (
     encode_search_attribute_values,
     value_to_type,
 )
-import nexusrpc
-from temporalio.api.enums.v1 import NexusHandlerErrorRetryBehavior
 from temporalio.exceptions import (
     ApplicationError,
     FailureError,
@@ -628,7 +628,7 @@ async def test_nexus_handler_error_round_trip(
     message = f"test message for {handler_type.name}"
     original_error = nexusrpc.HandlerError(
         message,
-        type=handler_type,
+        error_type=handler_type,
         retryable_override=retryable_override,
     )
 
@@ -663,7 +663,7 @@ async def test_nexus_handler_error_round_trip(
 
     # Verify result
     assert isinstance(result_error, nexusrpc.HandlerError)
-    assert result_error.type == handler_type
+    assert result_error.error_type == handler_type
     assert result_error.retryable_override == expected_retryable
     assert str(result_error) == message
 
@@ -677,7 +677,7 @@ async def test_nexus_handler_error_with_cause():
 
     handler_error = nexusrpc.HandlerError(
         "handler error message",
-        type=nexusrpc.HandlerErrorType.INTERNAL,
+        error_type=nexusrpc.HandlerErrorType.INTERNAL,
     )
     handler_error.__cause__ = middle_cause
 
@@ -719,7 +719,7 @@ async def test_nexus_handler_error_unknown_type_fallback():
 
     # Should fall back to INTERNAL with message preserved
     assert isinstance(result_error, nexusrpc.HandlerError)
-    assert result_error.type == nexusrpc.HandlerErrorType.INTERNAL
+    assert result_error.error_type == nexusrpc.HandlerErrorType.INTERNAL
     assert str(result_error) == "unknown type error"
 
 
@@ -776,7 +776,7 @@ async def test_nexus_operation_error_with_cause():
     # Create NexusOperationError with HandlerError as cause
     cause_error = nexusrpc.HandlerError(
         "handler failed",
-        type=nexusrpc.HandlerErrorType.NOT_FOUND,
+        error_type=nexusrpc.HandlerErrorType.NOT_FOUND,
     )
 
     original_error = NexusOperationError(
@@ -807,7 +807,7 @@ async def test_nexus_operation_error_with_cause():
     assert result_error.message == "nexus operation failed"
     assert result_error.__cause__ is not None
     assert isinstance(result_error.__cause__, nexusrpc.HandlerError)
-    assert result_error.__cause__.type == nexusrpc.HandlerErrorType.NOT_FOUND
+    assert result_error.__cause__.error_type == nexusrpc.HandlerErrorType.NOT_FOUND
     assert str(result_error.__cause__) == "handler failed"
 
 
@@ -871,7 +871,7 @@ async def test_nexus_sdk_failure_error_info():
 
 async def test_reset_workflow_error_round_trip():
     """Test round-trip conversion of ResetWorkflowError."""
-    test_cases = [
+    test_cases: list[tuple[str, list[Any]]] = [
         # (message, last_heartbeat_details)
         ("reset with details", ["detail1", 42, {"key": "value"}]),
         ("reset with single detail", [123]),

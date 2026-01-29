@@ -241,9 +241,9 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                 if use_temporal_failure:
                     completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
                         task_token=task_token,
-                        failure=await self._handler_error_to_temporal_failure(
-                            handler_error
-                        ),
+                    )
+                    await self._data_converter.encode_failure(
+                        handler_error, completion.failure
                     )
                 else:
                     completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
@@ -401,9 +401,9 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                 )
         except nexusrpc.OperationError as err:
             if use_temporal_failure:
-                return temporalio.api.nexus.v1.StartOperationResponse(
-                    failure=await self._operation_error_to_temporal_failure(err),
-                )
+                response = temporalio.api.nexus.v1.StartOperationResponse()
+                await self._data_converter.encode_failure(err, response.failure)
+                return response
             else:
                 return temporalio.api.nexus.v1.StartOperationResponse(
                     operation_error=await self._operation_error_to_proto(err),
@@ -476,71 +476,10 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
             else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
         )
         return temporalio.api.nexus.v1.HandlerError(
-            error_type=handler_error.type.value,
+            error_type=handler_error.error_type.value,
             failure=await self._nexus_error_to_nexus_failure_proto(handler_error),
             retry_behavior=retry_behavior,
         )
-
-    async def _handler_error_to_temporal_failure(
-        self, handler_error: nexusrpc.HandlerError
-    ) -> temporalio.api.failure.v1.Failure:
-        """Serialize ``handler_error`` as a Temporal Failure proto (new format).
-
-        This format is used when the server supports temporal_failure_responses capability.
-        """
-        import traceback
-
-        retry_behavior = (
-            temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
-            if handler_error.retryable_override is True
-            else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
-            if handler_error.retryable_override is False
-            else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
-        )
-
-        failure = temporalio.api.failure.v1.Failure(
-            message=str(handler_error),
-            nexus_handler_failure_info=temporalio.api.failure.v1.NexusHandlerFailureInfo(
-                type=handler_error.type.value,
-                retry_behavior=retry_behavior,
-            ),
-        )
-
-        if handler_error.__traceback__:
-            failure.stack_trace = "\n".join(
-                traceback.format_tb(handler_error.__traceback__)
-            )
-
-        if handler_error.__cause__:
-            await self._data_converter.encode_failure(
-                handler_error.__cause__, failure.cause
-            )
-
-        return failure
-
-    async def _operation_error_to_temporal_failure(
-        self, err: nexusrpc.OperationError
-    ) -> temporalio.api.failure.v1.Failure:
-        """Serialize ``err`` as a Temporal Failure proto (new format).
-
-        This format is used when the server supports temporal_failure_responses capability.
-        """
-        import traceback
-
-        failure = temporalio.api.failure.v1.Failure(
-            message=str(err),
-            nexus_sdk_operation_failure_info=temporalio.api.failure.v1.NexusSDKOperationFailureInfo(
-                state=err.state.value,
-            ),
-        )
-
-        if err.__traceback__:
-            failure.stack_trace = "\n".join(traceback.format_tb(err.__traceback__))
-
-        if err.__cause__:
-            await self._data_converter.encode_failure(err.__cause__, failure.cause)
-
-        return failure
 
 
 @dataclass
@@ -567,7 +506,7 @@ class _DummyPayloadSerializer:
         except Exception as err:
             raise nexusrpc.HandlerError(
                 "Data converter failed to decode Nexus operation input",
-                type=nexusrpc.HandlerErrorType.BAD_REQUEST,
+                error_type=nexusrpc.HandlerErrorType.BAD_REQUEST,
                 retryable_override=False,
             ) from err
 
@@ -596,20 +535,20 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
         handler_err = nexusrpc.HandlerError(
             # TODO(nexus-preview): confirm what we want as message here
             err.message,
-            type=nexusrpc.HandlerErrorType.INTERNAL,
+            error_type=nexusrpc.HandlerErrorType.INTERNAL,
             retryable_override=not err.non_retryable,
         )
     elif isinstance(err, WorkflowAlreadyStartedError):
         handler_err = nexusrpc.HandlerError(
             err.message,
-            type=nexusrpc.HandlerErrorType.INTERNAL,
+            error_type=nexusrpc.HandlerErrorType.INTERNAL,
             retryable_override=False,
         )
     elif isinstance(err, RPCError):
         if err.status == RPCStatusCode.INVALID_ARGUMENT:
             handler_err = nexusrpc.HandlerError(
                 err.message,
-                type=nexusrpc.HandlerErrorType.BAD_REQUEST,
+                error_type=nexusrpc.HandlerErrorType.BAD_REQUEST,
             )
         elif err.status in [
             RPCStatusCode.ALREADY_EXISTS,
@@ -618,13 +557,13 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
         ]:
             handler_err = nexusrpc.HandlerError(
                 err.message,
-                type=nexusrpc.HandlerErrorType.INTERNAL,
+                error_type=nexusrpc.HandlerErrorType.INTERNAL,
                 retryable_override=False,
             )
         elif err.status in [RPCStatusCode.ABORTED, RPCStatusCode.UNAVAILABLE]:
             handler_err = nexusrpc.HandlerError(
                 err.message,
-                type=nexusrpc.HandlerErrorType.UNAVAILABLE,
+                error_type=nexusrpc.HandlerErrorType.UNAVAILABLE,
             )
         elif err.status in [
             RPCStatusCode.CANCELLED,
@@ -639,35 +578,35 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
             # when the handler fails to auth with Temporal and should be considered
             # retryable.
             handler_err = nexusrpc.HandlerError(
-                err.message, type=nexusrpc.HandlerErrorType.INTERNAL
+                err.message, error_type=nexusrpc.HandlerErrorType.INTERNAL
             )
         elif err.status == RPCStatusCode.NOT_FOUND:
             handler_err = nexusrpc.HandlerError(
-                err.message, type=nexusrpc.HandlerErrorType.NOT_FOUND
+                err.message, error_type=nexusrpc.HandlerErrorType.NOT_FOUND
             )
         elif err.status == RPCStatusCode.RESOURCE_EXHAUSTED:
             handler_err = nexusrpc.HandlerError(
                 err.message,
-                type=nexusrpc.HandlerErrorType.RESOURCE_EXHAUSTED,
+                error_type=nexusrpc.HandlerErrorType.RESOURCE_EXHAUSTED,
             )
         elif err.status == RPCStatusCode.UNIMPLEMENTED:
             handler_err = nexusrpc.HandlerError(
                 err.message,
-                type=nexusrpc.HandlerErrorType.NOT_IMPLEMENTED,
+                error_type=nexusrpc.HandlerErrorType.NOT_IMPLEMENTED,
             )
         elif err.status == RPCStatusCode.DEADLINE_EXCEEDED:
             handler_err = nexusrpc.HandlerError(
                 err.message,
-                type=nexusrpc.HandlerErrorType.UPSTREAM_TIMEOUT,
+                error_type=nexusrpc.HandlerErrorType.UPSTREAM_TIMEOUT,
             )
         else:
             handler_err = nexusrpc.HandlerError(
                 f"Unhandled RPC error status: {err.status}",
-                type=nexusrpc.HandlerErrorType.INTERNAL,
+                error_type=nexusrpc.HandlerErrorType.INTERNAL,
             )
     else:
         handler_err = nexusrpc.HandlerError(
-            str(err), type=nexusrpc.HandlerErrorType.INTERNAL
+            str(err), error_type=nexusrpc.HandlerErrorType.INTERNAL
         )
     handler_err.__cause__ = err
     return handler_err
