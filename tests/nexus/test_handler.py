@@ -179,7 +179,7 @@ class MyServiceHandler:
     ) -> Output:
         raise HandlerError(
             message="deliberate internal handler error",
-            error_type=HandlerErrorType.INTERNAL,
+            type=HandlerErrorType.INTERNAL,
             retryable_override=False,
         ) from RuntimeError("cause message")
 

@@ -1773,7 +1773,7 @@ wheels = [
 [[package]]
 name = "nexus-rpc"
 version = "1.3.0"
-source = { git = "https://github.com/nexus-rpc/sdk-python.git?branch=amazzeo%2Fadd-failure#486986d9f3beef1b4a72a3d4a3dc48eedf747e0e" }
+source = { git = "https://github.com/nexus-rpc/sdk-python.git?branch=amazzeo%2Fadd-failure#d0c4695f1433979d37eb2af57f689cc044ea6efd" }
 dependencies = [
     { name = "typing-extensions" },
 ]

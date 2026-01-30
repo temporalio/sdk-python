@@ -1088,7 +1088,7 @@ class DefaultFailureConverter(FailureConverter):
         if error.__cause__:
             self.to_failure(error.__cause__, payload_converter, failure.cause)
         failure.nexus_handler_failure_info.SetInParent()
-        failure.nexus_handler_failure_info.type = error.error_type.name
+        failure.nexus_handler_failure_info.type = error.type.name
         failure.nexus_handler_failure_info.retry_behavior = temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.ValueType(
             temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
             if error.retryable_override is True
@@ -1252,7 +1252,7 @@ class DefaultFailureConverter(FailureConverter):
 
                 err = nexusrpc.HandlerError(
                     failure.message or "Nexus handler error",
-                    error_type=_type,
+                    type=_type,
                     retryable_override=retryable_override,
                     stack_trace=failure.stack_trace if failure.stack_trace else None,
                 )
@@ -1269,7 +1269,6 @@ class DefaultFailureConverter(FailureConverter):
                 )
 
             case "nexus_sdk_operation_failure_info":
-                print("sup")
                 nexus_sdk_op_info = failure.nexus_sdk_operation_failure_info
                 try:
                     state = nexusrpc.OperationErrorState(nexus_sdk_op_info.state)

@@ -152,7 +152,7 @@ class Failure:
             retryable_override = (details or {}).get("retryableOverride")
             return nexusrpc.HandlerError(
                 self.message,
-                error_type=handler_type,
+                type=handler_type,
                 retryable_override=retryable_override,
             )
 

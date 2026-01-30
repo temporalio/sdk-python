@@ -84,7 +84,7 @@ class ErrorTestService:
         operation_invocation_counts[input.id] += 1
         raise nexusrpc.HandlerError(
             "handler-error-message",
-            error_type=nexusrpc.HandlerErrorType.RESOURCE_EXHAUSTED,
+            type=nexusrpc.HandlerErrorType.RESOURCE_EXHAUSTED,
         )
 
     @nexusrpc.handler.sync_operation
@@ -94,7 +94,7 @@ class ErrorTestService:
         operation_invocation_counts[input.id] += 1
         raise nexusrpc.HandlerError(
             "handler-error-message",
-            error_type=nexusrpc.HandlerErrorType.INTERNAL,
+            type=nexusrpc.HandlerErrorType.INTERNAL,
         )
 
     @nexusrpc.handler.sync_operation
@@ -173,16 +173,16 @@ async def test_nexus_operation_is_retried(
             nexusrpc.HandlerErrorType.NOT_FOUND,
             "has no operation",
         ),
-        # (
-        #     "fails_due_to_nonexistent_service",
-        #     nexusrpc.HandlerErrorType.NOT_FOUND,
-        #     "No handler for service",
-        # ),
-        # (
-        #     "fails_due_to_workflow_already_started",
-        #     nexusrpc.HandlerErrorType.INTERNAL,
-        #     "already started",
-        # ),
+        (
+            "fails_due_to_nonexistent_service",
+            nexusrpc.HandlerErrorType.NOT_FOUND,
+            "No handler for service",
+        ),
+        (
+            "fails_due_to_workflow_already_started",
+            nexusrpc.HandlerErrorType.INTERNAL,
+            "already started",
+        ),
     ],
 )
 async def test_nexus_operation_fails_without_retry_as_handler_error(
@@ -226,7 +226,7 @@ async def test_nexus_operation_fails_without_retry_as_handler_error(
             handler_error = err.__cause__.__cause__
             assert isinstance(handler_error, nexusrpc.HandlerError)
             assert not handler_error.retryable
-            assert handler_error.error_type == handler_error_type
+            assert handler_error.type == handler_error_type
             assert handler_error_message in str(handler_error)
         else:
             pytest.fail("Unreachable")
@@ -251,7 +251,6 @@ class StartTimeoutTestService:
     def expect_timeout_cancellation_sync(
         self, ctx: StartOperationContext, _input: None
     ) -> None:
-        print("sup")
         global _start_operation_sync_complete
         cancelled = ctx.task_cancellation.wait_until_cancelled_sync(3)
         if not cancelled:

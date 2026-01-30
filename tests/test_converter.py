@@ -628,7 +628,7 @@ async def test_nexus_handler_error_round_trip(
     message = f"test message for {handler_type.name}"
     original_error = nexusrpc.HandlerError(
         message,
-        error_type=handler_type,
+        type=handler_type,
         retryable_override=retryable_override,
     )
 
@@ -663,7 +663,7 @@ async def test_nexus_handler_error_round_trip(
 
     # Verify result
     assert isinstance(result_error, nexusrpc.HandlerError)
-    assert result_error.error_type == handler_type
+    assert result_error.type == handler_type
     assert result_error.retryable_override == expected_retryable
     assert str(result_error) == message
 
@@ -677,7 +677,7 @@ async def test_nexus_handler_error_with_cause():
 
     handler_error = nexusrpc.HandlerError(
         "handler error message",
-        error_type=nexusrpc.HandlerErrorType.INTERNAL,
+        type=nexusrpc.HandlerErrorType.INTERNAL,
     )
     handler_error.__cause__ = middle_cause
 
@@ -719,7 +719,7 @@ async def test_nexus_handler_error_unknown_type_fallback():
 
     # Should fall back to INTERNAL with message preserved
     assert isinstance(result_error, nexusrpc.HandlerError)
-    assert result_error.error_type == nexusrpc.HandlerErrorType.INTERNAL
+    assert result_error.type == nexusrpc.HandlerErrorType.INTERNAL
     assert str(result_error) == "unknown type error"
 
 
@@ -776,7 +776,7 @@ async def test_nexus_operation_error_with_cause():
     # Create NexusOperationError with HandlerError as cause
     cause_error = nexusrpc.HandlerError(
         "handler failed",
-        error_type=nexusrpc.HandlerErrorType.NOT_FOUND,
+        type=nexusrpc.HandlerErrorType.NOT_FOUND,
     )
 
     original_error = NexusOperationError(
@@ -807,7 +807,7 @@ async def test_nexus_operation_error_with_cause():
     assert result_error.message == "nexus operation failed"
     assert result_error.__cause__ is not None
     assert isinstance(result_error.__cause__, nexusrpc.HandlerError)
-    assert result_error.__cause__.error_type == nexusrpc.HandlerErrorType.NOT_FOUND
+    assert result_error.__cause__.type == nexusrpc.HandlerErrorType.NOT_FOUND
     assert str(result_error.__cause__) == "handler failed"
 
 
