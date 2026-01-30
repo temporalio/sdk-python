@@ -315,7 +315,6 @@ async def encode_completion(
     encode_headers: bool,
 ) -> None:
     """Encode all payloads in the completion."""
-    if data_converter._encode_payload_has_effect:
-        await CommandAwarePayloadVisitor(
-            skip_search_attributes=True, skip_headers=not encode_headers
-        ).visit(_Visitor(data_converter._encode_payload_sequence), completion)
+    await CommandAwarePayloadVisitor(
+        skip_search_attributes=True, skip_headers=not encode_headers
+    ).visit(_Visitor(data_converter._encode_payload_sequence), completion)
