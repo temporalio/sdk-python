@@ -31,6 +31,7 @@ from temporalio.exceptions import (
     NexusOperationError,
     TimeoutError,
 )
+from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import LogCapturer, assert_eq_eventually
@@ -45,6 +46,13 @@ logger = getLogger(__name__)
 class ErrorTestInput:
     service_name: str
     operation_name: str
+    task_queue: str
+    id: str
+
+
+@dataclass
+class RPCErrorInput:
+    status_code_value: int  # RPCStatusCode int value
     task_queue: str
     id: str
 
@@ -108,6 +116,18 @@ class ErrorTestService:
                 task_queue=nexus.info().task_queue,
             )
 
+    @nexusrpc.handler.sync_operation
+    def raise_rpc_error(
+        self, _ctx: nexusrpc.handler.StartOperationContext, input: RPCErrorInput
+    ) -> None:
+        operation_invocation_counts[input.id] += 1
+        status_code = RPCStatusCode(input.status_code_value)
+        raise RPCError(
+            f"Test error for {status_code.name}",
+            status_code,
+            b"",
+        )
+
 
 @workflow.defn(sandboxed=False)
 class CallerWorkflow:
@@ -118,6 +138,20 @@ class CallerWorkflow:
             endpoint=make_nexus_endpoint_name(input.task_queue),
         )
         await nexus_client.execute_operation(input.operation_name, input)
+
+
+@workflow.defn(sandboxed=False)
+class RPCErrorCallerWorkflow:
+    @workflow.run
+    async def run(self, input: RPCErrorInput) -> None:
+        nexus_client = workflow.create_nexus_client(
+            service="ErrorTestService",
+            endpoint=make_nexus_endpoint_name(input.task_queue),
+        )
+        await nexus_client.execute_operation(
+            ErrorTestService.raise_rpc_error,
+            input,
+        )
 
 
 @pytest.mark.parametrize(
@@ -394,3 +428,112 @@ async def test_error_raised_by_timeout_of_nexus_cancel_operation(
                 )
 
             assert capturer.find_log("expected cancellation") is None
+
+
+# RPCError tests
+
+
+@pytest.mark.parametrize(
+    ["status_code", "expected_handler_error_type"],
+    [
+        (RPCStatusCode.INVALID_ARGUMENT, nexusrpc.HandlerErrorType.BAD_REQUEST),
+        (RPCStatusCode.ALREADY_EXISTS, nexusrpc.HandlerErrorType.INTERNAL),
+        (RPCStatusCode.FAILED_PRECONDITION, nexusrpc.HandlerErrorType.INTERNAL),
+        (RPCStatusCode.OUT_OF_RANGE, nexusrpc.HandlerErrorType.INTERNAL),
+        (RPCStatusCode.NOT_FOUND, nexusrpc.HandlerErrorType.NOT_FOUND),
+        (RPCStatusCode.UNIMPLEMENTED, nexusrpc.HandlerErrorType.NOT_IMPLEMENTED),
+    ],
+)
+async def test_rpc_error_fails_without_retry(
+    client: Client,
+    env: WorkflowEnvironment,
+    status_code: RPCStatusCode,
+    expected_handler_error_type: nexusrpc.HandlerErrorType,
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    input = RPCErrorInput(
+        status_code_value=status_code.value,
+        task_queue=str(uuid.uuid4()),
+        id=str(uuid.uuid4()),
+    )
+    async with Worker(
+        client,
+        nexus_service_handlers=[ErrorTestService()],
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1),
+        workflows=[RPCErrorCallerWorkflow],
+        task_queue=input.task_queue,
+    ):
+        await create_nexus_endpoint(input.task_queue, client)
+        try:
+            await client.execute_workflow(
+                RPCErrorCallerWorkflow.run,
+                input,
+                id=str(uuid.uuid4()),
+                task_queue=input.task_queue,
+            )
+        except Exception as err:
+            assert isinstance(err, WorkflowFailureError)
+            assert isinstance(err.__cause__, NexusOperationError)
+            handler_error = err.__cause__.__cause__
+            assert isinstance(handler_error, nexusrpc.HandlerError)
+            assert not handler_error.retryable
+            assert handler_error.type == expected_handler_error_type
+            # Verify no retry occurred
+            assert operation_invocation_counts[input.id] == 1
+        else:
+            pytest.fail("Expected WorkflowFailureError")
+
+
+@pytest.mark.parametrize(
+    "status_code",
+    [
+        RPCStatusCode.ABORTED,
+        RPCStatusCode.UNAVAILABLE,
+        RPCStatusCode.CANCELLED,
+        RPCStatusCode.DATA_LOSS,
+        RPCStatusCode.INTERNAL,
+        RPCStatusCode.UNKNOWN,
+        RPCStatusCode.UNAUTHENTICATED,
+        RPCStatusCode.PERMISSION_DENIED,
+        RPCStatusCode.RESOURCE_EXHAUSTED,
+        RPCStatusCode.DEADLINE_EXCEEDED,
+        RPCStatusCode.OK,  # fallback case
+    ],
+)
+async def test_rpc_error_is_retried(
+    client: Client,
+    env: WorkflowEnvironment,
+    status_code: RPCStatusCode,
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    input = RPCErrorInput(
+        status_code_value=status_code.value,
+        task_queue=str(uuid.uuid4()),
+        id=str(uuid.uuid4()),
+    )
+    async with Worker(
+        client,
+        nexus_service_handlers=[ErrorTestService()],
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1),
+        workflows=[RPCErrorCallerWorkflow],
+        task_queue=input.task_queue,
+    ):
+        await create_nexus_endpoint(input.task_queue, client)
+
+        handle = await client.start_workflow(
+            RPCErrorCallerWorkflow.run,
+            input,
+            id=str(uuid.uuid4()),
+            task_queue=input.task_queue,
+        )
+
+        async def times_called() -> int:
+            return operation_invocation_counts[input.id]
+
+        await assert_eq_eventually(2, times_called)
+
+        await handle.cancel()
