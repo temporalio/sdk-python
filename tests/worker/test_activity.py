@@ -1008,34 +1008,63 @@ async def test_activity_error_non_retryable_type(
     )
 
 
+@pytest.mark.parametrize("temporal_extra_mode", ["dict", "flatten"])
 async def test_activity_logging(
     client: Client,
     worker: ExternalWorker,
     shared_state_manager: SharedStateManager,
+    temporal_extra_mode: str,
 ):
+    """Test that activity logger produces correct log records for each extra mode."""
+
     @activity.defn
     async def say_hello(name: str) -> str:
         activity.logger.info(f"Called with arg: {name}")
         return f"Hello, {name}!"
 
-    # Create a queue, add handler to logger, call normal activity, then check
+    original_mode = activity.logger.temporal_extra_mode
+    activity.logger.temporal_extra_mode = temporal_extra_mode
+
     handler = logging.handlers.QueueHandler(queue.Queue())
-    with LogHandler.apply(activity.logger.base_logger, handler):
-        activity.logger.base_logger.setLevel(logging.INFO)
-        result = await _execute_workflow_with_activity(
-            client,
-            worker,
-            say_hello,
-            "Temporal",
-            shared_state_manager=shared_state_manager,
-        )
+    try:
+        with LogHandler.apply(activity.logger.base_logger, handler):
+            activity.logger.base_logger.setLevel(logging.INFO)
+            result = await _execute_workflow_with_activity(
+                client,
+                worker,
+                say_hello,
+                "Temporal",
+                shared_state_manager=shared_state_manager,
+            )
+    finally:
+        activity.logger.temporal_extra_mode = original_mode
+
     assert result.result == "Hello, Temporal!"
     records: list[logging.LogRecord] = list(handler.queue.queue)  # type: ignore
     assert len(records) > 0
-    assert records[-1].message.startswith(
-        "Called with arg: Temporal ({'activity_id': '"
-    )
-    assert records[-1].__dict__["temporal_activity"]["activity_type"] == "say_hello"
+    record = records[-1]
+
+    if temporal_extra_mode == "dict":
+        # Dict mode appends context to message and uses nested dict
+        assert record.message.startswith("Called with arg: Temporal ({'activity_id': '")
+        assert record.__dict__["temporal_activity"]["activity_type"] == "say_hello"
+    else:
+        # Flatten mode uses OTel-safe scalar attributes
+        assert "temporal_activity" not in record.__dict__
+        assert record.__dict__["temporal.activity.activity_type"] == "say_hello"
+        assert "temporal.activity.activity_id" in record.__dict__
+        assert "temporal.activity.workflow_id" in record.__dict__
+        assert "temporal.activity.workflow_run_id" in record.__dict__
+        assert "temporal.activity.namespace" in record.__dict__
+        assert "temporal.activity.task_queue" in record.__dict__
+        assert record.__dict__["temporal.activity.attempt"] == 1
+
+        # Verify all temporal.activity.* values are primitives (OTel-safe)
+        for key, value in record.__dict__.items():
+            if key.startswith("temporal.activity."):
+                assert isinstance(
+                    value, (str, int, float, bool, type(None))
+                ), f"Key {key} has non-primitive value: {type(value)}"
 
 
 async def test_activity_worker_shutdown(

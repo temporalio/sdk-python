@@ -1991,7 +1991,67 @@ class LoggingWorkflow:
         return self._last_signal
 
 
-async def test_workflow_logging(client: Client):
+@pytest.mark.parametrize("temporal_extra_mode", ["dict", "flatten"])
+async def test_workflow_logging(client: Client, temporal_extra_mode: str):
+    """Test that workflow logger produces correct log records for each extra mode."""
+    original_mode = workflow.logger.temporal_extra_mode
+    workflow.logger.temporal_extra_mode = temporal_extra_mode
+
+    try:
+        with LogCapturer().logs_captured(workflow.logger.base_logger) as capturer:
+            async with new_worker(
+                client, LoggingWorkflow, max_cached_workflows=0
+            ) as worker:
+                handle = await client.start_workflow(
+                    LoggingWorkflow.run,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+                await handle.signal(LoggingWorkflow.my_signal, "signal 1")
+                await handle.execute_update(
+                    LoggingWorkflow.my_update, "update 1", id="update-1"
+                )
+                await handle.signal(LoggingWorkflow.my_signal, "finish")
+                await handle.result()
+
+            record = capturer.find_log("Signal: signal 1")
+            assert record is not None
+            assert record.funcName == "my_signal"
+
+            update_record = capturer.find_log("Update: update 1")
+            assert update_record is not None
+
+            if temporal_extra_mode == "dict":
+                # Dict mode appends context to message and uses nested dict
+                assert "({'attempt':" in record.message
+                assert record.__dict__["temporal_workflow"]["workflow_type"] == "LoggingWorkflow"
+                assert update_record.__dict__["temporal_workflow"]["update_id"] == "update-1"
+                assert update_record.__dict__["temporal_workflow"]["update_name"] == "my_update"
+                assert "'update_id': 'update-1'" in update_record.message
+            else:
+                # Flatten mode uses OTel-safe scalar attributes
+                assert "temporal_workflow" not in record.__dict__
+                assert record.__dict__["temporal.workflow.workflow_type"] == "LoggingWorkflow"
+                assert "temporal.workflow.workflow_id" in record.__dict__
+                assert "temporal.workflow.run_id" in record.__dict__
+                assert "temporal.workflow.namespace" in record.__dict__
+                assert "temporal.workflow.task_queue" in record.__dict__
+                assert record.__dict__["temporal.workflow.attempt"] == 1
+                assert update_record.__dict__["temporal.workflow.update_id"] == "update-1"
+                assert update_record.__dict__["temporal.workflow.update_name"] == "my_update"
+
+                # Verify all temporal.workflow.* values are primitives (OTel-safe)
+                for key, value in record.__dict__.items():
+                    if key.startswith("temporal.workflow."):
+                        assert isinstance(
+                            value, (str, int, float, bool, type(None))
+                        ), f"Key {key} has non-primitive value: {type(value)}"
+    finally:
+        workflow.logger.temporal_extra_mode = original_mode
+
+
+async def test_workflow_logging_replay(client: Client):
+    """Test that replayed logs are suppressed and full_workflow_info_on_extra works."""
     workflow.logger.full_workflow_info_on_extra = True
     with LogCapturer().logs_captured(
         workflow.logger.base_logger, activity.logger.base_logger
@@ -2007,43 +2067,22 @@ async def test_workflow_logging(client: Client):
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
-            # Send some signals and updates
             await handle.signal(LoggingWorkflow.my_signal, "signal 1")
             await handle.signal(LoggingWorkflow.my_signal, "signal 2")
             await handle.execute_update(
                 LoggingWorkflow.my_update, "update 1", id="update-1"
             )
-            await handle.execute_update(
-                LoggingWorkflow.my_update, "update 2", id="update-2"
-            )
             assert "signal 2" == await handle.query(LoggingWorkflow.last_signal)
 
         # Confirm logs were produced
-        assert capturer.find_log("Signal: signal 1 ({'attempt':")
+        assert capturer.find_log("Signal: signal 1")
         assert capturer.find_log("Signal: signal 2")
         assert capturer.find_log("Update: update 1")
-        assert capturer.find_log("Update: update 2")
         assert capturer.find_log("Query called")
-        assert not capturer.find_log("Signal: signal 3")
-        # Also make sure it has some workflow info and correct funcName
-        record = capturer.find_log("Signal: signal 1")
-        assert (
-            record
-            and record.__dict__["temporal_workflow"]["workflow_type"]
-            == "LoggingWorkflow"
-            and record.funcName == "my_signal"
-        )
+
         # Since we enabled full info, make sure it's there
-        assert isinstance(record.__dict__["workflow_info"], workflow.Info)
-        # Check the log emitted by the update execution.
-        record = capturer.find_log("Update: update 1")
-        assert (
-            record
-            and record.__dict__["temporal_workflow"]["update_id"] == "update-1"
-            and record.__dict__["temporal_workflow"]["update_name"] == "my_update"
-            and "'update_id': 'update-1'" in record.message
-            and "'update_name': 'my_update'" in record.message
-        )
+        record = capturer.find_log("Signal: signal 1")
+        assert record and isinstance(record.__dict__["workflow_info"], workflow.Info)
 
         # Clear queue and start a new one with more signals
         capturer.log_queue.queue.clear()
@@ -2053,7 +2092,6 @@ async def test_workflow_logging(client: Client):
             task_queue=worker.task_queue,
             max_cached_workflows=0,
         ) as worker:
-            # Send signals and updates
             await handle.signal(LoggingWorkflow.my_signal, "signal 3")
             await handle.signal(LoggingWorkflow.my_signal, "finish")
             await handle.result()
