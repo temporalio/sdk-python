@@ -1,28 +1,37 @@
-from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from contextlib import asynccontextmanager
-from typing import Any, Callable
+from typing import Any, Protocol
 
-from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SpanExporter
 
 
-class Instrumentor(ABC):
-    @abstractmethod
+class Instrumentor(Protocol):
+    """Protocol for instrumenting libraries with OpenTelemetry."""
+
     def instrument(self, **kwargs: Any):
         """Instrument the library"""
 
-    @abstractmethod
     def uninstrument(self, **kwargs: Any):
         """Uninstrument the library"""
 
+
 @asynccontextmanager
-async def with_instrumentation_context(span_exporters: list[SpanExporter], instrumentor: Instrumentor):
+async def with_instrumentation_context(
+    span_exporters: Sequence[SpanExporter], instrumentor: Instrumentor
+):
+    """Context manager that sets up OpenTelemetry instrumentation with Temporal-specific components.
+
+    Args:
+        span_exporters: Sequence of span exporters to use for tracing
+        instrumentor: Instrumentor instance to use for library instrumentation
+    """
+    from opentelemetry import trace
+    from opentelemetry.sdk import trace as trace_sdk
+
     from temporalio.contrib.opentelemetry import (
         TemporalIdGenerator,
         TemporalSpanProcessor,
     )
-    from opentelemetry import trace
-    from opentelemetry.sdk import trace as trace_sdk
 
     # Create trace provider with deterministic ID generation
     provider = trace_sdk.TracerProvider(id_generator=TemporalIdGenerator())
@@ -41,3 +50,4 @@ async def with_instrumentation_context(span_exporters: list[SpanExporter], instr
         yield
     finally:
         instrumentor.uninstrument()
+        trace.set_tracer_provider(old_provider)

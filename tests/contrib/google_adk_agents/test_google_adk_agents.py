@@ -19,7 +19,6 @@ import os
 import uuid
 from collections.abc import AsyncGenerator, Iterator
 from datetime import timedelta
-from pathlib import Path
 
 import pytest
 from google.adk import Agent, Runner
@@ -35,7 +34,6 @@ from google.adk.utils.context_utils import Aclosing
 from google.genai import types
 from google.genai.types import Content, FunctionCall, Part
 from mcp import StdioServerParameters
-from opentelemetry.sdk.trace import TracerProvider, export, ReadableSpan
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from temporalio import activity, workflow
@@ -520,16 +518,20 @@ async def test_single_agent_telemetry(client: Client):
 
     spans = exporter.get_finished_spans()
 
-    invocation_span = next((s for s in spans if s.name == "invocation [test_app]"), None)
+    invocation_span = next(
+        (s for s in spans if s.name == "invocation [test_app]"), None
+    )
     agent_span = next((s for s in spans if s.name == "agent_run [test_agent]"), None)
-    llm_spans = [s for s in spans if s.name == "call_llm"]
+    _llm_spans = [s for s in spans if s.name == "call_llm"]
     tool_spans = [s for s in spans if "execute_tool" in s.name]
 
     assert invocation_span is not None
     assert invocation_span.parent is None
+    assert invocation_span.context is not None
 
     assert agent_span is not None
     assert agent_span.parent is not None
+    assert agent_span.context is not None
     assert agent_span.parent.span_id == invocation_span.context.span_id
 
     # Model is invoked twice, but because of before_model_callback, llm spans are not reported

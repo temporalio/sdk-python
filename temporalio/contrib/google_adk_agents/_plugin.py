@@ -5,9 +5,9 @@ import inspect
 import time
 import typing
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
-from typing import Any, Callable, Sequence
+from typing import Any, Callable
 
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models import LLMRegistry
@@ -18,7 +18,10 @@ from openinference.instrumentation.google_adk import GoogleADKInstrumentor
 
 from temporalio import activity, workflow
 from temporalio.contrib.google_adk_agents._mcp import TemporalMcpToolSetProvider
-from temporalio.contrib.opentelemetry import TracingInterceptor, with_instrumentation_context
+from temporalio.contrib.opentelemetry import (
+    TracingInterceptor,
+    with_instrumentation_context,
+)
 from temporalio.contrib.pydantic import (
     PydanticPayloadConverter as _DefaultPydanticPayloadConverter,
 )
@@ -31,6 +34,7 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 if typing.TYPE_CHECKING:
     from opentelemetry.sdk.trace.export import SpanExporter
+
 
 def setup_deterministic_runtime():
     """Configures ADK runtime for Temporal determinism.
@@ -164,18 +168,28 @@ class TemporalAdkPlugin(SimplePlugin):
     2. Sandbox Passthrough for `google.adk` and `google.genai`.
     """
 
-    def __init__(self, toolset_providers: list[TemporalMcpToolSetProvider] | None = None, otel_exporters: Sequence["SpanExporter"] | None = None):
+    def __init__(
+        self,
+        toolset_providers: list[TemporalMcpToolSetProvider] | None = None,
+        otel_exporters: Sequence["SpanExporter"] | None = None,
+    ):
         """Initializes the Temporal ADK Plugin.
 
         Args:
             toolset_providers: Optional list of toolset providers for MCP integration.
+            otel_exporters: Optional sequence of OpenTelemetry span exporters for tracing.
         """
-        self._otel_exporters = otel_exporters
+
         @asynccontextmanager
         async def run_context() -> AsyncIterator[None]:
             setup_deterministic_runtime()
 
-            async with with_instrumentation_context(self._otel_exporters, GoogleADKInstrumentor()):
+            if otel_exporters is not None:
+                async with with_instrumentation_context(
+                    otel_exporters, GoogleADKInstrumentor()
+                ):
+                    yield
+            else:
                 yield
 
         def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:

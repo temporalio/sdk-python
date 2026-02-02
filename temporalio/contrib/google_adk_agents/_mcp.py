@@ -35,9 +35,10 @@ class _ToolResult:
 @dataclass
 class TemporalToolContext:
     """Context for tools running within Temporal workflows.
-    
+
     Provides access to tool confirmation and event actions for ADK integration.
     """
+
     tool_confirmation: ToolConfirmation | None
     function_call_id: str | None
     event_actions: EventActions
@@ -80,10 +81,11 @@ class _CallToolArguments:
 
 class TemporalMcpToolSetProvider:
     """Provider for creating Temporal-aware MCP toolsets.
-    
+
     Manages the creation of toolset activities and handles tool execution
     within Temporal workflows.
     """
+
     def __init__(self, name: str, toolset_factory: Callable[[Any | None], McpToolset]):
         """Initializes the toolset provider.
 
@@ -195,10 +197,11 @@ class _TemporalTool(BaseTool):
 
 class TemporalMcpToolSet(BaseToolset):
     """Temporal-aware MCP toolset implementation.
-    
+
     Executes MCP tools as Temporal activities, providing proper isolation
     and execution guarantees within workflows.
     """
+
     def __init__(
         self,
         name: str,

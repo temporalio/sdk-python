@@ -1,5 +1,10 @@
+"""Workflow-specific OpenTelemetry utilities for Temporal workflows."""
+
 import opentelemetry.util.types
-from temporalio.contrib.opentelemetry._interceptors import TracingWorkflowInboundInterceptor
+
+from temporalio.contrib.opentelemetry._interceptors import (
+    TracingWorkflowInboundInterceptor,
+)
 
 
 def completed_span(
