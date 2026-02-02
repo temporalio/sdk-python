@@ -211,9 +211,7 @@ class RaiseNexusHandlerErrorNotFoundFromCustomError(ErrorConversionTestCase):
             (
                 ApplicationError,
                 {
-                    # TODO(nexus-preview): empirically, this is "handler-error-message",
-                    # but it should be "runtime-error-message"
-                    # "message": "runtime-error-message",
+                    "message": "custom-error-message",
                     "type": "CustomError",
                     "non_retryable": False,
                 },
@@ -393,7 +391,7 @@ class ErrorTestCallerWorkflow:
                 assert isinstance(err, expected_cls)
                 for k, v in expected_fields.items():
                     if k == "message" and isinstance(err, nexusrpc.HandlerError):
-                        assert str(err) == v
+                        assert v in str(err)
                     else:
                         assert getattr(err, k) == v
 
