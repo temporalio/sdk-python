@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
 
 import nexusrpc
 import nexusrpc.handler
@@ -25,20 +23,139 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
-error_conversion_test_cases: dict[str, type[ErrorConversionTestCase]] = {}
+
+@dataclass
+class ExpectedNexusOperationError:
+    message: str
+    service: str
 
 
 @dataclass
-class ErrorConversionTestCase:
-    action_in_nexus_operation: Callable[..., Any]
-    expected_exception_chain_in_workflow: list[tuple[type[Exception], dict[str, Any]]]
-
-    def __init_subclass__(cls, **kwargs):  # type:ignore[reportMissingParameterType]
-        super().__init_subclass__(**kwargs)
-        assert cls.__name__ not in error_conversion_test_cases
-        error_conversion_test_cases[cls.__name__] = cls
+class ExpectedHandlerError:
+    message: str  # Uses containment check (server may add prefix)
+    type: str  # HandlerErrorType name (e.g., "INTERNAL", "NOT_FOUND")
+    retryable: bool
 
 
+@dataclass
+class ExpectedApplicationError:
+    message: str
+    non_retryable: bool
+    type: str | None = None
+
+
+ExpectedExceptionInfo = (
+    ExpectedNexusOperationError | ExpectedHandlerError | ExpectedApplicationError
+)
+
+
+@dataclass
+class ErrorTestCase:
+    name: str
+    operation_name: str
+    expected_exception_chain: list[ExpectedExceptionInfo]
+
+
+class CustomError(Exception):
+    pass
+
+
+@dataclass
+class ErrorTestInput:
+    task_queue: str
+    operation_name: str
+    expected_exception_chain: list[ExpectedExceptionInfo]
+
+
+# Handler service with one operation per test case
+
+
+@nexusrpc.handler.service_handler
+class ErrorTestService:
+    @sync_operation
+    async def raise_application_error_non_retryable(
+        self, _ctx: StartOperationContext, _input: ErrorTestInput
+    ) -> None:
+        raise ApplicationError(
+            "application-error-message",
+            type="application-error-type",
+            non_retryable=True,
+        )
+
+    @sync_operation
+    async def raise_application_error_non_retryable_from_custom_error(
+        self, _ctx: StartOperationContext, _input: ErrorTestInput
+    ) -> None:
+        try:
+            raise CustomError("custom-error-message")
+        except CustomError as err:
+            raise ApplicationError(
+                "application-error-message",
+                type="application-error-type",
+                non_retryable=True,
+            ) from err
+
+    @sync_operation
+    async def raise_nexus_handler_error_not_found(
+        self, _ctx: StartOperationContext, _input: ErrorTestInput
+    ) -> None:
+        try:
+            raise RuntimeError("runtime-error-message")
+        except RuntimeError as err:
+            raise nexusrpc.HandlerError(
+                "handler-error-message",
+                type=nexusrpc.HandlerErrorType.NOT_FOUND,
+            ) from err
+
+    @sync_operation
+    async def raise_nexus_handler_error_not_found_from_custom_error(
+        self, _ctx: StartOperationContext, _input: ErrorTestInput
+    ) -> None:
+        try:
+            raise CustomError("custom-error-message")
+        except CustomError as err:
+            raise nexusrpc.HandlerError(
+                "handler-error-message",
+                type=nexusrpc.HandlerErrorType.NOT_FOUND,
+            ) from err
+
+    @sync_operation
+    async def raise_nexus_handler_error_not_found_from_handler_error_unavailable(
+        self, _ctx: StartOperationContext, _input: ErrorTestInput
+    ) -> None:
+        try:
+            raise nexusrpc.HandlerError(
+                "handler-error-message-2",
+                type=nexusrpc.HandlerErrorType.UNAVAILABLE,
+            )
+        except nexusrpc.HandlerError as err:
+            raise nexusrpc.HandlerError(
+                "handler-error-message",
+                type=nexusrpc.HandlerErrorType.NOT_FOUND,
+            ) from err
+
+    @sync_operation
+    async def raise_nexus_operation_error_from_application_error_non_retryable_from_custom_error(
+        self, _ctx: StartOperationContext, _input: ErrorTestInput
+    ) -> None:
+        try:
+            try:
+                raise CustomError("custom-error-message")
+            except CustomError as err:
+                raise ApplicationError(
+                    "application-error-message",
+                    type="application-error-type",
+                    non_retryable=True,
+                ) from err
+        except ApplicationError as err:
+            raise nexusrpc.OperationError(
+                "operation-error-message",
+                state=nexusrpc.OperationErrorState.FAILED,
+            ) from err
+
+
+# Test cases
+#
 # If a nexus handler raises a non-retryable ApplicationError, the calling workflow
 # should see a non-retryable exception.
 #
@@ -70,185 +187,131 @@ class ErrorConversionTestCase:
 #     ]
 #   }
 # )
-
-
-class RaiseApplicationErrorNonRetryable(ErrorConversionTestCase):
-    @staticmethod
-    def action_in_nexus_operation():
-        raise ApplicationError(
-            "application-error-message",
+RaiseApplicationErrorNonRetryable = ErrorTestCase(
+    name="RaiseApplicationErrorNonRetryable",
+    operation_name=ErrorTestService.raise_application_error_non_retryable.__name__,
+    expected_exception_chain=[
+        ExpectedNexusOperationError(
+            message="nexus operation completed unsuccessfully",
+            service="ErrorTestService",
+        ),
+        ExpectedHandlerError(
+            message="application-error-message",
+            type="INTERNAL",
+            retryable=False,
+        ),
+        ExpectedApplicationError(
+            message="application-error-message",
             type="application-error-type",
             non_retryable=True,
-        )
-
-    expected_exception_chain_in_workflow = [
-        (
-            NexusOperationError,
-            {
-                "service": "ErrorTestService",
-                "message": "nexus operation completed unsuccessfully",
-            },
         ),
-        (
-            nexusrpc.HandlerError,
-            {
-                # In this test case the user code raised ApplicationError directly, and
-                # a wrapping HandlerError was synthesized with the same error message as
-                # that of the ApplicationError. The server prepends 'handler error
-                # (INTERNAL):'
-                # "message": "handler error (INTERNAL): application-error-message",
-                "message": "application-error-message",
-                "type": nexusrpc.HandlerErrorType.INTERNAL,
-                "retryable": False,
-            },
+    ],
+)
+
+
+RaiseApplicationErrorNonRetryableFromCustomError = ErrorTestCase(
+    name="RaiseApplicationErrorNonRetryableFromCustomError",
+    operation_name=ErrorTestService.raise_application_error_non_retryable_from_custom_error.__name__,
+    expected_exception_chain=[
+        ExpectedNexusOperationError(
+            message="nexus operation completed unsuccessfully",
+            service="ErrorTestService",
         ),
-        (
-            ApplicationError,
-            {
-                "message": "application-error-message",
-                "type": "application-error-type",
-                "non_retryable": True,
-            },
+        ExpectedHandlerError(
+            message="application-error-message",
+            type="INTERNAL",
+            retryable=False,
         ),
-    ]
-
-
-class RaiseApplicationErrorNonRetryableFromCustomError(ErrorConversionTestCase):
-    @staticmethod
-    def action_in_nexus_operation():
-        try:
-            raise CustomError("custom-error-message")
-        except CustomError as err:
-            raise ApplicationError(
-                "application-error-message",
-                type="application-error-type",
-                non_retryable=True,
-            ) from err
-
-    expected_exception_chain_in_workflow = (
-        RaiseApplicationErrorNonRetryable.expected_exception_chain_in_workflow
-        + [
-            (
-                ApplicationError,
-                {
-                    "message": "custom-error-message",
-                    "type": "CustomError",
-                    "non_retryable": False,
-                },
-            ),
-        ]
-    )
-
-
-class RaiseNexusHandlerErrorNotFound(ErrorConversionTestCase):
-    @staticmethod
-    def action_in_nexus_operation():
-        try:
-            raise RuntimeError("runtime-error-message")
-        except RuntimeError as err:
-            raise nexusrpc.HandlerError(
-                "handler-error-message",
-                type=nexusrpc.HandlerErrorType.NOT_FOUND,
-            ) from err
-
-    expected_exception_chain_in_workflow = [
-        (
-            NexusOperationError,
-            {
-                "service": "ErrorTestService",
-                "message": "nexus operation completed unsuccessfully",
-            },
+        ExpectedApplicationError(
+            message="application-error-message",
+            type="application-error-type",
+            non_retryable=True,
         ),
-        (
-            nexusrpc.HandlerError,
-            {
-                # In this test case the user code raised HandlerError directly, so there
-                # was no need to synthesize a wrapping HandlerError The server prepends
-                # 'handler error (INTERNAL):'
-                # "message": "handler error (NOT_FOUND): handler-error-message",
-                "message": "handler-error-message",
-                "type": nexusrpc.HandlerErrorType.NOT_FOUND,
-                # The following HandlerError types should be considered non-retryable:
-                # BAD_REQUEST, UNAUTHENTICATED, UNAUTHORIZED, NOT_FOUND, and
-                # RESOURCE_EXHAUSTED. In this test case, the handler does not set the
-                # retryable flag in the HandlerError sent to the server. This value is
-                # computed by the retryable property on HandlerError.
-                "retryable": False,
-            },
+        ExpectedApplicationError(
+            message="custom-error-message",
+            type="CustomError",
+            non_retryable=False,
         ),
-        (
-            ApplicationError,
-            {
-                "message": "handler-error-message",
-                "non_retryable": True,
-            },
+    ],
+)
+
+
+RaiseNexusHandlerErrorNotFound = ErrorTestCase(
+    name="RaiseNexusHandlerErrorNotFound",
+    operation_name=ErrorTestService.raise_nexus_handler_error_not_found.__name__,
+    expected_exception_chain=[
+        ExpectedNexusOperationError(
+            message="nexus operation completed unsuccessfully",
+            service="ErrorTestService",
         ),
-        (
-            ApplicationError,
-            {
-                "message": "runtime-error-message",
-                "type": "RuntimeError",
-                "non_retryable": False,
-            },
+        ExpectedHandlerError(
+            message="handler-error-message",
+            type="NOT_FOUND",
+            retryable=False,
         ),
-    ]
+        ExpectedApplicationError(
+            message="handler-error-message",
+            non_retryable=True,
+        ),
+        ExpectedApplicationError(
+            message="runtime-error-message",
+            type="RuntimeError",
+            non_retryable=False,
+        ),
+    ],
+)
 
 
-class RaiseNexusHandlerErrorNotFoundFromCustomError(ErrorConversionTestCase):
-    @staticmethod
-    def action_in_nexus_operation():
-        try:
-            raise CustomError("custom-error-message")
-        except CustomError as err:
-            raise nexusrpc.HandlerError(
-                "handler-error-message",
-                type=nexusrpc.HandlerErrorType.NOT_FOUND,
-            ) from err
+RaiseNexusHandlerErrorNotFoundFromCustomError = ErrorTestCase(
+    name="RaiseNexusHandlerErrorNotFoundFromCustomError",
+    operation_name=ErrorTestService.raise_nexus_handler_error_not_found_from_custom_error.__name__,
+    expected_exception_chain=[
+        ExpectedNexusOperationError(
+            message="nexus operation completed unsuccessfully",
+            service="ErrorTestService",
+        ),
+        ExpectedHandlerError(
+            message="handler-error-message",
+            type="NOT_FOUND",
+            retryable=False,
+        ),
+        ExpectedApplicationError(
+            message="handler-error-message",
+            non_retryable=True,
+        ),
+        ExpectedApplicationError(
+            message="custom-error-message",
+            type="CustomError",
+            non_retryable=False,
+        ),
+    ],
+)
 
-    expected_exception_chain_in_workflow = (
-        RaiseNexusHandlerErrorNotFound.expected_exception_chain_in_workflow[:-1]
-        + [
-            (
-                ApplicationError,
-                {
-                    "message": "custom-error-message",
-                    "type": "CustomError",
-                    "non_retryable": False,
-                },
-            )
-        ]
-    )
 
-
-class RaiseNexusHandlerErrorNotFoundFromHandlerErrorUnavailable(
-    ErrorConversionTestCase
-):
-    @staticmethod
-    def action_in_nexus_operation():
-        try:
-            raise nexusrpc.HandlerError(
-                "handler-error-message-2",
-                type=nexusrpc.HandlerErrorType.UNAVAILABLE,
-            )
-        except nexusrpc.HandlerError as err:
-            raise nexusrpc.HandlerError(
-                "handler-error-message",
-                type=nexusrpc.HandlerErrorType.NOT_FOUND,
-            ) from err
-
-    expected_exception_chain_in_workflow = (
-        RaiseNexusHandlerErrorNotFound.expected_exception_chain_in_workflow[:-1]
-        + [
-            (
-                nexusrpc.HandlerError,
-                {
-                    "message": "handler-error-message-2",
-                    "type": nexusrpc.HandlerErrorType.UNAVAILABLE,
-                    "retryable": True,
-                },
-            )
-        ]
-    )
+RaiseNexusHandlerErrorNotFoundFromHandlerErrorUnavailable = ErrorTestCase(
+    name="RaiseNexusHandlerErrorNotFoundFromHandlerErrorUnavailable",
+    operation_name=ErrorTestService.raise_nexus_handler_error_not_found_from_handler_error_unavailable.__name__,
+    expected_exception_chain=[
+        ExpectedNexusOperationError(
+            message="nexus operation completed unsuccessfully",
+            service="ErrorTestService",
+        ),
+        ExpectedHandlerError(
+            message="handler-error-message",
+            type="NOT_FOUND",
+            retryable=False,
+        ),
+        ExpectedApplicationError(
+            message="handler-error-message",
+            non_retryable=True,
+        ),
+        ExpectedHandlerError(
+            message="handler-error-message-2",
+            type="UNAVAILABLE",
+            retryable=True,
+        ),
+    ],
+)
 
 
 # If a nexus handler raises an OperationError, the calling workflow
@@ -292,72 +355,88 @@ class RaiseNexusHandlerErrorNotFoundFromHandlerErrorUnavailable(
 #     ]
 #   }
 # )
-#
-class RaiseNexusOperationErrorFromApplicationErrorNonRetryableFromCustomError(
-    ErrorConversionTestCase
-):
-    @staticmethod
-    def action_in_nexus_operation():
-        try:
-            try:
-                raise CustomError("custom-error-message")
-            except CustomError as err:
-                raise ApplicationError(
-                    "application-error-message",
-                    type="application-error-type",
-                    non_retryable=True,
-                ) from err
-        except ApplicationError as err:
-            raise nexusrpc.OperationError(
-                "operation-error-message",
-                state=nexusrpc.OperationErrorState.FAILED,
-            ) from err
-
-    expected_exception_chain_in_workflow = [
-        (
-            NexusOperationError,
-            {
-                "message": "operation-error-message",
-                "service": "ErrorTestService",
-            },
+RaiseNexusOperationErrorFromApplicationErrorNonRetryableFromCustomError = ErrorTestCase(
+    name="RaiseNexusOperationErrorFromApplicationErrorNonRetryableFromCustomError",
+    operation_name=ErrorTestService.raise_nexus_operation_error_from_application_error_non_retryable_from_custom_error.__name__,
+    expected_exception_chain=[
+        ExpectedNexusOperationError(
+            message="nexus operation completed unsuccessfully",
+            service="ErrorTestService",
         ),
-        (
-            ApplicationError,
-            {
-                "message": "application-error-message",
-                "type": "application-error-type",
-                "non_retryable": True,
-            },
+        ExpectedApplicationError(
+            message="application-error-message",
+            type="application-error-type",
+            non_retryable=True,
         ),
-        (
-            ApplicationError,
-            {
-                "message": "custom-error-message",
-                "type": "CustomError",
-                "non_retryable": False,
-            },
+        ExpectedApplicationError(
+            message="custom-error-message",
+            type="CustomError",
+            non_retryable=False,
         ),
-    ]
+    ],
+)
 
 
-class CustomError(Exception):
-    pass
+# Caller workflow
 
 
-@dataclass
-class ErrorTestInput:
-    task_queue: str
-    name: str
+def _validate_exception_chain(
+    err: BaseException,
+    expected_chain: list[ExpectedExceptionInfo],
+) -> None:
+    """Walk the exception chain and validate each exception against expected."""
+    actual_chain: list[BaseException] = []
+    current: BaseException | None = err
+    while current is not None:
+        actual_chain.append(current)
+        current = current.__cause__
 
+    assert len(actual_chain) == len(
+        expected_chain
+    ), f"Expected {len(expected_chain)} exceptions in chain, got {len(actual_chain)}"
 
-@nexusrpc.handler.service_handler
-class ErrorTestService:
-    @sync_operation
-    async def op(self, _ctx: StartOperationContext, input: ErrorTestInput) -> None:
-        error_conversion_test_cases[input.name].action_in_nexus_operation()
+    for actual, expected in zip(actual_chain, expected_chain):
+        if isinstance(expected, ExpectedNexusOperationError):
+            assert isinstance(
+                actual, NexusOperationError
+            ), f"Expected NexusOperationError, got {type(actual).__name__}"
+            assert (
+                actual.message == expected.message
+            ), f"Expected message '{expected.message}', got '{actual.message}'"
+            assert (
+                actual.service == expected.service
+            ), f"Expected service '{expected.service}', got '{actual.service}'"
 
+        elif isinstance(expected, ExpectedHandlerError):
+            assert isinstance(
+                actual, nexusrpc.HandlerError
+            ), f"Expected HandlerError, got {type(actual).__name__}"
+            # HandlerError message may have server prefix, check containment
+            actual_message = str(actual)
+            assert (
+                expected.message in actual_message
+            ), f"Expected message containing '{expected.message}', got '{actual_message}'"
+            assert (
+                actual.type.name == expected.type
+            ), f"Expected handler_error_type '{expected.type}', got '{actual.type.name}'"
+            assert (
+                actual.retryable == expected.retryable
+            ), f"Expected retryable={expected.retryable}, got {actual.retryable}"
 
-# Caller
+        elif isinstance(expected, ExpectedApplicationError):
+            assert isinstance(
+                actual, ApplicationError
+            ), f"Expected ApplicationError, got {type(actual).__name__}"
+            assert (
+                actual.message == expected.message
+            ), f"Expected message '{expected.message}', got '{actual.message}'"
+            assert (
+                actual.non_retryable == expected.non_retryable
+            ), f"Expected non_retryable={expected.non_retryable}, got {actual.non_retryable}"
+            if expected.type is not None:
+                assert (
+                    actual.type == expected.type
+                ), f"Expected type '{expected.type}', got '{actual.type}'"
 
 
 @workflow.defn(sandboxed=False)
@@ -370,38 +449,34 @@ class ErrorTestCallerWorkflow:
         )
 
     @workflow.run
-    async def invoke_nexus_op_and_assert_error(self, input: ErrorTestInput) -> None:
+    async def run(self, input: ErrorTestInput) -> None:
         try:
             await self.nexus_client.execute_operation(
-                ErrorTestService.op,  # type: ignore[arg-type] # mypy can't infer OutputT=None in Union type
+                input.operation_name,
                 input,
                 output_type=None,
             )
         except BaseException as err:
-            errs = [err]
-            while err.__cause__:
-                errs.append(err.__cause__)
-                err = err.__cause__
+            _validate_exception_chain(err, input.expected_exception_chain)
+            return
 
-            test_case = error_conversion_test_cases[input.name]
-            assert len(errs) == len(test_case.expected_exception_chain_in_workflow)
-            for err, (expected_cls, expected_fields) in zip(
-                errs, test_case.expected_exception_chain_in_workflow
-            ):
-                assert isinstance(err, expected_cls)
-                for k, v in expected_fields.items():
-                    if k == "message" and isinstance(err, nexusrpc.HandlerError):
-                        assert v in str(err)
-                    else:
-                        assert getattr(err, k) == v
-
-        else:
-            assert False, "Unreachable"
+        raise AssertionError("Expected exception was not raised")
 
 
-@pytest.mark.parametrize("test_case", list(error_conversion_test_cases.values()))
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RaiseApplicationErrorNonRetryable,
+        RaiseApplicationErrorNonRetryableFromCustomError,
+        RaiseNexusHandlerErrorNotFound,
+        RaiseNexusHandlerErrorNotFoundFromCustomError,
+        RaiseNexusHandlerErrorNotFoundFromHandlerErrorUnavailable,
+        RaiseNexusOperationErrorFromApplicationErrorNonRetryableFromCustomError,
+    ],
+    ids=lambda tc: tc.name,
+)
 async def test_errors_raised_by_nexus_operation(
-    client: Client, env: WorkflowEnvironment, test_case: type[ErrorConversionTestCase]
+    client: Client, env: WorkflowEnvironment, test_case: ErrorTestCase
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
@@ -415,10 +490,11 @@ async def test_errors_raised_by_nexus_operation(
     ):
         await create_nexus_endpoint(task_queue, client)
         await client.execute_workflow(
-            ErrorTestCallerWorkflow.invoke_nexus_op_and_assert_error,
+            ErrorTestCallerWorkflow.run,
             ErrorTestInput(
                 task_queue=task_queue,
-                name=test_case.__name__,
+                operation_name=test_case.operation_name,
+                expected_exception_chain=test_case.expected_exception_chain,
             ),
             id=str(uuid.uuid4()),
             task_queue=task_queue,
