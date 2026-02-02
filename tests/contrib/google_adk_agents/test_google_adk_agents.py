@@ -35,6 +35,8 @@ from google.adk.utils.context_utils import Aclosing
 from google.genai import types
 from google.genai.types import Content, FunctionCall, Part
 from mcp import StdioServerParameters
+from opentelemetry.sdk.trace import TracerProvider, export, ReadableSpan
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from temporalio import activity, workflow
 from temporalio.client import Client
@@ -254,11 +256,6 @@ async def test_single_agent(client: Client, use_local_model: bool):
             assert result.content is not None
             assert result.content.parts is not None
             assert result.content.parts[0].text == "warm and sunny"
-
-        with (Path(__file__).with_name("histories") / "single_agent.json").open(
-            "w"
-        ) as f:
-            f.write((await handle.fetch_history()).to_json())
 
 
 class ResearchModel(BaseLlm):
@@ -482,3 +479,62 @@ async def test_mcp_agent(client: Client, use_local_model: bool):
         print(f"MCP-Agent Workflow result: {result}")
         if use_local_model:
             assert result == "haiku"
+
+
+@pytest.mark.asyncio
+async def test_single_agent_telemetry(client: Client):
+    exporter = InMemorySpanExporter()
+    new_config = client.config()
+    new_config["plugins"] = [TemporalAdkPlugin(otel_exporters=[exporter])]
+    client = Client(**new_config)
+
+    # Run Worker with the ADK plugin
+    async with Worker(
+        client,
+        task_queue="adk-task-queue",
+        activities=[
+            get_weather,
+        ],
+        workflows=[WeatherAgent],
+        max_cached_workflows=0,
+    ):
+        LLMRegistry.register(WeatherModel)
+
+        # Test Weather Agent
+        handle = await client.start_workflow(
+            WeatherAgent.run,
+            args=[
+                "What is the weather in New York?",
+                "weather_model",
+            ],
+            id=f"weather-agent-workflow-{uuid.uuid4()}",
+            task_queue="adk-task-queue",
+        )
+        result = await handle.result()
+        print(f"Workflow result: {result}")
+
+        assert result is not None
+        assert result.content is not None
+        assert result.content.parts is not None
+        assert result.content.parts[0].text == "warm and sunny"
+
+    spans = exporter.get_finished_spans()
+
+    invocation_span = next((s for s in spans if s.name == "invocation [test_app]"), None)
+    agent_span = next((s for s in spans if s.name == "agent_run [test_agent]"), None)
+    llm_spans = [s for s in spans if s.name == "call_llm"]
+    tool_spans = [s for s in spans if "execute_tool" in s.name]
+
+    assert invocation_span is not None
+    assert invocation_span.parent is None
+
+    assert agent_span is not None
+    assert agent_span.parent is not None
+    assert agent_span.parent.span_id == invocation_span.context.span_id
+
+    # Model is invoked twice, but because of before_model_callback, llm spans are not reported
+    # assert len(llm_spans) == 2
+
+    assert len(tool_spans) == 1
+    assert tool_spans[0].parent is not None
+    assert tool_spans[0].parent.span_id == agent_span.context.span_id
