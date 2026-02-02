@@ -4742,6 +4742,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn: ...
 
 
@@ -4760,6 +4761,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn: ...
 
 
@@ -4779,6 +4781,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn: ...
 
 
@@ -4798,6 +4801,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn: ...
 
 
@@ -4817,6 +4821,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn: ...
 
 
@@ -4835,7 +4840,7 @@ def continue_as_new(
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     ) = None,
     versioning_intent: VersioningIntent | None = None,
-    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None
+    initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
 ) -> NoReturn:
     """Stop the workflow immediately and continue as new.
 

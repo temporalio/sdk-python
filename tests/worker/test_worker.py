@@ -27,6 +27,7 @@ from temporalio.api.workflowservice.v1 import (
 )
 from temporalio.client import (
     Client,
+    WorkflowHandle,
 )
 from temporalio.common import PinnedVersioningOverride, RawValue, VersioningBehavior
 from temporalio.runtime import (
@@ -1151,6 +1152,39 @@ async def set_ramping_version(
     return response
 
 
+async def wait_for_worker_deployment_routing_config_propagation(
+    client: Client,
+    deployment_name: str,
+    expected_current_build_id: str,
+    expected_ramping_build_id: str = "",
+) -> None:
+    """Wait for routing config to be propagated to all task queues."""
+    import temporalio.api.enums.v1
+
+    async def check() -> bool:
+        resp = await client.workflow_service.describe_worker_deployment(
+            DescribeWorkerDeploymentRequest(
+                namespace=client.namespace,
+                deployment_name=deployment_name,
+            )
+        )
+        routing_config = resp.worker_deployment_info.routing_config
+        if routing_config.current_deployment_version.build_id != expected_current_build_id:
+            return False
+        if routing_config.ramping_deployment_version.build_id != expected_ramping_build_id:
+            return False
+        state = resp.worker_deployment_info.routing_config_update_state
+        if state == temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_COMPLETED:
+            return True
+        if state == temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED:
+            return True # unimplemented
+        if state == temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS:
+            return False
+        return False
+
+    await assert_eventually(check)
+
+
 def create_worker(
     client: Client,
     on_fatal_error: Callable[[BaseException], Awaitable[None]] | None = None,
@@ -1256,3 +1290,135 @@ class TestForkUseWorker(_TestFork):
             nexus_service_handlers=[],
         )
         self.run(mp_fork_ctx)
+
+
+# Workflows for continue-as-new with version upgrade test
+@workflow.defn(
+    name="ContinueAsNewWithVersionUpgrade",
+    versioning_behavior=VersioningBehavior.PINNED,
+)
+class ContinueAsNewWithVersionUpgradeV1:
+    @workflow.run
+    async def run(self, attempt: int) -> str:
+        print("IN WORKFLOW")
+        if attempt > 0:
+            print("ATTEMPT > 1")
+            return "v1.0"
+
+        # Loop waiting for CAN suggestion with version change reason
+        while True:
+            # Trigger a WFT when timer expires, thereby refreshing the continue-as-new-suggested flag
+            await asyncio.sleep(0.01)
+            info = workflow.info()
+            if info.is_continue_as_new_suggested():
+                print("WORKFLOW CAN")
+                for reason in info.get_suggested_continue_as_new_reasons():
+                    if (
+                        reason
+                        == workflow.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED
+                    ):
+                        print("WORKFLOW CAN BECAUSE VERSION UPGRADE")
+                        workflow.continue_as_new(
+                            arg=attempt + 1,
+                            initial_versioning_behavior=workflow.ContinueAsNewVersioningBehavior.AUTO_UPGRADE,
+                        )
+
+
+@workflow.defn(
+    name="ContinueAsNewWithVersionUpgrade",
+    versioning_behavior=VersioningBehavior.PINNED,
+)
+class ContinueAsNewWithVersionUpgradeV2:
+    @workflow.run
+    async def run(self, attempt: int) -> str:
+        print("IN V2")
+        return "v2.0"
+
+
+async def wait_for_workflow_running_on_version(
+    handle: WorkflowHandle[Any, Any], expected_build_id: str
+) -> None:
+    """Wait until workflow is RUNNING with expected build ID."""
+
+    async def check() -> bool:
+        desc = await handle.describe()
+        if (
+            desc.status
+            != temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_RUNNING
+        ):
+            return False
+        versioning_info = desc.raw_description.workflow_execution_info.versioning_info
+        if not versioning_info.HasField("deployment_version"):
+            return False
+        return versioning_info.deployment_version.build_id == expected_build_id
+
+    await assert_eventually(check)
+
+
+async def test_continue_as_new_with_version_upgrade(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker deployments")
+
+    deployment_name = f"deployment-can-upgrade-{uuid.uuid4()}"
+    v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
+    v2 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="2.0")
+
+    async with (
+        new_worker(
+            client,
+            ContinueAsNewWithVersionUpgradeV1,
+            deployment_config=WorkerDeploymentConfig(
+                version=v1,
+                use_worker_versioning=True,
+            ),
+        ) as w1,
+        new_worker(
+            client,
+            ContinueAsNewWithVersionUpgradeV2,
+            deployment_config=WorkerDeploymentConfig(
+                version=v2,
+                use_worker_versioning=True,
+            ),
+            task_queue=w1.task_queue,
+        ),
+    ):
+        # Wait for the deployment to be ready
+        describe_resp = await wait_until_worker_deployment_visible(client, v1)
+
+        # Set version 1.0 as current
+        resp2 = await set_current_deployment_version(
+            client, describe_resp.conflict_token, v1
+        )
+
+        # Wait for v1.0-as-Current routing config to be propagated
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id
+        )
+
+        # Start workflow with v1 as current
+        handle = await client.start_workflow(
+            "ContinueAsNewWithVersionUpgrade",
+            0,
+            id=f"test-can-version-upgrade-{uuid.uuid4()}",
+            task_queue=w1.task_queue,
+        )
+
+        # Wait for workflow to complete one WFT on v1.0
+        await wait_for_workflow_running_on_version(handle, v1.build_id)
+
+        # Wait for version 2.0 to be ready
+        await wait_until_worker_deployment_visible(client, v2)
+
+        # Set version 2.0 as current
+        await set_current_deployment_version(client, resp2.conflict_token, v2)
+
+        # Wait for v2.0-as-Current routing config to be propagated
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v2.build_id
+        )
+
+        # Expect workflow to return "v2.0", indicating that it continued-as-new and completed on v2
+        result = await handle.result()
+        assert result == "v2.0"
