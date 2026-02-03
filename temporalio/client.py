@@ -1429,7 +1429,7 @@ class Client:
         For more on this feature, see https://docs.temporal.io/workers#worker-versioning
 
         .. deprecated::
-            Legacy API, see the docs above for new usage 
+            Legacy API, see the docs above for new usage
 
         Args:
             task_queue: The task queue to target.
