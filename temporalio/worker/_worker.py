@@ -729,8 +729,8 @@ class Worker:
         namespace_info = await self._bridge_worker.validate()
         payload_error_limits = (
             _PayloadErrorLimits(
-                memo_size_error=namespace_info.Limits.memo_size_limit_error,
-                payload_size_error=namespace_info.Limits.blob_size_limit_error,
+                memo_size_error=namespace_info.limits.memo_size_limit_error,
+                payload_size_error=namespace_info.limits.blob_size_limit_error,
             )
             if namespace_info.HasField("limits")
             and not self._config.get("disable_payload_error_limit", False)

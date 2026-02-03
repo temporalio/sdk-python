@@ -91,7 +91,6 @@ from temporalio.converter import (
     PayloadConverter,
     PayloadLimitsConfig,
     PayloadSizeWarning,
-    _PayloadErrorLimits,
 )
 from temporalio.exceptions import (
     ActivityError,
@@ -8658,19 +8657,11 @@ async def test_large_payload_workflow_result_error(client: Client):
     )
 
     # Create client for worker with custom payload limits
-    error_limit = 5 * 1024
+    error_limit = 2 * 1024 * 1024
     worker_client = await Client.connect(
         client.service_client.config.target_host,
         namespace=client.namespace,
         runtime=worker_runtime,
-        # Mock server behavior since referenced server version doesn't report limits.
-        # Remove and configure error limits in server when limit reporting supported.
-        data_converter=temporalio.converter.default()._with_payload_error_limits(
-            _PayloadErrorLimits(
-                memo_size_error=0,
-                payload_size_error=error_limit,
-            )
-        ),
     )
 
     with (
@@ -8687,7 +8678,7 @@ async def test_large_payload_workflow_result_error(client: Client):
                         activity_input_data_size=0,
                         activity_output_data_size=0,
                         activity_exception_data_size=0,
-                        workflow_output_data_size=6 * 1024,
+                        workflow_output_data_size=3 * 1024 * 1024,
                         data=[],
                     ),
                     id=f"workflow-{uuid.uuid4()}",
@@ -8767,19 +8758,11 @@ async def test_large_payload_activity_input_error(client: Client):
     )
 
     # Create client for worker with custom payload limits
-    error_limit = 5 * 1024
+    error_limit = 2 * 1024 * 1024
     worker_client = await Client.connect(
         client.service_client.config.target_host,
         namespace=client.namespace,
         runtime=worker_runtime,
-        # Mock server behavior since referenced server version doesn't report limits.
-        # Remove and configure error limits in server when limit reporting supported.
-        data_converter=temporalio.converter.default()._with_payload_error_limits(
-            _PayloadErrorLimits(
-                memo_size_error=0,
-                payload_size_error=error_limit,
-            )
-        ),
     )
 
     with (
@@ -8793,7 +8776,7 @@ async def test_large_payload_activity_input_error(client: Client):
                 await client.execute_workflow(
                     LargePayloadWorkflow.run,
                     LargePayloadWorkflowInput(
-                        activity_input_data_size=6 * 1024,
+                        activity_input_data_size=3 * 1024 * 1024,
                         activity_output_data_size=0,
                         activity_exception_data_size=0,
                         workflow_output_data_size=0,
@@ -8874,19 +8857,10 @@ async def test_large_payload_activity_exception_error(client: Client):
     )
 
     # Create client for worker with custom payload limits
-    error_limit = 5 * 1024
     worker_client = await Client.connect(
         client.service_client.config.target_host,
         namespace=client.namespace,
         runtime=worker_runtime,
-        # Mock server behavior since referenced server version doesn't report limits.
-        # Remove and configure error limits in server when limit reporting supported.
-        data_converter=temporalio.converter.default()._with_payload_error_limits(
-            _PayloadErrorLimits(
-                memo_size_error=0,
-                payload_size_error=error_limit,
-            )
-        ),
     )
 
     with (
@@ -8903,7 +8877,7 @@ async def test_large_payload_activity_exception_error(client: Client):
                     LargePayloadWorkflowInput(
                         activity_input_data_size=0,
                         activity_output_data_size=0,
-                        activity_exception_data_size=6 * 1024,
+                        activity_exception_data_size=3 * 1024 * 1024,
                         workflow_output_data_size=0,
                         data=[],
                     ),
@@ -8937,19 +8911,11 @@ async def test_large_payload_activity_result_error(client: Client):
     )
 
     # Create client for worker with custom payload limits
-    error_limit = 5 * 1024
+    error_limit = 2 * 1024 * 1024
     worker_client = await Client.connect(
         client.service_client.config.target_host,
         namespace=client.namespace,
         runtime=worker_runtime,
-        # Mock server behavior since referenced server version doesn't report limits.
-        # Remove and configure error limits in server when limit reporting supported.
-        data_converter=temporalio.converter.default()._with_payload_error_limits(
-            _PayloadErrorLimits(
-                memo_size_error=0,
-                payload_size_error=error_limit,
-            )
-        ),
     )
 
     with (
@@ -8965,7 +8931,7 @@ async def test_large_payload_activity_result_error(client: Client):
                     LargePayloadWorkflow.run,
                     LargePayloadWorkflowInput(
                         activity_input_data_size=0,
-                        activity_output_data_size=6 * 1024,
+                        activity_output_data_size=3 * 1024 * 1024,
                         activity_exception_data_size=0,
                         workflow_output_data_size=0,
                         data=[],
