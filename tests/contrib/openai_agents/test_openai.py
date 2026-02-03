@@ -2592,3 +2592,101 @@ async def test_split_workers(client: Client):
                 execution_timeout=timedelta(seconds=120),
             )
             assert result == "test"
+
+
+def multiple_handoffs_mock_model():
+    return TestModel.returning_responses(
+        [
+            ResponseBuilders.tool_call("{}", "transfer_to_planner"),
+            ResponseBuilders.output_message(
+                "I'll analyze the requirements and create a plan."
+            ),
+        ]
+    )
+
+
+@workflow.defn
+class MultipleHandoffsWorkflow:
+    @workflow.run
+    async def run(self, task: str) -> str:
+        planner = Agent[None](
+            name="Planner",
+            instructions="You analyze requirements and create detailed plans.",
+            handoff_description="An agent that creates detailed plans and strategies",
+        )
+
+        writer = Agent[None](
+            name="Writer",
+            instructions="You write documents and reports based on provided information.",
+            handoff_description="An agent that writes professional documents and reports",
+        )
+
+        specialists = [planner, writer]
+        handoffs_list: list[Agent[Any] | Handoff[None, Any]] = [
+            handoff(agent=a) for a in specialists
+        ]
+
+        triage = Agent[None](
+            name="Triage",
+            instructions="Hand off to Planner when requested.",
+            handoffs=handoffs_list,
+        )
+
+        result = await Runner.run(starting_agent=triage, input=task)
+        return result.final_output
+
+
+async def test_multiple_handoffs_workflow(client: Client):
+    model = multiple_handoffs_mock_model()
+    async with AgentEnvironment(
+        model=model,
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as env:
+        client = env.applied_on_client(client)
+
+        async with new_worker(
+            client,
+            MultipleHandoffsWorkflow,
+        ) as worker:
+            workflow_handle = await client.start_workflow(
+                MultipleHandoffsWorkflow.run,
+                "Create a project plan for building a web application",
+                id=f"multiple-handoffs-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+            result = await workflow_handle.result()
+
+            assert result == "I'll analyze the requirements and create a plan."
+
+            # Verify the correct handoff occurred
+            events = []
+            async for e in workflow_handle.fetch_history_events():
+                if e.HasField("activity_task_completed_event_attributes"):
+                    events.append(e)
+
+            # Should have 2 activity completions:
+            # 1. Triage agent makes handoff call to planner
+            # 2. Planner agent responds
+            assert len(events) == 2
+
+            # Verify handoff to planner was requested
+            first_event_data = (
+                events[0]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert "transfer_to_planner" in first_event_data
+
+            # Verify that the planner agent was actually invoked (this would fail before the fix)
+            planner_response_data = (
+                events[1]
+                .activity_task_completed_event_attributes.result.payloads[0]
+                .data.decode()
+            )
+            assert (
+                "I'll analyze the requirements and create a plan."
+                in planner_response_data
+            )

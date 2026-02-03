@@ -6,6 +6,7 @@ import asyncio
 import contextvars
 import inspect
 import logging
+import sys
 import threading
 import typing
 import uuid
@@ -138,7 +139,6 @@ def defn(
             ``Exception`` is set, it effectively will fail a workflow/update in
             all user exception cases. WARNING: This setting is experimental.
         versioning_behavior: Specifies the versioning behavior to use for this workflow.
-            WARNING: This setting is experimental.
     """
 
     def decorator(cls: ClassType) -> ClassType:
@@ -443,8 +443,6 @@ class DynamicWorkflowConfig:
     """Specifies the versioning behavior to use for this workflow.
 
     Always overrides the equivalent parameter on :py:func:`defn`.
-
-        WARNING: This setting is experimental.
     """
 
 
@@ -739,6 +737,9 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_is_replaying(self) -> bool: ...
+
+    @abstractmethod
+    def workflow_is_replaying_history_events(self) -> bool: ...
 
     @abstractmethod
     def workflow_memo(self) -> Mapping[str, Any]: ...
@@ -1444,10 +1445,23 @@ class unsafe:
     def is_replaying() -> bool:
         """Whether the workflow is currently replaying.
 
+        This includes queries and update validators that occur during replay.
+
         Returns:
             True if the workflow is currently replaying
         """
         return _Runtime.current().workflow_is_replaying()
+
+    @staticmethod
+    def is_replaying_history_events() -> bool:
+        """Whether the workflow is replaying history events.
+
+        This excludes queries and update validators, which are live operations.
+
+        Returns:
+            True if replaying history events, False otherwise.
+        """
+        return _Runtime.current().workflow_is_replaying_history_events()
 
     @staticmethod
     def is_sandbox_unrestricted() -> bool:
@@ -1565,6 +1579,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         self.workflow_info_on_extra = True
         self.full_workflow_info_on_extra = False
         self.log_during_replay = False
+        self.disable_sandbox = False
 
     def process(
         self, msg: Any, kwargs: MutableMapping[str, Any]
@@ -1598,11 +1613,32 @@ class LoggerAdapter(logging.LoggerAdapter):
         kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
         if msg_extra:
             msg = f"{msg} ({msg_extra})"
-        return (msg, kwargs)
+        return msg, kwargs
+
+    def log(
+        self,
+        level: int,
+        msg: object,
+        *args: Any,
+        stacklevel: int = 1,
+        **kwargs: Any,
+    ):
+        """Override to potentially disable the sandbox."""
+        if sys.version_info < (3, 11) and stacklevel == 1:
+            # An additional stacklevel is needed on 3.10 because it doesn't skip internal frames until after stacklevel
+            # is decremented, so it needs an additional stacklevel to skip the internal frame.
+            stacklevel += 1  # type: ignore[reportUnreachable]
+        stacklevel += 1
+        if self.disable_sandbox:
+            with unsafe.sandbox_unrestricted():
+                with unsafe.imports_passed_through():
+                    super().log(level, msg, *args, stacklevel=stacklevel, **kwargs)
+        else:
+            super().log(level, msg, *args, stacklevel=stacklevel, **kwargs)
 
     def isEnabledFor(self, level: int) -> bool:
         """Override to ignore replay logs."""
-        if not self.log_during_replay and unsafe.is_replaying():
+        if not self.log_during_replay and unsafe.is_replaying_history_events():
             return False
         return super().isEnabledFor(level)
 
@@ -1612,6 +1648,12 @@ class LoggerAdapter(logging.LoggerAdapter):
         handlers/formatters.
         """
         return self.logger
+
+    def unsafe_disable_sandbox(self, value: bool = True):
+        """Disable the sandbox during log processing.
+        Can be turned back on with unsafe_disable_sandbox(False).
+        """
+        self.disable_sandbox = value
 
 
 logger = LoggerAdapter(logging.getLogger(__name__), None)
@@ -5475,9 +5517,6 @@ class NexusClient(ABC, Generic[ServiceT]):
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
     ) -> OutputT: ...
-
-    # TODO(nexus-preview): in practice, both these overloads match an async def sync
-    # operation (i.e. either can be deleted without causing a type error).
 
     # Overload for sync_operation methods (async def)
     @overload
