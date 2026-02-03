@@ -1040,10 +1040,7 @@ Priority.default = Priority(priority_key=None, fairness_key=None, fairness_weigh
 
 
 class VersioningBehavior(IntEnum):
-    """Specifies when a workflow might move from a worker of one Build Id to another.
-
-    WARNING: Experimental API.
-    """
+    """Specifies when a workflow might move from a worker of one Build Id to another."""
 
     UNSPECIFIED = (
         temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_UNSPECIFIED
@@ -1108,11 +1105,7 @@ class VersioningOverride(ABC):
 
 @dataclass(frozen=True)
 class PinnedVersioningOverride(VersioningOverride):
-    """Workflow will be pinned to a specific deployment version.
-
-    .. warning::
-        Experimental API.
-    """
+    """Workflow will be pinned to a specific deployment version."""
 
     version: WorkerDeploymentVersion
 

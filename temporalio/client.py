@@ -1094,9 +1094,6 @@ class Client:
         means that the call will not return successfully until the update has been
         delivered to a worker.
 
-        .. warning::
-           This API is experimental
-
         Args:
             update: Update function or name on the workflow. arg: Single argument to the
                 update.
