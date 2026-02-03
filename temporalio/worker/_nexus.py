@@ -23,7 +23,6 @@ import nexusrpc.handler
 from nexusrpc import LazyValue
 from nexusrpc.handler import CancelOperationContext, Handler, StartOperationContext
 
-import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.failure.v1
@@ -93,7 +92,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
 
         self._running_tasks: dict[bytes, _RunningNexusTask] = {}
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
-        self._worker_shutdown_event: temporalio.activity._CompositeEvent | None = None
+        self._worker_shutdown_event: temporalio.common._CompositeEvent | None = None
 
     async def run(self) -> None:
         """Continually poll for Nexus tasks and dispatch to handlers."""
@@ -214,7 +213,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         """
         # Create the worker shutdown event if not created
         if not self._worker_shutdown_event:
-            self._worker_shutdown_event = temporalio.activity._CompositeEvent(
+            self._worker_shutdown_event = temporalio.common._CompositeEvent(
                 thread_event=threading.Event(), async_event=asyncio.Event()
             )
         # TODO(nexus-prerelease): headers
@@ -332,7 +331,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         """
         # Create the worker shutdown event if not created
         if not self._worker_shutdown_event:
-            self._worker_shutdown_event = temporalio.activity._CompositeEvent(
+            self._worker_shutdown_event = temporalio.common._CompositeEvent(
                 thread_event=threading.Event(), async_event=asyncio.Event()
             )
         ctx = StartOperationContext(

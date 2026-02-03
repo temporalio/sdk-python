@@ -29,7 +29,6 @@ from nexusrpc.handler import (
     StartOperationContext,
 )
 
-import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
@@ -179,7 +178,7 @@ class _TemporalOperationCtx(Generic[_OperationCtxT]):
 
     _runtime_metric_meter: temporalio.common.MetricMeter
     _metric_meter: temporalio.common.MetricMeter | None = None
-    _worker_shutdown_event: temporalio.activity._CompositeEvent | None = None
+    _worker_shutdown_event: temporalio.common._CompositeEvent | None = None
 
     @property
     def metric_meter(self) -> temporalio.common.MetricMeter:

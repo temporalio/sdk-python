@@ -175,8 +175,8 @@ class _Context:
     info: Callable[[], Info]
     # This is optional because during interceptor init it is not present
     heartbeat: Callable[..., None] | None
-    cancelled_event: _CompositeEvent
-    worker_shutdown_event: _CompositeEvent
+    cancelled_event: temporalio.common._CompositeEvent
+    worker_shutdown_event: temporalio.common._CompositeEvent
     shield_thread_cancel_exception: Callable[[], AbstractContextManager] | None
     payload_converter_class_or_instance: (
         type[temporalio.converter.PayloadConverter]
@@ -244,36 +244,6 @@ class _Context:
                 }
             )
         return self._metric_meter
-
-
-@dataclass
-class _CompositeEvent:
-    # This should always be present, but is sometimes lazily set internally
-    thread_event: threading.Event | None
-    # Async event only for async activities
-    async_event: asyncio.Event | None
-
-    def set(self) -> None:
-        if not self.thread_event:
-            raise RuntimeError("Missing event")
-        self.thread_event.set()
-        if self.async_event:
-            self.async_event.set()
-
-    def is_set(self) -> bool:
-        if not self.thread_event:
-            raise RuntimeError("Missing event")
-        return self.thread_event.is_set()
-
-    async def wait(self) -> None:
-        if not self.async_event:
-            raise RuntimeError("not in async activity")
-        await self.async_event.wait()
-
-    def wait_sync(self, timeout: float | None = None) -> None:
-        if not self.thread_event:
-            raise RuntimeError("Missing event")
-        self.thread_event.wait(timeout)
 
 
 def client() -> Client:
