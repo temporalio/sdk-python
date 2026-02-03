@@ -5320,12 +5320,6 @@ class ContinueAsNewVersioningBehavior(IntEnum):
     effective version will be whatever is specified by the Versioning Override until the override is removed.
     """
 
-    def _to_proto(self) -> temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.ValueType:
-        if self == ContinueAsNewVersioningBehavior.AUTO_UPGRADE:
-            return temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE
-        return temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED
-
-
 class SuggestContinueAsNewReason(IntEnum):
     """SuggestContinueAsNewReason specifies a reason why continue as new is true."""
     UNSPECIFIED = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED)
