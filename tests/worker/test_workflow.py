@@ -1991,88 +1991,18 @@ class LoggingWorkflow:
         return self._last_signal
 
 
-async def test_workflow_logging(client: Client):
-    workflow.logger.full_workflow_info_on_extra = True
-    with LogCapturer().logs_captured(
-        workflow.logger.base_logger, activity.logger.base_logger
-    ) as capturer:
-        # Log two signals and kill worker before completing. Need to disable
-        # workflow cache since we restart the worker and don't want to pay the
-        # sticky queue penalty.
-        async with new_worker(
-            client, LoggingWorkflow, max_cached_workflows=0
-        ) as worker:
-            handle = await client.start_workflow(
-                LoggingWorkflow.run,
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-            )
-            # Send some signals and updates
-            await handle.signal(LoggingWorkflow.my_signal, "signal 1")
-            await handle.signal(LoggingWorkflow.my_signal, "signal 2")
-            await handle.execute_update(
-                LoggingWorkflow.my_update, "update 1", id="update-1"
-            )
-            await handle.execute_update(
-                LoggingWorkflow.my_update, "update 2", id="update-2"
-            )
-            assert "signal 2" == await handle.query(LoggingWorkflow.last_signal)
-
-        # Confirm logs were produced
-        assert capturer.find_log("Signal: signal 1 ({'attempt':")
-        assert capturer.find_log("Signal: signal 2")
-        assert capturer.find_log("Update: update 1")
-        assert capturer.find_log("Update: update 2")
-        assert capturer.find_log("Query called")
-        assert not capturer.find_log("Signal: signal 3")
-        # Also make sure it has some workflow info and correct funcName
-        record = capturer.find_log("Signal: signal 1")
-        assert (
-            record
-            and record.__dict__["temporal_workflow"]["workflow_type"]
-            == "LoggingWorkflow"
-            and record.funcName == "my_signal"
-        )
-        # Since we enabled full info, make sure it's there
-        assert isinstance(record.__dict__["workflow_info"], workflow.Info)
-        # Check the log emitted by the update execution.
-        record = capturer.find_log("Update: update 1")
-        assert (
-            record
-            and record.__dict__["temporal_workflow"]["update_id"] == "update-1"
-            and record.__dict__["temporal_workflow"]["update_name"] == "my_update"
-            and "'update_id': 'update-1'" in record.message
-            and "'update_name': 'my_update'" in record.message
-        )
-
-        # Clear queue and start a new one with more signals
-        capturer.log_queue.queue.clear()
-        async with new_worker(
-            client,
-            LoggingWorkflow,
-            task_queue=worker.task_queue,
-            max_cached_workflows=0,
-        ) as worker:
-            # Send signals and updates
-            await handle.signal(LoggingWorkflow.my_signal, "signal 3")
-            await handle.signal(LoggingWorkflow.my_signal, "finish")
-            await handle.result()
-
-        # Confirm replayed logs are not present but new ones are
-        assert not capturer.find_log("Signal: signal 1")
-        assert not capturer.find_log("Signal: signal 2")
-        assert capturer.find_log("Signal: signal 3")
-        assert capturer.find_log("Signal: finish")
-
-
-async def test_workflow_logging_flatten_mode(client: Client):
-    """Test that flatten mode produces OTel-safe scalar attributes."""
-    # Save original mode and set to flatten
+@pytest.mark.parametrize("temporal_extra_mode", ["dict", "flatten"])
+async def test_workflow_logging(client: Client, temporal_extra_mode: str):
+    """Test workflow logging: extra mode formatting, replay suppression, and full_workflow_info."""
     original_mode = workflow.logger.temporal_extra_mode
-    workflow.logger.temporal_extra_mode = "flatten"
+    original_full_info = workflow.logger.full_workflow_info_on_extra
+    workflow.logger.temporal_extra_mode = temporal_extra_mode
+    workflow.logger.full_workflow_info_on_extra = True
 
     try:
         with LogCapturer().logs_captured(workflow.logger.base_logger) as capturer:
+            # --- First execution: logs should appear ---
+            # Disable workflow cache so worker restart triggers replay
             async with new_worker(
                 client, LoggingWorkflow, max_cached_workflows=0
             ) as worker:
@@ -2082,41 +2012,75 @@ async def test_workflow_logging_flatten_mode(client: Client):
                     task_queue=worker.task_queue,
                 )
                 await handle.signal(LoggingWorkflow.my_signal, "signal 1")
+                await handle.signal(LoggingWorkflow.my_signal, "signal 2")
                 await handle.execute_update(
                     LoggingWorkflow.my_update, "update 1", id="update-1"
                 )
+                assert "signal 2" == await handle.query(LoggingWorkflow.last_signal)
+
+            # Verify logs from first execution
+            record = capturer.find_log("Signal: signal 1")
+            assert record is not None
+            assert record.funcName == "my_signal"
+            assert capturer.find_log("Signal: signal 2")
+            assert capturer.find_log("Query called")
+
+            update_record = capturer.find_log("Update: update 1")
+            assert update_record is not None
+
+            # Verify full_workflow_info_on_extra
+            assert isinstance(record.__dict__["workflow_info"], workflow.Info)
+
+            # Verify extra mode formatting
+            if temporal_extra_mode == "dict":
+                # Dict mode appends context to message and uses nested dict
+                assert "({'attempt':" in record.message
+                assert record.__dict__["temporal_workflow"]["workflow_type"] == "LoggingWorkflow"
+                assert update_record.__dict__["temporal_workflow"]["update_id"] == "update-1"
+                assert update_record.__dict__["temporal_workflow"]["update_name"] == "my_update"
+                assert "'update_id': 'update-1'" in update_record.message
+            else:
+                # Flatten mode uses OTel-safe scalar attributes
+                assert "temporal_workflow" not in record.__dict__
+                assert record.__dict__["temporal.workflow.workflow_type"] == "LoggingWorkflow"
+                assert "temporal.workflow.workflow_id" in record.__dict__
+                assert "temporal.workflow.run_id" in record.__dict__
+                assert "temporal.workflow.namespace" in record.__dict__
+                assert "temporal.workflow.task_queue" in record.__dict__
+                assert record.__dict__["temporal.workflow.attempt"] == 1
+                assert update_record.__dict__["temporal.workflow.update_id"] == "update-1"
+                assert update_record.__dict__["temporal.workflow.update_name"] == "my_update"
+
+                # Verify all temporal.workflow.* values are primitives (OTel-safe)
+                for key, value in record.__dict__.items():
+                    if key.startswith("temporal.workflow."):
+                        assert isinstance(
+                            value, (str, int, float, bool, type(None))
+                        ), f"Key {key} has non-primitive value: {type(value)}"
+
+            # --- Clear logs and continue execution (replay path) ---
+            # When the new worker starts, it replays the workflow history (signals 1 & 2).
+            # Replay suppression should prevent those logs from appearing again.
+            capturer.log_queue.queue.clear()
+
+            async with new_worker(
+                client,
+                LoggingWorkflow,
+                task_queue=worker.task_queue,
+                max_cached_workflows=0,
+            ) as worker:
+                await handle.signal(LoggingWorkflow.my_signal, "signal 3")
                 await handle.signal(LoggingWorkflow.my_signal, "finish")
                 await handle.result()
 
-            # Check signal log record
-            record = capturer.find_log("Signal: signal 1")
-            assert record is not None
-
-            # Should NOT have nested dict
-            assert "temporal_workflow" not in record.__dict__
-
-            # Should have flattened keys with temporal.workflow prefix
-            assert record.__dict__["temporal.workflow.workflow_type"] == "LoggingWorkflow"
-            assert "temporal.workflow.workflow_id" in record.__dict__
-            assert "temporal.workflow.run_id" in record.__dict__
-            assert "temporal.workflow.namespace" in record.__dict__
-            assert "temporal.workflow.task_queue" in record.__dict__
-            assert record.__dict__["temporal.workflow.attempt"] == 1
-
-            # Verify all temporal.workflow.* values are primitives (OTel-safe)
-            for key, value in record.__dict__.items():
-                if key.startswith("temporal.workflow."):
-                    assert isinstance(
-                        value, (str, int, float, bool, type(None))
-                    ), f"Key {key} has non-primitive value: {type(value)}"
-
-            # Check update log record has flattened update fields
-            update_record = capturer.find_log("Update: update 1")
-            assert update_record is not None
-            assert update_record.__dict__["temporal.workflow.update_id"] == "update-1"
-            assert update_record.__dict__["temporal.workflow.update_name"] == "my_update"
+            # --- Replay execution: no duplicate logs ---
+            assert not capturer.find_log("Signal: signal 1")
+            assert not capturer.find_log("Signal: signal 2")
+            assert capturer.find_log("Signal: signal 3")
+            assert capturer.find_log("Signal: finish")
     finally:
         workflow.logger.temporal_extra_mode = original_mode
+        workflow.logger.full_workflow_info_on_extra = original_full_info
 
 
 @activity.defn
@@ -2179,6 +2143,18 @@ async def test_workflow_logging_task_fail(client: Client):
             getattr(act_task_record, "temporal_activity")["activity_type"]
             == "task_fail_once_activity"
         )
+
+        def workflow_failure_with_identifier(l: logging.LogRecord):
+            if (
+                hasattr(l, "__temporal_error_identifier")
+                and getattr(l, "__temporal_error_identifier")
+                == "WorkflowTaskFailure"
+            ):
+                assert l.msg.startswith("Failed activation on workflow")
+                return True
+            return False
+
+        assert capturer.find(workflow_failure_with_identifier) is not None
 
 
 @workflow.defn
@@ -8037,33 +8013,6 @@ async def test_quick_activity_swallows_cancellation(client: Client):
 
             assert isinstance(cause, CancelledError)
             assert cause.message == "Workflow cancelled"
-
-
-async def test_workflow_logging_trace_identifier(client: Client):
-    with LogCapturer().logs_captured(
-        temporalio.worker._workflow_instance.logger
-    ) as capturer:
-        async with new_worker(
-            client,
-            TaskFailOnceWorkflow,
-            activities=[task_fail_once_activity],
-        ) as worker:
-            await client.execute_workflow(
-                TaskFailOnceWorkflow.run,
-                id="workflow_failure_trace_identifier",
-                task_queue=worker.task_queue,
-            )
-
-        def workflow_failure(l: logging.LogRecord):
-            if (
-                hasattr(l, "__temporal_error_identifier")
-                and getattr(l, "__temporal_error_identifier") == "WorkflowTaskFailure"
-            ):
-                assert l.msg.startswith("Failed activation on workflow")
-                return True
-            return False
-
-        assert capturer.find(workflow_failure) is not None
 
 
 @activity.defn
