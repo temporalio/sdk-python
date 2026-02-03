@@ -1404,16 +1404,14 @@ class DataConverter(WithSerializationContext):
     async def _encode_memo_existing(
         self, source: Mapping[str, Any], memo: temporalio.api.common.v1.Memo
     ):
-        payloads = []
         for k, v in source.items():
             payload = v
             if not isinstance(v, temporalio.api.common.v1.Payload):
                 payload = (await self.encode([v]))[0]
             memo.fields[k].CopyFrom(payload)
-            payloads.append(payload)
         # Memos have their field payloads validated all together in one unit
         DataConverter._validate_limits(
-            payloads,
+            list(memo.fields.values()),
             self._payload_error_limits.memo_size_error
             if self._payload_error_limits
             else None,
