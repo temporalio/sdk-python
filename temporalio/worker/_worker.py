@@ -959,10 +959,7 @@ def _warn_if_nexus_task_executor_max_workers_is_inconsistent(
 
 @dataclass
 class WorkerDeploymentConfig:
-    """Options for configuring the Worker Versioning feature.
-
-    WARNING: This is an experimental feature and may change in the future.
-    """
+    """Options for configuring the Worker Versioning feature."""
 
     version: WorkerDeploymentVersion
     use_worker_versioning: bool

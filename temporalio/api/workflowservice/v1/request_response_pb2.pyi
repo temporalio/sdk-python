@@ -1876,6 +1876,7 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
     RETRY_POLICY_FIELD_NUMBER: builtins.int
     POLLER_SCALING_DECISION_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    ACTIVITY_RUN_ID_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """A unique identifier for this task"""
     workflow_namespace: builtins.str
@@ -1951,6 +1952,8 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """Priority metadata"""
+    activity_run_id: builtins.str
+    """The run ID of the activity execution, only set for standalone activities."""
     def __init__(
         self,
         *,
@@ -1976,6 +1979,7 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
         poller_scaling_decision: temporalio.api.taskqueue.v1.message_pb2.PollerScalingDecision
         | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        activity_run_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2017,6 +2021,8 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "activity_id",
             b"activity_id",
+            "activity_run_id",
+            b"activity_run_id",
             "activity_type",
             b"activity_type",
             "attempt",

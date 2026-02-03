@@ -170,6 +170,10 @@ class _WorkflowTaskFailedCauseEnumTypeWrapper(
         _WorkflowTaskFailedCause.ValueType
     )  # 36
     """A workflow task failed because a grpc message was too large."""
+    WORKFLOW_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE: (
+        _WorkflowTaskFailedCause.ValueType
+    )  # 37
+    """A workflow task failed because payloads were too large."""
 
 class WorkflowTaskFailedCause(
     _WorkflowTaskFailedCause, metaclass=_WorkflowTaskFailedCauseEnumTypeWrapper
@@ -314,6 +318,8 @@ WORKFLOW_TASK_FAILED_CAUSE_GRPC_MESSAGE_TOO_LARGE: (
     WorkflowTaskFailedCause.ValueType
 )  # 36
 """A workflow task failed because a grpc message was too large."""
+WORKFLOW_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE: WorkflowTaskFailedCause.ValueType  # 37
+"""A workflow task failed because payloads were too large."""
 global___WorkflowTaskFailedCause = WorkflowTaskFailedCause
 
 class _StartChildWorkflowExecutionFailedCause:

@@ -1042,10 +1042,7 @@ Priority.default = Priority(priority_key=None, fairness_key=None, fairness_weigh
 
 
 class VersioningBehavior(IntEnum):
-    """Specifies when a workflow might move from a worker of one Build Id to another.
-
-    WARNING: Experimental API.
-    """
+    """Specifies when a workflow might move from a worker of one Build Id to another."""
 
     UNSPECIFIED = (
         temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_UNSPECIFIED
@@ -1063,10 +1060,7 @@ class VersioningBehavior(IntEnum):
 
 @dataclass(frozen=True)
 class WorkerDeploymentVersion:
-    """Represents the version of a specific worker deployment.
-
-    WARNING: Experimental API.
-    """
+    """Represents the version of a specific worker deployment."""
 
     deployment_name: str
     build_id: str
@@ -1096,11 +1090,7 @@ class WorkerDeploymentVersion:
 
 
 class VersioningOverride(ABC):
-    """Represents the override of a worker's versioning behavior for a workflow execution.
-
-    .. warning::
-        Experimental API.
-    """
+    """Represents the override of a worker's versioning behavior for a workflow execution."""
 
     @abstractmethod
     def _to_proto(self) -> temporalio.api.workflow.v1.VersioningOverride:
@@ -1110,11 +1100,7 @@ class VersioningOverride(ABC):
 
 @dataclass(frozen=True)
 class PinnedVersioningOverride(VersioningOverride):
-    """Workflow will be pinned to a specific deployment version.
-
-    .. warning::
-        Experimental API.
-    """
+    """Workflow will be pinned to a specific deployment version."""
 
     version: WorkerDeploymentVersion
 
@@ -1133,11 +1119,7 @@ class PinnedVersioningOverride(VersioningOverride):
 
 @dataclass(frozen=True)
 class AutoUpgradeVersioningOverride(VersioningOverride):
-    """The workflow will auto-upgrade to the current deployment version on the next workflow task.
-
-    .. warning::
-        Experimental API.
-    """
+    """The workflow will auto-upgrade to the current deployment version on the next workflow task."""
 
     def _to_proto(self) -> temporalio.api.workflow.v1.VersioningOverride:
         """Convert to proto representation."""
