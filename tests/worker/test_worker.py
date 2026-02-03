@@ -1340,8 +1340,7 @@ class ContinueAsNewWithVersionUpgradeV1:
 )
 class ContinueAsNewWithVersionUpgradeV2:
     @workflow.run
-    async def run(self, attempt: int) -> str:
-        print("IN V2")
+    async def run(self) -> str:
         return "v2.0"
 
 
