@@ -8644,7 +8644,12 @@ async def test_large_payload_workflow_payload_error_disabled(client: Client):
         )
 
 
-async def test_large_payload_workflow_result_error(client: Client):
+async def test_large_payload_workflow_result_error(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Time-skipping server does not report payload limits.")
+
     # Create worker runtime with forwarded logger
     worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
     worker_runtime = Runtime(
@@ -8745,7 +8750,12 @@ async def test_large_payload_workflow_result_warning(client: Client):
         )
 
 
-async def test_large_payload_activity_input_error(client: Client):
+async def test_large_payload_activity_input_error(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Time-skipping server does not report payload limits.")
+
     # Create worker runtime with forwarded logger
     worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
     worker_runtime = Runtime(
@@ -8844,7 +8854,12 @@ async def test_large_payload_activity_input_warning(client: Client):
         )
 
 
-async def test_large_payload_activity_exception_error(client: Client):
+async def test_large_payload_activity_exception_error(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Time-skipping server does not report payload limits.")
+
     # Create worker runtime with forwarded logger
     worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
     worker_runtime = Runtime(
@@ -8898,7 +8913,12 @@ async def test_large_payload_activity_exception_error(client: Client):
         assert activity_logger_capturer.find(activity_logger_predicate)
 
 
-async def test_large_payload_activity_result_error(client: Client):
+async def test_large_payload_activity_result_error(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Time-skipping server does not report payload limits.")
+
     # Create worker runtime with forwarded logger
     worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
     worker_runtime = Runtime(
