@@ -107,18 +107,41 @@ def metric_meter() -> temporalio.common.MetricMeter:
 
 
 def is_worker_shutdown() -> bool:
-    """Whether shutdown has been invoked on the worker."""
+    """Whether shutdown has been invoked on the worker.
+
+    Returns:
+        True if shutdown has been called on the worker, False otherwise.
+
+    Raises:
+        RuntimeError: When not in a Nexus operation.
+    """
     return _temporal_context()._worker_shutdown_event.is_set()
 
 
 async def wait_for_worker_shutdown() -> None:
-    """Asynchronously wait for shutdown to be called on the worker."""
+    """Asynchronously wait for shutdown to be called on the worker.
+
+    Raises:
+        RuntimeError: When not in a Nexus operation.
+    """
     await _temporal_context()._worker_shutdown_event.wait()
 
 
-def wait_for_worker_shutdown_sync(timeout: float | None = None) -> None:
-    """Synchronously block while waiting for worker shutdown."""
-    _temporal_context()._worker_shutdown_event.wait_sync(timeout)
+def wait_for_worker_shutdown_sync(timeout: timedelta | float | None = None) -> None:
+    """Synchronously block while waiting for shutdown to be called on the worker.
+
+    This is essentially a wrapper around :py:meth:`threading.Event.wait`.
+
+    Args:
+        timeout: Max amount of time to wait for shutdown to be called on the
+            worker.
+
+    Raises:
+        RuntimeError: When not in a Nexus operation.
+    """
+    _temporal_context()._worker_shutdown_event.wait_sync(
+        timeout.total_seconds() if isinstance(timeout, timedelta) else timeout
+    )
 
 
 def _temporal_context() -> (
