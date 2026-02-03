@@ -1248,7 +1248,7 @@ class HeaderCodecBehavior(IntEnum):
 
 
 @dataclass
-class _CompositeEvent:
+class _CompositeEvent:  # pyright: ignore[reportUnusedClass]
     # This should always be present, but is sometimes lazily set internally
     thread_event: threading.Event | None
     # Async event only for async activities

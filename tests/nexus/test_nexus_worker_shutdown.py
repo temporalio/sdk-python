@@ -249,7 +249,9 @@ async def test_sync_nexus_operation_worker_shutdown_graceful(env: WorkflowEnviro
                 env.client,
                 task_queue=handler_task_queue,
                 nexus_service_handlers=[
-                    ShutdownTestServiceHandler(sync_operation_started=sync_operation_started)
+                    ShutdownTestServiceHandler(
+                        sync_operation_started=sync_operation_started
+                    )
                 ],
                 nexus_task_executor=executor,
                 graceful_shutdown_timeout=timedelta(seconds=5),

@@ -9,12 +9,10 @@ explicitly propagated.
 
 from __future__ import annotations
 
-import asyncio
 import contextvars
 import dataclasses
 import inspect
 import logging
-import threading
 from collections.abc import Callable, Iterator, Mapping, MutableMapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
