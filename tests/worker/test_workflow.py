@@ -1992,77 +1992,84 @@ class LoggingWorkflow:
 
 
 async def test_workflow_logging(client: Client):
+    original_full_workflow_info_on_extra = workflow.logger.full_workflow_info_on_extra
     workflow.logger.full_workflow_info_on_extra = True
-    with LogCapturer().logs_captured(
-        workflow.logger.base_logger, activity.logger.base_logger
-    ) as capturer:
-        # Log two signals and kill worker before completing. Need to disable
-        # workflow cache since we restart the worker and don't want to pay the
-        # sticky queue penalty.
-        async with new_worker(
-            client, LoggingWorkflow, max_cached_workflows=0
-        ) as worker:
-            handle = await client.start_workflow(
-                LoggingWorkflow.run,
-                id=f"workflow-{uuid.uuid4()}",
+    try:
+        with LogCapturer().logs_captured(
+            workflow.logger.base_logger, activity.logger.base_logger
+        ) as capturer:
+            # --- First execution: logs should appear ---
+            # Disable workflow cache so worker restart triggers replay
+            async with new_worker(
+                client, LoggingWorkflow, max_cached_workflows=0
+            ) as worker:
+                handle = await client.start_workflow(
+                    LoggingWorkflow.run,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+                await handle.signal(LoggingWorkflow.my_signal, "signal 1")
+                await handle.signal(LoggingWorkflow.my_signal, "signal 2")
+                await handle.execute_update(
+                    LoggingWorkflow.my_update, "update 1", id="update-1"
+                )
+                await handle.execute_update(
+                    LoggingWorkflow.my_update, "update 2", id="update-2"
+                )
+                assert "signal 2" == await handle.query(LoggingWorkflow.last_signal)
+
+            # Verify logs from first execution
+            assert capturer.find_log("Signal: signal 1 ({'attempt':")
+            assert capturer.find_log("Signal: signal 2")
+            assert capturer.find_log("Update: update 1")
+            assert capturer.find_log("Update: update 2")
+            assert capturer.find_log("Query called")
+            assert not capturer.find_log("Signal: signal 3")
+
+            # Verify workflow info and funcName
+            record = capturer.find_log("Signal: signal 1")
+            assert (
+                record
+                and record.__dict__["temporal_workflow"]["workflow_type"]
+                == "LoggingWorkflow"
+                and record.funcName == "my_signal"
+            )
+
+            # Verify full_workflow_info_on_extra
+            assert isinstance(record.__dict__["workflow_info"], workflow.Info)
+
+            # Verify update logging
+            record = capturer.find_log("Update: update 1")
+            assert (
+                record
+                and record.__dict__["temporal_workflow"]["update_id"] == "update-1"
+                and record.__dict__["temporal_workflow"]["update_name"] == "my_update"
+                and "'update_id': 'update-1'" in record.message
+                and "'update_name': 'my_update'" in record.message
+            )
+
+            # --- Clear logs and continue execution (replay path) ---
+            # When the new worker starts, it replays the workflow history (signals 1 & 2).
+            # Replay suppression should prevent those logs from appearing again.
+            capturer.log_queue.queue.clear()
+
+            async with new_worker(
+                client,
+                LoggingWorkflow,
                 task_queue=worker.task_queue,
-            )
-            # Send some signals and updates
-            await handle.signal(LoggingWorkflow.my_signal, "signal 1")
-            await handle.signal(LoggingWorkflow.my_signal, "signal 2")
-            await handle.execute_update(
-                LoggingWorkflow.my_update, "update 1", id="update-1"
-            )
-            await handle.execute_update(
-                LoggingWorkflow.my_update, "update 2", id="update-2"
-            )
-            assert "signal 2" == await handle.query(LoggingWorkflow.last_signal)
+                max_cached_workflows=0,
+            ) as worker:
+                await handle.signal(LoggingWorkflow.my_signal, "signal 3")
+                await handle.signal(LoggingWorkflow.my_signal, "finish")
+                await handle.result()
 
-        # Confirm logs were produced
-        assert capturer.find_log("Signal: signal 1 ({'attempt':")
-        assert capturer.find_log("Signal: signal 2")
-        assert capturer.find_log("Update: update 1")
-        assert capturer.find_log("Update: update 2")
-        assert capturer.find_log("Query called")
-        assert not capturer.find_log("Signal: signal 3")
-        # Also make sure it has some workflow info and correct funcName
-        record = capturer.find_log("Signal: signal 1")
-        assert (
-            record
-            and record.__dict__["temporal_workflow"]["workflow_type"]
-            == "LoggingWorkflow"
-            and record.funcName == "my_signal"
-        )
-        # Since we enabled full info, make sure it's there
-        assert isinstance(record.__dict__["workflow_info"], workflow.Info)
-        # Check the log emitted by the update execution.
-        record = capturer.find_log("Update: update 1")
-        assert (
-            record
-            and record.__dict__["temporal_workflow"]["update_id"] == "update-1"
-            and record.__dict__["temporal_workflow"]["update_name"] == "my_update"
-            and "'update_id': 'update-1'" in record.message
-            and "'update_name': 'my_update'" in record.message
-        )
-
-        # Clear queue and start a new one with more signals
-        capturer.log_queue.queue.clear()
-        async with new_worker(
-            client,
-            LoggingWorkflow,
-            task_queue=worker.task_queue,
-            max_cached_workflows=0,
-        ) as worker:
-            # Send signals and updates
-            await handle.signal(LoggingWorkflow.my_signal, "signal 3")
-            await handle.signal(LoggingWorkflow.my_signal, "finish")
-            await handle.result()
-
-        # Confirm replayed logs are not present but new ones are
-        assert not capturer.find_log("Signal: signal 1")
-        assert not capturer.find_log("Signal: signal 2")
-        assert capturer.find_log("Signal: signal 3")
-        assert capturer.find_log("Signal: finish")
+            # --- Replay execution: no duplicate logs ---
+            assert not capturer.find_log("Signal: signal 1")
+            assert not capturer.find_log("Signal: signal 2")
+            assert capturer.find_log("Signal: signal 3")
+            assert capturer.find_log("Signal: finish")
+    finally:
+        workflow.logger.full_workflow_info_on_extra = original_full_workflow_info_on_extra
 
 
 @activity.defn
