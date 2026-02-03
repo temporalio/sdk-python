@@ -5304,6 +5304,9 @@ class ContinueAsNewVersioningBehavior(IntEnum):
     of the previous run.
     """
     UNSPECIFIED = int(temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED)
+    """An initial versioning behavior is not set, follow the existing continue-as-new inheritance semantics.
+    See https://docs.temporal.io/worker-versioning#inheritance-semantics for more detail.
+    """
 
     AUTO_UPGRADE = int(temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE)
     """Start the new run with AutoUpgrade behavior. Use the Target Version of the workflow's task queue at
@@ -5326,6 +5329,7 @@ class ContinueAsNewVersioningBehavior(IntEnum):
 class SuggestContinueAsNewReason(IntEnum):
     """SuggestContinueAsNewReason specifies a reason why continue as new is true."""
     UNSPECIFIED = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED)
+    """Continue as new is suggested but the reason is unknown"""
 
     HISTORY_SIZE_TOO_LARGE = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE)
     """Workflow History size is getting too large."""
