@@ -1,5 +1,6 @@
 import dataclasses
-from typing import Any
+from collections.abc import Awaitable
+from typing import Any, Callable
 
 from agents import (
     Agent,
@@ -51,8 +52,15 @@ def _convert_agent(
         elif isinstance(handoff, Handoff):
             original_invoke = handoff.on_invoke_handoff
 
-            async def on_invoke(context: RunContextWrapper[Any], args: str) -> Agent:
-                handoff_agent = await original_invoke(context, args)
+            # Use default parameter to capture original_invoke by value, not reference
+            async def on_invoke(
+                context: RunContextWrapper[Any],
+                args: str,
+                invoke_func: Callable[
+                    [RunContextWrapper[Any], str], Awaitable[Any]
+                ] = original_invoke,
+            ) -> Agent:
+                handoff_agent = await invoke_func(context, args)
                 return _convert_agent(model_params, handoff_agent, seen)
 
             new_handoffs.append(
