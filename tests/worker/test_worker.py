@@ -1169,16 +1169,31 @@ async def wait_for_worker_deployment_routing_config_propagation(
             )
         )
         routing_config = resp.worker_deployment_info.routing_config
-        if routing_config.current_deployment_version.build_id != expected_current_build_id:
+        if (
+            routing_config.current_deployment_version.build_id
+            != expected_current_build_id
+        ):
             return False
-        if routing_config.ramping_deployment_version.build_id != expected_ramping_build_id:
+        if (
+            routing_config.ramping_deployment_version.build_id
+            != expected_ramping_build_id
+        ):
             return False
         state = resp.worker_deployment_info.routing_config_update_state
-        if state == temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_COMPLETED:
+        if (
+            state
+            == temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_COMPLETED
+        ):
             return True
-        if state == temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED:
-            return True # unimplemented
-        if state == temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS:
+        if (
+            state
+            == temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED
+        ):
+            return True  # unimplemented
+        if (
+            state
+            == temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS
+        ):
             return False
         return False
 

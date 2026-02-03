@@ -279,7 +279,9 @@ class HistoryInfo:
     history_length: int
     history_size: int
     continue_as_new_suggested: bool
-    continue_as_new_suggested_reasons: Sequence[temporalio.workflow.SuggestContinueAsNewReason]
+    continue_as_new_suggested_reasons: Sequence[
+        temporalio.workflow.SuggestContinueAsNewReason
+    ]
 
 
 @workflow.defn
@@ -337,6 +339,7 @@ async def test_workflow_history_info(
         assert new_info.history_size > orig_info.history_size
         assert new_info.continue_as_new_suggested
 
+
 # Test that CAN suggested reasons/suggestion are persistent across WFTs
 async def test_workflow_continue_as_new_reasons_persistent(
     client: Client, env: WorkflowEnvironment, continue_as_new_suggest_history_count: int
@@ -365,7 +368,10 @@ async def test_workflow_continue_as_new_reasons_persistent(
         # Assert CAN expectations
         assert info.continue_as_new_suggested
         assert len(info.continue_as_new_suggested_reasons) == 1
-        assert info.continue_as_new_suggested_reasons[0] == temporalio.workflow.SuggestContinueAsNewReason.TOO_MANY_HISTORY_EVENTS
+        assert (
+            info.continue_as_new_suggested_reasons[0]
+            == temporalio.workflow.SuggestContinueAsNewReason.TOO_MANY_HISTORY_EVENTS
+        )
         # Send another signal to create a new WFT
         await handle.signal(HistoryInfoWorkflow.bunch_of_events, 1)
         # Get fresh info
@@ -374,7 +380,10 @@ async def test_workflow_continue_as_new_reasons_persistent(
         assert info.continue_as_new_suggested
         # Expected reasons to still be populated
         assert len(info.continue_as_new_suggested_reasons) == 1
-        assert info.continue_as_new_suggested_reasons[0] == temporalio.workflow.SuggestContinueAsNewReason.TOO_MANY_HISTORY_EVENTS
+        assert (
+            info.continue_as_new_suggested_reasons[0]
+            == temporalio.workflow.SuggestContinueAsNewReason.TOO_MANY_HISTORY_EVENTS
+        )
 
 
 @workflow.defn

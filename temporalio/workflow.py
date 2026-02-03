@@ -606,9 +606,12 @@ class Info:
         """
         return _Runtime.current().workflow_is_continue_as_new_suggested()
 
-    def get_suggested_continue_as_new_reasons(self) -> Sequence[SuggestContinueAsNewReason]:
+    def get_suggested_continue_as_new_reasons(
+        self,
+    ) -> Sequence[SuggestContinueAsNewReason]:
         """Get reason(s) why continue as new is suggested"""
         return _Runtime.current().workflow_get_suggested_continue_as_new_reasons()
+
 
 @dataclass(frozen=True)
 class ParentInfo:
@@ -4882,7 +4885,7 @@ def continue_as_new(
         memo=memo,
         search_attributes=search_attributes,
         versioning_intent=versioning_intent,
-        initial_versioning_behavior=initial_versioning_behavior
+        initial_versioning_behavior=initial_versioning_behavior,
     )
 
 
@@ -5298,17 +5301,23 @@ class VersioningIntent(Enum):
             return temporalio.bridge.proto.common.VersioningIntent.DEFAULT
         return temporalio.bridge.proto.common.VersioningIntent.UNSPECIFIED
 
+
 class ContinueAsNewVersioningBehavior(IntEnum):
     """Experimental. Optionally decide the versioning behavior that the first task of the new run should use.
     For example, choose to AutoUpgrade on continue-as-new instead of inheriting the pinned version
     of the previous run.
     """
-    UNSPECIFIED = int(temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED)
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED
+    )
     """An initial versioning behavior is not set, follow the existing continue-as-new inheritance semantics.
     See https://docs.temporal.io/worker-versioning#inheritance-semantics for more detail.
     """
 
-    AUTO_UPGRADE = int(temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE)
+    AUTO_UPGRADE = int(
+        temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_AUTO_UPGRADE
+    )
     """Start the new run with AutoUpgrade behavior. Use the Target Version of the workflow's task queue at
     start-time, as AutoUpgrade workflows do. After the first workflow task completes, use whatever
     Versioning Behavior the workflow is annotated with in the workflow code.
@@ -5320,23 +5329,35 @@ class ContinueAsNewVersioningBehavior(IntEnum):
     effective version will be whatever is specified by the Versioning Override until the override is removed.
     """
 
+
 class SuggestContinueAsNewReason(IntEnum):
     """SuggestContinueAsNewReason specifies a reason why continue as new is true."""
-    UNSPECIFIED = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED)
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED
+    )
     """Continue as new is suggested but the reason is unknown"""
 
-    HISTORY_SIZE_TOO_LARGE = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE)
+    HISTORY_SIZE_TOO_LARGE = int(
+        temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE
+    )
     """Workflow History size is getting too large."""
 
-    TOO_MANY_HISTORY_EVENTS = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS)
+    TOO_MANY_HISTORY_EVENTS = int(
+        temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS
+    )
     """Workflow History event count is getting too large."""
 
-    TOO_MANY_UPDATES = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES)
+    TOO_MANY_UPDATES = int(
+        temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES
+    )
     """Workflow's count of completed plus in-flight updates is too large."""
 
-    TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED)
+    TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED = int(
+        temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED
+    )
     """Workflow's Target Worker Deployment Version is different from its current Version and the workflow is versioned."""
- 
+
 
 ServiceT = TypeVar("ServiceT")
 
