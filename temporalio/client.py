@@ -1429,6 +1429,7 @@ class Client:
         For more on this feature, see https://docs.temporal.io/workers#worker-versioning
 
         .. deprecated::
+            Legacy API, see the docs above for new usage 
 
         Args:
             task_queue: The task queue to target.
@@ -1458,6 +1459,7 @@ class Client:
         For more on this feature, see https://docs.temporal.io/workers#worker-versioning
 
         .. deprecated::
+            Legacy API, see the docs above for new usage
 
         Args:
             task_queue: The task queue to target.
@@ -1489,6 +1491,7 @@ class Client:
         For more on this feature, see https://docs.temporal.io/workers#worker-versioning
 
         .. deprecated::
+            Legacy API, see the docs above for new usage
 
         Args:
             build_ids: The Build IDs to query the reachability of. At least one must be specified.
