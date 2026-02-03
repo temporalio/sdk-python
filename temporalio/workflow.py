@@ -5325,18 +5325,18 @@ class ContinueAsNewVersioningBehavior(IntEnum):
 
 class SuggestContinueAsNewReason(IntEnum):
     """SuggestContinueAsNewReason specifies a reason why continue as new is true."""
-    SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED)
+    UNSPECIFIED = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED)
 
-    SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE)
+    HISTORY_SIZE_TOO_LARGE = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_HISTORY_SIZE_TOO_LARGE)
     """Workflow History size is getting too large."""
 
-    SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS)
+    TOO_MANY_HISTORY_EVENTS = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_HISTORY_EVENTS)
     """Workflow History event count is getting too large."""
 
-    SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES)
+    TOO_MANY_UPDATES = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TOO_MANY_UPDATES)
     """Workflow's count of completed plus in-flight updates is too large."""
 
-    SUGGEST_CONTINUE_AS_NEW_REASON_TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED)
+    TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED = int(temporalio.api.enums.v1.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED)
     """Workflow's Target Worker Deployment Version is different from its current Version and the workflow is versioned."""
  
 

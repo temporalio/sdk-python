@@ -1292,7 +1292,6 @@ class TestForkUseWorker(_TestFork):
         self.run(mp_fork_ctx)
 
 
-# Workflows for continue-as-new with version upgrade test
 @workflow.defn(
     name="ContinueAsNewWithVersionUpgrade",
     versioning_behavior=VersioningBehavior.PINNED,
@@ -1300,9 +1299,7 @@ class TestForkUseWorker(_TestFork):
 class ContinueAsNewWithVersionUpgradeV1:
     @workflow.run
     async def run(self, attempt: int) -> str:
-        print("IN WORKFLOW")
         if attempt > 0:
-            print("ATTEMPT > 1")
             return "v1.0"
 
         # Loop waiting for CAN suggestion with version change reason
@@ -1311,13 +1308,11 @@ class ContinueAsNewWithVersionUpgradeV1:
             await asyncio.sleep(0.01)
             info = workflow.info()
             if info.is_continue_as_new_suggested():
-                print("WORKFLOW CAN")
                 for reason in info.get_suggested_continue_as_new_reasons():
                     if (
                         reason
-                        == workflow.SuggestContinueAsNewReason.SUGGEST_CONTINUE_AS_NEW_REASON_TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED
+                        == workflow.SuggestContinueAsNewReason.TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED
                     ):
-                        print("WORKFLOW CAN BECAUSE VERSION UPGRADE")
                         workflow.continue_as_new(
                             arg=attempt + 1,
                             initial_versioning_behavior=workflow.ContinueAsNewVersioningBehavior.AUTO_UPGRADE,

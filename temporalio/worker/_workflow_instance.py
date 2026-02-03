@@ -3395,7 +3395,10 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
         if self._input.versioning_intent:
             v.versioning_intent = self._input.versioning_intent._to_proto()
         if self._input.initial_versioning_behavior:
-            v.initial_versioning_behavior = self._input.initial_versioning_behavior._to_proto()
+            v.initial_versioning_behavior = cast(
+            "temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.ValueType",
+            int(self._input.initial_versioning_behavior),
+        )
 
 
 def _encode_search_attributes(
