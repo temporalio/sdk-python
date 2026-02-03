@@ -166,12 +166,11 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
 
     async def run(
         self,
-        payload_error_limits: temporalio.converter._PayloadErrorLimits | None,
+        payload_error_limits: temporalio.converter._ServerPayloadErrorLimits | None,
     ) -> None:
-        if payload_error_limits:
-            self._data_converter = self._data_converter._with_payload_error_limits(
-                payload_error_limits
-            )
+        self._data_converter = self._data_converter._with_payload_error_limits(
+            payload_error_limits
+        )
 
         # Continually poll for workflow work
         task_tag = object()

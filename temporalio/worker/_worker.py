@@ -29,7 +29,7 @@ from temporalio.common import (
     VersioningBehavior,
     WorkerDeploymentVersion,
 )
-from temporalio.converter import _PayloadErrorLimits
+from temporalio.converter import _ServerPayloadErrorLimits
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
@@ -728,7 +728,7 @@ class Worker:
         # Eagerly validate which will do a namespace check in Core
         namespace_info = await self._bridge_worker.validate()
         payload_error_limits = (
-            _PayloadErrorLimits(
+            _ServerPayloadErrorLimits(
                 memo_size_error=namespace_info.limits.memo_size_limit_error,
                 payload_size_error=namespace_info.limits.blob_size_limit_error,
             )
