@@ -29,6 +29,7 @@ from nexusrpc.handler import (
     StartOperationContext,
 )
 
+import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
@@ -106,6 +107,30 @@ def metric_meter() -> temporalio.common.MetricMeter:
     return _temporal_context().metric_meter
 
 
+def is_worker_shutdown() -> bool:
+    """Whether shutdown has been invoked on the worker."""
+    ctx = _temporal_context()
+    if not ctx._worker_shutdown_event:
+        return False
+    return ctx._worker_shutdown_event.is_set()
+
+
+async def wait_for_worker_shutdown() -> None:
+    """Asynchronously wait for shutdown to be called on the worker."""
+    ctx = _temporal_context()
+    if not ctx._worker_shutdown_event:
+        raise RuntimeError("Worker shutdown event not available")
+    await ctx._worker_shutdown_event.wait()
+
+
+def wait_for_worker_shutdown_sync(timeout: float | None = None) -> None:
+    """Synchronously block while waiting for worker shutdown."""
+    ctx = _temporal_context()
+    if not ctx._worker_shutdown_event:
+        raise RuntimeError("Worker shutdown event not available")
+    ctx._worker_shutdown_event.wait_sync(timeout)
+
+
 def _temporal_context() -> (
     _TemporalStartOperationContext | _TemporalCancelOperationContext
 ):
@@ -154,6 +179,7 @@ class _TemporalOperationCtx(Generic[_OperationCtxT]):
 
     _runtime_metric_meter: temporalio.common.MetricMeter
     _metric_meter: temporalio.common.MetricMeter | None = None
+    _worker_shutdown_event: temporalio.activity._CompositeEvent | None = None
 
     @property
     def metric_meter(self) -> temporalio.common.MetricMeter:

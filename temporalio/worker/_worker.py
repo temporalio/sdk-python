@@ -786,6 +786,8 @@ class Worker:
             self._activity_worker.notify_shutdown()
         if self._workflow_worker:
             self._workflow_worker.notify_shutdown()
+        if self._nexus_worker:
+            self._nexus_worker.notify_shutdown()
 
         # Wait for all tasks to complete (i.e. for poller loops to stop)
         await asyncio.wait(tasks.values())
