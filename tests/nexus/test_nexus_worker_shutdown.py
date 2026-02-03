@@ -2,6 +2,7 @@
 
 import asyncio
 import concurrent.futures
+import threading
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -36,16 +37,17 @@ class ShutdownTestService:
 class ShutdownTestServiceHandler:
     def __init__(
         self,
-        operation_started: asyncio.Event,
-        loop: asyncio.AbstractEventLoop | None = None,
+        operation_started: asyncio.Event | None = None,
+        sync_operation_started: threading.Event | None = None,
     ) -> None:
         self.operation_started = operation_started
-        self.loop = loop  # For thread-safe signaling from sync handler
+        self.sync_operation_started = sync_operation_started
         self.shutdown_check_before: bool | None = None
         self.shutdown_check_after: bool | None = None
 
     @sync_operation
     async def wait_for_shutdown(self, _ctx: StartOperationContext, _input: None) -> str:
+        assert self.operation_started
         self.operation_started.set()
         await nexus.wait_for_worker_shutdown()
         return "Worker graceful shutdown"
@@ -54,6 +56,7 @@ class ShutdownTestServiceHandler:
     async def hang_until_cancelled(
         self, _ctx: StartOperationContext, _input: None
     ) -> str:
+        assert self.operation_started
         self.operation_started.set()
         try:
             while True:
@@ -63,14 +66,14 @@ class ShutdownTestServiceHandler:
 
     @sync_operation
     def wait_for_shutdown_sync(self, _ctx: StartOperationContext, _input: None) -> str:
-        # Thread-safe signaling for sync handler
-        assert self.loop
-        self.loop.call_soon_threadsafe(self.operation_started.set)
+        assert self.sync_operation_started
+        self.sync_operation_started.set()
         nexus.wait_for_worker_shutdown_sync(30)
         return "Worker graceful shutdown sync"
 
     @sync_operation
     async def check_shutdown(self, _ctx: StartOperationContext, _input: None) -> str:
+        assert self.operation_started
         self.shutdown_check_before = nexus.is_worker_shutdown()
         self.operation_started.set()
         await nexus.wait_for_worker_shutdown()
@@ -233,8 +236,7 @@ async def test_sync_nexus_operation_worker_shutdown_graceful(env: WorkflowEnviro
     caller_task_queue = str(uuid.uuid4())
     await create_nexus_endpoint(handler_task_queue, env.client)
 
-    operation_started = asyncio.Event()
-    loop = asyncio.get_event_loop()
+    sync_operation_started = threading.Event()
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         async with Worker(
@@ -247,7 +249,7 @@ async def test_sync_nexus_operation_worker_shutdown_graceful(env: WorkflowEnviro
                 env.client,
                 task_queue=handler_task_queue,
                 nexus_service_handlers=[
-                    ShutdownTestServiceHandler(operation_started, loop)
+                    ShutdownTestServiceHandler(sync_operation_started=sync_operation_started)
                 ],
                 nexus_task_executor=executor,
                 graceful_shutdown_timeout=timedelta(seconds=5),
@@ -267,7 +269,7 @@ async def test_sync_nexus_operation_worker_shutdown_graceful(env: WorkflowEnviro
             )
 
             # Wait for operation to start
-            await operation_started.wait()
+            await asyncio.to_thread(sync_operation_started.wait)
 
             # Shutdown the handler worker - this should signal the shutdown event
             await handler_worker.shutdown()
