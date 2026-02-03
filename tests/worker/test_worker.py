@@ -1340,7 +1340,7 @@ class ContinueAsNewWithVersionUpgradeV1:
 )
 class ContinueAsNewWithVersionUpgradeV2:
     @workflow.run
-    async def run(self) -> str:
+    async def run(self, attempt: int) -> str: # type:ignore[reportUnusedParameter]
         return "v2.0"
 
 
