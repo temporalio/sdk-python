@@ -99,6 +99,7 @@ from temporalio.exceptions import (
     CancelledError,
     ChildWorkflowError,
     TemporalError,
+    TerminatedError,
     TimeoutError,
     TimeoutType,
     WorkflowAlreadyStartedError,
@@ -8500,24 +8501,24 @@ class LargePayloadWorkflowInput:
     activity_output_data_size: int
     activity_exception_data_size: int
     workflow_output_data_size: int
-    data: list[int]
+    data: str
 
 
 @dataclass
 class LargePayloadWorkflowOutput:
-    data: list[int]
+    data: str
 
 
 @dataclass
 class LargePayloadActivityInput:
     exception_data_size: int
     output_data_size: int
-    data: list[int]
+    data: str
 
 
 @dataclass
 class LargePayloadActivityOutput:
-    data: list[int]
+    data: str
 
 
 @activity.defn
@@ -8526,9 +8527,9 @@ async def large_payload_activity(
 ) -> LargePayloadActivityOutput:
     if input.exception_data_size > 0:
         raise ApplicationError(
-            "Intentially failing activity", "a" * input.exception_data_size
+            "Intentially failing activity", "e" * input.exception_data_size
         )
-    return LargePayloadActivityOutput(data=[0] * input.output_data_size)
+    return LargePayloadActivityOutput(data="o" * input.output_data_size)
 
 
 @workflow.defn
@@ -8540,11 +8541,11 @@ class LargePayloadWorkflow:
             LargePayloadActivityInput(
                 exception_data_size=input.activity_exception_data_size,
                 output_data_size=input.activity_output_data_size,
-                data=[0] * input.activity_input_data_size,
+                data="i" * input.activity_input_data_size,
             ),
             schedule_to_close_timeout=timedelta(seconds=5),
         )
-        return LargePayloadWorkflowOutput(data=[0] * input.workflow_output_data_size)
+        return LargePayloadWorkflowOutput(data="o" * input.workflow_output_data_size)
 
 
 async def test_large_payload_workflow_input_warning(client: Client):
@@ -8552,7 +8553,7 @@ async def test_large_payload_workflow_input_warning(client: Client):
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
         payload_limits=PayloadLimitsConfig(
-            payload_size_warning=102,
+            payload_size_warning=100,
         ),
     )
     client = Client(**config)
@@ -8568,7 +8569,7 @@ async def test_large_payload_workflow_input_warning(client: Client):
                     activity_output_data_size=0,
                     activity_exception_data_size=0,
                     workflow_output_data_size=0,
-                    data=[0] * 2 * 1024,
+                    data="i" * 2 * 1024,
                 ),
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
@@ -8601,7 +8602,7 @@ async def test_large_payload_workflow_memo_warning(client: Client):
                     activity_output_data_size=0,
                     activity_exception_data_size=0,
                     workflow_output_data_size=0,
-                    data=[],
+                    data="",
                 ),
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
@@ -8625,22 +8626,27 @@ async def test_large_payload_workflow_payload_error_disabled(client: Client):
         client,
         LargePayloadWorkflow,
         activities=[large_payload_activity],
-        # Referenced server version doesn't report payload limits.
-        # Configure error limits in server when limit reporting supported.
         disable_payload_error_limit=True,
     ) as worker:
-        await client.execute_workflow(
-            LargePayloadWorkflow.run,
-            LargePayloadWorkflowInput(
-                activity_input_data_size=0,
-                activity_output_data_size=0,
-                activity_exception_data_size=0,
-                workflow_output_data_size=6 * 1024,
-                data=[],
-            ),
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=3),
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                LargePayloadWorkflow.run,
+                LargePayloadWorkflowInput(
+                    activity_input_data_size=0,
+                    activity_output_data_size=0,
+                    activity_exception_data_size=0,
+                    workflow_output_data_size=2 * 1024 * 1024,
+                    data="",
+                ),
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=3),
+            )
+
+        assert isinstance(err.value.cause, TerminatedError)
+        assert (
+            err.value.cause.message
+            == "BadScheduleActivityAttributes: CompleteWorkflowExecutionCommandAttributes.Result exceeds size limit."
         )
 
 
@@ -8661,7 +8667,7 @@ async def test_large_payload_workflow_result_error(
         )
     )
 
-    # Create client for worker with custom payload limits
+    # Create client for worker with custom runtime logging
     error_limit = 2 * 1024 * 1024
     worker_client = await Client.connect(
         client.service_client.config.target_host,
@@ -8683,8 +8689,8 @@ async def test_large_payload_workflow_result_error(
                         activity_input_data_size=0,
                         activity_output_data_size=0,
                         activity_exception_data_size=0,
-                        workflow_output_data_size=3 * 1024 * 1024,
-                        data=[],
+                        workflow_output_data_size=2 * 1024 * 1024,
+                        data="",
                     ),
                     id=f"workflow-{uuid.uuid4()}",
                     task_queue=worker.task_queue,
@@ -8735,7 +8741,7 @@ async def test_large_payload_workflow_result_warning(client: Client):
                     activity_output_data_size=0,
                     activity_exception_data_size=0,
                     workflow_output_data_size=2 * 1024,
-                    data=[],
+                    data="",
                 ),
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
@@ -8767,7 +8773,7 @@ async def test_large_payload_activity_input_error(
         )
     )
 
-    # Create client for worker with custom payload limits
+    # Create client for worker with custom runtime logging
     error_limit = 2 * 1024 * 1024
     worker_client = await Client.connect(
         client.service_client.config.target_host,
@@ -8786,11 +8792,11 @@ async def test_large_payload_activity_input_error(
                 await client.execute_workflow(
                     LargePayloadWorkflow.run,
                     LargePayloadWorkflowInput(
-                        activity_input_data_size=3 * 1024 * 1024,
+                        activity_input_data_size=2 * 1024 * 1024,
                         activity_output_data_size=0,
                         activity_exception_data_size=0,
                         workflow_output_data_size=0,
-                        data=[],
+                        data="",
                     ),
                     id=f"workflow-{uuid.uuid4()}",
                     task_queue=worker.task_queue,
@@ -8840,7 +8846,7 @@ async def test_large_payload_activity_input_warning(client: Client):
                     activity_output_data_size=0,
                     activity_exception_data_size=0,
                     workflow_output_data_size=0,
-                    data=[],
+                    data="",
                 ),
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
@@ -8871,7 +8877,7 @@ async def test_large_payload_activity_exception_error(
         )
     )
 
-    # Create client for worker with custom payload limits
+    # Create client for worker with custom runtime logging
     worker_client = await Client.connect(
         client.service_client.config.target_host,
         namespace=client.namespace,
@@ -8892,9 +8898,9 @@ async def test_large_payload_activity_exception_error(
                     LargePayloadWorkflowInput(
                         activity_input_data_size=0,
                         activity_output_data_size=0,
-                        activity_exception_data_size=3 * 1024 * 1024,
+                        activity_exception_data_size=2 * 1024 * 1024,
                         workflow_output_data_size=0,
-                        data=[],
+                        data="",
                     ),
                     id=f"workflow-{uuid.uuid4()}",
                     task_queue=worker.task_queue,
@@ -8930,7 +8936,7 @@ async def test_large_payload_activity_result_error(
         )
     )
 
-    # Create client for worker with custom payload limits
+    # Create client for worker with custom runtime logging
     error_limit = 2 * 1024 * 1024
     worker_client = await Client.connect(
         client.service_client.config.target_host,
@@ -8951,10 +8957,10 @@ async def test_large_payload_activity_result_error(
                     LargePayloadWorkflow.run,
                     LargePayloadWorkflowInput(
                         activity_input_data_size=0,
-                        activity_output_data_size=3 * 1024 * 1024,
+                        activity_output_data_size=2 * 1024 * 1024,
                         activity_exception_data_size=0,
                         workflow_output_data_size=0,
-                        data=[],
+                        data="",
                     ),
                     id=f"workflow-{uuid.uuid4()}",
                     task_queue=worker.task_queue,
@@ -8997,7 +9003,7 @@ async def test_large_payload_activity_result_warning(client: Client):
                     activity_output_data_size=2 * 1024,
                     activity_exception_data_size=0,
                     workflow_output_data_size=0,
-                    data=[],
+                    data="",
                 ),
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
