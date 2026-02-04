@@ -22,6 +22,7 @@ from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 logger = logging.getLogger(__name__)
 
+
 @pytest.fixture
 def reset_otel_tracer_provider():
     """Reset OpenTelemetry tracer provider state to allow multiple test runs."""
