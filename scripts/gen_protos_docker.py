@@ -11,7 +11,7 @@ result = subprocess.run(
         os.path.join("scripts", "_proto", "Dockerfile"),
         ".",
     ],
-    capture_output=True,
+    stdout=subprocess.PIPE,
     text=True,
     check=True,
 )
