@@ -27,7 +27,7 @@ def _get_tracer():
     tracer = getattr(temporalio.workflow.instance(), "__temporal_opentelemetry_tracer")
     if tracer is None or not isinstance(tracer, Tracer):
         raise ApplicationError(
-            "Failed to get temporal opentelemetry tracer from workflow."
+            "Failed to get temporal opentelemetry tracer from workflow. You may not have registered the OpenTelemetryPlugin."
         )
 
     return tracer

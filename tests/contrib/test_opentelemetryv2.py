@@ -14,6 +14,7 @@ import temporalio.contrib.opentelemetryv2.workflow
 from temporalio import activity, nexus, workflow
 from temporalio.client import Client
 from temporalio.contrib.opentelemetryv2 import OpenTelemetryPlugin
+from temporalio.testing import WorkflowEnvironment
 
 # Import the dump_spans function from the original opentelemetry test
 from tests.contrib.test_opentelemetry import dump_spans
@@ -253,9 +254,13 @@ class ComprehensiveWorkflow:
 
 async def test_opentelemetryv2_comprehensive_tracing(
     client: Client,
+    env: WorkflowEnvironment,
     reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
 ):
     """Test OpenTelemetry v2 integration across all workflow operations."""
+    if env.supports_time_skipping:
+        pytest.skip("Fails on java test server.")
+
     exporter = InMemorySpanExporter()
 
     plugin = OpenTelemetryPlugin(exporters=[exporter], add_temporal_spans=True)
