@@ -39,6 +39,8 @@ import google.protobuf.timestamp_pb2
 from google.protobuf.internal.containers import MessageMap
 from typing_extensions import Required, Self, TypedDict
 
+import temporalio.activity
+import temporalio.api.activity.v1
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.errordetails.v1
@@ -60,6 +62,7 @@ import temporalio.service
 import temporalio.workflow
 from temporalio.activity import ActivityCancellationDetails
 from temporalio.converter import (
+    ActivitySerializationContext,
     DataConverter,
     SerializationContext,
     WithSerializationContext,
@@ -79,6 +82,10 @@ from temporalio.service import (
 from .common import HeaderCodecBehavior
 from .types import (
     AnyType,
+    CallableAsyncNoParam,
+    CallableAsyncSingleParam,
+    CallableSyncNoParam,
+    CallableSyncSingleParam,
     LocalReturnType,
     MethodAsyncNoParam,
     MethodAsyncSingleParam,
@@ -1263,6 +1270,1257 @@ class Client:
             )
         )
 
+    # async no-param
+    @overload
+    async def start_activity(
+        self,
+        activity: CallableAsyncNoParam[ReturnType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # sync no-param
+    @overload
+    async def start_activity(
+        self,
+        activity: CallableSyncNoParam[ReturnType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # async single-param
+    @overload
+    async def start_activity(
+        self,
+        activity: CallableAsyncSingleParam[ParamType, ReturnType],
+        arg: ParamType,
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # sync single-param
+    @overload
+    async def start_activity(
+        self,
+        activity: CallableSyncSingleParam[ParamType, ReturnType],
+        arg: ParamType,
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # async multi-param
+    @overload
+    async def start_activity(
+        self,
+        activity: Callable[..., Awaitable[ReturnType]],
+        *,
+        args: Sequence[Any],
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # sync multi-param
+    @overload
+    async def start_activity(
+        self,
+        activity: Callable[..., ReturnType],
+        *,
+        args: Sequence[Any],
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # string name
+    @overload
+    async def start_activity(
+        self,
+        activity: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str,
+        result_type: type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[Any]: ...
+
+    async def start_activity(
+        self,
+        activity: (
+            str | Callable[..., Awaitable[ReturnType]] | Callable[..., ReturnType]
+        ),
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str,
+        result_type: type | None = None,
+        # Either schedule_to_close_timeout or start_to_close_timeout must be present
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]:
+        """Start an activity and return its handle.
+
+        .. warning::
+           This API is experimental.
+
+        Args:
+            activity: String name or callable activity function to execute.
+            arg: Single argument to the activity.
+            args: Multiple arguments to the activity. Cannot be set if arg is.
+            id: Unique identifier for the activity. Required.
+            task_queue: Task queue to send the activity to.
+            result_type: For string name activities, optional type to deserialize result into.
+            schedule_to_close_timeout: Total time allowed for the activity from schedule to completion.
+            schedule_to_start_timeout: Time allowed for the activity to sit in the task queue.
+            start_to_close_timeout: Time allowed for a single execution attempt.
+            heartbeat_timeout: Time between heartbeats before the activity is considered failed.
+            id_reuse_policy: How to handle reusing activity IDs from closed activities.
+                Default is ALLOW_DUPLICATE.
+            id_conflict_policy: How to handle activity ID conflicts with running activities.
+                Default is FAIL.
+            retry_policy: Retry policy for the activity.
+            search_attributes: Search attributes for the activity.
+            summary: A single-line fixed summary for this activity that may appear
+                in the UI/CLI. This can be in single-line Temporal markdown format.
+            priority: Priority of the activity execution.
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
+        Returns:
+            A handle to the started activity.
+        """
+        name, result_type_from_type_annotation = (
+            temporalio.activity._Definition.get_name_and_result_type(activity)
+        )
+        return await self._impl.start_activity(
+            StartActivityInput(
+                activity_type=name,
+                args=temporalio.common._arg_or_args(arg, args),
+                id=id,
+                task_queue=task_queue,
+                result_type=result_type or result_type_from_type_annotation,
+                schedule_to_close_timeout=schedule_to_close_timeout,
+                schedule_to_start_timeout=schedule_to_start_timeout,
+                start_to_close_timeout=start_to_close_timeout,
+                heartbeat_timeout=heartbeat_timeout,
+                id_reuse_policy=id_reuse_policy,
+                id_conflict_policy=id_conflict_policy,
+                retry_policy=retry_policy,
+                search_attributes=search_attributes,
+                summary=summary,
+                headers={},
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+                priority=priority,
+            )
+        )
+
+    # async no-param
+    @overload
+    async def execute_activity(
+        self,
+        activity: CallableAsyncNoParam[ReturnType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # sync no-param
+    @overload
+    async def execute_activity(
+        self,
+        activity: CallableSyncNoParam[ReturnType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # async single-param
+    @overload
+    async def execute_activity(
+        self,
+        activity: CallableAsyncSingleParam[ParamType, ReturnType],
+        arg: ParamType,
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # sync single-param
+    @overload
+    async def execute_activity(
+        self,
+        activity: CallableSyncSingleParam[ParamType, ReturnType],
+        arg: ParamType,
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # async multi-param
+    @overload
+    async def execute_activity(
+        self,
+        activity: Callable[..., Awaitable[ReturnType]],
+        *,
+        args: Sequence[Any],
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # sync multi-param
+    @overload
+    async def execute_activity(
+        self,
+        activity: Callable[..., ReturnType],
+        *,
+        args: Sequence[Any],
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # string name
+    @overload
+    async def execute_activity(
+        self,
+        activity: str,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str,
+        result_type: type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> Any: ...
+
+    async def execute_activity(
+        self,
+        activity: (
+            str | Callable[..., Awaitable[ReturnType]] | Callable[..., ReturnType]
+        ),
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str,
+        result_type: type | None = None,
+        # Either schedule_to_close_timeout or start_to_close_timeout must be present
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType:
+        """Start an activity, wait for it to complete, and return its result.
+
+        .. warning::
+           This API is experimental.
+
+        This is a convenience method that combines :py:meth:`start_activity` and
+        :py:meth:`ActivityHandle.result`.
+
+        Returns:
+            The result of the activity.
+
+        Raises:
+            ActivityFailureError: If the activity completed with a failure.
+        """
+        handle: ActivityHandle[ReturnType] = await self.start_activity(
+            cast(Any, activity),
+            arg,
+            args=args,
+            id=id,
+            task_queue=task_queue,
+            result_type=result_type,
+            schedule_to_close_timeout=schedule_to_close_timeout,
+            schedule_to_start_timeout=schedule_to_start_timeout,
+            start_to_close_timeout=start_to_close_timeout,
+            heartbeat_timeout=heartbeat_timeout,
+            id_reuse_policy=id_reuse_policy,
+            id_conflict_policy=id_conflict_policy,
+            retry_policy=retry_policy,
+            search_attributes=search_attributes,
+            summary=summary,
+            priority=priority,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
+        )
+        return await handle.result()
+
+    # async no-param
+    @overload
+    async def start_activity_class(
+        self,
+        activity: type[CallableAsyncNoParam[ReturnType]],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # sync no-param
+    @overload
+    async def start_activity_class(
+        self,
+        activity: type[CallableSyncNoParam[ReturnType]],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # async single-param
+    @overload
+    async def start_activity_class(
+        self,
+        activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
+        arg: ParamType,
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # sync single-param
+    @overload
+    async def start_activity_class(
+        self,
+        activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
+        arg: ParamType,
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # async multi-param
+    @overload
+    async def start_activity_class(
+        self,
+        activity: type[Callable[..., Awaitable[ReturnType]]],  # type: ignore[reportInvalidTypeForm]
+        *,
+        args: Sequence[Any],
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # sync multi-param
+    @overload
+    async def start_activity_class(
+        self,
+        activity: type[Callable[..., ReturnType]],  # type: ignore[reportInvalidTypeForm]
+        *,
+        args: Sequence[Any],
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    async def start_activity_class(
+        self,
+        activity: type[Callable],  # type: ignore[reportInvalidTypeForm]
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str,
+        result_type: type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[Any]:
+        """Start an activity from a callable class.
+
+        .. warning::
+           This API is experimental.
+
+        See :py:meth:`start_activity` for parameter and return details.
+        """
+        return await self.start_activity(
+            cast(Any, activity),
+            arg,
+            args=args,
+            id=id,
+            task_queue=task_queue,
+            result_type=result_type,
+            schedule_to_close_timeout=schedule_to_close_timeout,
+            schedule_to_start_timeout=schedule_to_start_timeout,
+            start_to_close_timeout=start_to_close_timeout,
+            heartbeat_timeout=heartbeat_timeout,
+            id_reuse_policy=id_reuse_policy,
+            id_conflict_policy=id_conflict_policy,
+            retry_policy=retry_policy,
+            search_attributes=search_attributes,
+            summary=summary,
+            priority=priority,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
+        )
+
+    # async no-param
+    @overload
+    async def execute_activity_class(
+        self,
+        activity: type[CallableAsyncNoParam[ReturnType]],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # sync no-param
+    @overload
+    async def execute_activity_class(
+        self,
+        activity: type[CallableSyncNoParam[ReturnType]],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # async single-param
+    @overload
+    async def execute_activity_class(
+        self,
+        activity: type[CallableAsyncSingleParam[ParamType, ReturnType]],
+        arg: ParamType,
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # sync single-param
+    @overload
+    async def execute_activity_class(
+        self,
+        activity: type[CallableSyncSingleParam[ParamType, ReturnType]],
+        arg: ParamType,
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # async multi-param
+    @overload
+    async def execute_activity_class(
+        self,
+        activity: type[Callable[..., Awaitable[ReturnType]]],  # type: ignore[reportInvalidTypeForm]
+        *,
+        args: Sequence[Any],
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # sync multi-param
+    @overload
+    async def execute_activity_class(
+        self,
+        activity: type[Callable[..., ReturnType]],  # type: ignore[reportInvalidTypeForm]
+        *,
+        args: Sequence[Any],
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    async def execute_activity_class(
+        self,
+        activity: type[Callable],  # type: ignore[reportInvalidTypeForm]
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str,
+        result_type: type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> Any:
+        """Start an activity from a callable class and wait for completion.
+
+        .. warning::
+           This API is experimental.
+
+        This is a shortcut for ``await`` :py:meth:`start_activity_class`.
+        """
+        return await self.execute_activity(
+            cast(Any, activity),
+            arg,
+            args=args,
+            id=id,
+            task_queue=task_queue,
+            result_type=result_type,
+            schedule_to_close_timeout=schedule_to_close_timeout,
+            schedule_to_start_timeout=schedule_to_start_timeout,
+            start_to_close_timeout=start_to_close_timeout,
+            heartbeat_timeout=heartbeat_timeout,
+            id_reuse_policy=id_reuse_policy,
+            id_conflict_policy=id_conflict_policy,
+            retry_policy=retry_policy,
+            search_attributes=search_attributes,
+            summary=summary,
+            priority=priority,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
+        )
+
+    # async no-param
+    @overload
+    async def start_activity_method(
+        self,
+        activity: MethodAsyncNoParam[SelfType, ReturnType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # async single-param
+    @overload
+    async def start_activity_method(
+        self,
+        activity: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
+        arg: ParamType,
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # async multi-param
+    @overload
+    async def start_activity_method(
+        self,
+        activity: Callable[
+            Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]
+        ],
+        *,
+        args: Sequence[Any],
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    # sync multi-param
+    @overload
+    async def start_activity_method(
+        self,
+        activity: Callable[Concatenate[SelfType, MultiParamSpec], ReturnType],
+        *,
+        args: Sequence[Any],
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[ReturnType]: ...
+
+    async def start_activity_method(
+        self,
+        activity: Callable,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str,
+        result_type: type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityHandle[Any]:
+        """Start an activity from a method.
+
+        .. warning::
+           This API is experimental.
+
+        See :py:meth:`start_activity` for parameter and return details.
+        """
+        return await self.start_activity(
+            cast(Any, activity),
+            arg,
+            args=args,
+            id=id,
+            task_queue=task_queue,
+            result_type=result_type,
+            schedule_to_close_timeout=schedule_to_close_timeout,
+            schedule_to_start_timeout=schedule_to_start_timeout,
+            start_to_close_timeout=start_to_close_timeout,
+            heartbeat_timeout=heartbeat_timeout,
+            id_reuse_policy=id_reuse_policy,
+            id_conflict_policy=id_conflict_policy,
+            retry_policy=retry_policy,
+            search_attributes=search_attributes,
+            summary=summary,
+            priority=priority,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
+        )
+
+    # async no-param
+    @overload
+    async def execute_activity_method(
+        self,
+        activity: MethodAsyncNoParam[SelfType, ReturnType],
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # async single-param
+    @overload
+    async def execute_activity_method(
+        self,
+        activity: MethodAsyncSingleParam[SelfType, ParamType, ReturnType],
+        arg: ParamType,
+        *,
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # async multi-param
+    @overload
+    async def execute_activity_method(
+        self,
+        activity: Callable[
+            Concatenate[SelfType, MultiParamSpec], Awaitable[ReturnType]
+        ],
+        *,
+        args: Sequence[Any],
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    # sync multi-param
+    @overload
+    async def execute_activity_method(
+        self,
+        activity: Callable[Concatenate[SelfType, MultiParamSpec], ReturnType],
+        *,
+        args: Sequence[Any],
+        id: str,
+        task_queue: str,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType: ...
+
+    async def execute_activity_method(
+        self,
+        activity: Callable,
+        arg: Any = temporalio.common._arg_unset,
+        *,
+        args: Sequence[Any] = [],
+        id: str,
+        task_queue: str,
+        result_type: type | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        heartbeat_timeout: timedelta | None = None,
+        id_reuse_policy: temporalio.common.ActivityIDReusePolicy = temporalio.common.ActivityIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.ActivityIDConflictPolicy = temporalio.common.ActivityIDConflictPolicy.FAIL,
+        retry_policy: temporalio.common.RetryPolicy | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> Any:
+        """Start an activity from a method and wait for completion.
+
+        .. warning::
+           This API is experimental.
+
+        This is a shortcut for ``await`` :py:meth:`start_activity_method`.
+        """
+        return await self.execute_activity(
+            cast(Any, activity),
+            arg,
+            args=args,
+            id=id,
+            task_queue=task_queue,
+            result_type=result_type,
+            schedule_to_close_timeout=schedule_to_close_timeout,
+            schedule_to_start_timeout=schedule_to_start_timeout,
+            start_to_close_timeout=start_to_close_timeout,
+            heartbeat_timeout=heartbeat_timeout,
+            id_reuse_policy=id_reuse_policy,
+            id_conflict_policy=id_conflict_policy,
+            retry_policy=retry_policy,
+            search_attributes=search_attributes,
+            summary=summary,
+            priority=priority,
+            rpc_metadata=rpc_metadata,
+            rpc_timeout=rpc_timeout,
+        )
+
+    def list_activities(
+        self,
+        query: str,
+        *,
+        limit: int | None = None,
+        page_size: int = 1000,
+        next_page_token: bytes | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityExecutionAsyncIterator:
+        """List activities not started by a workflow.
+
+        .. warning::
+           This API is experimental.
+
+        This does not make a request until the first iteration is attempted.
+        Therefore any errors will not occur until then.
+
+        Args:
+            query: A Temporal visibility list filter for activities. Required.
+            limit: Maximum number of activities to return. If unset, all
+                activities are returned. Only applies if using the
+                returned :py:class:`ActivityExecutionAsyncIterator`
+                as an async iterator.
+            page_size: Maximum number of results for each page.
+            next_page_token: A previously obtained next page token if doing
+                pagination. Usually not needed as the iterator automatically
+                starts from the beginning.
+            rpc_metadata: Headers used on each RPC call. Keys here override
+                client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for each RPC call.
+
+        Returns:
+            An async iterator that can be used with ``async for``.
+        """
+        return self._impl.list_activities(
+            ListActivitiesInput(
+                query=query,
+                page_size=page_size,
+                next_page_token=next_page_token,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+                limit=limit,
+            )
+        )
+
+    async def count_activities(
+        self,
+        query: str | None = None,
+        *,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityExecutionCount:
+        """Count activities not started by a workflow.
+
+        .. warning::
+           This API is experimental.
+
+        Args:
+            query: A Temporal visibility filter for activities.
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
+        Returns:
+            Count of activities.
+        """
+        return await self._impl.count_activities(
+            CountActivitiesInput(
+                query=query, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
+            )
+        )
+
+    @overload
+    def get_activity_handle(
+        self,
+        activity_id: str,
+        *,
+        run_id: str | None = None,
+    ) -> ActivityHandle[Any]: ...
+
+    @overload
+    def get_activity_handle(
+        self,
+        activity_id: str,
+        *,
+        run_id: str | None = None,
+        result_type: type[ReturnType],
+    ) -> ActivityHandle[ReturnType]: ...
+
+    def get_activity_handle(
+        self,
+        activity_id: str,
+        *,
+        run_id: str | None = None,
+        result_type: type | None = None,
+    ) -> ActivityHandle[Any]:
+        """Get a handle to an existing activity, as the caller of that activity.
+
+        The activity must not have been started by a workflow.
+
+        .. warning::
+           This API is experimental.
+
+        To get a handle to an activity execution that you control for manual completion and
+        heartbeating, see :py:meth:`Client.get_async_activity_handle`.
+
+        Args:
+            activity_id: The activity ID.
+            run_id: The activity run ID. If not provided, targets the latest run.
+            result_type: The result type to deserialize into.
+
+        Returns:
+            A handle to the activity.
+        """
+        return ActivityHandle(
+            self,
+            activity_id,
+            run_id=run_id,
+            result_type=result_type,
+        )
+
+    @overload
+    def get_async_activity_handle(
+        self, *, activity_id: str, run_id: str | None = None
+    ) -> AsyncActivityHandle:
+        pass
+
     @overload
     def get_async_activity_handle(
         self, *, workflow_id: str, run_id: str | None, activity_id: str
@@ -1281,22 +2539,35 @@ class Client:
         activity_id: str | None = None,
         task_token: bytes | None = None,
     ) -> AsyncActivityHandle:
-        """Get an async activity handle.
+        """Get a handle to an activity execution that you control, for manual
+        completion and heartbeating.
 
-        Either the workflow_id, run_id, and activity_id can be provided, or a
-        singular task_token can be provided.
+        To get a handle to an activity execution as the caller of that activity,
+        see :py:meth:`Client.get_activity_handle`.
+
+        This function may be used to get a handle to an activity started by a
+        client, or an activity started by a workflow.
+
+        To get a handle to an activity started by a workflow, use one of the
+        following two calls:
+        - Supply ``workflow_id``, ``run_id``, and ``activity_id``
+        - Supply the activity ``task_token`` alone
+
+        To get a handle to an activity not started by a workflow, supply
+        ``activity_id`` and ``run_id``
 
         Args:
-            workflow_id: Workflow ID for the activity. Cannot be set if
+            workflow_id: Workflow ID for the activity, or None if not a workflow
+                activity. Cannot be set if task_token is set.
+            run_id: Run ID for the activity or workflow. Cannot be set if
                 task_token is set.
-            run_id: Run ID for the activity. Cannot be set if task_token is set.
             activity_id: ID for the activity. Cannot be set if task_token is
                 set.
-            task_token: Task token for the activity. Cannot be set if any of the
-                id parameters are set.
+            task_token: Task token for the activity. Cannot be set with other
+                fields.
 
         Returns:
-            A handle that can be used for completion or heartbeat.
+            A handle that can be used for completion or heartbeating.
         """
         if task_token is not None:
             if workflow_id is not None or run_id is not None or activity_id is not None:
@@ -1313,7 +2584,18 @@ class Client:
                     workflow_id=workflow_id, run_id=run_id, activity_id=activity_id
                 ),
             )
-        raise ValueError("Task token or workflow/run/activity ID must be present")
+        elif activity_id is not None:
+            return AsyncActivityHandle(
+                self,
+                AsyncActivityIDReference(
+                    activity_id=activity_id,
+                    run_id=run_id,
+                    workflow_id=None,
+                ),
+            )
+        raise ValueError(
+            "Require task token, or workflow_id & run_id & activity_id, or activity_id & run_id"
+        )
 
     async def create_schedule(
         self,
@@ -1589,7 +2871,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
     @property
     def id(self) -> str:
-        """ID for the workflow."""
+        """ID of the workflow."""
         return self._id
 
     @property
@@ -2688,11 +3970,480 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
         return await self._workflow_handle
 
 
+class ActivityExecutionAsyncIterator:
+    """Asynchronous iterator for activity execution values.
+
+    You should typically use ``async for`` on this iterator and not call any of its methods.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    def __init__(
+        self,
+        client: Client,
+        input: ListActivitiesInput,
+    ) -> None:
+        """Create an asynchronous iterator for the given input.
+
+        Users should not create this directly, but rather use
+        :py:meth:`Client.list_activities`.
+        """
+        self._client = client
+        self._input = input
+        self._next_page_token = input.next_page_token
+        self._current_page: Sequence[ActivityExecution] | None = None
+        self._current_page_index = 0
+        self._limit = input.limit
+        self._yielded = 0
+
+    @property
+    def current_page_index(self) -> int:
+        """Index of the entry in the current page that will be returned from
+        the next :py:meth:`__anext__` call.
+        """
+        return self._current_page_index
+
+    @property
+    def current_page(self) -> Sequence[ActivityExecution] | None:
+        """Current page, if it has been fetched yet."""
+        return self._current_page
+
+    @property
+    def next_page_token(self) -> bytes | None:
+        """Token for the next page request if any."""
+        return self._next_page_token
+
+    async def fetch_next_page(self, *, page_size: int | None = None) -> None:
+        """Fetch the next page of results.
+
+        Args:
+            page_size: Override the page size this iterator was originally
+                created with.
+        """
+        page_size = page_size or self._input.page_size
+        if self._limit is not None and self._limit - self._yielded < page_size:
+            page_size = self._limit - self._yielded
+
+        resp = await self._client.workflow_service.list_activity_executions(
+            temporalio.api.workflowservice.v1.ListActivityExecutionsRequest(
+                namespace=self._client.namespace,
+                page_size=page_size,
+                next_page_token=self._next_page_token or b"",
+                query=self._input.query or "",
+            ),
+            retry=True,
+            metadata=self._input.rpc_metadata,
+            timeout=self._input.rpc_timeout,
+        )
+
+        self._current_page = [
+            ActivityExecution._from_raw_info(v, self._client.namespace)
+            for v in resp.executions
+        ]
+        self._current_page_index = 0
+        self._next_page_token = resp.next_page_token or None
+
+    def __aiter__(self) -> ActivityExecutionAsyncIterator:
+        """Return self as the iterator."""
+        return self
+
+    async def __anext__(self) -> ActivityExecution:
+        """Get the next execution on this iterator, fetching next page if
+        necessary.
+        """
+        if self._limit is not None and self._yielded >= self._limit:
+            raise StopAsyncIteration
+        while True:
+            # No page? fetch and continue
+            if self._current_page is None:
+                await self.fetch_next_page()
+                continue
+            # No more left in page?
+            if self._current_page_index >= len(self._current_page):
+                # If there is a next page token, try to get another page and try
+                # again
+                if self._next_page_token is not None:
+                    await self.fetch_next_page()
+                    continue
+                # No more pages means we're done
+                raise StopAsyncIteration
+            # Get current, increment page index, and return
+            ret = self._current_page[self._current_page_index]
+            self._current_page_index += 1
+            self._yielded += 1
+            return ret
+
+
+@dataclass(frozen=True)
+class ActivityExecution:
+    """Info for an activity execution not started by a workflow, from list response.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    activity_id: str
+    """Activity ID."""
+
+    activity_run_id: str | None
+    """Run ID of the activity."""
+
+    activity_type: str
+    """Type name of the activity."""
+
+    close_time: datetime | None
+    """Time the activity reached a terminal status, if closed."""
+
+    execution_duration: timedelta | None
+    """Duration from scheduled to close time, only populated if closed."""
+
+    namespace: str
+    """Namespace of the activity (copied from calling client)."""
+
+    raw_info: (
+        temporalio.api.activity.v1.ActivityExecutionListInfo
+        | temporalio.api.activity.v1.ActivityExecutionInfo
+    )
+    """Underlying protobuf info."""
+
+    scheduled_time: datetime
+    """Time the activity was originally scheduled."""
+
+    state_transition_count: int | None
+    """Number of state transitions, if available."""
+
+    status: ActivityExecutionStatus
+    """Current status of the activity."""
+
+    task_queue: str
+    """Task queue the activity was scheduled on."""
+
+    typed_search_attributes: temporalio.common.TypedSearchAttributes
+    """Current set of search attributes if any."""
+
+    @classmethod
+    def _from_raw_info(
+        cls, info: temporalio.api.activity.v1.ActivityExecutionListInfo, namespace: str
+    ) -> Self:
+        """Create from raw proto activity list info."""
+        return cls(
+            activity_id=info.activity_id,
+            activity_run_id=info.run_id or None,
+            activity_type=(
+                info.activity_type.name if info.HasField("activity_type") else ""
+            ),
+            close_time=(
+                info.close_time.ToDatetime().replace(tzinfo=timezone.utc)
+                if info.HasField("close_time")
+                else None
+            ),
+            execution_duration=(
+                info.execution_duration.ToTimedelta()
+                if info.HasField("execution_duration")
+                else None
+            ),
+            namespace=namespace,
+            raw_info=info,
+            scheduled_time=(
+                info.schedule_time.ToDatetime().replace(tzinfo=timezone.utc)
+                if info.HasField("schedule_time")
+                else datetime.min
+            ),
+            state_transition_count=(
+                info.state_transition_count if info.state_transition_count else None
+            ),
+            status=(
+                ActivityExecutionStatus(info.status)
+                if info.status
+                else ActivityExecutionStatus.UNSPECIFIED
+            ),
+            task_queue=info.task_queue,
+            typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
+                info.search_attributes
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class ActivityExecutionDescription(ActivityExecution):
+    """Detailed information about an activity execution not started by a workflow.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    attempt: int
+    """Current attempt number."""
+
+    canceled_reason: str | None
+    """Reason for cancellation, if cancel was requested."""
+
+    current_retry_interval: timedelta | None
+    """Time until the next retry, if applicable."""
+
+    eager_execution_requested: bool
+    """Whether eager execution was requested for this activity."""
+
+    expiration_time: datetime
+    """Scheduled time plus schedule_to_close_timeout."""
+
+    last_attempt_complete_time: datetime | None
+    """Time when the last attempt completed."""
+
+    last_failure: Exception | None
+    """Failure from the last failed attempt, if any."""
+
+    last_heartbeat_time: datetime | None
+    """Time of the last heartbeat."""
+
+    last_started_time: datetime | None
+    """Time the last attempt was started."""
+
+    last_worker_identity: str
+    """Identity of the last worker that processed the activity."""
+
+    next_attempt_schedule_time: datetime | None
+    """Time when the next attempt will be scheduled."""
+
+    paused: bool
+    """Whether the activity is paused."""
+
+    raw_heartbeat_details: Sequence[temporalio.api.common.v1.Payload]
+    """Details from the last heartbeat."""
+
+    retry_policy: temporalio.common.RetryPolicy | None
+    """Retry policy for the activity."""
+
+    run_state: PendingActivityState | None
+    """More detailed breakdown if status is RUNNING."""
+
+    long_poll_token: bytes | None
+    """Token for follow-on long-poll requests. None if the activity is complete."""
+
+    @classmethod
+    async def _from_execution_info(
+        cls,
+        info: temporalio.api.activity.v1.ActivityExecutionInfo,
+        long_poll_token: bytes | None,
+        namespace: str,
+        data_converter: temporalio.converter.DataConverter,
+    ) -> Self:
+        """Create from raw proto activity execution info."""
+        # Decode heartbeat details if present
+        decoded_heartbeat_details: Sequence[temporalio.api.common.v1.Payload] = (
+            info.heartbeat_details.payloads
+        )
+        if decoded_heartbeat_details and data_converter.payload_codec:
+            decoded_heartbeat_details = await data_converter.payload_codec.decode(
+                decoded_heartbeat_details
+            )
+
+        return cls(
+            activity_id=info.activity_id,
+            activity_run_id=info.run_id or None,
+            activity_type=(
+                info.activity_type.name if info.HasField("activity_type") else ""
+            ),
+            attempt=info.attempt,
+            canceled_reason=info.canceled_reason or None,
+            close_time=(
+                info.close_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("close_time")
+                else None
+            ),
+            current_retry_interval=(
+                info.current_retry_interval.ToTimedelta()
+                if info.HasField("current_retry_interval")
+                else None
+            ),
+            eager_execution_requested=getattr(info, "eager_execution_requested", False),
+            execution_duration=(
+                info.execution_duration.ToTimedelta()
+                if info.HasField("execution_duration")
+                else None
+            ),
+            expiration_time=(
+                info.expiration_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("expiration_time")
+                else datetime.min
+            ),
+            last_attempt_complete_time=(
+                info.last_attempt_complete_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("last_attempt_complete_time")
+                else None
+            ),
+            last_failure=(
+                cast(
+                    Exception | None,
+                    await data_converter.decode_failure(info.last_failure),
+                )
+                if info.HasField("last_failure")
+                else None
+            ),
+            last_heartbeat_time=(
+                info.last_heartbeat_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("last_heartbeat_time")
+                else None
+            ),
+            last_started_time=(
+                info.last_started_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("last_started_time")
+                else None
+            ),
+            last_worker_identity=info.last_worker_identity,
+            long_poll_token=long_poll_token or None,
+            namespace=namespace,
+            next_attempt_schedule_time=(
+                info.next_attempt_schedule_time.ToDatetime(tzinfo=timezone.utc)
+                if info.HasField("next_attempt_schedule_time")
+                else None
+            ),
+            paused=getattr(info, "paused", False),
+            raw_heartbeat_details=decoded_heartbeat_details,
+            raw_info=info,
+            retry_policy=temporalio.common.RetryPolicy.from_proto(info.retry_policy)
+            if info.HasField("retry_policy")
+            else None,
+            run_state=(
+                PendingActivityState(info.run_state) if info.run_state else None
+            ),
+            scheduled_time=(info.schedule_time.ToDatetime(tzinfo=timezone.utc)),
+            state_transition_count=(
+                info.state_transition_count if info.state_transition_count else None
+            ),
+            status=(
+                ActivityExecutionStatus(info.status)
+                if info.status
+                else ActivityExecutionStatus.UNSPECIFIED
+            ),
+            task_queue=info.task_queue,
+            typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
+                info.search_attributes
+            ),
+        )
+
+
+class ActivityExecutionStatus(IntEnum):
+    """Status of an activity execution.
+
+    .. warning::
+       This API is experimental.
+
+    See :py:class:`temporalio.api.enums.v1.ActivityExecutionStatus`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_UNSPECIFIED
+    )
+    RUNNING = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_RUNNING
+    )
+    COMPLETED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_COMPLETED
+    )
+    FAILED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_FAILED
+    )
+    CANCELED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_CANCELED
+    )
+    TERMINATED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_TERMINATED
+    )
+    TIMED_OUT = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_TIMED_OUT
+    )
+
+
+class PendingActivityState(IntEnum):
+    """Detailed state of an activity execution that is in ACTIVITY_EXECUTION_STATUS_RUNNING.
+
+    .. warning::
+       This API is experimental.
+
+    See :py:class:`temporalio.api.enums.v1.PendingActivityState`.
+    """
+
+    UNSPECIFIED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_UNSPECIFIED
+    )
+    SCHEDULED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_SCHEDULED
+    )
+    STARTED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_STARTED
+    )
+    CANCEL_REQUESTED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_CANCEL_REQUESTED
+    )
+    PAUSED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_PAUSED
+    )
+    PAUSE_REQUESTED = int(
+        temporalio.api.enums.v1.PendingActivityState.PENDING_ACTIVITY_STATE_PAUSE_REQUESTED
+    )
+
+
+@dataclass(frozen=True)
+class ActivityExecutionCount:
+    """Representation of a count from a count activities call.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    count: int
+    """Total count matching the filter, if any."""
+
+    groups: Sequence[ActivityExecutionCountAggregationGroup]
+    """Aggregation groups if requested."""
+
+    @staticmethod
+    def _from_raw(
+        resp: temporalio.api.workflowservice.v1.CountActivityExecutionsResponse,
+    ) -> ActivityExecutionCount:
+        """Create from raw proto response."""
+        return ActivityExecutionCount(
+            count=resp.count,
+            groups=[
+                ActivityExecutionCountAggregationGroup._from_raw(g) for g in resp.groups
+            ],
+        )
+
+
+@dataclass(frozen=True)
+class ActivityExecutionCountAggregationGroup:
+    """A single aggregation group from a count activities call.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    count: int
+    """Count for this group."""
+
+    group_values: Sequence[temporalio.common.SearchAttributeValue]
+    """Values that define this group."""
+
+    @staticmethod
+    def _from_raw(
+        raw: temporalio.api.workflowservice.v1.CountActivityExecutionsResponse.AggregationGroup,
+    ) -> ActivityExecutionCountAggregationGroup:
+        return ActivityExecutionCountAggregationGroup(
+            count=raw.count,
+            group_values=[
+                temporalio.converter._decode_search_attribute_value(v)
+                for v in raw.group_values
+            ],
+        )
+
+
 @dataclass(frozen=True)
 class AsyncActivityIDReference:
     """Reference to an async activity by its qualified ID."""
 
-    workflow_id: str
+    workflow_id: str | None
     run_id: str | None
     activity_id: str
 
@@ -2833,6 +4584,242 @@ class AsyncActivityHandle(WithSerializationContext):
             self._client,
             self._id_or_token,
             data_converter,
+        )
+
+
+class ActivityHandle(Generic[ReturnType]):
+    """Handle representing an activity execution not started by a workflow.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    def __init__(
+        self,
+        client: Client,
+        id: str,
+        *,
+        run_id: str | None = None,
+        result_type: type | None = None,
+    ) -> None:
+        """Create activity handle."""
+        self._client = client
+        self._id = id
+        self._run_id = run_id
+        self._result_type = result_type
+        self._known_outcome: (
+            temporalio.api.activity.v1.ActivityExecutionOutcome | None
+        ) = None
+
+    @functools.cached_property
+    def _data_converter(self) -> temporalio.converter.DataConverter:
+        return self._client.data_converter.with_context(
+            ActivitySerializationContext(
+                namespace=self._client.namespace,
+                activity_id=self._id,
+                activity_type=None,
+                activity_task_queue=None,
+                is_local=False,
+                workflow_id=None,
+                workflow_type=None,
+            )
+        )
+
+    @property
+    def id(self) -> str:
+        """ID of the activity."""
+        return self._id
+
+    @property
+    def run_id(self) -> str | None:
+        """Run ID of the activity."""
+        return self._run_id
+
+    async def result(
+        self,
+        *,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ReturnType:
+        """Wait for result of the activity.
+
+        .. warning::
+           This API is experimental.
+
+        The result may already be known if this method has been called before,
+        in which case no network call is made. Otherwise the result will be
+        polled for until it is available.
+
+        Args:
+            rpc_metadata: Headers used on the RPC call. Keys here override
+                client-level RPC metadata keys.
+            rpc_timeout: Optional RPC deadline to set for each RPC call. Note:
+                this is the timeout for each RPC call while polling, not a
+                timeout for the function as a whole. If an individual RPC
+                times out, it will be retried until the result is available.
+
+        Returns:
+            The result of the activity.
+
+        Raises:
+            ActivityFailureError: If the activity completed with a failure.
+            RPCError: Activity result could not be fetched for some reason.
+        """
+        await self._poll_until_outcome(
+            rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
+        )
+
+        # Convert outcome to failure or value
+        assert self._known_outcome
+        if self._known_outcome.HasField("failure"):
+            raise ActivityFailureError(
+                cause=await self._data_converter.decode_failure(
+                    self._known_outcome.failure
+                ),
+            )
+        if not self._known_outcome.result.payloads:
+            return None  # type: ignore
+        type_hints = [self._result_type] if self._result_type else None
+        results = await self._data_converter.decode(
+            self._known_outcome.result.payloads, type_hints
+        )
+        if not results:
+            return None  # type: ignore
+        elif len(results) > 1:
+            warnings.warn(f"Expected single activity result, got {len(results)}")
+        return results[0]
+
+    async def _poll_until_outcome(
+        self,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> None:
+        """Poll for activity result until it's available."""
+        if self._known_outcome:
+            return
+
+        req = temporalio.api.workflowservice.v1.PollActivityExecutionRequest(
+            namespace=self._client.namespace,
+            activity_id=self._id,
+            run_id=self._run_id or "",
+        )
+
+        # Continue polling as long as we have no outcome
+        while True:
+            try:
+                res = await self._client.workflow_service.poll_activity_execution(
+                    req,
+                    retry=True,
+                    metadata=rpc_metadata,
+                    timeout=rpc_timeout,
+                )
+                if res.HasField("outcome"):
+                    self._known_outcome = res.outcome
+                    return
+            except RPCError as err:
+                if err.status == RPCStatusCode.DEADLINE_EXCEEDED:
+                    # Deadline exceeded is expected with long polling; retry
+                    continue
+                elif err.status == RPCStatusCode.CANCELLED:
+                    raise asyncio.CancelledError() from err
+                else:
+                    raise
+            except asyncio.CancelledError:
+                raise
+
+    async def cancel(
+        self,
+        *,
+        reason: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> None:
+        """Request cancellation of the activity.
+
+        .. warning::
+           This API is experimental.
+
+        Requesting cancellation of an activity does not automatically transition the activity to
+        canceled status. If the activity is heartbeating, a :py:class:`exceptions.CancelledError`
+        exception will be raised when receiving the heartbeat response; if the activity allows this
+        exception to bubble out, the activity will transition to canceled status. If the activity it
+        is not heartbeating, this method will have no effect on activity status.
+
+        Args:
+            reason: Reason for the cancellation. Recorded and available via describe.
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+        """
+        await self._client._impl.cancel_activity(
+            CancelActivityInput(
+                activity_id=self._id,
+                activity_run_id=self._run_id,
+                reason=reason,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
+
+    async def terminate(
+        self,
+        *,
+        reason: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> None:
+        """Terminate the activity execution immediately.
+
+        .. warning::
+           This API is experimental.
+
+        Termination does not reach the worker and the activity code cannot react to it.
+        A terminated activity may have a running attempt and will be requested to be
+        canceled by the server when it heartbeats.
+
+        Args:
+            reason: Reason for the termination.
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+        """
+        await self._client._impl.terminate_activity(
+            TerminateActivityInput(
+                activity_id=self._id,
+                activity_run_id=self._run_id,
+                reason=reason,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
+
+    async def describe(
+        self,
+        *,
+        long_poll_token: bytes | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityExecutionDescription:
+        """Describe the activity execution.
+
+        .. warning::
+           This API is experimental.
+
+        Args:
+            long_poll_token: Token from a previous describe response. If provided,
+                the request will long-poll until the activity state changes.
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
+        Returns:
+            Activity execution description.
+        """
+        return await self._client._impl.describe_activity(
+            DescribeActivityInput(
+                activity_id=self._id,
+                activity_run_id=self._run_id,
+                long_poll_token=long_poll_token,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
         )
 
 
@@ -3005,7 +4992,7 @@ class WorkflowExecution:
             key: Key to get memo value for.
             default: Default to use if key is not present. If unset, a
                 :py:class:`KeyError` is raised when the key does not exist.
-            type_hint: Type hint to use when converting.
+            type_hint: type hint to use when converting.
 
         Returns:
             Memo value, converted with the type hint if present.
@@ -4530,7 +6517,7 @@ class ScheduleDescription:
             key: Key to get memo value for.
             default: Default to use if key is not present. If unset, a
                 :py:class:`KeyError` is raised when the key does not exist.
-            type_hint: Type hint to use when converting.
+            type_hint: type hint to use when converting.
 
         Returns:
             Memo value, converted with the type hint if present.
@@ -4769,7 +6756,7 @@ class ScheduleListDescription:
             key: Key to get memo value for.
             default: Default to use if key is not present. If unset, a
                 :py:class:`KeyError` is raised when the key does not exist.
-            type_hint: Type hint to use when converting.
+            type_hint: type hint to use when converting.
 
         Returns:
             Memo value, converted with the type hint if present.
@@ -5221,6 +7208,25 @@ class WorkflowUpdateRPCTimeoutOrCancelledError(RPCTimeoutOrCancelledError):
         super().__init__("Timeout or cancellation waiting for update")
 
 
+class ActivityFailureError(temporalio.exceptions.TemporalError):
+    """Error that occurs when an activity is unsuccessful.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    def __init__(self, *, cause: BaseException) -> None:
+        """Create activity failure error."""
+        super().__init__("Activity execution failed")
+        self.__cause__ = cause
+
+    @property
+    def cause(self) -> BaseException:
+        """Cause of the activity failure."""
+        assert self.__cause__
+        return self.__cause__
+
+
 class AsyncActivityCancelledError(temporalio.exceptions.TemporalError):
     """Error that occurs when async activity attempted heartbeat but was cancelled."""
 
@@ -5371,6 +7377,108 @@ class TerminateWorkflowInput:
     first_execution_run_id: str | None
     args: Sequence[Any]
     reason: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class StartActivityInput:
+    """Input for :py:meth:`OutboundInterceptor.start_activity`.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    activity_type: str
+    args: Sequence[Any]
+    id: str
+    task_queue: str
+    result_type: type | None
+    schedule_to_close_timeout: timedelta | None
+    start_to_close_timeout: timedelta | None
+    schedule_to_start_timeout: timedelta | None
+    heartbeat_timeout: timedelta | None
+    id_reuse_policy: temporalio.common.ActivityIDReusePolicy
+    id_conflict_policy: temporalio.common.ActivityIDConflictPolicy
+    retry_policy: temporalio.common.RetryPolicy | None
+    priority: temporalio.common.Priority
+    search_attributes: temporalio.common.TypedSearchAttributes | None
+    summary: str | None
+    headers: Mapping[str, temporalio.api.common.v1.Payload]
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class CancelActivityInput:
+    """Input for :py:meth:`OutboundInterceptor.cancel_activity`.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    activity_id: str
+    activity_run_id: str | None
+    reason: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class TerminateActivityInput:
+    """Input for :py:meth:`OutboundInterceptor.terminate_activity`.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    activity_id: str
+    activity_run_id: str | None
+    reason: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class DescribeActivityInput:
+    """Input for :py:meth:`OutboundInterceptor.describe_activity`.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    activity_id: str
+    activity_run_id: str | None
+    long_poll_token: bytes | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class ListActivitiesInput:
+    """Input for :py:meth:`OutboundInterceptor.list_activities`.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    query: str | None
+    page_size: int
+    next_page_token: bytes | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+    limit: int | None
+
+
+@dataclass
+class CountActivitiesInput:
+    """Input for :py:meth:`OutboundInterceptor.count_activities`.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    query: str | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
 
@@ -5708,6 +7816,62 @@ class OutboundInterceptor:
     async def terminate_workflow(self, input: TerminateWorkflowInput) -> None:
         """Called for every :py:meth:`WorkflowHandle.terminate` call."""
         await self.next.terminate_workflow(input)
+
+    ### Activity calls
+
+    async def start_activity(self, input: StartActivityInput) -> ActivityHandle[Any]:
+        """Called for every :py:meth:`Client.start_activity` call.
+
+        .. warning::
+           This API is experimental.
+        """
+        return await self.next.start_activity(input)
+
+    async def cancel_activity(self, input: CancelActivityInput) -> None:
+        """Called for every :py:meth:`ActivityHandle.cancel` call.
+
+        .. warning::
+           This API is experimental.
+        """
+        await self.next.cancel_activity(input)
+
+    async def terminate_activity(self, input: TerminateActivityInput) -> None:
+        """Called for every :py:meth:`ActivityHandle.terminate` call.
+
+        .. warning::
+           This API is experimental.
+        """
+        await self.next.terminate_activity(input)
+
+    async def describe_activity(
+        self, input: DescribeActivityInput
+    ) -> ActivityExecutionDescription:
+        """Called for every :py:meth:`ActivityHandle.describe` call.
+
+        .. warning::
+           This API is experimental.
+        """
+        return await self.next.describe_activity(input)
+
+    def list_activities(
+        self, input: ListActivitiesInput
+    ) -> ActivityExecutionAsyncIterator:
+        """Called for every :py:meth:`Client.list_activities` call.
+
+        .. warning::
+           This API is experimental.
+        """
+        return self.next.list_activities(input)
+
+    async def count_activities(
+        self, input: CountActivitiesInput
+    ) -> ActivityExecutionCount:
+        """Called for every :py:meth:`Client.count_activities` call.
+
+        .. warning::
+           This API is experimental.
+        """
+        return await self.next.count_activities(input)
 
     async def start_workflow_update(
         self, input: StartWorkflowUpdateInput
@@ -6159,6 +8323,186 @@ class _ClientImpl(OutboundInterceptor):
             req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
         )
 
+    async def start_activity(self, input: StartActivityInput) -> ActivityHandle[Any]:
+        """Start an activity and return a handle to it."""
+        if not (input.start_to_close_timeout or input.schedule_to_close_timeout):
+            raise ValueError(
+                "Activity must have start_to_close_timeout or schedule_to_close_timeout"
+            )
+        req = await self._build_start_activity_execution_request(input)
+
+        resp: temporalio.api.workflowservice.v1.StartActivityExecutionResponse
+        try:
+            resp = await self._client.workflow_service.start_activity_execution(
+                req,
+                retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
+            )
+        except RPCError as err:
+            # If the status is ALREADY_EXISTS and the details can be extracted
+            # as already started, use a different exception
+            if err.status == RPCStatusCode.ALREADY_EXISTS and err.grpc_status.details:
+                details = temporalio.api.errordetails.v1.ActivityExecutionAlreadyStartedFailure()
+                if err.grpc_status.details[0].Unpack(details):
+                    raise temporalio.exceptions.ActivityAlreadyStartedError(
+                        input.id, input.activity_type, run_id=details.run_id
+                    )
+            raise
+        return ActivityHandle(
+            self._client,
+            input.id,
+            run_id=resp.run_id,
+            result_type=input.result_type,
+        )
+
+    async def _build_start_activity_execution_request(
+        self, input: StartActivityInput
+    ) -> temporalio.api.workflowservice.v1.StartActivityExecutionRequest:
+        """Build StartActivityExecutionRequest from input."""
+        data_converter = self._client.data_converter.with_context(
+            ActivitySerializationContext(
+                namespace=self._client.namespace,
+                activity_id=input.id,
+                activity_type=input.activity_type,
+                activity_task_queue=input.task_queue,
+                is_local=False,
+                workflow_id=None,
+                workflow_type=None,
+            )
+        )
+
+        req = temporalio.api.workflowservice.v1.StartActivityExecutionRequest(
+            namespace=self._client.namespace,
+            identity=self._client.identity,
+            activity_id=input.id,
+            activity_type=temporalio.api.common.v1.ActivityType(
+                name=input.activity_type
+            ),
+            task_queue=temporalio.api.taskqueue.v1.TaskQueue(name=input.task_queue),
+            id_reuse_policy=cast(
+                "temporalio.api.enums.v1.ActivityIdReusePolicy.ValueType",
+                int(input.id_reuse_policy),
+            ),
+            id_conflict_policy=cast(
+                "temporalio.api.enums.v1.ActivityIdConflictPolicy.ValueType",
+                int(input.id_conflict_policy),
+            ),
+        )
+
+        if input.schedule_to_close_timeout is not None:
+            req.schedule_to_close_timeout.FromTimedelta(input.schedule_to_close_timeout)
+        if input.start_to_close_timeout is not None:
+            req.start_to_close_timeout.FromTimedelta(input.start_to_close_timeout)
+        if input.schedule_to_start_timeout is not None:
+            req.schedule_to_start_timeout.FromTimedelta(input.schedule_to_start_timeout)
+        if input.heartbeat_timeout is not None:
+            req.heartbeat_timeout.FromTimedelta(input.heartbeat_timeout)
+        if input.retry_policy is not None:
+            input.retry_policy.apply_to_proto(req.retry_policy)
+
+        # Set input payloads
+        if input.args:
+            req.input.payloads.extend(await data_converter.encode(input.args))
+
+        # Set search attributes
+        if input.search_attributes is not None:
+            temporalio.converter.encode_search_attributes(
+                input.search_attributes, req.search_attributes
+            )
+
+        # Set user metadata
+        metadata = await _encode_user_metadata(data_converter, input.summary, None)
+        if metadata is not None:
+            req.user_metadata.CopyFrom(metadata)
+
+        # Set headers
+        if input.headers:
+            await self._apply_headers(input.headers, req.header.fields)
+
+        # Set priority
+        req.priority.CopyFrom(input.priority._to_proto())
+
+        return req
+
+    async def cancel_activity(self, input: CancelActivityInput) -> None:
+        """Cancel an activity."""
+        await self._client.workflow_service.request_cancel_activity_execution(
+            temporalio.api.workflowservice.v1.RequestCancelActivityExecutionRequest(
+                namespace=self._client.namespace,
+                activity_id=input.activity_id,
+                run_id=input.activity_run_id or "",
+                identity=self._client.identity,
+                request_id=str(uuid.uuid4()),
+                reason=input.reason or "",
+            ),
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+
+    async def terminate_activity(self, input: TerminateActivityInput) -> None:
+        """Terminate an activity."""
+        await self._client.workflow_service.terminate_activity_execution(
+            temporalio.api.workflowservice.v1.TerminateActivityExecutionRequest(
+                namespace=self._client.namespace,
+                activity_id=input.activity_id,
+                run_id=input.activity_run_id or "",
+                reason=input.reason or "",
+                identity=self._client.identity,
+            ),
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+
+    async def describe_activity(
+        self, input: DescribeActivityInput
+    ) -> ActivityExecutionDescription:
+        """Describe an activity."""
+        resp = await self._client.workflow_service.describe_activity_execution(
+            temporalio.api.workflowservice.v1.DescribeActivityExecutionRequest(
+                namespace=self._client.namespace,
+                activity_id=input.activity_id,
+                run_id=input.activity_run_id or "",
+                long_poll_token=input.long_poll_token or b"",
+            ),
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+        return await ActivityExecutionDescription._from_execution_info(
+            info=resp.info,
+            long_poll_token=resp.long_poll_token or None,
+            namespace=self._client.namespace,
+            data_converter=self._client.data_converter.with_context(
+                WorkflowSerializationContext(
+                    namespace=self._client.namespace,
+                    workflow_id=input.activity_id,  # Using activity_id as workflow_id for activities not started by a workflow
+                )
+            ),
+        )
+
+    def list_activities(
+        self, input: ListActivitiesInput
+    ) -> ActivityExecutionAsyncIterator:
+        return ActivityExecutionAsyncIterator(self._client, input)
+
+    async def count_activities(
+        self, input: CountActivitiesInput
+    ) -> ActivityExecutionCount:
+        return ActivityExecutionCount._from_raw(
+            await self._client.workflow_service.count_activity_executions(
+                temporalio.api.workflowservice.v1.CountActivityExecutionsRequest(
+                    namespace=self._client.namespace,
+                    query=input.query or "",
+                ),
+                retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
+            )
+        )
+
     async def start_workflow_update(
         self, input: StartWorkflowUpdateInput
     ) -> WorkflowUpdateHandle[Any]:
@@ -6402,7 +8746,7 @@ class _ClientImpl(OutboundInterceptor):
         if isinstance(input.id_or_token, AsyncActivityIDReference):
             resp_by_id = await self._client.workflow_service.record_activity_task_heartbeat_by_id(
                 temporalio.api.workflowservice.v1.RecordActivityTaskHeartbeatByIdRequest(
-                    workflow_id=input.id_or_token.workflow_id,
+                    workflow_id=input.id_or_token.workflow_id or "",
                     run_id=input.id_or_token.run_id or "",
                     activity_id=input.id_or_token.activity_id,
                     namespace=self._client.namespace,
@@ -6457,7 +8801,7 @@ class _ClientImpl(OutboundInterceptor):
         if isinstance(input.id_or_token, AsyncActivityIDReference):
             await self._client.workflow_service.respond_activity_task_completed_by_id(
                 temporalio.api.workflowservice.v1.RespondActivityTaskCompletedByIdRequest(
-                    workflow_id=input.id_or_token.workflow_id,
+                    workflow_id=input.id_or_token.workflow_id or "",
                     run_id=input.id_or_token.run_id or "",
                     activity_id=input.id_or_token.activity_id,
                     namespace=self._client.namespace,
@@ -6494,7 +8838,7 @@ class _ClientImpl(OutboundInterceptor):
         if isinstance(input.id_or_token, AsyncActivityIDReference):
             await self._client.workflow_service.respond_activity_task_failed_by_id(
                 temporalio.api.workflowservice.v1.RespondActivityTaskFailedByIdRequest(
-                    workflow_id=input.id_or_token.workflow_id,
+                    workflow_id=input.id_or_token.workflow_id or "",
                     run_id=input.id_or_token.run_id or "",
                     activity_id=input.id_or_token.activity_id,
                     namespace=self._client.namespace,
@@ -6532,7 +8876,7 @@ class _ClientImpl(OutboundInterceptor):
         if isinstance(input.id_or_token, AsyncActivityIDReference):
             await self._client.workflow_service.respond_activity_task_canceled_by_id(
                 temporalio.api.workflowservice.v1.RespondActivityTaskCanceledByIdRequest(
-                    workflow_id=input.id_or_token.workflow_id,
+                    workflow_id=input.id_or_token.workflow_id or "",
                     run_id=input.id_or_token.run_id or "",
                     activity_id=input.id_or_token.activity_id,
                     namespace=self._client.namespace,

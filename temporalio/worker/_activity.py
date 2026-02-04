@@ -246,10 +246,11 @@ class _ActivityWorker:
         data_converter = self._data_converter
         if activity.info:
             context = temporalio.converter.ActivitySerializationContext(
-                namespace=activity.info.workflow_namespace,
+                namespace=activity.info.namespace,
                 workflow_id=activity.info.workflow_id,
                 workflow_type=activity.info.workflow_type,
                 activity_type=activity.info.activity_type,
+                activity_id=activity.info.activity_id,
                 activity_task_queue=self._task_queue,
                 is_local=activity.info.is_local,
             )
@@ -298,10 +299,11 @@ class _ActivityWorker:
         )
         # Create serialization context for the activity
         context = temporalio.converter.ActivitySerializationContext(
-            namespace=start.workflow_namespace,
+            namespace=start.workflow_namespace or self._client.namespace,
             workflow_id=start.workflow_execution.workflow_id,
             workflow_type=start.workflow_type,
             activity_type=start.activity_type,
+            activity_id=start.activity_id,
             activity_task_queue=self._task_queue,
             is_local=start.is_local,
         )
@@ -541,6 +543,7 @@ class _ActivityWorker:
             ) from err
 
         # Build info
+        started_by_workflow = bool(start.workflow_execution.workflow_id)
         info = temporalio.activity.Info(
             activity_id=start.activity_id,
             activity_type=start.activity_type,
@@ -553,6 +556,7 @@ class _ActivityWorker:
             if start.HasField("heartbeat_timeout")
             else None,
             is_local=start.is_local,
+            namespace=start.workflow_namespace or self._client.namespace,
             schedule_to_close_timeout=_proto_to_non_zero_timedelta(
                 start.schedule_to_close_timeout
             )
@@ -567,13 +571,16 @@ class _ActivityWorker:
             started_time=_proto_to_datetime(start.started_time),
             task_queue=self._task_queue,
             task_token=task_token,
-            workflow_id=start.workflow_execution.workflow_id,
-            workflow_namespace=start.workflow_namespace,
-            workflow_run_id=start.workflow_execution.run_id,
-            workflow_type=start.workflow_type,
+            workflow_id=start.workflow_execution.workflow_id or None,
+            workflow_namespace=start.workflow_namespace or None,
+            workflow_run_id=start.workflow_execution.run_id or None,
+            workflow_type=start.workflow_type or None,
             priority=temporalio.common.Priority._from_proto(start.priority),
             retry_policy=temporalio.common.RetryPolicy.from_proto(start.retry_policy)
             if start.HasField("retry_policy")
+            else None,
+            activity_run_id=getattr(start, "run_id", None)
+            if not started_by_workflow
             else None,
         )
 
