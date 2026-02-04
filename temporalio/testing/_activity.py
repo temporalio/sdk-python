@@ -162,11 +162,11 @@ class _Activity:
         self.context = temporalio.activity._Context(
             info=lambda: env.info,
             heartbeat=lambda *args: env.on_heartbeat(*args),
-            cancelled_event=temporalio.activity._CompositeEvent(
+            cancelled_event=temporalio.common._CompositeEvent(
                 thread_event=threading.Event(),
                 async_event=asyncio.Event() if self.is_async else None,
             ),
-            worker_shutdown_event=temporalio.activity._CompositeEvent(
+            worker_shutdown_event=temporalio.common._CompositeEvent(
                 thread_event=threading.Event(),
                 async_event=asyncio.Event() if self.is_async else None,
             ),
