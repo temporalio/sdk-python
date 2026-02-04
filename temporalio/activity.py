@@ -93,6 +93,12 @@ class Info:
     """Information about the running activity.
 
     Retrieved inside an activity via :py:func:`info`.
+
+    .. warning::
+        Do not construct this class directly. For testing, use
+        :py:meth:`temporalio.testing.ActivityEnvironment.default_info` with
+        :py:func:`dataclasses.replace` to customize fields. This class may have
+        new required fields added in future versions.
     """
 
     activity_id: str
