@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import timedelta
 from typing import Any
@@ -19,6 +20,7 @@ from tests.contrib.test_opentelemetry import dump_spans
 from tests.helpers import new_worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
+logger = logging.getLogger(__name__)
 
 @pytest.fixture
 def reset_otel_tracer_provider():
@@ -293,19 +295,27 @@ async def test_opentelemetryv2_comprehensive_tracing(
                 execution_timeout=timedelta(seconds=120),
             )
 
+            logger.info(f"Comprehensive workflow query")
+
             # Test query
             status = await workflow_handle.query(ComprehensiveWorkflow.get_status)
             assert status["signal_count"] == 0
 
+            logger.info(f"Comprehensive workflow signal")
+
             # Test signal
             await workflow_handle.signal(ComprehensiveWorkflow.notify, "test-signal-1")
             await workflow_handle.signal(ComprehensiveWorkflow.notify, "test-signal-2")
+
+            logger.info(f"Comprehensive workflow update")
 
             # Test update
             update_result = await workflow_handle.execute_update(
                 ComprehensiveWorkflow.update_status, "active"
             )
             assert update_result == "updated_to_active"
+
+            logger.info(f"Comprehensive workflow get result")
 
             # Get final result
             result = await workflow_handle.result()
