@@ -15,8 +15,11 @@ from ._operation_context import (
     client,
     in_operation,
     info,
+    is_worker_shutdown,
     logger,
     metric_meter,
+    wait_for_worker_shutdown,
+    wait_for_worker_shutdown_sync,
 )
 from ._token import WorkflowHandle
 
@@ -29,7 +32,10 @@ __all__ = (
     "client",
     "in_operation",
     "info",
+    "is_worker_shutdown",
     "logger",
     "metric_meter",
+    "wait_for_worker_shutdown",
+    "wait_for_worker_shutdown_sync",
     "WorkflowHandle",
 )
