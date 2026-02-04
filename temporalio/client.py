@@ -1094,9 +1094,6 @@ class Client:
         means that the call will not return successfully until the update has been
         delivered to a worker.
 
-        .. warning::
-           This API is experimental
-
         Args:
             update: Update function or name on the workflow. arg: Single argument to the
                 update.
@@ -1431,8 +1428,8 @@ class Client:
 
         For more on this feature, see https://docs.temporal.io/workers#worker-versioning
 
-        .. warning::
-           This API is experimental
+        .. deprecated::
+            Legacy API, see the docs above for new usage
 
         Args:
             task_queue: The task queue to target.
@@ -1461,8 +1458,8 @@ class Client:
 
         For more on this feature, see https://docs.temporal.io/workers#worker-versioning
 
-        .. warning::
-           This API is experimental
+        .. deprecated::
+            Legacy API, see the docs above for new usage
 
         Args:
             task_queue: The task queue to target.
@@ -1493,8 +1490,8 @@ class Client:
 
         For more on this feature, see https://docs.temporal.io/workers#worker-versioning
 
-        .. warning::
-           This API is experimental
+        .. deprecated::
+            Legacy API, see the docs above for new usage
 
         Args:
             build_ids: The Build IDs to query the reachability of. At least one must be specified.
