@@ -181,6 +181,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
             "StatelessMCPServerProvider | StatefulMCPServerProvider"
         ] = (),
         register_activities: bool = True,
+        create_spans: bool = True,
     ) -> None:
         """Initialize the OpenAI agents plugin.
 
@@ -196,7 +197,11 @@ class OpenAIAgentsPlugin(SimplePlugin):
             register_activities: Whether to register activities during the worker execution.
                 This can be disabled on some workers to allow a separation of workflows and activities
                 but should not be disabled on all workers, or agents will not be able to progress.
+            create_spans: Whether to create ``temporal:*`` spans for workflow and activity
+                operations. If False, trace context is still propagated but no spans are
+                created. Defaults to True.
         """
+        self._create_spans = create_spans
         if model_params is None:
             model_params = ModelActivityParameters()
 
@@ -252,7 +257,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
         super().__init__(
             name="OpenAIAgentsPlugin",
             data_converter=_data_converter,
-            worker_interceptors=[OpenAIAgentsTracingInterceptor()],
+            worker_interceptors=[OpenAIAgentsTracingInterceptor(create_spans=self._create_spans)],
             activities=add_activities,
             workflow_runner=workflow_runner,
             workflow_failure_exception_types=[AgentsWorkflowError],

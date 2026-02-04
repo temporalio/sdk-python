@@ -989,3 +989,94 @@ def test_opentelemetry_safe_detach():
         assert (
             capturer.find(otel_context_error) is None
         ), "Detach from context message should not be logged"
+
+
+async def test_opentelemetry_create_spans_false_no_spans(client: Client):
+    """Test that create_spans=False creates no spans but propagates context."""
+    # Create a tracer that has an in-memory exporter
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+    # Create new client with tracer interceptor with create_spans=False
+    client_config = client.config()
+    client_config["interceptors"] = [TracingInterceptor(tracer, create_spans=False)]
+    client = Client(**client_config)
+
+    task_queue = f"task_queue_{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[ReadBaggageTestWorkflow],
+        activities=[read_baggage_activity],
+    ):
+        # Test with baggage values to verify context propagation
+        with baggage_values({"user.id": "test-user-no-spans", "tenant.id": "test-corp"}):
+            result = await client.execute_workflow(
+                ReadBaggageTestWorkflow.run,
+                id=f"workflow_{uuid.uuid4()}",
+                task_queue=task_queue,
+            )
+
+    # Verify no spans were created
+    spans = exporter.get_finished_spans()
+    assert len(spans) == 0, f"Expected no spans but got: {[s.name for s in spans]}"
+
+    # Verify context (baggage) was propagated to activity
+    assert result["user_id"] == "test-user-no-spans"
+    assert result["tenant_id"] == "test-corp"
+
+
+async def test_opentelemetry_create_spans_false_with_child_workflow(
+    client: Client, env: WorkflowEnvironment
+):
+    """Test that create_spans=False propagates context through child workflows."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
+        )
+    # Create a tracer that has an in-memory exporter
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+    # Create new client with tracer interceptor with create_spans=False
+    client_config = client.config()
+    client_config["interceptors"] = [TracingInterceptor(tracer, create_spans=False)]
+    client = Client(**client_config)
+
+    task_queue = f"task_queue_{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[TracingWorkflow],
+        activities=[tracing_activity],
+        # Needed for reliable test execution
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ):
+        # Run workflow with child workflow and activity
+        workflow_id = f"workflow_{uuid.uuid4()}"
+        await client.execute_workflow(
+            TracingWorkflow.run,
+            TracingWorkflowParam(
+                actions=[
+                    TracingWorkflowAction(
+                        activity=TracingWorkflowActionActivity(
+                            param=TracingActivityParam(heartbeat=False),
+                        ),
+                    ),
+                    TracingWorkflowAction(
+                        child_workflow=TracingWorkflowActionChildWorkflow(
+                            id=f"{workflow_id}_child",
+                            param=TracingWorkflowParam(actions=[]),
+                        )
+                    ),
+                ],
+            ),
+            id=workflow_id,
+            task_queue=task_queue,
+        )
+
+    # Verify no spans were created
+    spans = exporter.get_finished_spans()
+    assert len(spans) == 0, f"Expected no spans but got: {[s.name for s in spans]}"
