@@ -19,12 +19,36 @@ class TemporalIdGenerator(IdGenerator):
     This generator ensures that span and trace IDs are deterministic when running
     within Temporal workflows by using the workflow's deterministic random source.
     This is crucial for maintaining consistency across workflow replays.
+
+    Can be seeded with OpenTelemetry span IDs from client context to maintain
+    proper span parenting across the client-workflow boundary.
     """
 
     def __init__(self):
         """Initialize the ID generator with empty trace and span pools."""
         self.traces = []
         self.spans = []
+
+    def seed_span_id(self, span_id: int) -> None:
+        """Seed the generator with a span ID to use as the first result.
+
+        This is typically used to maintain OpenTelemetry span parenting
+        when crossing the client-workflow boundary.
+
+        Args:
+            span_id: The span ID to use as the first generated span ID.
+        """
+        # Insert at the beginning so it's used as the first span ID
+        self.spans.insert(0, span_id)
+
+    def seed_trace_id(self, trace_id: int) -> None:
+        """Seed the generator with a trace ID to use as the first result.
+
+        Args:
+            trace_id: The trace ID to use as the first generated trace ID.
+        """
+        # Insert at the beginning so it's used as the first trace ID
+        self.traces.insert(0, trace_id)
 
     def generate_span_id(self) -> int:
         """Generate a deterministic span ID.
@@ -43,7 +67,7 @@ class TemporalIdGenerator(IdGenerator):
             get_rand_bits = random.getrandbits
 
         if len(self.spans) > 0:
-            return self.spans.pop()
+            return self.spans.pop(0)  # Use FIFO to get seeded spans first
 
         span_id = get_rand_bits(64)
         while span_id == INVALID_SPAN_ID:
@@ -66,7 +90,7 @@ class TemporalIdGenerator(IdGenerator):
 
             get_rand_bits = random.getrandbits
         if len(self.traces) > 0:
-            return self.traces.pop()
+            return self.traces.pop(0)  # Use FIFO to get seeded traces first
 
         trace_id = get_rand_bits(128)
         while trace_id == INVALID_TRACE_ID:

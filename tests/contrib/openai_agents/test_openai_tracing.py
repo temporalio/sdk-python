@@ -275,28 +275,30 @@ async def test_external_trace_to_workflow_spans(client: Client):
     ) as env:
         new_client = env.applied_on_client(client)
 
+        # Start external trace, then start workflow within that trace
+        # Start it outside of the worker to validate provider usage without worker's runcontext
+        with env.openai_agents_plugin.tracing_context():
+            with trace("External trace"):
+                workflow_handle = await new_client.start_workflow(
+                    TraceWorkflow.run,
+                    id=f"external-trace-workflow-{uuid.uuid4()}",
+                    task_queue=task_queue,
+                    execution_timeout=timedelta(seconds=120),
+                )
+                workflow_id = workflow_handle.id
+
         async with new_worker(
             new_client,
             TraceWorkflow,
             activities=[simple_no_context_activity],
             max_cached_workflows=0,
             task_queue=task_queue,
-        ) as worker:
-            # Start external trace, then start workflow within that trace
-            with trace("External trace"):
-                workflow_handle = await new_client.start_workflow(
-                    TraceWorkflow.run,
-                    id=f"external-trace-workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                    execution_timeout=timedelta(seconds=120),
-                )
-                workflow_id = workflow_handle.id
+        ):
+            # Wait for workflow to be ready
+            async def ready() -> bool:
+                return await workflow_handle.query(TraceWorkflow.ready)
 
-                # Wait for workflow to be ready
-                async def ready() -> bool:
-                    return await workflow_handle.query(TraceWorkflow.ready)
-
-                await assert_eq_eventually(True, ready)
+            await assert_eq_eventually(True, ready)
 
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(
@@ -310,14 +312,13 @@ async def test_external_trace_to_workflow_spans(client: Client):
             activities=[simple_no_context_activity],
             max_cached_workflows=0,
             task_queue=task_queue,
-        ) as worker:
+        ):
             workflow_handle = new_client.get_workflow_handle(workflow_id)
             await workflow_handle.signal(TraceWorkflow.proceed)
             result = await workflow_handle.result()
             assert result == "done"
 
     spans = exporter.get_finished_spans()
-    print("External trace to workflow spans:")
     print_otel_spans(spans)
 
     assert len(spans) >= 2  # External trace + workflow span
@@ -358,29 +359,31 @@ async def test_external_trace_and_span_to_workflow_spans(client: Client):
     ) as env:
         new_client = env.applied_on_client(client)
 
+        # Start external trace + span, then start workflow within that context
+        # Start it outside of the worker to validate provider usage without worker's runcontext
+        with env.openai_agents_plugin.tracing_context():
+            with trace("External trace"):
+                with custom_span("External span"):
+                    workflow_handle = await new_client.start_workflow(
+                        TraceWorkflow.run,
+                        id=f"external-span-workflow-{uuid.uuid4()}",
+                        task_queue=task_queue,
+                        execution_timeout=timedelta(seconds=120),
+                    )
+                    workflow_id = workflow_handle.id
+
         async with new_worker(
             new_client,
             TraceWorkflow,
             activities=[simple_no_context_activity],
             max_cached_workflows=0,
             task_queue=task_queue,
-        ) as worker:
-            # Start external trace + span, then start workflow within that context
-            with trace("External trace"):
-                with custom_span("External span"):
-                    workflow_handle = await new_client.start_workflow(
-                        TraceWorkflow.run,
-                        id=f"external-span-workflow-{uuid.uuid4()}",
-                        task_queue=worker.task_queue,
-                        execution_timeout=timedelta(seconds=120),
-                    )
-                    workflow_id = workflow_handle.id
+        ):
+            # Wait for workflow to be ready
+            async def ready() -> bool:
+                return await workflow_handle.query(TraceWorkflow.ready)
 
-                    # Wait for workflow to be ready
-                    async def ready() -> bool:
-                        return await workflow_handle.query(TraceWorkflow.ready)
-
-                    await assert_eq_eventually(True, ready)
+            await assert_eq_eventually(True, ready)
 
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(
@@ -394,15 +397,13 @@ async def test_external_trace_and_span_to_workflow_spans(client: Client):
             activities=[simple_no_context_activity],
             max_cached_workflows=0,
             task_queue=task_queue,
-        ) as worker:
+        ):
             workflow_handle = new_client.get_workflow_handle(workflow_id)
             await workflow_handle.signal(TraceWorkflow.proceed)
             result = await workflow_handle.result()
             assert result == "done"
 
     spans = exporter.get_finished_spans()
-    print("External trace + span to workflow spans:")
-    print_otel_spans(spans)
 
     assert len(spans) >= 3  # External trace + external span + workflow span
 
@@ -492,12 +493,6 @@ async def test_workflow_only_trace_to_spans(client: Client):
             assert result == "done"
 
     spans = exporter.get_finished_spans()
-    print("Workflow-only trace to spans:")
-    print(f"Total spans: {len(spans)}")
-    print_otel_spans(spans)
-
-    # Debug: print all span names
-    print("Span names:", [span.name for span in spans])
 
     assert len(spans) >= 2  # Workflow trace + workflow span
 
