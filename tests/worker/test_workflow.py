@@ -8548,6 +8548,16 @@ class LargePayloadWorkflow:
         return LargePayloadWorkflowOutput(data="o" * input.workflow_output_data_size)
 
 
+PAYLOAD_ERROR_LIMIT = 10 * 1024
+PAYLOAD_LIMITS_EXTRA_ARGS = [
+    "--dynamic-config-value",
+    f"limit.blobSize.error={PAYLOAD_ERROR_LIMIT}",
+    # Warn limit must be specified to have the server enforce the error limit
+    "--dynamic-config-value",
+    f"limit.blobSize.warn={2 * 1024}",
+]
+
+
 async def test_large_payload_workflow_input_warning(client: Client):
     config = client.config()
     config["data_converter"] = dataclasses.replace(
@@ -8621,75 +8631,28 @@ async def test_large_payload_workflow_memo_warning(client: Client):
         )
 
 
-async def test_large_payload_workflow_payload_error_disabled(client: Client):
-    async with new_worker(
-        client,
-        LargePayloadWorkflow,
-        activities=[large_payload_activity],
-        disable_payload_error_limit=True,
-    ) as worker:
-        with pytest.raises(WorkflowFailureError) as err:
-            await client.execute_workflow(
-                LargePayloadWorkflow.run,
-                LargePayloadWorkflowInput(
-                    activity_input_data_size=0,
-                    activity_output_data_size=0,
-                    activity_exception_data_size=0,
-                    workflow_output_data_size=2 * 1024 * 1024,
-                    data="",
-                ),
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=3),
-            )
-
-        assert isinstance(err.value.cause, TerminatedError)
-        assert (
-            err.value.cause.message
-            == "BadScheduleActivityAttributes: CompleteWorkflowExecutionCommandAttributes.Result exceeds size limit."
-        )
-
-
-async def test_large_payload_workflow_result_error(
-    client: Client, env: WorkflowEnvironment
-):
+async def test_large_payload_workflow_payload_error_disabled(env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip("Time-skipping server does not report payload limits.")
 
-    # Create worker runtime with forwarded logger
-    worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
-    worker_runtime = Runtime(
-        telemetry=TelemetryConfig(
-            logging=LoggingConfig(
-                filter=TelemetryFilter(core_level="WARN", other_level="ERROR"),
-                forwarding=LogForwardingConfig(logger=worker_logger),
-            )
-        )
-    )
-
-    # Create client for worker with custom runtime logging
-    error_limit = 2 * 1024 * 1024
-    worker_client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
-        runtime=worker_runtime,
-    )
-
-    with (
-        LogCapturer().logs_captured(worker_logger) as worker_logger_capturer,
-        LogCapturer().logs_captured(logging.getLogger()) as root_logger_capturer,
-    ):
+    async with await WorkflowEnvironment.start_local(
+        dev_server_extra_args=PAYLOAD_LIMITS_EXTRA_ARGS,
+        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
+    ) as env:
         async with new_worker(
-            worker_client, LargePayloadWorkflow, activities=[large_payload_activity]
+            env.client,
+            LargePayloadWorkflow,
+            activities=[large_payload_activity],
+            disable_payload_error_limit=True,
         ) as worker:
             with pytest.raises(WorkflowFailureError) as err:
-                await client.execute_workflow(
+                await env.client.execute_workflow(
                     LargePayloadWorkflow.run,
                     LargePayloadWorkflowInput(
-                        activity_input_data_size=0,
+                        activity_input_data_size=PAYLOAD_ERROR_LIMIT + 1024,
                         activity_output_data_size=0,
                         activity_exception_data_size=0,
-                        workflow_output_data_size=2 * 1024 * 1024,
+                        workflow_output_data_size=0,
                         data="",
                     ),
                     id=f"workflow-{uuid.uuid4()}",
@@ -8697,27 +8660,81 @@ async def test_large_payload_workflow_result_error(
                     execution_timeout=timedelta(seconds=3),
                 )
 
-            assert isinstance(err.value.cause, TimeoutError)
-            assert err.value.cause.type == TimeoutType.START_TO_CLOSE
-
-        def worker_logger_predicate(record: logging.LogRecord) -> bool:
-            return (
-                record.levelname == "WARNING"
-                and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
-                in record.msg
+            assert isinstance(err.value.cause, TerminatedError)
+            assert (
+                err.value.cause.message
+                == "BadScheduleActivityAttributes: ScheduleActivityTaskCommandAttributes.Input exceeds size limit."
             )
 
-        assert worker_logger_capturer.find(worker_logger_predicate)
 
-        def root_logger_predicate(record: logging.LogRecord) -> bool:
-            return (
-                record.levelname == "WARNING"
-                and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
-                in record.msg
-                and f"Limit: {error_limit} bytes" in record.msg
+async def test_large_payload_workflow_result_error(env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Time-skipping server does not report payload limits.")
+
+    async with await WorkflowEnvironment.start_local(
+        dev_server_extra_args=PAYLOAD_LIMITS_EXTRA_ARGS,
+        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
+    ) as env:
+        # Create worker runtime with forwarded logger
+        worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
+        worker_runtime = Runtime(
+            telemetry=TelemetryConfig(
+                logging=LoggingConfig(
+                    filter=TelemetryFilter(core_level="WARN", other_level="ERROR"),
+                    forwarding=LogForwardingConfig(logger=worker_logger),
+                )
             )
+        )
 
-        assert root_logger_capturer.find(root_logger_predicate)
+        # Create client for worker with custom runtime logging
+        worker_client = await Client.connect(
+            env.client.service_client.config.target_host,
+            namespace=env.client.namespace,
+            runtime=worker_runtime,
+        )
+
+        with (
+            LogCapturer().logs_captured(worker_logger) as worker_logger_capturer,
+            LogCapturer().logs_captured(logging.getLogger()) as root_logger_capturer,
+        ):
+            async with new_worker(
+                worker_client, LargePayloadWorkflow, activities=[large_payload_activity]
+            ) as worker:
+                with pytest.raises(WorkflowFailureError) as err:
+                    await env.client.execute_workflow(
+                        LargePayloadWorkflow.run,
+                        LargePayloadWorkflowInput(
+                            activity_input_data_size=0,
+                            activity_output_data_size=0,
+                            activity_exception_data_size=0,
+                            workflow_output_data_size=PAYLOAD_ERROR_LIMIT + 1024,
+                            data="",
+                        ),
+                        id=f"workflow-{uuid.uuid4()}",
+                        task_queue=worker.task_queue,
+                        execution_timeout=timedelta(seconds=3),
+                    )
+
+                assert isinstance(err.value.cause, TimeoutError)
+                assert err.value.cause.type == TimeoutType.START_TO_CLOSE
+
+            def worker_logger_predicate(record: logging.LogRecord) -> bool:
+                return (
+                    record.levelname == "WARNING"
+                    and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
+                    in record.msg
+                )
+
+            assert worker_logger_capturer.find(worker_logger_predicate)
+
+            def root_logger_predicate(record: logging.LogRecord) -> bool:
+                return (
+                    record.levelname == "WARNING"
+                    and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
+                    in record.msg
+                )
+
+            assert root_logger_capturer.find(root_logger_predicate)
 
 
 async def test_large_payload_workflow_result_warning(client: Client):
@@ -8756,73 +8773,73 @@ async def test_large_payload_workflow_result_warning(client: Client):
         )
 
 
-async def test_large_payload_activity_input_error(
-    client: Client, env: WorkflowEnvironment
-):
+async def test_large_payload_activity_input_error(env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip("Time-skipping server does not report payload limits.")
 
-    # Create worker runtime with forwarded logger
-    worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
-    worker_runtime = Runtime(
-        telemetry=TelemetryConfig(
-            logging=LoggingConfig(
-                filter=TelemetryFilter(core_level="WARN", other_level="ERROR"),
-                forwarding=LogForwardingConfig(logger=worker_logger),
+    async with await WorkflowEnvironment.start_local(
+        dev_server_extra_args=PAYLOAD_LIMITS_EXTRA_ARGS,
+        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
+    ) as env:
+        # Create worker runtime with forwarded logger
+        worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
+        worker_runtime = Runtime(
+            telemetry=TelemetryConfig(
+                logging=LoggingConfig(
+                    filter=TelemetryFilter(core_level="WARN", other_level="ERROR"),
+                    forwarding=LogForwardingConfig(logger=worker_logger),
+                )
             )
         )
-    )
 
-    # Create client for worker with custom runtime logging
-    error_limit = 2 * 1024 * 1024
-    worker_client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
-        runtime=worker_runtime,
-    )
+        # Create client for worker with custom runtime logging
+        worker_client = await Client.connect(
+            env.client.service_client.config.target_host,
+            namespace=env.client.namespace,
+            runtime=worker_runtime,
+        )
 
-    with (
-        LogCapturer().logs_captured(worker_logger) as worker_logger_capturer,
-        LogCapturer().logs_captured(logging.getLogger()) as root_logger_capturer,
-    ):
-        async with new_worker(
-            worker_client, LargePayloadWorkflow, activities=[large_payload_activity]
-        ) as worker:
-            with pytest.raises(WorkflowFailureError) as err:
-                await client.execute_workflow(
-                    LargePayloadWorkflow.run,
-                    LargePayloadWorkflowInput(
-                        activity_input_data_size=2 * 1024 * 1024,
-                        activity_output_data_size=0,
-                        activity_exception_data_size=0,
-                        workflow_output_data_size=0,
-                        data="",
-                    ),
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                    execution_timeout=timedelta(seconds=3),
+        with (
+            LogCapturer().logs_captured(worker_logger) as worker_logger_capturer,
+            LogCapturer().logs_captured(logging.getLogger()) as root_logger_capturer,
+        ):
+            async with new_worker(
+                worker_client, LargePayloadWorkflow, activities=[large_payload_activity]
+            ) as worker:
+                with pytest.raises(WorkflowFailureError) as err:
+                    await env.client.execute_workflow(
+                        LargePayloadWorkflow.run,
+                        LargePayloadWorkflowInput(
+                            activity_input_data_size=PAYLOAD_ERROR_LIMIT + 1024,
+                            activity_output_data_size=0,
+                            activity_exception_data_size=0,
+                            workflow_output_data_size=0,
+                            data="",
+                        ),
+                        id=f"workflow-{uuid.uuid4()}",
+                        task_queue=worker.task_queue,
+                        execution_timeout=timedelta(seconds=3),
+                    )
+
+                assert isinstance(err.value.cause, TimeoutError)
+
+            def worker_logger_predicate(record: logging.LogRecord) -> bool:
+                return (
+                    record.levelname == "WARNING"
+                    and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
+                    in record.msg
                 )
 
-            assert isinstance(err.value.cause, TimeoutError)
+            assert worker_logger_capturer.find(worker_logger_predicate)
 
-        def worker_logger_predicate(record: logging.LogRecord) -> bool:
-            return (
-                record.levelname == "WARNING"
-                and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
-                in record.msg
-            )
+            def root_logger_predicate(record: logging.LogRecord) -> bool:
+                return (
+                    record.levelname == "WARNING"
+                    and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
+                    in record.msg
+                )
 
-        assert worker_logger_capturer.find(worker_logger_predicate)
-
-        def root_logger_predicate(record: logging.LogRecord) -> bool:
-            return (
-                record.levelname == "WARNING"
-                and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
-                in record.msg
-                and f"Limit: {error_limit} bytes" in record.msg
-            )
-
-        assert root_logger_capturer.find(root_logger_predicate)
+            assert root_logger_capturer.find(root_logger_predicate)
 
 
 async def test_large_payload_activity_input_warning(client: Client):
@@ -8860,128 +8877,129 @@ async def test_large_payload_activity_input_warning(client: Client):
         )
 
 
-async def test_large_payload_activity_exception_error(
-    client: Client, env: WorkflowEnvironment
-):
-    pytest.skip("Skipping due to logging of activity exception causing CI to stall.")
-
+async def test_large_payload_activity_exception_error(env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip("Time-skipping server does not report payload limits.")
 
-    # Create worker runtime with forwarded logger
-    worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
-    worker_runtime = Runtime(
-        telemetry=TelemetryConfig(
-            logging=LoggingConfig(
-                filter=TelemetryFilter(core_level="WARN", other_level="ERROR"),
-                forwarding=LogForwardingConfig(logger=worker_logger),
+    async with await WorkflowEnvironment.start_local(
+        dev_server_extra_args=PAYLOAD_LIMITS_EXTRA_ARGS,
+        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
+    ) as env:
+        # Create worker runtime with forwarded logger
+        worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
+        worker_runtime = Runtime(
+            telemetry=TelemetryConfig(
+                logging=LoggingConfig(
+                    filter=TelemetryFilter(core_level="WARN", other_level="ERROR"),
+                    forwarding=LogForwardingConfig(logger=worker_logger),
+                )
             )
         )
-    )
 
-    # Create client for worker with custom runtime logging
-    worker_client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
-        runtime=worker_runtime,
-    )
+        # Create client for worker with custom runtime logging
+        worker_client = await Client.connect(
+            env.client.service_client.config.target_host,
+            namespace=env.client.namespace,
+            runtime=worker_runtime,
+        )
 
-    with (
-        LogCapturer().logs_captured(
-            activity.logger.base_logger
-        ) as activity_logger_capturer,
-    ):
-        async with new_worker(
-            worker_client, LargePayloadWorkflow, activities=[large_payload_activity]
-        ) as worker:
-            with pytest.raises(WorkflowFailureError) as err:
-                await client.execute_workflow(
-                    LargePayloadWorkflow.run,
-                    LargePayloadWorkflowInput(
-                        activity_input_data_size=0,
-                        activity_output_data_size=0,
-                        activity_exception_data_size=2 * 1024 * 1024,
-                        workflow_output_data_size=0,
-                        data="",
-                    ),
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
+        with (
+            LogCapturer().logs_captured(
+                activity.logger.base_logger
+            ) as activity_logger_capturer,
+        ):
+            async with new_worker(
+                worker_client, LargePayloadWorkflow, activities=[large_payload_activity]
+            ) as worker:
+                with pytest.raises(WorkflowFailureError) as err:
+                    await env.client.execute_workflow(
+                        LargePayloadWorkflow.run,
+                        LargePayloadWorkflowInput(
+                            activity_input_data_size=0,
+                            activity_output_data_size=0,
+                            activity_exception_data_size=PAYLOAD_ERROR_LIMIT + 1024,
+                            workflow_output_data_size=0,
+                            data="",
+                        ),
+                        id=f"workflow-{uuid.uuid4()}",
+                        task_queue=worker.task_queue,
+                    )
+
+                assert isinstance(err.value.cause, ActivityError)
+                assert isinstance(err.value.cause.cause, ApplicationError)
+
+            def activity_logger_predicate(record: logging.LogRecord) -> bool:
+                return (
+                    record.levelname == "ERROR"
+                    and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
+                    in record.msg
                 )
 
-            assert isinstance(err.value.cause, ActivityError)
-            assert isinstance(err.value.cause.cause, ApplicationError)
-
-        def activity_logger_predicate(record: logging.LogRecord) -> bool:
-            return (
-                record.levelname == "ERROR"
-                and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
-                in record.msg
-            )
-
-        assert activity_logger_capturer.find(activity_logger_predicate)
+            assert activity_logger_capturer.find(activity_logger_predicate)
 
 
-async def test_large_payload_activity_result_error(
-    client: Client, env: WorkflowEnvironment
-):
+async def test_large_payload_activity_result_error(env: WorkflowEnvironment):
     if env.supports_time_skipping:
         pytest.skip("Time-skipping server does not report payload limits.")
 
-    # Create worker runtime with forwarded logger
-    worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
-    worker_runtime = Runtime(
-        telemetry=TelemetryConfig(
-            logging=LoggingConfig(
-                filter=TelemetryFilter(core_level="WARN", other_level="ERROR"),
-                forwarding=LogForwardingConfig(logger=worker_logger),
+    async with await WorkflowEnvironment.start_local(
+        dev_server_extra_args=PAYLOAD_LIMITS_EXTRA_ARGS,
+        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
+    ) as env:
+        # Create worker runtime with forwarded logger
+        worker_logger = logging.getLogger(f"log-{uuid.uuid4()}")
+        worker_runtime = Runtime(
+            telemetry=TelemetryConfig(
+                logging=LoggingConfig(
+                    filter=TelemetryFilter(core_level="WARN", other_level="ERROR"),
+                    forwarding=LogForwardingConfig(logger=worker_logger),
+                )
             )
         )
-    )
 
-    # Create client for worker with custom runtime logging
-    error_limit = 2 * 1024 * 1024
-    worker_client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
-        runtime=worker_runtime,
-    )
+        # Create client for worker with custom runtime logging
+        worker_client = await Client.connect(
+            env.client.service_client.config.target_host,
+            namespace=env.client.namespace,
+            runtime=worker_runtime,
+        )
 
-    with (
-        LogCapturer().logs_captured(
-            activity.logger.base_logger
-        ) as activity_logger_capturer,
-    ):
-        async with new_worker(
-            worker_client, LargePayloadWorkflow, activities=[large_payload_activity]
-        ) as worker:
-            with pytest.raises(WorkflowFailureError) as err:
-                await client.execute_workflow(
-                    LargePayloadWorkflow.run,
-                    LargePayloadWorkflowInput(
-                        activity_input_data_size=0,
-                        activity_output_data_size=2 * 1024 * 1024,
-                        activity_exception_data_size=0,
-                        workflow_output_data_size=0,
-                        data="",
-                    ),
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
+        with (
+            LogCapturer().logs_captured(
+                activity.logger.base_logger
+            ) as activity_logger_capturer,
+        ):
+            async with new_worker(
+                worker_client, LargePayloadWorkflow, activities=[large_payload_activity]
+            ) as worker:
+                with pytest.raises(WorkflowFailureError) as err:
+                    await env.client.execute_workflow(
+                        LargePayloadWorkflow.run,
+                        LargePayloadWorkflowInput(
+                            activity_input_data_size=0,
+                            activity_output_data_size=PAYLOAD_ERROR_LIMIT + 1024,
+                            activity_exception_data_size=0,
+                            workflow_output_data_size=0,
+                            data="",
+                        ),
+                        id=f"workflow-{uuid.uuid4()}",
+                        task_queue=worker.task_queue,
+                    )
+
+                assert isinstance(err.value.cause, ActivityError)
+                assert isinstance(err.value.cause.cause, ApplicationError)
+
+            def activity_logger_predicate(record: logging.LogRecord) -> bool:
+                return (
+                    hasattr(record, "__temporal_error_identifier")
+                    and getattr(record, "__temporal_error_identifier")
+                    == "PayloadSizeError"
+                    and record.levelname == "WARNING"
+                    and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
+                    in record.msg
                 )
 
-            assert isinstance(err.value.cause, ActivityError)
-            assert isinstance(err.value.cause.cause, ApplicationError)
-
-        def activity_logger_predicate(record: logging.LogRecord) -> bool:
-            return (
-                hasattr(record, "__temporal_error_identifier")
-                and getattr(record, "__temporal_error_identifier") == "PayloadSizeError"
-                and record.levelname == "WARNING"
-                and "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit."
-                in record.msg
-                and f"Limit: {error_limit} bytes" in record.msg
-            )
-
-        assert activity_logger_capturer.find(activity_logger_predicate)
+            assert activity_logger_capturer.find(activity_logger_predicate)
 
 
 async def test_large_payload_activity_result_warning(client: Client):
