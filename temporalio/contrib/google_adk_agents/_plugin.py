@@ -7,6 +7,7 @@ import typing
 import uuid
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from typing import Any, Callable
 
 from google.adk.agents.callback_context import CallbackContext
@@ -17,6 +18,7 @@ from google.adk.plugins import BasePlugin
 from openinference.instrumentation.google_adk import GoogleADKInstrumentor
 
 from temporalio import activity, workflow
+from temporalio.common import Priority, RetryPolicy
 from temporalio.contrib.google_adk_agents._mcp import TemporalMcpToolSetProvider
 from temporalio.contrib.opentelemetry import (
     TracingInterceptor,
@@ -31,6 +33,10 @@ from temporalio.worker import (
     WorkflowRunner,
 )
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
+from temporalio.workflow import (
+    ActivityCancellationType,
+    VersioningIntent,
+)
 
 if typing.TYPE_CHECKING:
     from opentelemetry.sdk.trace.export import SpanExporter
@@ -64,6 +70,42 @@ def setup_deterministic_runtime():
         print(f"Warning: Failed to set deterministic runtime providers: {e}")
 
 
+@dataclasses.dataclass
+class ModelActivityParameters:
+    """Parameters for configuring Temporal activity execution for model calls.
+
+    This class encapsulates all the parameters that can be used to configure
+    how Temporal activities are executed when making model calls.
+    """
+
+    task_queue: str | None = None
+    """Specific task queue to use for model activities."""
+
+    schedule_to_close_timeout: timedelta | None = None
+    """Maximum time from scheduling to completion."""
+
+    schedule_to_start_timeout: timedelta | None = None
+    """Maximum time from scheduling to starting."""
+
+    start_to_close_timeout: timedelta | None = timedelta(seconds=60)
+    """Maximum time for the activity to complete."""
+
+    heartbeat_timeout: timedelta | None = None
+    """Maximum time between heartbeats."""
+
+    retry_policy: RetryPolicy | None = None
+    """Policy for retrying failed activities."""
+
+    cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL
+    """How the activity handles cancellation."""
+
+    versioning_intent: VersioningIntent | None = None
+    """Versioning intent for the activity."""
+
+    priority: Priority = Priority.default
+    """Priority for the activity execution."""
+
+
 class AdkAgentPlugin(BasePlugin):
     """ADK Plugin for Temporal integration.
 
@@ -71,14 +113,16 @@ class AdkAgentPlugin(BasePlugin):
     inside a Temporal workflow, and intercepts model calls to execute them as Temporal Activities.
     """
 
-    def __init__(self, activity_options: dict[str, Any] | None = None):
+    def __init__(self, activity_options: ModelActivityParameters | None = None):
         """Initializes the Temporal Plugin.
 
         Args:
             activity_options: Default options for model activities (e.g. start_to_close_timeout).
         """
         super().__init__(name="temporal_plugin")
-        self.activity_options = activity_options or {}
+        self.activity_options = activity_options or ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=60)
+        )
 
     @staticmethod
     def activity_tool(activity_def: Callable, **kwargs: Any) -> Callable:
@@ -127,7 +171,15 @@ class AdkAgentPlugin(BasePlugin):
             invoke_model,
             args=[llm_request],
             summary=callback_context.agent_name,
-            **self.activity_options,
+            task_queue=self.activity_options.task_queue,
+            schedule_to_close_timeout=self.activity_options.schedule_to_close_timeout,
+            schedule_to_start_timeout=self.activity_options.schedule_to_start_timeout,
+            start_to_close_timeout=self.activity_options.start_to_close_timeout,
+            heartbeat_timeout=self.activity_options.heartbeat_timeout,
+            retry_policy=self.activity_options.retry_policy,
+            cancellation_type=self.activity_options.cancellation_type,
+            versioning_intent=self.activity_options.versioning_intent,
+            priority=self.activity_options.priority,
         )
 
         # Simple consolidation: return the last complete response

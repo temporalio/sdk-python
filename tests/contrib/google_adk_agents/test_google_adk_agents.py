@@ -90,11 +90,7 @@ class WeatherAgent:
             agent=agent,
             app_name="test_app",
             session_service=session_service,
-            plugins=[
-                AdkAgentPlugin(
-                    activity_options={"start_to_close_timeout": timedelta(minutes=2)}
-                )
-            ],
+            plugins=[AdkAgentPlugin()],
         )
 
         logger.info("Starting runner.")
@@ -151,11 +147,7 @@ class MultiAgentWorkflow:
             agent=coordinator,
             app_name="multi_agent_app",
             session_service=session_service,
-            plugins=[
-                AdkAgentPlugin(
-                    activity_options={"start_to_close_timeout": timedelta(minutes=2)}
-                )
-            ],
+            plugins=[AdkAgentPlugin()],
         )
 
         # 4. Run
@@ -340,7 +332,7 @@ async def test_multi_agent(client: Client, use_local_model: bool):
 @workflow.defn
 class McpAgent:
     @workflow.run
-    async def run(self, prompt: str, model_name: str) -> Event | None:
+    async def run(self, prompt: str, model_name: str) -> str:
         logger.info("Workflow started.")
 
         # 1. Define Agent using Temporal Helpers
@@ -367,11 +359,7 @@ class McpAgent:
             agent=agent,
             app_name="test_app",
             session_service=session_service,
-            plugins=[
-                AdkAgentPlugin(
-                    activity_options={"start_to_close_timeout": timedelta(minutes=2)}
-                )
-            ],
+            plugins=[AdkAgentPlugin()],
         )
 
         last_event = None
@@ -386,7 +374,11 @@ class McpAgent:
                 logger.info(f"Event: {event}")
                 last_event = event
 
-        return last_event
+        assert last_event
+        assert last_event.content
+        assert last_event.content.parts
+        assert last_event.content.parts[0].text
+        return last_event.content.parts[0].text
 
 
 class McpModel(BaseLlm):
@@ -397,7 +389,8 @@ class McpModel(BaseLlm):
                 parts=[
                     Part(
                         function_call=FunctionCall(
-                            args={"city": "New York"}, name="get_weather"
+                            args={"path": os.path.dirname(os.path.abspath(__file__))},
+                            name="list_directory",
                         )
                     )
                 ],
@@ -406,7 +399,7 @@ class McpModel(BaseLlm):
         LlmResponse(
             content=Content(
                 role="model",
-                parts=[Part(text="warm and sunny")],
+                parts=[Part(text="Some files.")],
             )
         ),
     ]
@@ -414,7 +407,7 @@ class McpModel(BaseLlm):
 
     @classmethod
     def supported_models(cls) -> list[str]:
-        return ["weather_model"]
+        return ["mcp_model"]
 
     async def generate_content_async(
         self, llm_request: LlmRequest, stream: bool = False
@@ -445,10 +438,9 @@ async def test_mcp_agent(client: Client, use_local_model: bool):
                                 ],
                             ),
                         ),
-                        require_confirmation=True,
                     ),
                 )
-            ]
+            ],
         )
     ]
     client = Client(**new_config)
@@ -461,14 +453,14 @@ async def test_mcp_agent(client: Client, use_local_model: bool):
         max_cached_workflows=0,
     ):
         if use_local_model:
-            LLMRegistry.register(ResearchModel)
+            LLMRegistry.register(McpModel)
 
         # Test Multi Agent
         handle = await client.start_workflow(
             McpAgent.run,
             args=[
                 "What files are in the current directory?",
-                "research_model" if use_local_model else "gemini-2.5-pro",
+                "mcp_model" if use_local_model else "gemini-2.5-pro",
             ],
             id=f"mcp-agent-workflow-{uuid.uuid4()}",
             task_queue="adk-task-queue",
@@ -476,7 +468,7 @@ async def test_mcp_agent(client: Client, use_local_model: bool):
         result = await handle.result()
         print(f"MCP-Agent Workflow result: {result}")
         if use_local_model:
-            assert result == "haiku"
+            assert result == "Some files."
 
 
 @pytest.mark.asyncio
