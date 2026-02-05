@@ -54,6 +54,7 @@ dev = [
   "toml>=0.10.2,<0.11",
   "twine>=4.0.1,<5",
   "maturin>=1.8.2",
+  "openinference-instrumentation-openai-agents>=0.1.0",
   "pytest-cov>=6.1.1",
   "httpx>=0.28.1",
   "pytest-pretty>=1.3.0",

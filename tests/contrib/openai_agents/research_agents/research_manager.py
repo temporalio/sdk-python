@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from agents import Runner, custom_span, gen_trace_id, trace
+from agents import Runner, custom_span
 
 import temporalio.workflow
 from tests.contrib.openai_agents.research_agents.planner_agent import (
@@ -24,8 +24,7 @@ class ResearchManager:
         self.writer_agent = new_writer_agent()
 
     async def run(self, query: str) -> str:
-        trace_id = gen_trace_id()
-        with trace("Research trace", trace_id=trace_id):
+        with custom_span("Research manager"):
             search_plan = await self._plan_searches(query)
             search_results = await self._perform_searches(search_plan)
             report = await self._write_report(query, search_results)

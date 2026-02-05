@@ -513,10 +513,6 @@ SandboxRestrictions.passthrough_modules_with_temporal = (
         # Due to how Pydantic is importing lazily inside of some classes, we choose
         # to always pass it through
         "pydantic",
-        # OpenAI and OpenAI agent modules in workflows we always want to pass
-        # through and reference the out-of-sandbox forms
-        "openai",
-        "agents",
     }
 )
 

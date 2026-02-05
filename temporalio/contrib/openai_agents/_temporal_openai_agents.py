@@ -2,11 +2,11 @@
 
 import dataclasses
 import typing
-from collections.abc import AsyncIterator, Callable, Sequence
+from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from contextlib import asynccontextmanager, contextmanager
 from datetime import timedelta
 
-from agents import ModelProvider, set_trace_provider
+from agents import ModelProvider, Trace, set_trace_provider
 from agents.run import get_default_agent_runner, set_default_agent_runner
 from agents.tracing import get_trace_provider
 from agents.tracing.provider import DefaultTraceProvider
@@ -20,7 +20,7 @@ from temporalio.contrib.openai_agents._temporal_trace_provider import (
     TemporalTraceProvider,
 )
 from temporalio.contrib.openai_agents._trace_interceptor import (
-    OpenAIAgentsTracingInterceptor,
+    OpenAIAgentsContextPropagationInterceptor,
 )
 from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
 from temporalio.contrib.pydantic import (
@@ -36,6 +36,8 @@ from temporalio.worker import WorkflowRunner
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 if typing.TYPE_CHECKING:
+    from opentelemetry.sdk.trace.export import SpanExporter
+
     from temporalio.contrib.openai_agents import (
         StatefulMCPServerProvider,
         StatelessMCPServerProvider,
@@ -45,7 +47,7 @@ if typing.TYPE_CHECKING:
 @contextmanager
 def set_open_ai_agent_temporal_overrides(
     model_params: ModelActivityParameters,
-    auto_close_tracing_in_workflows: bool = False,
+    start_spans_in_replay: bool = False,
 ):
     """Configure Temporal-specific overrides for OpenAI agents.
 
@@ -65,7 +67,7 @@ def set_open_ai_agent_temporal_overrides(
 
     Args:
         model_params: Configuration parameters for Temporal activity execution of model calls.
-        auto_close_tracing_in_workflows: If set to true, close tracing spans immediately.
+        start_spans_in_replay: If set to true, start spans even during replay. Primarily used for otel integration.
 
     Returns:
         A context manager that yields the configured TemporalTraceProvider.
@@ -73,7 +75,7 @@ def set_open_ai_agent_temporal_overrides(
     previous_runner = get_default_agent_runner()
     previous_trace_provider = get_trace_provider()
     provider = TemporalTraceProvider(
-        auto_close_in_workflows=auto_close_tracing_in_workflows
+        start_spans_in_replay=start_spans_in_replay,
     )
 
     try:
@@ -181,6 +183,8 @@ class OpenAIAgentsPlugin(SimplePlugin):
             "StatelessMCPServerProvider | StatefulMCPServerProvider"
         ] = (),
         register_activities: bool = True,
+        add_temporal_spans: bool = True,
+        otel_exporters: Sequence["SpanExporter"] | None = None,
     ) -> None:
         """Initialize the OpenAI agents plugin.
 
@@ -196,6 +200,11 @@ class OpenAIAgentsPlugin(SimplePlugin):
             register_activities: Whether to register activities during the worker execution.
                 This can be disabled on some workers to allow a separation of workflows and activities
                 but should not be disabled on all workers, or agents will not be able to progress.
+            add_temporal_spans: Whether to add temporal spans to traces
+            otel_exporters: Optional sequence of OpenTelemetry span exporters for telemetry export.
+                When provided, the plugin automatically sets up OpenAI agents instrumentation
+                with proper Temporal workflow replay semantics. Each exporter will receive
+                a copy of all OpenAI agent spans. If None, no OTEL instrumentation is configured.
         """
         if model_params is None:
             model_params = ModelActivityParameters()
@@ -212,6 +221,10 @@ class OpenAIAgentsPlugin(SimplePlugin):
                 raise ValueError(
                     "When configuring a custom provider, the model activity must have start_to_close_timeout or schedule_to_close_timeout"
                 )
+
+        # Store OTEL configuration for later setup
+        self._otel_exporters = otel_exporters
+        self._instrumented = False
 
         # Delay activity construction until they are actually needed
         def add_activities(
@@ -240,21 +253,115 @@ class OpenAIAgentsPlugin(SimplePlugin):
             if isinstance(runner, SandboxedWorkflowRunner):
                 return dataclasses.replace(
                     runner,
-                    restrictions=runner.restrictions.with_passthrough_modules("mcp"),
+                    restrictions=runner.restrictions.with_passthrough_modules(
+                        "openai", "agents", "mcp"
+                    ),
                 )
             return runner
 
+        if self._otel_exporters is not None:
+            from opentelemetry.sdk import trace as trace_sdk
+
+            from temporalio.contrib.openai_agents._otel import (
+                TemporalIdGenerator,
+            )
+
+            # Create trace provider with deterministic ID generation
+            self._otel_id_generator = TemporalIdGenerator()
+            self._otel_provider = trace_sdk.TracerProvider(
+                id_generator=self._otel_id_generator
+            )
+
         @asynccontextmanager
         async def run_context() -> AsyncIterator[None]:
-            with set_open_ai_agent_temporal_overrides(model_params):
-                yield
+            with self.tracing_context():
+                with set_open_ai_agent_temporal_overrides(
+                    model_params, start_spans_in_replay=self._otel_exporters is not None
+                ):
+                    yield
+
+        if self._otel_exporters is None:
+            interceptor = OpenAIAgentsContextPropagationInterceptor(
+                add_temporal_spans=add_temporal_spans,
+            )
+        else:
+            from ._otel_trace_interceptor import (
+                OTelOpenAIAgentsContextPropagationInterceptor,
+            )
+
+            interceptor = OTelOpenAIAgentsContextPropagationInterceptor(
+                add_temporal_spans=add_temporal_spans,
+                otel_id_generator=self._otel_id_generator,
+            )
 
         super().__init__(
             name="OpenAIAgentsPlugin",
             data_converter=_data_converter,
-            worker_interceptors=[OpenAIAgentsTracingInterceptor()],
+            client_interceptors=[interceptor],
+            worker_interceptors=[interceptor],
             activities=add_activities,
             workflow_runner=workflow_runner,
             workflow_failure_exception_types=[AgentsWorkflowError],
             run_context=lambda: run_context(),
         )
+
+    @contextmanager
+    def tracing_context(self) -> Iterator[None]:
+        """Context manager for setting up OpenAI Agents tracing instrumentation. This should be called if
+        AgentsSDK traces and/or spans are started outside of the context of a worker. For example:
+
+        with env.openai_agents_plugin.tracing_context():
+            with trace("External trace"):
+                with custom_span("External span"):
+                    workflow_handle = await new_client.start_workflow(
+                        ...
+                    )
+
+        Yields:
+            Context with tracing instrumentation enabled.
+        """
+        # Set up OTEL instrumentation if exporters are provided
+        otel_instrumentor = None
+        if self._otel_exporters is not None and not self._instrumented:
+            from openinference.instrumentation.openai_agents import (
+                OpenAIAgentsInstrumentor,
+            )
+            from openinference.instrumentation.openai_agents._processor import (
+                OpenInferenceTracingProcessor,
+            )
+            from opentelemetry import trace
+            from opentelemetry.context import attach
+            from opentelemetry.trace import set_span_in_context
+
+            from temporalio.contrib.openai_agents._otel import (
+                TemporalSpanProcessor,
+            )
+
+            # Switch the current tracer provider
+            trace.set_tracer_provider(self._otel_provider)
+
+            # Unfortunate monkey patching is needed to ensure the trace is set in context so we can propagate it.
+            original_on_trace_start = OpenInferenceTracingProcessor.on_trace_start
+
+            def on_trace_start(self, trace: Trace) -> None:  # type: ignore[reportMissingParameterType]
+                original_on_trace_start(self, trace)
+                otel_span = self._root_spans[trace.trace_id]
+                attach(set_span_in_context(otel_span))
+
+            OpenInferenceTracingProcessor.on_trace_start = on_trace_start  # type:ignore[method-assign]
+
+            # Add all exporters with TemporalSpanProcessor wrapper
+            for exporter in self._otel_exporters:
+                processor = TemporalSpanProcessor(exporter)
+                self._otel_provider.add_span_processor(processor)
+
+            # Set up instrumentor
+            otel_instrumentor = OpenAIAgentsInstrumentor()
+            otel_instrumentor.instrument(tracer_provider=self._otel_provider)
+            self._instrumented = True
+        try:
+            yield
+        finally:
+            # Clean up OTEL instrumentation
+            if otel_instrumentor is not None:
+                otel_instrumentor.uninstrument()

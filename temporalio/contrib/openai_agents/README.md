@@ -536,6 +536,200 @@ SQLite storage is not suited to a distributed environment.
 | :--------------- | :-------: |
 | OpenAI platform  |    Yes    |
 
+## OpenTelemetry Integration
+
+This integration provides seamless export of OpenAI agent telemetry to OpenTelemetry (OTEL) endpoints for observability and monitoring. The integration automatically handles workflow replay semantics, ensuring spans are only exported when workflows actually complete.
+
+### Quick Start
+
+To enable OTEL telemetry export, simply provide exporters to the `OpenAIAgentsPlugin` or `AgentEnvironment`:
+
+```python
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
+# Your OTEL endpoint configuration
+exporters = [
+    OTLPSpanExporter(endpoint="http://localhost:4317"),
+    # Add multiple exporters for different endpoints as needed
+]
+
+# For production applications
+client = await Client.connect(
+    "localhost:7233",
+    plugins=[
+        OpenAIAgentsPlugin(
+            otel_exporters=exporters,  # Enable OTEL integration
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(seconds=30)
+            )
+        ),
+    ],
+)
+
+# For testing
+from temporalio.contrib.openai_agents.testing import AgentEnvironment
+
+async with AgentEnvironment(
+    model=my_test_model,
+    otel_exporters=exporters  # Enable OTEL integration for tests
+) as env:
+    client = env.applied_on_client(base_client)
+```
+
+### Features
+
+- **Multiple Exporters**: Send telemetry to multiple OTEL endpoints simultaneously
+- **Replay-Safe**: Spans are only exported when workflows actually complete, not during replays
+- **Deterministic IDs**: Consistent span IDs across workflow replays for reliable correlation
+- **Automatic Setup**: No manual instrumentation required - just provide exporters
+- **Graceful Degradation**: Works seamlessly whether OTEL dependencies are installed or not
+
+### Dependencies
+
+OTEL integration requires additional dependencies:
+
+```bash
+pip install openinference-instrumentation-openai-agents opentelemetry-sdk
+```
+
+Choose the appropriate OTEL exporter for your monitoring system:
+
+```bash
+# For OTLP (works with most OTEL collectors and monitoring systems)
+pip install opentelemetry-exporter-otlp
+
+# For Console output (development/debugging)
+pip install opentelemetry-exporter-console
+
+# Other exporters available for specific systems
+pip install opentelemetry-exporter-<your-system>
+```
+
+### Example: Multiple Exporters
+
+```python
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.console import ConsoleSpanExporter
+
+exporters = [
+    # Production monitoring system
+    OTLPSpanExporter(
+        endpoint="https://your-monitoring-system:4317",
+        headers={"api-key": "your-api-key"}
+    ),
+    
+    # Secondary monitoring endpoint
+    OTLPSpanExporter(endpoint="https://backup-collector:4317"),
+    
+    # Development debugging
+    ConsoleSpanExporter(),
+]
+
+plugin = OpenAIAgentsPlugin(otel_exporters=exporters)
+```
+
+### Error Handling
+
+If you provide OTEL exporters but the required dependencies are not installed, you'll receive a clear error message:
+
+```
+ImportError: OTEL dependencies not available. Install with: pip install openinference-instrumentation-openai-agents opentelemetry-sdk
+```
+
+### Direct OpenTelemetry API Calls in Workflows
+
+When using direct OpenTelemetry API calls within workflows (e.g., `opentelemetry.trace.get_tracer(__name__).start_as_current_span()`), you need to ensure proper context bridging and sandbox configuration.
+
+#### Sandbox Configuration
+
+Workflows run in a sandbox that restricts module access. To use direct OTEL API calls, you must explicitly allow OpenTelemetry passthrough:
+
+```python
+from temporalio.worker import Worker
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner, SandboxRestrictions
+
+# Configure worker with OpenTelemetry passthrough
+worker = Worker(
+    client,
+    task_queue="my-task-queue",
+    workflows=[MyWorkflow],
+    workflow_runner=SandboxedWorkflowRunner(
+        SandboxRestrictions.default.with_passthrough_modules("opentelemetry")
+    )
+)
+```
+
+#### Context Bridging Pattern
+
+Direct OTEL spans must be created within an active OpenAI Agents SDK span to ensure proper parenting:
+
+```python
+import opentelemetry.trace
+from agents import custom_span
+from temporalio import workflow
+
+@workflow.defn
+class MyWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        # Start an SDK span first to establish OTEL context bridge
+        with custom_span("Workflow coordination"):
+            # Now direct OTEL spans will be properly parented
+            tracer = opentelemetry.trace.get_tracer(__name__)
+            with tracer.start_as_current_span("Custom workflow span"):
+                # Your workflow logic here
+                result = await self.do_work()
+                return result
+```
+
+#### Why This Pattern is Required
+
+- **OpenInference instrumentation** bridges OpenAI Agents SDK spans to OpenTelemetry context
+- **Direct OTEL API calls** without an active SDK span become root spans with no parent
+- **SDK spans** (`custom_span()`) establish the context bridge that allows subsequent direct OTEL spans to inherit proper trace parenting
+
+#### Complete Example
+
+```python
+import opentelemetry.trace
+from agents import custom_span
+from temporalio import workflow
+from temporalio.worker import Worker
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner, SandboxRestrictions
+
+@workflow.defn
+class TracedWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        # Establish OTEL context with SDK span
+        with custom_span("Main workflow"):
+            # Create direct OTEL spans for fine-grained tracing
+            tracer = opentelemetry.trace.get_tracer(__name__)
+            
+            with tracer.start_as_current_span("Data processing"):
+                data = await self.process_data()
+                
+            with tracer.start_as_current_span("Business logic"):
+                result = await self.execute_business_logic(data)
+                
+            return result
+
+# Worker configuration
+worker = Worker(
+    client,
+    task_queue="traced-workflows",
+    workflows=[TracedWorkflow],
+    workflow_runner=SandboxedWorkflowRunner(
+        SandboxRestrictions.default.with_passthrough_modules("opentelemetry")
+    )
+)
+```
+
+This ensures your direct OTEL spans are properly parented within the trace hierarchy initiated by your client SDK traces.
+
+If no OTEL exporters are provided, the integration works normally without any OTEL setup.
+
 ### Voice
 
 | Mode                     | Supported |
