@@ -6,7 +6,7 @@ from typing import Any, cast
 import nexusrpc
 import opentelemetry.trace
 import pytest
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import get_tracer
 from opentelemetry.util._once import Once
@@ -23,6 +23,23 @@ from tests.helpers import new_worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 logger = logging.getLogger(__name__)
+
+
+def print_otel_spans(spans: tuple[ReadableSpan, ...]):
+    print(
+        "\n".join(
+            [
+                str(
+                    {
+                        "Name": span.name,
+                        "Id": span.context.span_id if span.context else None,
+                        "Parent": span.parent.span_id if span.parent else None,
+                    }
+                )
+                for span in spans
+            ]
+        )
+    )
 
 
 @pytest.fixture
