@@ -8545,7 +8545,11 @@ class RandomSeedTestWorkflow:
         return self._ready
 
 
-async def test_random_seed_functionality(client: Client, worker: Worker):
+async def test_random_seed_functionality(
+    client: Client, worker: Worker, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server doesn't support reset")
     async with new_worker(
         client, RandomSeedTestWorkflow, activities=[say_hello], max_cached_workflows=0
     ) as worker:
