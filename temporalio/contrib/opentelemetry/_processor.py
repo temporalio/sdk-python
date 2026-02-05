@@ -1,10 +1,10 @@
 from opentelemetry.sdk.trace import ReadableSpan
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from temporalio import workflow
 
 
-class TemporalSpanProcessor(SimpleSpanProcessor):
+class TemporalSpanProcessor(BatchSpanProcessor):
     """A span processor that handles Temporal workflow replay semantics.
 
     This processor ensures that spans are only exported when workflows actually

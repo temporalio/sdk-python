@@ -1,11 +1,12 @@
 import logging
 import uuid
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 
 import nexusrpc
 import opentelemetry.trace
 import pytest
+from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import get_tracer
 from opentelemetry.util._once import Once
@@ -108,6 +109,8 @@ async def test_otel_tracing_basic(client: Client, reset_otel_tracer_provider: An
                 execution_timeout=timedelta(seconds=120),
             )
             await workflow_handle.result()
+
+    cast(TracerProvider, plugin.provider()).force_flush()
 
     spans = exporter.get_finished_spans()
     assert len(spans) == 7
@@ -326,6 +329,7 @@ async def test_opentelemetry_comprehensive_tracing(
             assert result["wait_signal"] == "received_2_signals"
             assert result["wait_update"] == "update_received"
 
+    cast(TracerProvider, plugin.provider()).force_flush()
     spans = exporter.get_finished_spans()
 
     # Note: Even though we call signal twice, dump_spans() deduplicates signal spans
@@ -419,6 +423,7 @@ async def test_otel_tracing_with_added_spans(
             )
             await workflow_handle.result()
 
+    cast(TracerProvider, plugin.provider()).force_flush()
     spans = exporter.get_finished_spans()
     assert len(spans) == 15
 

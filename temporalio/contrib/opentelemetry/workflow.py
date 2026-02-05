@@ -27,8 +27,10 @@ from temporalio.exceptions import ApplicationError
 
 
 def _try_get_tracer() -> Tracer | None:
-    tracer = getattr(temporalio.workflow.instance(), "__temporal_opentelemetry_tracer")
-    if not isinstance(tracer, Tracer):
+    tracer = getattr(
+        temporalio.workflow.instance(), "__temporal_opentelemetry_tracer", None
+    )
+    if tracer is not None and not isinstance(tracer, Tracer):
         raise ApplicationError(
             "Failed to get temporal OpenTelemetry tracer from workflow. It was present but not a Tracer. This is unexpected."
         )
