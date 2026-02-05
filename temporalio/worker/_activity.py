@@ -401,7 +401,7 @@ class _ActivityWorker:
                         )
                     elif isinstance(
                         err,
-                        temporalio.exceptions.PayloadSizeError,
+                        temporalio.converter._PayloadSizeError,
                     ):
                         temporalio.activity.logger.warning(
                             err.message,
@@ -442,7 +442,7 @@ class _ActivityWorker:
                         if isinstance(err, concurrent.futures.BrokenExecutor):
                             self._fail_worker_exception_queue.put_nowait(err)
                 # Handle PayloadSizeError from attempting to encode failure information
-                except temporalio.exceptions.PayloadSizeError as inner_err:
+                except temporalio.converter._PayloadSizeError as inner_err:
                     temporalio.activity.logger.exception(inner_err.message)
                     completion.result.Clear()
                     await data_converter.encode_failure(
