@@ -141,7 +141,6 @@ def defn(
             ``Exception`` is set, it effectively will fail a workflow/update in
             all user exception cases. WARNING: This setting is experimental.
         versioning_behavior: Specifies the versioning behavior to use for this workflow.
-            WARNING: This setting is experimental.
     """
 
     def decorator(cls: ClassType) -> ClassType:
@@ -446,8 +445,6 @@ class DynamicWorkflowConfig:
     """Specifies the versioning behavior to use for this workflow.
 
     Always overrides the equivalent parameter on :py:func:`defn`.
-
-        WARNING: This setting is experimental.
     """
 
 
