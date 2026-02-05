@@ -29,7 +29,7 @@ from typing_extensions import Protocol
 import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.client
-import temporalio.contrib.opentelemetryv2.workflow
+import temporalio.contrib.opentelemetry.workflow
 import temporalio.converter
 import temporalio.worker
 import temporalio.workflow
@@ -136,7 +136,7 @@ def _maybe_span(
         token = opentelemetry.context.attach(context) if context else None
         try:
             span_factory = (
-                temporalio.contrib.opentelemetryv2.workflow.start_as_current_span
+                temporalio.contrib.opentelemetry.workflow.tracer().start_as_current_span
                 if workflow.in_workflow()
                 else tracer.start_as_current_span
             )
@@ -166,7 +166,9 @@ def _maybe_span(
                 opentelemetry.context.detach(token)
 
 
-class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interceptor):
+class TracingInterceptorV2(
+    temporalio.client.Interceptor, temporalio.worker.Interceptor
+):
     """Interceptor that supports client and worker OpenTelemetry span creation
     and propagation.
 

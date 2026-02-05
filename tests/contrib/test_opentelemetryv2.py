@@ -10,10 +10,10 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import get_tracer
 from opentelemetry.util._once import Once
 
-import temporalio.contrib.opentelemetryv2.workflow
+import temporalio.contrib.opentelemetry.workflow
 from temporalio import activity, nexus, workflow
 from temporalio.client import Client
-from temporalio.contrib.opentelemetryv2 import OpenTelemetryPlugin
+from temporalio.contrib.opentelemetry import OpenTelemetryPlugin
 from temporalio.testing import WorkflowEnvironment
 
 # Import the dump_spans function from the original opentelemetry test
@@ -65,9 +65,9 @@ class ComprehensiveNexusService:
 class BasicTraceWorkflow:
     @workflow.run
     async def run(self):
-        with temporalio.contrib.opentelemetryv2.workflow.start_as_current_span(
-            "Hello World"
-        ):
+        tracer = temporalio.contrib.opentelemetry.workflow.tracer()
+        temporalio.contrib.opentelemetry.workflow.completed_span("Completed Span")
+        with tracer.start_as_current_span("Hello World"):
             await workflow.execute_activity(
                 simple_no_context_activity,
                 start_to_close_timeout=timedelta(seconds=10),
@@ -76,9 +76,7 @@ class BasicTraceWorkflow:
                 simple_no_context_activity,
                 start_to_close_timeout=timedelta(seconds=10),
             )
-            with temporalio.contrib.opentelemetryv2.workflow.start_as_current_span(
-                "Inner"
-            ):
+            with tracer.start_as_current_span("Inner"):
                 await workflow.execute_activity(
                     simple_no_context_activity,
                     start_to_close_timeout=timedelta(seconds=10),
@@ -86,7 +84,7 @@ class BasicTraceWorkflow:
         return
 
 
-async def test_otel_tracing(client: Client, reset_otel_tracer_provider: Any):  # type: ignore[reportUnusedParameter]
+async def test_otel_tracing_basic(client: Client, reset_otel_tracer_provider: Any):  # type: ignore[reportUnusedParameter]
     exporter = InMemorySpanExporter()
 
     plugin = OpenTelemetryPlugin(exporters=[exporter])
@@ -112,10 +110,11 @@ async def test_otel_tracing(client: Client, reset_otel_tracer_provider: Any):  #
             await workflow_handle.result()
 
     spans = exporter.get_finished_spans()
-    assert len(spans) == 6
+    assert len(spans) == 7
 
     expected_hierarchy = [
         "Research workflow",
+        "  Completed Span",
         "  Hello World",
         "    Activity",
         "    Activity",
@@ -140,15 +139,11 @@ class ComprehensiveWorkflow:
     @workflow.run
     async def run(self, actions: list[str]) -> dict[str, str]:
         results = {}
-
-        with temporalio.contrib.opentelemetryv2.workflow.start_as_current_span(
-            "MainWorkflow"
-        ):
+        tracer = temporalio.contrib.opentelemetry.workflow.tracer()
+        with tracer.start_as_current_span("MainWorkflow"):
             for action in actions:
                 if action == "activity":
-                    with temporalio.contrib.opentelemetryv2.workflow.start_as_current_span(
-                        "ActivitySection"
-                    ):
+                    with tracer.start_as_current_span("ActivitySection"):
                         result = await workflow.execute_activity(
                             simple_no_context_activity,
                             start_to_close_timeout=timedelta(seconds=10),
@@ -156,9 +151,7 @@ class ComprehensiveWorkflow:
                         results["activity"] = result
 
                 elif action == "local_activity":
-                    with temporalio.contrib.opentelemetryv2.workflow.start_as_current_span(
-                        "LocalActivitySection"
-                    ):
+                    with tracer.start_as_current_span("LocalActivitySection"):
                         result = await workflow.execute_local_activity(
                             simple_no_context_activity,
                             start_to_close_timeout=timedelta(seconds=10),
@@ -166,9 +159,7 @@ class ComprehensiveWorkflow:
                         results["local_activity"] = result
 
                 elif action == "child_workflow":
-                    with temporalio.contrib.opentelemetryv2.workflow.start_as_current_span(
-                        "ChildWorkflowSection"
-                    ):
+                    with tracer.start_as_current_span("ChildWorkflowSection"):
                         child_handle = await workflow.start_child_workflow(
                             BasicTraceWorkflow.run,
                             id=f"child-{workflow.info().workflow_id}",
@@ -177,32 +168,24 @@ class ComprehensiveWorkflow:
                         results["child_workflow"] = "completed"
 
                 elif action == "timer":
-                    with temporalio.contrib.opentelemetryv2.workflow.start_as_current_span(
-                        "TimerSection"
-                    ):
+                    with tracer.start_as_current_span("TimerSection"):
                         await workflow.sleep(0.01)
                         results["timer"] = "completed"
 
                 elif action == "wait_signal":
-                    with temporalio.contrib.opentelemetryv2.workflow.start_as_current_span(
-                        "WaitSignalSection"
-                    ):
+                    with tracer.start_as_current_span("WaitSignalSection"):
                         await workflow.wait_condition(lambda: self._signal_count > 0)
                         results["wait_signal"] = (
                             f"received_{self._signal_count}_signals"
                         )
 
                 elif action == "wait_update":
-                    with temporalio.contrib.opentelemetryv2.workflow.start_as_current_span(
-                        "WaitUpdateSection"
-                    ):
+                    with tracer.start_as_current_span("WaitUpdateSection"):
                         await workflow.wait_condition(lambda: self._update_completed)
                         results["wait_update"] = "update_received"
 
                 elif action == "nexus":
-                    with temporalio.contrib.opentelemetryv2.workflow.start_as_current_span(
-                        "NexusSection"
-                    ):
+                    with tracer.start_as_current_span("NexusSection"):
                         nexus_client = workflow.create_nexus_client(
                             endpoint=make_nexus_endpoint_name(
                                 workflow.info().task_queue
@@ -217,9 +200,7 @@ class ComprehensiveWorkflow:
                         results["nexus"] = nexus_result
 
                 elif action == "continue_as_new":
-                    with temporalio.contrib.opentelemetryv2.workflow.start_as_current_span(
-                        "ContinueAsNewSection"
-                    ):
+                    with tracer.start_as_current_span("ContinueAsNewSection"):
                         if (
                             len(results) > 0
                         ):  # Only continue as new if we've done some work
@@ -252,7 +233,7 @@ class ComprehensiveWorkflow:
             raise ValueError("Status cannot be empty")
 
 
-async def test_opentelemetryv2_comprehensive_tracing(
+async def test_opentelemetry_comprehensive_tracing(
     client: Client,
     env: WorkflowEnvironment,
     reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
@@ -374,6 +355,7 @@ async def test_opentelemetryv2_comprehensive_tracing(
         "        ChildWorkflowSection",
         "          StartChildWorkflow:BasicTraceWorkflow",
         "            RunWorkflow:BasicTraceWorkflow",
+        "              Completed Span",
         "              Hello World",
         "                StartActivity:simple_no_context_activity",
         "                  RunActivity:simple_no_context_activity",
@@ -438,12 +420,13 @@ async def test_otel_tracing_with_added_spans(
             await workflow_handle.result()
 
     spans = exporter.get_finished_spans()
-    assert len(spans) == 14
+    assert len(spans) == 15
 
     expected_hierarchy = [
         "Research workflow",
         "  StartWorkflow:BasicTraceWorkflow",
         "    RunWorkflow:BasicTraceWorkflow",
+        "      Completed Span",
         "      Hello World",
         "        StartActivity:simple_no_context_activity",
         "          RunActivity:simple_no_context_activity",
