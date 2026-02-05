@@ -272,6 +272,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._object: Any = None
         self._is_replaying: bool = False
         self._random = random.Random(det.randomness_seed)
+        self._current_seed = det.randomness_seed
+        self._seed_callbacks: list[Callable[[int], None]] = []
         self._read_only = False
         self._in_query_or_validator = False
 
@@ -1075,6 +1077,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self, job: temporalio.bridge.proto.workflow_activation.UpdateRandomSeed
     ) -> None:
         self._random.seed(job.randomness_seed)
+        self._current_seed = job.randomness_seed
+        # Notify all registered callbacks
+        for callback in self._seed_callbacks:
+            try:
+                callback(job.randomness_seed)
+            except Exception:
+                # Ignore callback errors to avoid disrupting workflow execution
+                pass
 
     def _make_workflow_input(
         self, init_job: temporalio.bridge.proto.workflow_activation.InitializeWorkflow
@@ -1807,6 +1817,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
 
         return None
+
+    def workflow_random_seed(self) -> int:
+        return self._current_seed
+
+    def workflow_register_random_seed_callback(
+        self, callback: Callable[[int], None]
+    ) -> None:
+        self._seed_callbacks.append(callback)
 
     #### Calls from outbound impl ####
     # These are in alphabetical order and all start with "_outbound_".
