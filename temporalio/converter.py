@@ -1222,20 +1222,6 @@ class PayloadSizeWarning(RuntimeWarning):
     """The size of payloads is above the warning limit."""
 
 
-class _PayloadSizeError(temporalio.exceptions.TemporalError):
-    """Error raised when payloads size exceeds payload size limits."""
-
-    def __init__(self, message: str):
-        """Initialize a payloads size error."""
-        super().__init__(message)
-        self._message = message
-
-    @property
-    def message(self) -> str:
-        """Message."""
-        return self._message
-
-
 @dataclass(frozen=True)
 class _ServerPayloadErrorLimits:
     """Error limits for payloads as described by the Temporal server."""
@@ -1536,7 +1522,7 @@ class DataConverter(WithSerializationContext):
         total_size = sum(payload.ByteSize() for payload in payloads)
 
         if error_limit and error_limit > 0 and total_size > error_limit:
-            raise _PayloadSizeError(
+            raise temporalio.exceptions.PayloadSizeError(
                 f"{error_message} Size: {total_size} bytes, Limit: {error_limit} bytes"
             )
 

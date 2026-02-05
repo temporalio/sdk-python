@@ -381,7 +381,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                     data_converter,
                     encode_headers=self._encode_headers,
                 )
-            except temporalio.converter._PayloadSizeError as err:
+            except temporalio.exceptions.PayloadSizeError as err:
                 logger.warning(err.message)
                 completion.failed.Clear()
                 await data_converter.encode_failure(err, completion.failed.failure)
