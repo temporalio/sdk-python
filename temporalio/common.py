@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
+import threading
 import types
 import warnings
 from abc import ABC, abstractmethod
@@ -1040,10 +1042,7 @@ Priority.default = Priority(priority_key=None, fairness_key=None, fairness_weigh
 
 
 class VersioningBehavior(IntEnum):
-    """Specifies when a workflow might move from a worker of one Build Id to another.
-
-    WARNING: Experimental API.
-    """
+    """Specifies when a workflow might move from a worker of one Build Id to another."""
 
     UNSPECIFIED = (
         temporalio.api.enums.v1.VersioningBehavior.VERSIONING_BEHAVIOR_UNSPECIFIED
@@ -1061,10 +1060,7 @@ class VersioningBehavior(IntEnum):
 
 @dataclass(frozen=True)
 class WorkerDeploymentVersion:
-    """Represents the version of a specific worker deployment.
-
-    WARNING: Experimental API.
-    """
+    """Represents the version of a specific worker deployment."""
 
     deployment_name: str
     build_id: str
@@ -1094,11 +1090,7 @@ class WorkerDeploymentVersion:
 
 
 class VersioningOverride(ABC):
-    """Represents the override of a worker's versioning behavior for a workflow execution.
-
-    .. warning::
-        Experimental API.
-    """
+    """Represents the override of a worker's versioning behavior for a workflow execution."""
 
     @abstractmethod
     def _to_proto(self) -> temporalio.api.workflow.v1.VersioningOverride:
@@ -1108,11 +1100,7 @@ class VersioningOverride(ABC):
 
 @dataclass(frozen=True)
 class PinnedVersioningOverride(VersioningOverride):
-    """Workflow will be pinned to a specific deployment version.
-
-    .. warning::
-        Experimental API.
-    """
+    """Workflow will be pinned to a specific deployment version."""
 
     version: WorkerDeploymentVersion
 
@@ -1131,11 +1119,7 @@ class PinnedVersioningOverride(VersioningOverride):
 
 @dataclass(frozen=True)
 class AutoUpgradeVersioningOverride(VersioningOverride):
-    """The workflow will auto-upgrade to the current deployment version on the next workflow task.
-
-    .. warning::
-        Experimental API.
-    """
+    """The workflow will auto-upgrade to the current deployment version on the next workflow task."""
 
     def _to_proto(self) -> temporalio.api.workflow.v1.VersioningOverride:
         """Convert to proto representation."""
@@ -1261,3 +1245,33 @@ class HeaderCodecBehavior(IntEnum):
     """Encode and decode all headers automatically"""
     WORKFLOW_ONLY_CODEC = 3
     """Only automatically encode and decode headers in workflow activation encoding and decoding."""
+
+
+@dataclass
+class _CompositeEvent:  # pyright: ignore[reportUnusedClass]
+    # This should always be present, but is sometimes lazily set internally
+    thread_event: threading.Event | None
+    # Async event only for async activities
+    async_event: asyncio.Event | None
+
+    def set(self) -> None:
+        if not self.thread_event:
+            raise RuntimeError("Missing event")
+        self.thread_event.set()
+        if self.async_event:
+            self.async_event.set()
+
+    def is_set(self) -> bool:
+        if not self.thread_event:
+            raise RuntimeError("Missing event")
+        return self.thread_event.is_set()
+
+    async def wait(self) -> None:
+        if not self.async_event:
+            raise RuntimeError("not in async activity")
+        await self.async_event.wait()
+
+    def wait_sync(self, timeout: float | None = None) -> None:
+        if not self.thread_event:
+            raise RuntimeError("Missing event")
+        self.thread_event.wait(timeout)

@@ -70,7 +70,7 @@ class _ActivityWorker:
         self._encode_headers = encode_headers
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
         # Lazily created on first activity
-        self._worker_shutdown_event: temporalio.activity._CompositeEvent | None = None
+        self._worker_shutdown_event: temporalio.common._CompositeEvent | None = None
         self._seen_sync_activity = False
         self._client = client
 
@@ -461,7 +461,7 @@ class _ActivityWorker:
 
         # Create the worker shutdown event if not created
         if not self._worker_shutdown_event:
-            self._worker_shutdown_event = temporalio.activity._CompositeEvent(
+            self._worker_shutdown_event = temporalio.common._CompositeEvent(
                 thread_event=threading.Event(), async_event=asyncio.Event()
             )
 
@@ -474,7 +474,7 @@ class _ActivityWorker:
             if isinstance(
                 self._activity_executor, concurrent.futures.ThreadPoolExecutor
             ):
-                running_activity.cancelled_event = temporalio.activity._CompositeEvent(
+                running_activity.cancelled_event = temporalio.common._CompositeEvent(
                     thread_event=threading.Event(),
                     # No async event
                     async_event=None,
@@ -486,7 +486,7 @@ class _ActivityWorker:
                 manager = self._shared_state_manager
                 # Pre-checked on worker init
                 assert manager
-                running_activity.cancelled_event = temporalio.activity._CompositeEvent(
+                running_activity.cancelled_event = temporalio.common._CompositeEvent(
                     thread_event=manager.new_event(),
                     # No async event
                     async_event=None,
@@ -500,7 +500,7 @@ class _ActivityWorker:
             self._seen_sync_activity = True
         else:
             # We have to set the async form of events
-            running_activity.cancelled_event = temporalio.activity._CompositeEvent(
+            running_activity.cancelled_event = temporalio.common._CompositeEvent(
                 thread_event=threading.Event(),
                 async_event=asyncio.Event(),
             )
@@ -577,10 +577,9 @@ class _ActivityWorker:
             else None,
         )
 
-        if self._encode_headers and data_converter.payload_codec is not None:
+        if self._encode_headers and data_converter._decode_payload_has_effect:
             for payload in start.header_fields.values():
-                new_payload = (await data_converter.payload_codec.decode([payload]))[0]
-                payload.CopyFrom(new_payload)
+                payload.CopyFrom(await data_converter._decode_payload(payload))
 
         running_activity.info = info
         input = ExecuteActivityInput(
@@ -639,7 +638,7 @@ class _RunningActivity:
     # Most of these optional values are set before use
     info: temporalio.activity.Info | None = None
     task: asyncio.Task | None = None
-    cancelled_event: temporalio.activity._CompositeEvent | None = None
+    cancelled_event: temporalio.common._CompositeEvent | None = None
     last_heartbeat_task: asyncio.Task | None = None
     cancel_thread_raiser: _ThreadExceptionRaiser | None = None
     sync: bool = False
@@ -861,10 +860,10 @@ def _execute_sync_activity(
         temporalio.activity._Context(
             info=lambda: info,
             heartbeat=heartbeat_fn,
-            cancelled_event=temporalio.activity._CompositeEvent(
+            cancelled_event=temporalio.common._CompositeEvent(
                 thread_event=cancelled_event, async_event=None
             ),
-            worker_shutdown_event=temporalio.activity._CompositeEvent(
+            worker_shutdown_event=temporalio.common._CompositeEvent(
                 thread_event=worker_shutdown_event, async_event=None
             ),
             shield_thread_cancel_exception=(

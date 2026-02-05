@@ -1589,6 +1589,8 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
     SCHEDULED_EVENT_ID_FIELD_NUMBER: builtins.int
     BLOCKED_REASON_FIELD_NUMBER: builtins.int
     OPERATION_TOKEN_FIELD_NUMBER: builtins.int
+    SCHEDULE_TO_START_TIMEOUT_FIELD_NUMBER: builtins.int
+    START_TO_CLOSE_TIMEOUT_FIELD_NUMBER: builtins.int
     endpoint: builtins.str
     """Endpoint name.
     Resolved to a URL via the cluster's endpoint registry.
@@ -1636,6 +1638,18 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
     """If the state is BLOCKED, blocked reason provides additional information."""
     operation_token: builtins.str
     """Operation token. Only set for asynchronous operations after a successful StartOperation call."""
+    @property
+    def schedule_to_start_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Schedule-to-start timeout for this operation.
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "to" is used to indicate interval. --)
+        """
+    @property
+    def start_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Start-to-close timeout for this operation.
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "to" is used to indicate interval. --)
+        """
     def __init__(
         self,
         *,
@@ -1657,6 +1671,8 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
         scheduled_event_id: builtins.int = ...,
         blocked_reason: builtins.str = ...,
         operation_token: builtins.str = ...,
+        schedule_to_start_timeout: google.protobuf.duration_pb2.Duration | None = ...,
+        start_to_close_timeout: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1671,8 +1687,12 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
             b"next_attempt_schedule_time",
             "schedule_to_close_timeout",
             b"schedule_to_close_timeout",
+            "schedule_to_start_timeout",
+            b"schedule_to_start_timeout",
             "scheduled_time",
             b"scheduled_time",
+            "start_to_close_timeout",
+            b"start_to_close_timeout",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -1700,12 +1720,16 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
             b"operation_token",
             "schedule_to_close_timeout",
             b"schedule_to_close_timeout",
+            "schedule_to_start_timeout",
+            b"schedule_to_start_timeout",
             "scheduled_event_id",
             b"scheduled_event_id",
             "scheduled_time",
             b"scheduled_time",
             "service",
             b"service",
+            "start_to_close_timeout",
+            b"start_to_close_timeout",
             "state",
             b"state",
         ],

@@ -6,6 +6,7 @@ import asyncio
 import contextvars
 import inspect
 import logging
+import sys
 import threading
 import typing
 import uuid
@@ -138,7 +139,6 @@ def defn(
             ``Exception`` is set, it effectively will fail a workflow/update in
             all user exception cases. WARNING: This setting is experimental.
         versioning_behavior: Specifies the versioning behavior to use for this workflow.
-            WARNING: This setting is experimental.
     """
 
     def decorator(cls: ClassType) -> ClassType:
@@ -443,8 +443,6 @@ class DynamicWorkflowConfig:
     """Specifies the versioning behavior to use for this workflow.
 
     Always overrides the equivalent parameter on :py:func:`defn`.
-
-        WARNING: This setting is experimental.
     """
 
 
@@ -907,6 +905,14 @@ class _Runtime(ABC):
     @abstractmethod
     def workflow_last_failure(self) -> BaseException | None: ...
 
+    @abstractmethod
+    def workflow_random_seed(self) -> int: ...
+
+    @abstractmethod
+    def workflow_register_random_seed_callback(
+        self, callback: Callable[[int], None]
+    ) -> None: ...
+
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
     "__temporal_current_update_info"
@@ -1159,6 +1165,51 @@ def random() -> Random:
         The deterministically-seeded pseudo-random number generator.
     """
     return _Runtime.current().workflow_random()
+
+
+def random_seed() -> int:
+    """Get the current random seed value from core.
+
+    This returns the seed value currently being used by the workflow's
+    deterministic random number generator.
+
+    Returns:
+        The current random seed as an integer.
+    """
+    return _Runtime.current().workflow_random_seed()
+
+
+def register_random_seed_callback(callback: Callable[[int], None]) -> None:
+    """Register a callback to be notified when the random seed changes.
+
+    The callback will be invoked whenever the workflow receives a new random
+    seed from the core. This is useful for maintaining external random number
+    generators that need to stay in sync with the workflow's randomness.
+
+    Args:
+        callback: Function to be called with the new seed value when it changes.
+    """
+    return _Runtime.current().workflow_register_random_seed_callback(callback)
+
+
+def new_random() -> Random:
+    """Create a Random instance that automatically reseeds when the workflow seed changes.
+
+    This creates a new Random instance that is initially seeded with the current
+    workflow seed, and automatically registers a callback to reseed itself
+    whenever the workflow receives a new seed from core.
+
+    Returns:
+        A Random instance that stays synchronized with the workflow's randomness.
+    """
+    current_seed = random_seed()
+    auto_random = Random(current_seed)
+
+    def reseed_callback(new_seed: int) -> None:
+        auto_random.seed(new_seed)
+
+    register_random_seed_callback(reseed_callback)
+    return auto_random
 
 
 def time() -> float:
@@ -1596,6 +1647,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         self.workflow_info_on_extra = True
         self.full_workflow_info_on_extra = False
         self.log_during_replay = False
+        self.disable_sandbox = False
 
     def process(
         self, msg: Any, kwargs: MutableMapping[str, Any]
@@ -1629,7 +1681,28 @@ class LoggerAdapter(logging.LoggerAdapter):
         kwargs["extra"] = {**extra, **(kwargs.get("extra") or {})}
         if msg_extra:
             msg = f"{msg} ({msg_extra})"
-        return (msg, kwargs)
+        return msg, kwargs
+
+    def log(
+        self,
+        level: int,
+        msg: object,
+        *args: Any,
+        stacklevel: int = 1,
+        **kwargs: Any,
+    ):
+        """Override to potentially disable the sandbox."""
+        if sys.version_info < (3, 11) and stacklevel == 1:
+            # An additional stacklevel is needed on 3.10 because it doesn't skip internal frames until after stacklevel
+            # is decremented, so it needs an additional stacklevel to skip the internal frame.
+            stacklevel += 1  # type: ignore[reportUnreachable]
+        stacklevel += 1
+        if self.disable_sandbox:
+            with unsafe.sandbox_unrestricted():
+                with unsafe.imports_passed_through():
+                    super().log(level, msg, *args, stacklevel=stacklevel, **kwargs)
+        else:
+            super().log(level, msg, *args, stacklevel=stacklevel, **kwargs)
 
     def isEnabledFor(self, level: int) -> bool:
         """Override to ignore replay logs."""
@@ -1643,6 +1716,12 @@ class LoggerAdapter(logging.LoggerAdapter):
         handlers/formatters.
         """
         return self.logger
+
+    def unsafe_disable_sandbox(self, value: bool = True):
+        """Disable the sandbox during log processing.
+        Can be turned back on with unsafe_disable_sandbox(False).
+        """
+        self.disable_sandbox = value
 
 
 logger = LoggerAdapter(logging.getLogger(__name__), None)
