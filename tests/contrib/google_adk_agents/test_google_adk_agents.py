@@ -17,6 +17,7 @@
 import logging
 import os
 import uuid
+from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator, Iterator
 from datetime import timedelta
 
@@ -173,37 +174,54 @@ class MultiAgentWorkflow:
         return final_content
 
 
-class WeatherModel(BaseLlm):
-    responses: list[LlmResponse] = [
-        LlmResponse(
-            content=Content(
-                role="model",
-                parts=[
-                    Part(
-                        function_call=FunctionCall(
-                            args={"city": "New York"}, name="get_weather"
-                        )
-                    )
-                ],
-            )
-        ),
-        LlmResponse(
-            content=Content(
-                role="model",
-                parts=[Part(text="warm and sunny")],
-            )
-        ),
-    ]
-    response_iter: Iterator[LlmResponse] = iter(responses)
+class TestModel(BaseLlm, ABC):
+    @abstractmethod
+    def responses(self) -> list[LlmResponse]:
+        raise NotImplementedError
 
     @classmethod
+    @abstractmethod
     def supported_models(cls) -> list[str]:
-        return ["weather_model"]
+        raise NotImplementedError
 
     async def generate_content_async(
         self, llm_request: LlmRequest, stream: bool = False
     ) -> AsyncGenerator[LlmResponse, None]:
-        yield next(self.response_iter)
+        for i, response in enumerate(self.responses()):
+            print("Checking if response ", i, " is in ", llm_request.contents)
+            if any(content == response.content for content in llm_request.contents):
+                continue
+            print("Returning response ", i)
+            yield response
+            return
+
+
+class WeatherModel(TestModel):
+    def responses(self) -> list[LlmResponse]:
+        return [
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[
+                        Part(
+                            function_call=FunctionCall(
+                                args={"city": "New York"}, name="get_weather"
+                            )
+                        )
+                    ],
+                )
+            ),
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[Part(text="warm and sunny")],
+                )
+            ),
+        ]
+
+    @classmethod
+    def supported_models(cls) -> list[str]:
+        return ["weather_model"]
 
 
 @pytest.mark.parametrize("use_local_model", [True, False])
@@ -248,49 +266,45 @@ async def test_single_agent(client: Client, use_local_model: bool):
             assert result.content.parts[0].text == "warm and sunny"
 
 
-class ResearchModel(BaseLlm):
-    responses: list[LlmResponse] = [
-        LlmResponse(
-            content=Content(
-                role="model",
-                parts=[
-                    Part(
-                        function_call=FunctionCall(
-                            args={"agent_name": "researcher"}, name="transfer_to_agent"
+class ResearchModel(TestModel):
+    def responses(self) -> list[LlmResponse]:
+        return [
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[
+                        Part(
+                            function_call=FunctionCall(
+                                args={"agent_name": "researcher"},
+                                name="transfer_to_agent",
+                            )
                         )
-                    )
-                ],
-            )
-        ),
-        LlmResponse(
-            content=Content(
-                role="model",
-                parts=[
-                    Part(
-                        function_call=FunctionCall(
-                            args={"agent_name": "writer"}, name="transfer_to_agent"
+                    ],
+                )
+            ),
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[
+                        Part(
+                            function_call=FunctionCall(
+                                args={"agent_name": "writer"}, name="transfer_to_agent"
+                            )
                         )
-                    )
-                ],
-            )
-        ),
-        LlmResponse(
-            content=Content(
-                role="model",
-                parts=[Part(text="haiku")],
-            )
-        ),
-    ]
-    response_iter: Iterator[LlmResponse] = iter(responses)
+                    ],
+                )
+            ),
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[Part(text="haiku")],
+                )
+            ),
+        ]
 
     @classmethod
     def supported_models(cls) -> list[str]:
         return ["research_model"]
-
-    async def generate_content_async(
-        self, llm_request: LlmRequest, stream: bool = False
-    ) -> AsyncGenerator[LlmResponse, None]:
-        yield next(self.response_iter)
 
 
 @pytest.mark.parametrize("use_local_model", [True, False])
