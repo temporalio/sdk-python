@@ -1,18 +1,12 @@
-from collections.abc import AsyncIterator, Sequence
-from contextlib import asynccontextmanager
+from opentelemetry.trace import get_tracer_provider
 
-import opentelemetry.sdk.trace
-from opentelemetry.sdk.trace.export import SpanExporter
-from opentelemetry.trace import TracerProvider, set_tracer_provider
-
-from temporalio.contrib.opentelemetry import TracingInterceptorV2
-from temporalio.contrib.opentelemetry._id_generator import TemporalIdGenerator
-from temporalio.contrib.opentelemetry._processor import TemporalSpanProcessor
+from temporalio.contrib.opentelemetry import OpenTelemetryInterceptor
+from temporalio.contrib.opentelemetry._tracer_provider import ReplaySafeTracerProvider
 from temporalio.plugin import SimplePlugin
 
 
 class OpenTelemetryPlugin(SimplePlugin):
-    """OpenTelemetry v2 plugin for Temporal SDK.
+    """OpenTelemetry plugin for Temporal SDK.
 
     .. warning::
         This class is experimental and may change in future versions.
@@ -20,7 +14,7 @@ class OpenTelemetryPlugin(SimplePlugin):
 
     This plugin integrates OpenTelemetry tracing with the Temporal SDK, providing
     automatic span creation for workflows, activities, and other Temporal operations.
-    It uses the new TracingInterceptorV2 implementation.
+    It uses the new OpenTelemetryInterceptor implementation.
 
     Unlike the prior TracingInterceptor, this allows for accurate duration spans and parenting inside a workflow
     with temporalio.contrib.opentelemetry.workflow.tracer()
@@ -30,43 +24,25 @@ class OpenTelemetryPlugin(SimplePlugin):
     traces will not be propagated to the workflow.
     """
 
-    def __init__(
-        self, exporters: Sequence[SpanExporter], *, add_temporal_spans: bool = False
-    ):
+    def __init__(self, *, add_temporal_spans: bool = False):
         """Initialize the OpenTelemetry plugin.
 
         Args:
-            exporters: Sequence of OpenTelemetry span exporters to use.
             add_temporal_spans: Whether to add additional Temporal-specific spans
                 for operations like StartWorkflow, RunWorkflow, etc.
         """
-        generator = TemporalIdGenerator()
-        self._provider = opentelemetry.sdk.trace.TracerProvider(id_generator=generator)
-        for exporter in exporters:
-            self._provider.add_span_processor(TemporalSpanProcessor(exporter))
+        provider = get_tracer_provider()
+        if not isinstance(provider, ReplaySafeTracerProvider):
+            raise ValueError(
+                "When using OpenTelemetryPlugin, the global trace provider must be a ReplaySafeTracerProvider. Use init_tracer_provider to create one."
+            )
 
         interceptors = [
-            TracingInterceptorV2(
-                self._provider.get_tracer(__name__), add_temporal_spans
-            )
+            OpenTelemetryInterceptor(provider.get_tracer(__name__), add_temporal_spans)
         ]
-
-        @asynccontextmanager
-        async def run_context() -> AsyncIterator[None]:
-            set_tracer_provider(self._provider)
-            yield
 
         super().__init__(
             "OpenTelemetryPlugin",
             client_interceptors=interceptors,
             worker_interceptors=interceptors,
-            run_context=lambda: run_context(),
         )
-
-    def provider(self) -> TracerProvider:
-        """Get the OpenTelemetry TracerProvider instance.
-
-        Returns:
-            The TracerProvider used by this plugin.
-        """
-        return self._provider

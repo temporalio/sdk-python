@@ -8,18 +8,11 @@ this module are designed to work correctly during workflow replay.
 from __future__ import annotations
 
 import warnings
-from collections.abc import Iterator, Sequence
 
 import opentelemetry.util.types
-from opentelemetry.context import Context
 from opentelemetry.trace import (
-    Link,
-    SpanKind,
     Tracer,
 )
-from opentelemetry.trace.span import Span
-from opentelemetry.util import types
-from opentelemetry.util._decorator import _agnosticcontextmanager
 
 import temporalio.workflow
 from temporalio.contrib.opentelemetry import TracingWorkflowInboundInterceptor
@@ -37,7 +30,13 @@ def _try_get_tracer() -> Tracer | None:
     return tracer
 
 
-def _get_tracer():
+def tracer():
+    """Get an OpenTelemetry Tracer which functions inside a Temporal workflow.
+
+    .. warning::
+        This function is experimental and may change in future versions.
+        Use with caution in production environments.
+    """
     tracer = _try_get_tracer()
     if tracer is None or not isinstance(tracer, Tracer):
         raise ApplicationError(
@@ -45,63 +44,6 @@ def _get_tracer():
         )
 
     return tracer
-
-
-class _TemporalTracer(Tracer):
-    def __init__(self, tracer: Tracer) -> None:
-        self._tracer = tracer
-
-    def start_span(
-        self,
-        name: str,
-        context: Context | None = None,
-        kind: SpanKind = SpanKind.INTERNAL,
-        attributes: types.Attributes = None,
-        links: Sequence[Link] | None = None,
-        start_time: int | None = None,
-        record_exception: bool = True,
-        set_status_on_exception: bool = True,
-    ) -> "Span":
-        return self._tracer.start_span(
-            name,
-            context,
-            kind,
-            attributes,
-            links,
-            start_time or temporalio.workflow.time_ns(),
-            record_exception,
-            set_status_on_exception,
-        )
-
-    @_agnosticcontextmanager
-    def start_as_current_span(
-        self,
-        name: str,
-        context: Context | None = None,
-        kind: SpanKind = SpanKind.INTERNAL,
-        attributes: types.Attributes = None,
-        links: Sequence[Link] | None = None,
-        start_time: int | None = None,
-        record_exception: bool = True,
-        set_status_on_exception: bool = True,
-        end_on_exit: bool = True,
-    ) -> Iterator["Span"]:
-        with self._tracer.start_as_current_span(
-            name,
-            context,
-            kind,
-            attributes,
-            links,
-            start_time or temporalio.workflow.time_ns(),
-            record_exception,
-            set_status_on_exception,
-        ) as span:
-            yield span
-
-
-def tracer() -> Tracer:
-    """Get an OpenTelemetry Tracer which functions inside a Temporal workflow."""
-    return _TemporalTracer(_get_tracer())
 
 
 def completed_span(

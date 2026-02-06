@@ -132,45 +132,50 @@ def _maybe_span(
 ) -> Iterator[None]:
     if not add_temporal_spans:
         yield
-    else:
-        token = opentelemetry.context.attach(context) if context else None
-        try:
-            span_factory = (
-                temporalio.contrib.opentelemetry.workflow.tracer().start_as_current_span
-                if workflow.in_workflow()
-                else tracer.start_as_current_span
-            )
-            with span_factory(
-                name,
-                attributes=attributes,
-                kind=kind,
-                context=context,
-                set_status_on_exception=False,
-            ) as span:
-                try:
-                    yield
-                except Exception as exc:
-                    if (
-                        not isinstance(exc, ApplicationError)
-                        or exc.category != ApplicationErrorCategory.BENIGN
-                    ):
-                        span.set_status(
-                            Status(
-                                status_code=StatusCode.ERROR,
-                                description=f"{type(exc).__name__}: {exc}",
-                            )
+        return
+
+    token = opentelemetry.context.attach(context) if context else None
+    try:
+        span_factory = (
+            temporalio.contrib.opentelemetry.workflow.tracer().start_as_current_span
+            if workflow.in_workflow()
+            else tracer.start_as_current_span
+        )
+        with span_factory(
+            name,
+            attributes=attributes,
+            kind=kind,
+            context=context,
+            set_status_on_exception=False,
+        ) as span:
+            try:
+                yield
+            except Exception as exc:
+                if (
+                    not isinstance(exc, ApplicationError)
+                    or exc.category != ApplicationErrorCategory.BENIGN
+                ):
+                    span.set_status(
+                        Status(
+                            status_code=StatusCode.ERROR,
+                            description=f"{type(exc).__name__}: {exc}",
                         )
-                    raise
-        finally:
-            if token and context is opentelemetry.context.get_current():
-                opentelemetry.context.detach(token)
+                    )
+                raise
+    finally:
+        if token and context is opentelemetry.context.get_current():
+            opentelemetry.context.detach(token)
 
 
-class TracingInterceptorV2(
+class OpenTelemetryInterceptor(
     temporalio.client.Interceptor, temporalio.worker.Interceptor
 ):
     """Interceptor that supports client and worker OpenTelemetry span creation
     and propagation.
+
+    .. warning::
+        This class is experimental and may change in future versions.
+        Use with caution in production environments.
 
     This should be created and used for ``interceptors`` on the
     :py:meth:`temporalio.client.Client.connect` call to apply to all client
