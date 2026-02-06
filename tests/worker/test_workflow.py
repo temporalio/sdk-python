@@ -2035,21 +2035,38 @@ async def test_workflow_logging(client: Client, temporal_extra_mode: str):
             if temporal_extra_mode == "dict":
                 # Dict mode appends context to message and uses nested dict
                 assert "({'attempt':" in record.message
-                assert record.__dict__["temporal_workflow"]["workflow_type"] == "LoggingWorkflow"
-                assert update_record.__dict__["temporal_workflow"]["update_id"] == "update-1"
-                assert update_record.__dict__["temporal_workflow"]["update_name"] == "my_update"
+                assert (
+                    record.__dict__["temporal_workflow"]["workflow_type"]
+                    == "LoggingWorkflow"
+                )
+                assert (
+                    update_record.__dict__["temporal_workflow"]["update_id"]
+                    == "update-1"
+                )
+                assert (
+                    update_record.__dict__["temporal_workflow"]["update_name"]
+                    == "my_update"
+                )
                 assert "'update_id': 'update-1'" in update_record.message
             else:
                 # Flatten mode uses OTel-safe scalar attributes
                 assert "temporal_workflow" not in record.__dict__
-                assert record.__dict__["temporal.workflow.workflow_type"] == "LoggingWorkflow"
+                assert (
+                    record.__dict__["temporal.workflow.workflow_type"]
+                    == "LoggingWorkflow"
+                )
                 assert "temporal.workflow.workflow_id" in record.__dict__
                 assert "temporal.workflow.run_id" in record.__dict__
                 assert "temporal.workflow.namespace" in record.__dict__
                 assert "temporal.workflow.task_queue" in record.__dict__
                 assert record.__dict__["temporal.workflow.attempt"] == 1
-                assert update_record.__dict__["temporal.workflow.update_id"] == "update-1"
-                assert update_record.__dict__["temporal.workflow.update_name"] == "my_update"
+                assert (
+                    update_record.__dict__["temporal.workflow.update_id"] == "update-1"
+                )
+                assert (
+                    update_record.__dict__["temporal.workflow.update_name"]
+                    == "my_update"
+                )
 
                 # Verify all temporal.workflow.* values are primitives (OTel-safe)
                 for key, value in record.__dict__.items():
@@ -2147,8 +2164,7 @@ async def test_workflow_logging_task_fail(client: Client):
         def workflow_failure_with_identifier(l: logging.LogRecord):
             if (
                 hasattr(l, "__temporal_error_identifier")
-                and getattr(l, "__temporal_error_identifier")
-                == "WorkflowTaskFailure"
+                and getattr(l, "__temporal_error_identifier") == "WorkflowTaskFailure"
             ):
                 assert l.msg.startswith("Failed activation on workflow")
                 return True

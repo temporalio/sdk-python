@@ -178,9 +178,9 @@ class TestFlattenModeOTelSafety:
         )
 
         for k, v in extra.items():
-            assert not isinstance(v, dict), (
-                f"Flatten mode violation after update: {k}={type(v).__name__}"
-            )
+            assert not isinstance(
+                v, dict
+            ), f"Flatten mode violation after update: {k}={type(v).__name__}"
         assert "temporal_workflow" not in extra
         assert extra["temporal.workflow.workflow_id"] == "wf-001"
         assert extra["temporal.workflow.update_id"] == "upd-001"
@@ -188,10 +188,27 @@ class TestFlattenModeOTelSafety:
     def test_flattened_keys_do_not_conflict_with_logrecord_attrs(self) -> None:
         """Verify temporal prefixed keys won't conflict with LogRecord attributes."""
         logrecord_attrs = {
-            "name", "msg", "args", "created", "filename", "funcName",
-            "levelname", "levelno", "lineno", "module", "msecs", "pathname",
-            "process", "processName", "relativeCreated", "stack_info",
-            "exc_info", "exc_text", "thread", "threadName", "message",
+            "name",
+            "msg",
+            "args",
+            "created",
+            "filename",
+            "funcName",
+            "levelname",
+            "levelno",
+            "lineno",
+            "module",
+            "msecs",
+            "pathname",
+            "process",
+            "processName",
+            "relativeCreated",
+            "stack_info",
+            "exc_info",
+            "exc_text",
+            "thread",
+            "threadName",
+            "message",
         }
         ctx = {
             "msecs": 999,
@@ -204,12 +221,12 @@ class TestFlattenModeOTelSafety:
         )
 
         for key in extra:
-            assert key not in logrecord_attrs, (
-                f"Key {key} conflicts with LogRecord attribute"
-            )
-            assert key.startswith("temporal."), (
-                f"Key {key} doesn't have temporal prefix"
-            )
+            assert (
+                key not in logrecord_attrs
+            ), f"Key {key} conflicts with LogRecord attribute"
+            assert key.startswith(
+                "temporal."
+            ), f"Key {key} doesn't have temporal prefix"
 
 
 class TestLogRecordAccessibility:
@@ -239,6 +256,6 @@ class TestLogRecordAccessibility:
 
         for key in extra:
             value = record.__dict__[key]
-            assert isinstance(value, (str, int, float, bool, type(None))), (
-                f"Value for {key} is not primitive: {type(value)}"
-            )
+            assert isinstance(
+                value, (str, int, float, bool, type(None))
+            ), f"Value for {key} is not primitive: {type(value)}"
