@@ -181,13 +181,6 @@ class OpenTelemetryInterceptor(
     :py:meth:`temporalio.client.Client.connect` call to apply to all client
     calls and worker calls using that client. To only apply to workers, set as
     worker creation option instead of in client.
-
-    To customize the header key, text map propagator, or payload converter, a
-    subclass of this and :py:class:`TracingWorkflowInboundInterceptor` should be
-    created. In addition to customizing those attributes, the subclass of this
-    class should return the workflow interceptor subclass from
-    :py:meth:`workflow_interceptor_class`. That subclass should also set the
-    custom attributes desired.
     """
 
     def __init__(  # type: ignore[reportMissingSuperCall]
