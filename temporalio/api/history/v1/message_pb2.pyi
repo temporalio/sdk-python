@@ -3650,6 +3650,8 @@ class NexusOperationScheduledEventAttributes(google.protobuf.message.Message):
     WORKFLOW_TASK_COMPLETED_EVENT_ID_FIELD_NUMBER: builtins.int
     REQUEST_ID_FIELD_NUMBER: builtins.int
     ENDPOINT_ID_FIELD_NUMBER: builtins.int
+    SCHEDULE_TO_START_TIMEOUT_FIELD_NUMBER: builtins.int
+    START_TO_CLOSE_TIMEOUT_FIELD_NUMBER: builtins.int
     endpoint: builtins.str
     """Endpoint name, must exist in the endpoint registry."""
     service: builtins.str
@@ -3689,6 +3691,20 @@ class NexusOperationScheduledEventAttributes(google.protobuf.message.Message):
     This is stored on the event and used internally by the server in case the endpoint is renamed from the time the
     event was originally scheduled.
     """
+    @property
+    def schedule_to_start_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Schedule-to-start timeout for this operation.
+        See ScheduleNexusOperationCommandAttributes.schedule_to_start_timeout for details.
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "to" is used to indicate interval. --)
+        """
+    @property
+    def start_to_close_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """Start-to-close timeout for this operation.
+        See ScheduleNexusOperationCommandAttributes.start_to_close_timeout for details.
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "to" is used to indicate interval. --)
+        """
     def __init__(
         self,
         *,
@@ -3701,11 +3717,20 @@ class NexusOperationScheduledEventAttributes(google.protobuf.message.Message):
         workflow_task_completed_event_id: builtins.int = ...,
         request_id: builtins.str = ...,
         endpoint_id: builtins.str = ...,
+        schedule_to_start_timeout: google.protobuf.duration_pb2.Duration | None = ...,
+        start_to_close_timeout: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "input", b"input", "schedule_to_close_timeout", b"schedule_to_close_timeout"
+            "input",
+            b"input",
+            "schedule_to_close_timeout",
+            b"schedule_to_close_timeout",
+            "schedule_to_start_timeout",
+            b"schedule_to_start_timeout",
+            "start_to_close_timeout",
+            b"start_to_close_timeout",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -3725,8 +3750,12 @@ class NexusOperationScheduledEventAttributes(google.protobuf.message.Message):
             b"request_id",
             "schedule_to_close_timeout",
             b"schedule_to_close_timeout",
+            "schedule_to_start_timeout",
+            b"schedule_to_start_timeout",
             "service",
             b"service",
+            "start_to_close_timeout",
+            b"start_to_close_timeout",
             "workflow_task_completed_event_id",
             b"workflow_task_completed_event_id",
         ],
