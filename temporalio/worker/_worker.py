@@ -29,6 +29,7 @@ from temporalio.common import (
     VersioningBehavior,
     WorkerDeploymentVersion,
 )
+from temporalio.converter import _ServerPayloadErrorLimits
 
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
@@ -140,6 +141,7 @@ class Worker:
         nexus_task_poller_behavior: PollerBehavior = PollerBehaviorSimpleMaximum(
             maximum=5
         ),
+        disable_payload_error_limit: bool = False,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -313,6 +315,14 @@ class Worker:
                 Defaults to a 5-poller maximum.
             nexus_task_poller_behavior: Specify the behavior of Nexus task polling.
                 Defaults to a 5-poller maximum.
+            disable_payload_error_limit: If true, payload and memo error limit checks
+                are disabled in the worker, allowing payloads and memos that are above
+                the server error limit to be submitted to the Temporal server. If false,
+                the worker will validate the size before submitting to the Temporal server,
+                and cause a task failure if the size limit is exceeded. The default is False.
+                See https://docs.temporal.io/troubleshooting/blob-size-limit-error for more
+                details.
+
         """
         config = WorkerConfig(
             client=client,
@@ -356,6 +366,7 @@ class Worker:
             workflow_task_poller_behavior=workflow_task_poller_behavior,
             activity_task_poller_behavior=activity_task_poller_behavior,
             nexus_task_poller_behavior=nexus_task_poller_behavior,
+            disable_payload_error_limit=disable_payload_error_limit,
         )
 
         plugins_from_client = cast(
@@ -715,7 +726,16 @@ class Worker:
 
     async def _run(self):
         # Eagerly validate which will do a namespace check in Core
-        await self._bridge_worker.validate()
+        namespace_info = await self._bridge_worker.validate()
+        payload_error_limits = (
+            _ServerPayloadErrorLimits(
+                memo_size_error=namespace_info.limits.memo_size_limit_error,
+                payload_size_error=namespace_info.limits.blob_size_limit_error,
+            )
+            if namespace_info.HasField("limits")
+            and not self._config.get("disable_payload_error_limit", False)
+            else None
+        )
 
         if self._started:
             raise RuntimeError("Already started")
@@ -735,14 +755,16 @@ class Worker:
         # Create tasks for workers
         if self._activity_worker:
             tasks[self._activity_worker] = asyncio.create_task(
-                self._activity_worker.run()
+                self._activity_worker.run(payload_error_limits)
             )
         if self._workflow_worker:
             tasks[self._workflow_worker] = asyncio.create_task(
-                self._workflow_worker.run()
+                self._workflow_worker.run(payload_error_limits)
             )
         if self._nexus_worker:
-            tasks[self._nexus_worker] = asyncio.create_task(self._nexus_worker.run())
+            tasks[self._nexus_worker] = asyncio.create_task(
+                self._nexus_worker.run(payload_error_limits)
+            )
 
         # Wait for either worker or shutdown requested
         wait_task = asyncio.wait(tasks.values(), return_when=asyncio.FIRST_EXCEPTION)
@@ -921,6 +943,7 @@ class WorkerConfig(TypedDict, total=False):
     workflow_task_poller_behavior: PollerBehavior
     activity_task_poller_behavior: PollerBehavior
     nexus_task_poller_behavior: PollerBehavior
+    disable_payload_error_limit: bool
 
 
 def _warn_if_activity_executor_max_workers_is_inconsistent(

@@ -6834,7 +6834,7 @@ async def _apply_headers(
 ) -> None:
     if source is None:
         return
-    if encode_headers and data_converter._encode_payload_has_effect:
+    if encode_headers:
         for payload in source.values():
             payload.CopyFrom(await data_converter._encode_payload(payload))
     temporalio.common._apply_headers(source, dest)
