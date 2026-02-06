@@ -1232,6 +1232,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     def workflow_is_replaying_history_events(self) -> bool:
         return self._is_replaying and not self._in_query_or_validator
 
+    def workflow_is_read_only(self) -> bool:
+        return self._read_only
+
     def workflow_memo(self) -> Mapping[str, Any]:
         if self._untyped_converted_memo is None:
             self._untyped_converted_memo = {

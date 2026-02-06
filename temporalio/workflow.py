@@ -742,6 +742,9 @@ class _Runtime(ABC):
     def workflow_is_replaying_history_events(self) -> bool: ...
 
     @abstractmethod
+    def workflow_is_read_only(self) -> bool: ...
+
+    @abstractmethod
     def workflow_memo(self) -> Mapping[str, Any]: ...
 
     @abstractmethod
@@ -1515,6 +1518,18 @@ class unsafe:
             True if replaying history events, False otherwise.
         """
         return _Runtime.current().workflow_is_replaying_history_events()
+
+    @staticmethod
+    def is_read_only() -> bool:
+        """Whether the workflow is currently in read-only mode.
+
+        Read-only mode occurs during queries and update validators where
+        side effects are not allowed.
+
+        Returns:
+            True if the workflow is in read-only mode, False otherwise.
+        """
+        return _Runtime.current().workflow_is_read_only()
 
     @staticmethod
     def is_sandbox_unrestricted() -> bool:
