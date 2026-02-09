@@ -14,6 +14,8 @@ import pytest
 from google.protobuf import json_format
 
 import temporalio.api.common.v1
+import temporalio.api.enums.v1
+import temporalio.api.schedule.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
@@ -826,6 +828,7 @@ async def test_schedule_basics(
             overlap=ScheduleOverlapPolicy.BUFFER_ONE,
             catchup_window=timedelta(minutes=5),
             pause_on_failure=True,
+            keep_original_workflow_id=True,
         ),
         state=ScheduleState(
             note="sched note 1", paused=True, limited_actions=True, remaining_actions=30
@@ -878,6 +881,7 @@ async def test_schedule_basics(
     assert desc.id == handle.id
     assert desc.schedule == schedule
     assert "memoval2" == await desc.memo_value("memokey2")
+
 
     # Update to just change the schedule workflow's task timeout
     def update_schedule_simple(input: ScheduleUpdateInput) -> ScheduleUpdate:
@@ -1020,6 +1024,23 @@ async def test_schedule_basics(
     for id in await list_ids():
         await client.get_schedule_handle(id).delete()
     await assert_no_schedules(client)
+
+
+def test_schedule_policy_keep_original_workflow_id_round_trip() -> None:
+    policy = SchedulePolicy(
+        overlap=ScheduleOverlapPolicy.BUFFER_ONE,
+        catchup_window=timedelta(minutes=5),
+        pause_on_failure=True,
+        keep_original_workflow_id=True,
+    )
+    proto = policy._to_proto()
+    assert proto.keep_original_workflow_id
+    assert SchedulePolicy._from_proto(proto) == policy
+    assert not SchedulePolicy._from_proto(
+        temporalio.api.schedule.v1.SchedulePolicies(
+            overlap_policy=temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_SKIP
+        )
+    ).keep_original_workflow_id
 
 
 async def test_schedule_calendar_spec_defaults(

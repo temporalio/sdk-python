@@ -4336,12 +4336,20 @@ class SchedulePolicy:
     exhausted.
     """
 
+    keep_original_workflow_id: bool = False
+    """Whether a scheduled workflow keeps its original workflow ID.
+
+    If false, a timestamp may be appended to the scheduled workflow ID for
+    uniqueness.
+    """
+
     @staticmethod
     def _from_proto(pol: temporalio.api.schedule.v1.SchedulePolicies) -> SchedulePolicy:
         return SchedulePolicy(
             overlap=ScheduleOverlapPolicy(int(pol.overlap_policy)),
             catchup_window=pol.catchup_window.ToTimedelta(),
             pause_on_failure=pol.pause_on_failure,
+            keep_original_workflow_id=pol.keep_original_workflow_id,
         )
 
     def _to_proto(self) -> temporalio.api.schedule.v1.SchedulePolicies:
@@ -4353,6 +4361,7 @@ class SchedulePolicy:
             ),
             catchup_window=catchup_window,
             pause_on_failure=self.pause_on_failure,
+            keep_original_workflow_id=self.keep_original_workflow_id,
         )
 
 
