@@ -19,7 +19,7 @@ from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, init_tracer_pr
 from temporalio.testing import WorkflowEnvironment
 
 # Import the dump_spans function from the original opentelemetry test
-from tests.contrib.test_opentelemetry import dump_spans
+from tests.contrib.opentelemetry.test_opentelemetry import dump_spans
 from tests.helpers import new_worker
 from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
