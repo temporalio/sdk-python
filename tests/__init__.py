@@ -1,1 +1,1 @@
-DEV_SERVER_DOWNLOAD_VERSION = "v1.5.2-standalone-activity-server"
+DEV_SERVER_DOWNLOAD_VERSION = "v1.6.1-server-1.31.0-150.0"
