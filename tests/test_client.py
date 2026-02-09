@@ -879,7 +879,6 @@ async def test_schedule_basics(
     assert desc.schedule == schedule
     assert "memoval2" == await desc.memo_value("memokey2")
 
-
     # Update to just change the schedule workflow's task timeout
     def update_schedule_simple(input: ScheduleUpdateInput) -> ScheduleUpdate:
         assert input.description.schedule == schedule
@@ -1033,10 +1032,14 @@ async def test_schedule_can_create_with_keep_original_workflow_id_policy(
     handle = await client.create_schedule(
         schedule_id,
         Schedule(
-            spec=ScheduleSpec(intervals=[ScheduleIntervalSpec(every=timedelta(hours=1))]),
+            spec=ScheduleSpec(
+                intervals=[ScheduleIntervalSpec(every=timedelta(hours=1))]
+            ),
             action=ScheduleActionStartWorkflow(
                 "kitchen_sink",
-                KSWorkflowParams(actions=[KSAction(result=KSResultAction("some result"))]),
+                KSWorkflowParams(
+                    actions=[KSAction(result=KSResultAction("some result"))]
+                ),
                 id=f"{schedule_id}-workflow",
                 task_queue=worker.task_queue,
             ),
@@ -1062,10 +1065,14 @@ async def test_schedule_can_update_keep_original_workflow_id_policy(
     handle = await client.create_schedule(
         schedule_id,
         Schedule(
-            spec=ScheduleSpec(intervals=[ScheduleIntervalSpec(every=timedelta(hours=5))]),
+            spec=ScheduleSpec(
+                intervals=[ScheduleIntervalSpec(every=timedelta(hours=5))]
+            ),
             action=ScheduleActionStartWorkflow(
                 "kitchen_sink",
-                KSWorkflowParams(actions=[KSAction(result=KSResultAction("some result"))]),
+                KSWorkflowParams(
+                    actions=[KSAction(result=KSResultAction("some result"))]
+                ),
                 id=f"{schedule_id}-workflow",
                 task_queue=worker.task_queue,
             ),
