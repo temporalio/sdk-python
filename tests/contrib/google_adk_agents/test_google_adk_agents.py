@@ -37,15 +37,17 @@ from google.genai.types import Content, FunctionCall, Part
 from mcp import StdioServerParameters
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
+import temporalio.contrib.google_adk_agents.workflow
 from temporalio import activity, workflow
 from temporalio.client import Client
 from temporalio.contrib.google_adk_agents import (
-    AdkAgentPlugin,
     TemporalAdkPlugin,
     TemporalMcpToolSet,
     TemporalMcpToolSetProvider,
+    TemporalModel,
 )
 from temporalio.worker import Worker
+from tests.contrib.test_opentelemetry import dump_spans
 
 logger = logging.getLogger(__name__)
 
@@ -67,13 +69,13 @@ class WeatherAgent:
         # and Model Activity interception. We use standard ADK models now.
 
         # Wraps 'get_weather' activity as a Tool
-        weather_tool = AdkAgentPlugin.activity_tool(
+        weather_tool = temporalio.contrib.google_adk_agents.workflow.activity_tool(
             get_weather, start_to_close_timeout=timedelta(seconds=60)
         )
 
         agent = Agent(
             name="test_agent",
-            model=model_name,
+            model=TemporalModel(model_name),
             tools=[weather_tool],
         )
 
@@ -91,7 +93,6 @@ class WeatherAgent:
             agent=agent,
             app_name="test_app",
             session_service=session_service,
-            plugins=[AdkAgentPlugin()],
         )
 
         logger.info("Starting runner.")
@@ -124,21 +125,21 @@ class MultiAgentWorkflow:
         # Sub-agent: Researcher
         researcher = LlmAgent(
             name="researcher",
-            model=model_name,
+            model=TemporalModel(model_name),
             instruction="You are a researcher. Find information about the topic.",
         )
 
         # Sub-agent: Writer
         writer = LlmAgent(
             name="writer",
-            model=model_name,
+            model=TemporalModel(model_name),
             instruction="You are a poet. Write a haiku based on the research.",
         )
 
         # Root Agent: Coordinator
         coordinator = LlmAgent(
             name="coordinator",
-            model=model_name,
+            model=TemporalModel(model_name),
             instruction="You are a coordinator. Delegate to researcher then writer.",
             sub_agents=[researcher, writer],
         )
@@ -148,7 +149,6 @@ class MultiAgentWorkflow:
             agent=coordinator,
             app_name="multi_agent_app",
             session_service=session_service,
-            plugins=[AdkAgentPlugin()],
         )
 
         # 4. Run
@@ -187,11 +187,9 @@ class TestModel(BaseLlm, ABC):
     async def generate_content_async(
         self, llm_request: LlmRequest, stream: bool = False
     ) -> AsyncGenerator[LlmResponse, None]:
-        for i, response in enumerate(self.responses()):
-            print("Checking if response ", i, " is in ", llm_request.contents)
+        for response in self.responses():
             if any(content == response.content for content in llm_request.contents):
                 continue
-            print("Returning response ", i)
             yield response
             return
 
@@ -355,7 +353,7 @@ class McpAgent:
         agent = Agent(
             name="test_agent",
             # instruction="Always use your tools to answer questions.",
-            model=model_name,
+            model=TemporalModel(model_name),
             tools=[TemporalMcpToolSet("test_set")],
         )
 
@@ -373,7 +371,6 @@ class McpAgent:
             agent=agent,
             app_name="test_app",
             session_service=session_service,
-            plugins=[AdkAgentPlugin()],
         )
 
         last_event = None
@@ -522,27 +519,16 @@ async def test_single_agent_telemetry(client: Client):
         assert result.content.parts is not None
         assert result.content.parts[0].text == "warm and sunny"
 
-    spans = exporter.get_finished_spans()
-
-    invocation_span = next(
-        (s for s in spans if s.name == "invocation [test_app]"), None
-    )
-    agent_span = next((s for s in spans if s.name == "agent_run [test_agent]"), None)
-    _llm_spans = [s for s in spans if s.name == "call_llm"]
-    tool_spans = [s for s in spans if "execute_tool" in s.name]
-
-    assert invocation_span is not None
-    assert invocation_span.parent is None
-    assert invocation_span.context is not None
-
-    assert agent_span is not None
-    assert agent_span.parent is not None
-    assert agent_span.context is not None
-    assert agent_span.parent.span_id == invocation_span.context.span_id
-
-    # Model is invoked twice, but because of before_model_callback, llm spans are not reported
-    # assert len(llm_spans) == 2
-
-    assert len(tool_spans) == 1
-    assert tool_spans[0].parent is not None
-    assert tool_spans[0].parent.span_id == agent_span.context.span_id
+    assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
+        "invocation [test_app]",
+        "  agent_run [test_agent]",
+        "    call_llm",
+        "      StartActivity:invoke_model",
+        "        RunActivity:invoke_model",
+        "      execute_tool get_weather",
+        "        StartActivity:get_weather",
+        "          RunActivity:get_weather",
+        "    call_llm",
+        "      StartActivity:invoke_model",
+        "        RunActivity:invoke_model",
+    ]
