@@ -25,7 +25,9 @@ from temporalio.bridge._visitor import VisitorFunctions
 from temporalio.bridge.temporal_sdk_bridge import (
     CustomSlotSupplier as BridgeCustomSlotSupplier,
 )
-from temporalio.bridge.temporal_sdk_bridge import PollShutdownError  # type: ignore
+from temporalio.bridge.temporal_sdk_bridge import (
+    PollShutdownError,  # type: ignore # noqa: F401
+)
 from temporalio.worker._command_aware_visitor import CommandAwarePayloadVisitor
 
 
@@ -194,9 +196,13 @@ class Worker:
         """Create SDK core worker from a bridge worker."""
         self._ref = ref
 
-    async def validate(self) -> None:
+    async def validate(
+        self,
+    ) -> temporalio.bridge.proto.NamespaceInfo:
         """Validate the bridge worker."""
-        await self._ref.validate()  # type: ignore[reportOptionalMemberAccess]
+        return temporalio.bridge.proto.NamespaceInfo.FromString(
+            await self._ref.validate()  # type: ignore[reportOptionalMemberAccess]
+        )
 
     async def poll_workflow_activation(
         self,
@@ -293,21 +299,23 @@ class _Visitor(VisitorFunctions):
 
 async def decode_activation(
     activation: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
-    codec: temporalio.converter.PayloadCodec,
+    data_converter: temporalio.converter.DataConverter,
     decode_headers: bool,
 ) -> None:
     """Decode all payloads in the activation."""
-    await CommandAwarePayloadVisitor(
-        skip_search_attributes=True, skip_headers=not decode_headers
-    ).visit(_Visitor(codec.decode), activation)
+    if data_converter._decode_payload_has_effect:
+        await CommandAwarePayloadVisitor(
+            skip_search_attributes=True, skip_headers=not decode_headers
+        ).visit(_Visitor(data_converter._decode_payload_sequence), activation)
 
 
 async def encode_completion(
     completion: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
-    codec: temporalio.converter.PayloadCodec,
+    data_converter: temporalio.converter.DataConverter,
     encode_headers: bool,
 ) -> None:
     """Encode all payloads in the completion."""
-    await CommandAwarePayloadVisitor(
-        skip_search_attributes=True, skip_headers=not encode_headers
-    ).visit(_Visitor(codec.encode), completion)
+    if data_converter._encode_payload_has_effect:
+        await CommandAwarePayloadVisitor(
+            skip_search_attributes=True, skip_headers=not encode_headers
+        ).visit(_Visitor(data_converter._encode_payload_sequence), completion)
