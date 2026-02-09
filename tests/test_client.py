@@ -14,8 +14,6 @@ import pytest
 from google.protobuf import json_format
 
 import temporalio.api.common.v1
-import temporalio.api.enums.v1
-import temporalio.api.schedule.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
@@ -828,7 +826,6 @@ async def test_schedule_basics(
             overlap=ScheduleOverlapPolicy.BUFFER_ONE,
             catchup_window=timedelta(minutes=5),
             pause_on_failure=True,
-            keep_original_workflow_id=True,
         ),
         state=ScheduleState(
             note="sched note 1", paused=True, limited_actions=True, remaining_actions=30
@@ -1026,21 +1023,78 @@ async def test_schedule_basics(
     await assert_no_schedules(client)
 
 
-def test_schedule_policy_keep_original_workflow_id_round_trip() -> None:
-    policy = SchedulePolicy(
-        overlap=ScheduleOverlapPolicy.BUFFER_ONE,
-        catchup_window=timedelta(minutes=5),
-        pause_on_failure=True,
-        keep_original_workflow_id=True,
+async def test_schedule_can_create_with_keep_original_workflow_id_policy(
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server doesn't support schedules")
+
+    schedule_id = f"can-create-schedule-with-keep-original-workflow-id-{uuid.uuid4()}"
+    handle = await client.create_schedule(
+        schedule_id,
+        Schedule(
+            spec=ScheduleSpec(intervals=[ScheduleIntervalSpec(every=timedelta(hours=1))]),
+            action=ScheduleActionStartWorkflow(
+                "kitchen_sink",
+                KSWorkflowParams(actions=[KSAction(result=KSResultAction("some result"))]),
+                id=f"{schedule_id}-workflow",
+                task_queue=worker.task_queue,
+            ),
+            policy=SchedulePolicy(keep_original_workflow_id=True),
+        ),
     )
-    proto = policy._to_proto()
-    assert proto.keep_original_workflow_id
-    assert SchedulePolicy._from_proto(proto) == policy
-    assert not SchedulePolicy._from_proto(
-        temporalio.api.schedule.v1.SchedulePolicies(
-            overlap_policy=temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_SKIP
-        )
-    ).keep_original_workflow_id
+
+    try:
+        desc = await handle.describe()
+        assert desc.schedule.policy.keep_original_workflow_id
+        assert desc.raw_description.schedule.policies.keep_original_workflow_id
+    finally:
+        await handle.delete()
+
+
+async def test_schedule_can_update_keep_original_workflow_id_policy(
+    client: Client, worker: ExternalWorker, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Java test server doesn't support schedules")
+
+    schedule_id = f"can-update-keep-original-workflow-id-{uuid.uuid4()}"
+    handle = await client.create_schedule(
+        schedule_id,
+        Schedule(
+            spec=ScheduleSpec(intervals=[ScheduleIntervalSpec(every=timedelta(hours=5))]),
+            action=ScheduleActionStartWorkflow(
+                "kitchen_sink",
+                KSWorkflowParams(actions=[KSAction(result=KSResultAction("some result"))]),
+                id=f"{schedule_id}-workflow",
+                task_queue=worker.task_queue,
+            ),
+        ),
+    )
+
+    try:
+        desc = await handle.describe()
+        assert not desc.schedule.policy.keep_original_workflow_id
+
+        def update_enable(input: ScheduleUpdateInput) -> ScheduleUpdate:
+            input.description.schedule.policy.keep_original_workflow_id = True
+            return ScheduleUpdate(schedule=input.description.schedule)
+
+        await handle.update(update_enable)
+        desc = await handle.describe()
+        assert desc.schedule.policy.keep_original_workflow_id
+        assert desc.raw_description.schedule.policies.keep_original_workflow_id
+
+        def update_disable(input: ScheduleUpdateInput) -> ScheduleUpdate:
+            input.description.schedule.policy.keep_original_workflow_id = False
+            return ScheduleUpdate(schedule=input.description.schedule)
+
+        await handle.update(update_disable)
+        desc = await handle.describe()
+        assert not desc.schedule.policy.keep_original_workflow_id
+        assert not desc.raw_description.schedule.policies.keep_original_workflow_id
+    finally:
+        await handle.delete()
 
 
 async def test_schedule_calendar_spec_defaults(
