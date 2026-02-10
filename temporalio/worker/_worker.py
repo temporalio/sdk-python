@@ -808,6 +808,8 @@ class Worker:
             self._activity_worker.notify_shutdown()
         if self._workflow_worker:
             self._workflow_worker.notify_shutdown()
+        if self._nexus_worker:
+            self._nexus_worker.notify_shutdown()
 
         # Wait for all tasks to complete (i.e. for poller loops to stop)
         await asyncio.wait(tasks.values())
@@ -980,10 +982,7 @@ def _warn_if_nexus_task_executor_max_workers_is_inconsistent(
 
 @dataclass
 class WorkerDeploymentConfig:
-    """Options for configuring the Worker Versioning feature.
-
-    WARNING: This is an experimental feature and may change in the future.
-    """
+    """Options for configuring the Worker Versioning feature."""
 
     version: WorkerDeploymentVersion
     use_worker_versioning: bool

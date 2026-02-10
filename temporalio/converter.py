@@ -82,51 +82,64 @@ class SerializationContext(ABC):
 
 
 @dataclass(frozen=True)
-class BaseWorkflowSerializationContext(SerializationContext):
-    """Base serialization context shared by workflow and activity serialization contexts."""
-
-    namespace: str
-    workflow_id: str
-
-
-@dataclass(frozen=True)
-class WorkflowSerializationContext(BaseWorkflowSerializationContext):
+class WorkflowSerializationContext(SerializationContext):
     """Serialization context for workflows.
 
     See :py:class:`SerializationContext` for more details.
-
-    Attributes:
-        namespace: The namespace the workflow is running in.
-        workflow_id: The ID of the workflow. Note that this is the ID of the workflow of which the
-            payload being operated on is an input or output. Note also that when creating/describing
-            schedules, this may be the workflow ID prefix as configured, not the final workflow ID
-            when the workflow is created by the schedule.
     """
 
-    pass
+    namespace: str
+    """The namespace the workflow is running in."""
+
+    workflow_id: str | None
+    """The ID of the workflow.
+    
+    Note that this is the ID of the workflow of which the payload being operated on is an input or
+    output. Note also that when creating/describing schedules, this may be the workflow ID prefix
+    as configured, not the final workflow ID when the workflow is created by the schedule.
+    """
 
 
 @dataclass(frozen=True)
-class ActivitySerializationContext(BaseWorkflowSerializationContext):
+class ActivitySerializationContext(SerializationContext):
     """Serialization context for activities.
 
     See :py:class:`SerializationContext` for more details.
-
-    Attributes:
-        namespace: Workflow/activity namespace.
-        workflow_id: Workflow ID. Note, when creating/describing schedules,
-            this may be the workflow ID prefix as configured, not the final workflow ID when the
-            workflow is created by the schedule.
-        workflow_type: Workflow Type.
-        activity_type: Activity Type.
-        activity_task_queue: Activity task queue.
-        is_local: Whether the activity is a local activity.
     """
 
-    workflow_type: str
-    activity_type: str
-    activity_task_queue: str
+    namespace: str
+    """Workflow/activity namespace."""
+
+    activity_id: str | None
+    """Activity ID. Optional if this is an activity started from a workflow."""
+
+    activity_type: str | None
+    """Activity type.
+    
+    .. deprecated::
+        This value may not be set in some bidirectional situations, it should
+        not be relied on.
+    """
+
+    activity_task_queue: str | None
+    """Activity task queue.
+    
+    .. deprecated::
+        This value may not be set in some bidirectional situations, it should
+        not be relied on.
+    """
+
+    workflow_id: str | None
+    """Workflow ID. Only set if this is an activity started from a workflow.
+    
+    Note, when creating/describing schedules, this may be the workflow ID prefix as
+    configured, not the final workflow ID when the workflow is created by the schedule."""
+
+    workflow_type: str | None
+    """Workflow type if this is an activity started from a workflow."""
+
     is_local: bool
+    """Whether the activity is a local activity started from a workflow."""
 
 
 class WithSerializationContext(ABC):

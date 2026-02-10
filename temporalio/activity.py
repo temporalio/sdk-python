@@ -9,12 +9,10 @@ explicitly propagated.
 
 from __future__ import annotations
 
-import asyncio
 import contextvars
 import dataclasses
 import inspect
 import logging
-import threading
 from collections.abc import Callable, Iterator, Mapping, MutableMapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
@@ -95,6 +93,12 @@ class Info:
     """Information about the running activity.
 
     Retrieved inside an activity via :py:func:`info`.
+
+    .. warning::
+        Do not construct this class directly. For testing, use
+        :py:meth:`temporalio.testing.ActivityEnvironment.default_info` with
+        :py:func:`dataclasses.replace` to customize fields. This class may have
+        new required fields added in future versions.
     """
 
     activity_id: str
@@ -104,16 +108,25 @@ class Info:
     heartbeat_details: Sequence[Any]
     heartbeat_timeout: timedelta | None
     is_local: bool
+    namespace: str
     schedule_to_close_timeout: timedelta | None
     scheduled_time: datetime
     start_to_close_timeout: timedelta | None
     started_time: datetime
     task_queue: str
     task_token: bytes
-    workflow_id: str
-    workflow_namespace: str
-    workflow_run_id: str
-    workflow_type: str
+    workflow_id: str | None
+    """ID of the workflow. None if the activity was not started by a workflow."""
+    workflow_namespace: str | None
+    """Namespace of the workflow. None if the activity was not started by a workflow.
+
+    .. deprecated::
+        Use :py:attr:`namespace` instead.
+    """
+    workflow_run_id: str | None
+    """Run ID of the workflow. None if the activity was not started by a workflow."""
+    workflow_type: str | None
+    """Type of the workflow. None if the activity was not started by a workflow."""
     priority: temporalio.common.Priority
     retry_policy: temporalio.common.RetryPolicy | None
     """The retry policy of this activity.
@@ -122,6 +135,14 @@ class Info:
     If the value is None, it means the server didn't send information about retry policy (e.g. due to old server
     version), but it may still be defined server-side."""
 
+    activity_run_id: str | None = None
+    """Run ID of this activity. None for workflow activities."""
+
+    @property
+    def in_workflow(self) -> bool:
+        """Was this activity started by a workflow?"""
+        return self.workflow_id is not None
+
     # TODO(cretz): Consider putting identity on here for "worker_id" for logger?
 
     def _logger_details(self) -> Mapping[str, Any]:
@@ -129,7 +150,7 @@ class Info:
             "activity_id": self.activity_id,
             "activity_type": self.activity_type,
             "attempt": self.attempt,
-            "namespace": self.workflow_namespace,
+            "namespace": self.namespace,
             "task_queue": self.task_queue,
             "workflow_id": self.workflow_id,
             "workflow_run_id": self.workflow_run_id,
@@ -175,8 +196,8 @@ class _Context:
     info: Callable[[], Info]
     # This is optional because during interceptor init it is not present
     heartbeat: Callable[..., None] | None
-    cancelled_event: _CompositeEvent
-    worker_shutdown_event: _CompositeEvent
+    cancelled_event: temporalio.common._CompositeEvent
+    worker_shutdown_event: temporalio.common._CompositeEvent
     shield_thread_cancel_exception: Callable[[], AbstractContextManager] | None
     payload_converter_class_or_instance: (
         type[temporalio.converter.PayloadConverter]
@@ -238,42 +259,12 @@ class _Context:
             info = self.info()
             self._metric_meter = self.runtime_metric_meter.with_additional_attributes(
                 {
-                    "namespace": info.workflow_namespace,
+                    "namespace": info.namespace,
                     "task_queue": info.task_queue,
                     "activity_type": info.activity_type,
                 }
             )
         return self._metric_meter
-
-
-@dataclass
-class _CompositeEvent:
-    # This should always be present, but is sometimes lazily set internally
-    thread_event: threading.Event | None
-    # Async event only for async activities
-    async_event: asyncio.Event | None
-
-    def set(self) -> None:
-        if not self.thread_event:
-            raise RuntimeError("Missing event")
-        self.thread_event.set()
-        if self.async_event:
-            self.async_event.set()
-
-    def is_set(self) -> bool:
-        if not self.thread_event:
-            raise RuntimeError("Missing event")
-        return self.thread_event.is_set()
-
-    async def wait(self) -> None:
-        if not self.async_event:
-            raise RuntimeError("not in async activity")
-        await self.async_event.wait()
-
-    def wait_sync(self, timeout: float | None = None) -> None:
-        if not self.thread_event:
-            raise RuntimeError("Missing event")
-        self.thread_event.wait(timeout)
 
 
 def client() -> Client:
@@ -576,6 +567,20 @@ class _Definition:
         raise TypeError(
             f"Activity {fn_name} missing attributes, was it decorated with @activity.defn?"
         )
+
+    @classmethod
+    def get_name_and_result_type(
+        cls, name_or_run_fn: str | Callable[..., Any]
+    ) -> tuple[str, type | None]:
+        if isinstance(name_or_run_fn, str):
+            return name_or_run_fn, None
+        elif callable(name_or_run_fn):
+            defn = cls.must_from_callable(name_or_run_fn)
+            if not defn.name:
+                raise ValueError(f"Activity {name_or_run_fn} definition has no name")
+            return defn.name, defn.ret_type
+        else:
+            raise TypeError("Activity must be a string or callable")  # type:ignore[reportUnreachable]
 
     @staticmethod
     def _apply_to_callable(
