@@ -220,12 +220,13 @@ class ReplaySafeTracerProvider(TracerProvider):
         Returns:
             A replay-safe tracer instance.
         """
-        return self._tracer_provider.get_tracer(
+        tracer = self._tracer_provider.get_tracer(
             instrumenting_module_name,
             instrumenting_library_version,
             schema_url,
             attributes,
         )
+        return _ReplaySafeTracer(tracer)
 
 
 def create_tracer_provider(

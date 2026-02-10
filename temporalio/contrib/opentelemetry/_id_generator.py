@@ -10,9 +10,9 @@ import temporalio.workflow
 
 
 def _get_workflow_random() -> random.Random | None:
-    if (
-        temporalio.workflow.in_workflow()
-        and not temporalio.workflow.unsafe.is_read_only()
+    if temporalio.workflow.in_workflow() and (
+        (not temporalio.workflow.unsafe.is_replaying())
+        or temporalio.workflow.unsafe.is_replaying_history_events()
     ):
         # Cache the random on the workflow instance because this IdGenerator is created outside of the workflow
         # but the random should be reseeded for each workflow task
@@ -57,7 +57,10 @@ class TemporalIdGenerator(IdGenerator):
             span_id = workflow_random.getrandbits(64)
             while span_id == INVALID_SPAN_ID:
                 span_id = workflow_random.getrandbits(64)
+            print("Generating workflow random span id - ", span_id)
+
             return span_id
+        print("Generating random span id")
         return self._id_generator.generate_span_id()
 
     def generate_trace_id(self) -> int:

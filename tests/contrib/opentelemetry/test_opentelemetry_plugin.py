@@ -8,8 +8,12 @@ import opentelemetry.trace
 import pytest
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import get_tracer
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+    InMemorySpanExporter,
+)
+from opentelemetry.trace import (
+    get_tracer,
+)
 from opentelemetry.util._once import Once
 
 import temporalio.contrib.opentelemetry.workflow
@@ -85,7 +89,7 @@ class ComprehensiveNexusService:
 class BasicTraceWorkflow:
     @workflow.run
     async def run(self):
-        tracer = temporalio.contrib.opentelemetry.workflow.tracer()
+        tracer = get_tracer(__name__)
         temporalio.contrib.opentelemetry.workflow.completed_span("Completed Span")
         with tracer.start_as_current_span("Hello World"):
             await workflow.execute_activity(

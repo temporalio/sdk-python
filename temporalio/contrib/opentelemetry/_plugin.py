@@ -1,7 +1,11 @@
+import dataclasses
+
 from opentelemetry.trace import get_tracer_provider
 
 from temporalio.contrib.opentelemetry import OpenTelemetryInterceptor
 from temporalio.plugin import SimplePlugin
+from temporalio.worker import WorkflowRunner
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 
 class OpenTelemetryPlugin(SimplePlugin):
@@ -32,8 +36,23 @@ class OpenTelemetryPlugin(SimplePlugin):
 
         interceptors = [OpenTelemetryInterceptor(provider, add_temporal_spans)]
 
+        def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
+            if not runner:
+                raise ValueError("No WorkflowRunner provided to the OpenAI plugin.")
+
+            # If in sandbox, add additional passthrough
+            if isinstance(runner, SandboxedWorkflowRunner):
+                return dataclasses.replace(
+                    runner,
+                    restrictions=runner.restrictions.with_passthrough_modules(
+                        "opentelemetry.trace"
+                    ),
+                )
+            return runner
+
         super().__init__(
             "OpenTelemetryPlugin",
             client_interceptors=interceptors,
             worker_interceptors=interceptors,
+            workflow_runner=workflow_runner,
         )

@@ -36,7 +36,6 @@ import temporalio.workflow
 from temporalio import workflow
 from temporalio.contrib.opentelemetry._tracer_provider import (
     ReplaySafeTracerProvider,
-    _ReplaySafeTracer,
 )
 from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 
@@ -228,7 +227,7 @@ class OpenTelemetryInterceptor(
                 "When using OpenTelemetryPlugin, the global trace provider must be a ReplaySafeTracerProvider. Use init_tracer_provider to create one."
             )
 
-        tracer = _ReplaySafeTracer(self._tracer)
+        tracer = self._tracer
 
         class InterceptorWithState(_TracingWorkflowInboundInterceptor):
             _add_temporal_spans = self._add_temporal_spans
