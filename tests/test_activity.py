@@ -117,7 +117,7 @@ class TestDescribe:
         assert desc.current_retry_interval is None
         assert desc.eager_execution_requested is False
         assert desc.expiration_time is not None
-        assert desc.raw_heartbeat_details == []
+        assert len(desc.raw_heartbeat_details) == 0
         assert desc.run_state == PendingActivityState.SCHEDULED
         assert desc.last_attempt_complete_time is None
         assert desc.last_failure is None
