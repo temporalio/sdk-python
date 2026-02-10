@@ -26,6 +26,7 @@ from temporalio.client import (
 )
 from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.service import RPCError, RPCStatusCode
+from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import assert_eq_eventually
 
@@ -79,7 +80,12 @@ class ActivityHolder:
 
 class TestDescribe:
     @pytest.fixture
-    async def activity_handle(self, client: Client):
+    async def activity_handle(self, client: Client, env: WorkflowEnvironment):
+        if env.supports_time_skipping:
+            pytest.skip(
+                "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+            )
+
         id = str(uuid.uuid4())
         task_queue = str(uuid.uuid4())
         yield await client.start_activity(
@@ -196,8 +202,15 @@ class ActivityTracingOutboundInterceptor(OutboundInterceptor):
         return await super().count_activities(input)
 
 
-async def test_start_activity_calls_interceptor(client: Client):
+async def test_start_activity_calls_interceptor(
+    client: Client, env: WorkflowEnvironment
+):
     """Client.start_activity() should call the start_activity interceptor."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     interceptor = ActivityTracingInterceptor()
     intercepted_client = Client(
         service_client=client.service_client,
@@ -223,8 +236,15 @@ async def test_start_activity_calls_interceptor(client: Client):
     assert call.activity_type == "increment"
 
 
-async def test_describe_activity_calls_interceptor(client: Client):
+async def test_describe_activity_calls_interceptor(
+    client: Client, env: WorkflowEnvironment
+):
     """ActivityHandle.describe() should call the describe_activity interceptor."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     interceptor = ActivityTracingInterceptor()
     intercepted_client = Client(
         service_client=client.service_client,
@@ -251,8 +271,15 @@ async def test_describe_activity_calls_interceptor(client: Client):
     assert call.activity_id == activity_id
 
 
-async def test_cancel_activity_calls_interceptor(client: Client):
+async def test_cancel_activity_calls_interceptor(
+    client: Client, env: WorkflowEnvironment
+):
     """ActivityHandle.cancel() should call the cancel_activity interceptor."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     interceptor = ActivityTracingInterceptor()
     intercepted_client = Client(
         service_client=client.service_client,
@@ -279,8 +306,15 @@ async def test_cancel_activity_calls_interceptor(client: Client):
     assert call.reason == "test cancellation"
 
 
-async def test_terminate_activity_calls_interceptor(client: Client):
+async def test_terminate_activity_calls_interceptor(
+    client: Client, env: WorkflowEnvironment
+):
     """ActivityHandle.terminate() should call the terminate_activity interceptor."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     interceptor = ActivityTracingInterceptor()
     intercepted_client = Client(
         service_client=client.service_client,
@@ -307,8 +341,15 @@ async def test_terminate_activity_calls_interceptor(client: Client):
     assert call.reason == "test termination"
 
 
-async def test_list_activities_calls_interceptor(client: Client):
+async def test_list_activities_calls_interceptor(
+    client: Client, env: WorkflowEnvironment
+):
     """Client.list_activities() should call the list_activities interceptor."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     interceptor = ActivityTracingInterceptor()
     intercepted_client = Client(
         service_client=client.service_client,
@@ -336,8 +377,15 @@ async def test_list_activities_calls_interceptor(client: Client):
     assert call.query == query
 
 
-async def test_count_activities_calls_interceptor(client: Client):
+async def test_count_activities_calls_interceptor(
+    client: Client, env: WorkflowEnvironment
+):
     """Client.count_activities() should call the count_activities interceptor."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     interceptor = ActivityTracingInterceptor()
     intercepted_client = Client(
         service_client=client.service_client,
@@ -365,7 +413,12 @@ async def test_count_activities_calls_interceptor(client: Client):
     assert call.query == query
 
 
-async def test_get_result(client: Client):
+async def test_get_result(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
 
@@ -393,7 +446,12 @@ async def test_get_result(client: Client):
         assert await result_via_execute_activity == 2
 
 
-async def test_get_activity_handle(client: Client):
+async def test_get_activity_handle(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
 
@@ -432,7 +490,12 @@ async def test_get_activity_handle(client: Client):
         assert await handle_with_result_type.result() == 2
 
 
-async def test_list_activities(client: Client):
+async def test_list_activities(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
 
@@ -456,7 +519,12 @@ async def test_list_activities(client: Client):
     assert execution.state_transition_count is None  # Not set until activity completes
 
 
-async def test_count_activities(client: Client):
+async def test_count_activities(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
 
@@ -477,7 +545,12 @@ async def test_count_activities(client: Client):
     )
 
 
-async def test_count_activities_group_by(client: Client):
+async def test_count_activities_group_by(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     from temporalio.client import ActivityExecutionCount
 
     task_queue = str(uuid.uuid4())
@@ -529,7 +602,12 @@ async def async_activity(input: ActivityInput) -> int:
     activity.raise_complete_async()
 
 
-async def test_manual_completion(client: Client):
+async def test_manual_completion(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     event_workflow_id = str(uuid.uuid4())
@@ -566,7 +644,12 @@ async def test_manual_completion(client: Client):
         assert desc.status == ActivityExecutionStatus.COMPLETED
 
 
-async def test_manual_cancellation(client: Client):
+async def test_manual_cancellation(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     event_workflow_id = str(uuid.uuid4())
@@ -617,7 +700,12 @@ async def test_manual_cancellation(client: Client):
         assert desc.status == ActivityExecutionStatus.CANCELED
 
 
-async def test_manual_failure(client: Client):
+async def test_manual_failure(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     event_workflow_id = str(uuid.uuid4())
@@ -685,7 +773,12 @@ async def activity_for_testing_heartbeat(input: ActivityInput) -> str:
         raise AssertionError(f"Unexpected attempt number: {info.attempt}")
 
 
-async def test_manual_heartbeat(client: Client):
+async def test_manual_heartbeat(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     event_workflow_id = str(uuid.uuid4())
@@ -724,7 +817,12 @@ async def test_manual_heartbeat(client: Client):
         assert await activity_handle.result() == "Test heartbeat details"
 
 
-async def test_id_conflict_policy_fail(client: Client):
+async def test_id_conflict_policy_fail(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     from temporalio.common import ActivityIDConflictPolicy
@@ -751,7 +849,14 @@ async def test_id_conflict_policy_fail(client: Client):
     assert err.value.activity_id == activity_id
 
 
-async def test_id_conflict_policy_use_existing(client: Client):
+async def test_id_conflict_policy_use_existing(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     from temporalio.common import ActivityIDConflictPolicy
@@ -778,7 +883,14 @@ async def test_id_conflict_policy_use_existing(client: Client):
     assert handle1.run_id == handle2.run_id
 
 
-async def test_id_reuse_policy_reject_duplicate(client: Client):
+async def test_id_reuse_policy_reject_duplicate(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     from temporalio.common import ActivityIDReusePolicy
@@ -812,7 +924,14 @@ async def test_id_reuse_policy_reject_duplicate(client: Client):
     assert err.value.activity_id == activity_id
 
 
-async def test_id_reuse_policy_allow_duplicate(client: Client):
+async def test_id_reuse_policy_allow_duplicate(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     from temporalio.common import ActivityIDReusePolicy
@@ -846,7 +965,12 @@ async def test_id_reuse_policy_allow_duplicate(client: Client):
     assert handle1.run_id != handle2.run_id
 
 
-async def test_search_attributes(client: Client):
+async def test_search_attributes(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     from temporalio.common import (
         SearchAttributeKey,
         SearchAttributePair,
@@ -877,7 +1001,12 @@ async def test_search_attributes(client: Client):
     ]
 
 
-async def test_retry_policy(client: Client):
+async def test_retry_policy(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     from temporalio.common import RetryPolicy
 
     activity_id = str(uuid.uuid4())
@@ -905,7 +1034,12 @@ async def test_retry_policy(client: Client):
     assert desc.retry_policy.maximum_attempts == 3
 
 
-async def test_terminate(client: Client):
+async def test_terminate(client: Client, env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     event_workflow_id = str(uuid.uuid4())
@@ -942,8 +1076,13 @@ async def test_terminate(client: Client):
 # Tests for start_activity_class / execute_activity_class
 
 
-async def test_start_activity_class_async(client: Client):
+async def test_start_activity_class_async(client: Client, env: WorkflowEnvironment):
     """Test start_activity_class with an async callable class."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
 
@@ -964,8 +1103,13 @@ async def test_start_activity_class_async(client: Client):
         assert result == 2
 
 
-async def test_execute_activity_class_async(client: Client):
+async def test_execute_activity_class_async(client: Client, env: WorkflowEnvironment):
     """Test execute_activity_class with an async callable class."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
 
@@ -984,8 +1128,13 @@ async def test_execute_activity_class_async(client: Client):
         assert result == 2
 
 
-async def test_start_activity_class_no_param(client: Client):
+async def test_start_activity_class_no_param(client: Client, env: WorkflowEnvironment):
     """Test start_activity_class with a no-param callable class."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
 
@@ -1005,8 +1154,13 @@ async def test_start_activity_class_no_param(client: Client):
         assert result == "no-param-result"
 
 
-async def test_start_activity_class_sync(client: Client):
+async def test_start_activity_class_sync(client: Client, env: WorkflowEnvironment):
     """Test start_activity_class with a sync callable class."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     import concurrent.futures
 
     activity_id = str(uuid.uuid4())
@@ -1034,8 +1188,13 @@ async def test_start_activity_class_sync(client: Client):
 # Tests for start_activity_method / execute_activity_method
 
 
-async def test_start_activity_method_async(client: Client):
+async def test_start_activity_method_async(client: Client, env: WorkflowEnvironment):
     """Test start_activity_method with an async method."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
 
@@ -1057,8 +1216,13 @@ async def test_start_activity_method_async(client: Client):
         assert result == 2
 
 
-async def test_execute_activity_method_async(client: Client):
+async def test_execute_activity_method_async(client: Client, env: WorkflowEnvironment):
     """Test execute_activity_method with an async method."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
 
@@ -1078,8 +1242,13 @@ async def test_execute_activity_method_async(client: Client):
         assert result == 2
 
 
-async def test_start_activity_method_no_param(client: Client):
+async def test_start_activity_method_no_param(client: Client, env: WorkflowEnvironment):
     """Test start_activity_method with a no-param method."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+        )
+
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
 
