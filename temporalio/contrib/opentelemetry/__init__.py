@@ -11,12 +11,12 @@ from temporalio.contrib.opentelemetry._interceptor import (
 )
 from temporalio.contrib.opentelemetry._otel_interceptor import OpenTelemetryInterceptor
 from temporalio.contrib.opentelemetry._plugin import OpenTelemetryPlugin
-from temporalio.contrib.opentelemetry._tracer_provider import init_tracer_provider
+from temporalio.contrib.opentelemetry._tracer_provider import create_tracer_provider
 
 __all__ = [
     "TracingInterceptor",
     "TracingWorkflowInboundInterceptor",
     "OpenTelemetryInterceptor",
     "OpenTelemetryPlugin",
-    "init_tracer_provider",
+    "create_tracer_provider",
 ]

@@ -16,6 +16,7 @@ from opentelemetry.trace import (
 
 import temporalio.workflow
 from temporalio.contrib.opentelemetry import TracingWorkflowInboundInterceptor
+from temporalio.contrib.opentelemetry._tracer_provider import _ReplaySafeTracer
 from temporalio.exceptions import ApplicationError
 
 
@@ -43,7 +44,7 @@ def tracer():
             "Failed to get temporal OpenTelemetry tracer from workflow. You may not have registered the OpenTelemetryPlugin."
         )
 
-    return tracer
+    return _ReplaySafeTracer(tracer)
 
 
 def completed_span(

@@ -14,8 +14,9 @@ from opentelemetry.util._once import Once
 
 import temporalio.contrib.opentelemetry.workflow
 from temporalio import activity, nexus, workflow
-from temporalio.client import Client
-from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, init_tracer_provider
+from temporalio.client import Client, WorkflowFailureError
+from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
+from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
 
 # Import the dump_spans function from the original opentelemetry test
@@ -84,9 +85,7 @@ class ComprehensiveNexusService:
 class BasicTraceWorkflow:
     @workflow.run
     async def run(self):
-        print("\nWorkflow Run")
         tracer = temporalio.contrib.opentelemetry.workflow.tracer()
-        print("Workflow tracer: ", tracer)
         temporalio.contrib.opentelemetry.workflow.completed_span("Completed Span")
         with tracer.start_as_current_span("Hello World"):
             await workflow.execute_activity(
@@ -109,7 +108,7 @@ class BasicTraceWorkflow:
 
 async def test_otel_tracing_basic(client: Client, reset_otel_tracer_provider: Any):  # type: ignore[reportUnusedParameter]
     exporter = InMemorySpanExporter()
-    provider = init_tracer_provider()
+    provider = create_tracer_provider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     opentelemetry.trace.set_tracer_provider(provider)
 
@@ -271,7 +270,7 @@ async def test_opentelemetry_comprehensive_tracing(
         pytest.skip("Fails on java test server.")
 
     exporter = InMemorySpanExporter()
-    provider = init_tracer_provider()
+    provider = create_tracer_provider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     opentelemetry.trace.set_tracer_provider(provider)
 
@@ -418,7 +417,7 @@ async def test_otel_tracing_with_added_spans(
     reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
 ):
     exporter = InMemorySpanExporter()
-    provider = init_tracer_provider()
+    provider = create_tracer_provider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     opentelemetry.trace.set_tracer_provider(provider)
 
@@ -464,6 +463,129 @@ async def test_otel_tracing_with_added_spans(
     ]
 
     # Verify the span hierarchy matches expectations
+    actual_hierarchy = dump_spans(spans, with_attributes=False)
+    assert (
+        actual_hierarchy == expected_hierarchy
+    ), f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+
+
+task_fail_once_workflow_has_failed = False
+
+
+@workflow.defn(sandboxed=False)
+class FailingTaskWorkflow:
+    @workflow.run
+    async def run(self):
+        tracer = temporalio.contrib.opentelemetry.workflow.tracer()
+        with tracer.start_as_current_span("FailingWorkflowSpan"):
+            with tracer.start_as_current_span("FailingWorkflow CompletedSpan"):
+                pass
+            global task_fail_once_workflow_has_failed
+            if not task_fail_once_workflow_has_failed:
+                task_fail_once_workflow_has_failed = True
+                raise RuntimeError("Intentional workflow task failure")
+            task_fail_once_workflow_has_failed = False
+
+        return
+
+
+async def test_otel_tracing_workflow_task_failure(
+    client: Client,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
+    """Test OpenTelemetry behavior when a workflow task fails."""
+    exporter = InMemorySpanExporter()
+    provider = create_tracer_provider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    opentelemetry.trace.set_tracer_provider(provider)
+
+    new_config = client.config()
+    new_config["plugins"] = [OpenTelemetryPlugin(add_temporal_spans=True)]
+    new_client = Client(**new_config)
+
+    async with new_worker(
+        new_client,
+        FailingTaskWorkflow,
+        max_cached_workflows=0,
+    ) as worker:
+        with get_tracer(__name__).start_as_current_span("FailingWorkflowTest"):
+            workflow_handle = await new_client.start_workflow(
+                FailingTaskWorkflow.run,
+                id=f"failing-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+
+            await workflow_handle.result()
+
+    spans = exporter.get_finished_spans()
+
+    # Verify the span hierarchy includes the failure, but only once
+    # Spans which completed during the failed task will duplicate
+    expected_hierarchy = [
+        "FailingWorkflowTest",
+        "  StartWorkflow:FailingTaskWorkflow",
+        "    RunWorkflow:FailingTaskWorkflow",
+        "      FailingWorkflowSpan",
+        "        FailingWorkflow CompletedSpan",
+        "        FailingWorkflow CompletedSpan",
+    ]
+
+    actual_hierarchy = dump_spans(spans, with_attributes=False)
+    assert (
+        actual_hierarchy == expected_hierarchy
+    ), f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+
+
+@workflow.defn
+class FailingWorkflow:
+    @workflow.run
+    async def run(self):
+        tracer = temporalio.contrib.opentelemetry.workflow.tracer()
+        with tracer.start_as_current_span("FailingWorkflowSpan"):
+            raise ApplicationError("Intentional workflow failure", non_retryable=True)
+
+
+async def test_otel_tracing_workflow_failure(
+    client: Client,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
+    """Test OpenTelemetry behavior when a workflow task fails."""
+    exporter = InMemorySpanExporter()
+    provider = create_tracer_provider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    opentelemetry.trace.set_tracer_provider(provider)
+
+    new_config = client.config()
+    new_config["plugins"] = [OpenTelemetryPlugin(add_temporal_spans=True)]
+    new_client = Client(**new_config)
+
+    async with new_worker(
+        new_client,
+        FailingWorkflow,
+        max_cached_workflows=0,
+    ) as worker:
+        with get_tracer(__name__).start_as_current_span("FailingWorkflowTest"):
+            workflow_handle = await new_client.start_workflow(
+                FailingWorkflow.run,
+                id=f"failing-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+
+            with pytest.raises(WorkflowFailureError):
+                await workflow_handle.result()
+
+    spans = exporter.get_finished_spans()
+
+    # Verify the span hierarchy includes the failure when it fails the whole workflow
+    expected_hierarchy = [
+        "FailingWorkflowTest",
+        "  StartWorkflow:FailingWorkflow",
+        "    RunWorkflow:FailingWorkflow",
+        "      FailingWorkflowSpan",
+    ]
+
     actual_hierarchy = dump_spans(spans, with_attributes=False)
     assert (
         actual_hierarchy == expected_hierarchy

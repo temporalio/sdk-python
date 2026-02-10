@@ -1,7 +1,6 @@
 from opentelemetry.trace import get_tracer_provider
 
 from temporalio.contrib.opentelemetry import OpenTelemetryInterceptor
-from temporalio.contrib.opentelemetry._tracer_provider import ReplaySafeTracerProvider
 from temporalio.plugin import SimplePlugin
 
 
@@ -19,9 +18,7 @@ class OpenTelemetryPlugin(SimplePlugin):
     Unlike the prior TracingInterceptor, this allows for accurate duration spans and parenting inside a workflow
     with temporalio.contrib.opentelemetry.workflow.tracer()
 
-    When starting traces on the client side, you can use OpenTelemetryPlugin.provider() to trace to the same
-    exporters provided. If you don't, ensure that some provider is globally registered or the client side
-    traces will not be propagated to the workflow.
+    Your tracer provider should be created with `create_tracer_provider` for it to be used within a Temporal worker.
     """
 
     def __init__(self, *, add_temporal_spans: bool = False):
@@ -32,14 +29,8 @@ class OpenTelemetryPlugin(SimplePlugin):
                 for operations like StartWorkflow, RunWorkflow, etc.
         """
         provider = get_tracer_provider()
-        if not isinstance(provider, ReplaySafeTracerProvider):
-            raise ValueError(
-                "When using OpenTelemetryPlugin, the global trace provider must be a ReplaySafeTracerProvider. Use init_tracer_provider to create one."
-            )
 
-        interceptors = [
-            OpenTelemetryInterceptor(provider.get_tracer(__name__), add_temporal_spans)
-        ]
+        interceptors = [OpenTelemetryInterceptor(provider, add_temporal_spans)]
 
         super().__init__(
             "OpenTelemetryPlugin",

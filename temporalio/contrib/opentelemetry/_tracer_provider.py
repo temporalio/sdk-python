@@ -30,12 +30,23 @@ from temporalio.contrib.opentelemetry._id_generator import TemporalIdGenerator
 
 class _ReplaySafeSpan(Span):
     def __init__(self, span: Span):
+        self._exception: BaseException | None = None
         self._span = span
 
     def end(self, end_time: int | None = None) -> None:
         if workflow.in_workflow() and workflow.unsafe.is_replaying_history_events():
             # Skip ending spans during workflow replay to avoid duplicate telemetry
             return
+
+        if (
+            workflow.in_workflow()
+            and self._exception is not None
+            and not workflow.is_failure_exception(self._exception)
+        ):
+            # Skip ending spans with workflow task failures. Otherwise, each failure will create its own span
+            # This may still occur for spans which were completed during failed workflow tasks.
+            return
+
         self._span.end(end_time=end_time)
 
     def get_span_context(self) -> SpanContext:
@@ -64,6 +75,7 @@ class _ReplaySafeSpan(Span):
     def set_status(
         self, status: Status | StatusCode, description: str | None = None
     ) -> None:
+        self._status = status
         self._span.set_status(status, description)
 
     def record_exception(
@@ -73,10 +85,11 @@ class _ReplaySafeSpan(Span):
         timestamp: int | None = None,
         escaped: bool = False,
     ) -> None:
+        self._exception = exception
         self._span.record_exception(exception, attributes, timestamp, escaped)
 
 
-class _ReplaySafeTracer(Tracer):
+class _ReplaySafeTracer(Tracer):  # type: ignore[reportUnusedClass] # Used outside file
     def __init__(self, tracer: Tracer):
         self._tracer = tracer
 
@@ -207,16 +220,15 @@ class ReplaySafeTracerProvider(TracerProvider):
         Returns:
             A replay-safe tracer instance.
         """
-        tracer = self._tracer_provider.get_tracer(
+        return self._tracer_provider.get_tracer(
             instrumenting_module_name,
             instrumenting_library_version,
             schema_url,
             attributes,
         )
-        return _ReplaySafeTracer(tracer)
 
 
-def init_tracer_provider(
+def create_tracer_provider(
     sampler: sampling.Sampler | None = None,
     resource: Resource | None = None,
     shutdown_on_exit: bool = True,
