@@ -86,20 +86,18 @@ class WorkflowSerializationContext(SerializationContext):
     """Serialization context for workflows.
 
     See :py:class:`SerializationContext` for more details.
-
-    Attributes:
-        namespace: The namespace the workflow is running in.
-        workflow_id: The ID of the workflow. Note that this is the ID of the workflow of which the
-            payload being operated on is an input or output. Note also that when creating/describing
-            schedules, this may be the workflow ID prefix as configured, not the final workflow ID
-            when the workflow is created by the schedule.
     """
 
     namespace: str
-    """Namespace."""
+    """The namespace the workflow is running in."""
 
     workflow_id: str | None
-    """Workflow ID."""
+    """The ID of the workflow.
+    
+    Note that this is the ID of the workflow of which the payload being operated on is an input or
+    output. Note also that when creating/describing schedules, this may be the workflow ID prefix
+    as configured, not the final workflow ID when the workflow is created by the schedule.
+    """
 
 
 @dataclass(frozen=True)
@@ -107,21 +105,10 @@ class ActivitySerializationContext(SerializationContext):
     """Serialization context for activities.
 
     See :py:class:`SerializationContext` for more details.
-
-    Attributes:
-        namespace: Workflow/activity namespace.
-        activity_id: Activity ID. Optional if this is an activity started from a workflow.
-        activity_type: Activity type.
-        activity_task_queue: Activity task queue.
-        workflow_id: Workflow ID. Only set if this is an activity started from a workflow. Note, when creating/describing schedules,
-            this may be the workflow ID prefix as configured, not the final workflow ID when the
-            workflow is created by the schedule.
-        workflow_type: Workflow Type. Only set if this is an activity started from a workflow.
-        is_local: Whether the activity is a local activity. False if the activity was not started by a workflow.
     """
 
     namespace: str
-    """Namespace."""
+    """Workflow/activity namespace."""
 
     activity_id: str | None
     """Activity ID. Optional if this is an activity started from a workflow."""
@@ -143,7 +130,10 @@ class ActivitySerializationContext(SerializationContext):
     """
 
     workflow_id: str | None
-    """Workflow ID if this is an activity started from a workflow."""
+    """Workflow ID. Only set if this is an activity started from a workflow.
+    
+    Note, when creating/describing schedules, this may be the workflow ID prefix as
+    configured, not the final workflow ID when the workflow is created by the schedule."""
 
     workflow_type: str | None
     """Workflow type if this is an activity started from a workflow."""
