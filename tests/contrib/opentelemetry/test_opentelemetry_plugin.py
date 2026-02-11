@@ -148,6 +148,7 @@ class ComprehensiveWorkflow:
 
     @workflow.run
     async def run(self, actions: list[str]) -> dict[str, str]:
+        print("\n------Starting workflow run-------\n")
         results = {}
         tracer = get_tracer(__name__)
         with tracer.start_as_current_span("MainWorkflow"):
