@@ -1,5 +1,5 @@
 import random
-import traceback
+from traceback import format_stack
 
 from opentelemetry.sdk.trace.id_generator import IdGenerator
 from opentelemetry.trace import (
@@ -13,12 +13,14 @@ import temporalio.workflow
 def _get_workflow_random() -> random.Random | None:
     print("Looking for workflow random: ", temporalio.workflow.in_workflow())
     if temporalio.workflow.in_workflow():
+        x = format_stack(limit=12)
         print(
             "Extra:",
             temporalio.workflow.unsafe.is_replaying(),
             temporalio.workflow.unsafe.is_replaying_history_events(),
+            "\n",
+            "".join(x),
         )
-        traceback.print_stack(limit=12)
 
     if temporalio.workflow.in_workflow() and (
         (not temporalio.workflow.unsafe.is_replaying())
