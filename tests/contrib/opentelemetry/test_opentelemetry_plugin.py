@@ -169,11 +169,15 @@ class ComprehensiveWorkflow:
                         results["local_activity"] = result
 
                 elif action == "child_workflow":
-                    with tracer.start_as_current_span("ChildWorkflowSection"):
+                    print("Child workflow action")
+                    with tracer.start_as_current_span("ChildWorkflowSection") as span:
+                        print("Start child span: ", span.get_span_context().span_id)
                         child_handle = await workflow.start_child_workflow(
                             BasicTraceWorkflow.run,
                             id=f"child-{workflow.info().workflow_id}",
                         )
+                        print("Child workflow started")
+
                         await child_handle
                         results["child_workflow"] = "completed"
 

@@ -23,6 +23,7 @@ from opentelemetry.trace import (
     Status,
     StatusCode,
     Tracer,
+    get_current_span,
 )
 from typing_extensions import Protocol
 
@@ -582,10 +583,12 @@ class _TracingWorkflowOutboundInterceptor(
     async def start_child_workflow(
         self, input: temporalio.worker.StartChildWorkflowInput
     ) -> temporalio.workflow.ChildWorkflowHandle:
+        print("Start child workflow: ", get_current_span().get_span_context().span_id)
         with self._workflow_maybe_span(
             f"StartChildWorkflow:{input.workflow}",
             kind=opentelemetry.trace.SpanKind.CLIENT,
         ):
+            print("Start child workflow span")
             input.headers = _context_to_headers(input.headers)
             return await super().start_child_workflow(input)
 
