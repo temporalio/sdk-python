@@ -49,26 +49,45 @@ class Failure(google.protobuf.message.Message):
         ) -> None: ...
 
     MESSAGE_FIELD_NUMBER: builtins.int
+    STACK_TRACE_FIELD_NUMBER: builtins.int
     METADATA_FIELD_NUMBER: builtins.int
     DETAILS_FIELD_NUMBER: builtins.int
+    CAUSE_FIELD_NUMBER: builtins.int
     message: builtins.str
+    stack_trace: builtins.str
     @property
     def metadata(
         self,
     ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]: ...
     details: builtins.bytes
     """UTF-8 encoded JSON serializable details."""
+    @property
+    def cause(self) -> global___Failure: ...
     def __init__(
         self,
         *,
         message: builtins.str = ...,
+        stack_trace: builtins.str = ...,
         metadata: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         details: builtins.bytes = ...,
+        cause: global___Failure | None = ...,
     ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["cause", b"cause"]
+    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "details", b"details", "message", b"message", "metadata", b"metadata"
+            "cause",
+            b"cause",
+            "details",
+            b"details",
+            "message",
+            b"message",
+            "metadata",
+            b"metadata",
+            "stack_trace",
+            b"stack_trace",
         ],
     ) -> None: ...
 
@@ -499,11 +518,13 @@ class StartOperationResponse(google.protobuf.message.Message):
     def async_success(self) -> global___StartOperationResponse.Async: ...
     @property
     def operation_error(self) -> global___UnsuccessfulOperationError:
-        """The operation completed unsuccessfully (failed or canceled)."""
+        """The operation completed unsuccessfully (failed or canceled).
+        Deprecated. Use the failure variant instead.
+        """
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
         """The operation completed unsuccessfully (failed or canceled).
-        Failure object must contain a NexusSDKOperationFailureInfo object.
+        Failure object must contain an ApplicationFailureInfo or CanceledFailureInfo object.
         """
     def __init__(
         self,

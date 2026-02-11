@@ -945,10 +945,6 @@ class DefaultFailureConverter(FailureConverter):
             self._error_to_failure(exception, payload_converter, failure)
         elif isinstance(exception, nexusrpc.HandlerError):
             self._nexus_handler_error_to_failure(exception, payload_converter, failure)
-        elif isinstance(exception, nexusrpc.OperationError):
-            self._nexus_operation_error_to_failure(
-                exception, payload_converter, failure
-            )
         else:
             # Convert to failure error
             failure_error = temporalio.exceptions.ApplicationError(
@@ -1085,6 +1081,8 @@ class DefaultFailureConverter(FailureConverter):
         failure.message = error.message
         if stack_trace := error.stack_trace:
             failure.stack_trace = stack_trace
+        elif tb := error.__traceback__:
+            failure.stack_trace = "\n".join(traceback.format_tb(tb))
         if error.__cause__:
             self.to_failure(error.__cause__, payload_converter, failure.cause)
         failure.nexus_handler_failure_info.SetInParent()
@@ -1096,20 +1094,6 @@ class DefaultFailureConverter(FailureConverter):
             if error.retryable_override is False
             else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
         )
-
-    def _nexus_operation_error_to_failure(
-        self,
-        error: nexusrpc.OperationError,
-        payload_converter: PayloadConverter,
-        failure: temporalio.api.failure.v1.Failure,
-    ) -> None:
-        failure.message = error.message
-        if stack_trace := error.stack_trace:
-            failure.stack_trace = stack_trace
-        if error.__cause__:
-            self.to_failure(error.__cause__, payload_converter, failure.cause)
-            failure.nexus_sdk_operation_failure_info.SetInParent()
-            failure.nexus_sdk_operation_failure_info.state = error.state.value
 
     def from_failure(
         self,
