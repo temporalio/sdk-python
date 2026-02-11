@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import contextvars
-import json
 import threading
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -18,14 +17,11 @@ from typing import (
     cast,
 )
 
-import google.protobuf.json_format
 import nexusrpc.handler
 from nexusrpc import LazyValue
 from nexusrpc.handler import CancelOperationContext, Handler, StartOperationContext
 
 import temporalio.api.common.v1
-import temporalio.api.enums.v1
-import temporalio.api.failure.v1
 import temporalio.api.nexus.v1
 import temporalio.bridge.proto.nexus
 import temporalio.bridge.worker
@@ -395,77 +391,6 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                 await self._data_converter.encode_failure(new_err, response.failure)
                 return response
 
-    async def _nexus_error_to_nexus_failure_proto(
-        self,
-        error: nexusrpc.HandlerError | nexusrpc.OperationError,
-    ) -> temporalio.api.nexus.v1.Failure:
-        """Serialize ``error`` as a Nexus Failure proto.
-
-        The Nexus Failure represents the top-level error. If there is a cause chain
-        attached to the exception, then serialize it as the ``details``.
-
-        Notice that any stack trace attached to ``error`` itself is not included in the
-        result.
-
-        See https://github.com/nexus-rpc/api/blob/main/SPEC.md#failure
-        """
-        if cause := error.__cause__:
-            try:
-                failure = temporalio.api.failure.v1.Failure()
-                await self._data_converter.encode_failure(cause, failure)
-                # Following other SDKs, we move the message from the first item
-                # in the details chain to the top level nexus.v1.Failure
-                # message. In Go and Java this particularly makes sense since
-                # their constructors are controlled such that the nexus
-                # exception itself does not have its own message. However, in
-                # Python, nexusrpc.HandlerError and nexusrpc.OperationError have
-                # their own error messages and stack traces, independent of any
-                # cause exception they may have, and this must be propagated to
-                # the caller. See _exception_to_handler_error for how we address
-                # this by injecting an additional error into the cause chain
-                # before the current function is called.
-                failure_dict = google.protobuf.json_format.MessageToDict(failure)
-                return temporalio.api.nexus.v1.Failure(
-                    message=failure_dict.pop("message", str(error)),
-                    metadata={"type": _TEMPORAL_FAILURE_PROTO_TYPE},
-                    details=json.dumps(
-                        failure_dict,
-                        separators=(",", ":"),
-                    ).encode("utf-8"),
-                )
-            except BaseException:
-                logger.exception("Failed to serialize cause chain of nexus exception")
-        return temporalio.api.nexus.v1.Failure(
-            message=str(error),
-            metadata={},
-            details=b"",
-        )
-
-    async def _operation_error_to_proto(
-        self,
-        err: nexusrpc.OperationError,
-    ) -> temporalio.api.nexus.v1.UnsuccessfulOperationError:
-        return temporalio.api.nexus.v1.UnsuccessfulOperationError(
-            operation_state=err.state.value,
-            failure=await self._nexus_error_to_nexus_failure_proto(err),
-        )
-
-    async def _handler_error_to_proto(
-        self, handler_error: nexusrpc.HandlerError
-    ) -> temporalio.api.nexus.v1.HandlerError:
-        """Serialize ``handler_error`` as a Nexus HandlerError proto (legacy format)."""
-        retry_behavior = (
-            temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
-            if handler_error.retryable_override is True
-            else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
-            if handler_error.retryable_override is False
-            else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
-        )
-        return temporalio.api.nexus.v1.HandlerError(
-            error_type=handler_error.type.value,
-            failure=await self._nexus_error_to_nexus_failure_proto(handler_error),
-            retry_behavior=retry_behavior,
-        )
 
 
 @dataclass
