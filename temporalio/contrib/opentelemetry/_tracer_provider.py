@@ -238,7 +238,7 @@ def create_tracer_provider(
     | None = None,
     id_generator: IdGenerator | None = None,
     span_limits: SpanLimits | None = None,
-) -> TracerProvider:
+) -> ReplaySafeTracerProvider:
     """Initialize a replay-safe tracer provider.
 
     .. warning::
