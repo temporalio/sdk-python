@@ -29,7 +29,7 @@ from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 @dataclass
 class ExpectedError:
     message: str
-    optional: bool = field(kw_only=True, default_factory=lambda: False)
+    optional: bool = field(kw_only=True, default=False)
 
 
 @dataclass
