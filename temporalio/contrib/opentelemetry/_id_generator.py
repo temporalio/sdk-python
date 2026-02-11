@@ -1,5 +1,4 @@
 import random
-from traceback import format_stack
 
 from opentelemetry.sdk.trace.id_generator import IdGenerator
 from opentelemetry.trace import (
@@ -11,7 +10,10 @@ import temporalio.workflow
 
 
 def _get_workflow_random() -> random.Random | None:
-    if temporalio.workflow.in_workflow() and not temporalio.workflow.unsafe.is_read_only():
+    if (
+        temporalio.workflow.in_workflow()
+        and not temporalio.workflow.unsafe.is_read_only()
+    ):
         if (
             getattr(temporalio.workflow.instance(), "__temporal_otel_id_random", None)
             is None
