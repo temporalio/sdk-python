@@ -23,6 +23,7 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.workflow
+from temporalio.api.enums.v1 import WorkflowTaskFailedCause
 from temporalio.bridge.worker import PollShutdownError
 
 from . import _command_aware_visitor
@@ -163,7 +164,14 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             else:
                 self._dynamic_workflow = defn
 
-    async def run(self) -> None:
+    async def run(
+        self,
+        payload_error_limits: temporalio.converter._ServerPayloadErrorLimits | None,
+    ) -> None:
+        self._data_converter = self._data_converter._with_payload_error_limits(
+            payload_error_limits
+        )
+
         # Continually poll for workflow work
         task_tag = object()
         try:
@@ -367,11 +375,17 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             )
 
         try:
-            await temporalio.bridge.worker.encode_completion(
-                completion,
-                data_converter,
-                encode_headers=self._encode_headers,
-            )
+            try:
+                await temporalio.bridge.worker.encode_completion(
+                    completion,
+                    data_converter,
+                    encode_headers=self._encode_headers,
+                )
+            except temporalio.converter._PayloadSizeError as err:
+                logger.warning(err.message)
+                completion.failed.Clear()
+                await data_converter.encode_failure(err, completion.failed.failure)
+                completion.failed.force_cause = WorkflowTaskFailedCause.WORKFLOW_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE
         except Exception as err:
             logger.exception(
                 "Failed encoding completion on workflow with run ID %s", act.run_id

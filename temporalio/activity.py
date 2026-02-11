@@ -108,16 +108,25 @@ class Info:
     heartbeat_details: Sequence[Any]
     heartbeat_timeout: timedelta | None
     is_local: bool
+    namespace: str
     schedule_to_close_timeout: timedelta | None
     scheduled_time: datetime
     start_to_close_timeout: timedelta | None
     started_time: datetime
     task_queue: str
     task_token: bytes
-    workflow_id: str
-    workflow_namespace: str
-    workflow_run_id: str
-    workflow_type: str
+    workflow_id: str | None
+    """ID of the workflow. None if the activity was not started by a workflow."""
+    workflow_namespace: str | None
+    """Namespace of the workflow. None if the activity was not started by a workflow.
+
+    .. deprecated::
+        Use :py:attr:`namespace` instead.
+    """
+    workflow_run_id: str | None
+    """Run ID of the workflow. None if the activity was not started by a workflow."""
+    workflow_type: str | None
+    """Type of the workflow. None if the activity was not started by a workflow."""
     priority: temporalio.common.Priority
     retry_policy: temporalio.common.RetryPolicy | None
     """The retry policy of this activity.
@@ -126,6 +135,14 @@ class Info:
     If the value is None, it means the server didn't send information about retry policy (e.g. due to old server
     version), but it may still be defined server-side."""
 
+    activity_run_id: str | None = None
+    """Run ID of this activity. None for workflow activities."""
+
+    @property
+    def in_workflow(self) -> bool:
+        """Was this activity started by a workflow?"""
+        return self.workflow_id is not None
+
     # TODO(cretz): Consider putting identity on here for "worker_id" for logger?
 
     def _logger_details(self) -> Mapping[str, Any]:
@@ -133,7 +150,7 @@ class Info:
             "activity_id": self.activity_id,
             "activity_type": self.activity_type,
             "attempt": self.attempt,
-            "namespace": self.workflow_namespace,
+            "namespace": self.namespace,
             "task_queue": self.task_queue,
             "workflow_id": self.workflow_id,
             "workflow_run_id": self.workflow_run_id,
@@ -242,7 +259,7 @@ class _Context:
             info = self.info()
             self._metric_meter = self.runtime_metric_meter.with_additional_attributes(
                 {
-                    "namespace": info.workflow_namespace,
+                    "namespace": info.namespace,
                     "task_queue": info.task_queue,
                     "activity_type": info.activity_type,
                 }
@@ -550,6 +567,20 @@ class _Definition:
         raise TypeError(
             f"Activity {fn_name} missing attributes, was it decorated with @activity.defn?"
         )
+
+    @classmethod
+    def get_name_and_result_type(
+        cls, name_or_run_fn: str | Callable[..., Any]
+    ) -> tuple[str, type | None]:
+        if isinstance(name_or_run_fn, str):
+            return name_or_run_fn, None
+        elif callable(name_or_run_fn):
+            defn = cls.must_from_callable(name_or_run_fn)
+            if not defn.name:
+                raise ValueError(f"Activity {name_or_run_fn} definition has no name")
+            return defn.name, defn.ret_type
+        else:
+            raise TypeError("Activity must be a string or callable")  # type:ignore[reportUnreachable]
 
     @staticmethod
     def _apply_to_callable(
