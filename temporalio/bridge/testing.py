@@ -27,6 +27,7 @@ class DevServerConfig:
     port: int | None
     database_filename: str | None
     ui: bool
+    ui_port: int | None
     log_format: str
     log_level: str
     extra_args: Sequence[str]

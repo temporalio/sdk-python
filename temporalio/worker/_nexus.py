@@ -90,9 +90,16 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
 
         self._running_tasks: dict[bytes, _RunningNexusTask] = {}
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
+        self._worker_shutdown_event: temporalio.common._CompositeEvent | None = None
 
-    async def run(self) -> None:
+    async def run(
+        self,
+        payload_error_limits: temporalio.converter._ServerPayloadErrorLimits | None,
+    ) -> None:
         """Continually poll for Nexus tasks and dispatch to handlers."""
+        self._data_converter = self._data_converter._with_payload_error_limits(
+            payload_error_limits
+        )
 
         async def raise_from_exception_queue() -> NoReturn:
             raise await self._fail_worker_exception_queue.get()
@@ -167,6 +174,10 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
             except Exception as err:
                 raise RuntimeError("Nexus worker failed") from err
 
+    def notify_shutdown(self) -> None:
+        if self._worker_shutdown_event:
+            self._worker_shutdown_event.set()
+
     # Only call this if run() raised an error
     async def drain_poll_queue(self) -> None:
         while True:
@@ -204,6 +215,11 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         Attempt to execute the user cancel_operation method. Handle errors and send the
         task completion.
         """
+        # Create the worker shutdown event if not created
+        if not self._worker_shutdown_event:
+            self._worker_shutdown_event = temporalio.common._CompositeEvent(
+                thread_event=threading.Event(), async_event=asyncio.Event()
+            )
         # TODO(nexus-prerelease): headers
         ctx = CancelOperationContext(
             service=request.service,
@@ -216,6 +232,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
             nexus_context=ctx,
             client=self._client,
             _runtime_metric_meter=self._metric_meter,
+            _worker_shutdown_event=self._worker_shutdown_event,
         ).set()
         try:
             try:
@@ -318,6 +335,11 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
 
         All other exceptions are handled by a caller of this function.
         """
+        # Create the worker shutdown event if not created
+        if not self._worker_shutdown_event:
+            self._worker_shutdown_event = temporalio.common._CompositeEvent(
+                thread_event=threading.Event(), async_event=asyncio.Event()
+            )
         ctx = StartOperationContext(
             service=start_request.service,
             operation=start_request.operation,
@@ -336,6 +358,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
             client=self._client,
             info=lambda: Info(task_queue=self._task_queue),
             _runtime_metric_meter=self._metric_meter,
+            _worker_shutdown_event=self._worker_shutdown_event,
         ).set()
         input = LazyValue(
             serializer=_DummyPayloadSerializer(
@@ -390,7 +413,6 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                 response = temporalio.api.nexus.v1.StartOperationResponse()
                 await self._data_converter.encode_failure(new_err, response.failure)
                 return response
-
 
 
 @dataclass

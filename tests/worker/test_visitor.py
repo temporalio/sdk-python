@@ -1,8 +1,10 @@
+import dataclasses
 from collections.abc import MutableSequence
 
 from google.protobuf.duration_pb2 import Duration
 
 import temporalio.bridge.worker
+import temporalio.converter
 from temporalio.api.common.v1.message_pb2 import (
     Payload,
     Payloads,
@@ -228,7 +230,12 @@ async def test_bridge_encoding():
         ),
     )
 
-    await temporalio.bridge.worker.encode_completion(comp, SimpleCodec(), True)
+    data_converter = dataclasses.replace(
+        temporalio.converter.default(),
+        payload_codec=SimpleCodec(),
+    )
+
+    await temporalio.bridge.worker.encode_completion(comp, data_converter, True)
 
     cmd = comp.successful.commands[0]
     sa = cmd.schedule_activity

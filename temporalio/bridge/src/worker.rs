@@ -569,7 +569,7 @@ pub fn new_replay_worker<'a>(
 
 #[pymethods]
 impl WorkerRef {
-    fn validate<'p>(&self, py: Python<'p>) -> PyResult<Bound<PyAny, 'p>> {
+    fn validate<'p>(&self, py: Python<'p>) -> PyResult<Bound<'p, PyAny>> {
         self.runtime.assert_same_process("use worker")?;
         let worker = self.worker.as_ref().unwrap().clone();
         // Set custom slot supplier task locals so they can run futures.
@@ -581,13 +581,15 @@ impl WorkerRef {
             .expect("must only be set once");
 
         self.runtime.future_into_py(py, async move {
-            let info: NamespaceInfo = worker
-                .validate()
-                .await
-                .context("Worker validation failed")
-                .map_err::<PyErr, _>(Into::into)?
-                .into();
-            Ok(info)
+            let bytes = match worker.validate().await {
+                Ok(info) => info.encode_to_vec(),
+                Err(err) => {
+                    return Err(PyRuntimeError::new_err(format!(
+                        "Worker validation failed: {err}"
+                    )))
+                }
+            };
+            Ok(bytes)
         })
     }
 
