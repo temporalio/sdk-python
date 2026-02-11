@@ -31,23 +31,6 @@ from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 logger = logging.getLogger(__name__)
 
 
-def print_otel_spans(spans: tuple[ReadableSpan, ...]):
-    print(
-        "\n".join(
-            [
-                str(
-                    {
-                        "Name": span.name,
-                        "Id": span.context.span_id if span.context else None,
-                        "Parent": span.parent.span_id if span.parent else None,
-                    }
-                )
-                for span in spans
-            ]
-        )
-    )
-
-
 @pytest.fixture
 def reset_otel_tracer_provider():
     """Reset OpenTelemetry tracer provider state to allow multiple test runs."""
@@ -138,9 +121,6 @@ async def test_otel_tracing_basic(client: Client, reset_otel_tracer_provider: An
             await workflow_handle.result()
 
     spans = exporter.get_finished_spans()
-    print_otel_spans(spans)
-    print(dump_spans(spans, with_attributes=False))
-    # assert len(spans) == 7
 
     expected_hierarchy = [
         "Research workflow",
