@@ -360,8 +360,8 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
                 f"RunActivity:{info.activity_type}",
                 add_temporal_spans=self._add_temporal_spans,
                 attributes={
-                    "temporalWorkflowID": info.workflow_id,
-                    "temporalRunID": info.workflow_run_id,
+                    "temporalWorkflowID": info.workflow_id or "",
+                    "temporalRunID": info.workflow_run_id or "",
                     "temporalActivityID": info.activity_id,
                 },
                 kind=opentelemetry.trace.SpanKind.SERVER,
