@@ -1252,27 +1252,6 @@ class DefaultFailureConverter(FailureConverter):
                     operation_token=nexus_op_failure_info.operation_token,
                 )
 
-            case "nexus_sdk_operation_failure_info":
-                nexus_sdk_op_info = failure.nexus_sdk_operation_failure_info
-                try:
-                    state = nexusrpc.OperationErrorState(nexus_sdk_op_info.state)
-                except ValueError:
-                    logger.warning(
-                        f"Unknown Nexus OperationErrorState: {nexus_sdk_op_info.state}"
-                    )
-                    state = nexusrpc.OperationErrorState.FAILED
-                err = nexusrpc.OperationError(
-                    failure.message or "Nexus operation error",
-                    state=state,
-                    stack_trace=failure.stack_trace if failure.stack_trace else None,
-                )
-
-            case "nexus_sdk_failure_error_info":
-                err = temporalio.exceptions.FailureError(
-                    failure.message or "Nexus failure error",
-                    failure=failure,
-                )
-
             case None:
                 err = temporalio.exceptions.FailureError(
                     failure.message or "Failure error",

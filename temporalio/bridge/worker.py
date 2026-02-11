@@ -194,9 +194,9 @@ class Worker:
         """Create SDK core worker from a bridge worker."""
         self._ref = ref
 
-    async def validate(self) -> None:
+    async def validate(self) -> temporalio.bridge.temporal_sdk_bridge.NamespaceInfo:
         """Validate the bridge worker."""
-        await self._ref.validate()  # type: ignore[reportOptionalMemberAccess]
+        return await self._ref.validate()  # type: ignore[reportOptionalMemberAccess]
 
     async def poll_workflow_activation(
         self,

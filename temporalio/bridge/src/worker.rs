@@ -269,6 +269,32 @@ pub struct NexusSlotInfo {
 }
 
 #[pyclass]
+pub struct NamespaceInfo {
+    #[pyo3(get)]
+    pub limits: Option<NamespaceInfoLimits>,
+}
+
+#[pyclass]
+#[derive(Clone)]
+pub struct NamespaceInfoLimits {
+    #[pyo3(get)]
+    pub blob_size_limit_error: i64,
+    #[pyo3(get)]
+    pub memo_size_limit_error: i64,
+}
+
+impl From<temporalio_common::protos::coresdk::NamespaceInfo> for NamespaceInfo {
+    fn from(info: temporalio_common::protos::coresdk::NamespaceInfo) -> Self {
+        NamespaceInfo {
+            limits: info.limits.map(|l| NamespaceInfoLimits {
+                blob_size_limit_error: l.blob_size_limit_error,
+                memo_size_limit_error: l.memo_size_limit_error,
+            }),
+        }
+    }
+}
+
+#[pyclass]
 pub struct SlotReleaseCtx {
     #[pyo3(get)]
     slot_info: Option<PyObject>,
@@ -555,11 +581,13 @@ impl WorkerRef {
             .expect("must only be set once");
 
         self.runtime.future_into_py(py, async move {
-            worker
+            let info: NamespaceInfo = worker
                 .validate()
                 .await
                 .context("Worker validation failed")
-                .map_err(Into::into)
+                .map_err::<PyErr, _>(Into::into)?
+                .into();
+            Ok(info)
         })
     }
 
