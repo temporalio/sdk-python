@@ -10,6 +10,13 @@ import temporalio.workflow
 
 
 def _get_workflow_random() -> random.Random | None:
+    print("Looking for workflow random: ", temporalio.workflow.in_workflow())
+    if temporalio.workflow.in_workflow():
+        print(
+            "Extra:",
+            temporalio.workflow.unsafe.is_replaying(),
+            temporalio.workflow.unsafe.is_replaying_history_events(),
+        )
     if temporalio.workflow.in_workflow() and (
         (not temporalio.workflow.unsafe.is_replaying())
         or temporalio.workflow.unsafe.is_replaying_history_events()
@@ -57,7 +64,10 @@ class TemporalIdGenerator(IdGenerator):
             span_id = workflow_random.getrandbits(64)
             while span_id == INVALID_SPAN_ID:
                 span_id = workflow_random.getrandbits(64)
+            print("Generating workflow random span id - ", span_id)
+
             return span_id
+        print("Generating random span id")
         return self._id_generator.generate_span_id()
 
     def generate_trace_id(self) -> int:
