@@ -2316,7 +2316,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
         except Exception:
             logger.exception(
-                f"Failed deserializing signal input for {job.signal_name}, dropping the signal"
+                f"Failed deserializing signal input for {job.signal_name}"
+                f" on workflow {self._info.workflow_type} with ID {self._info.workflow_id}"
+                f" and run ID {self._info.run_id}, dropping the signal",
+                extra={"temporal_workflow": self._info._logger_details()},
             )
             return
         input = HandleSignalInput(
