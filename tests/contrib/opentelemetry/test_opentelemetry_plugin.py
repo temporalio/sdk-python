@@ -6,7 +6,6 @@ from typing import Any
 import nexusrpc
 import opentelemetry.trace
 import pytest
-from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
