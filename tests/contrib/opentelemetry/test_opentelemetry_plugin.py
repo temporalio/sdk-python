@@ -170,7 +170,7 @@ class ComprehensiveWorkflow:
     @workflow.run
     async def run(self, actions: list[str]) -> dict[str, str]:
         results = {}
-        tracer = temporalio.contrib.opentelemetry.workflow.tracer()
+        tracer = get_tracer(__name__)
         with tracer.start_as_current_span("MainWorkflow"):
             for action in actions:
                 if action == "activity":
@@ -480,7 +480,7 @@ task_fail_once_workflow_has_failed = False
 class FailingTaskWorkflow:
     @workflow.run
     async def run(self):
-        tracer = temporalio.contrib.opentelemetry.workflow.tracer()
+        tracer = get_tracer(__name__)
         with tracer.start_as_current_span("FailingWorkflowSpan"):
             with tracer.start_as_current_span("FailingWorkflow CompletedSpan"):
                 pass
@@ -545,7 +545,7 @@ async def test_otel_tracing_workflow_task_failure(
 class FailingWorkflow:
     @workflow.run
     async def run(self):
-        tracer = temporalio.contrib.opentelemetry.workflow.tracer()
+        tracer = get_tracer(__name__)
         with tracer.start_as_current_span("FailingWorkflowSpan"):
             raise ApplicationError("Intentional workflow failure", non_retryable=True)
 

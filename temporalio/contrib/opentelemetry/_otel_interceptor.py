@@ -29,11 +29,9 @@ from typing_extensions import Protocol
 import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.client
-import temporalio.contrib.opentelemetry.workflow
 import temporalio.converter
 import temporalio.worker
 import temporalio.workflow
-from temporalio import workflow
 from temporalio.contrib.opentelemetry._tracer_provider import (
     ReplaySafeTracerProvider,
 )
@@ -110,19 +108,6 @@ def _nexus_headers_to_context(headers: Mapping[str, str]) -> Context:
     return context
 
 
-def _ensure_tracer(tracer: Tracer) -> None:
-    """We use a custom uuid generator for spans to ensure that changes to user code workflow.random usage
-    do not affect tracing and vice versa.
-    """
-    instance = workflow.instance()
-    if not hasattr(instance, "__temporal_opentelemetry_tracer"):
-        setattr(
-            workflow.instance(),
-            "__temporal_opentelemetry_tracer",
-            tracer,
-        )
-
-
 @contextmanager
 def _maybe_span(
     tracer: Tracer,
@@ -139,12 +124,7 @@ def _maybe_span(
 
     token = opentelemetry.context.attach(context) if context else None
     try:
-        span_factory = (
-            temporalio.contrib.opentelemetry.workflow.tracer().start_as_current_span
-            if workflow.in_workflow()
-            else tracer.start_as_current_span
-        )
-        with span_factory(
+        with tracer.start_as_current_span(
             name,
             attributes=attributes,
             kind=kind,
@@ -473,7 +453,6 @@ class _TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterc
         """Implementation of
         :py:meth:`temporalio.worker.WorkflowInboundInterceptor.execute_workflow`.
         """
-        _ensure_tracer(self.get_tracer())
         with self._top_level_workflow_context(input):
             with self._workflow_maybe_span(
                 f"RunWorkflow:{temporalio.workflow.info().workflow_type}"
@@ -484,7 +463,6 @@ class _TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterc
         """Implementation of
         :py:meth:`temporalio.worker.WorkflowInboundInterceptor.handle_signal`.
         """
-        _ensure_tracer(self.get_tracer())
         with self._top_level_workflow_context(input):
             with self._workflow_maybe_span(
                 f"HandleSignal:{input.signal}",
@@ -495,7 +473,6 @@ class _TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterc
         """Implementation of
         :py:meth:`temporalio.worker.WorkflowInboundInterceptor.handle_query`.
         """
-        _ensure_tracer(self.get_tracer())
         with self._top_level_workflow_context(input):
             with self._workflow_maybe_span(
                 f"HandleQuery:{input.query}",
@@ -508,7 +485,6 @@ class _TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterc
         """Implementation of
         :py:meth:`temporalio.worker.WorkflowInboundInterceptor.handle_update_validator`.
         """
-        _ensure_tracer(self.get_tracer())
         with self._top_level_workflow_context(input):
             with self._workflow_maybe_span(
                 f"ValidateUpdate:{input.update}",
@@ -521,7 +497,6 @@ class _TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterc
         """Implementation of
         :py:meth:`temporalio.worker.WorkflowInboundInterceptor.handle_update_handler`.
         """
-        _ensure_tracer(self.get_tracer())
         with self._top_level_workflow_context(input):
             with self._workflow_maybe_span(
                 f"HandleUpdate:{input.update}",

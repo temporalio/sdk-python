@@ -57,10 +57,7 @@ class TemporalIdGenerator(IdGenerator):
             span_id = workflow_random.getrandbits(64)
             while span_id == INVALID_SPAN_ID:
                 span_id = workflow_random.getrandbits(64)
-            print("Generating workflow random span id - ", span_id)
-
             return span_id
-        print("Generating random span id")
         return self._id_generator.generate_span_id()
 
     def generate_trace_id(self) -> int:

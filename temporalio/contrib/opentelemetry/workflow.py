@@ -11,40 +11,10 @@ import warnings
 
 import opentelemetry.util.types
 from opentelemetry.trace import (
-    Tracer,
+    get_tracer,
 )
 
-import temporalio.workflow
 from temporalio.contrib.opentelemetry import TracingWorkflowInboundInterceptor
-from temporalio.contrib.opentelemetry._tracer_provider import _ReplaySafeTracer
-from temporalio.exceptions import ApplicationError
-
-
-def _try_get_tracer() -> Tracer | None:
-    tracer = getattr(
-        temporalio.workflow.instance(), "__temporal_opentelemetry_tracer", None
-    )
-    if tracer is not None and not isinstance(tracer, Tracer):
-        raise ApplicationError(
-            "Failed to get temporal OpenTelemetry tracer from workflow. It was present but not a Tracer. This is unexpected."
-        )
-    return tracer
-
-
-def tracer():
-    """Get an OpenTelemetry Tracer which functions inside a Temporal workflow.
-
-    .. warning::
-        This function is experimental and may change in future versions.
-        Use with caution in production environments.
-    """
-    tracer = _try_get_tracer()
-    if tracer is None or not isinstance(tracer, Tracer):
-        raise ApplicationError(
-            "Failed to get temporal OpenTelemetry tracer from workflow. You may not have registered the OpenTelemetryPlugin."
-        )
-
-    return _ReplaySafeTracer(tracer)
 
 
 def completed_span(
@@ -68,20 +38,16 @@ def completed_span(
             run ID are automatically added.
         exception: Optional exception to record on the span.
     """
-    # Check for v2 Tracer first
-    if tracer := _try_get_tracer():
-        warnings.warn(
-            "When using OpenTelemetryPlugin, you should prefer workflow.tracer().",
-            DeprecationWarning,
-        )
-        span = tracer.start_span(name, attributes=attributes)
-        if exception:
-            span.record_exception(exception)
-        span.end()
-        return
-
-    interceptor = TracingWorkflowInboundInterceptor._from_context()
-    if interceptor:
+    if interceptor := TracingWorkflowInboundInterceptor._from_context():
         interceptor._completed_span(
             name, additional_attributes=attributes, exception=exception
         )
+    else:
+        warnings.warn(
+            "When using OpenTelemetryPlugin, you should prefer using opentelemetry directly.",
+            DeprecationWarning,
+        )
+        span = get_tracer(__name__).start_span(name, attributes=attributes)
+        if exception:
+            span.record_exception(exception)
+        span.end()
