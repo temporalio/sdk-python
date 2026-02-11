@@ -23,7 +23,8 @@ from opentelemetry.trace import (
     Status,
     StatusCode,
     Tracer,
-    get_current_span,
+    get_tracer,
+    get_tracer_provider,
 )
 from typing_extensions import Protocol
 
@@ -169,12 +170,9 @@ class OpenTelemetryInterceptor(
 
     def __init__(  # type: ignore[reportMissingSuperCall]
         self,
-        provider: opentelemetry.trace.TracerProvider,
         add_temporal_spans: bool = False,
     ) -> None:
         """Initialize a OpenTelemetry tracing interceptor."""
-        self._tracer = provider.get_tracer(__name__)
-        self._provider = provider
         self._add_temporal_spans = add_temporal_spans
 
     def intercept_client(
@@ -183,9 +181,7 @@ class OpenTelemetryInterceptor(
         """Implementation of
         :py:meth:`temporalio.client.Interceptor.intercept_client`.
         """
-        return _TracingClientOutboundInterceptor(
-            next, self._tracer, self._add_temporal_spans
-        )
+        return _TracingClientOutboundInterceptor(next, self._add_temporal_spans)
 
     def intercept_activity(
         self, next: temporalio.worker.ActivityInboundInterceptor
@@ -193,9 +189,7 @@ class OpenTelemetryInterceptor(
         """Implementation of
         :py:meth:`temporalio.worker.Interceptor.intercept_activity`.
         """
-        return _TracingActivityInboundInterceptor(
-            next, self._tracer, self._add_temporal_spans
-        )
+        return _TracingActivityInboundInterceptor(next, self._add_temporal_spans)
 
     def workflow_interceptor_class(
         self, input: temporalio.worker.WorkflowInterceptorClassInput
@@ -203,18 +197,14 @@ class OpenTelemetryInterceptor(
         """Implementation of
         :py:meth:`temporalio.worker.Interceptor.workflow_interceptor_class`.
         """
-        if not isinstance(self._provider, ReplaySafeTracerProvider):
+        provider = get_tracer_provider()
+        if not isinstance(provider, ReplaySafeTracerProvider):
             raise ValueError(
                 "When using OpenTelemetryPlugin, the global trace provider must be a ReplaySafeTracerProvider. Use init_tracer_provider to create one."
             )
 
-        tracer = self._tracer
-
         class InterceptorWithState(_TracingWorkflowInboundInterceptor):
             _add_temporal_spans = self._add_temporal_spans
-
-            def get_tracer(self):
-                return tracer
 
         return InterceptorWithState
 
@@ -224,21 +214,17 @@ class OpenTelemetryInterceptor(
         """Implementation of
         :py:meth:`temporalio.worker.Interceptor.intercept_nexus_operation`.
         """
-        return _TracingNexusOperationInboundInterceptor(
-            next, self._tracer, self._add_temporal_spans
-        )
+        return _TracingNexusOperationInboundInterceptor(next, self._add_temporal_spans)
 
 
 class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
     def __init__(
         self,
         next: temporalio.client.OutboundInterceptor,
-        tracer: Tracer,
         add_temporal_spans: bool,
     ) -> None:
         super().__init__(next)
         self._add_temporal_spans = add_temporal_spans
-        self._tracer = tracer
 
     async def start_workflow(
         self, input: temporalio.client.StartWorkflowInput
@@ -247,7 +233,7 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
             "StartWorkflow" if not input.start_signal else "SignalWithStartWorkflow"
         )
         with _maybe_span(
-            self._tracer,
+            get_tracer(__name__),
             f"{prefix}:{input.workflow}",
             add_temporal_spans=self._add_temporal_spans,
             attributes={"temporalWorkflowID": input.id},
@@ -258,7 +244,7 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
 
     async def query_workflow(self, input: temporalio.client.QueryWorkflowInput) -> Any:
         with _maybe_span(
-            self._tracer,
+            get_tracer(__name__),
             f"QueryWorkflow:{input.query}",
             add_temporal_spans=self._add_temporal_spans,
             attributes={"temporalWorkflowID": input.id},
@@ -271,7 +257,7 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
         self, input: temporalio.client.SignalWorkflowInput
     ) -> None:
         with _maybe_span(
-            self._tracer,
+            get_tracer(__name__),
             f"SignalWorkflow:{input.signal}",
             add_temporal_spans=self._add_temporal_spans,
             attributes={"temporalWorkflowID": input.id},
@@ -284,7 +270,7 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
         self, input: temporalio.client.StartWorkflowUpdateInput
     ) -> temporalio.client.WorkflowUpdateHandle[Any]:
         with _maybe_span(
-            self._tracer,
+            get_tracer(__name__),
             f"StartWorkflowUpdate:{input.update}",
             add_temporal_spans=self._add_temporal_spans,
             attributes={"temporalWorkflowID": input.id},
@@ -303,7 +289,7 @@ class _TracingClientOutboundInterceptor(temporalio.client.OutboundInterceptor):
             attrs["temporalUpdateID"] = input.update_workflow_input.update_id
 
         with _maybe_span(
-            self._tracer,
+            get_tracer(__name__),
             f"StartUpdateWithStartWorkflow:{input.start_workflow_input.workflow}",
             add_temporal_spans=self._add_temporal_spans,
             attributes=attrs,
@@ -322,11 +308,9 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
     def __init__(
         self,
         next: temporalio.worker.ActivityInboundInterceptor,
-        tracer: Tracer,
         add_temporal_spans: bool,
     ) -> None:
         super().__init__(next)
-        self._tracer = tracer
         self._add_temporal_spans = add_temporal_spans
 
     async def execute_activity(
@@ -337,7 +321,7 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
         try:
             info = temporalio.activity.info()
             with _maybe_span(
-                self._tracer,
+                get_tracer(__name__),
                 f"RunActivity:{info.activity_type}",
                 add_temporal_spans=self._add_temporal_spans,
                 attributes={
@@ -359,11 +343,9 @@ class _TracingNexusOperationInboundInterceptor(
     def __init__(
         self,
         next: temporalio.worker.NexusOperationInboundInterceptor,
-        tracer: Tracer,
         add_temporal_spans: bool,
     ) -> None:
         super().__init__(next)
-        self._tracer = tracer
         self._add_temporal_spans = add_temporal_spans
 
     @contextmanager
@@ -384,7 +366,7 @@ class _TracingNexusOperationInboundInterceptor(
     ):
         with self._top_level_context(input.ctx.headers):
             with _maybe_span(
-                self._tracer,
+                get_tracer(__name__),
                 f"RunStartNexusOperationHandler:{input.ctx.service}/{input.ctx.operation}",
                 add_temporal_spans=self._add_temporal_spans,
                 attributes={},
@@ -397,7 +379,7 @@ class _TracingNexusOperationInboundInterceptor(
     ) -> None:
         with self._top_level_context(input.ctx.headers):
             with _maybe_span(
-                self._tracer,
+                get_tracer(__name__),
                 f"RunCancelNexusOperationHandler:{input.ctx.service}/{input.ctx.operation}",
                 add_temporal_spans=self._add_temporal_spans,
                 attributes={},
@@ -419,17 +401,12 @@ class _TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterc
         """Initialize a tracing workflow interceptor."""
         super().__init__(next)
 
-    def get_tracer(self) -> Tracer:
-        raise NotImplementedError()
-
     def init(self, outbound: temporalio.worker.WorkflowOutboundInterceptor) -> None:
         """Implementation of
         :py:meth:`temporalio.worker.WorkflowInboundInterceptor.init`.
         """
         super().init(
-            _TracingWorkflowOutboundInterceptor(
-                outbound, self.get_tracer(), self._add_temporal_spans
-            )
+            _TracingWorkflowOutboundInterceptor(outbound, self._add_temporal_spans)
         )
 
     @contextmanager
@@ -440,7 +417,7 @@ class _TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterc
             "temporalRunID": info.run_id,
         }
         with _maybe_span(
-            self.get_tracer(),
+            get_tracer(__name__),
             name,
             add_temporal_spans=self._add_temporal_spans,
             attributes=attributes,
@@ -521,11 +498,9 @@ class _TracingWorkflowOutboundInterceptor(
     def __init__(
         self,
         next: temporalio.worker.WorkflowOutboundInterceptor,
-        tracer: Tracer,
         add_temporal_spans: bool,
     ) -> None:
         super().__init__(next)
-        self._tracer = tracer
         self._add_temporal_spans = add_temporal_spans
 
     @contextmanager
@@ -538,7 +513,7 @@ class _TracingWorkflowOutboundInterceptor(
             "temporalRunID": info.run_id,
         }
         with _maybe_span(
-            self._tracer,
+            get_tracer(__name__),
             name,
             add_temporal_spans=self._add_temporal_spans,
             attributes=attributes,
@@ -583,12 +558,10 @@ class _TracingWorkflowOutboundInterceptor(
     async def start_child_workflow(
         self, input: temporalio.worker.StartChildWorkflowInput
     ) -> temporalio.workflow.ChildWorkflowHandle:
-        print("Start child workflow: ", get_current_span().get_span_context().span_id)
         with self._workflow_maybe_span(
             f"StartChildWorkflow:{input.workflow}",
             kind=opentelemetry.trace.SpanKind.CLIENT,
         ):
-            print("Start child workflow span")
             input.headers = _context_to_headers(input.headers)
             return await super().start_child_workflow(input)
 

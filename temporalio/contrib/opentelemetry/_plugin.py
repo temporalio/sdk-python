@@ -1,7 +1,5 @@
 import dataclasses
 
-from opentelemetry.trace import get_tracer_provider
-
 from temporalio.contrib.opentelemetry import OpenTelemetryInterceptor
 from temporalio.plugin import SimplePlugin
 from temporalio.worker import WorkflowRunner
@@ -32,9 +30,7 @@ class OpenTelemetryPlugin(SimplePlugin):
             add_temporal_spans: Whether to add additional Temporal-specific spans
                 for operations like StartWorkflow, RunWorkflow, etc.
         """
-        provider = get_tracer_provider()
-
-        interceptors = [OpenTelemetryInterceptor(provider, add_temporal_spans)]
+        interceptors = [OpenTelemetryInterceptor(add_temporal_spans)]
 
         def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
             if not runner:
@@ -53,6 +49,5 @@ class OpenTelemetryPlugin(SimplePlugin):
         super().__init__(
             "OpenTelemetryPlugin",
             client_interceptors=interceptors,
-            worker_interceptors=interceptors,
             workflow_runner=workflow_runner,
         )
