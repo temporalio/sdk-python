@@ -54,8 +54,6 @@ fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<worker::WorkflowSlotInfo>()?;
     m.add_class::<worker::ActivitySlotInfo>()?;
     m.add_class::<worker::LocalActivitySlotInfo>()?;
-    m.add_class::<worker::NamespaceInfo>()?;
-    m.add_class::<worker::NamespaceInfoLimits>()?;
     m.add_function(wrap_pyfunction!(new_worker, m)?)?;
     m.add_function(wrap_pyfunction!(new_replay_worker, m)?)?;
 
