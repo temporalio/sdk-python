@@ -1065,12 +1065,6 @@ class DefaultFailureConverter(FailureConverter):
             failure.nexus_operation_execution_failure_info.operation_token = (
                 error.operation_token
             )
-        elif isinstance(error, temporalio.exceptions.ResetWorkflowError):
-            failure.reset_workflow_failure_info.SetInParent()
-            if error.last_heartbeat_details:
-                failure.reset_workflow_failure_info.last_heartbeat_details.CopyFrom(
-                    payload_converter.to_payloads_wrapper(error.last_heartbeat_details)
-                )
 
     def _nexus_handler_error_to_failure(
         self,
@@ -1125,7 +1119,6 @@ class DefaultFailureConverter(FailureConverter):
         err: (
             temporalio.exceptions.FailureError
             | nexusrpc.HandlerError
-            | nexusrpc.OperationError
         )
         match failure.WhichOneof("failure_info"):
             case "application_failure_info":
@@ -1206,14 +1199,6 @@ class DefaultFailureConverter(FailureConverter):
                     else None,
                 )
 
-            case "reset_workflow_failure_info":
-                reset_info = failure.reset_workflow_failure_info
-                err = temporalio.exceptions.ResetWorkflowError(
-                    failure.message or "Reset workflow error",
-                    last_heartbeat_details=payload_converter.from_payloads_wrapper(
-                        reset_info.last_heartbeat_details
-                    ),
-                )
 
             case "nexus_handler_failure_info":
                 nexus_handler_failure_info = failure.nexus_handler_failure_info
@@ -1252,10 +1237,9 @@ class DefaultFailureConverter(FailureConverter):
                     operation_token=nexus_op_failure_info.operation_token,
                 )
 
-            case None:
+            case "reset_workflow_failure_info" | None:
                 err = temporalio.exceptions.FailureError(
                     failure.message or "Failure error",
-                    failure=failure,
                 )
 
         if isinstance(err, temporalio.exceptions.FailureError):

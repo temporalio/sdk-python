@@ -50,7 +50,6 @@ from temporalio.exceptions import (
     ApplicationError,
     FailureError,
     NexusOperationError,
-    ResetWorkflowError,
 )
 
 # StrEnum is available in 3.11+
@@ -809,62 +808,6 @@ async def test_nexus_operation_error_with_cause():
     assert isinstance(result_error.__cause__, nexusrpc.HandlerError)
     assert result_error.__cause__.type == nexusrpc.HandlerErrorType.NOT_FOUND
     assert str(result_error.__cause__) == "handler failed"
-
-async def test_reset_workflow_error_round_trip():
-    """Test round-trip conversion of ResetWorkflowError."""
-    test_cases: list[tuple[str, list[Any]]] = [
-        # (message, last_heartbeat_details)
-        ("reset with details", ["detail1", 42, {"key": "value"}]),
-        ("reset with single detail", [123]),
-    ]
-
-    for message, last_heartbeat_details in test_cases:
-        original_error = ResetWorkflowError(
-            message,
-            last_heartbeat_details=last_heartbeat_details,
-        )
-
-        # Convert to failure
-        failure = Failure()
-        await DataConverter.default.encode_failure(original_error, failure)
-
-        # Verify failure structure and message
-        assert failure.message == message
-        assert failure.HasField("reset_workflow_failure_info")
-        assert failure.reset_workflow_failure_info.HasField("last_heartbeat_details")
-
-        # Convert back
-        result_error = await DataConverter.default.decode_failure(failure)
-
-        # Verify message and details preserved
-        assert isinstance(result_error, ResetWorkflowError)
-        assert result_error.message == message
-        assert list(result_error.last_heartbeat_details) == last_heartbeat_details
-
-
-async def test_reset_workflow_error_empty_details():
-    """Test ResetWorkflowError with empty last_heartbeat_details."""
-    message = "reset with no details"
-    original_error = ResetWorkflowError(
-        message,
-        last_heartbeat_details=[],
-    )
-
-    # Convert to failure
-    failure = Failure()
-    await DataConverter.default.encode_failure(original_error, failure)
-
-    # Should have reset_workflow_failure_info with message
-    assert failure.message == message
-    assert failure.HasField("reset_workflow_failure_info")
-
-    # Convert back
-    result_error = await DataConverter.default.decode_failure(failure)
-
-    # Verify message and empty details
-    assert isinstance(result_error, ResetWorkflowError)
-    assert result_error.message == message
-    assert list(result_error.last_heartbeat_details) == []
 
 
 class IPv4AddressPayloadConverter(CompositePayloadConverter):
