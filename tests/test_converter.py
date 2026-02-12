@@ -664,7 +664,41 @@ async def test_nexus_handler_error_round_trip(
     assert isinstance(result_error, nexusrpc.HandlerError)
     assert result_error.type == handler_type
     assert result_error.retryable_override == expected_retryable
-    assert str(result_error) == message
+    assert result_error.message == message
+    assert result_error.original_failure
+    assert result_error.original_failure.details
+
+    # modify result_error.original_failure as a way of confirming that it is used
+    # when encoding the resulting failure
+    result_error.original_failure.details = {
+        "nexusHandlerFailureInfo": {
+            **result_error.original_failure.details["nexusHandlerFailureInfo"],
+            "type": "TEST TYPE",
+        }
+    }
+
+    result_failure = Failure()
+    await DataConverter.default.encode_failure(result_error, result_failure)
+    assert result_failure.HasField("nexus_handler_failure_info")
+    assert result_failure.nexus_handler_failure_info.type == "TEST TYPE"
+    assert result_failure.message == message
+
+    # Verify retryable behavior mapping
+    if retryable_override is True:
+        assert (
+            result_failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+        )
+    elif retryable_override is False:
+        assert (
+            result_failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+        )
+    else:
+        assert (
+            result_failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+        )
 
 
 async def test_nexus_handler_error_with_cause():

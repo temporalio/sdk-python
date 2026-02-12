@@ -55,6 +55,8 @@ from types import UnionType
 
 logger = getLogger(__name__)
 
+_TEMPORAL_FAILURE_PROTO_TYPE = "temporal.api.failure.v1.Failure"
+
 
 class SerializationContext(ABC):
     """Base serialization context.
@@ -1057,22 +1059,72 @@ class DefaultFailureConverter(FailureConverter):
         payload_converter: PayloadConverter,
         failure: temporalio.api.failure.v1.Failure,
     ) -> None:
-        failure.message = error.message
-        if stack_trace := error.stack_trace:
-            failure.stack_trace = stack_trace
-        elif tb := error.__traceback__:
-            failure.stack_trace = "\n".join(traceback.format_tb(tb))
-        if error.__cause__:
-            self.to_failure(error.__cause__, payload_converter, failure.cause)
-        failure.nexus_handler_failure_info.SetInParent()
-        failure.nexus_handler_failure_info.type = error.type.name
-        failure.nexus_handler_failure_info.retry_behavior = temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.ValueType(
-            temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
-            if error.retryable_override is True
-            else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
-            if error.retryable_override is False
-            else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+        if error.original_failure:
+            self._nexus_failure_to_temporal_failure(
+                error.original_failure, True, failure
+            )
+        else:
+            failure.message = error.message
+            if stack_trace := error.stack_trace:
+                failure.stack_trace = stack_trace
+            elif tb := error.__traceback__:
+                failure.stack_trace = "\n".join(traceback.format_tb(tb))
+            if error.__cause__:
+                self.to_failure(error.__cause__, payload_converter, failure.cause)
+            failure.nexus_handler_failure_info.SetInParent()
+            failure.nexus_handler_failure_info.type = error.type.name
+            failure.nexus_handler_failure_info.retry_behavior = temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.ValueType(
+                temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+                if error.retryable_override is True
+                else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+                if error.retryable_override is False
+                else temporalio.api.enums.v1.NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+            )
+
+    def _temporal_failure_to_nexus_failure(
+        self, failure: temporalio.api.failure.v1.Failure
+    ) -> nexusrpc.Failure:
+        message, failure.message = failure.message, ""
+        stack_trace = failure.stack_trace
+        failure_dict = google.protobuf.json_format.MessageToDict(failure)
+        failure.message = message
+        failure.stack_trace = stack_trace
+        return nexusrpc.Failure(
+            message=message,
+            stack_trace=stack_trace,
+            metadata={
+                "type": _TEMPORAL_FAILURE_PROTO_TYPE,
+            },
+            details=failure_dict,
         )
+
+    def _nexus_failure_to_temporal_failure(
+        self,
+        failure: nexusrpc.Failure,
+        retryable: bool,
+        temporal_failure: temporalio.api.failure.v1.Failure,
+    ) -> None:
+        if (
+            failure.metadata
+            and failure.metadata.get("type") == _TEMPORAL_FAILURE_PROTO_TYPE
+        ):
+            google.protobuf.json_format.ParseDict(failure.details, temporal_failure)
+        else:
+            temporal_failure.application_failure_info.SetInParent()
+            temporal_failure.application_failure_info.type = "NexusFailure"
+            temporal_failure.application_failure_info.non_retryable = not retryable
+            temporal_failure.application_failure_info.details.SetInParent()
+            temporal_failure.application_failure_info.details.payloads.append(
+                temporalio.api.common.v1.Payload(
+                    metadata={"encoding": b"json/plain"},
+                    data=json.dumps(
+                        dataclasses.replace(failure, message=""), separators=(",", ":")
+                    ).encode("utf-8"),
+                )
+            )
+
+        temporal_failure.message = failure.message
+        temporal_failure.stack_trace = failure.stack_trace or ""
 
     def from_failure(
         self,
@@ -1205,6 +1257,7 @@ class DefaultFailureConverter(FailureConverter):
                     type=_type,
                     retryable_override=retryable_override,
                     stack_trace=failure.stack_trace if failure.stack_trace else None,
+                    original_failure=self._temporal_failure_to_nexus_failure(failure),
                 )
 
             case "nexus_operation_execution_failure_info":
