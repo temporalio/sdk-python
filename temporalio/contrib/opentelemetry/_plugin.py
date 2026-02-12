@@ -41,7 +41,7 @@ class OpenTelemetryPlugin(SimplePlugin):
                 return dataclasses.replace(
                     runner,
                     restrictions=runner.restrictions.with_passthrough_modules(
-                        "opentelemetry.trace"
+                        "opentelemetry"
                     ),
                 )
             return runner
