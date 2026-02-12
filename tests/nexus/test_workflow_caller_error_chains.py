@@ -244,12 +244,12 @@ RaiseApplicationErrorNonRetryable = ErrorTestCase(
             service="ErrorTestService",
         ),
         ExpectedHandlerError(
-            message="application-error-message",
+            message="Handler failed with non-retryable application error",
             type="INTERNAL",
             retryable=False,
         ),
         ExpectedHandlerError(
-            message="application-error-message",
+            message="Handler failed with non-retryable application error",
             type="INTERNAL",
             retryable=False,
             optional=True,
@@ -272,12 +272,12 @@ RaiseApplicationErrorNonRetryableFromCustomError = ErrorTestCase(
             service="ErrorTestService",
         ),
         ExpectedHandlerError(
-            message="application-error-message",
+            message="Handler failed with non-retryable application error",
             type="INTERNAL",
             retryable=False,
         ),
         ExpectedHandlerError(
-            message="application-error-message",
+            message="Handler failed with non-retryable application error",
             type="INTERNAL",
             retryable=False,
             optional=True,

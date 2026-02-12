@@ -452,8 +452,7 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
         return err
     elif isinstance(err, ApplicationError):
         handler_err = nexusrpc.HandlerError(
-            # TODO(nexus-preview): confirm what we want as message here
-            err.message,
+            message="Handler failed with non-retryable application error",
             type=nexusrpc.HandlerErrorType.INTERNAL,
             retryable_override=not err.non_retryable,
         )
@@ -525,7 +524,7 @@ def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
             )
     else:
         handler_err = nexusrpc.HandlerError(
-            str(err), type=nexusrpc.HandlerErrorType.INTERNAL
+            "Internal handler error", type=nexusrpc.HandlerErrorType.INTERNAL
         )
     handler_err.__cause__ = err
     return handler_err

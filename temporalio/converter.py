@@ -1085,7 +1085,7 @@ class DefaultFailureConverter(FailureConverter):
         self, failure: temporalio.api.failure.v1.Failure
     ) -> nexusrpc.Failure:
         message, failure.message = failure.message, ""
-        stack_trace = failure.stack_trace
+        stack_trace, failure.stack_trace = failure.stack_trace, ""
         failure_dict = google.protobuf.json_format.MessageToDict(failure)
         failure.message = message
         failure.stack_trace = stack_trace
