@@ -150,12 +150,36 @@ class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         if workflow_runner:
             config["workflow_runner"] = workflow_runner
 
-        interceptors = _resolve_append_parameter(
-            config.get("interceptors"), self.worker_interceptors
+        interceptors = list(
+            _resolve_append_parameter(
+                config.get("interceptors"), self.worker_interceptors
+            )
+            or []
         )
 
-        if interceptors is not None:
-            config["interceptors"] = interceptors
+        # Only propagate client interceptors if they are provided as a simple list (not callable)
+        if self.client_interceptors is not None and not callable(
+            self.client_interceptors
+        ):
+            client_worker_interceptors = [
+                interceptor
+                for interceptor in self.client_interceptors
+                if isinstance(interceptor, temporalio.worker.Interceptor)
+            ]
+            for interceptor in client_worker_interceptors:
+                if interceptor not in interceptors:
+                    # Check if interceptor is already in client's interceptors to avoid duplication
+                    client_config = config.get("client")
+                    if client_config is not None:
+                        client_interceptors_list = client_config.config(
+                            active_config=True
+                        ).get("interceptors", [])
+                        if interceptor not in client_interceptors_list:
+                            interceptors.append(interceptor)
+                    else:
+                        interceptors.append(interceptor)
+
+        config["interceptors"] = interceptors
 
         failure_exception_types = _resolve_append_parameter(
             config.get("workflow_failure_exception_types"),
