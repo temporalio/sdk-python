@@ -156,38 +156,46 @@ class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         if workflow_runner:
             config["workflow_runner"] = workflow_runner
 
-        interceptors = list(
-            _resolve_append_parameter(
-                cast(
-                    Sequence[
-                        temporalio.client.Interceptor | temporalio.worker.Interceptor
-                    ]
-                    | None,
-                    config.get("interceptors"),
-                ),
-                self.interceptors,
+        if callable(self.interceptors):
+            interceptors = (
+                _resolve_append_parameter(
+                    cast(
+                        Sequence[
+                            temporalio.client.Interceptor
+                            | temporalio.worker.Interceptor
+                        ]
+                        | None,
+                        config.get("interceptors"),
+                    ),
+                    self.interceptors,
+                )
+                or []
             )
-            or []
-        )
 
-        client_config = config.get("client")
-        worker_interceptors = [
-            interceptor
-            for interceptor in interceptors
-            if isinstance(interceptor, temporalio.worker.Interceptor)
-        ]
-        # If there is a client config, exclude any already registered interceptors
-        if client_config is not None:
-            client_interceptors_list = client_config.config(active_config=True).get(
-                "interceptors", []
+            # Filter out any client only interceptors the callable returned
+            config["interceptors"] = [
+                interceptor
+                for interceptor in interceptors
+                if isinstance(interceptor, temporalio.worker.Interceptor)
+            ]
+        elif self.interceptors is not None:
+            client_interceptors_list = (
+                config["client"].config(active_config=True).get("interceptors", [])  # type:ignore[reportTypedDictNotRequiredAccess]
             )
+
+            # Exclude any already registered interceptors and client only interceptors
             worker_interceptors = [
                 interceptor
-                for interceptor in worker_interceptors
-                if interceptor not in client_interceptors_list
+                for interceptor in self.interceptors
+                if isinstance(interceptor, temporalio.worker.Interceptor)
+                and interceptor not in client_interceptors_list
             ]
 
-        config["interceptors"] = worker_interceptors
+            provided_interceptors = _resolve_append_parameter(
+                config.get("interceptors"), worker_interceptors
+            )
+            if provided_interceptors is not None:
+                config["interceptors"] = provided_interceptors
 
         failure_exception_types = _resolve_append_parameter(
             config.get("workflow_failure_exception_types"),

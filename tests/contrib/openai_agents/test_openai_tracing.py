@@ -4,7 +4,6 @@ from typing import Any
 
 from agents import Span, Trace, TracingProcessor
 from agents.tracing import get_trace_provider
-from agents import trace
 
 from temporalio.client import Client
 from temporalio.contrib.openai_agents.testing import (
@@ -78,18 +77,27 @@ async def test_tracing(client: Client):
             assert a[1]
             assert not b[1]
 
-        print("\n".join([str({"id":t.span_id,"data": t.span_data.export()}) for t, _ in processor.span_events]))
+        print(
+            "\n".join(
+                [
+                    str({"id": t.span_id, "data": t.span_data.export()})
+                    for t, _ in processor.span_events
+                ]
+            )
+        )
 
         # Start workflow traces
         paired_span(processor.span_events[0], processor.span_events[1])
         assert (
-            processor.span_events[0][0].span_data.export().get("name") == "temporal:startWorkflow:ResearchWorkflow"
+            processor.span_events[0][0].span_data.export().get("name")
+            == "temporal:startWorkflow:ResearchWorkflow"
         )
 
         # Execute workflow
         paired_span(processor.span_events[2], processor.span_events[-1])
         assert (
-            processor.span_events[2][0].span_data.export().get("name") == "temporal:executeWorkflow"
+            processor.span_events[2][0].span_data.export().get("name")
+            == "temporal:executeWorkflow"
         )
 
         # Initial planner spans - There are only 3 because we don't make an actual model call
