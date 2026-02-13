@@ -7,6 +7,7 @@ import warnings
 from collections.abc import Awaitable, Callable
 from typing import (
     Any,
+    TypeGuard,
     TypeVar,
 )
 
@@ -153,8 +154,10 @@ def set_operation_factory(
 #
 # Copyright (c) 2024 Anthropic, PBC.
 #
+# Modified to use TypeGuard.
+#
 # This file is licensed under the MIT License.
-def is_async_callable(obj: Any) -> bool:
+def is_async_callable(obj: Any) -> TypeGuard[Callable[..., Awaitable[Any]]]:
     """Return True if ``obj`` is an async callable.
 
     Supports partials of async callable class instances.

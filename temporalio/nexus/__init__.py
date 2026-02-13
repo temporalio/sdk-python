@@ -22,6 +22,7 @@ from ._operation_context import (
     wait_for_worker_shutdown_sync,
 )
 from ._token import WorkflowHandle
+from ._util import is_async_callable
 
 __all__ = (
     "workflow_run_operation",
@@ -32,6 +33,7 @@ __all__ = (
     "client",
     "in_operation",
     "info",
+    "is_async_callable",
     "is_worker_shutdown",
     "logger",
     "metric_meter",
