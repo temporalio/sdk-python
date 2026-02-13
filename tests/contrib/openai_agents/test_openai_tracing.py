@@ -6,6 +6,7 @@ import opentelemetry.trace
 from agents import Span, Trace, TracingProcessor, custom_span, trace
 from agents.tracing import get_trace_provider
 from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from temporalio import activity, workflow
@@ -13,6 +14,7 @@ from temporalio.client import Client
 from temporalio.contrib.openai_agents.testing import (
     AgentEnvironment,
 )
+from temporalio.contrib.opentelemetry import create_tracer_provider
 from temporalio.worker.workflow_sandbox import (
     SandboxedWorkflowRunner,
     SandboxRestrictions,
@@ -263,18 +265,34 @@ def print_otel_spans(spans: tuple[ReadableSpan, ...]):
     )
 
 
+def set_test_tracer_provider() -> InMemorySpanExporter:
+    exporter = InMemorySpanExporter()
+
+    # Reset global so tests don't conflict
+    from opentelemetry.util._once import Once
+
+    opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
+    opentelemetry.trace._TRACER_PROVIDER = None
+
+    provider = create_tracer_provider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    opentelemetry.trace.set_tracer_provider(provider)
+    return exporter
+
+
 async def test_external_trace_to_workflow_spans(client: Client):
     """Test: External trace -> workflow spans (with worker restart)."""
-    exporter = InMemorySpanExporter()
+    exporter = set_test_tracer_provider()
     workflow_id = None
     task_queue = str(uuid.uuid4())
 
     # First worker: Start workflow with external trace context
     async with AgentEnvironment(
-        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
+        model=research_mock_model(),
+        add_temporal_spans=False,
+        use_otel_instrumentation=True,
     ) as env:
         new_client = env.applied_on_client(client)
-
         # Start external trace, then start workflow within that trace
         # Start it outside of the worker to validate provider usage without worker's runcontext
         with env.openai_agents_plugin.tracing_context():
@@ -302,7 +320,9 @@ async def test_external_trace_to_workflow_spans(client: Client):
 
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(
-        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
+        model=research_mock_model(),
+        add_temporal_spans=False,
+        use_otel_instrumentation=True,
     ) as env:
         new_client = env.applied_on_client(client)
 
@@ -349,13 +369,15 @@ async def test_external_trace_to_workflow_spans(client: Client):
 
 async def test_external_trace_and_span_to_workflow_spans(client: Client):
     """Test: External trace + span -> workflow spans (with worker restart)."""
-    exporter = InMemorySpanExporter()
+    exporter = set_test_tracer_provider()
     workflow_id = None
     task_queue = str(uuid.uuid4())
 
     # First worker: Start workflow with external trace + span context
     async with AgentEnvironment(
-        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
+        model=research_mock_model(),
+        add_temporal_spans=False,
+        use_otel_instrumentation=True,
     ) as env:
         new_client = env.applied_on_client(client)
 
@@ -387,7 +409,9 @@ async def test_external_trace_and_span_to_workflow_spans(client: Client):
 
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(
-        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
+        model=research_mock_model(),
+        add_temporal_spans=False,
+        use_otel_instrumentation=True,
     ) as env:
         new_client = env.applied_on_client(client)
 
@@ -442,13 +466,15 @@ async def test_external_trace_and_span_to_workflow_spans(client: Client):
 
 async def test_workflow_only_trace_to_spans(client: Client):
     """Test: Workflow-only trace -> spans (with worker restart)."""
-    exporter = InMemorySpanExporter()
+    exporter = set_test_tracer_provider()
     workflow_id = None
     task_queue = str(uuid.uuid4())
 
     # First worker: Start workflow (no external trace context)
     async with AgentEnvironment(
-        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
+        model=research_mock_model(),
+        add_temporal_spans=False,
+        use_otel_instrumentation=True,
     ) as env:
         new_client = env.applied_on_client(client)
 
@@ -476,7 +502,9 @@ async def test_workflow_only_trace_to_spans(client: Client):
 
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(
-        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
+        model=research_mock_model(),
+        add_temporal_spans=False,
+        use_otel_instrumentation=True,
     ) as env:
         new_client = env.applied_on_client(client)
 
@@ -532,10 +560,10 @@ async def test_custom_span_without_trace_context(client: Client):
     This validates our hypothesis about why the main test fails:
     If no OpenAI trace is started, custom_span() calls should be no-ops.
     """
-    exporter = InMemorySpanExporter()
+    exporter = set_test_tracer_provider()
 
     async with AgentEnvironment(
-        model=research_mock_model(), otel_exporters=[exporter]
+        model=research_mock_model(), use_otel_instrumentation=True
     ) as env:
         client = env.applied_on_client(client)
 
@@ -567,12 +595,14 @@ async def test_custom_span_without_trace_context(client: Client):
 
 
 async def test_otel_tracing_in_runner(client: Client):
-    """Test the ergonomic AgentEnvironment OTEL integration."""
-    exporter = InMemorySpanExporter()
+    """Test the tracing when executing an actual OpenAI Runner."""
+    exporter = set_test_tracer_provider()
 
     # Test the new ergonomic API - just pass exporters to AgentEnvironment
     async with AgentEnvironment(
-        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
+        model=research_mock_model(),
+        add_temporal_spans=False,
+        use_otel_instrumentation=True,
     ) as env:
         client = env.applied_on_client(client)
 
@@ -725,21 +755,15 @@ class OtelSpanWorkflow:
 
 async def test_sdk_trace_to_otel_span_parenting(client: Client):
     """Test that OTEL spans started in workflow are properly parented to client SDK trace."""
-    # Reset OpenTelemetry global state to avoid conflicts with previous tests
-    import opentelemetry.trace
-    from opentelemetry.util._once import Once
-
-    # Clear the global TracerProvider state
-    opentelemetry.trace._TRACER_PROVIDER = None
-    opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
-
-    exporter = InMemorySpanExporter()
+    exporter = set_test_tracer_provider()
     workflow_id = None
     task_queue = str(uuid.uuid4())
 
     # First worker: Start workflow with client SDK trace context
     async with AgentEnvironment(
-        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
+        model=research_mock_model(),
+        add_temporal_spans=False,
+        use_otel_instrumentation=True,
     ) as env:
         new_client = env.applied_on_client(client)
 
@@ -771,7 +795,9 @@ async def test_sdk_trace_to_otel_span_parenting(client: Client):
 
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(
-        model=research_mock_model(), add_temporal_spans=False, otel_exporters=[exporter]
+        model=research_mock_model(),
+        add_temporal_spans=False,
+        use_otel_instrumentation=True,
     ) as env:
         new_client = env.applied_on_client(client)
 

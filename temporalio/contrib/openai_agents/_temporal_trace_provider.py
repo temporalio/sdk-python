@@ -15,6 +15,7 @@ from agents.tracing.provider import (
 )
 from agents.tracing.spans import Span
 
+import temporalio.workflow
 from temporalio import workflow
 from temporalio.workflow import ReadOnlyContextError
 
@@ -148,10 +149,21 @@ class RunIdRandom:
 
 
 def _workflow_uuid() -> str:
-    random = cast(
-        RunIdRandom, getattr(workflow.instance(), "__temporal_openai_tracing_random")
-    )
-    return random.uuid4()
+    if (
+        getattr(
+            temporalio.workflow.instance(), "__temporal_openai_tracing_random", None
+        )
+        is None
+    ):
+        setattr(
+            temporalio.workflow.instance(),
+            "__temporal_openai_tracing_random",
+            temporalio.workflow.new_random(),
+        )
+    random = getattr(temporalio.workflow.instance(), "__temporal_openai_tracing_random")
+    return uuid.UUID(
+        bytes=random.getrandbits(16 * 8).to_bytes(16, "big"), version=4
+    ).hex[:24]
 
 
 class TemporalTraceProvider(DefaultTraceProvider):

@@ -104,13 +104,15 @@ class _ReplaySafeTracer(Tracer):  # type: ignore[reportUnusedClass] # Used outsi
         record_exception: bool = True,
         set_status_on_exception: bool = True,
     ) -> "Span":
+        if workflow.in_workflow() and workflow.unsafe.is_replaying_history_events():
+            start_time = start_time or workflow.time_ns()
         span = self._tracer.start_span(
             name,
             context,
             kind,
             attributes,
             links,
-            start_time or workflow.time_ns(),
+            start_time,
             record_exception,
             set_status_on_exception,
         )
@@ -163,7 +165,11 @@ class ReplaySafeTracerProvider(TracerProvider):
     replay-safe spans and tracers.
     """
 
-    def __init__(self, tracer_provider: trace_sdk.TracerProvider):
+    def __init__(
+        self,
+        tracer_provider: trace_sdk.TracerProvider,
+        id_generator: TemporalIdGenerator,
+    ):
         """Initialize the replay-safe tracer provider.
 
         Args:
@@ -177,6 +183,7 @@ class ReplaySafeTracerProvider(TracerProvider):
             raise ValueError(
                 "ReplaySafeTracerProvider should only be used with a TemporalIdGenerator for replay safety. The given TracerProvider doesnt use one."
             )
+        self._id_generator = id_generator
         self._tracer_provider = tracer_provider
 
     def add_span_processor(self, span_processor: trace_sdk.SpanProcessor) -> None:
@@ -228,6 +235,10 @@ class ReplaySafeTracerProvider(TracerProvider):
         )
         return _ReplaySafeTracer(tracer)
 
+    def id_generator(self) -> TemporalIdGenerator:
+        """Gets the temporal id generator associated with this provider."""
+        return self._id_generator
+
 
 def create_tracer_provider(
     sampler: sampling.Sampler | None = None,
@@ -268,4 +279,4 @@ def create_tracer_provider(
         span_limits=span_limits,
         id_generator=generator,
     )
-    return ReplaySafeTracerProvider(provider)
+    return ReplaySafeTracerProvider(provider, generator)

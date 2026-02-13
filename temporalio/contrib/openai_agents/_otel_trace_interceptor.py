@@ -10,7 +10,7 @@ import opentelemetry.trace
 import temporalio.api.common.v1
 import temporalio.converter
 
-from ._otel import TemporalIdGenerator
+from ..opentelemetry._id_generator import TemporalIdGenerator
 from ._trace_interceptor import (
     OpenAIAgentsContextPropagationInterceptor,
 )

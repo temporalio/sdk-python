@@ -78,19 +78,6 @@ class RunIdRandom:
         ).hex[:24]
 
 
-def _ensure_tracing_random() -> None:
-    """We use a custom uuid generator for spans to ensure that changes to user code workflow.random usage
-    do not affect tracing and vice versa.
-    """
-    instance = workflow.instance()
-    if not hasattr(instance, "__temporal_openai_tracing_random"):
-        setattr(
-            workflow.instance(),
-            "__temporal_openai_tracing_random",
-            RunIdRandom(),
-        )
-
-
 class OpenAIAgentsContextPropagationInterceptor(
     temporalio.client.Interceptor, temporalio.worker.Interceptor
 ):
@@ -377,19 +364,16 @@ class _ContextPropagationWorkflowInboundInterceptor(
     async def execute_workflow(
         self, input: temporalio.worker.ExecuteWorkflowInput
     ) -> Any:
-        _ensure_tracing_random()
         self.root().context_from_header(input)
         with temporal_span(self.root()._add_temporal_spans, "temporal:executeWorkflow"):
             return await self.next.execute_workflow(input)
 
     async def handle_signal(self, input: temporalio.worker.HandleSignalInput) -> None:
-        _ensure_tracing_random()
         self.root().context_from_header(input)
         with temporal_span(self.root()._add_temporal_spans, "temporal:handleSignal"):
             return await self.next.handle_signal(input)
 
     async def handle_query(self, input: temporalio.worker.HandleQueryInput) -> Any:
-        _ensure_tracing_random()
         with temporal_span(self.root()._add_temporal_spans, "temporal:handleQuery"):
             return await self.next.handle_query(input)
 
@@ -402,7 +386,6 @@ class _ContextPropagationWorkflowInboundInterceptor(
     async def handle_update_handler(
         self, input: temporalio.worker.HandleUpdateInput
     ) -> Any:
-        _ensure_tracing_random()
         self.root().context_from_header(input)
         return await self.next.handle_update_handler(input)
 
