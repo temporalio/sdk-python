@@ -4,6 +4,7 @@ from typing import Any
 
 from agents import Span, Trace, TracingProcessor
 from agents.tracing import get_trace_provider
+from agents import trace
 
 from temporalio.client import Client
 from temporalio.contrib.openai_agents.testing import (
@@ -61,9 +62,10 @@ async def test_tracing(client: Client):
                 execution_timeout=timedelta(seconds=120),
             )
             await workflow_handle.result()
+        print("\n".join([str({"name": t.name}) for t, _ in processor.trace_events]))
 
-        # There is one closed root trace
-        assert len(processor.trace_events) == 2
+        # There are two traces, one is created in the client because it is needed to start the temporal spans
+        assert len(processor.trace_events) == 4
         assert (
             processor.trace_events[0][0].trace_id
             == processor.trace_events[1][0].trace_id
@@ -76,25 +78,39 @@ async def test_tracing(client: Client):
             assert a[1]
             assert not b[1]
 
-        # Initial planner spans - There are only 3 because we don't make an actual model call
-        paired_span(processor.span_events[0], processor.span_events[5])
+        print("\n".join([str({"id":t.span_id,"data": t.span_data.export()}) for t, _ in processor.span_events]))
+
+        # Start workflow traces
+        paired_span(processor.span_events[0], processor.span_events[1])
         assert (
-            processor.span_events[0][0].span_data.export().get("name") == "PlannerAgent"
+            processor.span_events[0][0].span_data.export().get("name") == "temporal:startWorkflow:ResearchWorkflow"
         )
 
-        paired_span(processor.span_events[1], processor.span_events[4])
+        # Execute workflow
+        paired_span(processor.span_events[2], processor.span_events[-1])
         assert (
-            processor.span_events[1][0].span_data.export().get("name")
+            processor.span_events[2][0].span_data.export().get("name") == "temporal:executeWorkflow"
+        )
+
+        # Initial planner spans - There are only 3 because we don't make an actual model call
+        paired_span(processor.span_events[3], processor.span_events[8])
+        assert (
+            processor.span_events[3][0].span_data.export().get("name") == "PlannerAgent"
+        )
+
+        paired_span(processor.span_events[4], processor.span_events[7])
+        assert (
+            processor.span_events[4][0].span_data.export().get("name")
             == "temporal:startActivity"
         )
 
-        paired_span(processor.span_events[2], processor.span_events[3])
+        paired_span(processor.span_events[5], processor.span_events[6])
         assert (
-            processor.span_events[2][0].span_data.export().get("name")
+            processor.span_events[5][0].span_data.export().get("name")
             == "temporal:executeActivity"
         )
 
-        for span, start in processor.span_events[6:-6]:
+        for span, start in processor.span_events[9:-7]:
             span_data = span.span_data.export()
 
             # All spans should be closed
@@ -126,19 +142,19 @@ async def test_tracing(client: Client):
                 )
 
         # Final writer spans - There are only 3 because we don't make an actual model call
-        paired_span(processor.span_events[-6], processor.span_events[-1])
+        paired_span(processor.span_events[-7], processor.span_events[-2])
         assert (
-            processor.span_events[-6][0].span_data.export().get("name") == "WriterAgent"
+            processor.span_events[-7][0].span_data.export().get("name") == "WriterAgent"
         )
 
-        paired_span(processor.span_events[-5], processor.span_events[-2])
+        paired_span(processor.span_events[-6], processor.span_events[-3])
         assert (
-            processor.span_events[-5][0].span_data.export().get("name")
+            processor.span_events[-6][0].span_data.export().get("name")
             == "temporal:startActivity"
         )
 
-        paired_span(processor.span_events[-4], processor.span_events[-3])
+        paired_span(processor.span_events[-5], processor.span_events[-4])
         assert (
-            processor.span_events[-4][0].span_data.export().get("name")
+            processor.span_events[-5][0].span_data.export().get("name")
             == "temporal:executeActivity"
         )
