@@ -19,6 +19,7 @@ from typing import (
 )
 from uuid import UUID, uuid4
 
+import nexusrpc
 import pydantic
 import pytest
 import typing_extensions
@@ -27,6 +28,7 @@ from typing_extensions import TypedDict
 import temporalio.api.common.v1
 import temporalio.common
 from temporalio.api.common.v1 import Payload, Payloads
+from temporalio.api.enums.v1 import NexusHandlerErrorRetryBehavior
 from temporalio.api.failure.v1 import Failure
 from temporalio.common import RawValue
 from temporalio.converter import (
@@ -44,7 +46,11 @@ from temporalio.converter import (
     encode_search_attribute_values,
     value_to_type,
 )
-from temporalio.exceptions import ApplicationError, FailureError
+from temporalio.exceptions import (
+    ApplicationError,
+    FailureError,
+    NexusOperationError,
+)
 
 # StrEnum is available in 3.11+
 if sys.version_info >= (3, 11):
@@ -594,6 +600,248 @@ async def test_failure_encoded_attributes():
         not in failure.application_failure_info.details.payloads[0].metadata
     )
     assert failure == orig_failure
+
+
+@pytest.mark.parametrize(
+    "handler_type,retryable_override,expected_retryable",
+    [
+        (nexusrpc.HandlerErrorType.BAD_REQUEST, None, None),
+        (nexusrpc.HandlerErrorType.BAD_REQUEST, True, True),
+        (nexusrpc.HandlerErrorType.BAD_REQUEST, False, False),
+        (nexusrpc.HandlerErrorType.INTERNAL, None, None),
+        (nexusrpc.HandlerErrorType.INTERNAL, True, True),
+        (nexusrpc.HandlerErrorType.NOT_FOUND, False, False),
+        (nexusrpc.HandlerErrorType.RESOURCE_EXHAUSTED, None, None),
+        (nexusrpc.HandlerErrorType.UNAVAILABLE, True, True),
+        (nexusrpc.HandlerErrorType.UPSTREAM_TIMEOUT, None, None),
+        (nexusrpc.HandlerErrorType.UNAUTHENTICATED, None, None),
+        (nexusrpc.HandlerErrorType.UNAUTHORIZED, None, None),
+    ],
+)
+async def test_nexus_handler_error_round_trip(
+    handler_type: nexusrpc.HandlerErrorType,
+    retryable_override: bool | None,
+    expected_retryable: bool | None,
+):
+    """Test round-trip conversion of nexusrpc.HandlerError through failure converter."""
+    message = f"test message for {handler_type.name}"
+    original_error = nexusrpc.HandlerError(
+        message,
+        type=handler_type,
+        retryable_override=retryable_override,
+    )
+
+    # Convert to failure
+    failure = Failure()
+    await DataConverter.default.encode_failure(original_error, failure)
+
+    # Verify failure structure
+    assert failure.HasField("nexus_handler_failure_info")
+    assert failure.nexus_handler_failure_info.type == handler_type.name
+    assert failure.message == message
+
+    # Verify retryable behavior mapping
+    if retryable_override is True:
+        assert (
+            failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+        )
+    elif retryable_override is False:
+        assert (
+            failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+        )
+    else:
+        assert (
+            failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+        )
+
+    # Convert back to error
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Verify result
+    assert isinstance(result_error, nexusrpc.HandlerError)
+    assert result_error.type == handler_type
+    assert result_error.retryable_override == expected_retryable
+    assert result_error.message == message
+    assert result_error.original_failure
+    assert result_error.original_failure.details
+
+    # modify result_error.original_failure as a way of confirming that it is used
+    # when encoding the resulting failure
+    result_error.original_failure.details = {
+        "nexusHandlerFailureInfo": {
+            **result_error.original_failure.details["nexusHandlerFailureInfo"],
+            "type": "TEST TYPE",
+        }
+    }
+
+    result_failure = Failure()
+    await DataConverter.default.encode_failure(result_error, result_failure)
+    assert result_failure.HasField("nexus_handler_failure_info")
+    assert result_failure.nexus_handler_failure_info.type == "TEST TYPE"
+    assert result_failure.message == message
+
+    # Verify retryable behavior mapping
+    if retryable_override is True:
+        assert (
+            result_failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+        )
+    elif retryable_override is False:
+        assert (
+            result_failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+        )
+    else:
+        assert (
+            result_failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+        )
+
+
+async def test_nexus_handler_error_with_cause():
+    """Test HandlerError with a cause chain is properly converted."""
+    # Create a cause chain
+    root_cause = ValueError("root cause")
+    middle_cause = RuntimeError("middle cause")
+    middle_cause.__cause__ = root_cause
+
+    handler_error = nexusrpc.HandlerError(
+        "handler error message",
+        type=nexusrpc.HandlerErrorType.INTERNAL,
+    )
+    handler_error.__cause__ = middle_cause
+
+    # Convert to failure
+    failure = Failure()
+    await DataConverter.default.encode_failure(handler_error, failure)
+
+    # Verify message and cause chain in failure
+    assert failure.message == "handler error message"
+    assert failure.HasField("cause")
+    assert failure.cause.message == "middle cause"
+    assert failure.cause.application_failure_info.type == "RuntimeError"
+    assert failure.cause.HasField("cause")
+    assert failure.cause.cause.message == "root cause"
+    assert failure.cause.cause.application_failure_info.type == "ValueError"
+
+    # Convert back
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Verify cause chain with messages (ApplicationError prepends type to message in str())
+    assert isinstance(result_error, nexusrpc.HandlerError)
+    assert str(result_error) == "handler error message"
+    assert result_error.__cause__ is not None
+    assert isinstance(result_error.__cause__, ApplicationError)
+    assert str(result_error.__cause__) == "RuntimeError: middle cause"
+    assert result_error.__cause__.__cause__ is not None
+    assert str(result_error.__cause__.__cause__) == "ValueError: root cause"
+
+
+async def test_nexus_handler_error_unknown_type_fallback():
+    """Test that unknown HandlerErrorType falls back to INTERNAL during from_failure."""
+    # Create a failure with an unknown type
+    failure = Failure()
+    failure.message = "unknown type error"
+    failure.nexus_handler_failure_info.type = "UNKNOWN_TYPE_XYZ"
+
+    # Convert to error
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Should fall back to INTERNAL with message preserved
+    assert isinstance(result_error, nexusrpc.HandlerError)
+    assert result_error.type == nexusrpc.HandlerErrorType.INTERNAL
+    assert str(result_error) == "unknown type error"
+
+
+async def test_nexus_operation_error_round_trip():
+    """Test round-trip conversion of NexusOperationError."""
+    test_cases = [
+        # (scheduled_event_id, endpoint, service, operation, operation_token)
+        (123, "my-endpoint", "MyService", "myOperation", "token-abc"),
+        (0, "", "", "", ""),  # Empty values
+        (999, "endpoint-2", "ServiceB", "op2", ""),  # Empty token
+        (1, "e", "s", "o", "very-long-token-" + "x" * 100),
+    ]
+
+    for scheduled_event_id, endpoint, service, operation, operation_token in test_cases:
+        message = "nexus operation failed"
+        original_error = NexusOperationError(
+            message,
+            scheduled_event_id=scheduled_event_id,
+            endpoint=endpoint,
+            service=service,
+            operation=operation,
+            operation_token=operation_token,
+        )
+
+        # Convert to failure
+        failure = Failure()
+        await DataConverter.default.encode_failure(original_error, failure)
+
+        # Verify failure structure and message
+        assert failure.message == message
+        assert failure.HasField("nexus_operation_execution_failure_info")
+        info = failure.nexus_operation_execution_failure_info
+        assert info.scheduled_event_id == scheduled_event_id
+        assert info.endpoint == endpoint
+        assert info.service == service
+        assert info.operation == operation
+        assert info.operation_token == operation_token
+
+        # Convert back
+        result_error = await DataConverter.default.decode_failure(failure)
+
+        # Verify result including message
+        assert isinstance(result_error, NexusOperationError)
+        assert result_error.message == message
+        assert result_error.scheduled_event_id == scheduled_event_id
+        assert result_error.endpoint == endpoint
+        assert result_error.service == service
+        assert result_error.operation == operation
+        assert result_error.operation_token == operation_token
+
+
+async def test_nexus_operation_error_with_cause():
+    """Test NexusOperationError with a HandlerError as cause."""
+    # Create NexusOperationError with HandlerError as cause
+    cause_error = nexusrpc.HandlerError(
+        "handler failed",
+        type=nexusrpc.HandlerErrorType.NOT_FOUND,
+    )
+
+    original_error = NexusOperationError(
+        "nexus operation failed",
+        scheduled_event_id=42,
+        endpoint="test-endpoint",
+        service="TestService",
+        operation="testOp",
+        operation_token="token123",
+    )
+    original_error.__cause__ = cause_error
+
+    # Convert to failure
+    failure = Failure()
+    await DataConverter.default.encode_failure(original_error, failure)
+
+    # Verify message and cause is present
+    assert failure.message == "nexus operation failed"
+    assert failure.HasField("cause")
+    assert failure.cause.HasField("nexus_handler_failure_info")
+    assert failure.cause.message == "handler failed"
+
+    # Convert back
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Verify messages preserved
+    assert isinstance(result_error, NexusOperationError)
+    assert result_error.message == "nexus operation failed"
+    assert result_error.__cause__ is not None
+    assert isinstance(result_error.__cause__, nexusrpc.HandlerError)
+    assert result_error.__cause__.type == nexusrpc.HandlerErrorType.NOT_FOUND
+    assert str(result_error.__cause__) == "handler failed"
 
 
 class IPv4AddressPayloadConverter(CompositePayloadConverter):

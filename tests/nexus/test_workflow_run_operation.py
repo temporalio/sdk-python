@@ -1,4 +1,3 @@
-import re
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -15,16 +14,12 @@ from nexusrpc.handler import (
 from nexusrpc.handler._decorators import operation_handler
 
 from temporalio import workflow
+from temporalio.client import Client
 from temporalio.nexus import WorkflowRunOperationContext
 from temporalio.nexus._operation_handlers import WorkflowRunOperationHandler
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers.nexus import (
-    Failure,
-    ServiceClient,
-    create_nexus_endpoint,
-    dataclass_as_dict,
-)
+from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
 
 
 @dataclass
@@ -79,6 +74,17 @@ class SubclassingNoInputOutputTypeAnnotationsWithServiceDefinition:
         return MyOperation()
 
 
+@workflow.defn
+class CallerWorkflow:
+    @workflow.run
+    async def run(self, input: Input, service_name: str, task_queue: str) -> str:
+        client = workflow.create_nexus_client(
+            service=service_name,
+            endpoint=make_nexus_endpoint_name(task_queue),
+        )
+        return await client.execute_operation("op", input, output_type=str)
+
+
 @pytest.mark.parametrize(
     "service_handler_cls",
     [
@@ -87,6 +93,7 @@ class SubclassingNoInputOutputTypeAnnotationsWithServiceDefinition:
     ],
 )
 async def test_workflow_run_operation(
+    client: Client,
     env: WorkflowEnvironment,
     service_handler_cls: type[Any],
 ):
@@ -94,26 +101,18 @@ async def test_workflow_run_operation(
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
-    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    await create_nexus_endpoint(task_queue, client)
     assert (service_defn := nexusrpc.get_service_definition(service_handler_cls))
-    service_client = ServiceClient(
-        server_address=ServiceClient.default_server_address(env),
-        endpoint=endpoint,
-        service=service_defn.name,
-    )
     async with Worker(
-        env.client,
+        client,
         task_queue=task_queue,
         nexus_service_handlers=[service_handler_cls()],
+        workflows=[CallerWorkflow, EchoWorkflow],
     ):
-        resp = await service_client.start_operation(
-            "op",
-            dataclass_as_dict(Input(value="test")),
+        result = await client.execute_workflow(
+            CallerWorkflow.run,
+            args=[Input(value="test"), service_defn.name, task_queue],
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
         )
-        if hasattr(service_handler_cls, "__expected__error__"):
-            status_code, message = service_handler_cls.__expected__error__
-            assert resp.status_code == status_code
-            failure = Failure(**resp.json())
-            assert re.search(message, failure.message)
-        else:
-            assert resp.status_code == 201
+        assert result == "test"

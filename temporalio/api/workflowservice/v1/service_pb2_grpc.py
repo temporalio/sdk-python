@@ -278,6 +278,11 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesResponse.FromString,
         )
+        self.CountSchedules = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/CountSchedules",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountSchedulesRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountSchedulesResponse.FromString,
+        )
         self.UpdateWorkerBuildIdCompatibility = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/UpdateWorkerBuildIdCompatibility",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UpdateWorkerBuildIdCompatibilityRequest.SerializeToString,
@@ -1085,6 +1090,12 @@ class WorkflowServiceServicer(object):
 
     def ListSchedules(self, request, context):
         """List all schedules in a namespace."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def CountSchedules(self, request, context):
+        """CountSchedules is a visibility API to count schedules in a specific namespace."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -1903,6 +1914,11 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             servicer.ListSchedules,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesResponse.SerializeToString,
+        ),
+        "CountSchedules": grpc.unary_unary_rpc_method_handler(
+            servicer.CountSchedules,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountSchedulesRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountSchedulesResponse.SerializeToString,
         ),
         "UpdateWorkerBuildIdCompatibility": grpc.unary_unary_rpc_method_handler(
             servicer.UpdateWorkerBuildIdCompatibility,
@@ -3636,6 +3652,35 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/ListSchedules",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.ListSchedulesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def CountSchedules(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/CountSchedules",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountSchedulesRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.CountSchedulesResponse.FromString,
             options,
             channel_credentials,
             insecure,
