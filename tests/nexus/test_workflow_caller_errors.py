@@ -550,7 +550,7 @@ async def test_rpc_error_is_retried(
 class DataConverterTestService:
     @nexusrpc.handler.sync_operation
     def succeed(
-        self, _ctx: nexusrpc.handler.StartOperationContext, input: ErrorTestInput
+        self, _ctx: nexusrpc.handler.StartOperationContext, _input: ErrorTestInput
     ) -> None:
         pass
 
@@ -672,9 +672,8 @@ async def test_nexus_operation_fails_without_retry_on_converter_failure(
             assert isinstance(handler_error, nexusrpc.HandlerError)
             assert handler_error.type == nexusrpc.HandlerErrorType.BAD_REQUEST
             assert not handler_error.retryable
-            assert (
-                "Payload converter failed to decode Nexus operation input"
-                in str(handler_error)
+            assert "Payload converter failed to decode Nexus operation input" in str(
+                handler_error
             )
         else:
             pytest.fail("Expected WorkflowFailureError")
