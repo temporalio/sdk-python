@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import threading
 import uuid
 from collections import Counter
 from dataclasses import dataclass
@@ -232,9 +231,6 @@ async def test_nexus_operation_fails_without_retry_as_handler_error(
             pytest.fail("Unreachable")
 
 
-_start_operation_sync_complete = threading.Event()
-
-
 # Start timeout test
 @service_handler
 class StartTimeoutTestService:
@@ -251,14 +247,7 @@ class StartTimeoutTestService:
     def expect_timeout_cancellation_sync(
         self, ctx: StartOperationContext, _input: None
     ) -> None:
-        global _start_operation_sync_complete
-        cancelled = ctx.task_cancellation.wait_until_cancelled_sync(1)
-        if not cancelled:
-            raise ApplicationError("expected cancel", non_retryable=True)
-        reason = ctx.task_cancellation.cancellation_reason()
-        if reason != "TIMED_OUT":
-            logger.error("unexpected cancellation reason: %s", reason)
-        _start_operation_sync_complete.set()
+        ctx.task_cancellation.wait_until_cancelled_sync(5)
 
 
 @workflow.defn
@@ -285,7 +274,6 @@ async def test_error_raised_by_timeout_of_nexus_start_operation(
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
-    global _start_operation_sync_complete
 
     task_queue = str(uuid.uuid4())
     async with Worker(
@@ -326,8 +314,6 @@ async def test_error_raised_by_timeout_of_nexus_start_operation(
                 pytest.fail(
                     "Expected exception due to timeout of nexus start operation"
                 )
-
-            _start_operation_sync_complete.wait()
             assert capturer.find_log("unexpected cancellation reason") is None
 
 

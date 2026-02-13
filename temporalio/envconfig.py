@@ -100,11 +100,7 @@ def _read_source(source: DataSource | None) -> bytes | None:
 
 @dataclass(frozen=True)
 class ClientConfigTLS:
-    """TLS configuration as specified as part of client configuration
-
-    .. warning::
-        Experimental API.
-    """
+    """TLS configuration as specified as part of client configuration"""
 
     disabled: bool | None = None
     """If True, TLS is explicitly disabled. If False, TLS is explicitly enabled. If None, TLS behavior was not configured."""
@@ -168,9 +164,6 @@ class ClientConfigTLS:
 class ClientConnectConfig(TypedDict, total=False):
     """Arguments for `temporalio.client.Client.connect` that are configurable via
     environment configuration.
-
-    .. warning::
-        Experimental API.
     """
 
     target_host: str
@@ -187,9 +180,6 @@ class ClientConfigProfile:
     This class holds the configuration as loaded from a file or environment.
     See `to_client_connect_config` to transform the profile to `ClientConnectConfig`,
     which can be used to create a client.
-
-    .. warning::
-        Experimental API.
     """
 
     address: str | None = None
@@ -307,9 +297,6 @@ class ClientConfig:
     This contains a mapping of profile names to client profiles. Use
     `ClientConfigProfile.to_client_connect_config` to create a `ClientConnectConfig`
     from a profile. See `ClientConfigProfile.load` to load an individual profile.
-
-    .. warning::
-        Experimental API.
     """
 
     profiles: Mapping[str, ClientConfigProfile]

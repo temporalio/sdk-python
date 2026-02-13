@@ -387,3 +387,232 @@ async def test_medium_plugin(client: Client) -> None:
     )
     task_queue = worker.config(active_config=True).get("task_queue")
     assert task_queue is not None and task_queue.startswith("override")
+
+
+class CombinedClientWorkerInterceptor(
+    temporalio.client.Interceptor, temporalio.worker.Interceptor
+):
+    """Test interceptor that can be used as both client and worker interceptor with execution counting."""
+
+    def __init__(self):
+        super().__init__()
+        self.client_intercepted = False
+        self.worker_intercepted = False
+        self.call_count = {"execute_workflow": 0}
+
+    def intercept_client(
+        self, next: temporalio.client.OutboundInterceptor
+    ) -> temporalio.client.OutboundInterceptor:
+        self.client_intercepted = True
+        return super().intercept_client(next)
+
+    def intercept_activity(
+        self, next: temporalio.worker.ActivityInboundInterceptor
+    ) -> temporalio.worker.ActivityInboundInterceptor:
+        self.worker_intercepted = True
+        return super().intercept_activity(next)
+
+    def workflow_interceptor_class(
+        self, input: temporalio.worker.WorkflowInterceptorClassInput
+    ) -> type[temporalio.worker.WorkflowInboundInterceptor] | None:
+        # This method gets called when the worker is configured with workflows
+        # Mark that worker interceptor was used
+        self.worker_intercepted = True
+
+        # Return counting interceptor class
+        call_count = self.call_count
+
+        class CountingWorkflowInterceptor(temporalio.worker.WorkflowInboundInterceptor):
+            async def execute_workflow(
+                self, input: temporalio.worker.ExecuteWorkflowInput
+            ):
+                call_count["execute_workflow"] += 1
+                return await super().execute_workflow(input)
+
+        return CountingWorkflowInterceptor
+
+
+async def test_simple_plugin_worker_interceptor_only_used_on_worker(
+    client: Client,
+) -> None:
+    """Test that when a combined client/worker interceptor is provided by SimplePlugin
+    to client_interceptors, and the plugin is only used on a worker (not on the client
+    used to create that worker), the worker interceptor functionality is still provided."""
+
+    interceptor = CombinedClientWorkerInterceptor()
+
+    # Create SimplePlugin that provides the combined interceptor as client_interceptors
+    plugin = SimplePlugin(
+        "TestCombinedPlugin",
+        client_interceptors=[interceptor],
+    )
+
+    # Create worker with the plugin (but don't add plugin to client)
+    worker = Worker(
+        client,
+        task_queue="queue" + str(uuid.uuid4()),
+        activities=[never_run_activity],
+        workflows=[
+            HelloWorkflow
+        ],  # Add workflows to trigger workflow_interceptor_class
+        plugins=[plugin],
+    )
+
+    # Worker creation triggers plugin configuration
+    assert worker is not None
+
+    # The interceptor should NOT have been used for client interception
+    # since the plugin was not added to the client
+    assert (
+        not interceptor.client_intercepted
+    ), "Client interceptor should not have been used"
+
+    # The interceptor SHOULD have been used for worker interception
+    # even though it was specified in client_interceptors
+    assert interceptor.worker_intercepted, "Worker interceptor should have been used"
+
+
+async def test_simple_plugin_interceptor_duplication_when_used_on_client_and_worker(
+    client: Client,
+) -> None:
+    """Test that when a combined client/worker interceptor is provided by SimplePlugin
+    to client_interceptors, and the plugin is used on both client and worker,
+    the interceptor is not duplicated in the worker."""
+
+    interceptor = CombinedClientWorkerInterceptor()
+
+    # Create SimplePlugin that provides the combined interceptor as client_interceptors
+    plugin = SimplePlugin(
+        "TestCombinedPlugin",
+        client_interceptors=[interceptor],
+    )
+
+    # Add plugin to client first
+    config = client.config()
+    config["plugins"] = [plugin]
+    new_client = Client(**config)
+
+    # Verify client interceptor was used
+    assert interceptor.client_intercepted, "Client interceptor should have been used"
+
+    # Reset the worker intercepted flag to test worker behavior
+    interceptor.worker_intercepted = False
+
+    # Create worker with the same plugin-enabled client
+    worker = Worker(
+        new_client,
+        task_queue="queue" + str(uuid.uuid4()),
+        activities=[never_run_activity],
+        workflows=[HelloWorkflow],
+    )
+
+    # The worker interceptor functionality should still work
+    # (regardless of whether it comes from client propagation or worker config)
+    assert interceptor.worker_intercepted, "Worker interceptor should have been used"
+
+    # Test execution-level duplication by running a workflow
+    async with new_worker(
+        new_client,
+        HelloWorkflow,
+        max_cached_workflows=0,
+    ) as worker:
+        # Start and complete a workflow
+        handle = await new_client.start_workflow(
+            HelloWorkflow.run,
+            "test",
+            id=f"counting-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        result = await handle.result()
+        assert result == "Hello, test!"
+
+        # The workflow interceptor should only be called ONCE, not twice
+        assert (
+            interceptor.call_count["execute_workflow"] == 1
+        ), f"Expected execute_workflow to be called once, but was called {interceptor.call_count['execute_workflow']} times. This indicates interceptor duplication in execution."
+
+
+async def test_simple_plugin_no_duplication_when_interceptor_in_both_client_and_worker_params(
+    client: Client,
+) -> None:
+    """Test that when the same interceptor is provided to both client_interceptors
+    and worker_interceptors in a SimplePlugin, it doesn't get duplicated."""
+
+    interceptor = CombinedClientWorkerInterceptor()
+
+    # Create SimplePlugin that provides the same interceptor to both client and worker
+    plugin = SimplePlugin(
+        "TestCombinedPlugin",
+        client_interceptors=[interceptor],
+        worker_interceptors=[interceptor],  # Same interceptor in both places
+    )
+
+    # Create worker with plugin (not on client)
+    worker = Worker(
+        client,
+        task_queue="queue" + str(uuid.uuid4()),
+        activities=[never_run_activity],
+        workflows=[HelloWorkflow],
+        plugins=[plugin],
+    )
+
+    # The worker interceptor functionality should work
+    assert interceptor.worker_intercepted, "Worker interceptor should have been used"
+
+    # Test execution-level duplication by running a workflow
+    async with worker:
+        # Start and complete a workflow
+        handle = await client.start_workflow(
+            HelloWorkflow.run,
+            "test",
+            id=f"counting-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        result = await handle.result()
+        assert result == "Hello, test!"
+
+        # The workflow interceptor should only be called ONCE, not twice
+        assert (
+            interceptor.call_count["execute_workflow"] == 1
+        ), f"Expected execute_workflow to be called once, but was called {interceptor.call_count['execute_workflow']} times. This indicates interceptor duplication in execution."
+
+
+async def test_simple_plugin_no_duplication_in_interceptor_chain(
+    client: Client,
+) -> None:
+    """Test that interceptors don't get duplicated in the actual interceptor chain execution.
+    This catches the specific OpenTelemetry issue where the same interceptor method gets called twice."""
+
+    interceptor = CombinedClientWorkerInterceptor()
+
+    # Create SimplePlugin that provides the combined interceptor as client_interceptors only
+    plugin = SimplePlugin(
+        "CountingPlugin",
+        client_interceptors=[interceptor],
+    )
+
+    # Add plugin to client (like OpenTelemetryPlugin does)
+    config = client.config()
+    config["plugins"] = [plugin]
+    new_client = Client(**config)
+
+    # Create worker with the plugin-enabled client (plugin propagates from client)
+    async with new_worker(
+        new_client,
+        HelloWorkflow,
+        max_cached_workflows=0,
+    ) as worker:
+        # Start and complete a workflow
+        handle = await new_client.start_workflow(
+            HelloWorkflow.run,
+            "test",
+            id=f"counting-workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        result = await handle.result()
+        assert result == "Hello, test!"
+
+        # The workflow interceptor should only be called ONCE, not twice
+        assert (
+            interceptor.call_count["execute_workflow"] == 1
+        ), f"Expected execute_workflow to be called once, but was called {interceptor.call_count['execute_workflow']} times. This indicates interceptor duplication in the chain."

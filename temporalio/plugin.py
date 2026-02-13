@@ -150,28 +150,36 @@ class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         if workflow_runner:
             config["workflow_runner"] = workflow_runner
 
-        client = config.get("client")
-
-        # Don't add new worker interceptors which are already registered in the client.
-        if (
-            self.worker_interceptors
-            and not callable(self.worker_interceptors)
-            and client
-        ):
-            new_interceptors = list(config.get("interceptors") or [])
-            for interceptor in self.worker_interceptors:
-                client_interceptors = client.config(active_config=True).get(
-                    "interceptors"
-                )
-                if not client_interceptors or not interceptor in client_interceptors:
-                    new_interceptors.append(interceptor)
-            config["interceptors"] = new_interceptors
-        else:
-            interceptors = _resolve_append_parameter(
+        interceptors = list(
+            _resolve_append_parameter(
                 config.get("interceptors"), self.worker_interceptors
             )
-            if interceptors is not None:
-                config["interceptors"] = interceptors
+            or []
+        )
+
+        # Only propagate client interceptors if they are provided as a simple list (not callable)
+        if self.client_interceptors is not None and not callable(
+            self.client_interceptors
+        ):
+            client_worker_interceptors = [
+                interceptor
+                for interceptor in self.client_interceptors
+                if isinstance(interceptor, temporalio.worker.Interceptor)
+            ]
+            for interceptor in client_worker_interceptors:
+                if interceptor not in interceptors:
+                    # Check if interceptor is already in client's interceptors to avoid duplication
+                    client_config = config.get("client")
+                    if client_config is not None:
+                        client_interceptors_list = client_config.config(
+                            active_config=True
+                        ).get("interceptors", [])
+                        if interceptor not in client_interceptors_list:
+                            interceptors.append(interceptor)
+                    else:
+                        interceptors.append(interceptor)
+
+        config["interceptors"] = interceptors
 
         failure_exception_types = _resolve_append_parameter(
             config.get("workflow_failure_exception_types"),

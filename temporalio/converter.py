@@ -82,51 +82,64 @@ class SerializationContext(ABC):
 
 
 @dataclass(frozen=True)
-class BaseWorkflowSerializationContext(SerializationContext):
-    """Base serialization context shared by workflow and activity serialization contexts."""
-
-    namespace: str
-    workflow_id: str
-
-
-@dataclass(frozen=True)
-class WorkflowSerializationContext(BaseWorkflowSerializationContext):
+class WorkflowSerializationContext(SerializationContext):
     """Serialization context for workflows.
 
     See :py:class:`SerializationContext` for more details.
-
-    Attributes:
-        namespace: The namespace the workflow is running in.
-        workflow_id: The ID of the workflow. Note that this is the ID of the workflow of which the
-            payload being operated on is an input or output. Note also that when creating/describing
-            schedules, this may be the workflow ID prefix as configured, not the final workflow ID
-            when the workflow is created by the schedule.
     """
 
-    pass
+    namespace: str
+    """The namespace the workflow is running in."""
+
+    workflow_id: str | None
+    """The ID of the workflow.
+    
+    Note that this is the ID of the workflow of which the payload being operated on is an input or
+    output. Note also that when creating/describing schedules, this may be the workflow ID prefix
+    as configured, not the final workflow ID when the workflow is created by the schedule.
+    """
 
 
 @dataclass(frozen=True)
-class ActivitySerializationContext(BaseWorkflowSerializationContext):
+class ActivitySerializationContext(SerializationContext):
     """Serialization context for activities.
 
     See :py:class:`SerializationContext` for more details.
-
-    Attributes:
-        namespace: Workflow/activity namespace.
-        workflow_id: Workflow ID. Note, when creating/describing schedules,
-            this may be the workflow ID prefix as configured, not the final workflow ID when the
-            workflow is created by the schedule.
-        workflow_type: Workflow Type.
-        activity_type: Activity Type.
-        activity_task_queue: Activity task queue.
-        is_local: Whether the activity is a local activity.
     """
 
-    workflow_type: str
-    activity_type: str
-    activity_task_queue: str
+    namespace: str
+    """Workflow/activity namespace."""
+
+    activity_id: str | None
+    """Activity ID. Optional if this is an activity started from a workflow."""
+
+    activity_type: str | None
+    """Activity type.
+    
+    .. deprecated::
+        This value may not be set in some bidirectional situations, it should
+        not be relied on.
+    """
+
+    activity_task_queue: str | None
+    """Activity task queue.
+    
+    .. deprecated::
+        This value may not be set in some bidirectional situations, it should
+        not be relied on.
+    """
+
+    workflow_id: str | None
+    """Workflow ID. Only set if this is an activity started from a workflow.
+    
+    Note, when creating/describing schedules, this may be the workflow ID prefix as
+    configured, not the final workflow ID when the workflow is created by the schedule."""
+
+    workflow_type: str | None
+    """Workflow type if this is an activity started from a workflow."""
+
     is_local: bool
+    """Whether the activity is a local activity started from a workflow."""
 
 
 class WithSerializationContext(ABC):
@@ -824,45 +837,14 @@ class PayloadCodec(ABC):
         It is not guaranteed that all failures will be encoded with this method rather
         than encoding the underlying payloads.
         """
-        await self._apply_to_failure_payloads(failure, self.encode_wrapper)
+        await DataConverter._apply_to_failure_payloads(failure, self.encode_wrapper)
 
     async def decode_failure(self, failure: temporalio.api.failure.v1.Failure) -> None:
         """Decode payloads of a failure. Intended as a helper method, not for overriding.
         It is not guaranteed that all failures will be decoded with this method rather
         than decoding the underlying payloads.
         """
-        await self._apply_to_failure_payloads(failure, self.decode_wrapper)
-
-    async def _apply_to_failure_payloads(
-        self,
-        failure: temporalio.api.failure.v1.Failure,
-        cb: Callable[[temporalio.api.common.v1.Payloads], Awaitable[None]],
-    ) -> None:
-        if failure.HasField("encoded_attributes"):
-            # Wrap in payloads and merge back
-            payloads = temporalio.api.common.v1.Payloads(
-                payloads=[failure.encoded_attributes]
-            )
-            await cb(payloads)
-            failure.encoded_attributes.CopyFrom(payloads.payloads[0])
-        if failure.HasField(
-            "application_failure_info"
-        ) and failure.application_failure_info.HasField("details"):
-            await cb(failure.application_failure_info.details)
-        elif failure.HasField(
-            "timeout_failure_info"
-        ) and failure.timeout_failure_info.HasField("last_heartbeat_details"):
-            await cb(failure.timeout_failure_info.last_heartbeat_details)
-        elif failure.HasField(
-            "canceled_failure_info"
-        ) and failure.canceled_failure_info.HasField("details"):
-            await cb(failure.canceled_failure_info.details)
-        elif failure.HasField(
-            "reset_workflow_failure_info"
-        ) and failure.reset_workflow_failure_info.HasField("last_heartbeat_details"):
-            await cb(failure.reset_workflow_failure_info.last_heartbeat_details)
-        if failure.HasField("cause"):
-            await self._apply_to_failure_payloads(failure.cause, cb)
+        await DataConverter._apply_to_failure_payloads(failure, self.decode_wrapper)
 
 
 class FailureConverter(ABC):
@@ -948,7 +930,10 @@ class DefaultFailureConverter(FailureConverter):
         else:
             # Convert to failure error
             failure_error = temporalio.exceptions.ApplicationError(
-                str(exception), type=exception.__class__.__name__
+                str(exception),
+                type="PayloadSizeError"
+                if isinstance(exception, _PayloadSizeError)
+                else exception.__class__.__name__,
             )
             failure_error.__traceback__ = exception.__traceback__
             failure_error.__cause__ = exception.__cause__
@@ -1239,6 +1224,46 @@ class DefaultFailureConverterWithEncodedAttributes(DefaultFailureConverter):
 
 
 @dataclass(frozen=True)
+class PayloadLimitsConfig:
+    """Configuration for when payload sizes exceed limits."""
+
+    memo_size_warning: int = 2 * 1024
+    """The limit (in bytes) at which a memo size warning is logged."""
+
+    payload_size_warning: int = 512 * 1024
+    """The limit (in bytes) at which a payload size warning is logged."""
+
+
+class PayloadSizeWarning(RuntimeWarning):
+    """The size of payloads is above the warning limit."""
+
+
+class _PayloadSizeError(temporalio.exceptions.TemporalError):
+    """Error raised when payloads size exceeds payload size limits."""
+
+    def __init__(self, message: str):
+        """Initialize a payloads size error."""
+        super().__init__(message)
+        self._message = message
+
+    @property
+    def message(self) -> str:
+        """Message."""
+        return self._message
+
+
+@dataclass(frozen=True)
+class _ServerPayloadErrorLimits:
+    """Error limits for payloads as described by the Temporal server."""
+
+    memo_size_error: int
+    """The limit (in bytes) at which a memo size error is raised."""
+
+    payload_size_error: int
+    """The limit (in bytes) at which a payload size error is raised."""
+
+
+@dataclass(frozen=True)
 class DataConverter(WithSerializationContext):
     """Data converter for converting and encoding payloads to/from Python values.
 
@@ -1261,8 +1286,14 @@ class DataConverter(WithSerializationContext):
     failure_converter: FailureConverter = dataclasses.field(init=False)
     """Failure converter created from the :py:attr:`failure_converter_class`."""
 
+    payload_limits: PayloadLimitsConfig = PayloadLimitsConfig()
+    """Settings for payload size limits."""
+
     default: ClassVar[DataConverter]
     """Singleton default data converter."""
+
+    _payload_error_limits: _ServerPayloadErrorLimits | None = None
+    """Server-reported limits for payloads."""
 
     def __post_init__(self) -> None:  # noqa: D105
         object.__setattr__(self, "payload_converter", self.payload_converter_class())
@@ -1284,8 +1315,7 @@ class DataConverter(WithSerializationContext):
             more than was given.
         """
         payloads = self.payload_converter.to_payloads(values)
-        if self.payload_codec:
-            payloads = await self.payload_codec.encode(payloads)
+        payloads = await self._encode_payload_sequence(payloads)
         return payloads
 
     async def decode(
@@ -1303,8 +1333,7 @@ class DataConverter(WithSerializationContext):
         Returns:
             Decoded and converted values.
         """
-        if self.payload_codec:
-            payloads = await self.payload_codec.decode(payloads)
+        payloads = await self._decode_payload_sequence(payloads)
         return self.payload_converter.from_payloads(payloads, type_hints)
 
     async def encode_wrapper(
@@ -1332,15 +1361,13 @@ class DataConverter(WithSerializationContext):
     ) -> None:
         """Convert and encode failure."""
         self.failure_converter.to_failure(exception, self.payload_converter, failure)
-        if self.payload_codec:
-            await self.payload_codec.encode_failure(failure)
+        await DataConverter._apply_to_failure_payloads(failure, self._encode_payloads)
 
     async def decode_failure(
         self, failure: temporalio.api.failure.v1.Failure
     ) -> BaseException:
         """Decode and convert failure."""
-        if self.payload_codec:
-            await self.payload_codec.decode_failure(failure)
+        await DataConverter._apply_to_failure_payloads(failure, self._decode_payloads)
         return self.failure_converter.from_failure(failure, self.payload_converter)
 
     def with_context(self, context: SerializationContext) -> Self:
@@ -1368,6 +1395,173 @@ class DataConverter(WithSerializationContext):
         object.__setattr__(cloned, "payload_codec", payload_codec)
         object.__setattr__(cloned, "failure_converter", failure_converter)
         return cloned
+
+    def _with_payload_error_limits(
+        self, limits: _ServerPayloadErrorLimits | None
+    ) -> DataConverter:
+        return dataclasses.replace(self, _payload_error_limits=limits)
+
+    async def _decode_memo(
+        self,
+        source: temporalio.api.common.v1.Memo,
+    ) -> Mapping[str, Any]:
+        mapping: dict[str, Any] = {}
+        for k, v in source.fields.items():
+            mapping[k] = (await self.decode([v]))[0]
+        return mapping
+
+    async def _decode_memo_field(
+        self,
+        source: temporalio.api.common.v1.Memo,
+        key: str,
+        default: Any,
+        type_hint: type | None,
+    ) -> dict[str, Any]:
+        payload = source.fields.get(key)
+        if not payload:
+            if default is temporalio.common._arg_unset:
+                raise KeyError(f"Memo does not have a value for key {key}")
+            return default
+        return (await self.decode([payload], [type_hint] if type_hint else None))[0]
+
+    async def _encode_memo(
+        self, source: Mapping[str, Any]
+    ) -> temporalio.api.common.v1.Memo:
+        memo = temporalio.api.common.v1.Memo()
+        await self._encode_memo_existing(source, memo)
+        return memo
+
+    async def _encode_memo_existing(
+        self, source: Mapping[str, Any], memo: temporalio.api.common.v1.Memo
+    ):
+        for k, v in source.items():
+            payload = v
+            if not isinstance(v, temporalio.api.common.v1.Payload):
+                payload = (await self.encode([v]))[0]
+            memo.fields[k].CopyFrom(payload)
+        # Memos have their field payloads validated all together in one unit
+        DataConverter._validate_limits(
+            list(memo.fields.values()),
+            self._payload_error_limits.memo_size_error
+            if self._payload_error_limits
+            else None,
+            "[TMPRL1103] Attempted to upload memo with size that exceeded the error limit.",
+            self.payload_limits.memo_size_warning,
+            "[TMPRL1103] Attempted to upload memo with size that exceeded the warning limit.",
+        )
+
+    async def _encode_payload(
+        self, payload: temporalio.api.common.v1.Payload
+    ) -> temporalio.api.common.v1.Payload:
+        if self.payload_codec:
+            payload = (await self.payload_codec.encode([payload]))[0]
+        self._validate_payload_limits([payload])
+        return payload
+
+    async def _encode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
+        if self.payload_codec:
+            await self.payload_codec.encode_wrapper(payloads)
+        self._validate_payload_limits(payloads.payloads)
+
+    async def _encode_payload_sequence(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        encoded_payloads = list(payloads)
+        if self.payload_codec:
+            encoded_payloads = await self.payload_codec.encode(encoded_payloads)
+        self._validate_payload_limits(encoded_payloads)
+        return encoded_payloads
+
+    async def _decode_payload(
+        self, payload: temporalio.api.common.v1.Payload
+    ) -> temporalio.api.common.v1.Payload:
+        if self.payload_codec:
+            payload = (await self.payload_codec.decode([payload]))[0]
+        return payload
+
+    async def _decode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
+        if self.payload_codec:
+            await self.payload_codec.decode_wrapper(payloads)
+
+    async def _decode_payload_sequence(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        if not self.payload_codec:
+            return list(payloads)
+        return await self.payload_codec.decode(payloads)
+
+    # Temporary shortcircuit detection while the _decode_* methods may no-op if
+    # a payload codec is not configured. Remove once those paths have more to them.
+    @property
+    def _decode_payload_has_effect(self) -> bool:
+        return self.payload_codec is not None
+
+    @staticmethod
+    async def _apply_to_failure_payloads(
+        failure: temporalio.api.failure.v1.Failure,
+        cb: Callable[[temporalio.api.common.v1.Payloads], Awaitable[None]],
+    ) -> None:
+        if failure.HasField("encoded_attributes"):
+            # Wrap in payloads and merge back
+            payloads = temporalio.api.common.v1.Payloads(
+                payloads=[failure.encoded_attributes]
+            )
+            await cb(payloads)
+            failure.encoded_attributes.CopyFrom(payloads.payloads[0])
+        if failure.HasField(
+            "application_failure_info"
+        ) and failure.application_failure_info.HasField("details"):
+            await cb(failure.application_failure_info.details)
+        elif failure.HasField(
+            "timeout_failure_info"
+        ) and failure.timeout_failure_info.HasField("last_heartbeat_details"):
+            await cb(failure.timeout_failure_info.last_heartbeat_details)
+        elif failure.HasField(
+            "canceled_failure_info"
+        ) and failure.canceled_failure_info.HasField("details"):
+            await cb(failure.canceled_failure_info.details)
+        elif failure.HasField(
+            "reset_workflow_failure_info"
+        ) and failure.reset_workflow_failure_info.HasField("last_heartbeat_details"):
+            await cb(failure.reset_workflow_failure_info.last_heartbeat_details)
+        if failure.HasField("cause"):
+            await DataConverter._apply_to_failure_payloads(failure.cause, cb)
+
+    def _validate_payload_limits(
+        self,
+        payloads: Sequence[temporalio.api.common.v1.Payload],
+    ):
+        DataConverter._validate_limits(
+            payloads,
+            self._payload_error_limits.payload_size_error
+            if self._payload_error_limits
+            else None,
+            "[TMPRL1103] Attempted to upload payloads with size that exceeded the error limit.",
+            self.payload_limits.payload_size_warning,
+            "[TMPRL1103] Attempted to upload payloads with size that exceeded the warning limit.",
+        )
+
+    @staticmethod
+    def _validate_limits(
+        payloads: Sequence[temporalio.api.common.v1.Payload],
+        error_limit: int | None,
+        error_message: str,
+        warning_limit: int,
+        warning_message: str,
+    ):
+        total_size = sum(payload.ByteSize() for payload in payloads)
+
+        if error_limit and error_limit > 0 and total_size > error_limit:
+            raise _PayloadSizeError(
+                f"{error_message} Size: {total_size} bytes, Limit: {error_limit} bytes"
+            )
+
+        if warning_limit > 0 and total_size > warning_limit:
+            # TODO: Use a context aware logger to log extra information about workflow/activity/etc
+            warnings.warn(
+                f"{warning_message} Size: {total_size} bytes, Limit: {warning_limit} bytes",
+                PayloadSizeWarning,
+            )
 
 
 DefaultPayloadConverter.default_encoding_payload_converters = (

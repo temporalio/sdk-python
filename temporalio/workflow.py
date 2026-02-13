@@ -139,7 +139,6 @@ def defn(
             ``Exception`` is set, it effectively will fail a workflow/update in
             all user exception cases. WARNING: This setting is experimental.
         versioning_behavior: Specifies the versioning behavior to use for this workflow.
-            WARNING: This setting is experimental.
     """
 
     def decorator(cls: ClassType) -> ClassType:
@@ -444,8 +443,6 @@ class DynamicWorkflowConfig:
     """Specifies the versioning behavior to use for this workflow.
 
     Always overrides the equivalent parameter on :py:func:`defn`.
-
-        WARNING: This setting is experimental.
     """
 
 
@@ -745,6 +742,9 @@ class _Runtime(ABC):
     def workflow_is_replaying_history_events(self) -> bool: ...
 
     @abstractmethod
+    def workflow_is_read_only(self) -> bool: ...
+
+    @abstractmethod
     def workflow_memo(self) -> Mapping[str, Any]: ...
 
     @abstractmethod
@@ -904,6 +904,14 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_last_failure(self) -> BaseException | None: ...
+
+    @abstractmethod
+    def workflow_random_seed(self) -> int: ...
+
+    @abstractmethod
+    def workflow_register_random_seed_callback(
+        self, callback: Callable[[int], None]
+    ) -> None: ...
 
 
 _current_update_info: contextvars.ContextVar[UpdateInfo] = contextvars.ContextVar(
@@ -1157,6 +1165,51 @@ def random() -> Random:
         The deterministically-seeded pseudo-random number generator.
     """
     return _Runtime.current().workflow_random()
+
+
+def random_seed() -> int:
+    """Get the current random seed value from core.
+
+    This returns the seed value currently being used by the workflow's
+    deterministic random number generator.
+
+    Returns:
+        The current random seed as an integer.
+    """
+    return _Runtime.current().workflow_random_seed()
+
+
+def register_random_seed_callback(callback: Callable[[int], None]) -> None:
+    """Register a callback to be notified when the random seed changes.
+
+    The callback will be invoked whenever the workflow receives a new random
+    seed from the core. This is useful for maintaining external random number
+    generators that need to stay in sync with the workflow's randomness.
+
+    Args:
+        callback: Function to be called with the new seed value when it changes.
+    """
+    return _Runtime.current().workflow_register_random_seed_callback(callback)
+
+
+def new_random() -> Random:
+    """Create a Random instance that automatically reseeds when the workflow seed changes.
+
+    This creates a new Random instance that is initially seeded with the current
+    workflow seed, and automatically registers a callback to reseed itself
+    whenever the workflow receives a new seed from core.
+
+    Returns:
+        A Random instance that stays synchronized with the workflow's randomness.
+    """
+    current_seed = random_seed()
+    auto_random = Random(current_seed)
+
+    def reseed_callback(new_seed: int) -> None:
+        auto_random.seed(new_seed)
+
+    register_random_seed_callback(reseed_callback)
+    return auto_random
 
 
 def time() -> float:
@@ -1465,6 +1518,18 @@ class unsafe:
             True if replaying history events, False otherwise.
         """
         return _Runtime.current().workflow_is_replaying_history_events()
+
+    @staticmethod
+    def is_read_only() -> bool:
+        """Whether the workflow is currently in read-only mode.
+
+        Read-only mode occurs during queries and update validators where
+        side effects are not allowed.
+
+        Returns:
+            True if the workflow is in read-only mode, False otherwise.
+        """
+        return _Runtime.current().workflow_is_read_only()
 
     @staticmethod
     def is_sandbox_unrestricted() -> bool:

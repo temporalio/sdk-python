@@ -445,7 +445,7 @@ class StatefulMCPServerProvider:
 
     def _get_activities(self) -> Sequence[Callable]:
         def _server_id():
-            return self.name + "@" + activity.info().workflow_run_id
+            return self.name + "@" + (activity.info().workflow_run_id or "")
 
         @activity.defn(name=self.name + "-list-tools")
         async def list_tools() -> list[MCPTool]:
@@ -491,7 +491,7 @@ class StatefulMCPServerProvider:
         ) -> None:
             heartbeat_task = asyncio.create_task(heartbeat_every(30))
 
-            server_id = self.name + "@" + activity.info().workflow_run_id
+            server_id = self.name + "@" + (activity.info().workflow_run_id or "")
             if server_id in self._servers:
                 raise ApplicationError(
                     "Cannot connect to an already running server. Use a distinct name if running multiple servers in one workflow."
