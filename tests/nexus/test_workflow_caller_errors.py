@@ -4,9 +4,11 @@ import asyncio
 import concurrent.futures
 import uuid
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from logging import getLogger
+from typing import Any
 
 import nexusrpc
 import nexusrpc.handler
@@ -21,11 +23,13 @@ from nexusrpc.handler import (
     sync_operation,
 )
 
+import temporalio.api.common.v1
 from temporalio import nexus, workflow
 from temporalio.client import (
     Client,
     WorkflowFailureError,
 )
+from temporalio.converter import DataConverter, DefaultPayloadConverter, PayloadCodec
 from temporalio.exceptions import (
     ApplicationError,
     NexusOperationError,
@@ -537,3 +541,140 @@ async def test_rpc_error_is_retried(
         await assert_eq_eventually(2, times_called)
 
         await handle.cancel()
+
+
+# DataConverter codec/converter error tests
+
+
+@nexusrpc.handler.service_handler
+class DataConverterTestService:
+    @nexusrpc.handler.sync_operation
+    def succeed(
+        self, _ctx: nexusrpc.handler.StartOperationContext, input: ErrorTestInput
+    ) -> None:
+        pass
+
+
+class FailOnFirstDecodeCodec(PayloadCodec):
+    def __init__(self) -> None:
+        self.decode_count = 0
+
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return list(payloads)
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        self.decode_count += 1
+        if self.decode_count == 1:
+            raise RuntimeError("Intentional codec decode failure")
+        return list(payloads)
+
+
+class FailingFromPayloadsConverter(DefaultPayloadConverter):
+    def from_payloads(
+        self,
+        payloads: Sequence[temporalio.api.common.v1.Payload],
+        type_hints: list[type] | None = None,
+    ) -> list[Any]:
+        raise RuntimeError("Intentional payload converter failure")
+
+
+async def test_nexus_operation_retried_on_codec_decode_failure(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    task_queue = str(uuid.uuid4())
+    codec = FailOnFirstDecodeCodec()
+    handler_client = Client(
+        client.service_client,
+        namespace=client.namespace,
+        data_converter=DataConverter(payload_codec=codec),
+    )
+    input = ErrorTestInput(
+        service_name="DataConverterTestService",
+        operation_name="succeed",
+        task_queue=task_queue,
+        id=str(uuid.uuid4()),
+    )
+    async with (
+        Worker(
+            client,
+            workflows=[CallerWorkflow],
+            task_queue=task_queue,
+        ),
+        Worker(
+            handler_client,
+            nexus_service_handlers=[DataConverterTestService()],
+            nexus_task_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1),
+            task_queue=task_queue,
+        ),
+    ):
+        await create_nexus_endpoint(task_queue, client)
+        await client.execute_workflow(
+            CallerWorkflow.run,
+            input,
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
+        )
+        assert codec.decode_count == 2
+
+
+async def test_nexus_operation_fails_without_retry_on_converter_failure(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    task_queue = str(uuid.uuid4())
+    handler_client = Client(
+        client.service_client,
+        namespace=client.namespace,
+        data_converter=DataConverter(
+            payload_converter_class=FailingFromPayloadsConverter
+        ),
+    )
+    input = ErrorTestInput(
+        service_name="DataConverterTestService",
+        operation_name="succeed",
+        task_queue=task_queue,
+        id=str(uuid.uuid4()),
+    )
+    async with (
+        Worker(
+            client,
+            workflows=[CallerWorkflow],
+            task_queue=task_queue,
+        ),
+        Worker(
+            handler_client,
+            nexus_service_handlers=[DataConverterTestService()],
+            nexus_task_executor=concurrent.futures.ThreadPoolExecutor(max_workers=1),
+            task_queue=task_queue,
+        ),
+    ):
+        await create_nexus_endpoint(task_queue, client)
+        try:
+            await client.execute_workflow(
+                CallerWorkflow.run,
+                input,
+                id=str(uuid.uuid4()),
+                task_queue=task_queue,
+            )
+        except Exception as err:
+            assert isinstance(err, WorkflowFailureError)
+            assert isinstance(err.__cause__, NexusOperationError)
+            handler_error = err.__cause__.__cause__
+            assert isinstance(handler_error, nexusrpc.HandlerError)
+            assert handler_error.type == nexusrpc.HandlerErrorType.BAD_REQUEST
+            assert not handler_error.retryable
+            assert (
+                "Payload converter failed to decode Nexus operation input"
+                in str(handler_error)
+            )
+        else:
+            pytest.fail("Expected WorkflowFailureError")

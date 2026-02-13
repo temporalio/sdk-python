@@ -430,21 +430,30 @@ class _DummyPayloadSerializer:
         content: nexusrpc.Content,  # type:ignore[reportUnusedParameter]
         as_type: type[Any] | None = None,
     ) -> Any:
+        payload = self.payload
+        if self.data_converter.payload_codec:
+            try:
+                [payload] = await self.data_converter.payload_codec.decode([payload])
+            except Exception as err:
+                raise nexusrpc.HandlerError(
+                    "Payload codec failed to decode Nexus operation input",
+                    type=nexusrpc.HandlerErrorType.INTERNAL,
+                ) from err
+
         try:
-            [input] = await self.data_converter.decode(
-                [self.payload],
+            [input] = self.data_converter.payload_converter.from_payloads(
+                [payload],
                 type_hints=[as_type] if as_type else None,
             )
             return input
         except Exception as err:
             raise nexusrpc.HandlerError(
-                "Data converter failed to decode Nexus operation input",
+                "Payload converter failed to decode Nexus operation input",
                 type=nexusrpc.HandlerErrorType.BAD_REQUEST,
                 retryable_override=False,
             ) from err
 
 
-# TODO(nexus-prerelease): tests for this function
 def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
     # Based on sdk-typescript's convertKnownErrors:
     # https://github.com/temporalio/sdk-typescript/blob/nexus/packages/worker/src/nexus.ts
