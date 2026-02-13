@@ -436,15 +436,15 @@ async def test_simple_plugin_worker_interceptor_only_used_on_worker(
     client: Client,
 ) -> None:
     """Test that when a combined client/worker interceptor is provided by SimplePlugin
-    to client_interceptors, and the plugin is only used on a worker (not on the client
+    to interceptors, and the plugin is only used on a worker (not on the client
     used to create that worker), the worker interceptor functionality is still provided."""
 
     interceptor = CombinedClientWorkerInterceptor()
 
-    # Create SimplePlugin that provides the combined interceptor as client_interceptors
+    # Create SimplePlugin that provides the combined interceptor
     plugin = SimplePlugin(
         "TestCombinedPlugin",
-        client_interceptors=[interceptor],
+        interceptors=[interceptor],
     )
 
     # Create worker with the plugin (but don't add plugin to client)
@@ -468,7 +468,7 @@ async def test_simple_plugin_worker_interceptor_only_used_on_worker(
     ), "Client interceptor should not have been used"
 
     # The interceptor SHOULD have been used for worker interception
-    # even though it was specified in client_interceptors
+    # even though it was specified in interceptors
     assert interceptor.worker_intercepted, "Worker interceptor should have been used"
 
 
@@ -476,15 +476,15 @@ async def test_simple_plugin_interceptor_duplication_when_used_on_client_and_wor
     client: Client,
 ) -> None:
     """Test that when a combined client/worker interceptor is provided by SimplePlugin
-    to client_interceptors, and the plugin is used on both client and worker,
+    to interceptors, and the plugin is used on both client and worker,
     the interceptor is not duplicated in the worker."""
 
     interceptor = CombinedClientWorkerInterceptor()
 
-    # Create SimplePlugin that provides the combined interceptor as client_interceptors
+    # Create SimplePlugin that provides the combined interceptor
     plugin = SimplePlugin(
         "TestCombinedPlugin",
-        client_interceptors=[interceptor],
+        interceptors=[interceptor],
     )
 
     # Add plugin to client first
@@ -535,16 +535,15 @@ async def test_simple_plugin_interceptor_duplication_when_used_on_client_and_wor
 async def test_simple_plugin_no_duplication_when_interceptor_in_both_client_and_worker_params(
     client: Client,
 ) -> None:
-    """Test that when the same interceptor is provided to both client_interceptors
-    and worker_interceptors in a SimplePlugin, it doesn't get duplicated."""
+    """Test that when the same interceptor is provided to the unified interceptors
+    parameter in a SimplePlugin, it doesn't get duplicated."""
 
     interceptor = CombinedClientWorkerInterceptor()
 
-    # Create SimplePlugin that provides the same interceptor to both client and worker
+    # Create SimplePlugin that provides the interceptor once to the unified parameter
     plugin = SimplePlugin(
         "TestCombinedPlugin",
-        client_interceptors=[interceptor],
-        worker_interceptors=[interceptor],  # Same interceptor in both places
+        interceptors=[interceptor],  # Single unified parameter
     )
 
     # Create worker with plugin (not on client)
@@ -585,10 +584,10 @@ async def test_simple_plugin_no_duplication_in_interceptor_chain(
 
     interceptor = CombinedClientWorkerInterceptor()
 
-    # Create SimplePlugin that provides the combined interceptor as client_interceptors only
+    # Create SimplePlugin that provides the combined interceptor
     plugin = SimplePlugin(
         "CountingPlugin",
-        client_interceptors=[interceptor],
+        interceptors=[interceptor],
     )
 
     # Add plugin to client (like OpenTelemetryPlugin does)

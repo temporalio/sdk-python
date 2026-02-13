@@ -252,7 +252,7 @@ class OpenAIAgentsPlugin(SimplePlugin):
         super().__init__(
             name="OpenAIAgentsPlugin",
             data_converter=_data_converter,
-            worker_interceptors=[OpenAIAgentsTracingInterceptor()],
+            interceptors=[OpenAIAgentsTracingInterceptor()],
             activities=add_activities,
             workflow_runner=workflow_runner,
             workflow_failure_exception_types=[AgentsWorkflowError],
