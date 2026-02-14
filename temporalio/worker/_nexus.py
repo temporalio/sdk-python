@@ -8,20 +8,16 @@ import contextvars
 import threading
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from functools import reduce
 from typing import (
     Any,
     NoReturn,
     ParamSpec,
     TypeVar,
-    cast,
 )
 
 import nexusrpc.handler
-from nexusrpc import LazyValue
-from nexusrpc.handler import CancelOperationContext, Handler, StartOperationContext
+from nexusrpc.handler import CancelOperationContext, StartOperationContext
 
-import temporalio.api.common.v1
 import temporalio.api.nexus.v1
 import temporalio.bridge.proto.nexus
 import temporalio.bridge.worker
@@ -40,11 +36,9 @@ from temporalio.nexus import Info, logger
 from temporalio.service import RPCError, RPCStatusCode
 
 from ._interceptor import (
-    ExecuteNexusOperationCancelInput,
-    ExecuteNexusOperationStartInput,
     Interceptor,
-    NexusOperationInboundInterceptor,
 )
+from ._nexus_handler import _TemporalNexusHandler
 
 _TEMPORAL_FAILURE_PROTO_TYPE = "temporal.api.failure.v1.Failure"
 
@@ -77,13 +71,12 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         self._task_queue = task_queue
 
         self._metric_meter = metric_meter
-        middleware = _NexusMiddlewareForInterceptors(interceptors)
 
         # If an executor is provided, we wrap the executor with one that will
         # copy the contextvars.Context to the thread on submit
         handler_executor = _ContextPropagatingExecutor(executor) if executor else None
-        self._handler = Handler(
-            service_handlers, handler_executor, middleware=[middleware]
+        self._handler = _TemporalNexusHandler(
+            service_handlers, interceptors, data_converter, handler_executor
         )
 
         self._data_converter = data_converter
@@ -360,16 +353,8 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
             _runtime_metric_meter=self._metric_meter,
             _worker_shutdown_event=self._worker_shutdown_event,
         ).set()
-        input = LazyValue(
-            serializer=_DummyPayloadSerializer(
-                data_converter=self._data_converter,
-                payload=start_request.payload,
-            ),
-            headers={},
-            stream=None,
-        )
         try:
-            result = await self._handler.start_operation(ctx, input)
+            result = await self._handler.start_operation(ctx, start_request.payload)
             links = [
                 temporalio.api.nexus.v1.Link(url=link.url, type=link.type)
                 for link in ctx.outbound_links
@@ -413,45 +398,6 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                 response = temporalio.api.nexus.v1.StartOperationResponse()
                 await self._data_converter.encode_failure(new_err, response.failure)
                 return response
-
-
-@dataclass
-class _DummyPayloadSerializer:
-    data_converter: temporalio.converter.DataConverter
-    payload: temporalio.api.common.v1.Payload
-
-    async def serialize(self, value: Any) -> nexusrpc.Content:  # type:ignore[reportUnusedParameter]
-        raise NotImplementedError(
-            "The serialize method of the Serializer is not used by handlers"
-        )
-
-    async def deserialize(
-        self,
-        content: nexusrpc.Content,  # type:ignore[reportUnusedParameter]
-        as_type: type[Any] | None = None,
-    ) -> Any:
-        payload = self.payload
-        if self.data_converter.payload_codec:
-            try:
-                [payload] = await self.data_converter.payload_codec.decode([payload])
-            except Exception as err:
-                raise nexusrpc.HandlerError(
-                    "Payload codec failed to decode Nexus operation input",
-                    type=nexusrpc.HandlerErrorType.INTERNAL,
-                ) from err
-
-        try:
-            [input] = self.data_converter.payload_converter.from_payloads(
-                [payload],
-                type_hints=[as_type] if as_type else None,
-            )
-            return input
-        except Exception as err:
-            raise nexusrpc.HandlerError(
-                "Payload converter failed to decode Nexus operation input",
-                type=nexusrpc.HandlerErrorType.BAD_REQUEST,
-                retryable_override=False,
-            ) from err
 
 
 def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
@@ -567,69 +513,6 @@ class _NexusTaskCancellation(nexusrpc.handler.OperationTaskCancellation):
             self._thread_evt.set()
             self._async_evt.set()
             return True
-
-
-class _NexusOperationHandlerForInterceptor(
-    nexusrpc.handler.MiddlewareSafeOperationHandler
-):
-    def __init__(self, next_interceptor: NexusOperationInboundInterceptor):
-        self._next_interceptor = next_interceptor
-
-    async def start(
-        self, ctx: nexusrpc.handler.StartOperationContext, input: Any
-    ) -> (
-        nexusrpc.handler.StartOperationResultSync[Any]
-        | nexusrpc.handler.StartOperationResultAsync
-    ):
-        return await self._next_interceptor.execute_nexus_operation_start(
-            ExecuteNexusOperationStartInput(ctx, input)
-        )
-
-    async def cancel(
-        self, ctx: nexusrpc.handler.CancelOperationContext, token: str
-    ) -> None:
-        return await self._next_interceptor.execute_nexus_operation_cancel(
-            ExecuteNexusOperationCancelInput(ctx, token)
-        )
-
-
-class _NexusOperationInboundInterceptorImpl(NexusOperationInboundInterceptor):
-    def __init__(self, handler: nexusrpc.handler.MiddlewareSafeOperationHandler):  # pyright: ignore[reportMissingSuperCall]
-        self._handler = handler
-
-    async def execute_nexus_operation_start(
-        self, input: ExecuteNexusOperationStartInput
-    ) -> (
-        nexusrpc.handler.StartOperationResultSync[Any]
-        | nexusrpc.handler.StartOperationResultAsync
-    ):
-        return await self._handler.start(input.ctx, input.input)
-
-    async def execute_nexus_operation_cancel(
-        self, input: ExecuteNexusOperationCancelInput
-    ) -> None:
-        return await self._handler.cancel(input.ctx, input.token)
-
-
-class _NexusMiddlewareForInterceptors(nexusrpc.handler.OperationHandlerMiddleware):
-    def __init__(self, interceptors: Sequence[Interceptor]) -> None:
-        self._interceptors = interceptors
-
-    def intercept(
-        self,
-        ctx: nexusrpc.handler.OperationContext,
-        next: nexusrpc.handler.MiddlewareSafeOperationHandler,
-    ) -> nexusrpc.handler.MiddlewareSafeOperationHandler:
-        inbound = reduce(
-            lambda impl, _next: _next.intercept_nexus_operation(impl),
-            reversed(self._interceptors),
-            cast(
-                NexusOperationInboundInterceptor,
-                _NexusOperationInboundInterceptorImpl(next),
-            ),
-        )
-
-        return _NexusOperationHandlerForInterceptor(inbound)
 
 
 _P = ParamSpec("_P")
