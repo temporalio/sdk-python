@@ -42,9 +42,10 @@ class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         name: str,
         *,
         data_converter: PluginParameter[temporalio.converter.DataConverter] = None,
-        interceptors: PluginParameter[
-            Sequence[temporalio.client.Interceptor | temporalio.worker.Interceptor]
-        ] = None,
+        interceptors: Sequence[
+            temporalio.client.Interceptor | temporalio.worker.Interceptor
+        ]
+        | None = None,
         activities: PluginParameter[Sequence[Callable]] = None,
         nexus_service_handlers: PluginParameter[Sequence[Any]] = None,
         workflows: PluginParameter[Sequence[type]] = None,
@@ -63,7 +64,7 @@ class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
             name: The name of the plugin.
             data_converter: Data converter for serialization, or callable to customize existing one.
                 Applied to the Client and Replayer.
-            interceptors: Interceptors to append, or callable to customize existing ones.
+            interceptors: Interceptors to append.
                 Client interceptors are applied to the Client, worker interceptors are applied
                 to the Worker and Replayer. Interceptors that implement both interfaces will
                 be applied to both, with exactly one instance used per worker to avoid duplication.
@@ -156,29 +157,7 @@ class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         if workflow_runner:
             config["workflow_runner"] = workflow_runner
 
-        if callable(self.interceptors):
-            interceptors = (
-                _resolve_append_parameter(
-                    cast(
-                        Sequence[
-                            temporalio.client.Interceptor
-                            | temporalio.worker.Interceptor
-                        ]
-                        | None,
-                        config.get("interceptors"),
-                    ),
-                    self.interceptors,
-                )
-                or []
-            )
-
-            # Filter out any client only interceptors the callable returned
-            config["interceptors"] = [
-                interceptor
-                for interceptor in interceptors
-                if isinstance(interceptor, temporalio.worker.Interceptor)
-            ]
-        elif self.interceptors is not None:
+        if self.interceptors is not None:
             client_interceptors_list = (
                 config["client"].config(active_config=True).get("interceptors", [])  # type:ignore[reportTypedDictNotRequiredAccess]
             )
