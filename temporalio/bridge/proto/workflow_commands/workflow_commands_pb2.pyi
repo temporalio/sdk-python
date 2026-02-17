@@ -963,6 +963,7 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     RETRY_POLICY_FIELD_NUMBER: builtins.int
     VERSIONING_INTENT_FIELD_NUMBER: builtins.int
+    INITIAL_VERSIONING_BEHAVIOR_FIELD_NUMBER: builtins.int
     workflow_type: builtins.str
     """The identifier the lang-specific sdk uses to execute workflow code"""
     task_queue: builtins.str
@@ -1016,6 +1017,13 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
         temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType
     )
     """Whether the continued workflow should run on a worker with a compatible build id or not."""
+    initial_versioning_behavior: (
+        temporalio.api.enums.v1.workflow_pb2.ContinueAsNewVersioningBehavior.ValueType
+    )
+    """Experimental. Optionally decide the versioning behavior that the first task of the new run should use.
+    For example, choose to AutoUpgrade on continue-as-new instead of inheriting the pinned version
+    of the previous run.
+    """
     def __init__(
         self,
         *,
@@ -1041,6 +1049,7 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
         | None = ...,
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
         versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType = ...,
+        initial_versioning_behavior: temporalio.api.enums.v1.workflow_pb2.ContinueAsNewVersioningBehavior.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1060,6 +1069,8 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
             b"arguments",
             "headers",
             b"headers",
+            "initial_versioning_behavior",
+            b"initial_versioning_behavior",
             "memo",
             b"memo",
             "retry_policy",
