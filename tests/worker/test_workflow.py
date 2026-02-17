@@ -679,21 +679,36 @@ class BadSignalParamWorkflow:
 
 
 async def test_workflow_bad_signal_param(client: Client):
-    async with new_worker(client, BadSignalParamWorkflow) as worker:
-        handle = await client.start_workflow(
-            BadSignalParamWorkflow.run,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
+    with LogCapturer().logs_captured(
+        temporalio.worker._workflow_instance.logger
+    ) as capturer:
+        async with new_worker(client, BadSignalParamWorkflow) as worker:
+            handle = await client.start_workflow(
+                BadSignalParamWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            # Send 4 signals, first and third are bad
+            await handle.signal("some_signal", "bad")
+            await handle.signal("some_signal", BadSignalParam(some_str="good"))
+            await handle.signal("some_signal", 123)
+            await handle.signal("some_signal", BadSignalParam(some_str="finish"))
+            assert [
+                BadSignalParam(some_str="good"),
+                BadSignalParam(some_str="finish"),
+            ] == await handle.result()
+
+        # Check that the log message includes workflow context
+        record = capturer.find_log("Failed deserializing signal input")
+        assert record is not None
+        assert "some_signal" in record.message
+        assert "BadSignalParamWorkflow" in record.message
+        assert handle.id in record.message
+        assert hasattr(record, "temporal_workflow")
+        assert (
+            getattr(record, "temporal_workflow")["workflow_type"]
+            == "BadSignalParamWorkflow"
         )
-        # Send 4 signals, first and third are bad
-        await handle.signal("some_signal", "bad")
-        await handle.signal("some_signal", BadSignalParam(some_str="good"))
-        await handle.signal("some_signal", 123)
-        await handle.signal("some_signal", BadSignalParam(some_str="finish"))
-        assert [
-            BadSignalParam(some_str="good"),
-            BadSignalParam(some_str="finish"),
-        ] == await handle.result()
 
 
 @workflow.defn

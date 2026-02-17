@@ -1,24 +1,22 @@
-"""OpenTelemetry integration for OpenAI Agents in Temporal workflows.
+"""OpenTelemetry v2 integration for Temporal SDK.
 
-This module provides utilities for properly exporting OpenAI agent telemetry
-to OpenTelemetry endpoints from within Temporal workflows, handling workflow
-replay semantics correctly.
+This package provides OpenTelemetry tracing integration for Temporal workflows,
+activities, and other operations. It includes automatic span creation and
+propagation for distributed tracing.
 """
 
-from temporalio.contrib.opentelemetry._generator import TemporalIdGenerator
-from temporalio.contrib.opentelemetry._instrumentation import (
-    with_instrumentation_context,
-)
-from temporalio.contrib.opentelemetry._interceptors import (
+from temporalio.contrib.opentelemetry._interceptor import (
     TracingInterceptor,
     TracingWorkflowInboundInterceptor,
 )
-from temporalio.contrib.opentelemetry._processor import TemporalSpanProcessor
+from temporalio.contrib.opentelemetry._otel_interceptor import OpenTelemetryInterceptor
+from temporalio.contrib.opentelemetry._plugin import OpenTelemetryPlugin
+from temporalio.contrib.opentelemetry._tracer_provider import create_tracer_provider
 
 __all__ = [
-    "TemporalSpanProcessor",
-    "TemporalIdGenerator",
     "TracingInterceptor",
     "TracingWorkflowInboundInterceptor",
-    "with_instrumentation_context",
+    "OpenTelemetryInterceptor",
+    "OpenTelemetryPlugin",
+    "create_tracer_provider",
 ]

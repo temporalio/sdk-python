@@ -35,7 +35,10 @@ from google.adk.utils.context_utils import Aclosing
 from google.genai import types
 from google.genai.types import Content, FunctionCall, Part
 from mcp import StdioServerParameters
+from openinference.instrumentation.google_adk import GoogleADKInstrumentor
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import set_tracer_provider
 
 import temporalio.contrib.google_adk_agents.workflow
 from temporalio import activity, workflow
@@ -46,8 +49,9 @@ from temporalio.contrib.google_adk_agents import (
     TemporalMcpToolSetProvider,
     TemporalModel,
 )
+from temporalio.contrib.opentelemetry import create_tracer_provider, OpenTelemetryPlugin
 from temporalio.worker import Worker
-from tests.contrib.test_opentelemetry import dump_spans
+from tests.contrib.opentelemetry.test_opentelemetry import dump_spans
 
 logger = logging.getLogger(__name__)
 
@@ -485,8 +489,13 @@ async def test_mcp_agent(client: Client, use_local_model: bool):
 @pytest.mark.asyncio
 async def test_single_agent_telemetry(client: Client):
     exporter = InMemorySpanExporter()
+    provider = create_tracer_provider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    set_tracer_provider(provider)
+    GoogleADKInstrumentor().instrument()
+
     new_config = client.config()
-    new_config["plugins"] = [TemporalAdkPlugin(otel_exporters=[exporter])]
+    new_config["plugins"] = [TemporalAdkPlugin(), OpenTelemetryPlugin(add_temporal_spans=True)]
     client = Client(**new_config)
 
     # Run Worker with the ADK plugin
@@ -519,16 +528,19 @@ async def test_single_agent_telemetry(client: Client):
         assert result.content.parts is not None
         assert result.content.parts[0].text == "warm and sunny"
 
+    print("\n".join(dump_spans(exporter.get_finished_spans(), with_attributes=False)))
     assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
-        "invocation [test_app]",
-        "  agent_run [test_agent]",
-        "    call_llm",
-        "      StartActivity:invoke_model",
-        "        RunActivity:invoke_model",
-        "      execute_tool get_weather",
-        "        StartActivity:get_weather",
-        "          RunActivity:get_weather",
-        "    call_llm",
-        "      StartActivity:invoke_model",
-        "        RunActivity:invoke_model",
+        "StartWorkflow:WeatherAgent",
+        "  RunWorkflow:WeatherAgent",
+        "    invocation [test_app]",
+        "      agent_run [test_agent]",
+        "        call_llm",
+        "          StartActivity:invoke_model",
+        "            RunActivity:invoke_model",
+        "          execute_tool get_weather",
+        "            StartActivity:get_weather",
+        "              RunActivity:get_weather",
+        "        call_llm",
+        "          StartActivity:invoke_model",
+        "            RunActivity:invoke_model",
     ]

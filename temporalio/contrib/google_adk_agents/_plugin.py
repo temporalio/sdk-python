@@ -2,20 +2,13 @@ from __future__ import annotations
 
 import dataclasses
 import time
-import typing
 import uuid
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 
-from openinference.instrumentation.google_adk import GoogleADKInstrumentor
-
 from temporalio import workflow
 from temporalio.contrib.google_adk_agents._mcp import TemporalMcpToolSetProvider
 from temporalio.contrib.google_adk_agents._model import invoke_model
-from temporalio.contrib.opentelemetry import (
-    TracingInterceptor,
-    with_instrumentation_context,
-)
 from temporalio.contrib.pydantic import (
     PydanticPayloadConverter as _DefaultPydanticPayloadConverter,
 )
@@ -25,9 +18,6 @@ from temporalio.worker import (
     WorkflowRunner,
 )
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
-
-if typing.TYPE_CHECKING:
-    from opentelemetry.sdk.trace.export import SpanExporter
 
 
 def setup_deterministic_runtime():
@@ -69,26 +59,17 @@ class TemporalAdkPlugin(SimplePlugin):
     def __init__(
         self,
         toolset_providers: list[TemporalMcpToolSetProvider] | None = None,
-        otel_exporters: Sequence["SpanExporter"] | None = None,
     ):
         """Initializes the Temporal ADK Plugin.
 
         Args:
             toolset_providers: Optional list of toolset providers for MCP integration.
-            otel_exporters: Optional sequence of OpenTelemetry span exporters for tracing.
         """
 
         @asynccontextmanager
         async def run_context() -> AsyncIterator[None]:
             setup_deterministic_runtime()
-
-            if otel_exporters is not None:
-                async with with_instrumentation_context(
-                    otel_exporters, GoogleADKInstrumentor()
-                ):
-                    yield
-            else:
-                yield
+            yield
 
         def workflow_runner(runner: WorkflowRunner | None) -> WorkflowRunner:
             if not runner:
@@ -109,12 +90,8 @@ class TemporalAdkPlugin(SimplePlugin):
             for toolset_provider in toolset_providers:
                 new_activities.extend(toolset_provider._get_activities())
 
-        interceptors = [TracingInterceptor()] if otel_exporters is not None else []
-
         super().__init__(
             name="google_adk_plugin",
-            client_interceptors=interceptors,
-            worker_interceptors=interceptors,
             data_converter=self._configure_data_converter,
             activities=new_activities,
             run_context=lambda: run_context(),

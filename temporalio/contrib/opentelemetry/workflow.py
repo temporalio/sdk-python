@@ -1,10 +1,20 @@
-"""Workflow-specific OpenTelemetry utilities for Temporal workflows."""
+"""OpenTelemetry workflow utilities for Temporal SDK.
+
+This module provides workflow-safe OpenTelemetry span creation and context
+management utilities for use within Temporal workflows. All functions in
+this module are designed to work correctly during workflow replay.
+"""
+
+from __future__ import annotations
+
+import warnings
 
 import opentelemetry.util.types
-
-from temporalio.contrib.opentelemetry._interceptors import (
-    TracingWorkflowInboundInterceptor,
+from opentelemetry.trace import (
+    get_tracer,
 )
+
+from temporalio.contrib.opentelemetry import TracingWorkflowInboundInterceptor
 
 
 def completed_span(
@@ -20,8 +30,7 @@ def completed_span(
     span and this interceptor is configured on the worker and the span is on
     the context).
 
-    There is currently no way to create a long-running span or to create a
-    span that actually spans other code.
+    To create a long-running span or to create a span that actually spans other code use OpenTelemetryPlugin and tracer().
 
     Args:
         name: Name of the span.
@@ -29,8 +38,16 @@ def completed_span(
             run ID are automatically added.
         exception: Optional exception to record on the span.
     """
-    interceptor = TracingWorkflowInboundInterceptor._from_context()
-    if interceptor:
+    if interceptor := TracingWorkflowInboundInterceptor._from_context():
         interceptor._completed_span(
             name, additional_attributes=attributes, exception=exception
         )
+    else:
+        warnings.warn(
+            "When using OpenTelemetryPlugin, you should prefer using opentelemetry directly.",
+            DeprecationWarning,
+        )
+        span = get_tracer(__name__).start_span(name, attributes=attributes)
+        if exception:
+            span.record_exception(exception)
+        span.end()
