@@ -1,6 +1,5 @@
 """Provides support for integration with OpenAI Agents SDK tracing across workflows"""
 
-import random
 import uuid
 from types import TracebackType
 from typing import Any, cast
@@ -96,7 +95,7 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
 
     def on_trace_start(self, trace: Trace) -> None:
         if not self._emit_spans_in_replay:
-            if workflow.in_workflow() and workflow.unsafe.is_replaying():
+            if workflow.in_workflow() and workflow.unsafe.is_replaying_history_events():
                 # In replay mode, don't report
                 return
 
@@ -104,7 +103,7 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
 
     def on_trace_end(self, trace: Trace) -> None:
         if not self._emit_spans_in_replay:
-            if workflow.in_workflow() and workflow.unsafe.is_replaying():
+            if workflow.in_workflow() and workflow.unsafe.is_replaying_history_events():
                 # In replay mode, don't report
                 return
 
@@ -112,14 +111,14 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
 
     def on_span_start(self, span: Span[Any]) -> None:
         if not self._emit_spans_in_replay:
-            if workflow.in_workflow() and workflow.unsafe.is_replaying():
+            if workflow.in_workflow() and workflow.unsafe.is_replaying_history_events():
                 # In replay mode, don't report
                 return
         self._impl.on_span_start(span)
 
     def on_span_end(self, span: Span[Any]) -> None:
         if not self._emit_spans_in_replay:
-            if workflow.in_workflow() and workflow.unsafe.is_replaying():
+            if workflow.in_workflow() and workflow.unsafe.is_replaying_history_events():
                 # In replay mode, don't report
                 return
 
@@ -130,22 +129,6 @@ class _TemporalTracingProcessor(SynchronousMultiTracingProcessor):
 
     def force_flush(self) -> None:
         self._impl.force_flush()
-
-
-class RunIdRandom:
-    """Random uuid generator seeded by the run id of the workflow.
-    Doesn't currently support replay over reset correctly.
-    """
-
-    def __init__(self):
-        """Create a new random UUID generator."""
-        self._random = random.Random("OpenAIPlugin" + workflow.info().run_id)
-
-    def uuid4(self) -> str:
-        """Generate a random UUID."""
-        return uuid.UUID(
-            bytes=random.getrandbits(16 * 8).to_bytes(16, "big"), version=4
-        ).hex[:24]
 
 
 def _workflow_uuid() -> str:

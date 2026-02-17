@@ -542,24 +542,30 @@ This integration provides seamless export of OpenAI agent telemetry to OpenTelem
 
 ### Quick Start
 
-To enable OTEL telemetry export, simply provide exporters to the `OpenAIAgentsPlugin` or `AgentEnvironment`:
+To enable OTEL telemetry export, you need to set up a global `ReplaySafeTracerProvider` and enable the integration in the `OpenAIAgentsPlugin`:
 
 ```python
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
+from temporalio.contrib.opentelemetry import create_tracer_provider
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry import trace
 
-# Your OTEL endpoint configuration
+# Configure your OTEL exporters
 exporters = [
     OTLPSpanExporter(endpoint="http://localhost:4317"),
     # Add multiple exporters for different endpoints as needed
 ]
+
+# Set up the global tracer provider
+tracer_provider = create_tracer_provider(exporters=exporters)
+trace.set_tracer_provider(tracer_provider)
 
 # For production applications
 client = await Client.connect(
     "localhost:7233",
     plugins=[
         OpenAIAgentsPlugin(
-            otel_exporters=exporters,  # Enable OTEL integration
+            use_otel_instrumentation=True,  # Enable OTEL integration
             model_params=ModelActivityParameters(
                 start_to_close_timeout=timedelta(seconds=30)
             )
@@ -572,17 +578,17 @@ from temporalio.contrib.openai_agents.testing import AgentEnvironment
 
 async with AgentEnvironment(
     model=my_test_model,
-    otel_exporters=exporters  # Enable OTEL integration for tests
+    use_otel_instrumentation=True  # Enable OTEL integration for tests
 ) as env:
     client = env.applied_on_client(base_client)
 ```
 
 ### Features
 
-- **Multiple Exporters**: Send telemetry to multiple OTEL endpoints simultaneously
+- **Multiple Exporters**: Send telemetry to multiple OTEL endpoints simultaneously via the global tracer provider
 - **Replay-Safe**: Spans are only exported when workflows actually complete, not during replays
 - **Deterministic IDs**: Consistent span IDs across workflow replays for reliable correlation
-- **Automatic Setup**: No manual instrumentation required - just provide exporters
+- **Automatic Setup**: No manual instrumentation required - just enable the flag and set up the global tracer provider
 - **Graceful Degradation**: Works seamlessly whether OTEL dependencies are installed or not
 
 ### Dependencies
@@ -609,8 +615,10 @@ pip install opentelemetry-exporter-<your-system>
 ### Example: Multiple Exporters
 
 ```python
+from temporalio.contrib.opentelemetry import create_tracer_provider
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.exporter.console import ConsoleSpanExporter
+from opentelemetry import trace
 
 exporters = [
     # Production monitoring system
@@ -626,15 +634,25 @@ exporters = [
     ConsoleSpanExporter(),
 ]
 
-plugin = OpenAIAgentsPlugin(otel_exporters=exporters)
+# Set up global tracer provider with multiple exporters
+tracer_provider = create_tracer_provider(exporters=exporters)
+trace.set_tracer_provider(tracer_provider)
+
+plugin = OpenAIAgentsPlugin(use_otel_instrumentation=True)
 ```
 
 ### Error Handling
 
-If you provide OTEL exporters but the required dependencies are not installed, you'll receive a clear error message:
+If you enable OTEL instrumentation but the required dependencies are not installed, you'll receive a clear error message:
 
 ```
 ImportError: OTEL dependencies not available. Install with: pip install openinference-instrumentation-openai-agents opentelemetry-sdk
+```
+
+If you enable OTEL instrumentation but don't have a proper global tracer provider set up, you'll get:
+
+```
+ValueError: Global tracer provider must a ReplaySafeTracerProvider. Use temporalio.contrib.opentelemtry.create_trace_provider to create one.
 ```
 
 ### Direct OpenTelemetry API Calls in Workflows
@@ -728,7 +746,40 @@ worker = Worker(
 
 This ensures your direct OTEL spans are properly parented within the trace hierarchy initiated by your client SDK traces.
 
-If no OTEL exporters are provided, the integration works normally without any OTEL setup.
+### Client-Side Trace Initialization
+
+You can also start an Agents SDK trace on the client side before executing a workflow. This is useful when you want the entire workflow execution to be part of a larger trace context:
+
+```python
+from agents import trace, custom_span
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
+
+# Set up the plugin with OTEL integration
+plugin = OpenAIAgentsPlugin(use_otel_instrumentation=True)
+
+# Client setup
+client = await Client.connect(
+    "localhost:7233",
+    plugins=[plugin]
+)
+
+# Start a trace on the client side
+with plugin.tracing_context():
+    with trace("Customer support workflow"):
+        with custom_span("Workflow execution"):
+            # Execute workflow within the trace context
+            result = await client.execute_workflow(
+                CustomerSupportAgent.run,
+                "Help me with my order",
+                id="customer-support-123",
+                task_queue="my-task-queue",
+            )
+            print(f"Result: {result}")
+```
+
+The `plugin.tracing_context()` is required when starting traces outside of a worker context. This ensures proper instrumentation setup and trace propagation into the workflow execution.
+
+If OTEL instrumentation is not enabled, the integration works normally without any OTEL setup.
 
 ### Voice
 

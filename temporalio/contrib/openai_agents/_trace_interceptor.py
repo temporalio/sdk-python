@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import abc
-import random
-import uuid
 from collections.abc import Mapping
 from contextlib import contextmanager
 from typing import Any, Protocol
@@ -21,7 +19,7 @@ import temporalio.client
 import temporalio.converter
 import temporalio.worker
 import temporalio.workflow
-from temporalio import activity, workflow
+from temporalio import activity
 
 HEADER_KEY = "__openai_span"
 
@@ -60,22 +58,6 @@ def temporal_span(
             yield
     else:
         yield
-
-
-class RunIdRandom:
-    """Random uuid generator seeded by the run id of the workflow.
-    Doesn't currently support replay over reset correctly.
-    """
-
-    def __init__(self):
-        """Create a new random UUID generator."""
-        self._random = random.Random("OpenAIPlugin" + workflow.info().run_id)
-
-    def uuid4(self) -> str:
-        """Generate a random UUID."""
-        return uuid.UUID(
-            bytes=random.getrandbits(16 * 8).to_bytes(16, "big"), version=4
-        ).hex[:24]
 
 
 class OpenAIAgentsContextPropagationInterceptor(

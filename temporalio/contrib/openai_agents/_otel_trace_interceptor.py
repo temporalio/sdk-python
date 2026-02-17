@@ -2,22 +2,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any, Protocol
+from typing import Any
 
 import opentelemetry.trace
 
-import temporalio.api.common.v1
 import temporalio.converter
 
 from ..opentelemetry._id_generator import TemporalIdGenerator
 from ._trace_interceptor import (
     OpenAIAgentsContextPropagationInterceptor,
+    _InputWithHeaders,
 )
-
-
-class _InputWithHeaders(Protocol):
-    headers: Mapping[str, temporalio.api.common.v1.Payload]
 
 
 class OTelOpenAIAgentsContextPropagationInterceptor(
