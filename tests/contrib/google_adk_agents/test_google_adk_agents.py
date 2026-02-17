@@ -49,7 +49,7 @@ from temporalio.contrib.google_adk_agents import (
     TemporalMcpToolSetProvider,
     TemporalModel,
 )
-from temporalio.contrib.opentelemetry import create_tracer_provider, OpenTelemetryPlugin
+from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
 from temporalio.worker import Worker
 from tests.contrib.opentelemetry.test_opentelemetry import dump_spans
 
@@ -495,7 +495,10 @@ async def test_single_agent_telemetry(client: Client):
     GoogleADKInstrumentor().instrument()
 
     new_config = client.config()
-    new_config["plugins"] = [TemporalAdkPlugin(), OpenTelemetryPlugin(add_temporal_spans=True)]
+    new_config["plugins"] = [
+        TemporalAdkPlugin(),
+        OpenTelemetryPlugin(add_temporal_spans=True),
+    ]
     client = Client(**new_config)
 
     # Run Worker with the ADK plugin

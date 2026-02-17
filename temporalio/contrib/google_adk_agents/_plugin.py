@@ -3,7 +3,7 @@ from __future__ import annotations
 import dataclasses
 import time
 import uuid
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from temporalio import workflow
