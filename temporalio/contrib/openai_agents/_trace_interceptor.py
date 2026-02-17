@@ -347,6 +347,7 @@ class _ContextPropagationWorkflowInboundInterceptor(
     def handle_update_validator(
         self, input: temporalio.worker.HandleUpdateInput
     ) -> None:
+        _ensure_tracing_random()
         with context_from_header(
             "temporal:handleUpdateValidator",
             input,
