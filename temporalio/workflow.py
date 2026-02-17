@@ -8,7 +8,6 @@ import inspect
 import logging
 import sys
 import threading
-import traceback
 import typing
 import uuid
 import warnings
@@ -644,7 +643,6 @@ class _Runtime(ABC):
     def current() -> _Runtime:
         loop = _Runtime.maybe_current()
         if not loop:
-            traceback.print_stack()
             raise _NotInWorkflowEventLoopError("Not in workflow event loop")
         return loop
 
