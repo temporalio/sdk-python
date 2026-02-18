@@ -48,6 +48,6 @@ class OpenTelemetryPlugin(SimplePlugin):
 
         super().__init__(
             "OpenTelemetryPlugin",
-            client_interceptors=interceptors,
+            interceptors=interceptors,
             workflow_runner=workflow_runner,
         )

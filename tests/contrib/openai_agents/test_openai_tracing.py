@@ -71,8 +71,9 @@ async def test_tracing(client: Client):
                     execution_timeout=timedelta(seconds=120),
                 )
                 await workflow_handle.result()
+        print("\n".join([str({"name": t.name}) for t, _ in processor.trace_events]))
 
-        # There is one closed root trace
+        # There are two traces, one is created in the client because it is needed to start the temporal spans
         assert len(processor.trace_events) == 2
         assert (
             processor.trace_events[0][0].trace_id
@@ -88,32 +89,28 @@ async def test_tracing(client: Client):
 
         print(
             "\n".join(
-                [str(event.span_data.export()) for event, _ in processor.span_events]
+                [
+                    str({"id": t.span_id, "data": t.span_data.export()})
+                    for t, _ in processor.span_events
+                ]
             )
         )
 
-        # Workflow start spans
+        # Start workflow traces
         paired_span(processor.span_events[0], processor.span_events[1])
         assert (
             processor.span_events[0][0].span_data.export().get("name")
             == "temporal:startWorkflow:ResearchWorkflow"
         )
 
-        # Workflow execute spans
+        # Execute workflow
         paired_span(processor.span_events[2], processor.span_events[-1])
         assert (
             processor.span_events[2][0].span_data.export().get("name")
             == "temporal:executeWorkflow"
         )
 
-        # Workflow execute spans
-        paired_span(processor.span_events[2], processor.span_events[-1])
-        assert (
-            processor.span_events[2][0].span_data.export().get("name")
-            == "temporal:executeWorkflow"
-        )
-
-        # Overarching research span
+        # Research manager span
         paired_span(processor.span_events[3], processor.span_events[-2])
         assert (
             processor.span_events[3][0].span_data.export().get("name")
@@ -138,7 +135,7 @@ async def test_tracing(client: Client):
             == "temporal:executeActivity"
         )
 
-        for span, start in processor.span_events[10:-7]:
+        for span, start in processor.span_events[10:-8]:
             span_data = span.span_data.export()
 
             # All spans should be closed
