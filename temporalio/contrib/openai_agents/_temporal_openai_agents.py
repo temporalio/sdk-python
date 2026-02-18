@@ -298,8 +298,8 @@ class OpenAIAgentsPlugin(SimplePlugin):
     @contextmanager
     def tracing_context(self) -> Iterator[None]:
         """Context manager for setting up OpenAI Agents tracing instrumentation.
-        
-        This should be called if AgentsSDK traces and/or spans are started outside of the context of a worker. 
+
+        This should be called if AgentsSDK traces and/or spans are started outside of the context of a worker.
         For example:
 
         .. code-block:: python
