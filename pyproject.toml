@@ -1,6 +1,6 @@
 [project]
 name = "temporalio"
-version = "1.22.0"
+version = "1.23.0"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.10"
