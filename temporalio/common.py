@@ -378,19 +378,22 @@ class SearchAttributeKey(ABC, Generic[SearchAttributeValueType]):
 
     @staticmethod
     def _from_metadata_type(name: str, metadata_type: str) -> SearchAttributeKey | None:
-        if metadata_type == "Text":
+        # The type metadata is usually in PascalCase (e.g. "KeywordList")
+        # but in rare cases may be in SCREAMING_SNAKE_CASE (e.g.
+        # "INDEXED_VALUE_TYPE_KEYWORD_LIST").
+        if metadata_type in ("Text", "INDEXED_VALUE_TYPE_TEXT"):
             return SearchAttributeKey.for_text(name)
-        elif metadata_type == "Keyword":
+        elif metadata_type in ("Keyword", "INDEXED_VALUE_TYPE_KEYWORD"):
             return SearchAttributeKey.for_keyword(name)
-        elif metadata_type == "Int":
+        elif metadata_type in ("Int", "INDEXED_VALUE_TYPE_INT"):
             return SearchAttributeKey.for_int(name)
-        elif metadata_type == "Double":
+        elif metadata_type in ("Double", "INDEXED_VALUE_TYPE_DOUBLE"):
             return SearchAttributeKey.for_float(name)
-        elif metadata_type == "Bool":
+        elif metadata_type in ("Bool", "INDEXED_VALUE_TYPE_BOOL"):
             return SearchAttributeKey.for_bool(name)
-        elif metadata_type == "Datetime":
+        elif metadata_type in ("Datetime", "INDEXED_VALUE_TYPE_DATETIME"):
             return SearchAttributeKey.for_datetime(name)
-        elif metadata_type == "KeywordList":
+        elif metadata_type in ("KeywordList", "INDEXED_VALUE_TYPE_KEYWORD_LIST"):
             return SearchAttributeKey.for_keyword_list(name)
         return None
 
