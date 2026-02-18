@@ -551,6 +551,7 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     ON_CONFLICT_OPTIONS_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
     EAGER_WORKER_DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     workflow_id: builtins.str
     @property
@@ -578,7 +579,7 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     )
     """Defines whether to allow re-using the workflow id from a previously *closed* workflow.
     The default policy is WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE.
-
+    
     See `workflow_id_conflict_policy` for handling a workflow id duplication with a *running* workflow.
     """
     workflow_id_conflict_policy: (
@@ -586,7 +587,7 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     )
     """Defines how to resolve a workflow id conflict with a *running* workflow.
     The default policy is WORKFLOW_ID_CONFLICT_POLICY_FAIL.
-
+    
     See `workflow_id_reuse_policy` for handling a workflow id duplication with a *closed* workflow.
     """
     @property
@@ -672,6 +673,11 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Deployment Options of the worker who will process the eager task. Passed when `request_eager_execution=true`."""
+    @property
+    def time_skipping_config(
+        self,
+    ) -> temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig:
+        """Time skipping configuration. If set, enables time skipping for this workflow from the start."""
     def __init__(
         self,
         *,
@@ -713,6 +719,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
         eager_worker_deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
+        time_skipping_config: temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -739,6 +747,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"search_attributes",
             "task_queue",
             b"task_queue",
+            "time_skipping_config",
+            b"time_skipping_config",
             "user_metadata",
             b"user_metadata",
             "versioning_override",
@@ -794,6 +804,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"search_attributes",
             "task_queue",
             b"task_queue",
+            "time_skipping_config",
+            b"time_skipping_config",
             "user_metadata",
             b"user_metadata",
             "versioning_override",
@@ -1204,7 +1216,7 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
     backlog_count_hint: builtins.int
     """A hint that there are more tasks already present in this task queue
     partition. Can be used to prioritize draining a sticky queue.
-
+    
     Specifically, the returned number is the number of tasks remaining in
     the in-memory buffer for this partition, which is currently capped at
     1000. Because sticky queues only have one partition, this number is
@@ -1389,7 +1401,7 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
         """True if the SDK can handle speculative workflow task with command events. If true, the
         server may choose, at its discretion, to discard a speculative workflow task even if that
         speculative task included command events the SDK had not previously processed.
-
+        
         (-- api-linter: core::0140::prepositions=disabled
             aip.dev/not-precedent: "with" used to describe the workflow task. --)
         """
@@ -3009,6 +3021,7 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
     LINKS_FIELD_NUMBER: builtins.int
     VERSIONING_OVERRIDE_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     workflow_id: builtins.str
     @property
@@ -3037,7 +3050,7 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
     )
     """Defines whether to allow re-using the workflow id from a previously *closed* workflow.
     The default policy is WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE.
-
+    
     See `workflow_id_reuse_policy` for handling a workflow id duplication with a *running* workflow.
     """
     workflow_id_conflict_policy: (
@@ -3046,7 +3059,7 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
     """Defines how to resolve a workflow id conflict with a *running* workflow.
     The default policy is WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING.
     Note that WORKFLOW_ID_CONFLICT_POLICY_FAIL is an invalid option.
-
+    
     See `workflow_id_reuse_policy` for handling a workflow id duplication with a *closed* workflow.
     """
     signal_name: builtins.str
@@ -3100,6 +3113,11 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """Priority metadata"""
+    @property
+    def time_skipping_config(
+        self,
+    ) -> temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig:
+        """Time skipping configuration. If set, enables time skipping for this workflow from the start."""
     def __init__(
         self,
         *,
@@ -3132,6 +3150,8 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
         versioning_override: temporalio.api.workflow.v1.message_pb2.VersioningOverride
         | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        time_skipping_config: temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -3152,6 +3172,8 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"signal_input",
             "task_queue",
             b"task_queue",
+            "time_skipping_config",
+            b"time_skipping_config",
             "user_metadata",
             b"user_metadata",
             "versioning_override",
@@ -3201,6 +3223,8 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"signal_name",
             "task_queue",
             b"task_queue",
+            "time_skipping_config",
+            b"time_skipping_config",
             "user_metadata",
             b"user_metadata",
             "versioning_override",
@@ -4349,6 +4373,8 @@ class DescribeWorkflowExecutionResponse(google.protobuf.message.Message):
     CALLBACKS_FIELD_NUMBER: builtins.int
     PENDING_NEXUS_OPERATIONS_FIELD_NUMBER: builtins.int
     WORKFLOW_EXTENDED_INFO_FIELD_NUMBER: builtins.int
+    UPCOMING_TIME_POINTS_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_INFO_FIELD_NUMBER: builtins.int
     @property
     def execution_config(
         self,
@@ -4389,6 +4415,18 @@ class DescribeWorkflowExecutionResponse(google.protobuf.message.Message):
     def workflow_extended_info(
         self,
     ) -> temporalio.api.workflow.v1.message_pb2.WorkflowExecutionExtendedInfo: ...
+    @property
+    def upcoming_time_points(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.workflow.v1.message_pb2.UpcomingTimePointInfo
+    ]:
+        """Upcoming time points for this workflow execution."""
+    @property
+    def time_skipping_info(
+        self,
+    ) -> temporalio.api.workflow.v1.message_pb2.TimeSkippingInfo:
+        """Time skipping information. Present when time skipping is enabled for this workflow."""
     def __init__(
         self,
         *,
@@ -4416,6 +4454,12 @@ class DescribeWorkflowExecutionResponse(google.protobuf.message.Message):
         | None = ...,
         workflow_extended_info: temporalio.api.workflow.v1.message_pb2.WorkflowExecutionExtendedInfo
         | None = ...,
+        upcoming_time_points: collections.abc.Iterable[
+            temporalio.api.workflow.v1.message_pb2.UpcomingTimePointInfo
+        ]
+        | None = ...,
+        time_skipping_info: temporalio.api.workflow.v1.message_pb2.TimeSkippingInfo
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -4424,6 +4468,8 @@ class DescribeWorkflowExecutionResponse(google.protobuf.message.Message):
             b"execution_config",
             "pending_workflow_task",
             b"pending_workflow_task",
+            "time_skipping_info",
+            b"time_skipping_info",
             "workflow_execution_info",
             b"workflow_execution_info",
             "workflow_extended_info",
@@ -4445,6 +4491,10 @@ class DescribeWorkflowExecutionResponse(google.protobuf.message.Message):
             b"pending_nexus_operations",
             "pending_workflow_task",
             b"pending_workflow_task",
+            "time_skipping_info",
+            b"time_skipping_info",
+            "upcoming_time_points",
+            b"upcoming_time_points",
             "workflow_execution_info",
             b"workflow_execution_info",
             "workflow_extended_info",
@@ -4926,7 +4976,7 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
         internal_error_differentiation: builtins.bool
         """True if internal errors are differentiated from other types of errors for purposes of
         retrying non-internal errors.
-
+        
         When unset/false, clients retry all failures. When true, clients should only retry
         non-internal errors.
         """
@@ -5701,7 +5751,7 @@ class UpdateWorkerBuildIdCompatibilityRequest(google.protobuf.message.Message):
     """A new build id. This operation will create a new set which will be the new overall
     default version for the queue, with this id as its only member. This new set is
     incompatible with all previous sets/versions.
-
+    
     (-- api-linter: core::0140::prepositions=disabled
         aip.dev/not-precedent: In makes perfect sense here. --)
     """
@@ -5713,13 +5763,13 @@ class UpdateWorkerBuildIdCompatibilityRequest(google.protobuf.message.Message):
     promote_set_by_build_id: builtins.str
     """Promote an existing set to be the current default (if it isn't already) by targeting
     an existing build id within it. This field's value is the extant build id.
-
+    
     (-- api-linter: core::0140::prepositions=disabled
         aip.dev/not-precedent: Names are hard. --)
     """
     promote_build_id_within_set: builtins.str
     """Promote an existing build id within some set to be the current default for that set.
-
+    
     (-- api-linter: core::0140::prepositions=disabled
         aip.dev/not-precedent: Within makes perfect sense here. --)
     """
@@ -10345,6 +10395,160 @@ class UnpauseWorkflowExecutionResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___UnpauseWorkflowExecutionResponse = UnpauseWorkflowExecutionResponse
+
+class AdvanceWorkflowExecutionTimePointRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    UP_TO_TIME_FIELD_NUMBER: builtins.int
+    UP_TO_DURATION_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    @property
+    def workflow_execution(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
+    @property
+    def time_skipping_config(
+        self,
+    ) -> temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig:
+        """Optionally enable or update time skipping configuration in the same call.
+        If time skipping is not already enabled, this must be provided with enabled=true.
+        """
+    identity: builtins.str
+    """The identity of the client who initiated this request."""
+    request_id: builtins.str
+    """A unique identifier for this request, used for idempotency."""
+    @property
+    def up_to_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Absolute virtual timestamp to advance up to."""
+    @property
+    def up_to_duration(self) -> google.protobuf.duration_pb2.Duration:
+        """Duration from the workflow's current virtual time to advance up to."""
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        workflow_execution: temporalio.api.common.v1.message_pb2.WorkflowExecution
+        | None = ...,
+        time_skipping_config: temporalio.api.workflow.v1.message_pb2.TimeSkippingConfig
+        | None = ...,
+        identity: builtins.str = ...,
+        request_id: builtins.str = ...,
+        up_to_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        up_to_duration: google.protobuf.duration_pb2.Duration | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "time_skipping_config",
+            b"time_skipping_config",
+            "up_to",
+            b"up_to",
+            "up_to_duration",
+            b"up_to_duration",
+            "up_to_time",
+            b"up_to_time",
+            "workflow_execution",
+            b"workflow_execution",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "identity",
+            b"identity",
+            "namespace",
+            b"namespace",
+            "request_id",
+            b"request_id",
+            "time_skipping_config",
+            b"time_skipping_config",
+            "up_to",
+            b"up_to",
+            "up_to_duration",
+            b"up_to_duration",
+            "up_to_time",
+            b"up_to_time",
+            "workflow_execution",
+            b"workflow_execution",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["up_to", b"up_to"]
+    ) -> typing_extensions.Literal["up_to_time", "up_to_duration"] | None: ...
+
+global___AdvanceWorkflowExecutionTimePointRequest = (
+    AdvanceWorkflowExecutionTimePointRequest
+)
+
+class AdvanceWorkflowExecutionTimePointResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TIME_SKIPPING_INFO_FIELD_NUMBER: builtins.int
+    ADVANCED_TIME_POINTS_FIELD_NUMBER: builtins.int
+    UPCOMING_TIME_POINTS_FIELD_NUMBER: builtins.int
+    @property
+    def time_skipping_info(
+        self,
+    ) -> temporalio.api.workflow.v1.message_pb2.TimeSkippingInfo:
+        """Time skipping state after the advance (config, virtual time offset, auto-skip info)."""
+    @property
+    def advanced_time_points(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.workflow.v1.message_pb2.UpcomingTimePointInfo
+    ]:
+        """The time points that were fired at the advanced-to time.
+        Empty when there was no upcoming time point to advance to.
+        Currently all entries will share the same fire_time, since each advance
+        moves to a single point in time and fires everything scheduled there.
+        """
+    @property
+    def upcoming_time_points(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.workflow.v1.message_pb2.UpcomingTimePointInfo
+    ]:
+        """Remaining upcoming time points after the advance."""
+    def __init__(
+        self,
+        *,
+        time_skipping_info: temporalio.api.workflow.v1.message_pb2.TimeSkippingInfo
+        | None = ...,
+        advanced_time_points: collections.abc.Iterable[
+            temporalio.api.workflow.v1.message_pb2.UpcomingTimePointInfo
+        ]
+        | None = ...,
+        upcoming_time_points: collections.abc.Iterable[
+            temporalio.api.workflow.v1.message_pb2.UpcomingTimePointInfo
+        ]
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "time_skipping_info", b"time_skipping_info"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "advanced_time_points",
+            b"advanced_time_points",
+            "time_skipping_info",
+            b"time_skipping_info",
+            "upcoming_time_points",
+            b"upcoming_time_points",
+        ],
+    ) -> None: ...
+
+global___AdvanceWorkflowExecutionTimePointResponse = (
+    AdvanceWorkflowExecutionTimePointResponse
+)
 
 class StartActivityExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

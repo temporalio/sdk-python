@@ -20,6 +20,14 @@ impl ClientRef {
         let mut retry_client = self.retry_client.clone();
         self.runtime.future_into_py(py, async move {
             let bytes = match call.rpc.as_str() {
+                "advance_workflow_execution_time_point" => {
+                    rpc_call!(
+                        retry_client,
+                        call,
+                        WorkflowService,
+                        advance_workflow_execution_time_point
+                    )
+                }
                 "count_activity_executions" => {
                     rpc_call!(
                         retry_client,

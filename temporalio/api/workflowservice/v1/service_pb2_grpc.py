@@ -508,6 +508,11 @@ class WorkflowServiceStub(object):
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseWorkflowExecutionRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseWorkflowExecutionResponse.FromString,
         )
+        self.AdvanceWorkflowExecutionTimePoint = channel.unary_unary(
+            "/temporal.api.workflowservice.v1.WorkflowService/AdvanceWorkflowExecutionTimePoint",
+            request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.AdvanceWorkflowExecutionTimePointRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.AdvanceWorkflowExecutionTimePointResponse.FromString,
+        )
         self.StartActivityExecution = channel.unary_unary(
             "/temporal.api.workflowservice.v1.WorkflowService/StartActivityExecution",
             request_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.StartActivityExecutionRequest.SerializeToString,
@@ -1575,6 +1580,15 @@ class WorkflowServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def AdvanceWorkflowExecutionTimePoint(self, request, context):
+        """AdvanceWorkflowExecutionTimePoint advances a workflow's virtual time to the
+        next upcoming time point (the nearest pending timer fire or timeout expiration),
+        causing it to trigger.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def StartActivityExecution(self, request, context):
         """StartActivityExecution starts a new activity execution.
 
@@ -2133,6 +2147,11 @@ def add_WorkflowServiceServicer_to_server(servicer, server):
             servicer.UnpauseWorkflowExecution,
             request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseWorkflowExecutionRequest.FromString,
             response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseWorkflowExecutionResponse.SerializeToString,
+        ),
+        "AdvanceWorkflowExecutionTimePoint": grpc.unary_unary_rpc_method_handler(
+            servicer.AdvanceWorkflowExecutionTimePoint,
+            request_deserializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.AdvanceWorkflowExecutionTimePointRequest.FromString,
+            response_serializer=temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.AdvanceWorkflowExecutionTimePointResponse.SerializeToString,
         ),
         "StartActivityExecution": grpc.unary_unary_rpc_method_handler(
             servicer.StartActivityExecution,
@@ -4970,6 +4989,35 @@ class WorkflowService(object):
             "/temporal.api.workflowservice.v1.WorkflowService/UnpauseWorkflowExecution",
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseWorkflowExecutionRequest.SerializeToString,
             temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.UnpauseWorkflowExecutionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def AdvanceWorkflowExecutionTimePoint(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.workflowservice.v1.WorkflowService/AdvanceWorkflowExecutionTimePoint",
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.AdvanceWorkflowExecutionTimePointRequest.SerializeToString,
+            temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2.AdvanceWorkflowExecutionTimePointResponse.FromString,
             options,
             channel_credentials,
             insecure,

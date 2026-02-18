@@ -12,7 +12,7 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import SharedStateManager
 from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
 
-from . import DEV_SERVER_DOWNLOAD_VERSION
+# from . import DEV_SERVER_DOWNLOAD_VERSION
 
 # If there is an integration test environment variable set, we must remove the
 # first path from the sys.path so we can import the wheel instead
@@ -100,6 +100,9 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
     if env_type == "local":
         http_port = 7243
         env = await WorkflowEnvironment.start_local(
+            dev_server_existing_path=os.path.join(
+                os.path.dirname(__file__), "..", "..", "cli", "temporal.exe"
+            ),
             dev_server_extra_args=[
                 "--dynamic-config-value",
                 "system.forceSearchAttributesCacheRefreshOnRead=true",
@@ -125,10 +128,11 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
                 "history.enableChasm=true",
                 "--dynamic-config-value",
                 "history.enableTransitionHistory=true",
+                "--dynamic-config-value",
+                "frontend.TimeSkippingEnabled=true",
                 "--http-port",
                 str(http_port),
             ],
-            dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         )
         # TODO(nexus-preview): expose this in a more principled way
         env._http_port = http_port  # type: ignore

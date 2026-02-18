@@ -214,6 +214,10 @@ class _EventTypeEnumTypeWrapper(
     """An event that indicates that the workflow execution has been paused."""
     EVENT_TYPE_WORKFLOW_EXECUTION_UNPAUSED: _EventType.ValueType  # 59
     """An event that indicates that the previously paused workflow execution has been unpaused."""
+    EVENT_TYPE_WORKFLOW_EXECUTION_TIME_POINT_ADVANCED: _EventType.ValueType  # 60
+    """A time point was advanced for this workflow execution via AdvanceWorkflowExecutionTimePoint
+    or auto-skip.
+    """
 
 class EventType(_EventType, metaclass=_EventTypeEnumTypeWrapper):
     """Whenever this list of events is changed do change the function shouldBufferEvent in mutableStateBuilder.go to make sure to do the correct event ordering"""
@@ -404,4 +408,8 @@ EVENT_TYPE_WORKFLOW_EXECUTION_PAUSED: EventType.ValueType  # 58
 """An event that indicates that the workflow execution has been paused."""
 EVENT_TYPE_WORKFLOW_EXECUTION_UNPAUSED: EventType.ValueType  # 59
 """An event that indicates that the previously paused workflow execution has been unpaused."""
+EVENT_TYPE_WORKFLOW_EXECUTION_TIME_POINT_ADVANCED: EventType.ValueType  # 60
+"""A time point was advanced for this workflow execution via AdvanceWorkflowExecutionTimePoint
+or auto-skip.
+"""
 global___EventType = EventType

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import contextvars
 import copy
 import dataclasses
 import functools
@@ -5039,17 +5040,20 @@ class WorkflowExecutionDescription(WorkflowExecution):
         )
         self._metadata_decoded = True
 
-    @staticmethod
+    @classmethod
     async def _from_raw_description(
+        cls,
         description: temporalio.api.workflowservice.v1.DescribeWorkflowExecutionResponse,
         namespace: str,
         converter: temporalio.converter.DataConverter,
-    ) -> WorkflowExecutionDescription:
-        return WorkflowExecutionDescription._from_raw_info(
+        **additional_fields: Any,
+    ) -> Self:
+        return cls._from_raw_info(
             description.workflow_execution_info,
             namespace=namespace,
             converter=converter,
             raw_description=description,
+            **additional_fields,
         )
 
 
@@ -7966,6 +7970,14 @@ class OutboundInterceptor:
         return await self.next.get_worker_task_reachability(input)
 
 
+# Contextvar used by WorkflowTimeSkipper to inject TimeSkippingConfig into
+# start workflow requests. Set by the time-skipping interceptor, read by the
+# request builder. See temporalio.testing.WorkflowTimeSkipper.
+_start_workflow_time_skipping_config: contextvars.ContextVar[
+    temporalio.api.workflow.v1.TimeSkippingConfig | None
+] = contextvars.ContextVar("_start_workflow_time_skipping_config", default=None)
+
+
 class _ClientImpl(OutboundInterceptor):
     def __init__(self, client: Client) -> None:  # type: ignore
         # We are intentionally not calling the base class's __init__ here
@@ -8154,6 +8166,9 @@ class _ClientImpl(OutboundInterceptor):
             req.priority.CopyFrom(input.priority._to_proto())
         if input.versioning_override is not None:
             req.versioning_override.CopyFrom(input.versioning_override._to_proto())
+        ts_config = _start_workflow_time_skipping_config.get(None)
+        if ts_config is not None:
+            req.time_skipping_config.CopyFrom(ts_config)
 
     async def cancel_workflow(self, input: CancelWorkflowInput) -> None:
         await self._client.workflow_service.request_cancel_workflow_execution(

@@ -1,4 +1,6 @@
 from .request_response_pb2 import (
+    AdvanceWorkflowExecutionTimePointRequest,
+    AdvanceWorkflowExecutionTimePointResponse,
     CountActivityExecutionsRequest,
     CountActivityExecutionsResponse,
     CountWorkflowExecutionsRequest,
@@ -210,6 +212,8 @@ from .request_response_pb2 import (
 )
 
 __all__ = [
+    "AdvanceWorkflowExecutionTimePointRequest",
+    "AdvanceWorkflowExecutionTimePointResponse",
     "CountActivityExecutionsRequest",
     "CountActivityExecutionsResponse",
     "CountWorkflowExecutionsRequest",

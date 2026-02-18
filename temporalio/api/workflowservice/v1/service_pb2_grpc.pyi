@@ -29,7 +29,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.RegisterNamespaceResponse,
     ]
     """RegisterNamespace creates a new namespace which can be used as a container for all resources.
-
+    
     A Namespace is a top level entity within Temporal, and is used as a container for resources
     like workflow executions, task queues, etc. A Namespace acts as a sandbox and provides
     isolation for all resources within the namespace. All resources belongs to exactly one
@@ -57,11 +57,11 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.DeprecateNamespaceResponse,
     ]
     """DeprecateNamespace is used to update the state of a registered namespace to DEPRECATED.
-
+    
     Once the namespace is deprecated it cannot be used to start new workflow executions. Existing
     workflow executions will continue to run on deprecated namespaces.
     Deprecated.
-
+    
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: Deprecated --)
     """
@@ -70,7 +70,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.StartWorkflowExecutionResponse,
     ]
     """StartWorkflowExecution starts a new workflow execution.
-
+    
     It will create the execution with a `WORKFLOW_EXECUTION_STARTED` event in its history and
     also schedule the first workflow task. Returns `WorkflowExecutionAlreadyStarted`, if an
     instance already exists with same workflow id.
@@ -80,13 +80,13 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.ExecuteMultiOperationResponse,
     ]
     """ExecuteMultiOperation executes multiple operations within a single workflow.
-
+    
     Operations are started atomically, meaning if *any* operation fails to be started, none are,
     and the request fails. Upon start, the API returns only when *all* operations have a response.
-
+    
     Upon failure, it returns `MultiOperationExecutionFailure` where the status code
     equals the status code of the *first* operation that failed to be started.
-
+    
     NOTE: Experimental API.
     """
     GetWorkflowExecutionHistory: grpc.UnaryUnaryMultiCallable[
@@ -109,12 +109,12 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowTaskQueueResponse,
     ]
     """PollWorkflowTaskQueue is called by workers to make progress on workflows.
-
+    
     A WorkflowTask is dispatched to callers for active workflow executions with pending workflow
     tasks. The worker is expected to call `RespondWorkflowTaskCompleted` when it is done
     processing the task. The service will create a `WorkflowTaskStarted` event in the history for
     this task before handing it to the worker.
-
+    
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
@@ -124,11 +124,11 @@ class WorkflowServiceStub:
     ]
     """RespondWorkflowTaskCompleted is called by workers to successfully complete workflow tasks
     they received from `PollWorkflowTaskQueue`.
-
+    
     Completing a WorkflowTask will write a `WORKFLOW_TASK_COMPLETED` event to the workflow's
     history, along with events corresponding to whatever commands the SDK generated while
     executing the task (ex timer started, activity task scheduled, etc).
-
+    
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
@@ -138,14 +138,14 @@ class WorkflowServiceStub:
     ]
     """RespondWorkflowTaskFailed is called by workers to indicate the processing of a workflow task
     failed.
-
+    
     This results in a `WORKFLOW_TASK_FAILED` event written to the history, and a new workflow
     task will be scheduled. This API can be used to report unhandled failures resulting from
     applying the workflow task.
-
+    
     Temporal will only append first WorkflowTaskFailed event to the history of workflow execution
     for consecutive failures.
-
+    
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
@@ -155,17 +155,17 @@ class WorkflowServiceStub:
     ]
     """PollActivityTaskQueue is called by workers to process activity tasks from a specific task
     queue.
-
+    
     The worker is expected to call one of the `RespondActivityTaskXXX` methods when it is done
     processing the task.
-
+    
     An activity task is dispatched whenever a `SCHEDULE_ACTIVITY_TASK` command is produced during
     workflow execution. An in memory `ACTIVITY_TASK_STARTED` event is written to mutable state
     before the task is dispatched to the worker. The started event, and the final event
     (`ACTIVITY_TASK_COMPLETED` / `ACTIVITY_TASK_FAILED` / `ACTIVITY_TASK_TIMED_OUT`) will both be
     written permanently to Workflow execution history when Activity is finished. This is done to
     avoid writing many events in the case of a failure/retry loop.
-
+    
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
@@ -174,15 +174,15 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.RecordActivityTaskHeartbeatResponse,
     ]
     """RecordActivityTaskHeartbeat is optionally called by workers while they execute activities.
-
+    
     If a worker fails to heartbeat within the `heartbeat_timeout` interval for the activity task,
     then the current attempt times out. Depending on RetryPolicy, this may trigger a retry or
     time out the activity.
-
+    
     For workflow activities, an `ACTIVITY_TASK_TIMED_OUT` event will be written to the workflow
     history. Calling `RecordActivityTaskHeartbeat` will fail with `NotFound` in such situations,
     in that event, the SDK should request cancellation of the activity.
-
+    
     The request may contain response `details` which will be persisted by the server and may be
     used by the activity to checkpoint progress. The `cancel_requested` field in the response
     indicates whether cancellation has been requested for the activity.
@@ -193,7 +193,7 @@ class WorkflowServiceStub:
     ]
     """See `RecordActivityTaskHeartbeat`. This version allows clients to record heartbeats by
     namespace/workflow id/activity id instead of task token.
-
+    
     (-- api-linter: core::0136::prepositions=disabled
         aip.dev/not-precedent: "By" is used to indicate request type. --)
     """
@@ -203,7 +203,7 @@ class WorkflowServiceStub:
     ]
     """RespondActivityTaskCompleted is called by workers when they successfully complete an activity
     task.
-
+    
     For workflow activities, this results in a new `ACTIVITY_TASK_COMPLETED` event being written to the workflow history
     and a new workflow task created for the workflow. Fails with `NotFound` if the task token is
     no longer valid due to activity timeout, already being completed, or never having existed.
@@ -214,7 +214,7 @@ class WorkflowServiceStub:
     ]
     """See `RespondActivityTaskCompleted`. This version allows clients to record completions by
     namespace/workflow id/activity id instead of task token.
-
+    
     (-- api-linter: core::0136::prepositions=disabled
         aip.dev/not-precedent: "By" is used to indicate request type. --)
     """
@@ -223,7 +223,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskFailedResponse,
     ]
     """RespondActivityTaskFailed is called by workers when processing an activity task fails.
-
+    
     This results in a new `ACTIVITY_TASK_FAILED` event being written to the workflow history and
     a new workflow task created for the workflow. Fails with `NotFound` if the task token is no
     longer valid due to activity timeout, already being completed, or never having existed.
@@ -234,7 +234,7 @@ class WorkflowServiceStub:
     ]
     """See `RecordActivityTaskFailed`. This version allows clients to record failures by
     namespace/workflow id/activity id instead of task token.
-
+    
     (-- api-linter: core::0136::prepositions=disabled
         aip.dev/not-precedent: "By" is used to indicate request type. --)
     """
@@ -243,7 +243,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.RespondActivityTaskCanceledResponse,
     ]
     """RespondActivityTaskFailed is called by workers when processing an activity task fails.
-
+    
     For workflow activities, this results in a new `ACTIVITY_TASK_CANCELED` event being written to the workflow history
     and a new workflow task created for the workflow. Fails with `NotFound` if the task token is
     no longer valid due to activity timeout, already being completed, or never having existed.
@@ -254,7 +254,7 @@ class WorkflowServiceStub:
     ]
     """See `RespondActivityTaskCanceled`. This version allows clients to record failures by
     namespace/workflow id/activity id instead of task token.
-
+    
     (-- api-linter: core::0136::prepositions=disabled
         aip.dev/not-precedent: "By" is used to indicate request type. --)
     """
@@ -264,7 +264,7 @@ class WorkflowServiceStub:
     ]
     """RequestCancelWorkflowExecution is called by workers when they want to request cancellation of
     a workflow execution.
-
+    
     This results in a new `WORKFLOW_EXECUTION_CANCEL_REQUESTED` event being written to the
     workflow history and a new workflow task created for the workflow. It returns success if the requested
     workflow is already closed. It fails with 'NotFound' if the requested workflow doesn't exist.
@@ -274,7 +274,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.SignalWorkflowExecutionResponse,
     ]
     """SignalWorkflowExecution is used to send a signal to a running workflow execution.
-
+    
     This results in a `WORKFLOW_EXECUTION_SIGNALED` event recorded in the history and a workflow
     task being created for the execution.
     """
@@ -284,14 +284,14 @@ class WorkflowServiceStub:
     ]
     """SignalWithStartWorkflowExecution is used to ensure a signal is sent to a workflow, even if
     it isn't yet started.
-
+    
     If the workflow is running, a `WORKFLOW_EXECUTION_SIGNALED` event is recorded in the history
     and a workflow task is generated.
-
+    
     If the workflow is not running or not found, then the workflow is created with
     `WORKFLOW_EXECUTION_STARTED` and `WORKFLOW_EXECUTION_SIGNALED` events in its history, and a
     workflow task is generated.
-
+    
     (-- api-linter: core::0136::prepositions=disabled
         aip.dev/not-precedent: "With" is used to indicate combined operation. --)
     """
@@ -321,7 +321,7 @@ class WorkflowServiceStub:
     WorkflowExecution.run_id is provided) or the latest Workflow Execution (when
     WorkflowExecution.run_id is not provided). If the Workflow Execution is Running, it will be
     terminated before deletion.
-
+    
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: Workflow deletion not exposed to HTTP, users should use cancel or terminate. --)
     """
@@ -330,7 +330,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.ListOpenWorkflowExecutionsResponse,
     ]
     """ListOpenWorkflowExecutions is a visibility API to list the open executions in a specific namespace.
-
+    
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
     """
@@ -339,7 +339,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.ListClosedWorkflowExecutionsResponse,
     ]
     """ListClosedWorkflowExecutions is a visibility API to list the closed executions in a specific namespace.
-
+    
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
     """
@@ -359,7 +359,7 @@ class WorkflowServiceStub:
     ]
     """ScanWorkflowExecutions _was_ a visibility API to list large amount of workflow executions in a specific namespace without order.
     It has since been deprecated in favor of `ListWorkflowExecutions` and rewritten to use `ListWorkflowExecutions` internally.
-
+    
     Deprecated: Replaced with `ListWorkflowExecutions`.
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: HTTP users should use ListWorkflowExecutions instead. --)
@@ -374,7 +374,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.GetSearchAttributesResponse,
     ]
     """GetSearchAttributes is a visibility API to get all legal keys that could be used in list APIs
-
+    
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose this search attribute API to HTTP (but may expose on OperatorService). --)
     """
@@ -384,10 +384,10 @@ class WorkflowServiceStub:
     ]
     """RespondQueryTaskCompleted is called by workers to complete queries which were delivered on
     the `query` (not `queries`) field of a `PollWorkflowTaskQueueResponse`.
-
+    
     Completing the query will unblock the corresponding client call to `QueryWorkflow` and return
     the query result a response.
-
+    
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
@@ -398,15 +398,15 @@ class WorkflowServiceStub:
     """ResetStickyTaskQueue resets the sticky task queue related information in the mutable state of
     a given workflow. This is prudent for workers to perform if a workflow has been paged out of
     their cache.
-
+    
     Things cleared are:
     1. StickyTaskQueue
     2. StickyScheduleToStartTimeout
-
+    
     When possible, ShutdownWorker should be preferred over
     ResetStickyTaskQueue (particularly when a worker is shutting down or
     cycling).
-
+    
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
@@ -418,13 +418,13 @@ class WorkflowServiceStub:
     queue is no longer being polled by its worker. Following the completion of
     ShutdownWorker, newly-added workflow tasks will instead be placed
     in the normal task queue, eligible for any worker to pick up.
-
+    
     ShutdownWorker should be called by workers while shutting down,
     after they've shut down their pollers. If another sticky poll
     request is issued, the sticky task queue will be revived.
-
+    
     As of Temporal Server v1.25.0, ShutdownWorker hasn't yet been implemented.
-
+    
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do not expose worker API to HTTP. --)
     """
@@ -504,20 +504,20 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse,
     ]
     """Deprecated. Use `UpdateWorkerVersioningRules`.
-
+    
     Allows users to specify sets of worker build id versions on a per task queue basis. Versions
     are ordered, and may be either compatible with some extant version, or a new incompatible
     version, forming sets of ids which are incompatible with each other, but whose contained
     members are compatible with one another.
-
+    
     A single build id may be mapped to multiple task queues using this API for cases where a single process hosts
     multiple workers.
-
+    
     To query which workers can be retired, use the `GetWorkerTaskReachability` API.
-
+    
     NOTE: The number of task queues mapped to a single build id is limited by the `limit.taskQueuesPerBuildId`
     (default is 20), if this limit is exceeded this API will error with a FailedPrecondition.
-
+    
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
     """
@@ -534,25 +534,25 @@ class WorkflowServiceStub:
     ]
     """Use this API to manage Worker Versioning Rules for a given Task Queue. There are two types of
     rules: Build ID Assignment rules and Compatible Build ID Redirect rules.
-
+    
     Assignment rules determine how to assign new executions to a Build IDs. Their primary
     use case is to specify the latest Build ID but they have powerful features for gradual rollout
     of a new Build ID.
-
+    
     Once a workflow execution is assigned to a Build ID and it completes its first Workflow Task,
     the workflow stays on the assigned Build ID regardless of changes in assignment rules. This
     eliminates the need for compatibility between versions when you only care about using the new
     version for new workflows and let existing workflows finish in their own version.
-
+    
     Activities, Child Workflows and Continue-as-New executions have the option to inherit the
     Build ID of their parent/previous workflow or use the latest assignment rules to independently
     select a Build ID.
-
+    
     Redirect rules should only be used when you want to move workflows and activities assigned to
     one Build ID (source) to another compatible Build ID (target). You are responsible to make sure
     the target Build ID of a redirect rule is able to process event histories made by the source
     Build ID by using [Patching](https://docs.temporal.io/workflows#patching) or other means.
-
+    
     WARNING: Worker Versioning is not yet stable and the API and behavior may change incompatibly.
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We do yet expose versioning API to HTTP. --)
@@ -569,17 +569,17 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.GetWorkerTaskReachabilityResponse,
     ]
     """Deprecated. Use `DescribeTaskQueue`.
-
+    
     Fetches task reachability to determine whether a worker may be retired.
     The request may specify task queues to query for or let the server fetch all task queues mapped to the given
     build IDs.
-
+    
     When requesting a large number of task queues or all task queues associated with the given build ids in a
     namespace, all task queues will be listed in the response but some of them may not contain reachability
     information due to a server enforced limit. When reaching the limit, task queues that reachability information
     could not be retrieved for will be marked with a single TASK_REACHABILITY_UNSPECIFIED entry. The caller may issue
     another call to get the reachability for those task queues.
-
+    
     Open source users can adjust this limit by setting the server's dynamic config value for
     `limit.reachabilityTaskQueueScan` with the caveat that this call can strain the visibility store.
     """
@@ -714,7 +714,7 @@ class WorkflowServiceStub:
     previously issued through the UpdateWorkflowExecution RPC. The effective
     timeout on this call will be shorter of the the caller-supplied gRPC
     timeout and the server's configured long-poll timeout.
-
+    
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: We don't expose update polling API to HTTP in favor of a potential future non-blocking form. --)
     """
@@ -782,7 +782,7 @@ class WorkflowServiceStub:
     ]
     """PauseActivity pauses the execution of an activity specified by its ID or type.
     If there are multiple pending activities of the provided type - all of them will be paused
-
+    
     Pausing an activity means:
     - If the activity is currently waiting for a retry or is running and subsequently fails,
       it will not be rescheduled until it is unpaused.
@@ -794,7 +794,7 @@ class WorkflowServiceStub:
     For long-running activities:
     - activities in paused state will send a cancellation with "activity_paused" set to 'true' in response to 'RecordActivityTaskHeartbeat'.
     - The activity should respond to the cancellation accordingly.
-
+    
     Returns a `NotFound` error if there is no pending activity with the provided ID or type
     This API will be deprecated soon and replaced with a newer PauseActivityExecution that is better named and
     structured to work well for standalone activities.
@@ -805,16 +805,16 @@ class WorkflowServiceStub:
     ]
     """UnpauseActivity unpauses the execution of an activity specified by its ID or type.
     If there are multiple pending activities of the provided type - all of them will be unpaused.
-
+    
     If activity is not paused, this call will have no effect.
     If the activity was paused while waiting for retry, it will be scheduled immediately (* see 'jitter' flag).
     Once the activity is unpaused, all timeout timers will be regenerated.
-
+    
     Flags:
     'jitter': the activity will be scheduled at a random time within the jitter duration.
     'reset_attempts': the number of attempts will be reset.
     'reset_heartbeat': the activity heartbeat timer and heartbeats will be reset.
-
+    
     Returns a `NotFound` error if there is no pending activity with the provided ID or type
     This API will be deprecated soon and replaced with a newer UnpauseActivityExecution that is better named and
     structured to work well for standalone activities.
@@ -825,20 +825,20 @@ class WorkflowServiceStub:
     ]
     """ResetActivity resets the execution of an activity specified by its ID or type.
     If there are multiple pending activities of the provided type - all of them will be reset.
-
+    
     Resetting an activity means:
     * number of attempts will be reset to 0.
     * activity timeouts will be reset.
     * if the activity is waiting for retry, and it is not paused or 'keep_paused' is not provided:
        it will be scheduled immediately (* see 'jitter' flag),
-
+    
     Flags:
-
+    
     'jitter': the activity will be scheduled at a random time within the jitter duration.
     If the activity currently paused it will be unpaused, unless 'keep_paused' flag is provided.
     'reset_heartbeats': the activity heartbeat timer and heartbeats will be reset.
     'keep_paused': if the activity is paused, it will remain paused.
-
+    
     Returns a `NotFound` error if there is no pending activity with the provided ID or type.
     This API will be deprecated soon and replaced with a newer ResetActivityExecution that is better named and
     structured to work well for standalone activities.
@@ -939,12 +939,20 @@ class WorkflowServiceStub:
     - The workflow execution status changes to `RUNNING` and a new WORKFLOW_EXECUTION_UNPAUSED event is added to the history
     - Workflow tasks and activity tasks are resumed.
     """
+    AdvanceWorkflowExecutionTimePoint: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.AdvanceWorkflowExecutionTimePointRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.AdvanceWorkflowExecutionTimePointResponse,
+    ]
+    """AdvanceWorkflowExecutionTimePoint advances a workflow's virtual time to the
+    next upcoming time point (the nearest pending timer fire or timeout expiration),
+    causing it to trigger.
+    """
     StartActivityExecution: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.StartActivityExecutionResponse,
     ]
     """StartActivityExecution starts a new activity execution.
-
+    
     Returns an `ActivityExecutionAlreadyStarted` error if an instance already exists with same activity ID in this namespace
     unless permitted by the specified ID conflict policy.
     """
@@ -980,7 +988,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.RequestCancelActivityExecutionResponse,
     ]
     """RequestCancelActivityExecution requests cancellation of an activity execution.
-
+    
     Cancellation is cooperative: this call records the request, but the activity must detect and
     acknowledge it for the activity to reach CANCELED status. The cancellation signal is
     delivered via `cancel_requested` in the heartbeat response; SDKs surface this via
@@ -991,7 +999,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.TerminateActivityExecutionResponse,
     ]
     """TerminateActivityExecution terminates an existing activity execution immediately.
-
+    
     Termination does not reach the worker and the activity code cannot react to it. A terminated activity may have a
     running attempt.
     """
@@ -1003,7 +1011,7 @@ class WorkflowServiceStub:
     ActivityExecution.run_id is provided) or the latest activity execution (when
     ActivityExecution.run_id is not provided). If the activity Execution is running, it will be
     terminated before deletion.
-
+    
     (-- api-linter: core::0127::http-annotation=disabled
         aip.dev/not-precedent: Activity deletion not exposed to HTTP, users should use cancel or terminate. --)
     """
@@ -2140,6 +2148,16 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         Unpausing a workflow execution results in
         - The workflow execution status changes to `RUNNING` and a new WORKFLOW_EXECUTION_UNPAUSED event is added to the history
         - Workflow tasks and activity tasks are resumed.
+        """
+    @abc.abstractmethod
+    def AdvanceWorkflowExecutionTimePoint(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.AdvanceWorkflowExecutionTimePointRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.AdvanceWorkflowExecutionTimePointResponse:
+        """AdvanceWorkflowExecutionTimePoint advances a workflow's virtual time to the
+        next upcoming time point (the nearest pending timer fire or timeout expiration),
+        causing it to trigger.
         """
     @abc.abstractmethod
     def StartActivityExecution(

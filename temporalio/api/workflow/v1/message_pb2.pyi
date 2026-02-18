@@ -432,14 +432,14 @@ class WorkflowExecutionVersioningInfo(google.protobuf.message.Message):
     upgraded. When present it means this workflow execution is versioned; UNSPECIFIED means
     unversioned. See the comments in `VersioningBehavior` enum for more info about different
     behaviors.
-
+    
     Child workflows or CaN executions **inherit** their parent/previous run's effective Versioning 
     Behavior and Version (except when the new execution runs on a task queue not belonging to the 
     same deployment version as the parent/previous run's task queue). The first workflow task will
     be dispatched according to the inherited behavior (or to the current version of the task-queue's 
     deployment in the case of AutoUpgrade.) After completion of their first workflow task the 
     Deployment Version and Behavior of the execution will update according to configuration on the worker.
-
+    
     Note that `behavior` is overridden by `versioning_override` if the latter is present.
     """
     @property
@@ -1601,7 +1601,7 @@ class PendingNexusOperationInfo(google.protobuf.message.Message):
     """Operation name."""
     operation_id: builtins.str
     """Operation ID. Only set for asynchronous operations after a successful StartOperation call.
-
+    
     Deprecated. Renamed to operation_token.
     """
     @property
@@ -1822,32 +1822,542 @@ class WorkflowExecutionOptions(google.protobuf.message.Message):
 
     VERSIONING_OVERRIDE_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
     @property
     def versioning_override(self) -> global___VersioningOverride:
         """If set, takes precedence over the Versioning Behavior sent by the SDK on Workflow Task completion."""
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """If set, overrides the workflow's priority sent by the SDK."""
+    @property
+    def time_skipping_config(self) -> global___TimeSkippingConfig:
+        """Time skipping configuration for this workflow execution.
+        Once enabled, cannot be disabled. See `TimeSkippingConfig` for details.
+        """
     def __init__(
         self,
         *,
         versioning_override: global___VersioningOverride | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        time_skipping_config: global___TimeSkippingConfig | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "priority", b"priority", "versioning_override", b"versioning_override"
+            "priority",
+            b"priority",
+            "time_skipping_config",
+            b"time_skipping_config",
+            "versioning_override",
+            b"versioning_override",
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "priority", b"priority", "versioning_override", b"versioning_override"
+            "priority",
+            b"priority",
+            "time_skipping_config",
+            b"time_skipping_config",
+            "versioning_override",
+            b"versioning_override",
         ],
     ) -> None: ...
 
 global___WorkflowExecutionOptions = WorkflowExecutionOptions
+
+class TimeSkippingConfig(google.protobuf.message.Message):
+    """Configuration for time skipping on a workflow execution.
+    Time skipping allows a workflow's virtual time to diverge from wall-clock time,
+    enabling fast-forwarding through timers and timeouts for testing purposes.
+    Once enabled, cannot be disabled (the workflow's virtual time has diverged).
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class AutoSkipConfig(google.protobuf.message.Message):
+        """Configuration for automatic time skipping.
+        Auto-skip advances the workflow's virtual time to the next upcoming time point
+        whenever the workflow is idle (no in-flight activities or Nexus operations).
+        Auto-skip halts when either the time bound or the firings limit is reached,
+        at which point the workflow behaves as manual-skip until the config is updated.
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        UNTIL_TIME_FIELD_NUMBER: builtins.int
+        UNTIL_DURATION_FIELD_NUMBER: builtins.int
+        MAX_FIRINGS_FIELD_NUMBER: builtins.int
+        @property
+        def until_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+            """Absolute virtual timestamp to auto-skip until."""
+        @property
+        def until_duration(self) -> google.protobuf.duration_pb2.Duration:
+            """Duration from the workflow's current virtual time (at the time the config
+            is applied) to auto-skip for. The server resolves this to an absolute
+            timestamp stored in TimeSkippingInfo.
+            """
+        max_firings: builtins.int
+        """Maximum number of time-point firings (timer fires, timeout expirations)
+        auto-skip will trigger before halting. Resets each time auto-skip config
+        is updated. Defaults to 10 if not set or set to 0.
+        """
+        def __init__(
+            self,
+            *,
+            until_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+            until_duration: google.protobuf.duration_pb2.Duration | None = ...,
+            max_firings: builtins.int = ...,
+        ) -> None: ...
+        def HasField(
+            self,
+            field_name: typing_extensions.Literal[
+                "bound",
+                b"bound",
+                "until_duration",
+                b"until_duration",
+                "until_time",
+                b"until_time",
+            ],
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "bound",
+                b"bound",
+                "max_firings",
+                b"max_firings",
+                "until_duration",
+                b"until_duration",
+                "until_time",
+                b"until_time",
+            ],
+        ) -> None: ...
+        def WhichOneof(
+            self, oneof_group: typing_extensions.Literal["bound", b"bound"]
+        ) -> typing_extensions.Literal["until_time", "until_duration"] | None: ...
+
+    ENABLED_FIELD_NUMBER: builtins.int
+    AUTO_SKIP_FIELD_NUMBER: builtins.int
+    PROPAGATE_TO_NEW_CHILDREN_FIELD_NUMBER: builtins.int
+    PROPAGATE_ON_CONTINUE_AS_NEW_FIELD_NUMBER: builtins.int
+    enabled: builtins.bool
+    """Enables time skipping for this workflow execution. Once set to true, cannot be
+    set back to false. When enabled, timers and timeouts will not fire based on
+    wall-clock time; they only fire via explicit SkipWorkflowExecutionTime calls
+    or auto-skip (if configured).
+    """
+    @property
+    def auto_skip(self) -> global___TimeSkippingConfig.AutoSkipConfig:
+        """If set, enables automatic time skipping. The workflow will automatically advance
+        to the next upcoming time point whenever there are no in-flight activities or
+        Nexus operations. Clear this field (set to null via FieldMask) to disable
+        auto-skip and return to manual-only time skipping.
+        """
+    propagate_to_new_children: builtins.bool
+    """If true, newly started child workflows will automatically inherit this
+    time-skipping configuration. Default false. The inherited config includes
+    this flag, so grandchildren will also inherit (transitive).
+    """
+    propagate_on_continue_as_new: builtins.bool
+    """If true, continue-as-new will inherit this time-skipping configuration
+    into the new run. The proto default is false, but SDKs should default
+    this to true when constructing a TimeSkippingConfig, since losing
+    time-skipping on continue-as-new is rarely desired.
+    """
+    def __init__(
+        self,
+        *,
+        enabled: builtins.bool = ...,
+        auto_skip: global___TimeSkippingConfig.AutoSkipConfig | None = ...,
+        propagate_to_new_children: builtins.bool = ...,
+        propagate_on_continue_as_new: builtins.bool = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["auto_skip", b"auto_skip"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "auto_skip",
+            b"auto_skip",
+            "enabled",
+            b"enabled",
+            "propagate_on_continue_as_new",
+            b"propagate_on_continue_as_new",
+            "propagate_to_new_children",
+            b"propagate_to_new_children",
+        ],
+    ) -> None: ...
+
+global___TimeSkippingConfig = TimeSkippingConfig
+
+class TimeSkippingInfo(google.protobuf.message.Message):
+    """Runtime information about time skipping for a workflow execution.
+    Returned by DescribeWorkflowExecution when time skipping is enabled.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class AutoSkipInfo(google.protobuf.message.Message):
+        """Runtime information about automatic time skipping."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        ACTIVE_FIELD_NUMBER: builtins.int
+        DEADLINE_FIELD_NUMBER: builtins.int
+        DEADLINE_REMAINING_FIELD_NUMBER: builtins.int
+        FIRINGS_USED_FIELD_NUMBER: builtins.int
+        FIRINGS_REMAINING_FIELD_NUMBER: builtins.int
+        active: builtins.bool
+        """Whether auto-skip is currently advancing time. False when paused due to
+        pending activities, child workflows, or Nexus operations, or when a
+        limit has been reached.
+        """
+        @property
+        def deadline(self) -> google.protobuf.timestamp_pb2.Timestamp:
+            """The resolved auto-skip deadline as an absolute virtual timestamp
+            (regardless of whether the config was set via `until_time` or
+            `until_duration`).
+            """
+        @property
+        def deadline_remaining(self) -> google.protobuf.duration_pb2.Duration:
+            """The remaining virtual time until the auto-skip deadline is reached."""
+        firings_used: builtins.int
+        """Number of time-point firings triggered by auto-skip in the current window."""
+        firings_remaining: builtins.int
+        """Number of firings remaining before the max_firings limit is reached."""
+        def __init__(
+            self,
+            *,
+            active: builtins.bool = ...,
+            deadline: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+            deadline_remaining: google.protobuf.duration_pb2.Duration | None = ...,
+            firings_used: builtins.int = ...,
+            firings_remaining: builtins.int = ...,
+        ) -> None: ...
+        def HasField(
+            self,
+            field_name: typing_extensions.Literal[
+                "deadline", b"deadline", "deadline_remaining", b"deadline_remaining"
+            ],
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "active",
+                b"active",
+                "deadline",
+                b"deadline",
+                "deadline_remaining",
+                b"deadline_remaining",
+                "firings_remaining",
+                b"firings_remaining",
+                "firings_used",
+                b"firings_used",
+            ],
+        ) -> None: ...
+
+    CONFIG_FIELD_NUMBER: builtins.int
+    VIRTUAL_TIME_OFFSET_FIELD_NUMBER: builtins.int
+    VIRTUAL_TIME_FIELD_NUMBER: builtins.int
+    AUTO_SKIP_FIELD_NUMBER: builtins.int
+    @property
+    def config(self) -> global___TimeSkippingConfig:
+        """The current time skipping configuration."""
+    @property
+    def virtual_time_offset(self) -> google.protobuf.duration_pb2.Duration:
+        """The accumulated virtual time offset from time-skipping advances."""
+    @property
+    def virtual_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The workflow's current virtual time (server wall clock + virtual_time_offset)."""
+    @property
+    def auto_skip(self) -> global___TimeSkippingInfo.AutoSkipInfo:
+        """Present when auto-skip is configured. Null when auto-skip is not active."""
+    def __init__(
+        self,
+        *,
+        config: global___TimeSkippingConfig | None = ...,
+        virtual_time_offset: google.protobuf.duration_pb2.Duration | None = ...,
+        virtual_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        auto_skip: global___TimeSkippingInfo.AutoSkipInfo | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "auto_skip",
+            b"auto_skip",
+            "config",
+            b"config",
+            "virtual_time",
+            b"virtual_time",
+            "virtual_time_offset",
+            b"virtual_time_offset",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "auto_skip",
+            b"auto_skip",
+            "config",
+            b"config",
+            "virtual_time",
+            b"virtual_time",
+            "virtual_time_offset",
+            b"virtual_time_offset",
+        ],
+    ) -> None: ...
+
+global___TimeSkippingInfo = TimeSkippingInfo
+
+class UpcomingTimePointInfo(google.protobuf.message.Message):
+    """Describes an upcoming time point for a workflow execution: a future instant at
+    which something will happen (a timer fires, a timeout expires, etc.).
+    Returned by DescribeWorkflowExecution.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class TimerTimePoint(google.protobuf.message.Message):
+        """A workflow timer (e.g., from workflow.sleep() or workflow.newTimer())."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        TIMER_ID_FIELD_NUMBER: builtins.int
+        STARTED_EVENT_ID_FIELD_NUMBER: builtins.int
+        timer_id: builtins.str
+        started_event_id: builtins.int
+        def __init__(
+            self,
+            *,
+            timer_id: builtins.str = ...,
+            started_event_id: builtins.int = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "started_event_id", b"started_event_id", "timer_id", b"timer_id"
+            ],
+        ) -> None: ...
+
+    class ActivityTimeoutTimePoint(google.protobuf.message.Message):
+        """An activity timeout about to expire."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        ACTIVITY_ID_FIELD_NUMBER: builtins.int
+        TIMEOUT_TYPE_FIELD_NUMBER: builtins.int
+        activity_id: builtins.str
+        timeout_type: temporalio.api.enums.v1.workflow_pb2.TimeoutType.ValueType
+        def __init__(
+            self,
+            *,
+            activity_id: builtins.str = ...,
+            timeout_type: temporalio.api.enums.v1.workflow_pb2.TimeoutType.ValueType = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "activity_id", b"activity_id", "timeout_type", b"timeout_type"
+            ],
+        ) -> None: ...
+
+    class WorkflowTimeoutTimePoint(google.protobuf.message.Message):
+        """A workflow-level timeout about to expire.
+        SCHEDULE_TO_CLOSE = execution timeout (total including retries/CaN).
+        START_TO_CLOSE = run timeout (single run).
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        TIMEOUT_TYPE_FIELD_NUMBER: builtins.int
+        timeout_type: temporalio.api.enums.v1.workflow_pb2.TimeoutType.ValueType
+        def __init__(
+            self,
+            *,
+            timeout_type: temporalio.api.enums.v1.workflow_pb2.TimeoutType.ValueType = ...,
+        ) -> None: ...
+        def ClearField(
+            self, field_name: typing_extensions.Literal["timeout_type", b"timeout_type"]
+        ) -> None: ...
+
+    class ChildWorkflowTimePoint(google.protobuf.message.Message):
+        """An upcoming time point originating from a child workflow.
+        TODO: Decide whether to include details of the child's time point source.
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        WORKFLOW_ID_FIELD_NUMBER: builtins.int
+        RUN_ID_FIELD_NUMBER: builtins.int
+        INITIATED_EVENT_ID_FIELD_NUMBER: builtins.int
+        workflow_id: builtins.str
+        run_id: builtins.str
+        initiated_event_id: builtins.int
+        def __init__(
+            self,
+            *,
+            workflow_id: builtins.str = ...,
+            run_id: builtins.str = ...,
+            initiated_event_id: builtins.int = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "initiated_event_id",
+                b"initiated_event_id",
+                "run_id",
+                b"run_id",
+                "workflow_id",
+                b"workflow_id",
+            ],
+        ) -> None: ...
+
+    class NexusOperationTimeoutTimePoint(google.protobuf.message.Message):
+        """A Nexus operation timeout about to expire."""
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        ENDPOINT_FIELD_NUMBER: builtins.int
+        SERVICE_FIELD_NUMBER: builtins.int
+        OPERATION_FIELD_NUMBER: builtins.int
+        SCHEDULED_EVENT_ID_FIELD_NUMBER: builtins.int
+        TIMEOUT_TYPE_FIELD_NUMBER: builtins.int
+        endpoint: builtins.str
+        service: builtins.str
+        operation: builtins.str
+        scheduled_event_id: builtins.int
+        timeout_type: temporalio.api.enums.v1.workflow_pb2.TimeoutType.ValueType
+        def __init__(
+            self,
+            *,
+            endpoint: builtins.str = ...,
+            service: builtins.str = ...,
+            operation: builtins.str = ...,
+            scheduled_event_id: builtins.int = ...,
+            timeout_type: temporalio.api.enums.v1.workflow_pb2.TimeoutType.ValueType = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "endpoint",
+                b"endpoint",
+                "operation",
+                b"operation",
+                "scheduled_event_id",
+                b"scheduled_event_id",
+                "service",
+                b"service",
+                "timeout_type",
+                b"timeout_type",
+            ],
+        ) -> None: ...
+
+    FIRE_TIME_FIELD_NUMBER: builtins.int
+    FIRE_TIME_REMAINING_FIELD_NUMBER: builtins.int
+    TIMER_FIELD_NUMBER: builtins.int
+    ACTIVITY_TIMEOUT_FIELD_NUMBER: builtins.int
+    WORKFLOW_TIMEOUT_FIELD_NUMBER: builtins.int
+    CHILD_WORKFLOW_FIELD_NUMBER: builtins.int
+    NEXUS_OPERATION_TIMEOUT_FIELD_NUMBER: builtins.int
+    @property
+    def fire_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The absolute virtual time at which this time point will fire."""
+    @property
+    def fire_time_remaining(self) -> google.protobuf.duration_pb2.Duration:
+        """The remaining virtual time until this time point fires
+        (fire_time minus current virtual time at the time of the response).
+        """
+    @property
+    def timer(self) -> global___UpcomingTimePointInfo.TimerTimePoint: ...
+    @property
+    def activity_timeout(
+        self,
+    ) -> global___UpcomingTimePointInfo.ActivityTimeoutTimePoint: ...
+    @property
+    def workflow_timeout(
+        self,
+    ) -> global___UpcomingTimePointInfo.WorkflowTimeoutTimePoint: ...
+    @property
+    def child_workflow(
+        self,
+    ) -> global___UpcomingTimePointInfo.ChildWorkflowTimePoint: ...
+    @property
+    def nexus_operation_timeout(
+        self,
+    ) -> global___UpcomingTimePointInfo.NexusOperationTimeoutTimePoint: ...
+    def __init__(
+        self,
+        *,
+        fire_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        fire_time_remaining: google.protobuf.duration_pb2.Duration | None = ...,
+        timer: global___UpcomingTimePointInfo.TimerTimePoint | None = ...,
+        activity_timeout: global___UpcomingTimePointInfo.ActivityTimeoutTimePoint
+        | None = ...,
+        workflow_timeout: global___UpcomingTimePointInfo.WorkflowTimeoutTimePoint
+        | None = ...,
+        child_workflow: global___UpcomingTimePointInfo.ChildWorkflowTimePoint
+        | None = ...,
+        nexus_operation_timeout: global___UpcomingTimePointInfo.NexusOperationTimeoutTimePoint
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_timeout",
+            b"activity_timeout",
+            "child_workflow",
+            b"child_workflow",
+            "fire_time",
+            b"fire_time",
+            "fire_time_remaining",
+            b"fire_time_remaining",
+            "nexus_operation_timeout",
+            b"nexus_operation_timeout",
+            "source",
+            b"source",
+            "timer",
+            b"timer",
+            "workflow_timeout",
+            b"workflow_timeout",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activity_timeout",
+            b"activity_timeout",
+            "child_workflow",
+            b"child_workflow",
+            "fire_time",
+            b"fire_time",
+            "fire_time_remaining",
+            b"fire_time_remaining",
+            "nexus_operation_timeout",
+            b"nexus_operation_timeout",
+            "source",
+            b"source",
+            "timer",
+            b"timer",
+            "workflow_timeout",
+            b"workflow_timeout",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing_extensions.Literal["source", b"source"]
+    ) -> (
+        typing_extensions.Literal[
+            "timer",
+            "activity_timeout",
+            "workflow_timeout",
+            "child_workflow",
+            "nexus_operation_timeout",
+        ]
+        | None
+    ): ...
+
+global___UpcomingTimePointInfo = UpcomingTimePointInfo
 
 class VersioningOverride(google.protobuf.message.Message):
     """Used to override the versioning behavior (and pinned deployment version, if applicable) of a

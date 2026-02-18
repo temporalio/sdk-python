@@ -27,6 +27,24 @@ class WorkflowService:
         self._client = client
         self._service = "workflow"
 
+    async def advance_workflow_execution_time_point(
+        self,
+        req: temporalio.api.workflowservice.v1.AdvanceWorkflowExecutionTimePointRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.AdvanceWorkflowExecutionTimePointResponse:
+        """Invokes the WorkflowService.advance_workflow_execution_time_point rpc method."""
+        return await self._client._rpc_call(
+            rpc="advance_workflow_execution_time_point",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.workflowservice.v1.AdvanceWorkflowExecutionTimePointResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def count_activity_executions(
         self,
         req: temporalio.api.workflowservice.v1.CountActivityExecutionsRequest,

@@ -805,6 +805,7 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
     REQUEST_ID_FIELD_NUMBER: builtins.int
     SUGGEST_CONTINUE_AS_NEW_FIELD_NUMBER: builtins.int
     SUGGEST_CONTINUE_AS_NEW_REASONS_FIELD_NUMBER: builtins.int
+    TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED_FIELD_NUMBER: builtins.int
     HISTORY_SIZE_BYTES_FIELD_NUMBER: builtins.int
     WORKER_VERSION_FIELD_NUMBER: builtins.int
     BUILD_ID_REDIRECT_COUNTER_FIELD_NUMBER: builtins.int
@@ -831,6 +832,11 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
         """The reason(s) that suggest_continue_as_new is true, if it is.
         Unset if suggest_continue_as_new is false.
         """
+    target_worker_deployment_version_changed: builtins.bool
+    """True if Workflow's Target Worker Deployment Version is different from its Pinned Version and
+    the workflow is Pinned.
+    Experimental.
+    """
     history_size_bytes: builtins.int
     """Total history size in bytes, which the workflow might use to decide when to
     continue-as-new regardless of the suggestion. Note that history event count is
@@ -857,6 +863,7 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
             temporalio.api.enums.v1.workflow_pb2.SuggestContinueAsNewReason.ValueType
         ]
         | None = ...,
+        target_worker_deployment_version_changed: builtins.bool = ...,
         history_size_bytes: builtins.int = ...,
         worker_version: temporalio.api.common.v1.message_pb2.WorkerVersionStamp
         | None = ...,
@@ -882,6 +889,8 @@ class WorkflowTaskStartedEventAttributes(google.protobuf.message.Message):
             b"suggest_continue_as_new",
             "suggest_continue_as_new_reasons",
             b"suggest_continue_as_new_reasons",
+            "target_worker_deployment_version_changed",
+            b"target_worker_deployment_version_changed",
             "worker_version",
             b"worker_version",
         ],
@@ -3618,6 +3627,56 @@ global___WorkflowExecutionUnpausedEventAttributes = (
     WorkflowExecutionUnpausedEventAttributes
 )
 
+class WorkflowExecutionTimePointAdvancedEventAttributes(
+    google.protobuf.message.Message
+):
+    """Attributes for an event marking that a time point was advanced for a workflow execution,
+    either via an explicit AdvanceWorkflowExecutionTimePoint call or auto-skip.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DURATION_ADVANCED_FIELD_NUMBER: builtins.int
+    IDENTITY_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
+    @property
+    def duration_advanced(self) -> google.protobuf.duration_pb2.Duration:
+        """The amount of virtual time advanced by this operation. This is the delta
+        added to the workflow's virtual time offset.
+        """
+    identity: builtins.str
+    """The identity of the client who initiated the advance. Empty for auto-skip."""
+    request_id: builtins.str
+    """The request ID of the advance request. Empty for auto-skip."""
+    def __init__(
+        self,
+        *,
+        duration_advanced: google.protobuf.duration_pb2.Duration | None = ...,
+        identity: builtins.str = ...,
+        request_id: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "duration_advanced", b"duration_advanced"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "duration_advanced",
+            b"duration_advanced",
+            "identity",
+            b"identity",
+            "request_id",
+            b"request_id",
+        ],
+    ) -> None: ...
+
+global___WorkflowExecutionTimePointAdvancedEventAttributes = (
+    WorkflowExecutionTimePointAdvancedEventAttributes
+)
+
 class NexusOperationScheduledEventAttributes(google.protobuf.message.Message):
     """Event marking that an operation was scheduled by a workflow via the ScheduleNexusOperation command."""
 
@@ -3781,7 +3840,7 @@ class NexusOperationStartedEventAttributes(google.protobuf.message.Message):
     operation_id: builtins.str
     """The operation ID returned by the Nexus handler in the response to the StartOperation request.
     This ID is used when canceling the operation.
-
+    
     Deprecated: Renamed to operation_token.
     """
     request_id: builtins.str
@@ -4171,6 +4230,7 @@ class HistoryEvent(google.protobuf.message.Message):
     NEXUS_OPERATION_CANCEL_REQUEST_FAILED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_PAUSED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     WORKFLOW_EXECUTION_UNPAUSED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
+    WORKFLOW_EXECUTION_TIME_POINT_ADVANCED_EVENT_ATTRIBUTES_FIELD_NUMBER: builtins.int
     event_id: builtins.int
     """Monotonically increasing event number, starts at 1."""
     @property
@@ -4442,6 +4502,10 @@ class HistoryEvent(google.protobuf.message.Message):
     def workflow_execution_unpaused_event_attributes(
         self,
     ) -> global___WorkflowExecutionUnpausedEventAttributes: ...
+    @property
+    def workflow_execution_time_point_advanced_event_attributes(
+        self,
+    ) -> global___WorkflowExecutionTimePointAdvancedEventAttributes: ...
     def __init__(
         self,
         *,
@@ -4572,6 +4636,8 @@ class HistoryEvent(google.protobuf.message.Message):
         | None = ...,
         workflow_execution_unpaused_event_attributes: global___WorkflowExecutionUnpausedEventAttributes
         | None = ...,
+        workflow_execution_time_point_advanced_event_attributes: global___WorkflowExecutionTimePointAdvancedEventAttributes
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -4674,6 +4740,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_execution_started_event_attributes",
             "workflow_execution_terminated_event_attributes",
             b"workflow_execution_terminated_event_attributes",
+            "workflow_execution_time_point_advanced_event_attributes",
+            b"workflow_execution_time_point_advanced_event_attributes",
             "workflow_execution_timed_out_event_attributes",
             b"workflow_execution_timed_out_event_attributes",
             "workflow_execution_unpaused_event_attributes",
@@ -4815,6 +4883,8 @@ class HistoryEvent(google.protobuf.message.Message):
             b"workflow_execution_started_event_attributes",
             "workflow_execution_terminated_event_attributes",
             b"workflow_execution_terminated_event_attributes",
+            "workflow_execution_time_point_advanced_event_attributes",
+            b"workflow_execution_time_point_advanced_event_attributes",
             "workflow_execution_timed_out_event_attributes",
             b"workflow_execution_timed_out_event_attributes",
             "workflow_execution_unpaused_event_attributes",
@@ -4906,6 +4976,7 @@ class HistoryEvent(google.protobuf.message.Message):
             "nexus_operation_cancel_request_failed_event_attributes",
             "workflow_execution_paused_event_attributes",
             "workflow_execution_unpaused_event_attributes",
+            "workflow_execution_time_point_advanced_event_attributes",
         ]
         | None
     ): ...
