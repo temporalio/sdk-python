@@ -451,10 +451,35 @@ To recover from such failures, you need to implement your own application-level 
 
 For network-accessible MCP servers, you can also use `HostedMCPTool` from the OpenAI Agents SDK, which uses an MCP client hosted by OpenAI.
 
+## Streaming
+
+Streaming can be enabled by using the Agent SDK's `Runner.run_streamed` API. This integration provides streaming content from LLMs by collecting all streaming events into a list and delivering them when the activity completes, allowing workflows to iterate over the stream events.
+
+```python
+from agents import Runner
+
+# In your workflow
+async for event in Runner.run_streamed(
+    starting_agent=my_agent,
+    input="Hello, stream this response!",
+).stream_events():
+    # Process each streaming event
+    if hasattr(event, 'content') and event.content:
+        print(f"Streamed content: {event.content}")
+```
+
+The streaming implementation:
+- Collects all stream events during the activity execution
+- Returns the complete list when the activity finishes
+- Allows workflows to iterate over events deterministically
+- Supports the same model configurations and tools as non-streaming calls
+
+Note that stream events are only delivered to the workflow after the entire LLM response is complete, ensuring deterministic execution in Temporal workflows.
+
 ## Feature Support
 
 This integration is presently subject to certain limitations.
-Streaming and voice agents are not supported.
+Voice agents are not supported.
 Certain tools are not suitable for a distributed computing environment, so these have been disabled as well.
 
 ### Model Providers
@@ -466,12 +491,10 @@ Certain tools are not suitable for a distributed computing environment, so these
 
 ### Model Response format
 
-This integration does not presently support streaming.
-
 | Model Response | Supported |
 | :------------- | :-------: |
 | Get Response   |    Yes    |
-| Streaming      |    No     |
+| Streaming      |    Yes    |
 
 ### Tools
 
