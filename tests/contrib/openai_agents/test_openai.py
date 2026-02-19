@@ -63,6 +63,7 @@ from openai.types.responses import (
     ResponseCodeInterpreterToolCall,
     ResponseFileSearchToolCall,
     ResponseFunctionWebSearch,
+    ResponseTextDeltaEvent,
 )
 from openai.types.responses.response_file_search_tool_call import Result
 from openai.types.responses.response_function_web_search import ActionSearch
@@ -90,6 +91,7 @@ from temporalio.contrib.openai_agents._temporal_model_stub import (
 )
 from temporalio.contrib.openai_agents.testing import (
     AgentEnvironment,
+    EventBuilders,
     ResponseBuilders,
     TestModel,
     TestModelProvider,
@@ -2690,3 +2692,70 @@ async def test_multiple_handoffs_workflow(client: Client):
                 "I'll analyze the requirements and create a plan."
                 in planner_response_data
             )
+
+
+@workflow.defn
+class StreamingBatchTestWorkflow:
+    def __init__(self):
+        self.events = []
+
+    @workflow.run
+    async def run(self, prompt: str) -> str | None:
+        agent = Agent[None](
+            name="Assistant",
+            instructions="You are a helpful assistant.",
+        )
+
+        result = Runner.run_streamed(
+            starting_agent=agent,
+            input=prompt,
+        )
+        async for event in result.stream_events():
+            if event.type == "raw_response_event" and isinstance(
+                event.data, ResponseTextDeltaEvent
+            ):
+                self.events.append(event.data.delta)
+
+        return result.final_output if result else None
+
+    @workflow.query
+    def get_events(self) -> list[str]:
+        return self.events
+
+
+def streaming_hello_model():
+    return TestModel.streaming_events_with_ending(
+        [
+            EventBuilders.text_delta("Hello"),
+            EventBuilders.text_delta(" there"),
+            EventBuilders.text_delta("!"),
+        ]
+    )
+
+
+async def test_batch_streaming(client: Client):
+    async with AgentEnvironment(
+        model=streaming_hello_model(),
+        model_params=ModelActivityParameters(
+            start_to_close_timeout=timedelta(seconds=30),
+        ),
+    ) as env:
+        client = env.applied_on_client(client)
+
+        async with new_worker(
+            client, StreamingBatchTestWorkflow, max_cached_workflows=0
+        ) as worker:
+            handle = await client.start_workflow(
+                StreamingBatchTestWorkflow.run,
+                args=["Say hello."],
+                id=f"streaming-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=50),
+            )
+            result = await handle.result()
+            assert result == "Hello there!"
+
+            # Verify we collected the streaming events
+            events = await handle.query(StreamingBatchTestWorkflow.get_events)
+            assert len(events) == 3
+            assert events == ["Hello", " there", "!"]
