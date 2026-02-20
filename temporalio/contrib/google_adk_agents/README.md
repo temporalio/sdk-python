@@ -5,7 +5,7 @@ This package provides the integration layer between the Google ADK and Temporal.
 ## What's Included
 
 ### Core ADK Integration
-- **`AdkAgentPlugin`**: Intercepts model calls and executes them as Temporal activities
+- **`TemporalModel`**: Intercepts model calls and executes them as Temporal activities
 - **`TemporalAdkPlugin`**: Worker plugin that configures runtime determinism and Pydantic serialization
 - **`invoke_model`**: Activity for executing LLM model calls with proper error handling
 
@@ -49,30 +49,33 @@ Model calls are intercepted and executed as Temporal activities with configurabl
 
 **Agent (Workflow) Side:**
 ```python
-from temporalio.contrib.google_adk_agents import AdkAgentPlugin, ModelActivityParameters
-from datetime import timedelta
+from temporalio.contrib.google_adk_agents import TemporalModel
+from google.adk import Agent
 
-# Configure activity parameters
-activity_params = ModelActivityParameters(
-    start_to_close_timeout=timedelta(minutes=1),
-    retry_policy=RetryPolicy(maximum_attempts=3)
-)
 
 # Add to agent
 agent = Agent(
-    model="gemini-2.5-pro", 
-    plugins=[AdkAgentPlugin(activity_params)]
+    name="test_agent",
+    model=TemporalModel("gemini-2.5-pro"), 
 )
 ```
 
 **Worker Side:**
 ```python
+from temporalio.client import Client
+from temporalio.worker import Worker
 from temporalio.contrib.google_adk_agents import TemporalAdkPlugin
+
+client = await Client.connect(
+    "localhost:7233",
+    plugins=[
+        TemporalAdkPlugin(),
+    ],
+)
 
 worker = Worker(
     client,
     task_queue="my-queue",
-    plugins=[TemporalAdkPlugin()]
 )
 ```
 
@@ -80,6 +83,14 @@ worker = Worker(
 
 **With MCP Tools:**
 ```python
+import os
+from google.adk import Agent
+from google.adk.tools.mcp_tool import McpToolset
+from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
+from mcp import StdioServerParameters
+from temporalio.client import Client
+from temporalio.worker import Worker
+
 from temporalio.contrib.google_adk_agents import (
     TemporalAdkPlugin, 
     TemporalMcpToolSetProvider,
@@ -87,27 +98,39 @@ from temporalio.contrib.google_adk_agents import (
 )
 
 # Create toolset provider
-provider = TemporalMcpToolSetProvider("my-tools", my_toolset_factory)
+provider = TemporalMcpToolSetProvider("my-tools", 
+    lambda _: McpToolset(
+        connection_params=StdioConnectionParams(
+            server_params=StdioServerParameters(
+                command="npx",
+                args=[
+                    "-y",
+                    "@modelcontextprotocol/server-filesystem",
+                    os.path.dirname(os.path.abspath(__file__)),
+                ],
+            ),
+        ),
+    ))
 
 # Use in agent workflow
 agent = Agent(
+    name="test_agent",
     model="gemini-2.5-pro",
-    toolsets=[TemporalMcpToolSet("my-tools")]
+    tools=[TemporalMcpToolSet("my-tools")]
+)
+
+client = await Client.connect(
+    "localhost:7233",
+    plugins=[
+        TemporalAdkPlugin(toolset_providers=[provider]),
+    ],
 )
 
 # Configure worker
 worker = Worker(
     client,
-    plugins=[TemporalAdkPlugin(toolset_providers=[provider])]
+    task_queue="task-queue"
 )
-```
-
-**With OpenTelemetry:**
-```python
-from opentelemetry.exporter.jaeger.thrift import JaegerExporter
-
-exporter = JaegerExporter(endpoint="http://localhost:14268/api/traces")
-plugin = TemporalAdkPlugin(otel_exporters=[exporter])
 ```
 
 ## Integration Points
