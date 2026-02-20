@@ -27,7 +27,8 @@ def setup_deterministic_runtime():
     (like SessionService) are used, if they rely on runtime.get_time() or runtime.new_uuid().
     """
     try:
-        from google.adk import runtime
+        import google.adk.platform.time
+        import google.adk.platform.uuid
 
         # Define safer, context-aware providers
         def _deterministic_time_provider() -> float:
@@ -40,8 +41,8 @@ def setup_deterministic_runtime():
                 return str(workflow.uuid4())
             return str(uuid.uuid4())
 
-        runtime.set_time_provider(_deterministic_time_provider)
-        runtime.set_id_provider(_deterministic_id_provider)
+        google.adk.platform.time.set_time_provider(_deterministic_time_provider)
+        google.adk.platform.uuid.set_id_provider(_deterministic_id_provider)
     except ImportError:
         pass
     except Exception as e:
