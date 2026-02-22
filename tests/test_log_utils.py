@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from temporalio._log_utils import (
+    TemporalLogExtraMode,
     _apply_temporal_context_to_extra,
     _update_temporal_context_in_extra,
 )
@@ -95,7 +96,7 @@ class TestUpdateTemporalContextInExtra:
         self,
         initial_context: dict[str, Any],
         update_context: dict[str, Any],
-        mode: str,
+        mode: TemporalLogExtraMode,
     ) -> None:
         extra: dict[str, Any] = {}
         _apply_temporal_context_to_extra(

@@ -42,6 +42,7 @@ import temporalio.worker
 import temporalio.worker._command_aware_visitor
 import temporalio.workflow
 from temporalio import activity, workflow
+from temporalio._log_utils import TemporalLogExtraMode
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.failure.v1 import Failure
@@ -1992,7 +1993,9 @@ class LoggingWorkflow:
 
 
 @pytest.mark.parametrize("temporal_extra_mode", ["dict", "flatten"])
-async def test_workflow_logging(client: Client, temporal_extra_mode: str):
+async def test_workflow_logging(
+    client: Client, temporal_extra_mode: TemporalLogExtraMode
+):
     """Test workflow logging: extra mode formatting, replay suppression, and full_workflow_info."""
     original_mode = workflow.logger.temporal_extra_mode
     original_full_info = workflow.logger.full_workflow_info_on_extra

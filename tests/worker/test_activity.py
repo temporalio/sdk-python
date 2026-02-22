@@ -23,6 +23,7 @@ import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
 import temporalio.exceptions
 from temporalio import activity, workflow
+from temporalio._log_utils import TemporalLogExtraMode
 from temporalio.client import (
     AsyncActivityHandle,
     Client,
@@ -1013,7 +1014,7 @@ async def test_activity_logging(
     client: Client,
     worker: ExternalWorker,
     shared_state_manager: SharedStateManager,
-    temporal_extra_mode: str,
+    temporal_extra_mode: TemporalLogExtraMode,
 ):
     """Test that activity logger produces correct log records for each extra mode."""
 

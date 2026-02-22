@@ -22,7 +22,7 @@ Values:
 """
 
 
-def _apply_temporal_context_to_extra(
+def _apply_temporal_context_to_extra(  # pyright: ignore[reportUnusedFunction]
     extra: MutableMapping[str, Any],
     *,
     key: str,
@@ -50,7 +50,7 @@ def _apply_temporal_context_to_extra(
         extra[key] = dict(ctx)
 
 
-def _update_temporal_context_in_extra(
+def _update_temporal_context_in_extra(  # pyright: ignore[reportUnusedFunction]
     extra: MutableMapping[str, Any],
     *,
     key: str,
