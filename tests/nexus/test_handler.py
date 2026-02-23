@@ -56,8 +56,8 @@ from temporalio.worker import Worker
 from tests.helpers.nexus import (
     Failure,
     ServiceClient,
-    create_nexus_endpoint,
     dataclass_as_dict,
+    make_nexus_endpoint_name,
 )
 
 
@@ -608,7 +608,11 @@ async def _test_start_operation_with_service_definition(
     if test_case.skip:
         pytest.skip(test_case.skip)
     task_queue = str(uuid.uuid4())
-    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    endpoint = (
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(task_queue), task_queue
+        )
+    ).id
     service_client = ServiceClient(
         server_address=ServiceClient.default_server_address(env),
         endpoint=endpoint,
@@ -642,7 +646,11 @@ async def _test_start_operation_without_service_definition(
     if test_case.skip:
         pytest.skip(test_case.skip)
     task_queue = str(uuid.uuid4())
-    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    endpoint = (
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(task_queue), task_queue
+        )
+    ).id
     service_client = ServiceClient(
         server_address=ServiceClient.default_server_address(env),
         endpoint=endpoint,
@@ -730,7 +738,11 @@ async def test_start_operation_without_type_annotations(
     if test_case.skip:
         pytest.skip(test_case.skip)
     task_queue = str(uuid.uuid4())
-    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    endpoint = (
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(task_queue), task_queue
+        )
+    ).id
     service_client = ServiceClient(
         server_address=ServiceClient.default_server_address(env),
         endpoint=endpoint,
@@ -776,8 +788,11 @@ async def test_logger_uses_operation_context(env: WorkflowEnvironment, caplog: A
     task_queue = str(uuid.uuid4())
     service_name = MyService.__name__
     operation_name = "log"
-    resp = await create_nexus_endpoint(task_queue, env.client)
-    endpoint = resp.endpoint.id
+    endpoint = (
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(task_queue), task_queue
+        )
+    ).id
     service_client = ServiceClient(
         server_address=ServiceClient.default_server_address(env),
         endpoint=endpoint,
@@ -929,7 +944,11 @@ async def test_cancel_operation_with_invalid_token(env: WorkflowEnvironment):
 
     """Verify that canceling an operation with an invalid token fails correctly."""
     task_queue = str(uuid.uuid4())
-    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    endpoint = (
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(task_queue), task_queue
+        )
+    ).id
     service_client = ServiceClient(
         server_address=ServiceClient.default_server_address(env),
         endpoint=endpoint,
@@ -961,7 +980,11 @@ async def test_request_id_is_received_by_sync_operation(
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
-    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    endpoint = (
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(task_queue), task_queue
+        )
+    ).id
     service_client = ServiceClient(
         server_address=ServiceClient.default_server_address(env),
         endpoint=endpoint,
@@ -1035,7 +1058,11 @@ async def test_request_id_becomes_start_workflow_request_id(env: WorkflowEnviron
     # demonstrating that the Nexus Start Operation request ID has become the
     # StartWorkflow request ID.
     task_queue = str(uuid.uuid4())
-    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    endpoint = (
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(task_queue), task_queue
+        )
+    ).id
     service_client = ServiceClient(
         server_address=ServiceClient.default_server_address(env),
         endpoint=endpoint,

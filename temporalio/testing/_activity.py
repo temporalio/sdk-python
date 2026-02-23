@@ -76,6 +76,7 @@ class ActivityEnvironment:
             heartbeat_details=[],
             heartbeat_timeout=None,
             is_local=False,
+            namespace="default",
             schedule_to_close_timeout=timedelta(seconds=1),
             scheduled_time=utc_zero,
             start_to_close_timeout=timedelta(seconds=1),
@@ -88,6 +89,7 @@ class ActivityEnvironment:
             workflow_type="test",
             priority=temporalio.common.Priority.default,
             retry_policy=None,
+            activity_run_id=None,
         )
 
     def cancel(

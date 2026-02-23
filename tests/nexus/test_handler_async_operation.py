@@ -24,7 +24,7 @@ from nexusrpc.handler._decorators import operation_handler
 
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers.nexus import ServiceClient, create_nexus_endpoint
+from tests.helpers.nexus import ServiceClient, make_nexus_endpoint_name
 
 
 @dataclass
@@ -113,7 +113,11 @@ async def test_async_operation_lifecycle(
 
     task_executor = await TaskExecutor.connect()
     task_queue = str(uuid.uuid4())
-    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    endpoint = (
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(task_queue), task_queue
+        )
+    ).id
     service_client = ServiceClient(
         ServiceClient.default_server_address(env),
         endpoint,

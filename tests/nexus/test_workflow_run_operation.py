@@ -22,8 +22,8 @@ from temporalio.worker import Worker
 from tests.helpers.nexus import (
     Failure,
     ServiceClient,
-    create_nexus_endpoint,
     dataclass_as_dict,
+    make_nexus_endpoint_name,
 )
 
 
@@ -94,7 +94,11 @@ async def test_workflow_run_operation(
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
-    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
+    endpoint = (
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(task_queue), task_queue
+        )
+    ).id
     assert (service_defn := nexusrpc.get_service_definition(service_handler_cls))
     service_client = ServiceClient(
         server_address=ServiceClient.default_server_address(env),

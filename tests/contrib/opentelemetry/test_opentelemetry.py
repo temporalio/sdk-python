@@ -38,7 +38,7 @@ from temporalio.exceptions import (
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers import LogCapturer
-from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 
 @dataclass
@@ -475,7 +475,7 @@ async def test_opentelemetry_tracing_nexus(client: Client, env: WorkflowEnvironm
     client = Client(**client_config)
 
     task_queue = f"task-queue-{uuid.uuid4()}"
-    await create_nexus_endpoint(task_queue, client)
+    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
     async with Worker(
         client,
         task_queue=task_queue,

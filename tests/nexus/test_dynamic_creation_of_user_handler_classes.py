@@ -10,7 +10,7 @@ from temporalio.client import Client
 from temporalio.nexus._util import get_operation_factory
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers.nexus import ServiceClient, create_nexus_endpoint
+from tests.helpers.nexus import ServiceClient, make_nexus_endpoint_name
 
 
 @workflow.defn
@@ -80,7 +80,11 @@ async def test_run_nexus_service_from_programmatically_created_service_handler(
 
     service_name = service_handler.service.name
 
-    endpoint = (await create_nexus_endpoint(task_queue, client)).endpoint.id
+    endpoint = (
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(task_queue), task_queue
+        )
+    ).id
     async with Worker(
         client,
         task_queue=task_queue,
@@ -146,7 +150,11 @@ async def test_dynamic_creation_of_user_handler_classes(
     assert (service_defn := nexusrpc.get_service_definition(service_cls))
     service_name = service_defn.name
 
-    endpoint = (await create_nexus_endpoint(task_queue, client)).endpoint.id
+    endpoint = (
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(task_queue), task_queue
+        )
+    ).id
     async with Worker(
         client,
         task_queue=task_queue,

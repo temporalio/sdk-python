@@ -23,7 +23,7 @@ from temporalio.exceptions import (
 )
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers.nexus import create_nexus_endpoint, make_nexus_endpoint_name
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 error_conversion_test_cases: dict[str, type[ErrorConversionTestCase]] = {}
 
@@ -413,7 +413,9 @@ async def test_errors_raised_by_nexus_operation(
         workflows=[ErrorTestCallerWorkflow],
         task_queue=task_queue,
     ):
-        await create_nexus_endpoint(task_queue, client)
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(task_queue), task_queue
+        )
         await client.execute_workflow(
             ErrorTestCallerWorkflow.invoke_nexus_op_and_assert_error,
             ErrorTestInput(

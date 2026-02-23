@@ -793,6 +793,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             workflow_id=self._info.workflow_id,
             workflow_type=self._info.workflow_type,
             activity_type=handle._input.activity,
+            activity_id=handle._input.activity_id,
             activity_task_queue=(
                 handle._input.task_queue or self._info.task_queue
                 if isinstance(handle._input, StartActivityInput)
@@ -1231,6 +1232,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
     def workflow_is_replaying_history_events(self) -> bool:
         return self._is_replaying and not self._in_query_or_validator
+
+    def workflow_is_read_only(self) -> bool:
+        return self._read_only
 
     def workflow_memo(self) -> Mapping[str, Any]:
         if self._untyped_converted_memo is None:
@@ -2148,6 +2152,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 workflow_id=self._info.workflow_id,
                 workflow_type=self._info.workflow_type,
                 activity_type=activity_handle._input.activity,
+                activity_id=activity_handle._input.activity_id,
                 activity_task_queue=(
                     activity_handle._input.task_queue
                     if isinstance(activity_handle._input, StartActivityInput)
@@ -2314,7 +2319,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
         except Exception:
             logger.exception(
-                f"Failed deserializing signal input for {job.signal_name}, dropping the signal"
+                f"Failed deserializing signal input for {job.signal_name}"
+                f" on workflow {self._info.workflow_type} with ID {self._info.workflow_id}"
+                f" and run ID {self._info.run_id}, dropping the signal",
+                extra={"temporal_workflow": self._info._logger_details()},
             )
             return
         input = HandleSignalInput(
@@ -2943,6 +2951,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
                 workflow_id=self._instance._info.workflow_id,
                 workflow_type=self._instance._info.workflow_type,
                 activity_type=self._input.activity,
+                activity_id=self._input.activity_id,
                 activity_task_queue=(
                     self._input.task_queue or self._instance._info.task_queue
                     if isinstance(self._input, StartActivityInput)

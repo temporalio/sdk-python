@@ -1285,6 +1285,9 @@ class AsyncActivityWrapper:
         assert self._info
         if use_task_token:
             return client.get_async_activity_handle(task_token=self._info.task_token)
+        assert (
+            self._info.workflow_id
+        )  # These tests are for workflow-triggered activities
         return client.get_async_activity_handle(
             workflow_id=self._info.workflow_id,
             run_id=self._info.workflow_run_id,
@@ -1761,8 +1764,8 @@ async def test_activity_reset_catch(
         req = temporalio.api.workflowservice.v1.ResetActivityRequest(
             namespace=client.namespace,
             execution=temporalio.api.common.v1.WorkflowExecution(
-                workflow_id=activity.info().workflow_id,
-                run_id=activity.info().workflow_run_id,
+                workflow_id=activity.info().workflow_id or "",
+                run_id=activity.info().workflow_run_id or "",
             ),
             id=activity.info().activity_id,
         )
@@ -1781,8 +1784,8 @@ async def test_activity_reset_catch(
         req = temporalio.api.workflowservice.v1.ResetActivityRequest(
             namespace=client.namespace,
             execution=temporalio.api.common.v1.WorkflowExecution(
-                workflow_id=activity.info().workflow_id,
-                run_id=activity.info().workflow_run_id,
+                workflow_id=activity.info().workflow_id or "",
+                run_id=activity.info().workflow_run_id or "",
             ),
             id=activity.info().activity_id,
         )
@@ -1833,8 +1836,8 @@ async def test_activity_reset_history(
         req = temporalio.api.workflowservice.v1.ResetActivityRequest(
             namespace=client.namespace,
             execution=temporalio.api.common.v1.WorkflowExecution(
-                workflow_id=activity.info().workflow_id,
-                run_id=activity.info().workflow_run_id,
+                workflow_id=activity.info().workflow_id or "",
+                run_id=activity.info().workflow_run_id or "",
             ),
             id=activity.info().activity_id,
         )
