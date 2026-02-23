@@ -663,8 +663,6 @@ class WorkflowRunHeaderTestCallerWorkflow:
 
 
 async def test_sync_operation_happy_path(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
@@ -701,8 +699,6 @@ async def test_sync_operation_happy_path(client: Client, env: WorkflowEnvironmen
 async def test_workflow_run_operation_happy_path(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
