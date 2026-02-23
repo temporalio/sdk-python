@@ -2104,6 +2104,9 @@ class TestAsyncAndNonAsyncCancel:
         self, client: Client, env: WorkflowEnvironment, use_async_cancel: bool
     ):
         """Test that both async and non-async cancel methods work for TaskExecutor-based operations."""
+        if env.supports_time_skipping:
+            pytest.skip("Nexus tests don't work with time-skipping server")
+
         task_queue = str(uuid.uuid4())
         async with Worker(
             client,
