@@ -91,9 +91,6 @@ class CallerWorkflow:
 async def test_multiple_operation_invocations_can_connect_to_same_handler_workflow(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
     task_queue = str(uuid.uuid4())
     workflow_id = str(uuid.uuid4())
 
