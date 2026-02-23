@@ -4,7 +4,6 @@ import asyncio
 import uuid
 from dataclasses import dataclass
 
-import pytest
 from nexusrpc.handler import service_handler
 
 from temporalio import nexus, workflow
