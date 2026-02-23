@@ -929,6 +929,8 @@ async def test_cancel_operation_headers(
     env: WorkflowEnvironment,
 ):
     """Test headers from workflow and interceptor are propagated to cancel operation handler."""
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
     workflow_id = str(uuid.uuid4())
