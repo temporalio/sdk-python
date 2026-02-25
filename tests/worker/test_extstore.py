@@ -1,0 +1,427 @@
+import dataclasses
+import uuid
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import timedelta
+
+import pytest
+
+import temporalio
+import temporalio.converter
+from temporalio import activity, workflow
+from temporalio.api.common.v1 import Payload
+from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
+from temporalio.common import RetryPolicy
+from temporalio.exceptions import ActivityError, ApplicationError
+from temporalio.extstore import (
+    DriverClaim,
+    DriverContext,
+    PayloadNotFoundError,
+    StorageOptions,
+    StorageWarning,
+)
+from temporalio.testing._workflow import WorkflowEnvironment
+from temporalio.worker import Replayer
+from tests.helpers import assert_task_fail_eventually, new_worker
+from tests.test_extstore import InMemoryTestDriver
+
+
+@dataclass(frozen=True)
+class ExtStoreActivityInput:
+    input_data: str
+    output_size: int
+    pass
+
+
+@activity.defn
+async def ext_store_activity(
+    input: ExtStoreActivityInput,
+) -> str:
+    return "ao" * int(input.output_size / 2)
+
+
+@dataclass(frozen=True)
+class ExtStoreWorkflowInput:
+    input_data: str
+    activity_input_size: int
+    activity_output_size: int
+    output_size: int
+    max_activity_attempts: int | None = None
+
+
+@workflow.defn
+class ExtStoreWorkflow:
+    @workflow.run
+    async def run(self, input: ExtStoreWorkflowInput) -> str:
+        retry_policy = (
+            RetryPolicy(maximum_attempts=input.max_activity_attempts)
+            if input.max_activity_attempts is not None
+            else None
+        )
+        await workflow.execute_activity(
+            ext_store_activity,
+            ExtStoreActivityInput(
+                input_data="ai" * int(input.activity_input_size / 2),
+                output_size=input.activity_output_size,
+            ),
+            schedule_to_close_timeout=timedelta(seconds=3),
+            retry_policy=retry_policy,
+        )
+        return "wo" * int(input.output_size / 2)
+
+
+class BadTestDriver(InMemoryTestDriver):
+    def __init__(
+        self,
+        driver_name: str = "bad-driver",
+        no_store: bool = False,
+        no_retrieve: bool = False,
+        raise_payload_not_found: bool = False,
+    ):
+        super().__init__(driver_name)
+        self._no_store = no_store
+        self._no_retrieve = no_retrieve
+        self._raise_payload_not_found = raise_payload_not_found
+
+    async def store(
+        self,
+        context: DriverContext,
+        payloads: Sequence[Payload],
+    ) -> list[DriverClaim]:
+        if self._no_store:
+            return []
+        return await super().store(context, payloads)
+
+    async def retrieve(
+        self,
+        context: DriverContext,
+        claims: Sequence[DriverClaim],
+    ) -> list[Payload]:
+        if self._no_retrieve:
+            return []
+        if self._raise_payload_not_found:
+            raise PayloadNotFoundError(
+                driver_claim=claims[0],
+                driver_name=self.name(),
+            )
+        return await super().retrieve(context, claims)
+
+
+async def test_extstore_activity_input_no_retrieve(
+    env: WorkflowEnvironment,
+):
+    """Using a small threshold, validate that activity result size over
+    the threshold causes driver to be invoked."""
+    driver = BadTestDriver(no_retrieve=True)
+
+    client = await Client.connect(
+        env.client.service_client.config.target_host,
+        namespace=env.client.namespace,
+        data_converter=dataclasses.replace(
+            temporalio.converter.default(),
+            external_storage=StorageOptions(
+                drivers=[driver],
+                payload_size_threshold=1024,
+            ),
+        ),
+    )
+
+    async with new_worker(
+        client, ExtStoreWorkflow, activities=[ext_store_activity]
+    ) as worker:
+        handle = await client.start_workflow(
+            ExtStoreWorkflow.run,
+            ExtStoreWorkflowInput(
+                input_data="workflow input",
+                activity_input_size=1000,
+                activity_output_size=10,
+                output_size=10,
+                max_activity_attempts=1,
+            ),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        with pytest.raises(WorkflowFailureError) as err:
+            await handle.result()
+
+        assert isinstance(err.value.cause, ActivityError)
+
+
+async def test_extstore_activity_result_no_store(
+    env: WorkflowEnvironment,
+):
+    """Using a small threshold, validate that activity result size over
+    the threshold causes driver to be invoked."""
+    driver = BadTestDriver(no_store=True)
+
+    client = await Client.connect(
+        env.client.service_client.config.target_host,
+        namespace=env.client.namespace,
+        data_converter=dataclasses.replace(
+            temporalio.converter.default(),
+            external_storage=StorageOptions(
+                drivers=[driver],
+                payload_size_threshold=1024,
+            ),
+        ),
+    )
+
+    async with new_worker(
+        client, ExtStoreWorkflow, activities=[ext_store_activity]
+    ) as worker:
+        handle = await client.start_workflow(
+            ExtStoreWorkflow.run,
+            ExtStoreWorkflowInput(
+                input_data="workflow input",
+                activity_input_size=10,
+                activity_output_size=1000,
+                output_size=10,
+                max_activity_attempts=1,
+            ),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        with pytest.raises(WorkflowFailureError) as err:
+            await handle.result()
+
+        assert isinstance(err.value.cause, ActivityError)
+
+
+async def test_extstore_worker_missing_driver(
+    env: WorkflowEnvironment,
+):
+    """Validate that when a worker is provided a workflow history with
+    external storage references and the worker is not configured for external
+    storage, it will cause a workflow task failure.
+    """
+    driver = InMemoryTestDriver()
+
+    far_client = await Client.connect(
+        env.client.service_client.config.target_host,
+        namespace=env.client.namespace,
+        data_converter=dataclasses.replace(
+            temporalio.converter.default(),
+            external_storage=StorageOptions(
+                drivers=[driver],
+                payload_size_threshold=1024,
+            ),
+        ),
+    )
+
+    worker_client = await Client.connect(
+        env.client.service_client.config.target_host,
+        namespace=env.client.namespace,
+    )
+
+    async with new_worker(
+        worker_client, ExtStoreWorkflow, activities=[ext_store_activity]
+    ) as worker:
+        handle = await far_client.start_workflow(
+            ExtStoreWorkflow.run,
+            ExtStoreWorkflowInput(
+                input_data="wi" * 1024,
+                activity_input_size=10,
+                activity_output_size=10,
+                output_size=10,
+            ),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        await assert_task_fail_eventually(handle)
+
+
+async def test_extstore_payload_not_found_fails_workflow(
+    env: WorkflowEnvironment,
+):
+    """When a PayloadNotFoundError is raised while retrieving workflow input,
+    the workflow must fail terminally (not retry as a task failure).
+    """
+    client = await Client.connect(
+        env.client.service_client.config.target_host,
+        namespace=env.client.namespace,
+        data_converter=dataclasses.replace(
+            temporalio.converter.default(),
+            external_storage=StorageOptions(
+                drivers=[BadTestDriver(raise_payload_not_found=True)],
+                payload_size_threshold=1024,
+            ),
+        ),
+    )
+
+    async with new_worker(
+        client, ExtStoreWorkflow, activities=[ext_store_activity]
+    ) as worker:
+        handle = await client.start_workflow(
+            ExtStoreWorkflow.run,
+            ExtStoreWorkflowInput(
+                input_data="wi" * 512,  # exceeds 1024-byte threshold
+                activity_input_size=10,
+                activity_output_size=10,
+                output_size=10,
+            ),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=10),
+        )
+
+        with pytest.raises(WorkflowFailureError) as exc_info:
+            await handle.result()
+
+        assert isinstance(exc_info.value.cause, ApplicationError)
+        assert exc_info.value.cause.type == "PayloadNotFoundError"
+        assert exc_info.value.cause.non_retryable is True
+
+
+async def _run_extstore_workflow_and_fetch_history(
+    env: WorkflowEnvironment,
+    driver: InMemoryTestDriver,
+    *,
+    input_data: str,
+    activity_output_size: int = 10,
+) -> WorkflowHandle:
+    """Helper: run ExtStoreWorkflow with the given driver and return its history handle."""
+    extstore_client = await Client.connect(
+        env.client.service_client.config.target_host,
+        namespace=env.client.namespace,
+        data_converter=dataclasses.replace(
+            temporalio.converter.default(),
+            external_storage=StorageOptions(
+                drivers=[driver],
+                payload_size_threshold=512,
+            ),
+        ),
+    )
+    async with new_worker(
+        extstore_client, ExtStoreWorkflow, activities=[ext_store_activity]
+    ) as worker:
+        handle = await extstore_client.start_workflow(
+            ExtStoreWorkflow.run,
+            ExtStoreWorkflowInput(
+                input_data=input_data,
+                activity_input_size=10,
+                activity_output_size=activity_output_size,
+                output_size=10,
+            ),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()
+    return handle
+
+
+async def test_replay_extstore_history_fails_without_extstore(
+    env: WorkflowEnvironment,
+) -> None:
+    """A history with externalized workflow input fails to replay when the
+    Replayer has no external storage configured."""
+    driver = InMemoryTestDriver()
+    handle = await _run_extstore_workflow_and_fetch_history(
+        env,
+        driver,
+        input_data="wi" * 512,  # exceeds 512-byte threshold
+    )
+    history = await handle.fetch_history()
+
+    # Replay without external storage — the reference payload cannot be decoded.
+    # The middleware emits a StorageWarning when it encounters a reference payload
+    # with no driver configured.
+    with pytest.warns(StorageWarning, match="External storage is not configured"):
+        result = await Replayer(workflows=[ExtStoreWorkflow]).replay_workflow(
+            history, raise_on_replay_failure=False
+        )
+    # Must be a task-failure RuntimeError, not a NondeterminismError — external
+    # storage decode failures are distinct from workflow code changes.
+    assert isinstance(result.replay_failure, RuntimeError)
+    assert not isinstance(result.replay_failure, workflow.NondeterminismError)
+    # The message is the full activation-completion failure string; the
+    # "Failed decoding arguments" text from _convert_payloads is embedded in it.
+    assert "Failed decoding arguments" in result.replay_failure.args[0]
+
+
+async def test_replay_extstore_history_succeeds_with_correct_extstore(
+    env: WorkflowEnvironment,
+) -> None:
+    """A history with externalized workflow input replays successfully when the
+    Replayer is configured with the same storage driver that holds the data."""
+    driver = InMemoryTestDriver()
+    handle = await _run_extstore_workflow_and_fetch_history(
+        env, driver, input_data="wi" * 512
+    )
+    history = await handle.fetch_history()
+
+    # Replay with the same populated driver — must succeed.
+    await Replayer(
+        workflows=[ExtStoreWorkflow],
+        data_converter=dataclasses.replace(
+            temporalio.converter.default(),
+            external_storage=StorageOptions(
+                drivers=[driver],
+                payload_size_threshold=512,
+            ),
+        ),
+    ).replay_workflow(history)
+
+
+async def test_replay_extstore_history_fails_with_empty_driver(
+    env: WorkflowEnvironment,
+) -> None:
+    """A history with external storage references fails to replay when the
+    Replayer has external storage configured but the driver holds no data
+    (simulates pointing at the wrong backend or a purged store)."""
+    driver = InMemoryTestDriver()
+    handle = await _run_extstore_workflow_and_fetch_history(
+        env, driver, input_data="wi" * 512
+    )
+    history = await handle.fetch_history()
+
+    # Replay with a fresh empty driver — retrieval will fail.
+    result = await Replayer(
+        workflows=[ExtStoreWorkflow],
+        data_converter=dataclasses.replace(
+            temporalio.converter.default(),
+            external_storage=StorageOptions(
+                drivers=[InMemoryTestDriver()],
+                payload_size_threshold=512,
+            ),
+        ),
+    ).replay_workflow(history, raise_on_replay_failure=False)
+    # InMemoryTestDriver raises PayloadNotFoundError for absent keys.
+    # PayloadNotFoundError is re-raised without wrapping, so it propagates
+    # through decode_activation (before the workflow task runs).  The core SDK
+    # receives an activation failure, issues a FailWorkflow command, but the
+    # next history event is ActivityTaskScheduled — causing a NondeterminismError.
+    assert isinstance(result.replay_failure, workflow.NondeterminismError)
+
+
+async def test_replay_extstore_activity_result_fails_without_extstore(
+    env: WorkflowEnvironment,
+) -> None:
+    """A history where only the activity result was stored externally (the
+    workflow input is small enough to be inline) also fails to replay without
+    external storage — verifying that mid-workflow decode failures are caught."""
+    driver = InMemoryTestDriver()
+    handle = await _run_extstore_workflow_and_fetch_history(
+        env,
+        driver,
+        input_data="small",  # well under 512 bytes — stays inline
+        activity_output_size=2048,  # 2 KB result — stored externally
+    )
+    history = await handle.fetch_history()
+
+    # Replay without external storage.  The workflow input decodes fine, but
+    # when the ActivityTaskCompleted result is delivered back to the workflow
+    # coroutine it cannot be decoded.
+    with pytest.warns(StorageWarning, match="External storage is not configured"):
+        result = await Replayer(workflows=[ExtStoreWorkflow]).replay_workflow(
+            history, raise_on_replay_failure=False
+        )
+    # Mid-workflow decode failure is still a task failure (RuntimeError), not
+    # nondeterminism.
+    assert isinstance(result.replay_failure, RuntimeError)
+    assert not isinstance(result.replay_failure, workflow.NondeterminismError)
+    # The message is the full activation-completion failure string; the
+    # "Failed decoding arguments" text from _convert_payloads is embedded in it.
+    assert "Failed decoding arguments" in result.replay_failure.args[0]

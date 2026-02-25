@@ -21,6 +21,7 @@ from enum import IntEnum
 from itertools import zip_longest
 from logging import getLogger
 from typing import (
+    TYPE_CHECKING,
     Any,
     ClassVar,
     Literal,
@@ -43,6 +44,9 @@ import temporalio.api.failure.v1
 import temporalio.common
 import temporalio.exceptions
 import temporalio.types
+
+if TYPE_CHECKING:
+    from temporalio.extstore import StorageOptions, _ExternalStorageMiddleware
 
 if sys.version_info < (3, 11):
     # Python's datetime.fromisoformat doesn't support certain formats pre-3.11
@@ -924,11 +928,42 @@ class DefaultFailureConverter(FailureConverter):
         failure: temporalio.api.failure.v1.Failure,
     ) -> None:
         """See base class."""
+        from temporalio.extstore import (
+            DriverError,
+            PayloadNotFoundError,
+        )
+
         # If already a failure error, use that
         if isinstance(exception, temporalio.exceptions.FailureError):
             self._error_to_failure(exception, payload_converter, failure)
         elif isinstance(exception, nexusrpc.HandlerError):
             self._nexus_handler_error_to_failure(exception, payload_converter, failure)
+        elif isinstance(exception, PayloadNotFoundError):
+            # Convert to failure error
+            failure_error = temporalio.exceptions.ApplicationError(
+                str(exception),
+                {
+                    "driver_name": exception.driver_name,
+                    "driver_claim": exception.driver_claim,
+                },
+                type=exception.__class__.__name__,
+                non_retryable=True,
+            )
+            failure_error.__traceback__ = exception.__traceback__
+            failure_error.__cause__ = exception.__cause__
+            self._error_to_failure(failure_error, payload_converter, failure)
+        elif isinstance(exception, DriverError):
+            # Convert to failure error
+            failure_error = temporalio.exceptions.ApplicationError(
+                str(exception),
+                {
+                    "driver_name": exception.driver_name,
+                },
+                type=exception.__class__.__name__,
+            )
+            failure_error.__traceback__ = exception.__traceback__
+            failure_error.__cause__ = exception.__cause__
+            self._error_to_failure(failure_error, payload_converter, failure)
         else:
             # Convert to failure error
             failure_error = temporalio.exceptions.ApplicationError(
@@ -1359,8 +1394,19 @@ class DataConverter(WithSerializationContext):
     payload_limits: PayloadLimitsConfig = PayloadLimitsConfig()
     """Settings for payload size limits."""
 
+    external_storage: StorageOptions | None = None
+    """Options for external storage. If None, external storage is disabled.
+    
+    .. warning::
+           This API is experimental.
+    """
+
     default: ClassVar[DataConverter]
     """Singleton default data converter."""
+
+    _external_storage_middleware: "_ExternalStorageMiddleware" = dataclasses.field(
+        init=False
+    )
 
     _payload_error_limits: _ServerPayloadErrorLimits | None = None
     """Server-reported limits for payloads."""
@@ -1368,6 +1414,7 @@ class DataConverter(WithSerializationContext):
     def __post_init__(self) -> None:  # noqa: D105
         object.__setattr__(self, "payload_converter", self.payload_converter_class())
         object.__setattr__(self, "failure_converter", self.failure_converter_class())
+        self._reset_external_storage_middleware()
 
     async def encode(
         self, values: Sequence[Any]
@@ -1445,18 +1492,22 @@ class DataConverter(WithSerializationContext):
         payload_converter = self.payload_converter
         payload_codec = self.payload_codec
         failure_converter = self.failure_converter
+        external_storage = self.external_storage
         if isinstance(payload_converter, WithSerializationContext):
             payload_converter = payload_converter.with_context(context)
         if isinstance(payload_codec, WithSerializationContext):
             payload_codec = payload_codec.with_context(context)
         if isinstance(failure_converter, WithSerializationContext):
             failure_converter = failure_converter.with_context(context)
+        if isinstance(external_storage, WithSerializationContext):
+            external_storage = external_storage.with_context(context)
         if all(
             new is orig
             for new, orig in [
                 (payload_converter, self.payload_converter),
                 (payload_codec, self.payload_codec),
                 (failure_converter, self.failure_converter),
+                (external_storage, self.external_storage),
             ]
         ):
             return self
@@ -1464,7 +1515,21 @@ class DataConverter(WithSerializationContext):
         object.__setattr__(cloned, "payload_converter", payload_converter)
         object.__setattr__(cloned, "payload_codec", payload_codec)
         object.__setattr__(cloned, "failure_converter", failure_converter)
+        object.__setattr__(cloned, "external_storage", external_storage)
+        cloned._reset_external_storage_middleware(context)
         return cloned
+
+    def _reset_external_storage_middleware(
+        self, context: SerializationContext | None = None
+    ) -> None:
+        # Lazy import to avoid circular dependency
+        from temporalio.extstore import _ExternalStorageMiddleware
+
+        object.__setattr__(
+            self,
+            "_external_storage_middleware",
+            _ExternalStorageMiddleware(self.external_storage, context),
+        )
 
     def _with_payload_error_limits(
         self, limits: _ServerPayloadErrorLimits | None
@@ -1523,48 +1588,47 @@ class DataConverter(WithSerializationContext):
     async def _encode_payload(
         self, payload: temporalio.api.common.v1.Payload
     ) -> temporalio.api.common.v1.Payload:
+        payload = await self._external_storage_middleware.store_payload(payload)
         if self.payload_codec:
             payload = (await self.payload_codec.encode([payload]))[0]
         self._validate_payload_limits([payload])
         return payload
 
     async def _encode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
-        if self.payload_codec:
-            await self.payload_codec.encode_wrapper(payloads)
-        self._validate_payload_limits(payloads.payloads)
+        encoded_payloads = await self._encode_payload_sequence(payloads.payloads)
+        del payloads.payloads[:]
+        payloads.payloads.extend(encoded_payloads)
 
     async def _encode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
-        encoded_payloads = list(payloads)
+        result = await self._external_storage_middleware.store_payloads(payloads)
         if self.payload_codec:
-            encoded_payloads = await self.payload_codec.encode(encoded_payloads)
-        self._validate_payload_limits(encoded_payloads)
-        return encoded_payloads
+            result = await self.payload_codec.encode(result)
+        self._validate_payload_limits(result)
+        return result
 
     async def _decode_payload(
         self, payload: temporalio.api.common.v1.Payload
     ) -> temporalio.api.common.v1.Payload:
         if self.payload_codec:
             payload = (await self.payload_codec.decode([payload]))[0]
+        payload = await self._external_storage_middleware.retrieve_payload(payload)
         return payload
 
     async def _decode_payloads(self, payloads: temporalio.api.common.v1.Payloads):
-        if self.payload_codec:
-            await self.payload_codec.decode_wrapper(payloads)
+        decoded_payloads = await self._decode_payload_sequence(payloads.payloads)
+        del payloads.payloads[:]
+        payloads.payloads.extend(decoded_payloads)
 
     async def _decode_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
-        if not self.payload_codec:
-            return list(payloads)
-        return await self.payload_codec.decode(payloads)
-
-    # Temporary shortcircuit detection while the _decode_* methods may no-op if
-    # a payload codec is not configured. Remove once those paths have more to them.
-    @property
-    def _decode_payload_has_effect(self) -> bool:
-        return self.payload_codec is not None
+        result = list(payloads)
+        if self.payload_codec:
+            result = await self.payload_codec.decode(result)
+        result = await self._external_storage_middleware.retrieve_payloads(result)
+        return result
 
     @staticmethod
     async def _apply_to_failure_payloads(

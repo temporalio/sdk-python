@@ -25,6 +25,7 @@ import temporalio.exceptions
 import temporalio.workflow
 from temporalio.api.enums.v1 import WorkflowTaskFailedCause
 from temporalio.bridge.worker import PollShutdownError
+from temporalio.extstore import PayloadNotFoundError
 
 from . import _command_aware_visitor
 from ._interceptor import (
@@ -340,21 +341,41 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 "Failed handling activation on workflow with run ID %s", act.run_id
             )
 
-            completion.failed.failure.SetInParent()
-            try:
-                data_converter.failure_converter.to_failure(
-                    err,
-                    data_converter.payload_converter,
-                    completion.failed.failure,
-                )
-            except Exception as inner_err:
-                logger.exception(
-                    "Failed converting activation exception on workflow with run ID %s",
-                    act.run_id,
-                )
-                completion.failed.failure.message = (
-                    f"Failed converting activation exception: {inner_err}"
-                )
+            if isinstance(err, PayloadNotFoundError):
+                # Fail the workflow execution terminally rather than failing the task
+                command = completion.successful.commands.add()
+                failure = command.fail_workflow_execution.failure
+                failure.SetInParent()
+                try:
+                    data_converter.failure_converter.to_failure(
+                        err,
+                        data_converter.payload_converter,
+                        failure,
+                    )
+                except Exception as inner_err:
+                    logger.exception(
+                        "Failed converting activation exception on workflow with run ID %s",
+                        act.run_id,
+                    )
+                    failure.message = (
+                        f"Failed converting activation exception: {inner_err}"
+                    )
+            else:
+                completion.failed.failure.SetInParent()
+                try:
+                    data_converter.failure_converter.to_failure(
+                        err,
+                        data_converter.payload_converter,
+                        completion.failed.failure,
+                    )
+                except Exception as inner_err:
+                    logger.exception(
+                        "Failed converting activation exception on workflow with run ID %s",
+                        act.run_id,
+                    )
+                    completion.failed.failure.message = (
+                        f"Failed converting activation exception: {inner_err}"
+                    )
 
         completion.run_id = act.run_id
 
