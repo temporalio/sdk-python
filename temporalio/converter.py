@@ -91,7 +91,7 @@ class WorkflowSerializationContext(SerializationContext):
     namespace: str
     """The namespace the workflow is running in."""
 
-    workflow_id: str | None
+    workflow_id: str
     """The ID of the workflow.
     
     Note that this is the ID of the workflow of which the payload being operated on is an input or
