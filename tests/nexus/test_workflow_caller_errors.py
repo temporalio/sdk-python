@@ -34,6 +34,7 @@ from temporalio.exceptions import (
     ApplicationError,
     NexusOperationError,
     TimeoutError,
+    TimeoutType,
 )
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
@@ -359,6 +360,149 @@ async def test_error_raised_by_timeout_of_nexus_start_operation(
                     "Expected exception due to timeout of nexus start operation"
                 )
             assert capturer.find_log("unexpected cancellation reason") is None
+
+
+# Schedule to start timeout test
+@service_handler
+class ScheduleToStartTimeoutTestService:
+    @sync_operation
+    async def expect_schedule_to_start_timeout(
+        self, ctx: StartOperationContext, _input: None
+    ) -> None:
+        try:
+            await asyncio.wait_for(ctx.task_cancellation.wait_until_cancelled(), 1)
+        except asyncio.TimeoutError:
+            raise ApplicationError("expected cancel", non_retryable=True)
+
+
+@workflow.defn
+class ScheduleToStartTimeoutTestCallerWorkflow:
+    @workflow.init
+    def __init__(self):
+        self.nexus_client = workflow.create_nexus_client(
+            service=ScheduleToStartTimeoutTestService,
+            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+        )
+
+    @workflow.run
+    async def run(self) -> None:
+        await self.nexus_client.execute_operation(
+            ScheduleToStartTimeoutTestService.expect_schedule_to_start_timeout,
+            None,
+            output_type=None,
+            schedule_to_start_timeout=timedelta(seconds=0.1),
+        )
+
+
+async def test_error_raised_by_schedule_to_start_timeout_of_nexus_operation(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client,
+        nexus_service_handlers=[ScheduleToStartTimeoutTestService()],
+        workflows=[ScheduleToStartTimeoutTestCallerWorkflow],
+        task_queue=task_queue,
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+    ):
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(task_queue), task_queue
+        )
+        try:
+            await client.execute_workflow(
+                ScheduleToStartTimeoutTestCallerWorkflow.run,
+                id=str(uuid.uuid4()),
+                task_queue=task_queue,
+            )
+        except Exception as err:
+            assert isinstance(err, WorkflowFailureError)
+            assert isinstance(err.__cause__, NexusOperationError)
+            assert isinstance(err.__cause__.__cause__, TimeoutError)
+            timeout_err = err.__cause__.__cause__
+            assert timeout_err.type == TimeoutType.SCHEDULE_TO_START
+        else:
+            pytest.fail(
+                "Expected exception due to schedule to start timeout of nexus operation"
+            )
+
+
+# Start to close timeout test
+
+
+class OperationThatExpectsStartToCloseTimeoutAsync(OperationHandler[None, None]):
+    async def start(
+        self, ctx: StartOperationContext, input: None
+    ) -> StartOperationResultAsync:
+        return StartOperationResultAsync("fake-token")
+
+    async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
+        pass
+
+
+@service_handler
+class StartToCloseTimeoutTestService:
+    @operation_handler
+    def expect_start_to_close_timeout(self) -> OperationHandler[None, None]:
+        return OperationThatExpectsStartToCloseTimeoutAsync()
+
+
+@workflow.defn
+class StartToCloseTimeoutTestCallerWorkflow:
+    @workflow.init
+    def __init__(
+        self,
+    ):
+        self.nexus_client = workflow.create_nexus_client(
+            service=StartToCloseTimeoutTestService,
+            endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
+        )
+
+    @workflow.run
+    async def run(self) -> None:
+        op_handle = await self.nexus_client.start_operation(
+            StartToCloseTimeoutTestService.expect_start_to_close_timeout,
+            None,
+            start_to_close_timeout=timedelta(seconds=0.1),
+        )
+        await op_handle
+
+
+async def test_error_raised_by_start_to_close_timeout_of_nexus_operation(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client,
+        nexus_service_handlers=[StartToCloseTimeoutTestService()],
+        workflows=[StartToCloseTimeoutTestCallerWorkflow],
+        task_queue=task_queue,
+        nexus_task_executor=concurrent.futures.ThreadPoolExecutor(),
+    ):
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(task_queue), task_queue
+        )
+        try:
+            await client.execute_workflow(
+                StartToCloseTimeoutTestCallerWorkflow.run,
+                id=str(uuid.uuid4()),
+                task_queue=task_queue,
+            )
+        except Exception as err:
+            assert isinstance(err, WorkflowFailureError)
+            assert isinstance(err.__cause__, NexusOperationError)
+            timeout_err = err.__cause__.__cause__
+            assert isinstance(timeout_err, TimeoutError)
+            assert timeout_err.type == TimeoutType.START_TO_CLOSE
+        else:
+            pytest.fail(
+                "Expected exception due to start to close timeout of nexus operation"
+            )
 
 
 # Cancellation timeout test
