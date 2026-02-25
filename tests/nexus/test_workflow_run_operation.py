@@ -14,6 +14,7 @@ from nexusrpc.handler import (
 from nexusrpc.handler._decorators import operation_handler
 
 from temporalio import nexus, workflow
+from temporalio.client import Client
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.nexus._operation_handlers import WorkflowRunOperationHandler
 from temporalio.testing import WorkflowEnvironment
@@ -58,19 +59,38 @@ class SubclassingHappyPath:
         return MyOperation()
 
 
-@service_handler
+@service
+class RequestDeadlineService:
+    op: Operation[Input, str]
+
+
+@service_handler(service=RequestDeadlineService)
 class RequestDeadlineHandler:
     @workflow_run_operation
     async def op(
-        self, ctx: WorkflowRunOperationContext, input: Input
+        self, ctx: WorkflowRunOperationContext, _input: Input
     ) -> nexus.WorkflowHandle[str]:
         assert (
             ctx.request_deadline is not None
         ), "request_deadline should be set in workflow_run_operation"
         return await ctx.start_workflow(
             EchoWorkflow.run,
-            input.value,
+            str(ctx.request_deadline),
             id=str(uuid.uuid4()),
+        )
+
+
+@workflow.defn
+class RequestDeadlineWorkflow:
+    @workflow.run
+    async def run(self, input: Input, task_queue: str) -> str:
+        client = workflow.create_nexus_client(
+            service=RequestDeadlineService,
+            endpoint=make_nexus_endpoint_name(task_queue),
+        )
+        return await client.execute_operation(
+            RequestDeadlineService.op,
+            input,
         )
 
 
@@ -130,16 +150,11 @@ async def test_workflow_run_operation(
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
-        if hasattr(service_handler_cls, "__expected__error__"):
-            status_code, message = service_handler_cls.__expected__error__
-            assert resp.status_code == status_code
-            failure = Failure(**resp.json())
-            assert re.search(message, failure.message)
-        else:
-            assert resp.status_code == 201
+        assert result == "test"
 
 
 async def test_request_deadline_is_accessible_in_workflow_run_operation(
+    client: Client,
     env: WorkflowEnvironment,
 ):
     """Test that request_deadline is accessible in WorkflowRunOperationContext."""
@@ -147,22 +162,18 @@ async def test_request_deadline_is_accessible_in_workflow_run_operation(
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
-    endpoint = (await create_nexus_endpoint(task_queue, env.client)).endpoint.id
-    assert (service_defn := nexusrpc.get_service_definition(RequestDeadlineHandler))
-    service_client = ServiceClient(
-        server_address=ServiceClient.default_server_address(env),
-        endpoint=endpoint,
-        service=service_defn.name,
-    )
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
     async with Worker(
         env.client,
         task_queue=task_queue,
         nexus_service_handlers=[RequestDeadlineHandler()],
+        workflows=[RequestDeadlineWorkflow, EchoWorkflow],
     ):
-        resp = await service_client.start_operation(
-            "op",
-            dataclass_as_dict(Input(value="test")),
-            {"Request-Timeout": "30s"},
+        result = await client.execute_workflow(
+            RequestDeadlineWorkflow.run,
+            args=[Input(value="test"), task_queue],
+            task_queue=task_queue,
+            id=str(uuid.uuid4()),
         )
-        # The assertion in the handler verified request_deadline was accessible
-        assert resp.status_code == 201
+        assert result
