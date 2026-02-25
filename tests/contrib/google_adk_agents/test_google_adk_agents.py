@@ -28,6 +28,7 @@ from google.adk.events import Event
 from google.adk.models import BaseLlm, LLMRegistry
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
+from google.adk.runners import InMemoryRunner
 from google.adk.sessions import InMemorySessionService
 from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
@@ -83,22 +84,20 @@ class WeatherAgent:
             tools=[weather_tool],
         )
 
-        # 2. Create Session (uses runtime.new_uuid() -> workflow.uuid4())
-        session_service = InMemorySessionService()
-        logger.info("Create session.")
-        session = await session_service.create_session(
-            app_name="test_app", user_id="test"
-        )
-
-        logger.info(f"Session created with ID: {session.id}")
-
-        # 3. Run Agent with AgentPlugin
-        runner = Runner(
+        # 2. Create runner
+        runner = InMemoryRunner(
             agent=agent,
             app_name="test_app",
-            session_service=session_service,
         )
 
+        # 3. Create Session (uses runtime.new_uuid() -> workflow.uuid4())
+        logger.info("Create session.")
+        session = await runner.session_service.create_session(
+            app_name="test_app", user_id="test"
+        )
+        logger.info(f"Session created with ID: {session.id}")
+
+        # 4. Run
         logger.info("Starting runner.")
         last_event = None
         async with Aclosing(
