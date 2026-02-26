@@ -301,11 +301,14 @@ async def decode_activation(
     activation: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
     data_converter: temporalio.converter.DataConverter,
     decode_headers: bool,
+    concurrency_limit: int,
 ) -> None:
     """Decode all payloads in the activation."""
     if data_converter._decode_payload_has_effect:
         await CommandAwarePayloadVisitor(
-            skip_search_attributes=True, skip_headers=not decode_headers
+            skip_search_attributes=True,
+            skip_headers=not decode_headers,
+            concurrency_limit=concurrency_limit,
         ).visit(_Visitor(data_converter._decode_payload_sequence), activation)
 
 
@@ -313,8 +316,11 @@ async def encode_completion(
     completion: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
     data_converter: temporalio.converter.DataConverter,
     encode_headers: bool,
+    concurrency_limit: int,
 ) -> None:
     """Encode all payloads in the completion."""
     await CommandAwarePayloadVisitor(
-        skip_search_attributes=True, skip_headers=not encode_headers
+        skip_search_attributes=True,
+        skip_headers=not encode_headers,
+        concurrency_limit=concurrency_limit,
     ).visit(_Visitor(data_converter._encode_payload_sequence), completion)

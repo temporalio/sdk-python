@@ -1,4 +1,6 @@
+import asyncio
 import dataclasses
+import time
 from collections.abc import MutableSequence
 
 from google.protobuf.duration_pb2 import Duration
@@ -205,6 +207,75 @@ async def test_visit_payloads_on_other_commands():
     assert ur.completed.metadata["visited"]
 
 
+async def test_concurrent_throughput():
+    """Demonstrate that concurrent visitation is faster than serialized for I/O-bound codecs."""
+    N_CMDS = 10
+    N_ARGS = 5
+    SLEEP = 0.02
+
+    class SlowVisitor(VisitorFunctions):
+        def __init__(self, *, blocking: bool = False):
+            self.visit_count = 0
+            self._active = 0
+            self.max_concurrent = 0
+            self._blocking = blocking
+
+        async def visit_payload(self, payload: Payload) -> None:
+            return await self._visit(1)
+
+        async def visit_payloads(self, payloads: MutableSequence[Payload]) -> None:
+            return await self._visit(len(payloads))
+
+        async def _visit(self, count: int) -> None:
+            self._active += 1
+            self.max_concurrent = max(self.max_concurrent, self._active)
+            try:
+                if self._blocking:
+                    time.sleep(SLEEP * count)
+                else:
+                    await asyncio.sleep(SLEEP * count)
+                self.visit_count += count
+            finally:
+                self._active -= 1
+
+    completion = WorkflowActivationCompletion(
+        run_id="1",
+        successful=Success(
+            commands=[
+                WorkflowCommand(
+                    schedule_activity=ScheduleActivity(
+                        seq=i,
+                        activity_id=str(i),
+                        activity_type="",
+                        task_queue="",
+                        arguments=[
+                            Payload(data=f"cmd_{i}_arg_{j}".encode())
+                            for j in range(N_ARGS)
+                        ],
+                        priority=Priority(),
+                    )
+                )
+                for i in range(N_CMDS)
+            ]
+        ),
+    )
+
+    visitor_max_parallel = SlowVisitor()
+    start = time.perf_counter()
+    await PayloadVisitor().visit(visitor_max_parallel, completion)
+    elapsed_concurrent = time.perf_counter() - start
+
+    assert visitor_max_parallel.visit_count == N_CMDS * N_ARGS
+
+    visitor_serialized = SlowVisitor()
+    start = time.perf_counter()
+    await PayloadVisitor(concurrency_limit=1).visit(visitor_serialized, completion)
+    elapsed_serialized = time.perf_counter() - start
+
+    assert visitor_serialized.visit_count == N_CMDS * N_ARGS
+    assert elapsed_concurrent < elapsed_serialized
+
+
 async def test_bridge_encoding():
     comp = WorkflowActivationCompletion(
         run_id="1",
@@ -235,7 +306,7 @@ async def test_bridge_encoding():
         payload_codec=SimpleCodec(),
     )
 
-    await temporalio.bridge.worker.encode_completion(comp, data_converter, True)
+    await temporalio.bridge.worker.encode_completion(comp, data_converter, True, 1)
 
     cmd = comp.successful.commands[0]
     sa = cmd.schedule_activity
