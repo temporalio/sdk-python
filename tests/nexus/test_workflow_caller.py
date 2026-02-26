@@ -348,9 +348,11 @@ class CancellableDeadlineOperationHandler(OperationHandler[None, str]):
         self,
         start_deadlines_received: list[datetime | None],
         cancel_deadlines_received: list[datetime | None],
+        cancel_received: asyncio.Event,
     ) -> None:
         self._start_deadlines_received = start_deadlines_received
         self._cancel_deadlines_received = cancel_deadlines_received
+        self._cancel_received = cancel_received
 
     async def start(
         self, ctx: StartOperationContext, input: None
@@ -360,6 +362,7 @@ class CancellableDeadlineOperationHandler(OperationHandler[None, str]):
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
         self._cancel_deadlines_received.append(ctx.request_deadline)
+        self._cancel_received.set()
 
 
 @service_handler(service=RequestDeadlineService)
@@ -367,11 +370,14 @@ class RequestDeadlineServiceImpl:
     def __init__(self) -> None:
         self.start_deadlines_received: list[datetime | None] = []
         self.cancel_deadlines_received: list[datetime | None] = []
+        self.cancel_received = asyncio.Event()
 
     @operation_handler
     def cancellable_op(self) -> OperationHandler[None, str]:
         return CancellableDeadlineOperationHandler(
-            self.start_deadlines_received, self.cancel_deadlines_received
+            self.start_deadlines_received,
+            self.cancel_deadlines_received,
+            self.cancel_received,
         )
 
 
@@ -623,11 +629,15 @@ class CancelDeadlineCallerWorkflow:
         op_handle = await nexus_client.start_operation(
             RequestDeadlineService.cancellable_op,
             None,
+            cancellation_type=workflow.NexusOperationCancellationType.WAIT_REQUESTED,
         )
         # Request cancellation - this sends a cancel operation to the handler
         op_handle.cancel()
-        # Wait briefly to allow cancel request to be processed
-        await asyncio.sleep(0.1)
+
+        try:
+            await op_handle
+        except NexusOperationError:
+            pass
 
 
 @workflow.defn
@@ -2234,7 +2244,7 @@ class TestAsyncAndNonAsyncCancel:
             assert result == "cancelled_successfully"
 
 
-async def test_request_deadline_is_accessible_in_start_operation(
+async def test_request_deadline_is_accessible_in_operation(
     client: Client,
     env: WorkflowEnvironment,
 ):
@@ -2268,33 +2278,7 @@ async def test_request_deadline_is_accessible_in_start_operation(
         ), "request_deadline should be set in StartOperationContext"
         assert deadline.tzinfo is timezone.utc, "request_deadline should be in utc"
 
-
-async def test_request_deadline_is_accessible_in_cancel_operation(
-    client: Client,
-    env: WorkflowEnvironment,
-):
-    """Test that request_deadline is accessible in CancelOperationContext."""
-    if env.supports_time_skipping:
-        pytest.skip("Nexus tests don't work with time-skipping server")
-
-    task_queue = str(uuid.uuid4())
-    service_handler = RequestDeadlineServiceImpl()
-
-    async with Worker(
-        client,
-        nexus_service_handlers=[service_handler],
-        workflows=[CancelDeadlineCallerWorkflow],
-        task_queue=task_queue,
-    ):
-        endpoint_name = make_nexus_endpoint_name(task_queue)
-        await env.create_nexus_endpoint(endpoint_name, task_queue)
-
-        await client.execute_workflow(
-            CancelDeadlineCallerWorkflow.run,
-            task_queue,
-            id=str(uuid.uuid4()),
-            task_queue=task_queue,
-        )
+        await asyncio.wait_for(service_handler.cancel_received.wait(), 1)
 
         assert len(service_handler.cancel_deadlines_received) == 1
         deadline = service_handler.cancel_deadlines_received[0]
