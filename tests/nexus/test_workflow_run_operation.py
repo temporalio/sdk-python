@@ -1,5 +1,6 @@
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 import nexusrpc
@@ -176,4 +177,5 @@ async def test_request_deadline_is_accessible_in_workflow_run_operation(
             task_queue=task_queue,
             id=str(uuid.uuid4()),
         )
-        assert result
+        parsed = datetime.fromisoformat(result)
+        assert parsed.tzinfo is timezone.utc, "request_deadline should be in utc"
