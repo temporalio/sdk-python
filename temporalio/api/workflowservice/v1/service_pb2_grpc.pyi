@@ -499,6 +499,11 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse,
     ]
     """List all schedules in a namespace."""
+    CountSchedules: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesRequest,
+        temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesResponse,
+    ]
+    """CountSchedules is a visibility API to count schedules in a specific namespace."""
     UpdateWorkerBuildIdCompatibility: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerBuildIdCompatibilityResponse,
@@ -1605,6 +1610,13 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListSchedulesResponse:
         """List all schedules in a namespace."""
+    @abc.abstractmethod
+    def CountSchedules(
+        self,
+        request: temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesRequest,
+        context: grpc.ServicerContext,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.CountSchedulesResponse:
+        """CountSchedules is a visibility API to count schedules in a specific namespace."""
     @abc.abstractmethod
     def UpdateWorkerBuildIdCompatibility(
         self,

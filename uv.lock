@@ -1820,14 +1820,14 @@ wheels = [
 
 [[package]]
 name = "nexus-rpc"
-version = "1.3.0"
+version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2e/f2/d54f5c03d8f4672ccc0875787a385f53dcb61f98a8ae594b5620e85b9cb3/nexus_rpc-1.3.0.tar.gz", hash = "sha256:e56d3b57b60d707ce7a72f83f23f106b86eca1043aa658e44582ab5ff30ab9ad", size = 75650, upload-time = "2025-12-08T22:59:13.002Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/35/d5/cd1ffb202b76ebc1b33c1332a3416e55a39929006982adc2b1eb069aaa9b/nexus_rpc-1.4.0.tar.gz", hash = "sha256:3b8b373d4865671789cc43623e3dc0bcbf192562e40e13727e17f1c149050fba", size = 82367, upload-time = "2026-02-25T22:01:34.053Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/74/0afd841de3199c148146c1d43b4bfb5605b2f1dc4c9a9087fe395091ea5a/nexus_rpc-1.3.0-py3-none-any.whl", hash = "sha256:aee0707b4861b22d8124ecb3f27d62dafbe8777dc50c66c91e49c006f971b92d", size = 28873, upload-time = "2025-12-08T22:59:12.024Z" },
+    { url = "https://files.pythonhosted.org/packages/11/52/6327a5f4fda01207205038a106a99848a41c83e933cd23ea2cab3d2ebc6c/nexus_rpc-1.4.0-py3-none-any.whl", hash = "sha256:14c953d3519113f8ccec533a9efdb6b10c28afef75d11cdd6d422640c40b3a49", size = 29645, upload-time = "2026-02-25T22:01:33.122Z" },
 ]
 
 [[package]]
@@ -3124,7 +3124,7 @@ dev = [
 requires-dist = [
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.48.2,<2" },
     { name = "mcp", marker = "extra == 'openai-agents'", specifier = ">=1.9.4,<2" },
-    { name = "nexus-rpc", specifier = "==1.3.0" },
+    { name = "nexus-rpc", specifier = "==1.4.0" },
     { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.3,<0.7" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-sdk", marker = "extra == 'opentelemetry'", specifier = ">=1.11.1,<2" },

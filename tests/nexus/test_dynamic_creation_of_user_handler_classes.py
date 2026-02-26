@@ -1,16 +1,14 @@
 import uuid
 
-import httpx
+import nexusrpc
 import nexusrpc.handler
 import pytest
-from nexusrpc.handler import sync_operation
 
 from temporalio import nexus, workflow
 from temporalio.client import Client
-from temporalio.nexus._util import get_operation_factory
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers.nexus import ServiceClient, make_nexus_endpoint_name
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 
 @workflow.defn
@@ -18,11 +16,6 @@ class MyWorkflow:
     @workflow.run
     async def run(self, input: int) -> int:
         return input + 1
-
-
-@nexusrpc.service
-class MyService:
-    increment: nexusrpc.Operation[int, int]
 
 
 class MyIncrementOperationHandler(nexusrpc.handler.OperationHandler[int, int]):
@@ -45,11 +38,15 @@ class MyIncrementOperationHandler(nexusrpc.handler.OperationHandler[int, int]):
         raise NotImplementedError
 
 
-@nexusrpc.handler.service_handler
-class MyServiceHandlerWithWorkflowRunOperation:
-    @nexusrpc.handler._decorators.operation_handler
-    def increment(self) -> nexusrpc.handler.OperationHandler[int, int]:
-        return MyIncrementOperationHandler()
+@workflow.defn
+class IncrementCallerWorkflow:
+    @workflow.run
+    async def run(self, input: int, task_queue: str) -> int:
+        client = workflow.create_nexus_client(
+            service="MyService",
+            endpoint=make_nexus_endpoint_name(task_queue),
+        )
+        return await client.execute_operation("increment", input, output_type=int)
 
 
 async def test_run_nexus_service_from_programmatically_created_service_handler(
@@ -78,93 +75,17 @@ async def test_run_nexus_service_from_programmatically_created_service_handler(
         },
     )
 
-    service_name = service_handler.service.name
-
-    endpoint = (
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(task_queue), task_queue
-        )
-    ).id
+    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
     async with Worker(
         client,
         task_queue=task_queue,
         nexus_service_handlers=[service_handler],
+        workflows=[IncrementCallerWorkflow, MyWorkflow],
     ):
-        server_address = ServiceClient.default_server_address(env)
-        async with httpx.AsyncClient() as http_client:
-            response = await http_client.post(
-                f"http://{server_address}/nexus/endpoints/{endpoint}/services/{service_name}/increment",
-                json=1,
-            )
-            assert response.status_code == 201
-
-
-def make_incrementer_user_service_definition_and_service_handler_classes(
-    op_names: list[str],
-) -> tuple[type, type]:
-    #
-    # service contract
-    #
-
-    ops = {name: nexusrpc.Operation[int, int] for name in op_names}
-    service_cls: type = nexusrpc.service(type("ServiceContract", (), ops))
-
-    #
-    # service handler
-    #
-    @sync_operation
-    async def _increment_op(
-        _self,  # type:ignore[reportMissingParameterType]
-        _ctx: nexusrpc.handler.StartOperationContext,
-        input: int,
-    ) -> int:
-        return input + 1
-
-    op_handler_factories = {}
-    for name in op_names:
-        op_handler_factory, _ = get_operation_factory(_increment_op)
-        assert op_handler_factory
-        op_handler_factories[name] = op_handler_factory
-
-    handler_cls: type = nexusrpc.handler.service_handler(service=service_cls)(
-        type("ServiceImpl", (), op_handler_factories)
-    )
-
-    return service_cls, handler_cls
-
-
-@pytest.mark.skip(
-    reason="Dynamic creation of service contract using type() is not supported"
-)
-async def test_dynamic_creation_of_user_handler_classes(
-    client: Client, env: WorkflowEnvironment
-):
-    task_queue = str(uuid.uuid4())
-
-    service_cls, handler_cls = (
-        make_incrementer_user_service_definition_and_service_handler_classes(
-            ["increment"]
+        result = await client.execute_workflow(
+            IncrementCallerWorkflow.run,
+            args=[5, task_queue],
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
         )
-    )
-
-    assert (service_defn := nexusrpc.get_service_definition(service_cls))
-    service_name = service_defn.name
-
-    endpoint = (
-        await env.create_nexus_endpoint(
-            make_nexus_endpoint_name(task_queue), task_queue
-        )
-    ).id
-    async with Worker(
-        client,
-        task_queue=task_queue,
-        nexus_service_handlers=[handler_cls()],
-    ):
-        server_address = ServiceClient.default_server_address(env)
-        async with httpx.AsyncClient() as http_client:
-            response = await http_client.post(
-                f"http://{server_address}/nexus/endpoints/{endpoint}/services/{service_name}/increment",
-                json=1,
-            )
-            assert response.status_code == 200
-            assert response.json() == 2
+        assert result == 6

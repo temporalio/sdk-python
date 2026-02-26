@@ -28,6 +28,9 @@ impl ClientRef {
                         count_activity_executions
                     )
                 }
+                "count_schedules" => {
+                    rpc_call!(retry_client, call, WorkflowService, count_schedules)
+                }
                 "count_workflow_executions" => {
                     rpc_call!(
                         retry_client,
